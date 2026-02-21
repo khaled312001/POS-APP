@@ -19,6 +19,10 @@ export default function ProductsScreen() {
   const [editProduct, setEditProduct] = useState<any>(null);
   const [form, setForm] = useState({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece", expiryDate: "" });
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [viewMode, setViewMode] = useState<"products" | "categories">("products");
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [editCategory, setEditCategory] = useState<any>(null);
+  const [catForm, setCatForm] = useState({ name: "", color: "#7C3AED", icon: "grid" });
 
   const { data: products = [] } = useQuery<any[]>({
     queryKey: ["/api/products", search ? `?search=${search}` : ""],
@@ -27,6 +31,11 @@ export default function ProductsScreen() {
 
   const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["/api/categories"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  const { data: inventoryData = [] } = useQuery<any[]>({
+    queryKey: ["/api/inventory"],
     queryFn: getQueryFn({ on401: "throw" }),
   });
 
@@ -44,6 +53,22 @@ export default function ProductsScreen() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/products/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/products"] }),
+  });
+
+  const createCategoryMutation = useMutation({
+    mutationFn: (data: any) => apiRequest(editCategory ? "PUT" : "POST", editCategory ? `/api/categories/${editCategory.id}` : "/api/categories", data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/categories"] });
+      setShowCategoryForm(false);
+      setEditCategory(null);
+      setCatForm({ name: "", color: "#7C3AED", icon: "grid" });
+    },
+    onError: (e: any) => Alert.alert("Error", e.message),
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/categories/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/categories"] }),
   });
 
   const resetForm = () => setForm({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece", expiryDate: "" });
@@ -67,6 +92,24 @@ export default function ProductsScreen() {
     });
   };
 
+  const getStock = (productId: number) => {
+    const inv = inventoryData.find((i: any) => i.productId === productId);
+    return inv ? inv.quantity : null;
+  };
+
+  const isNearExpiry = (dateStr: string | null) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffDays = (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+    return diffDays <= 30 && diffDays > 0;
+  };
+
+  const isExpired = (dateStr: string | null) => {
+    if (!dateStr) return false;
+    return new Date(dateStr) < new Date();
+  };
+
   const topPad = Platform.OS === "web" ? 67 : 0;
   const getCatName = (catId: number | null) => categories.find((c: any) => c.id === catId)?.name || "Uncategorized";
 
@@ -74,50 +117,126 @@ export default function ProductsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + topPad }]}>
       <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid]} style={styles.header}>
         <Text style={styles.headerTitle}>Products</Text>
-        <Pressable style={styles.addBtn} onPress={() => { resetForm(); setEditProduct(null); setShowForm(true); }}>
+        <Pressable style={styles.addBtn} onPress={() => {
+          if (viewMode === "products") {
+            resetForm(); setEditProduct(null); setShowForm(true);
+          } else {
+            setCatForm({ name: "", color: "#7C3AED", icon: "grid" }); setEditCategory(null); setShowCategoryForm(true);
+          }
+        }}>
           <Ionicons name="add" size={24} color={Colors.white} />
         </Pressable>
       </LinearGradient>
 
-      <View style={styles.searchRow}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={18} color={Colors.textMuted} />
-          <TextInput style={styles.searchInput} placeholder="Search products..." placeholderTextColor={Colors.textMuted} value={search} onChangeText={setSearch} />
-        </View>
+      <View style={{ flexDirection: "row", paddingHorizontal: 12, paddingTop: 10, gap: 8 }}>
+        <Pressable
+          style={{ flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: viewMode === "products" ? Colors.accent : Colors.surface, alignItems: "center", borderWidth: 1, borderColor: viewMode === "products" ? Colors.accent : Colors.cardBorder }}
+          onPress={() => setViewMode("products")}
+        >
+          <Text style={{ color: viewMode === "products" ? Colors.textDark : Colors.textSecondary, fontSize: 14, fontWeight: "600" }}>Products</Text>
+        </Pressable>
+        <Pressable
+          style={{ flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: viewMode === "categories" ? Colors.accent : Colors.surface, alignItems: "center", borderWidth: 1, borderColor: viewMode === "categories" ? Colors.accent : Colors.cardBorder }}
+          onPress={() => setViewMode("categories")}
+        >
+          <Text style={{ color: viewMode === "categories" ? Colors.textDark : Colors.textSecondary, fontSize: 14, fontWeight: "600" }}>Categories</Text>
+        </Pressable>
       </View>
 
-      <FlatList
-        data={products}
-        keyExtractor={(item: any) => String(item.id)}
-        contentContainerStyle={styles.list}
-        scrollEnabled={!!products.length}
-        renderItem={({ item }: { item: any }) => (
-          <Pressable style={styles.productCard} onPress={() => openEdit(item)}>
-            <View style={styles.productIconWrap}>
-              <Ionicons name="cube" size={24} color={Colors.accent} />
-            </View>
-            <View style={styles.productInfo}>
-              <Text style={styles.productName}>{item.name}</Text>
-              <Text style={styles.productMeta}>{item.sku || "No SKU"} | {getCatName(item.categoryId)}</Text>
-              {item.expiryDate && (
-                <Text style={[styles.productMeta, { color: new Date(item.expiryDate) < new Date() ? Colors.danger : new Date(item.expiryDate) < new Date(Date.now() + 30*24*60*60*1000) ? Colors.warning : Colors.textMuted }]}>
-                  Exp: {item.expiryDate}
+      {viewMode === "products" && (
+        <View style={styles.searchRow}>
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={18} color={Colors.textMuted} />
+            <TextInput style={styles.searchInput} placeholder="Search products..." placeholderTextColor={Colors.textMuted} value={search} onChangeText={setSearch} />
+          </View>
+        </View>
+      )}
+
+      {viewMode === "products" && (
+        <FlatList
+          data={products}
+          keyExtractor={(item: any) => String(item.id)}
+          contentContainerStyle={styles.list}
+          scrollEnabled={!!products.length}
+          renderItem={({ item }: { item: any }) => (
+            <Pressable style={styles.productCard} onPress={() => openEdit(item)}>
+              <View style={styles.productIconWrap}>
+                <Ionicons name="cube" size={24} color={Colors.accent} />
+              </View>
+              <View style={styles.productInfo}>
+                <Text style={styles.productName}>{item.name}</Text>
+                <Text style={styles.productMeta}>{item.sku || "No SKU"} | {getCatName(item.categoryId)}</Text>
+                {(() => {
+                  const stock = getStock(item.id);
+                  return stock !== null ? (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: stock <= 0 ? Colors.danger : stock <= 10 ? Colors.warning : Colors.success }} />
+                      <Text style={{ color: stock <= 0 ? Colors.danger : stock <= 10 ? Colors.warning : Colors.textMuted, fontSize: 11 }}>
+                        {stock <= 0 ? "Out of stock" : `${stock} in stock`}
+                      </Text>
+                    </View>
+                  ) : null;
+                })()}
+                {item.expiryDate && (
+                  <Text style={{ color: isExpired(item.expiryDate) ? Colors.danger : isNearExpiry(item.expiryDate) ? Colors.warning : Colors.textMuted, fontSize: 10, marginTop: 2 }}>
+                    {isExpired(item.expiryDate) ? "EXPIRED" : `Exp: ${new Date(item.expiryDate).toLocaleDateString()}`}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.productRight}>
+                <Text style={styles.productPrice}>${Number(item.price).toFixed(2)}</Text>
+                <Pressable onPress={() => { Alert.alert("Delete", `Delete ${item.name}?`, [
+                  { text: "Cancel" },
+                  { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate(item.id) },
+                ]); }}>
+                  <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                </Pressable>
+              </View>
+            </Pressable>
+          )}
+          ListEmptyComponent={<View style={styles.empty}><Ionicons name="cube-outline" size={48} color={Colors.textMuted} /><Text style={styles.emptyText}>No products yet</Text></View>}
+        />
+      )}
+
+      {viewMode === "categories" && (
+        <FlatList
+          data={categories}
+          keyExtractor={(item: any) => String(item.id)}
+          contentContainerStyle={styles.list}
+          scrollEnabled={!!categories.length}
+          renderItem={({ item }: { item: any }) => (
+            <Pressable style={styles.productCard} onPress={() => {
+              setEditCategory(item);
+              setCatForm({ name: item.name, color: item.color || "#7C3AED", icon: item.icon || "grid" });
+              setShowCategoryForm(true);
+            }}>
+              <View style={[styles.productIconWrap, { backgroundColor: (item.color || "#7C3AED") + "20" }]}>
+                <Ionicons name={(item.icon || "grid") as any} size={24} color={item.color || "#7C3AED"} />
+              </View>
+              <View style={styles.productInfo}>
+                <Text style={styles.productName}>{item.name}</Text>
+                <Text style={styles.productMeta}>
+                  {products.filter((p: any) => p.categoryId === item.id).length} products
                 </Text>
-              )}
-            </View>
-            <View style={styles.productRight}>
-              <Text style={styles.productPrice}>${Number(item.price).toFixed(2)}</Text>
-              <Pressable onPress={() => { Alert.alert("Delete", `Delete ${item.name}?`, [
-                { text: "Cancel" },
-                { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate(item.id) },
-              ]); }}>
-                <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-              </Pressable>
-            </View>
-          </Pressable>
-        )}
-        ListEmptyComponent={<View style={styles.empty}><Ionicons name="cube-outline" size={48} color={Colors.textMuted} /><Text style={styles.emptyText}>No products yet</Text></View>}
-      />
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Pressable
+                  onPress={() => {
+                    Alert.alert("Delete Category", `Delete "${item.name}"?`, [
+                      { text: "Cancel", style: "cancel" },
+                      { text: "Delete", style: "destructive", onPress: () => deleteCategoryMutation.mutate(item.id) },
+                    ]);
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                </Pressable>
+                <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+              </View>
+            </Pressable>
+          )}
+          ListEmptyComponent={<View style={styles.empty}><Ionicons name="grid-outline" size={48} color={Colors.textMuted} /><Text style={styles.emptyText}>No categories yet</Text></View>}
+        />
+      )}
 
       <Modal visible={showForm} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
@@ -167,6 +286,56 @@ export default function ProductsScreen() {
               <Pressable style={styles.saveBtn} onPress={handleSave}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
                   <Text style={styles.saveBtnText}>{editProduct ? "Update Product" : "Create Product"}</Text>
+                </LinearGradient>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showCategoryForm} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{editCategory ? "Edit Category" : "New Category"}</Text>
+              <Pressable onPress={() => setShowCategoryForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.label}>Name *</Text>
+              <TextInput style={styles.input} value={catForm.name} onChangeText={(t) => setCatForm({ ...catForm, name: t })} placeholderTextColor={Colors.textMuted} placeholder="Category name" />
+
+              <Text style={styles.label}>Color</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                {["#7C3AED", "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#EC4899", "#2FD3C6", "#F97316"].map((c) => (
+                  <Pressable
+                    key={c}
+                    onPress={() => setCatForm({ ...catForm, color: c })}
+                    style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c, borderWidth: catForm.color === c ? 3 : 0, borderColor: Colors.white, justifyContent: "center", alignItems: "center" }}
+                  >
+                    {catForm.color === c && <Ionicons name="checkmark" size={18} color={Colors.white} />}
+                  </Pressable>
+                ))}
+              </View>
+
+              <Text style={styles.label}>Icon</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                {["grid", "cube", "nutrition", "medical", "cart", "cafe", "beer", "pizza", "leaf", "sparkles", "hardware-chip", "shirt"].map((ic) => (
+                  <Pressable
+                    key={ic}
+                    onPress={() => setCatForm({ ...catForm, icon: ic })}
+                    style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: catForm.icon === ic ? Colors.accent + "30" : Colors.surfaceLight, justifyContent: "center", alignItems: "center", borderWidth: catForm.icon === ic ? 1 : 0, borderColor: Colors.accent }}
+                  >
+                    <Ionicons name={ic as any} size={20} color={catForm.icon === ic ? Colors.accent : Colors.textMuted} />
+                  </Pressable>
+                ))}
+              </View>
+
+              <Pressable style={styles.saveBtn} onPress={() => {
+                if (!catForm.name) return Alert.alert("Error", "Name is required");
+                createCategoryMutation.mutate({ name: catForm.name, color: catForm.color, icon: catForm.icon });
+              }}>
+                <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
+                  <Text style={styles.saveBtnText}>{editCategory ? "Update" : "Create"} Category</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>

@@ -17,10 +17,18 @@ export default function CustomersScreen() {
   const [showForm, setShowForm] = useState(false);
   const [editCustomer, setEditCustomer] = useState<any>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", notes: "" });
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [showDetail, setShowDetail] = useState(false);
 
   const { data: customers = [] } = useQuery<any[]>({
     queryKey: ["/api/customers", search ? `?search=${search}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  const { data: customerSales = [] } = useQuery<any[]>({
+    queryKey: [`/api/customers/${selectedCustomer?.id}/sales`],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!selectedCustomer?.id,
   });
 
   const saveMutation = useMutation({
@@ -69,7 +77,7 @@ export default function CustomersScreen() {
         contentContainerStyle={styles.list}
         scrollEnabled={!!customers.length}
         renderItem={({ item }: { item: any }) => (
-          <Pressable style={styles.card} onPress={() => openEdit(item)}>
+          <Pressable style={styles.card} onPress={() => { setSelectedCustomer(item); setShowDetail(true); }}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
             </View>
@@ -113,6 +121,103 @@ export default function CustomersScreen() {
                 </LinearGradient>
               </Pressable>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showDetail} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "90%" }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Customer Details</Text>
+              <Pressable onPress={() => setShowDetail(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            
+            {selectedCustomer && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={{ alignItems: "center", marginBottom: 20 }}>
+                  <View style={[styles.avatar, { width: 64, height: 64, borderRadius: 32, marginRight: 0, marginBottom: 10 }]}>
+                    <Text style={[styles.avatarText, { fontSize: 28 }]}>{selectedCustomer.name.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <Text style={{ color: Colors.text, fontSize: 20, fontWeight: "700" }}>{selectedCustomer.name}</Text>
+                  {selectedCustomer.phone && <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 4 }}>{selectedCustomer.phone}</Text>}
+                  {selectedCustomer.email && <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 2 }}>{selectedCustomer.email}</Text>}
+                </View>
+
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+                  <View style={{ flex: 1, backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 14, alignItems: "center" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                      <Ionicons name="star" size={16} color={Colors.warning} />
+                      <Text style={{ color: Colors.warning, fontSize: 20, fontWeight: "800" }}>{selectedCustomer.loyaltyPoints || 0}</Text>
+                    </View>
+                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>Loyalty Points</Text>
+                  </View>
+                  <View style={{ flex: 1, backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 14, alignItems: "center" }}>
+                    <Text style={{ color: Colors.accent, fontSize: 20, fontWeight: "800" }}>${Number(selectedCustomer.totalSpent || 0).toFixed(0)}</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>Total Spent</Text>
+                  </View>
+                  <View style={{ flex: 1, backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 14, alignItems: "center" }}>
+                    <Text style={{ color: Colors.info, fontSize: 20, fontWeight: "800" }}>{selectedCustomer.visitCount || 0}</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>Visits</Text>
+                  </View>
+                </View>
+
+                {selectedCustomer.address && (
+                  <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                      <Ionicons name="location-outline" size={14} color={Colors.textMuted} />
+                      <Text style={{ color: Colors.textSecondary, fontSize: 12, fontWeight: "600" }}>ADDRESS</Text>
+                    </View>
+                    <Text style={{ color: Colors.text, fontSize: 14 }}>{selectedCustomer.address}</Text>
+                  </View>
+                )}
+
+                {selectedCustomer.notes && (
+                  <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                      <Ionicons name="document-text-outline" size={14} color={Colors.textMuted} />
+                      <Text style={{ color: Colors.textSecondary, fontSize: 12, fontWeight: "600" }}>NOTES</Text>
+                    </View>
+                    <Text style={{ color: Colors.text, fontSize: 14 }}>{selectedCustomer.notes}</Text>
+                  </View>
+                )}
+
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+                  <Pressable style={{ flex: 1, borderRadius: 12, overflow: "hidden" }} onPress={() => { setShowDetail(false); openEdit(selectedCustomer); }}>
+                    <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 12, gap: 6 }}>
+                      <Ionicons name="create-outline" size={18} color={Colors.white} />
+                      <Text style={{ color: Colors.white, fontSize: 14, fontWeight: "600" }}>Edit</Text>
+                    </LinearGradient>
+                  </Pressable>
+                </View>
+
+                <Text style={{ color: Colors.textSecondary, fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Purchase History</Text>
+                
+                {customerSales.length === 0 ? (
+                  <View style={{ alignItems: "center", paddingVertical: 24 }}>
+                    <Ionicons name="receipt-outline" size={36} color={Colors.textMuted} />
+                    <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 8 }}>No purchases yet</Text>
+                  </View>
+                ) : (
+                  customerSales.map((sale: any) => (
+                    <View key={sale.id} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8 }}>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                        <Text style={{ color: Colors.text, fontSize: 14, fontWeight: "600" }}>Sale #{sale.id}</Text>
+                        <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: "700" }}>${Number(sale.totalAmount || 0).toFixed(2)}</Text>
+                      </View>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+                        <Text style={{ color: Colors.textMuted, fontSize: 12 }}>
+                          {sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : "N/A"}
+                        </Text>
+                        <View style={{ backgroundColor: sale.paymentMethod === "cash" ? Colors.accent + "20" : Colors.secondary + "20", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
+                          <Text style={{ color: sale.paymentMethod === "cash" ? Colors.accent : Colors.secondary, fontSize: 11, fontWeight: "600", textTransform: "capitalize" }}>{sale.paymentMethod || "cash"}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+            )}
           </View>
         </View>
       </Modal>

@@ -183,6 +183,9 @@ export const storage = {
   },
 
   // Sales
+  async getCustomerSales(customerId: number) {
+    return db.select().from(sales).where(eq(sales.customerId, customerId)).orderBy(desc(sales.createdAt)).limit(50);
+  },
   async getSales(filters?: { branchId?: number; startDate?: Date; endDate?: Date; limit?: number }) {
     let query = db.select().from(sales).orderBy(desc(sales.createdAt));
     if (filters?.limit) {

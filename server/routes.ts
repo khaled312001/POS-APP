@@ -140,6 +140,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/customers/:id/loyalty", async (req, res) => {
     try { res.json(await storage.addLoyaltyPoints(Number(req.params.id), req.body.points)); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
+  app.get("/api/customers/:id/sales", async (req, res) => {
+    try { res.json(await storage.getCustomerSales(Number(req.params.id))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
 
   // Sales
   app.get("/api/sales", async (req, res) => {
