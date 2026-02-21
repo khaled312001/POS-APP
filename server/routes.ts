@@ -164,9 +164,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (saleData.customerId) {
         const points = Math.floor(Number(saleData.totalAmount) / 10);
         await storage.addLoyaltyPoints(saleData.customerId, points);
-        await storage.updateCustomer(saleData.customerId, {
-          totalSpent: String(Number(saleData.totalAmount)),
-        });
+        const existingCustomer = await storage.getCustomer(saleData.customerId);
+        if (existingCustomer) {
+          await storage.updateCustomer(saleData.customerId, {
+            visitCount: (existingCustomer.visitCount || 0) + 1,
+            totalSpent: String(Number(existingCustomer.totalSpent || 0) + Number(saleData.totalAmount)),
+          });
+        }
       }
       res.json(sale);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -256,87 +260,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.createSubscription(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // Delete Expense
+  app.delete("/api/expenses/:id", async (req, res) => {
+    try { await storage.deleteExpense(Number(req.params.id)); res.json({ success: true }); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Purchase Order - single with items
+  app.get("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      const po = await storage.getPurchaseOrder(Number(req.params.id));
+      if (!po) return res.status(404).json({ error: "Purchase order not found" });
+      const items = await storage.getPurchaseOrderItems(po.id);
+      res.json({ ...po, items });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Add item to PO
+  app.post("/api/purchase-orders/:id/items", async (req, res) => {
+    try {
+      const item = await storage.createPurchaseOrderItem({ ...req.body, purchaseOrderId: Number(req.params.id) });
+      res.json(item);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Receive PO
+  app.post("/api/purchase-orders/:id/receive", async (req, res) => {
+    try {
+      const result = await storage.receivePurchaseOrder(Number(req.params.id), req.body.items);
+      if (!result) return res.status(404).json({ error: "Purchase order not found" });
+      res.json(result);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Employee shifts/attendance
+  app.get("/api/employees/:id/shifts", async (req, res) => {
+    try { res.json(await storage.getEmployeeAttendance(Number(req.params.id))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Analytics
+  app.get("/api/analytics/top-products", async (req, res) => {
+    try {
+      const limit = req.query.limit ? Number(req.query.limit) : undefined;
+      res.json(await storage.getTopProducts(limit));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get("/api/analytics/sales-by-payment", async (_req, res) => {
+    try { res.json(await storage.getSalesByPaymentMethod()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get("/api/analytics/sales-range", async (req, res) => {
+    try {
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date(0);
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date();
+      res.json(await storage.getSalesByDateRange(startDate, endDate));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Seed data
   app.post("/api/seed", async (_req, res) => {
     try {
-      const existingBranches = await storage.getBranches();
-      if (existingBranches.length > 0) {
-        return res.json({ message: "Data already seeded" });
-      }
-
-      const branch = await storage.createBranch({
-        name: "Main Branch",
-        address: "123 Main Street",
-        phone: "+1234567890",
-        isMain: true,
-        currency: "USD",
-        taxRate: "10",
-      });
-
-      await storage.createEmployee({
-        name: "Admin",
-        email: "admin@barmagly.com",
-        pin: "1234",
-        role: "admin",
-        branchId: branch.id,
-        permissions: ["all"],
-      });
-
-      await storage.createEmployee({
-        name: "Cashier",
-        email: "cashier@barmagly.com",
-        pin: "0000",
-        role: "cashier",
-        branchId: branch.id,
-        permissions: ["pos", "customers"],
-      });
-
-      const cats = [
-        { name: "Beverages", nameAr: null, color: "#3B82F6", icon: "cafe" },
-        { name: "Food", nameAr: null, color: "#EF4444", icon: "restaurant" },
-        { name: "Desserts", nameAr: null, color: "#F59E0B", icon: "ice-cream" },
-        { name: "Electronics", nameAr: null, color: "#8B5CF6", icon: "hardware-chip" },
-        { name: "Clothing", nameAr: null, color: "#10B981", icon: "shirt" },
-      ];
-      const createdCats: any[] = [];
-      for (const c of cats) {
-        createdCats.push(await storage.createCategory(c));
-      }
-
-      const prods = [
-        { name: "Espresso", price: "3.50", costPrice: "1.00", categoryId: createdCats[0].id, sku: "BEV-001", barcode: "1234567890123", unit: "cup" },
-        { name: "Cappuccino", price: "4.50", costPrice: "1.50", categoryId: createdCats[0].id, sku: "BEV-002", barcode: "1234567890124", unit: "cup" },
-        { name: "Latte", price: "5.00", costPrice: "1.50", categoryId: createdCats[0].id, sku: "BEV-003", barcode: "1234567890125", unit: "cup" },
-        { name: "Green Tea", price: "3.00", costPrice: "0.80", categoryId: createdCats[0].id, sku: "BEV-004", barcode: "1234567890126", unit: "cup" },
-        { name: "Chicken Burger", price: "8.50", costPrice: "3.50", categoryId: createdCats[1].id, sku: "FOOD-001", barcode: "2234567890123", unit: "piece" },
-        { name: "Caesar Salad", price: "7.00", costPrice: "2.50", categoryId: createdCats[1].id, sku: "FOOD-002", barcode: "2234567890124", unit: "plate" },
-        { name: "Margherita Pizza", price: "12.00", costPrice: "4.00", categoryId: createdCats[1].id, sku: "FOOD-003", barcode: "2234567890125", unit: "piece" },
-        { name: "Chocolate Cake", price: "6.00", costPrice: "2.00", categoryId: createdCats[2].id, sku: "DES-001", barcode: "3234567890123", unit: "slice" },
-        { name: "Ice Cream Sundae", price: "5.50", costPrice: "1.80", categoryId: createdCats[2].id, sku: "DES-002", barcode: "3234567890124", unit: "cup" },
-        { name: "USB Cable", price: "9.99", costPrice: "3.00", categoryId: createdCats[3].id, sku: "ELEC-001", barcode: "4234567890123", unit: "piece" },
-        { name: "Phone Case", price: "15.00", costPrice: "5.00", categoryId: createdCats[3].id, sku: "ELEC-002", barcode: "4234567890124", unit: "piece" },
-        { name: "T-Shirt", price: "25.00", costPrice: "10.00", categoryId: createdCats[4].id, sku: "CLO-001", barcode: "5234567890123", unit: "piece" },
-      ];
-      for (const p of prods) {
-        const prod = await storage.createProduct(p);
-        await storage.upsertInventory({ productId: prod.id, branchId: branch.id, quantity: Math.floor(Math.random() * 100) + 10 });
-      }
-
-      await storage.createCustomer({ name: "Walk-in Customer", phone: "N/A" });
-      await storage.createCustomer({ name: "John Smith", phone: "+1555000111", email: "john@example.com", loyaltyPoints: 150 });
-      await storage.createCustomer({ name: "Sarah Johnson", phone: "+1555000222", email: "sarah@example.com", loyaltyPoints: 300 });
-
-      await storage.createSupplier({ name: "Fresh Foods Co.", contactName: "Mike", phone: "+1555111000", email: "mike@freshfoods.com", paymentTerms: "Net 30" });
-      await storage.createSupplier({ name: "Tech Supplies Ltd.", contactName: "Lisa", phone: "+1555222000", email: "lisa@techsupplies.com", paymentTerms: "Net 15" });
-
-      for (let i = 1; i <= 6; i++) {
-        await storage.createTable({ branchId: branch.id, name: `Table ${i}`, capacity: i <= 3 ? 4 : 6, posX: (i - 1) % 3 * 120, posY: Math.floor((i - 1) / 3) * 120 });
-      }
-
+      const seeded = await storage.seedInitialData();
+      if (!seeded) return res.json({ message: "Data already seeded" });
       res.json({ message: "Seed data created successfully" });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   const httpServer = createServer(app);
+
+  storage.seedInitialData().then(seeded => {
+    if (seeded) console.log("Initial seed data created");
+  }).catch(e => console.log("Seed check:", e));
+
   return httpServer;
 }
