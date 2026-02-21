@@ -71,6 +71,7 @@ export default function SettingsScreen() {
   const [showAttendance, setShowAttendance] = useState(false);
   const [activeShiftElapsed, setActiveShiftElapsed] = useState("");
 
+  const [showActivityLog, setShowActivityLog] = useState(false);
   const [showPurchaseOrders, setShowPurchaseOrders] = useState(false);
   const [showPOForm, setShowPOForm] = useState(false);
   const [poForm, setPOForm] = useState({ supplierId: "", notes: "" });
@@ -81,8 +82,9 @@ export default function SettingsScreen() {
   const { data: shifts = [] } = useQuery<any[]>({ queryKey: ["/api/shifts"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: expenses = [] } = useQuery<any[]>({ queryKey: ["/api/expenses"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: purchaseOrders = [] } = useQuery<any[]>({ queryKey: ["/api/purchase-orders"], queryFn: getQueryFn({ on401: "throw" }) });
+  const { data: activityLog = [] } = useQuery<any[]>({ queryKey: ["/api/activity-log"], queryFn: getQueryFn({ on401: "throw" }) });
 
-  const activeShift = shifts.find((s: any) => s.employeeId === employee?.id && s.clockIn && !s.clockOut);
+  const activeShift = shifts.find((s: any) => s.employeeId === employee?.id && s.startTime && !s.endTime && s.status === "open");
 
   useEffect(() => {
     if (!activeShift) {
@@ -90,7 +92,7 @@ export default function SettingsScreen() {
       return;
     }
     const interval = setInterval(() => {
-      const elapsed = Date.now() - new Date(activeShift.clockIn).getTime();
+      const elapsed = Date.now() - new Date(activeShift.startTime).getTime();
       const hours = Math.floor(elapsed / 3600000);
       const mins = Math.floor((elapsed % 3600000) / 60000);
       const secs = Math.floor((elapsed % 60000) / 1000);
@@ -130,7 +132,7 @@ export default function SettingsScreen() {
   });
 
   const clockOutMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/shifts/${id}`, data),
+    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/shifts/${id}/close`, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/shifts"] }); },
     onError: (e: any) => Alert.alert("Error", e.message),
   });
@@ -150,8 +152,8 @@ export default function SettingsScreen() {
   const topPad = Platform.OS === "web" ? 67 : 0;
   const roleColors: Record<string, string> = { admin: Colors.danger, manager: Colors.warning, cashier: Colors.info, owner: Colors.secondary };
 
-  const formatDuration = (clockIn: string, clockOut: string) => {
-    const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime();
+  const formatDuration = (startTime: string, endTime: string) => {
+    const ms = new Date(endTime).getTime() - new Date(startTime).getTime();
     const hours = Math.floor(ms / 3600000);
     const mins = Math.floor((ms % 3600000) / 60000);
     return `${hours}h ${mins}m`;
@@ -185,6 +187,7 @@ export default function SettingsScreen() {
         <SettingRow icon="wallet" label="Expenses" value={`${expenses.length} expenses`} onPress={() => setShowExpenses(true)} color={Colors.warning} />
         <SettingRow icon="time" label="Attendance" value={`${shifts.length} shifts`} onPress={() => setShowAttendance(true)} color={Colors.warning} />
         <SettingRow icon="document-text" label="Purchase Orders" value={`${purchaseOrders.length} orders`} onPress={() => setShowPurchaseOrders(true)} color={Colors.info} />
+        <SettingRow icon="list" label="Activity Log" value={`${activityLog.length} entries`} onPress={() => setShowActivityLog(true)} color={Colors.secondary} />
 
         <Text style={styles.sectionTitle}>System</Text>
         <SettingRow icon="language" label="Language" value="English" color={Colors.accent} />
@@ -465,12 +468,12 @@ export default function SettingsScreen() {
                   )}
                 </View>
                 {activeShift ? (
-                  <Pressable style={[styles.clockBtn, { backgroundColor: Colors.danger + "20" }]} onPress={() => clockOutMutation.mutate({ id: activeShift.id, data: { clockOut: new Date().toISOString() } })}>
+                  <Pressable style={[styles.clockBtn, { backgroundColor: Colors.danger + "20" }]} onPress={() => clockOutMutation.mutate({ id: activeShift.id, data: {} })}>
                     <Ionicons name="stop-circle" size={20} color={Colors.danger} />
                     <Text style={[styles.clockBtnText, { color: Colors.danger }]}>Out</Text>
                   </Pressable>
                 ) : (
-                  <Pressable style={[styles.clockBtn, { backgroundColor: Colors.success + "20" }]} onPress={() => clockInMutation.mutate({ employeeId: employee.id, branchId: 1, clockIn: new Date().toISOString() })}>
+                  <Pressable style={[styles.clockBtn, { backgroundColor: Colors.success + "20" }]} onPress={() => clockInMutation.mutate({ employeeId: employee.id, branchId: 1, startTime: new Date().toISOString(), status: "open" })}>
                     <Ionicons name="play-circle" size={20} color={Colors.success} />
                     <Text style={[styles.clockBtnText, { color: Colors.success }]}>In</Text>
                   </Pressable>
@@ -486,19 +489,19 @@ export default function SettingsScreen() {
                 const emp = employees.find((e: any) => e.id === item.employeeId);
                 return (
                   <View style={styles.empCard}>
-                    <View style={[styles.empAvatar, { backgroundColor: item.clockOut ? Colors.info + "30" : Colors.success + "30" }]}>
-                      <Ionicons name="time" size={20} color={item.clockOut ? Colors.info : Colors.success} />
+                    <View style={[styles.empAvatar, { backgroundColor: item.endTime ? Colors.info + "30" : Colors.success + "30" }]}>
+                      <Ionicons name="time" size={20} color={item.endTime ? Colors.info : Colors.success} />
                     </View>
                     <View style={styles.empInfo}>
                       <Text style={styles.empName}>{emp?.name || `Employee #${item.employeeId}`}</Text>
                       <Text style={styles.empMeta}>
-                        {new Date(item.clockIn).toLocaleString()}
-                        {item.clockOut ? ` - ${new Date(item.clockOut).toLocaleString()}` : " (Active)"}
+                        {new Date(item.startTime).toLocaleString()}
+                        {item.endTime ? ` - ${new Date(item.endTime).toLocaleString()}` : " (Active)"}
                       </Text>
                     </View>
-                    {item.clockOut && (
+                    {item.endTime && (
                       <View style={[styles.roleBadge, { backgroundColor: Colors.info + "20" }]}>
-                        <Text style={[styles.roleText, { color: Colors.info }]}>{formatDuration(item.clockIn, item.clockOut)}</Text>
+                        <Text style={[styles.roleText, { color: Colors.info }]}>{formatDuration(item.startTime, item.endTime)}</Text>
                       </View>
                     )}
                   </View>
@@ -583,6 +586,43 @@ export default function SettingsScreen() {
                 </LinearGradient>
               </Pressable>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showActivityLog} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Activity Log</Text>
+              <Pressable onPress={() => setShowActivityLog(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <FlatList
+              data={activityLog}
+              keyExtractor={(item: any) => String(item.id)}
+              scrollEnabled={!!activityLog.length}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>No activity recorded</Text>}
+              renderItem={({ item }: { item: any }) => {
+                const actionIcons: Record<string, string> = { sale_created: "cart", login: "log-in", return_created: "swap-horizontal", shift_closed: "time" };
+                const iconName = actionIcons[item.action] || "ellipse";
+                const emp = employees.find((e: any) => e.id === item.employeeId);
+                return (
+                  <View style={styles.empCard}>
+                    <View style={[styles.empAvatar, { backgroundColor: Colors.secondary + "30" }]}>
+                      <Ionicons name={iconName as any} size={20} color={Colors.secondary} />
+                    </View>
+                    <View style={styles.empInfo}>
+                      <Text style={styles.empName}>{emp?.name || `Employee #${item.employeeId}`}</Text>
+                      <Text style={styles.empMeta}>{item.details || item.action}</Text>
+                      <Text style={[styles.empMeta, { fontSize: 10 }]}>{new Date(item.createdAt || item.timestamp).toLocaleString()}</Text>
+                    </View>
+                    <View style={[styles.roleBadge, { backgroundColor: Colors.secondary + "20" }]}>
+                      <Text style={[styles.roleText, { color: Colors.secondary }]}>{item.action?.replace(/_/g, " ") || "action"}</Text>
+                    </View>
+                  </View>
+                );
+              }}
+            />
           </View>
         </View>
       </Modal>
