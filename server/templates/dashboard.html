@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Barmagly Smart POS - Admin Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0A0E27;--surface:#131740;--surface2:#1a1f4a;--accent:#2FD3C6;--accent2:#7C3AED;--accent3:#1E40AF;--text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;--border:rgba(47,211,198,0.12);--green:#10b981;--red:#ef4444;--orange:#f59e0b;--radius:16px}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+.header{background:linear-gradient(135deg,rgba(30,64,175,0.3),rgba(124,58,237,0.2),rgba(47,211,198,0.1));border-bottom:1px solid var(--border);padding:16px 24px;position:sticky;top:0;z-index:100;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.header-inner{max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--accent3),var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff}
+.brand-text h1{font-size:18px;font-weight:700;background:linear-gradient(135deg,var(--accent),#fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.brand-text span{font-size:11px;color:var(--text2);font-weight:500;letter-spacing:1px;text-transform:uppercase}
+.header-right{display:flex;align-items:center;gap:16px}
+.last-updated{font-size:12px;color:var(--text3)}
+.refresh-indicator{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--accent);font-weight:500}
+.pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.8)}}
+.container{max-width:1400px;margin:0 auto;padding:24px}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;position:relative;overflow:hidden;transition:transform 0.2s,box-shadow 0.2s}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(47,211,198,0.1)}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat-card:nth-child(1)::before{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.stat-card:nth-child(2)::before{background:linear-gradient(90deg,var(--accent2),var(--accent3))}
+.stat-card:nth-child(3)::before{background:linear-gradient(90deg,var(--accent3),var(--accent))}
+.stat-card:nth-child(4)::before{background:linear-gradient(90deg,var(--accent),var(--green))}
+.stat-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px}
+.stat-card:nth-child(1) .stat-icon{background:rgba(47,211,198,0.15);color:var(--accent)}
+.stat-card:nth-child(2) .stat-icon{background:rgba(124,58,237,0.15);color:var(--accent2)}
+.stat-card:nth-child(3) .stat-icon{background:rgba(30,64,175,0.15);color:#60a5fa}
+.stat-card:nth-child(4) .stat-icon{background:rgba(16,185,129,0.15);color:var(--green)}
+.stat-label{font-size:13px;color:var(--text2);margin-bottom:4px;font-weight:500}
+.stat-value{font-size:28px;font-weight:800;letter-spacing:-0.5px}
+.stat-sub{font-size:12px;color:var(--text3);margin-top:4px}
+.main-grid{display:grid;grid-template-columns:1fr 380px;gap:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:box-shadow 0.2s}
+.card:hover{box-shadow:0 4px 24px rgba(0,0,0,0.2)}
+.card-header{padding:20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+.card-title .icon{font-size:18px}
+.card-body{padding:20px}
+.revenue-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.revenue-item{background:var(--surface2);border-radius:12px;padding:14px;text-align:center}
+.revenue-item .label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;font-weight:600}
+.revenue-item .value{font-size:20px;font-weight:700;color:var(--accent)}
+.profit-row{display:flex;gap:12px;margin-top:4px}
+.profit-item{flex:1;background:var(--surface2);border-radius:12px;padding:14px;text-align:center}
+.profit-item .label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;font-weight:600}
+.profit-item .value{font-size:20px;font-weight:700}
+.profit-item .value.positive{color:var(--green)}
+.profit-item .value.negative{color:var(--red)}
+.profit-item .value.expense{color:var(--orange)}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:10px 12px;font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;border-bottom:1px solid var(--border)}
+td{padding:10px 12px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(47,211,198,0.03)}
+.rank{width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:var(--surface2);color:var(--text2)}
+.rank.top{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.perf-bar-bg{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;min-width:80px}
+.perf-bar{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width 0.6s ease}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-completed{background:rgba(16,185,129,0.15);color:var(--green)}
+.badge-pending{background:rgba(245,158,11,0.15);color:var(--orange)}
+.badge-refunded{background:rgba(239,68,68,0.15);color:var(--red)}
+.badge-cash{background:rgba(47,211,198,0.15);color:var(--accent)}
+.badge-card{background:rgba(124,58,237,0.15);color:var(--accent2)}
+.badge-mobile{background:rgba(30,64,175,0.15);color:#60a5fa}
+.payment-item{margin-bottom:16px}
+.payment-item:last-child{margin-bottom:0}
+.payment-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.payment-method{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.payment-method .dot{width:10px;height:10px;border-radius:50%}
+.payment-stats{font-size:12px;color:var(--text2)}
+.payment-bar-bg{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden}
+.payment-bar{height:100%;border-radius:4px;transition:width 0.6s ease}
+.payment-bar.cash{background:var(--accent)}
+.payment-bar.card{background:var(--accent2)}
+.payment-bar.mobile{background:var(--accent3)}
+.alert-item{display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--surface2);border-radius:10px;margin-bottom:8px;border-left:3px solid var(--orange)}
+.alert-item:last-child{margin-bottom:0}
+.alert-name{font-size:13px;font-weight:600}
+.alert-qty{font-size:12px;color:var(--orange);font-weight:700;background:rgba(245,158,11,0.15);padding:2px 10px;border-radius:20px}
+.no-alerts{text-align:center;padding:24px;color:var(--text3);font-size:13px}
+.quick-actions{display:flex;flex-direction:column;gap:8px}
+.action-btn{display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;text-decoration:none}
+.action-btn:hover{background:rgba(47,211,198,0.1);border-color:var(--accent);transform:translateX(4px)}
+.action-btn .icon{font-size:18px;width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+.action-btn:nth-child(1) .icon{background:rgba(47,211,198,0.15);color:var(--accent)}
+.action-btn:nth-child(2) .icon{background:rgba(124,58,237,0.15);color:var(--accent2)}
+.action-btn:nth-child(3) .icon{background:rgba(30,64,175,0.15);color:#60a5fa}
+.left-col{display:flex;flex-direction:column;gap:24px}
+.right-col{display:flex;flex-direction:column;gap:24px}
+.skeleton{background:linear-gradient(90deg,var(--surface2) 25%,rgba(47,211,198,0.05) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skeleton-text{height:14px;margin-bottom:8px;width:80%}
+.skeleton-value{height:32px;width:60%;margin-top:8px}
+.skeleton-row{height:40px;margin-bottom:4px}
+.loading-overlay{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;transition:opacity 0.4s}
+.loading-overlay.hidden{opacity:0;pointer-events:none}
+.spinner{width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{margin-top:16px;font-size:14px;color:var(--text2)}
+.error-banner{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:16px 20px;margin-bottom:24px;display:none;align-items:center;justify-content:space-between}
+.error-banner.show{display:flex}
+.error-msg{font-size:13px;color:var(--red);font-weight:500}
+.retry-btn{padding:8px 20px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity 0.2s}
+.retry-btn:hover{opacity:0.8}
+.empty-state{text-align:center;padding:32px 16px;color:var(--text3);font-size:13px}
+@media(max-width:1024px){.main-grid{grid-template-columns:1fr}.stats-row{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.stats-row{grid-template-columns:1fr}.header-inner{flex-direction:column;align-items:flex-start}.stat-value{font-size:22px}.revenue-grid{grid-template-columns:1fr}.container{padding:16px}.card-body{padding:16px}table{font-size:12px}th,td{padding:8px 10px}}
+@media(max-width:480px){.header{padding:12px 16px}.brand-text h1{font-size:16px}.profit-row{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="loading-overlay" id="loadingOverlay">
+<div class="spinner"></div>
+<div class="loading-text">Loading Dashboard...</div>
+</div>
+
+<header class="header">
+<div class="header-inner">
+<div class="brand">
+<div class="logo">B</div>
+<div class="brand-text">
+<h1>Barmagly Smart POS</h1>
+<span>Admin Dashboard</span>
+</div>
+</div>
+<div class="header-right">
+<div class="last-updated" id="lastUpdated">Loading...</div>
+<div class="refresh-indicator">
+<div class="pulse-dot"></div>
+<span>Auto-refresh</span>
+</div>
+</div>
+</div>
+</header>
+
+<div class="container">
+<div class="error-banner" id="errorBanner">
+<span class="error-msg" id="errorMsg">Failed to load data</span>
+<button class="retry-btn" onclick="loadAllData()">Retry</button>
+</div>
+
+<div class="stats-row" id="statsRow">
+<div class="stat-card">
+<div class="stat-icon">&#128176;</div>
+<div class="stat-label">Today's Revenue</div>
+<div class="stat-value" id="todayRevenue"><div class="skeleton skeleton-value"></div></div>
+<div class="stat-sub" id="todayCount">--</div>
+</div>
+<div class="stat-card">
+<div class="stat-icon">&#128200;</div>
+<div class="stat-label">Total Revenue</div>
+<div class="stat-value" id="totalRevenue"><div class="skeleton skeleton-value"></div></div>
+<div class="stat-sub" id="avgOrder">--</div>
+</div>
+<div class="stat-card">
+<div class="stat-icon">&#128101;</div>
+<div class="stat-label">Total Customers</div>
+<div class="stat-value" id="totalCustomers"><div class="skeleton skeleton-value"></div></div>
+<div class="stat-sub">All registered</div>
+</div>
+<div class="stat-card">
+<div class="stat-icon">&#128230;</div>
+<div class="stat-label">Total Products</div>
+<div class="stat-value" id="totalProducts"><div class="skeleton skeleton-value"></div></div>
+<div class="stat-sub" id="lowStockCount">--</div>
+</div>
+</div>
+
+<div class="main-grid">
+<div class="left-col">
+<div class="card">
+<div class="card-header">
+<div class="card-title"><span class="icon">&#128178;</span> Revenue Overview</div>
+</div>
+<div class="card-body">
+<div class="revenue-grid">
+<div class="revenue-item">
+<div class="label">Today</div>
+<div class="value" id="revToday">--</div>
+</div>
+<div class="revenue-item">
+<div class="label">This Week</div>
+<div class="value" id="revWeek">--</div>
+</div>
+<div class="revenue-item">
+<div class="label">This Month</div>
+<div class="value" id="revMonth">--</div>
+</div>
+</div>
+<div class="profit-row">
+<div class="profit-item">
+<div class="label">Total Expenses</div>
+<div class="value expense" id="totalExpenses">--</div>
+</div>
+<div class="profit-item">
+<div class="label">Net Profit</div>
+<div class="value" id="netProfit">--</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">
+<div class="card-title"><span class="icon">&#127942;</span> Top Products</div>
+</div>
+<div class="card-body" style="padding:0">
+<table>
+<thead>
+<tr><th style="width:50px">Rank</th><th>Product</th><th>Sold</th><th>Revenue</th><th style="min-width:80px">Performance</th></tr>
+</thead>
+<tbody id="topProductsBody">
+<tr><td colspan="5"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">
+<div class="card-title"><span class="icon">&#128203;</span> Recent Sales</div>
+</div>
+<div class="card-body" style="padding:0">
+<table>
+<thead>
+<tr><th>Receipt #</th><th>Date/Time</th><th>Amount</th><th>Payment</th><th>Status</th></tr>
+</thead>
+<tbody id="recentSalesBody">
+<tr><td colspan="5"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+
+<div class="right-col">
+<div class="card">
+<div class="card-header">
+<div class="card-title"><span class="icon">&#128179;</span> Payment Methods</div>
+</div>
+<div class="card-body" id="paymentMethods">
+<div class="skeleton skeleton-row"></div>
+<div class="skeleton skeleton-row" style="margin-top:12px"></div>
+<div class="skeleton skeleton-row" style="margin-top:12px"></div>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">
+<div class="card-title"><span class="icon">&#9888;&#65039;</span> Inventory Alerts</div>
+</div>
+<div class="card-body" id="inventoryAlerts">
+<div class="skeleton skeleton-row"></div>
+<div class="skeleton skeleton-row" style="margin-top:8px"></div>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">
+<div class="card-title"><span class="icon">&#9889;</span> Quick Actions</div>
+</div>
+<div class="card-body">
+<div class="quick-actions">
+<a class="action-btn" href="/api/products" target="_blank">
+<div class="icon">&#128230;</div>
+<span>View Products</span>
+</a>
+<a class="action-btn" href="/api/customers" target="_blank">
+<div class="icon">&#128101;</div>
+<span>View Customers</span>
+</a>
+<a class="action-btn" href="#" onclick="exportData(event)">
+<div class="icon">&#128190;</div>
+<span>Export Data</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+let refreshTimer = null;
+const REFRESH_INTERVAL = 30000;
+
+function fmt(n) {
+  if (n == null || isNaN(n)) return '0.00';
+  return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtInt(n) {
+  if (n == null || isNaN(n)) return '0';
+  return Number(n).toLocaleString('en-US');
+}
+
+function fmtDate(d) {
+  if (!d) return '--';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '--';
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function showError(msg) {
+  document.getElementById('errorBanner').classList.add('show');
+  document.getElementById('errorMsg').textContent = msg || 'Failed to load data. Please try again.';
+}
+
+function hideError() {
+  document.getElementById('errorBanner').classList.remove('show');
+}
+
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+function renderStats(data) {
+  document.getElementById('todayRevenue').textContent = '$' + fmt(data.todayRevenue);
+  document.getElementById('todayCount').textContent = fmtInt(data.todaySalesCount) + ' transactions today';
+  document.getElementById('totalRevenue').textContent = '$' + fmt(data.totalRevenue);
+  document.getElementById('avgOrder').textContent = 'Avg order: $' + fmt(data.avgOrderValue);
+  document.getElementById('totalCustomers').textContent = fmtInt(data.totalCustomers);
+  document.getElementById('totalProducts').textContent = fmtInt(data.totalProducts);
+  document.getElementById('lowStockCount').textContent = (data.lowStockItems || 0) + ' low stock alerts';
+}
+
+function renderRevenue(data) {
+  document.getElementById('revToday').textContent = '$' + fmt(data.todayRevenue);
+  document.getElementById('revWeek').textContent = '$' + fmt(data.weekRevenue);
+  document.getElementById('revMonth').textContent = '$' + fmt(data.monthRevenue);
+  document.getElementById('totalExpenses').textContent = '$' + fmt(data.totalExpenses);
+  const profit = Number(data.totalProfit || 0);
+  const profitEl = document.getElementById('netProfit');
+  profitEl.textContent = (profit >= 0 ? '+$' : '-$') + fmt(Math.abs(profit));
+  profitEl.className = 'value ' + (profit >= 0 ? 'positive' : 'negative');
+}
+
+function renderTopProducts(products) {
+  const tbody = document.getElementById('topProductsBody');
+  if (!products || products.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No product data available</td></tr>';
+    return;
+  }
+  const maxRev = Math.max(...products.map(p => Number(p.revenue) || 0));
+  tbody.innerHTML = products.map((p, i) => {
+    const rev = Number(p.revenue) || 0;
+    const pct = maxRev > 0 ? (rev / maxRev * 100) : 0;
+    return '<tr><td><span class="rank ' + (i < 3 ? 'top' : '') + '">' + (i + 1) + '</span></td><td style="font-weight:600">' + (p.name || '--') + '</td><td>' + fmtInt(p.totalSold) + '</td><td style="color:var(--accent);font-weight:600">$' + fmt(rev) + '</td><td><div class="perf-bar-bg"><div class="perf-bar" style="width:' + pct + '%"></div></div></td></tr>';
+  }).join('');
+}
+
+function renderRecentSales(sales) {
+  const tbody = document.getElementById('recentSalesBody');
+  if (!sales || sales.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No recent sales</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sales.slice(0, 10).map(s => {
+    const status = (s.status || 'completed').toLowerCase();
+    const statusClass = status === 'completed' ? 'badge-completed' : status === 'refunded' ? 'badge-refunded' : 'badge-pending';
+    const method = (s.paymentMethod || 'cash').toLowerCase();
+    const methodClass = method === 'card' ? 'badge-card' : method === 'mobile' ? 'badge-mobile' : 'badge-cash';
+    return '<tr><td style="font-weight:600;font-size:12px">' + (s.receiptNumber || '--') + '</td><td style="font-size:12px;color:var(--text2)">' + fmtDate(s.createdAt) + '</td><td style="font-weight:600;color:var(--accent)">$' + fmt(s.totalAmount) + '</td><td><span class="badge ' + methodClass + '">' + (s.paymentMethod || 'Cash') + '</span></td><td><span class="badge ' + statusClass + '">' + (s.status || 'Completed') + '</span></td></tr>';
+  }).join('');
+}
+
+function renderPaymentMethods(methods) {
+  const container = document.getElementById('paymentMethods');
+  if (!methods || methods.length === 0) {
+    container.innerHTML = '<div class="empty-state">No payment data</div>';
+    return;
+  }
+  const totalCount = methods.reduce((s, m) => s + (Number(m.count) || 0), 0);
+  const colors = { cash: 'cash', card: 'card', mobile: 'mobile', credit_card: 'card', debit_card: 'card' };
+  const dotColors = { cash: 'var(--accent)', card: 'var(--accent2)', mobile: 'var(--accent3)', credit_card: 'var(--accent2)', debit_card: 'var(--accent2)' };
+  container.innerHTML = methods.map(m => {
+    const key = (m.method || 'cash').toLowerCase().replace(/\s+/g, '_');
+    const pct = totalCount > 0 ? ((Number(m.count) || 0) / totalCount * 100) : 0;
+    return '<div class="payment-item"><div class="payment-header"><div class="payment-method"><span class="dot" style="background:' + (dotColors[key] || 'var(--accent)') + '"></span>' + (m.method || 'Cash') + '</div><div class="payment-stats">' + fmtInt(m.count) + ' txns &middot; $' + fmt(m.total) + '</div></div><div class="payment-bar-bg"><div class="payment-bar ' + (colors[key] || 'cash') + '" style="width:' + pct + '%"></div></div><div style="text-align:right;font-size:11px;color:var(--text3);margin-top:4px">' + pct.toFixed(1) + '%</div></div>';
+  }).join('');
+}
+
+function renderInventoryAlerts(items) {
+  const container = document.getElementById('inventoryAlerts');
+  if (!items || items.length === 0) {
+    container.innerHTML = '<div class="no-alerts">&#10003; All inventory levels are healthy</div>';
+    return;
+  }
+  container.innerHTML = items.map(item => {
+    const name = item.productName || item.name || 'Unknown Product';
+    const qty = item.quantity != null ? item.quantity : item.currentStock != null ? item.currentStock : 0;
+    return '<div class="alert-item"><span class="alert-name">' + name + '</span><span class="alert-qty">' + fmtInt(qty) + ' left</span></div>';
+  }).join('');
+}
+
+async function loadAllData() {
+  hideError();
+  try {
+    const [dashboard, lowStock] = await Promise.all([
+      fetchJSON('/api/dashboard'),
+      fetchJSON('/api/inventory/low-stock')
+    ]);
+
+    renderStats(dashboard);
+    renderRevenue(dashboard);
+    renderTopProducts(dashboard.topProducts);
+    renderRecentSales(dashboard.recentSales);
+    renderPaymentMethods(dashboard.salesByPaymentMethod);
+    renderInventoryAlerts(lowStock && lowStock.length > 0 ? lowStock : null);
+
+    document.getElementById('lastUpdated').textContent = 'Updated: ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    document.getElementById('loadingOverlay').classList.add('hidden');
+  } catch (err) {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    showError('Failed to load dashboard data: ' + err.message);
+  }
+}
+
+function exportData(e) {
+  e.preventDefault();
+  Promise.all([
+    fetchJSON('/api/sales'),
+    fetchJSON('/api/products'),
+    fetchJSON('/api/customers'),
+    fetchJSON('/api/expenses')
+  ]).then(([sales, products, customers, expenses]) => {
+    const data = { exportDate: new Date().toISOString(), sales, products, customers, expenses };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'barmagly-export-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }).catch(err => {
+    alert('Export failed: ' + err.message);
+  });
+}
+
+loadAllData();
+refreshTimer = setInterval(loadAllData, REFRESH_INTERVAL);
+</script>
+</body>
+</html>

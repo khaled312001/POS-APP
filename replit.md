@@ -7,10 +7,13 @@ Barmagly Smart POS is a production-ready, tablet-optimized Point of Sale and Min
 The application is built as an Expo (React Native) frontend with a Node.js/Express backend, backed by a PostgreSQL database. It targets web, iOS, and Android platforms with a dark-mode-first UI featuring a Blue → Purple → Teal gradient brand identity (accent color: #2FD3C6).
 
 Key functional areas include:
-- **POS Interface** – Tablet-friendly product browsing, cart management, and checkout
-- **Product & Category Management** – CRUD for products and categories with search
-- **Customer Management** – Customer records with search and editing
+- **POS Interface** – Tablet-friendly product browsing, cart management, checkout with customer selection, discount controls, and multiple payment methods (Cash, Card, Mobile, QR Pay)
+- **Multi-User Login** – Employee selection grid with PIN-based authentication, role-coded badges (admin/cashier/manager/owner), Quick Start option
+- **QR Code Receipts** – Digital receipt generation with QR codes after each sale, full itemized breakdown
+- **Product & Category Management** – CRUD for products and categories with search and barcode display
+- **Customer Management** – Customer records with search, loyalty points tracking, selection at POS
 - **Employee Management** – PIN-based authentication, role-based access (admin, cashier, etc.)
+- **Web Admin Dashboard** – Full analytics dashboard at /dashboard route with revenue stats, top products, payment methods breakdown, inventory alerts, recent sales (served by Express on port 5000)
 - **Reporting & Dashboard** – Sales analytics, inventory stats, and overview metrics
 - **Settings & Admin** – Branch management, suppliers, purchase orders, expenses, shifts
 - **Multi-branch support** – Branch-level data isolation
@@ -67,6 +70,7 @@ Preferred communication style: Simple, everyday language.
 - **express** – HTTP server framework
 - **pg** – PostgreSQL client for Node.js
 - **@react-native-async-storage/async-storage** – Local key-value storage for auth persistence
+- **qrcode** – QR code generation for digital receipts (web platform)
 
 ### Expo Modules Used
 - expo-blur, expo-constants, expo-font, expo-haptics, expo-image, expo-image-picker, expo-linear-gradient, expo-linking, expo-location, expo-router, expo-splash-screen, expo-status-bar, expo-symbols, expo-system-ui, expo-web-browser, expo-glass-effect
