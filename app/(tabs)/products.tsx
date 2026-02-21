@@ -10,11 +10,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
 import { apiRequest, getQueryFn } from "@/lib/query-client";
 import BarcodeScanner from "@/components/BarcodeScanner";
+import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 
 export default function ProductsScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
+  const { canManage } = useAuth();
   const { t, isRTL } = useLanguage();
   const [screenDims, setScreenDims] = useState(Dimensions.get("window"));
   useEffect(() => {
@@ -129,15 +131,17 @@ export default function ProductsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
       <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid]} style={styles.header}>
         <Text style={styles.headerTitle}>{t("products")}</Text>
-        <Pressable style={styles.addBtn} onPress={() => {
-          if (viewMode === "products") {
-            resetForm(); setEditProduct(null); setShowForm(true);
-          } else {
-            setCatForm({ name: "", color: "#7C3AED", icon: "grid" }); setEditCategory(null); setShowCategoryForm(true);
-          }
-        }}>
-          <Ionicons name="add" size={24} color={Colors.white} />
-        </Pressable>
+        {canManage && (
+          <Pressable style={styles.addBtn} onPress={() => {
+            if (viewMode === "products") {
+              resetForm(); setEditProduct(null); setShowForm(true);
+            } else {
+              setCatForm({ name: "", color: "#7C3AED", icon: "grid" }); setEditCategory(null); setShowCategoryForm(true);
+            }
+          }}>
+            <Ionicons name="add" size={24} color={Colors.white} />
+          </Pressable>
+        )}
       </LinearGradient>
 
       <View style={{ flexDirection: "row", paddingHorizontal: 12, paddingTop: 10, gap: 8 }}>
@@ -171,7 +175,7 @@ export default function ProductsScreen() {
           contentContainerStyle={styles.list}
           scrollEnabled={!!products.length}
           renderItem={({ item }: { item: any }) => (
-            <Pressable style={styles.productCard} onPress={() => openEdit(item)}>
+            <Pressable style={styles.productCard} onPress={() => canManage ? openEdit(item) : null}>
               <View style={styles.productIconWrap}>
                 <Ionicons name="cube" size={24} color={Colors.accent} />
               </View>
@@ -197,12 +201,14 @@ export default function ProductsScreen() {
               </View>
               <View style={styles.productRight}>
                 <Text style={styles.productPrice}>${Number(item.price).toFixed(2)}</Text>
-                <Pressable onPress={() => { Alert.alert("Delete", `Delete ${item.name}?`, [
-                  { text: "Cancel" },
-                  { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate(item.id) },
-                ]); }}>
-                  <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-                </Pressable>
+                {canManage && (
+                  <Pressable onPress={() => { Alert.alert("Delete", `Delete ${item.name}?`, [
+                    { text: "Cancel" },
+                    { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate(item.id) },
+                  ]); }}>
+                    <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                  </Pressable>
+                )}
               </View>
             </Pressable>
           )}
@@ -218,6 +224,7 @@ export default function ProductsScreen() {
           scrollEnabled={!!categories.length}
           renderItem={({ item }: { item: any }) => (
             <Pressable style={styles.productCard} onPress={() => {
+              if (!canManage) return;
               setEditCategory(item);
               setCatForm({ name: item.name, color: item.color || "#7C3AED", icon: item.icon || "grid" });
               setShowCategoryForm(true);
@@ -232,16 +239,18 @@ export default function ProductsScreen() {
                 </Text>
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Pressable
-                  onPress={() => {
-                    Alert.alert("Delete Category", `Delete "${item.name}"?`, [
-                      { text: "Cancel", style: "cancel" },
-                      { text: "Delete", style: "destructive", onPress: () => deleteCategoryMutation.mutate(item.id) },
-                    ]);
-                  }}
-                >
-                  <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-                </Pressable>
+                {canManage && (
+                  <Pressable
+                    onPress={() => {
+                      Alert.alert("Delete Category", `Delete "${item.name}"?`, [
+                        { text: "Cancel", style: "cancel" },
+                        { text: "Delete", style: "destructive", onPress: () => deleteCategoryMutation.mutate(item.id) },
+                      ]);
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                  </Pressable>
+                )}
                 <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
               </View>
             </Pressable>

@@ -56,7 +56,7 @@ const poStatusColors: Record<string, string> = {
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
-  const { employee, logout } = useAuth();
+  const { employee, logout, isAdmin, canManage, isCashier } = useAuth();
   const { t, isRTL, language, setLanguage } = useLanguage();
   const [showEmployees, setShowEmployees] = useState(false);
   const [showSuppliers, setShowSuppliers] = useState(false);
@@ -276,18 +276,26 @@ export default function SettingsScreen() {
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>{t("management")}</Text>
-        <SettingRow icon="people" label={t("employees")} value={`${employees.length} members`} onPress={() => setShowEmployees(true)} color={Colors.info} rtl={isRTL} />
-        <SettingRow icon="business" label={t("branches")} value={`${branches.length} locations`} onPress={() => setShowBranches(true)} color={Colors.secondary} rtl={isRTL} />
-        <SettingRow icon="cube" label={t("suppliers")} value={`${suppliers.length} suppliers`} onPress={() => setShowSuppliers(true)} color={Colors.success} rtl={isRTL} />
-        <SettingRow icon="wallet" label={t("expenses")} value={`${expenses.length} expenses`} onPress={() => setShowExpenses(true)} color={Colors.warning} rtl={isRTL} />
-        <SettingRow icon="time" label={t("attendance")} value={`${shifts.length} shifts`} onPress={() => setShowAttendance(true)} color={Colors.warning} rtl={isRTL} />
-        <SettingRow icon="document-text" label={t("purchaseOrders")} value={`${purchaseOrders.length} orders`} onPress={() => setShowPurchaseOrders(true)} color={Colors.info} rtl={isRTL} />
-        <SettingRow icon="list" label={t("activityLog")} value={`${activityLog.length} entries`} onPress={() => setShowActivityLog(true)} color={Colors.secondary} rtl={isRTL} />
-        <SettingRow icon="swap-horizontal" label={t("returnsRefunds")} value={`${returns.length} returns`} onPress={() => setShowReturnsManager(true)} color={Colors.danger} rtl={isRTL} />
+        {canManage && (
+          <>
+            <Text style={styles.sectionTitle}>{t("management")}</Text>
+            {isAdmin && <SettingRow icon="people" label={t("employees")} value={`${employees.length} members`} onPress={() => setShowEmployees(true)} color={Colors.info} rtl={isRTL} />}
+            {isAdmin && <SettingRow icon="business" label={t("branches")} value={`${branches.length} locations`} onPress={() => setShowBranches(true)} color={Colors.secondary} rtl={isRTL} />}
+            <SettingRow icon="cube" label={t("suppliers")} value={`${suppliers.length} suppliers`} onPress={() => setShowSuppliers(true)} color={Colors.success} rtl={isRTL} />
+            <SettingRow icon="wallet" label={t("expenses")} value={`${expenses.length} expenses`} onPress={() => setShowExpenses(true)} color={Colors.warning} rtl={isRTL} />
+            <SettingRow icon="time" label={t("attendance")} value={`${shifts.length} shifts`} onPress={() => setShowAttendance(true)} color={Colors.warning} rtl={isRTL} />
+            <SettingRow icon="document-text" label={t("purchaseOrders")} value={`${purchaseOrders.length} orders`} onPress={() => setShowPurchaseOrders(true)} color={Colors.info} rtl={isRTL} />
+            <SettingRow icon="list" label={t("activityLog")} value={`${activityLog.length} entries`} onPress={() => setShowActivityLog(true)} color={Colors.secondary} rtl={isRTL} />
+            <SettingRow icon="swap-horizontal" label={t("returnsRefunds")} value={`${returns.length} returns`} onPress={() => setShowReturnsManager(true)} color={Colors.danger} rtl={isRTL} />
+          </>
+        )}
         <SettingRow icon="cash" label={t("cashDrawer")} value={activeShift ? "Active Shift" : "No Active Shift"} onPress={() => setShowCashDrawer(true)} color={Colors.success} rtl={isRTL} />
-        <SettingRow icon="home" label={t("warehouses")} value={`${warehousesList.length} warehouses`} onPress={() => setShowWarehouseManager(true)} color={Colors.accent} rtl={isRTL} />
-        <SettingRow icon="layers" label={t("productBatches")} value={`${batchesList.length} batches`} onPress={() => setShowBatchManager(true)} color={Colors.secondary} rtl={isRTL} />
+        {canManage && (
+          <>
+            <SettingRow icon="home" label={t("warehouses")} value={`${warehousesList.length} warehouses`} onPress={() => setShowWarehouseManager(true)} color={Colors.accent} rtl={isRTL} />
+            <SettingRow icon="layers" label={t("productBatches")} value={`${batchesList.length} batches`} onPress={() => setShowBatchManager(true)} color={Colors.secondary} rtl={isRTL} />
+          </>
+        )}
 
         <Text style={styles.sectionTitle}>{t("system")}</Text>
         <SettingRow icon="language" label={t("language")} value={language === "ar" ? "العربية" : "English"} onPress={() => setShowLanguagePicker(true)} color={Colors.info} rtl={isRTL} />

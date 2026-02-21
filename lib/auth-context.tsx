@@ -12,6 +12,10 @@ interface Employee {
 interface AuthContextValue {
   employee: Employee | null;
   isLoggedIn: boolean;
+  isAdmin: boolean;
+  isManager: boolean;
+  isCashier: boolean;
+  canManage: boolean;
   login: (employee: Employee) => void;
   logout: () => void;
 }
@@ -37,8 +41,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     AsyncStorage.removeItem("barmagly_employee");
   };
 
+  const role = employee?.role || "";
+  const isAdmin = role === "admin" || role === "owner";
+  const isManager = role === "manager";
+  const isCashier = role === "cashier";
+  const canManage = isAdmin || isManager;
+
   const value = useMemo(
-    () => ({ employee, isLoggedIn: !!employee, login, logout }),
+    () => ({ employee, isLoggedIn: !!employee, isAdmin, isManager, isCashier, canManage, login, logout }),
     [employee]
   );
 

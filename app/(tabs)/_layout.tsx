@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 
 export default function TabLayout() {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, isCashier } = useAuth();
   const { t, isRTL } = useLanguage();
   if (!isLoggedIn) {
     return <Redirect href="/login" />;
@@ -74,6 +74,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="stats-chart" size={size} color={color} />
           ),
+          href: isCashier ? null : undefined,
         }}
       />
       <Tabs.Screen

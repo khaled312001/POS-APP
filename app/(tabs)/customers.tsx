@@ -9,11 +9,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
 import { apiRequest, getQueryFn } from "@/lib/query-client";
+import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 
 export default function CustomersScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
+  const { canManage } = useAuth();
   const { t, isRTL } = useLanguage();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -61,9 +63,11 @@ export default function CustomersScreen() {
     <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
       <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid]} style={styles.header}>
         <Text style={styles.headerTitle}>{t("customers")}</Text>
-        <Pressable style={styles.addBtn} onPress={() => { setEditCustomer(null); setForm({ name: "", email: "", phone: "", address: "", notes: "" }); setShowForm(true); }}>
-          <Ionicons name="add" size={24} color={Colors.white} />
-        </Pressable>
+        {canManage && (
+          <Pressable style={styles.addBtn} onPress={() => { setEditCustomer(null); setForm({ name: "", email: "", phone: "", address: "", notes: "" }); setShowForm(true); }}>
+            <Ionicons name="add" size={24} color={Colors.white} />
+          </Pressable>
+        )}
       </LinearGradient>
 
       <View style={styles.searchRow}>
@@ -184,14 +188,16 @@ export default function CustomersScreen() {
                   </View>
                 )}
 
-                <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-                  <Pressable style={{ flex: 1, borderRadius: 12, overflow: "hidden" }} onPress={() => { setShowDetail(false); openEdit(selectedCustomer); }}>
-                    <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 12, gap: 6 }}>
-                      <Ionicons name="create-outline" size={18} color={Colors.white} />
-                      <Text style={{ color: Colors.white, fontSize: 14, fontWeight: "600" }}>Edit</Text>
-                    </LinearGradient>
-                  </Pressable>
-                </View>
+                {canManage && (
+                  <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+                    <Pressable style={{ flex: 1, borderRadius: 12, overflow: "hidden" }} onPress={() => { setShowDetail(false); openEdit(selectedCustomer); }}>
+                      <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 12, gap: 6 }}>
+                        <Ionicons name="create-outline" size={18} color={Colors.white} />
+                        <Text style={{ color: Colors.white, fontSize: 14, fontWeight: "600" }}>Edit</Text>
+                      </LinearGradient>
+                    </Pressable>
+                  </View>
+                )}
 
                 <Text style={{ color: Colors.textSecondary, fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Purchase History</Text>
                 
