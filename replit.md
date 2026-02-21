@@ -12,10 +12,15 @@ Key functional areas include:
 - **QR Code Receipts** – Digital receipt generation with QR codes after each sale, full itemized breakdown
 - **Product & Category Management** – CRUD for products and categories with search and barcode display
 - **Customer Management** – Customer records with search, loyalty points tracking, selection at POS
-- **Employee Management** – PIN-based authentication, role-based access (admin, cashier, etc.)
+- **Employee Management** – PIN-based authentication, role-based access, attendance tracking, commission rates
+- **Returns & Refunds** – Full return processing (refund/exchange/store credit) with automatic inventory adjustment
+- **Cash Drawer Management** – Opening/closing cash, withdrawals, deposits, cash counts tied to shifts
+- **Advanced Inventory** – Product batches with expiry tracking (pharmacy-ready), warehouse management, inventory movement log, stock counts
+- **Financial Reports** – Profit by product analysis, cashier performance metrics, slow-moving product detection
+- **Smart Analytics** – Revenue projections (daily/monthly/yearly), stock reorder alerts, trend-based insights
+- **Professional Reports** – 6-tab reporting (Overview, Sales, Inventory, Returns, Finance, Activity) with CSV export for all report types
 - **Web Admin Dashboard** – Full analytics dashboard at /dashboard route with revenue stats, top products, payment methods breakdown, inventory alerts, recent sales (served by Express on port 5000)
-- **Reporting & Dashboard** – Sales analytics, inventory stats, and overview metrics
-- **Settings & Admin** – Branch management, suppliers, purchase orders, expenses, shifts
+- **Settings & Admin** – Branch management, suppliers, purchase orders, expenses, shifts, warehouses, product batches
 - **Multi-branch support** – Branch-level data isolation
 - **Subscription billing** – Monthly/yearly subscription plan support (schema-level)
 
