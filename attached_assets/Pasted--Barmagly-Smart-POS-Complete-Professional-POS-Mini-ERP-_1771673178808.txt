@@ -1,0 +1,459 @@
+🚀 Barmagly Smart POS
+Complete Professional POS & Mini-ERP System for Pharmacies & Retail Stores
+🧠 PROJECT OVERVIEW
+
+Build a production-ready, tablet-optimized Barmagly Smart POS system that functions not only as a Point of Sale solution but as a complete Mini-ERP platform for pharmacies and retail stores.
+
+The system must include:
+
+Tablet-friendly POS interface
+
+Full Node.js backend (Express or NestJS)
+
+PostgreSQL cloud database
+
+Offline-first architecture
+
+NFC & electronic payment support
+
+Subscription billing (Monthly & Yearly)
+
+Multi-language (Arabic RTL + English LTR)
+
+Multi-branch management
+
+Advanced role-based permissions
+
+Cloud & Local deployment options
+
+🎨 BRANDING & IDENTITY
+
+App Name: Barmagly Smart POS
+
+Brand:
+
+Company: Barmagly
+
+Website: www.barmagly.tech
+
+Email: info@barmagly.tech
+
+Phone: +201010254819
+
+Country: Egypt
+
+Design Requirements:
+
+Primary gradient: Blue → Purple → Teal
+
+Accent color: #2FD3C6
+
+Modern glass UI
+
+Dark & Light mode
+
+Large tablet buttons
+
+Arabic-friendly typography
+
+RTL/LTR auto switching
+
+🏪 1) SALES & CASHIER MANAGEMENT
+POS Core Features
+
+Product grid with images
+
+Live search from first character
+
+Barcode scanning via camera or scanner
+
+Add / remove quantities
+
+Percentage & fixed discounts
+
+Mixed payment support (cash + card combined)
+
+Notes per item
+
+Customer selection (registered or walk-in)
+
+Return & exchange in same invoice
+
+Return time-limit configuration
+
+Cash Drawer Management
+
+Cash register opening/closing
+
+Automatic calculation of:
+
+Total cash
+
+Electronic payments
+
+Shortage / surplus
+
+End-of-shift report
+
+Cashier performance tracking
+
+Multi-Device Operation
+
+Multiple devices per branch
+
+Device registration & control
+
+Login by multiple users on same device
+
+Central device sync
+
+💳 2) ELECTRONIC & NFC PAYMENT SUPPORT
+Must Support:
+
+Direct POS machine integration (Visa / MasterCard / Meeza)
+
+NFC Tap-to-Pay
+
+Contactless payments
+
+Apple Pay / Google Pay ready
+
+Egyptian wallets:
+
+Vodafone Cash
+
+Orange Money
+
+Etisalat Cash
+
+QR payment support
+
+Payment Gateway Layer
+
+Modular integration system:
+
+Paymob
+
+Fawry
+
+Stripe
+
+Accept (Banque Misr)
+
+Offline payment queue with auto-sync.
+
+📦 3) SMART INVENTORY MANAGEMENT
+
+Add products with image, SKU, barcode, QR
+
+Cost & selling price
+
+Expiry date tracking (critical for pharmacies)
+
+Low stock auto alerts
+
+Expired items report with date filtering
+
+Product movement report:
+
+Sales
+
+Returns
+
+Purchases
+
+Transfers
+
+Multi-warehouse support
+
+Stock transfers between warehouses
+
+Manual & barcode stock counting
+
+Bulk CSV import
+
+📊 4) ADVANCED REPORTING & ANALYTICS
+
+Dashboard must include:
+
+Sales by day / week / month / custom range
+
+Net profit calculation
+
+Profit margin percentage
+
+Discount impact analysis
+
+Best-selling products
+
+Slow-moving product detection
+
+Sales by payment method
+
+Cashier performance reports
+
+Inventory valuation
+
+Expense tracking
+
+Export to PDF & Excel
+
+🤝 5) SUPPLIER & CONTRACT MANAGEMENT
+
+Full supplier database
+
+Compare discount rates per supplier
+
+Contract management:
+
+Terms & conditions
+
+Discount percentages
+
+Linked employees
+
+Purchase invoice tracking
+
+Due payments & financial alerts
+
+👨‍💼 6) HR MODULE (EMPLOYEE MANAGEMENT)
+
+Attendance & clock-in/out
+
+Working hours reports
+
+Salary calculation
+
+Commission tracking
+
+Role-based permissions
+
+Employee performance analytics
+
+👥 USER ROLES & SECURITY
+
+Roles:
+
+Owner
+
+Branch Manager
+
+Cashier
+
+Accountant
+
+Warehouse Staff
+
+Security Features:
+
+Granular permission system per button/action
+
+Full activity log system
+
+Daily automated backup
+
+JWT authentication
+
+Device binding
+
+☁️ CLOUD & OFFLINE ARCHITECTURE
+
+System must support:
+
+Cloud deployment (AWS / GCP / DigitalOcean)
+
+Local server option
+
+Offline-first mode (SQLite local DB)
+
+Background sync engine
+
+Conflict resolution logic
+
+Real-time branch monitoring
+
+📱 MANAGER MOBILE APP
+
+Companion mobile dashboard for owners:
+
+Live sales
+
+Revenue tracking
+
+Alerts
+
+Inventory warnings
+
+Multi-branch monitoring
+
+🧠 AI SMART INSIGHTS
+
+Predict low stock based on sales rate
+
+Suggest reorder quantities
+
+Detect slow-moving products
+
+Identify unusual refund patterns
+
+🧾 CUSTOMER MANAGEMENT
+
+Customer profiles
+
+Loyalty points system
+
+Purchase history
+
+SMS promotional campaigns
+
+💰 SUBSCRIPTION BILLING SYSTEM (SaaS)
+Plans:
+
+Basic
+Pro
+Business (Multi-Branch)
+
+Features:
+
+14-day free trial
+
+Monthly billing
+
+Yearly billing (20% discount)
+
+Auto renewal
+
+Grace period
+
+Feature gating per plan
+
+Auto-disable expired accounts
+
+Payment via:
+
+Stripe
+
+Paymob
+
+Fawry
+
+⚙️ TECHNICAL STACK
+Frontend:
+
+Flutter or React Native (Tablet optimized)
+
+Backend:
+
+Node.js (Express or NestJS)
+
+Database:
+
+PostgreSQL (Primary)
+SQLite (Offline)
+
+Realtime:
+
+WebSockets
+
+Security:
+
+HTTPS
+Encrypted tokens
+Role middleware
+
+🧩 REQUIRED DATABASE TABLES
+
+users
+
+roles
+
+businesses
+
+branches
+
+devices
+
+products
+
+categories
+
+warehouses
+
+inventory
+
+sales
+
+sale_items
+
+payments
+
+expenses
+
+suppliers
+
+contracts
+
+employees
+
+attendance
+
+subscriptions
+
+subscription_plans
+
+invoices
+
+sync_logs
+
+activity_logs
+
+🔌 HARDWARE SUPPORT
+
+Bluetooth thermal printers (ESC/POS)
+
+Barcode scanners
+
+NFC readers
+
+Cash drawers
+
+📦 FINAL DELIVERY REQUIREMENTS
+
+Generate:
+
+Complete backend API
+
+Complete mobile/tablet POS app
+
+Admin web dashboard
+
+Subscription engine
+
+Payment integration modules
+
+Offline sync engine
+
+Database schema
+
+Deployment guide (Docker ready)
+
+Production-ready code
+
+Clean documentation
+
+🏆 FINAL RESULT
+
+The system must function as:
+
+✔ POS System
+✔ Inventory System
+✔ Accounting System
+✔ Supplier & Contract System
+✔ HR System
+✔ Subscription SaaS Platform
+✔ Multi-Branch Cloud Platform
+✔ AI-Enhanced Business Intelligence Tool
+
+Not just a POS.
+
+A full Mini-ERP ecosystem built for pharmacies and retail stores.
