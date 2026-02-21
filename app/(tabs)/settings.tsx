@@ -85,6 +85,7 @@ export default function SettingsScreen() {
   const [cashDrawerForm, setCashDrawerForm] = useState({ type: "withdrawal", amount: "", reason: "" });
   const [showWarehouseManager, setShowWarehouseManager] = useState(false);
   const [showBatchManager, setShowBatchManager] = useState(false);
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
 
   const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: suppliers = [] } = useQuery<any[]>({ queryKey: ["/api/suppliers"], queryFn: getQueryFn({ on401: "throw" }) });
@@ -266,17 +267,7 @@ export default function SettingsScreen() {
         <SettingRow icon="layers" label={t("productBatches")} value={`${batchesList.length} batches`} onPress={() => setShowBatchManager(true)} color={Colors.secondary} rtl={isRTL} />
 
         <Text style={styles.sectionTitle}>{t("system")}</Text>
-        <SettingRow icon="language" label={t("language")} value={language === "ar" ? "العربية" : "English"} onPress={() => {
-          Alert.alert(
-            t("language"),
-            "",
-            [
-              { text: "English", onPress: () => setLanguage("en") },
-              { text: "العربية (Arabic)", onPress: () => setLanguage("ar") },
-              { text: t("cancel"), style: "cancel" },
-            ]
-          );
-        }} color={Colors.info} rtl={isRTL} />
+        <SettingRow icon="language" label={t("language")} value={language === "ar" ? "العربية" : "English"} onPress={() => setShowLanguagePicker(true)} color={Colors.info} rtl={isRTL} />
         <SettingRow icon="print" label="Receipt Printer" value="Not configured" color={Colors.textMuted} rtl={isRTL} />
         <SettingRow icon="cloud-upload" label="Sync Status" value="Connected" color={Colors.success} rtl={isRTL} />
         <SettingRow icon="information-circle" label="App Version" value="1.0.0" color={Colors.info} rtl={isRTL} />
@@ -957,6 +948,45 @@ export default function SettingsScreen() {
                 );
               }}
             />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showLanguagePicker} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxWidth: 340, maxHeight: 300 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t("language")}</Text>
+              <Pressable onPress={() => setShowLanguagePicker(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <Pressable
+              testID="lang-en"
+              style={[styles.empCard, language === "en" && { borderWidth: 2, borderColor: Colors.accent }]}
+              onPress={() => { setLanguage("en"); setShowLanguagePicker(false); }}
+            >
+              <View style={[styles.empAvatar, { backgroundColor: Colors.info + "30" }]}>
+                <Text style={{ fontSize: 20 }}>🇺🇸</Text>
+              </View>
+              <View style={styles.empInfo}>
+                <Text style={styles.empName}>English</Text>
+                <Text style={styles.empMeta}>Left to Right (LTR)</Text>
+              </View>
+              {language === "en" && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
+            </Pressable>
+            <Pressable
+              testID="lang-ar"
+              style={[styles.empCard, language === "ar" && { borderWidth: 2, borderColor: Colors.accent }]}
+              onPress={() => { setLanguage("ar"); setShowLanguagePicker(false); }}
+            >
+              <View style={[styles.empAvatar, { backgroundColor: Colors.success + "30" }]}>
+                <Text style={{ fontSize: 20 }}>🇸🇦</Text>
+              </View>
+              <View style={styles.empInfo}>
+                <Text style={styles.empName}>العربية</Text>
+                <Text style={styles.empMeta}>Right to Left (RTL)</Text>
+              </View>
+              {language === "ar" && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
+            </Pressable>
           </View>
         </View>
       </Modal>
