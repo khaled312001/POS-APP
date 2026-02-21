@@ -23,6 +23,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/branches/:id", async (req, res) => {
     try { res.json(await storage.updateBranch(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
+  app.delete("/api/branches/:id", async (req, res) => {
+    try { await storage.deleteBranch(Number(req.params.id)); res.json({ success: true }); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
 
   // Employees
   app.get("/api/employees", async (_req, res) => {

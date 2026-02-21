@@ -35,6 +35,9 @@ export const storage = {
     const [branch] = await db.update(branches).set({ ...data, updatedAt: new Date() }).where(eq(branches.id, id)).returning();
     return branch;
   },
+  async deleteBranch(id: number) {
+    await db.delete(branches).where(eq(branches.id, id));
+  },
 
   // Employees
   async getEmployees() {

@@ -27,6 +27,10 @@ export default function ProductsScreen() {
   const [editProduct, setEditProduct] = useState<any>(null);
   const [form, setForm] = useState({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece", expiryDate: "" });
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
+  const [pickerMonth, setPickerMonth] = useState(new Date().getMonth() + 1);
+  const [pickerDay, setPickerDay] = useState(1);
   const [viewMode, setViewMode] = useState<"products" | "categories">("products");
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editCategory, setEditCategory] = useState<any>(null);
@@ -274,7 +278,7 @@ export default function ProductsScreen() {
                 <View style={styles.half}>
                   <Text style={styles.label}>{t("barcode")}</Text>
                   <View style={{ flexDirection: "row", gap: 8 }}>
-                    <TextInput style={[styles.input, { flex: 1 }]} value={form.barcode} onChangeText={(v) => setForm({ ...form, barcode: v })} placeholderTextColor={Colors.textMuted} placeholder="123456789" />
+                    <TextInput style={[styles.input, { flex: 1 }]} value={form.barcode} onChangeText={(v) => setForm({ ...form, barcode: v })} placeholderTextColor={Colors.textMuted} placeholder="ABC-123456" />
                     <Pressable style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" }} onPress={() => setShowBarcodeScanner(true)}>
                       <Ionicons name="barcode-outline" size={22} color={Colors.textDark} />
                     </Pressable>
@@ -282,7 +286,27 @@ export default function ProductsScreen() {
                 </View>
               </View>
               <Text style={styles.label}>Expiry Date</Text>
-              <TextInput style={styles.input} value={form.expiryDate} onChangeText={(v) => setForm({ ...form, expiryDate: v })} placeholderTextColor={Colors.textMuted} placeholder="YYYY-MM-DD" />
+              <Pressable
+                style={[styles.input, { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}
+                onPress={() => {
+                  if (form.expiryDate) {
+                    const parts = form.expiryDate.split("-");
+                    setPickerYear(Number(parts[0]));
+                    setPickerMonth(Number(parts[1]));
+                    setPickerDay(Number(parts[2]));
+                  } else {
+                    setPickerYear(new Date().getFullYear());
+                    setPickerMonth(new Date().getMonth() + 1);
+                    setPickerDay(1);
+                  }
+                  setShowDatePicker(true);
+                }}
+              >
+                <Text style={{ color: form.expiryDate ? Colors.text : Colors.textMuted, fontSize: 15 }}>
+                  {form.expiryDate || "Select date"}
+                </Text>
+                <Ionicons name="calendar-outline" size={20} color={Colors.textMuted} />
+              </Pressable>
               <Text style={styles.label}>{t("category")}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catRow}>
                 {categories.map((cat: any) => (
@@ -356,6 +380,86 @@ export default function ProductsScreen() {
         onScanned={(barcode) => { setForm({ ...form, barcode }); setShowBarcodeScanner(false); }}
         onClose={() => setShowBarcodeScanner(false)}
       />
+
+      <Modal visible={showDatePicker} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "70%" }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Expiry Date</Text>
+              <Pressable onPress={() => setShowDatePicker(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.label, { marginTop: 0 }]}>Year</Text>
+                <ScrollView style={{ maxHeight: 150, backgroundColor: Colors.inputBg, borderRadius: 12, borderWidth: 1, borderColor: Colors.inputBorder }}>
+                  {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() + i).map((y) => (
+                    <Pressable
+                      key={y}
+                      onPress={() => setPickerYear(y)}
+                      style={{ paddingVertical: 10, paddingHorizontal: 12, backgroundColor: pickerYear === y ? Colors.accent + "30" : "transparent", borderRadius: 8 }}
+                    >
+                      <Text style={{ color: pickerYear === y ? Colors.accent : Colors.text, fontSize: 15, fontWeight: pickerYear === y ? "700" : "400", textAlign: "center" }}>{y}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.label, { marginTop: 0 }]}>Month</Text>
+                <ScrollView style={{ maxHeight: 150, backgroundColor: Colors.inputBg, borderRadius: 12, borderWidth: 1, borderColor: Colors.inputBorder }}>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <Pressable
+                      key={m}
+                      onPress={() => setPickerMonth(m)}
+                      style={{ paddingVertical: 10, paddingHorizontal: 12, backgroundColor: pickerMonth === m ? Colors.accent + "30" : "transparent", borderRadius: 8 }}
+                    >
+                      <Text style={{ color: pickerMonth === m ? Colors.accent : Colors.text, fontSize: 15, fontWeight: pickerMonth === m ? "700" : "400", textAlign: "center" }}>
+                        {new Date(2000, m - 1).toLocaleString("default", { month: "short" })}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.label, { marginTop: 0 }]}>Day</Text>
+                <ScrollView style={{ maxHeight: 150, backgroundColor: Colors.inputBg, borderRadius: 12, borderWidth: 1, borderColor: Colors.inputBorder }}>
+                  {Array.from({ length: new Date(pickerYear, pickerMonth, 0).getDate() }, (_, i) => i + 1).map((d) => (
+                    <Pressable
+                      key={d}
+                      onPress={() => setPickerDay(d)}
+                      style={{ paddingVertical: 10, paddingHorizontal: 12, backgroundColor: pickerDay === d ? Colors.accent + "30" : "transparent", borderRadius: 8 }}
+                    >
+                      <Text style={{ color: pickerDay === d ? Colors.accent : Colors.text, fontSize: 15, fontWeight: pickerDay === d ? "700" : "400", textAlign: "center" }}>{d}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+            <Text style={{ color: Colors.textSecondary, fontSize: 14, textAlign: "center", marginBottom: 16 }}>
+              {pickerYear}-{String(pickerMonth).padStart(2, "0")}-{String(pickerDay).padStart(2, "0")}
+            </Text>
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <Pressable
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: Colors.surfaceLight, alignItems: "center" }}
+                onPress={() => { setForm({ ...form, expiryDate: "" }); setShowDatePicker(false); }}
+              >
+                <Text style={{ color: Colors.danger, fontSize: 15, fontWeight: "600" }}>Clear</Text>
+              </Pressable>
+              <Pressable
+                style={{ flex: 1, borderRadius: 12, overflow: "hidden" }}
+                onPress={() => {
+                  const dateStr = `${pickerYear}-${String(pickerMonth).padStart(2, "0")}-${String(pickerDay).padStart(2, "0")}`;
+                  setForm({ ...form, expiryDate: dateStr });
+                  setShowDatePicker(false);
+                }}
+              >
+                <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ paddingVertical: 12, alignItems: "center", borderRadius: 12 }}>
+                  <Text style={{ color: Colors.white, fontSize: 15, fontWeight: "600" }}>Set Date</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <View style={{ height: Platform.OS === "web" ? 84 : 60 }} />
     </View>

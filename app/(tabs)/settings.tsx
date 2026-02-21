@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   StyleSheet, Text, View, ScrollView, Pressable, Modal,
-  TextInput, Alert, Platform, FlatList,
+  TextInput, Alert, Platform, FlatList, Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -86,6 +86,14 @@ export default function SettingsScreen() {
   const [showWarehouseManager, setShowWarehouseManager] = useState(false);
   const [showBatchManager, setShowBatchManager] = useState(false);
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const [showBranchForm, setShowBranchForm] = useState(false);
+  const [editBranch, setEditBranch] = useState<any | null>(null);
+  const [branchForm, setBranchForm] = useState({ name: "", address: "", phone: "", currency: "USD", taxRate: "" });
+  const [showWarehouseForm, setShowWarehouseForm] = useState(false);
+  const [warehouseForm, setWarehouseForm] = useState({ name: "", address: "", type: "main" });
+  const [showPrinterSettings, setShowPrinterSettings] = useState(false);
+  const [printerPaperSize, setPrinterPaperSize] = useState("80mm");
+  const [printerAutoPrint, setPrinterAutoPrint] = useState(false);
 
   const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: suppliers = [] } = useQuery<any[]>({ queryKey: ["/api/suppliers"], queryFn: getQueryFn({ on401: "throw" }) });
@@ -212,7 +220,22 @@ export default function SettingsScreen() {
 
   const createWarehouseMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/warehouses", data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/warehouses"] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/warehouses"] }); setShowWarehouseForm(false); },
+    onError: (e: any) => Alert.alert("Error", e.message),
+  });
+
+  const createBranchMutation = useMutation({
+    mutationFn: (data: any) => {
+      if (editBranch) return apiRequest("PUT", `/api/branches/${editBranch.id}`, data);
+      return apiRequest("POST", "/api/branches", data);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/branches"] }); setShowBranchForm(false); setEditBranch(null); },
+    onError: (e: any) => Alert.alert("Error", e.message),
+  });
+
+  const deleteBranchMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/branches/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/branches"] }); },
     onError: (e: any) => Alert.alert("Error", e.message),
   });
 
@@ -268,7 +291,7 @@ export default function SettingsScreen() {
 
         <Text style={styles.sectionTitle}>{t("system")}</Text>
         <SettingRow icon="language" label={t("language")} value={language === "ar" ? "العربية" : "English"} onPress={() => setShowLanguagePicker(true)} color={Colors.info} rtl={isRTL} />
-        <SettingRow icon="print" label="Receipt Printer" value="Not configured" color={Colors.textMuted} rtl={isRTL} />
+        <SettingRow icon="print" label="Receipt Printer" value="Not configured" onPress={() => setShowPrinterSettings(true)} color={Colors.textMuted} rtl={isRTL} />
         <SettingRow icon="cloud-upload" label="Sync Status" value="Connected" color={Colors.success} rtl={isRTL} />
         <SettingRow icon="information-circle" label="App Version" value="1.0.0" color={Colors.info} rtl={isRTL} />
 
@@ -414,12 +437,18 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("branches")}</Text>
-              <Pressable onPress={() => setShowBranches(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <View style={styles.modalActions}>
+                <Pressable onPress={() => { setBranchForm({ name: "", address: "", phone: "", currency: "USD", taxRate: "" }); setEditBranch(null); setShowBranchForm(true); }}>
+                  <Ionicons name="add-circle" size={28} color={Colors.accent} />
+                </Pressable>
+                <Pressable onPress={() => setShowBranches(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              </View>
             </View>
             <FlatList
               data={branches}
               keyExtractor={(item: any) => String(item.id)}
               scrollEnabled={!!branches.length}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>No branches yet</Text>}
               renderItem={({ item }: { item: any }) => (
                 <View style={styles.empCard}>
                   <View style={[styles.empAvatar, { backgroundColor: Colors.secondary + "30" }]}>
@@ -427,16 +456,73 @@ export default function SettingsScreen() {
                   </View>
                   <View style={styles.empInfo}>
                     <Text style={styles.empName}>{item.name}</Text>
-                    <Text style={styles.empMeta}>{item.address || "No address"} | {item.currency || "USD"}</Text>
+                    <Text style={styles.empMeta}>{item.address || "No address"} | {item.currency || "USD"} | Tax: {item.taxRate || "0"}%</Text>
+                    {item.phone ? <Text style={styles.empMeta}>{item.phone}</Text> : null}
                   </View>
-                  {item.isMain && (
-                    <View style={[styles.roleBadge, { backgroundColor: Colors.accent + "20" }]}>
-                      <Text style={[styles.roleText, { color: Colors.accent }]}>Main</Text>
-                    </View>
-                  )}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    {item.isMain && (
+                      <View style={[styles.roleBadge, { backgroundColor: Colors.accent + "20" }]}>
+                        <Text style={[styles.roleText, { color: Colors.accent }]}>Main</Text>
+                      </View>
+                    )}
+                    <Pressable onPress={() => {
+                      setEditBranch(item);
+                      setBranchForm({ name: item.name, address: item.address || "", phone: item.phone || "", currency: item.currency || "USD", taxRate: item.taxRate || "" });
+                      setShowBranchForm(true);
+                    }}>
+                      <Ionicons name="pencil" size={18} color={Colors.info} />
+                    </Pressable>
+                    {!item.isMain && (
+                      <Pressable onPress={() => {
+                        Alert.alert("Delete Branch", `Delete "${item.name}"?`, [
+                          { text: "Cancel", style: "cancel" },
+                          { text: "Delete", style: "destructive", onPress: () => deleteBranchMutation.mutate(item.id) },
+                        ]);
+                      }}>
+                        <Ionicons name="trash" size={18} color={Colors.danger} />
+                      </Pressable>
+                    )}
+                  </View>
                 </View>
               )}
             />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showBranchForm} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{editBranch ? "Edit Branch" : "New Branch"}</Text>
+              <Pressable onPress={() => { setShowBranchForm(false); setEditBranch(null); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <ScrollView>
+              <Text style={styles.label}>Name *</Text>
+              <TextInput style={styles.input} value={branchForm.name} onChangeText={(v) => setBranchForm({ ...branchForm, name: v })} placeholderTextColor={Colors.textMuted} placeholder="Branch name" />
+              <Text style={styles.label}>Address</Text>
+              <TextInput style={styles.input} value={branchForm.address} onChangeText={(v) => setBranchForm({ ...branchForm, address: v })} placeholderTextColor={Colors.textMuted} placeholder="Branch address" />
+              <Text style={styles.label}>Phone</Text>
+              <TextInput style={styles.input} value={branchForm.phone} onChangeText={(v) => setBranchForm({ ...branchForm, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+1234567890" />
+              <Text style={styles.label}>Currency</Text>
+              <View style={styles.roleRow}>
+                {["USD", "EGP", "EUR", "GBP", "SAR"].map((c) => (
+                  <Pressable key={c} style={[styles.roleChip, branchForm.currency === c && { backgroundColor: Colors.accent }]} onPress={() => setBranchForm({ ...branchForm, currency: c })}>
+                    <Text style={[styles.roleChipText, branchForm.currency === c && { color: Colors.textDark }]}>{c}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.label}>Tax Rate (%)</Text>
+              <TextInput style={styles.input} value={branchForm.taxRate} onChangeText={(v) => setBranchForm({ ...branchForm, taxRate: v })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" />
+              <Pressable style={styles.saveBtn} onPress={() => {
+                if (!branchForm.name) return Alert.alert("Error", "Branch name is required");
+                createBranchMutation.mutate({ name: branchForm.name, address: branchForm.address || undefined, phone: branchForm.phone || undefined, currency: branchForm.currency, taxRate: branchForm.taxRate || "0" });
+              }}>
+                <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
+                  <Text style={styles.saveBtnText}>{editBranch ? "Update Branch" : "Create Branch"}</Text>
+                </LinearGradient>
+              </Pressable>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -856,11 +942,7 @@ export default function SettingsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("warehouses")}</Text>
               <View style={styles.modalActions}>
-                <Pressable onPress={() => {
-                  Alert.prompt ? Alert.prompt("New Warehouse", "Enter warehouse name", (name: string) => {
-                    if (name) createWarehouseMutation.mutate({ name, branchId: employee?.branchId || 1 });
-                  }) : createWarehouseMutation.mutate({ name: `Warehouse ${warehousesList.length + 1}`, branchId: employee?.branchId || 1 });
-                }}>
+                <Pressable onPress={() => { setWarehouseForm({ name: "", address: "", type: "main" }); setShowWarehouseForm(true); }}>
                   <Ionicons name="add-circle" size={28} color={Colors.accent} />
                 </Pressable>
                 <Pressable onPress={() => setShowWarehouseManager(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
@@ -888,6 +970,39 @@ export default function SettingsScreen() {
                 </View>
               )}
             />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showWarehouseForm} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>New Warehouse</Text>
+              <Pressable onPress={() => setShowWarehouseForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <ScrollView>
+              <Text style={styles.label}>Name *</Text>
+              <TextInput style={styles.input} value={warehouseForm.name} onChangeText={(v) => setWarehouseForm({ ...warehouseForm, name: v })} placeholderTextColor={Colors.textMuted} placeholder="Warehouse name" />
+              <Text style={styles.label}>Address</Text>
+              <TextInput style={styles.input} value={warehouseForm.address} onChangeText={(v) => setWarehouseForm({ ...warehouseForm, address: v })} placeholderTextColor={Colors.textMuted} placeholder="Warehouse address" />
+              <Text style={styles.label}>Type</Text>
+              <View style={styles.roleRow}>
+                {["main", "secondary", "cold-storage"].map((t) => (
+                  <Pressable key={t} style={[styles.roleChip, warehouseForm.type === t && { backgroundColor: Colors.accent }]} onPress={() => setWarehouseForm({ ...warehouseForm, type: t })}>
+                    <Text style={[styles.roleChipText, warehouseForm.type === t && { color: Colors.textDark }]}>{t}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Pressable style={styles.saveBtn} onPress={() => {
+                if (!warehouseForm.name) return Alert.alert("Error", "Warehouse name is required");
+                createWarehouseMutation.mutate({ name: warehouseForm.name, address: warehouseForm.address || undefined, branchId: employee?.branchId || 1 });
+              }}>
+                <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
+                  <Text style={styles.saveBtnText}>Create Warehouse</Text>
+                </LinearGradient>
+              </Pressable>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -948,6 +1063,69 @@ export default function SettingsScreen() {
                 );
               }}
             />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showPrinterSettings} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Receipt Printer</Text>
+              <Pressable onPress={() => setShowPrinterSettings(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <ScrollView>
+              <View style={[styles.empCard, { marginBottom: 16 }]}>
+                <View style={[styles.empAvatar, { backgroundColor: Colors.danger + "30" }]}>
+                  <Ionicons name="print" size={20} color={Colors.danger} />
+                </View>
+                <View style={styles.empInfo}>
+                  <Text style={styles.empName}>Printer Status</Text>
+                  <Text style={[styles.empMeta, { color: Colors.danger }]}>Not Connected</Text>
+                </View>
+              </View>
+
+              <Text style={styles.label}>Paper Size</Text>
+              <View style={styles.roleRow}>
+                {["58mm", "80mm"].map((s) => (
+                  <Pressable key={s} style={[styles.roleChip, printerPaperSize === s && { backgroundColor: Colors.accent }]} onPress={() => setPrinterPaperSize(s)}>
+                    <Text style={[styles.roleChipText, printerPaperSize === s && { color: Colors.textDark }]}>{s}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Text style={styles.label}>Auto-Print Receipts</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 4 }}>
+                <Text style={{ color: Colors.text, fontSize: 14 }}>Print after every sale</Text>
+                <Switch value={printerAutoPrint} onValueChange={setPrinterAutoPrint} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={printerAutoPrint ? Colors.accent : Colors.textMuted} />
+              </View>
+
+              <Pressable style={styles.saveBtn} onPress={() => {
+                const sampleReceipt = `================================\n        SAMPLE RECEIPT\n================================\nDate: ${new Date().toLocaleString()}\nReceipt #: TEST-001\n--------------------------------\nItem 1          x2     $10.00\nItem 2          x1      $5.50\n--------------------------------\nSubtotal:              $15.50\nTax (10%):              $1.55\n--------------------------------\nTOTAL:                 $17.05\n================================\n      Thank you!\n================================`;
+                if (Platform.OS === "web") {
+                  const printWindow = window.open("", "_blank", "width=300,height=600");
+                  if (printWindow) {
+                    printWindow.document.write(`<pre style="font-family:monospace;font-size:12px;">${sampleReceipt}</pre>`);
+                    printWindow.document.close();
+                    printWindow.print();
+                  }
+                } else {
+                  Alert.alert("Test Print", sampleReceipt);
+                }
+              }}>
+                <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
+                  <Text style={styles.saveBtnText}>Test Print</Text>
+                </LinearGradient>
+              </Pressable>
+
+              <View style={{ backgroundColor: Colors.info + "15", borderRadius: 12, padding: 14, marginTop: 8, borderWidth: 1, borderColor: Colors.info + "30" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <Ionicons name="information-circle" size={18} color={Colors.info} />
+                  <Text style={{ color: Colors.info, fontSize: 13, fontWeight: "600" }}>Connection Info</Text>
+                </View>
+                <Text style={{ color: Colors.textMuted, fontSize: 12, lineHeight: 18 }}>Connect a Bluetooth thermal printer via device settings. Supported printers: ESC/POS compatible thermal printers (58mm or 80mm).</Text>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
