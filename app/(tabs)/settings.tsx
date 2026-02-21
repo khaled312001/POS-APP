@@ -76,6 +76,14 @@ export default function SettingsScreen() {
   const [showPOForm, setShowPOForm] = useState(false);
   const [poForm, setPOForm] = useState({ supplierId: "", notes: "" });
 
+  const [showReturnsManager, setShowReturnsManager] = useState(false);
+  const [showReturnForm, setShowReturnForm] = useState(false);
+  const [returnForm, setReturnForm] = useState({ originalSaleId: "", reason: "", type: "refund" });
+  const [showCashDrawer, setShowCashDrawer] = useState(false);
+  const [cashDrawerForm, setCashDrawerForm] = useState({ type: "withdrawal", amount: "", reason: "" });
+  const [showWarehouseManager, setShowWarehouseManager] = useState(false);
+  const [showBatchManager, setShowBatchManager] = useState(false);
+
   const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: suppliers = [] } = useQuery<any[]>({ queryKey: ["/api/suppliers"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: branches = [] } = useQuery<any[]>({ queryKey: ["/api/branches"], queryFn: getQueryFn({ on401: "throw" }) });
@@ -83,6 +91,11 @@ export default function SettingsScreen() {
   const { data: expenses = [] } = useQuery<any[]>({ queryKey: ["/api/expenses"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: purchaseOrders = [] } = useQuery<any[]>({ queryKey: ["/api/purchase-orders"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: activityLog = [] } = useQuery<any[]>({ queryKey: ["/api/activity-log"], queryFn: getQueryFn({ on401: "throw" }) });
+  const { data: returns = [] } = useQuery<any[]>({ queryKey: ["/api/returns"], queryFn: getQueryFn({ on401: "throw" }) });
+  const { data: salesList = [] } = useQuery<any[]>({ queryKey: ["/api/sales?limit=50"], queryFn: getQueryFn({ on401: "throw" }) });
+  const { data: warehousesList = [] } = useQuery<any[]>({ queryKey: ["/api/warehouses"], queryFn: getQueryFn({ on401: "throw" }) });
+  const { data: batchesList = [] } = useQuery<any[]>({ queryKey: ["/api/product-batches"], queryFn: getQueryFn({ on401: "throw" }) });
+  const { data: productsList = [] } = useQuery<any[]>({ queryKey: ["/api/products"], queryFn: getQueryFn({ on401: "throw" }) });
 
   const activeShift = shifts.find((s: any) => s.employeeId === employee?.id && s.startTime && !s.endTime && s.status === "open");
 
@@ -149,6 +162,63 @@ export default function SettingsScreen() {
     onError: (e: any) => Alert.alert("Error", e.message),
   });
 
+  const createReturnMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const sale = salesList.find((s: any) => String(s.id) === String(data.originalSaleId));
+      if (!sale) throw new Error("Sale not found");
+      const saleRes = await apiRequest("GET", `/api/sales/${sale.id}`);
+      const saleDetail = await saleRes.json();
+      const returnItems = (saleDetail.items || []).map((item: any) => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        total: item.total,
+      }));
+      return apiRequest("POST", "/api/returns", {
+        originalSaleId: Number(data.originalSaleId),
+        employeeId: employee?.id,
+        reason: data.reason,
+        type: data.type,
+        totalAmount: sale.totalAmount,
+        refundMethod: sale.paymentMethod,
+        branchId: employee?.branchId || 1,
+        items: returnItems,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/returns"] });
+      qc.invalidateQueries({ queryKey: ["/api/sales"] });
+      qc.invalidateQueries({ queryKey: ["/api/inventory"] });
+      setShowReturnForm(false);
+      setReturnForm({ originalSaleId: "", reason: "", type: "refund" });
+      Alert.alert("Success", "Return processed successfully");
+    },
+    onError: (e: any) => Alert.alert("Error", e.message),
+  });
+
+  const cashDrawerMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/cash-drawer", data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/shifts"] });
+      setCashDrawerForm({ type: "withdrawal", amount: "", reason: "" });
+      Alert.alert("Success", "Cash drawer operation recorded");
+    },
+    onError: (e: any) => Alert.alert("Error", e.message),
+  });
+
+  const createWarehouseMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/warehouses", data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/warehouses"] }); },
+    onError: (e: any) => Alert.alert("Error", e.message),
+  });
+
+  const createBatchMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/product-batches", data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/product-batches"] }); },
+    onError: (e: any) => Alert.alert("Error", e.message),
+  });
+
   const topPad = Platform.OS === "web" ? 67 : 0;
   const roleColors: Record<string, string> = { admin: Colors.danger, manager: Colors.warning, cashier: Colors.info, owner: Colors.secondary };
 
@@ -188,6 +258,10 @@ export default function SettingsScreen() {
         <SettingRow icon="time" label="Attendance" value={`${shifts.length} shifts`} onPress={() => setShowAttendance(true)} color={Colors.warning} />
         <SettingRow icon="document-text" label="Purchase Orders" value={`${purchaseOrders.length} orders`} onPress={() => setShowPurchaseOrders(true)} color={Colors.info} />
         <SettingRow icon="list" label="Activity Log" value={`${activityLog.length} entries`} onPress={() => setShowActivityLog(true)} color={Colors.secondary} />
+        <SettingRow icon="swap-horizontal" label="Returns & Refunds" value={`${returns.length} returns`} onPress={() => setShowReturnsManager(true)} color={Colors.danger} />
+        <SettingRow icon="cash" label="Cash Drawer" value={activeShift ? "Active Shift" : "No Active Shift"} onPress={() => setShowCashDrawer(true)} color={Colors.success} />
+        <SettingRow icon="home" label="Warehouses" value={`${warehousesList.length} warehouses`} onPress={() => setShowWarehouseManager(true)} color={Colors.accent} />
+        <SettingRow icon="layers" label="Product Batches" value={`${batchesList.length} batches`} onPress={() => setShowBatchManager(true)} color={Colors.secondary} />
 
         <Text style={styles.sectionTitle}>System</Text>
         <SettingRow icon="language" label="Language" value="English" color={Colors.accent} />
@@ -619,6 +693,254 @@ export default function SettingsScreen() {
                     <View style={[styles.roleBadge, { backgroundColor: Colors.secondary + "20" }]}>
                       <Text style={[styles.roleText, { color: Colors.secondary }]}>{item.action?.replace(/_/g, " ") || "action"}</Text>
                     </View>
+                  </View>
+                );
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showReturnsManager} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Returns & Refunds</Text>
+              <View style={styles.modalActions}>
+                <Pressable onPress={() => { setReturnForm({ originalSaleId: "", reason: "", type: "refund" }); setShowReturnForm(true); }}>
+                  <Ionicons name="add-circle" size={28} color={Colors.accent} />
+                </Pressable>
+                <Pressable onPress={() => setShowReturnsManager(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              </View>
+            </View>
+            <FlatList
+              data={returns}
+              keyExtractor={(item: any) => String(item.id)}
+              scrollEnabled={!!returns.length}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>No returns recorded</Text>}
+              renderItem={({ item }: { item: any }) => (
+                <View style={styles.empCard}>
+                  <View style={[styles.empAvatar, { backgroundColor: Colors.warning + "30" }]}>
+                    <Ionicons name="swap-horizontal" size={20} color={Colors.warning} />
+                  </View>
+                  <View style={styles.empInfo}>
+                    <Text style={styles.empName}>Return #{item.id} - Sale #{item.originalSaleId}</Text>
+                    <Text style={styles.empMeta}>${Number(item.totalAmount).toFixed(2)} | {item.reason || "No reason"} | {new Date(item.createdAt).toLocaleDateString()}</Text>
+                  </View>
+                  <View style={[styles.roleBadge, { backgroundColor: (item.status === "completed" ? Colors.success : Colors.warning) + "20" }]}>
+                    <Text style={[styles.roleText, { color: item.status === "completed" ? Colors.success : Colors.warning }]}>{item.status || "completed"}</Text>
+                  </View>
+                </View>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showReturnForm} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Process Return</Text>
+              <Pressable onPress={() => setShowReturnForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <ScrollView>
+              <Text style={styles.label}>Select Sale to Return *</Text>
+              <FlatList
+                data={salesList.filter((s: any) => s.status === "completed").slice(0, 20)}
+                keyExtractor={(item: any) => String(item.id)}
+                scrollEnabled={false}
+                renderItem={({ item }: { item: any }) => (
+                  <Pressable
+                    style={[styles.empCard, returnForm.originalSaleId === String(item.id) && { borderWidth: 2, borderColor: Colors.accent }]}
+                    onPress={() => setReturnForm({ ...returnForm, originalSaleId: String(item.id) })}
+                  >
+                    <View style={styles.empInfo}>
+                      <Text style={styles.empName}>{item.receiptNumber}</Text>
+                      <Text style={styles.empMeta}>${Number(item.totalAmount).toFixed(2)} | {new Date(item.createdAt).toLocaleDateString()} | {item.paymentMethod}</Text>
+                    </View>
+                    {returnForm.originalSaleId === String(item.id) && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
+                  </Pressable>
+                )}
+              />
+              <Text style={styles.label}>Return Type</Text>
+              <View style={styles.roleRow}>
+                {["refund", "exchange", "store_credit"].map((t) => (
+                  <Pressable key={t} style={[styles.roleChip, returnForm.type === t && { backgroundColor: Colors.accent }]} onPress={() => setReturnForm({ ...returnForm, type: t })}>
+                    <Text style={[styles.roleChipText, returnForm.type === t && { color: Colors.textDark }]}>{t.replace("_", " ")}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.label}>Reason</Text>
+              <TextInput style={styles.input} value={returnForm.reason} onChangeText={(t) => setReturnForm({ ...returnForm, reason: t })} placeholderTextColor={Colors.textMuted} placeholder="Reason for return" />
+              <Pressable style={styles.saveBtn} onPress={() => {
+                if (!returnForm.originalSaleId) return Alert.alert("Error", "Select a sale to return");
+                createReturnMutation.mutate(returnForm);
+              }}>
+                <LinearGradient colors={[Colors.warning, Colors.danger]} style={styles.saveBtnGradient}>
+                  <Text style={styles.saveBtnText}>Process Return</Text>
+                </LinearGradient>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showCashDrawer} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Cash Drawer</Text>
+              <Pressable onPress={() => setShowCashDrawer(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <ScrollView>
+              {activeShift ? (
+                <>
+                  <View style={{ backgroundColor: Colors.success + "15", borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.success + "30" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.success }} />
+                      <Text style={{ color: Colors.success, fontSize: 14, fontWeight: "700" }}>Active Shift</Text>
+                    </View>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12 }}>Opening Cash: ${Number(activeShift.openingCash || 0).toFixed(2)}</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>Duration: {activeShiftElapsed || "0:00"}</Text>
+                  </View>
+
+                  <Text style={styles.label}>Operation Type</Text>
+                  <View style={styles.roleRow}>
+                    {["withdrawal", "deposit", "count"].map((t) => (
+                      <Pressable key={t} style={[styles.roleChip, cashDrawerForm.type === t && { backgroundColor: Colors.accent }]} onPress={() => setCashDrawerForm({ ...cashDrawerForm, type: t })}>
+                        <Text style={[styles.roleChipText, cashDrawerForm.type === t && { color: Colors.textDark }]}>{t}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+
+                  <Text style={styles.label}>Amount *</Text>
+                  <TextInput style={styles.input} value={cashDrawerForm.amount} onChangeText={(t) => setCashDrawerForm({ ...cashDrawerForm, amount: t })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" />
+
+                  <Text style={styles.label}>Reason</Text>
+                  <TextInput style={styles.input} value={cashDrawerForm.reason} onChangeText={(t) => setCashDrawerForm({ ...cashDrawerForm, reason: t })} placeholderTextColor={Colors.textMuted} placeholder="Reason for operation" />
+
+                  <Pressable style={styles.saveBtn} onPress={() => {
+                    if (!cashDrawerForm.amount) return Alert.alert("Error", "Amount is required");
+                    cashDrawerMutation.mutate({
+                      shiftId: activeShift.id,
+                      employeeId: employee?.id,
+                      type: cashDrawerForm.type,
+                      amount: cashDrawerForm.amount,
+                      reason: cashDrawerForm.reason,
+                    });
+                  }}>
+                    <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
+                      <Text style={styles.saveBtnText}>Record Operation</Text>
+                    </LinearGradient>
+                  </Pressable>
+                </>
+              ) : (
+                <View style={{ alignItems: "center", paddingVertical: 40 }}>
+                  <Ionicons name="lock-closed" size={48} color={Colors.textMuted} />
+                  <Text style={{ color: Colors.textMuted, fontSize: 15, marginTop: 12 }}>No active shift</Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 4, textAlign: "center" }}>Start a shift from the Attendance section to use the cash drawer</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showWarehouseManager} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Warehouses</Text>
+              <View style={styles.modalActions}>
+                <Pressable onPress={() => {
+                  Alert.prompt ? Alert.prompt("New Warehouse", "Enter warehouse name", (name: string) => {
+                    if (name) createWarehouseMutation.mutate({ name, branchId: employee?.branchId || 1 });
+                  }) : createWarehouseMutation.mutate({ name: `Warehouse ${warehousesList.length + 1}`, branchId: employee?.branchId || 1 });
+                }}>
+                  <Ionicons name="add-circle" size={28} color={Colors.accent} />
+                </Pressable>
+                <Pressable onPress={() => setShowWarehouseManager(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              </View>
+            </View>
+            <FlatList
+              data={warehousesList}
+              keyExtractor={(item: any) => String(item.id)}
+              scrollEnabled={!!warehousesList.length}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>No warehouses yet. Tap + to add one.</Text>}
+              renderItem={({ item }: { item: any }) => (
+                <View style={styles.empCard}>
+                  <View style={[styles.empAvatar, { backgroundColor: Colors.accent + "30" }]}>
+                    <Ionicons name="home" size={20} color={Colors.accent} />
+                  </View>
+                  <View style={styles.empInfo}>
+                    <Text style={styles.empName}>{item.name}</Text>
+                    <Text style={styles.empMeta}>{item.address || "No address"}</Text>
+                  </View>
+                  {item.isDefault && (
+                    <View style={[styles.roleBadge, { backgroundColor: Colors.accent + "20" }]}>
+                      <Text style={[styles.roleText, { color: Colors.accent }]}>Default</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showBatchManager} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Product Batches</Text>
+              <View style={styles.modalActions}>
+                <Pressable onPress={() => {
+                  if (productsList.length === 0) return Alert.alert("Error", "No products available");
+                  const firstProd = productsList[0];
+                  createBatchMutation.mutate({
+                    productId: firstProd.id,
+                    batchNumber: `BATCH-${Date.now().toString(36).toUpperCase()}`,
+                    quantity: 50,
+                    branchId: employee?.branchId || 1,
+                  });
+                }}>
+                  <Ionicons name="add-circle" size={28} color={Colors.accent} />
+                </Pressable>
+                <Pressable onPress={() => setShowBatchManager(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              </View>
+            </View>
+            <FlatList
+              data={batchesList}
+              keyExtractor={(item: any) => String(item.id)}
+              scrollEnabled={!!batchesList.length}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>No batches tracked yet</Text>}
+              renderItem={({ item }: { item: any }) => {
+                const prod = productsList.find((p: any) => p.id === item.productId);
+                const isExpired = item.expiryDate && new Date(item.expiryDate) < new Date();
+                const isNearExpiry = item.expiryDate && !isExpired && (new Date(item.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24) <= 30;
+                return (
+                  <View style={styles.empCard}>
+                    <View style={[styles.empAvatar, { backgroundColor: (isExpired ? Colors.danger : isNearExpiry ? Colors.warning : Colors.secondary) + "30" }]}>
+                      <Ionicons name="layers" size={20} color={isExpired ? Colors.danger : isNearExpiry ? Colors.warning : Colors.secondary} />
+                    </View>
+                    <View style={styles.empInfo}>
+                      <Text style={styles.empName}>{prod?.name || `Product #${item.productId}`}</Text>
+                      <Text style={styles.empMeta}>
+                        Batch: {item.batchNumber} | Qty: {item.quantity}
+                        {item.expiryDate ? ` | Exp: ${new Date(item.expiryDate).toLocaleDateString()}` : ""}
+                      </Text>
+                    </View>
+                    {isExpired && (
+                      <View style={[styles.roleBadge, { backgroundColor: Colors.danger + "20" }]}>
+                        <Text style={[styles.roleText, { color: Colors.danger }]}>Expired</Text>
+                      </View>
+                    )}
+                    {isNearExpiry && (
+                      <View style={[styles.roleBadge, { backgroundColor: Colors.warning + "20" }]}>
+                        <Text style={[styles.roleText, { color: Colors.warning }]}>Near Expiry</Text>
+                      </View>
+                    )}
                   </View>
                 );
               }}

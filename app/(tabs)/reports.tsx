@@ -20,12 +20,14 @@ import { getQueryFn } from "@/lib/query-client";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const isTablet = SCREEN_WIDTH > 700;
 
-type TabType = "overview" | "sales" | "inventory" | "activity";
+type TabType = "overview" | "sales" | "inventory" | "returns" | "finance" | "activity";
 
 const TAB_ICONS: Record<TabType, string> = {
   overview: "analytics",
   sales: "receipt",
   inventory: "cube",
+  returns: "swap-horizontal",
+  finance: "wallet",
   activity: "list",
 };
 
@@ -84,6 +86,31 @@ export default function ReportsScreen() {
     queryKey: [salesQueryKey],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!(dateFrom || dateTo),
+  });
+
+  const { data: returnsReport } = useQuery<any>({
+    queryKey: ["/api/analytics/returns-report"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  const { data: profitByProduct = [] } = useQuery<any[]>({
+    queryKey: ["/api/analytics/profit-by-product"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  const { data: cashierPerformance = [] } = useQuery<any[]>({
+    queryKey: ["/api/analytics/cashier-performance"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  const { data: slowMovingProducts = [] } = useQuery<any[]>({
+    queryKey: ["/api/analytics/slow-moving"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  const { data: inventoryMovements = [] } = useQuery<any[]>({
+    queryKey: ["/api/inventory-movements?limit=50"],
+    queryFn: getQueryFn({ on401: "throw" }),
   });
 
   const topPad = Platform.OS === "web" ? 67 : 0;
@@ -406,6 +433,41 @@ export default function ReportsScreen() {
         </GlassCard>
       )}
 
+      <Text style={styles.sectionTitle}>Recent Movements</Text>
+      {inventoryMovements.length > 0 ? (
+        <FlatList
+          data={inventoryMovements.slice(0, 15)}
+          keyExtractor={(item: any) => String(item.id)}
+          scrollEnabled={false}
+          renderItem={({ item }: { item: any }) => {
+            const typeColors: Record<string, string> = { sale: Colors.success, return: Colors.warning, adjustment: Colors.info, transfer: Colors.secondary, purchase: Colors.accent, count: Colors.danger };
+            const typeIcons: Record<string, string> = { sale: "cart", return: "swap-horizontal", adjustment: "construct", transfer: "repeat", purchase: "cube", count: "clipboard" };
+            const color = typeColors[item.type] || Colors.textMuted;
+            return (
+              <GlassCard style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 }}>
+                <View style={[styles.paymentIcon, { backgroundColor: color + "20" }]}>
+                  <Ionicons name={(typeIcons[item.type] || "ellipse") as any} size={16} color={color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: Colors.text, fontSize: 13, fontWeight: "600" }}>{item.notes || `${item.type} movement`}</Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{new Date(item.createdAt).toLocaleString()}</Text>
+                </View>
+                <Text style={{ color: item.quantity > 0 ? Colors.success : Colors.danger, fontSize: 14, fontWeight: "700" }}>
+                  {item.quantity > 0 ? "+" : ""}{item.quantity}
+                </Text>
+              </GlassCard>
+            );
+          }}
+        />
+      ) : (
+        <GlassCard>
+          <View style={styles.empty}>
+            <Ionicons name="swap-vertical-outline" size={32} color={Colors.textMuted} />
+            <Text style={styles.emptyText}>No inventory movements yet</Text>
+          </View>
+        </GlassCard>
+      )}
+
       <Text style={styles.sectionTitle}>Full Inventory</Text>
       <FlatList
         data={allProducts}
@@ -500,6 +562,167 @@ export default function ReportsScreen() {
     );
   };
 
+  const renderReturns = () => (
+    <>
+      <View style={styles.statGrid}>
+        <GlassCard style={styles.statCardHalf}>
+          <View style={[styles.statIconWrap, { backgroundColor: Colors.warning + "20" }]}>
+            <Ionicons name="swap-horizontal" size={20} color={Colors.warning} />
+          </View>
+          <Text style={styles.statLabel}>Total Returns</Text>
+          <Text style={styles.statValue}>{returnsReport?.totalReturns || 0}</Text>
+        </GlassCard>
+        <GlassCard style={styles.statCardHalf}>
+          <View style={[styles.statIconWrap, { backgroundColor: Colors.danger + "20" }]}>
+            <Ionicons name="cash" size={20} color={Colors.danger} />
+          </View>
+          <Text style={styles.statLabel}>Total Refunds</Text>
+          <Text style={styles.statValue}>${Number(returnsReport?.totalRefundAmount || 0).toFixed(2)}</Text>
+        </GlassCard>
+      </View>
+
+      <Text style={styles.sectionTitle}>Recent Returns</Text>
+      {(returnsReport?.recentReturns || []).length > 0 ? (
+        (returnsReport.recentReturns || []).map((ret: any) => (
+          <GlassCard key={ret.id} style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 }}>
+            <View style={[styles.paymentIcon, { backgroundColor: Colors.warning + "20" }]}>
+              <Ionicons name="swap-horizontal" size={18} color={Colors.warning} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: Colors.text, fontSize: 14, fontWeight: "600" }}>Return #{ret.id} - Sale #{ret.originalSaleId}</Text>
+              <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                {new Date(ret.createdAt).toLocaleString()} | {ret.reason || "No reason"} | {ret.type || "refund"}
+              </Text>
+            </View>
+            <Text style={{ color: Colors.danger, fontSize: 15, fontWeight: "700" }}>-${Number(ret.totalAmount).toFixed(2)}</Text>
+          </GlassCard>
+        ))
+      ) : (
+        <GlassCard>
+          <View style={styles.empty}>
+            <Ionicons name="checkmark-circle" size={40} color={Colors.success} />
+            <Text style={styles.emptyText}>No returns recorded</Text>
+          </View>
+        </GlassCard>
+      )}
+    </>
+  );
+
+  const renderFinance = () => {
+    const totalProfitAll = profitByProduct.reduce((sum: number, p: any) => sum + (p.profit || 0), 0);
+    const maxProfit = profitByProduct.length > 0 ? Math.max(...profitByProduct.map((p: any) => Math.abs(p.profit || 0)), 1) : 1;
+
+    return (
+      <>
+        <View style={styles.statGrid}>
+          <GlassCard style={styles.statCardHalf}>
+            <View style={[styles.statIconWrap, { backgroundColor: Colors.success + "20" }]}>
+              <Ionicons name="trending-up" size={20} color={Colors.success} />
+            </View>
+            <Text style={styles.statLabel}>Total Profit</Text>
+            <Text style={[styles.statValue, { color: totalProfitAll >= 0 ? Colors.success : Colors.danger }]}>
+              ${totalProfitAll.toFixed(2)}
+            </Text>
+          </GlassCard>
+          <GlassCard style={styles.statCardHalf}>
+            <View style={[styles.statIconWrap, { backgroundColor: Colors.info + "20" }]}>
+              <Ionicons name="people" size={20} color={Colors.info} />
+            </View>
+            <Text style={styles.statLabel}>Active Cashiers</Text>
+            <Text style={styles.statValue}>{cashierPerformance.length}</Text>
+          </GlassCard>
+        </View>
+
+        <Text style={styles.sectionTitle}>Cashier Performance</Text>
+        {cashierPerformance.length > 0 ? (
+          <GlassCard>
+            {cashierPerformance.map((perf: any, index: number) => (
+              <View key={perf.employeeId} style={[styles.topProductRow, index < cashierPerformance.length - 1 && styles.topProductBorder]}>
+                <View style={styles.topProductRank}>
+                  <Text style={styles.topProductRankText}>{index + 1}</Text>
+                </View>
+                <View style={styles.topProductInfo}>
+                  <Text style={styles.topProductName}>{perf.employeeName}</Text>
+                  <View style={styles.topProductMeta}>
+                    <Text style={styles.topProductRevenue}>${Number(perf.totalRevenue).toFixed(2)}</Text>
+                    <Text style={styles.topProductQty}>{perf.salesCount} sales | Avg ${Number(perf.avgSaleValue).toFixed(2)}</Text>
+                  </View>
+                </View>
+                <View style={[styles.badge, { backgroundColor: (perf.role === "admin" ? Colors.danger : perf.role === "manager" ? Colors.warning : Colors.info) + "20" }]}>
+                  <Text style={[styles.badgeText, { color: perf.role === "admin" ? Colors.danger : perf.role === "manager" ? Colors.warning : Colors.info }]}>{perf.role}</Text>
+                </View>
+              </View>
+            ))}
+          </GlassCard>
+        ) : (
+          <GlassCard>
+            <View style={styles.empty}>
+              <Ionicons name="people-outline" size={32} color={Colors.textMuted} />
+              <Text style={styles.emptyText}>No sales data yet</Text>
+            </View>
+          </GlassCard>
+        )}
+
+        <Text style={styles.sectionTitle}>Profit by Product</Text>
+        {profitByProduct.length > 0 ? (
+          <GlassCard>
+            {profitByProduct.slice(0, 10).map((product: any, index: number) => (
+              <View key={product.productId} style={[styles.topProductRow, index < Math.min(profitByProduct.length, 10) - 1 && styles.topProductBorder]}>
+                <View style={styles.topProductRank}>
+                  <Text style={styles.topProductRankText}>{index + 1}</Text>
+                </View>
+                <View style={styles.topProductInfo}>
+                  <Text style={styles.topProductName} numberOfLines={1}>{product.productName}</Text>
+                  <View style={styles.topProductMeta}>
+                    <Text style={[styles.topProductRevenue, { color: product.profit >= 0 ? Colors.success : Colors.danger }]}>
+                      Profit: ${Number(product.profit).toFixed(2)}
+                    </Text>
+                    <Text style={styles.topProductQty}>{product.totalSold} sold | Cost: ${Number(product.costPrice).toFixed(2)}</Text>
+                  </View>
+                  <PercentBar percent={(Math.abs(product.profit) / maxProfit) * 100} color={product.profit >= 0 ? Colors.success : Colors.danger} height={4} />
+                </View>
+              </View>
+            ))}
+          </GlassCard>
+        ) : (
+          <GlassCard>
+            <View style={styles.empty}>
+              <Ionicons name="bar-chart-outline" size={32} color={Colors.textMuted} />
+              <Text style={styles.emptyText}>No profit data yet</Text>
+            </View>
+          </GlassCard>
+        )}
+
+        <Text style={styles.sectionTitle}>Slow Moving Products (Last 30 Days)</Text>
+        {slowMovingProducts.length > 0 ? (
+          <GlassCard>
+            {slowMovingProducts.slice(0, 8).map((product: any, index: number) => (
+              <View key={product.id} style={[{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 }, index < Math.min(slowMovingProducts.length, 8) - 1 && styles.topProductBorder]}>
+                <View style={[styles.paymentIcon, { backgroundColor: Colors.warning + "20" }]}>
+                  <Ionicons name="trending-down" size={16} color={Colors.warning} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: Colors.text, fontSize: 13, fontWeight: "600" }} numberOfLines={1}>{product.name}</Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 11 }}>Price: ${Number(product.price).toFixed(2)} | Sold: {product.recentSold}</Text>
+                </View>
+                <View style={[styles.badge, { backgroundColor: Colors.warning + "20" }]}>
+                  <Text style={[styles.badgeText, { color: Colors.warning }]}>Slow</Text>
+                </View>
+              </View>
+            ))}
+          </GlassCard>
+        ) : (
+          <GlassCard>
+            <View style={styles.empty}>
+              <Ionicons name="checkmark-circle" size={32} color={Colors.success} />
+              <Text style={styles.emptyText}>All products are selling well</Text>
+            </View>
+          </GlassCard>
+        )}
+      </>
+    );
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top + topPad }]}>
       <LinearGradient
@@ -513,7 +736,7 @@ export default function ReportsScreen() {
       </LinearGradient>
 
       <View style={styles.tabRow}>
-        {(["overview", "sales", "inventory", "activity"] as const).map((t) => (
+        {(["overview", "sales", "inventory", "returns", "finance", "activity"] as const).map((t) => (
           <Pressable
             key={t}
             style={[styles.tabBtn, tab === t && styles.tabBtnActive]}
@@ -538,6 +761,8 @@ export default function ReportsScreen() {
         {tab === "overview" && renderOverview()}
         {tab === "sales" && renderSales()}
         {tab === "inventory" && renderInventory()}
+        {tab === "returns" && renderReturns()}
+        {tab === "finance" && renderFinance()}
         {tab === "activity" && renderActivity()}
       </ScrollView>
     </View>

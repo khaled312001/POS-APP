@@ -28,6 +28,7 @@ export const employees = pgTable("employees", {
   branchId: integer("branch_id").references(() => branches.id),
   isActive: boolean("is_active").default(true),
   hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("0"),
   avatar: text("avatar"),
   permissions: jsonb("permissions").$type<string[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
@@ -114,6 +115,7 @@ export const sales = pgTable("sales", {
   changeAmount: decimal("change_amount", { precision: 10, scale: 2 }).default("0"),
   tableNumber: text("table_number"),
   orderType: text("order_type").default("dine_in"),
+  paymentDetails: jsonb("payment_details").$type<{method: string; amount: number}[]>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -256,6 +258,10 @@ export const returns = pgTable("returns", {
   reason: text("reason"),
   type: text("type").default("refund"),
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
+  returnGraceDays: integer("return_grace_days").default(30),
+  refundMethod: text("refund_method"),
+  approvedBy: integer("approved_by").references(() => employees.id),
+  branchId: integer("branch_id").references(() => branches.id),
   status: text("status").default("completed"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -282,6 +288,118 @@ export const syncQueue = pgTable("sync_queue", {
   processedAt: timestamp("processed_at"),
 });
 
+export const cashDrawerOperations = pgTable("cash_drawer_operations", {
+  id: serial("id").primaryKey(),
+  shiftId: integer("shift_id").references(() => shifts.id).notNull(),
+  employeeId: integer("employee_id").references(() => employees.id).notNull(),
+  type: text("type").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  expectedAmount: decimal("expected_amount", { precision: 10, scale: 2 }),
+  actualAmount: decimal("actual_amount", { precision: 10, scale: 2 }),
+  difference: decimal("difference", { precision: 10, scale: 2 }),
+  reason: text("reason"),
+  approvedBy: integer("approved_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const warehouses = pgTable("warehouses", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  branchId: integer("branch_id").references(() => branches.id).notNull(),
+  address: text("address"),
+  isDefault: boolean("is_default").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const warehouseTransfers = pgTable("warehouse_transfers", {
+  id: serial("id").primaryKey(),
+  fromWarehouseId: integer("from_warehouse_id").references(() => warehouses.id).notNull(),
+  toWarehouseId: integer("to_warehouse_id").references(() => warehouses.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  quantity: integer("quantity").notNull(),
+  employeeId: integer("employee_id").references(() => employees.id),
+  status: text("status").default("completed"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const productBatches = pgTable("product_batches", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  batchNumber: text("batch_number").notNull(),
+  quantity: integer("quantity").default(0),
+  expiryDate: timestamp("expiry_date"),
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
+  branchId: integer("branch_id").references(() => branches.id),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
+  receivedDate: timestamp("received_date").defaultNow(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const inventoryMovements = pgTable("inventory_movements", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  branchId: integer("branch_id").references(() => branches.id),
+  type: text("type").notNull(),
+  quantity: integer("quantity").notNull(),
+  previousQuantity: integer("previous_quantity"),
+  newQuantity: integer("new_quantity"),
+  referenceType: text("reference_type"),
+  referenceId: integer("reference_id"),
+  batchNumber: text("batch_number"),
+  employeeId: integer("employee_id").references(() => employees.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const stockCounts = pgTable("stock_counts", {
+  id: serial("id").primaryKey(),
+  branchId: integer("branch_id").references(() => branches.id).notNull(),
+  employeeId: integer("employee_id").references(() => employees.id).notNull(),
+  status: text("status").default("in_progress"),
+  approvedBy: integer("approved_by").references(() => employees.id),
+  totalItems: integer("total_items").default(0),
+  discrepancies: integer("discrepancies").default(0),
+  notes: text("notes"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const stockCountItems = pgTable("stock_count_items", {
+  id: serial("id").primaryKey(),
+  stockCountId: integer("stock_count_id").references(() => stockCounts.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  systemQuantity: integer("system_quantity").notNull(),
+  actualQuantity: integer("actual_quantity"),
+  difference: integer("difference"),
+  notes: text("notes"),
+});
+
+export const supplierContracts = pgTable("supplier_contracts", {
+  id: serial("id").primaryKey(),
+  supplierId: integer("supplier_id").references(() => suppliers.id).notNull(),
+  discountRate: decimal("discount_rate", { precision: 5, scale: 2 }).default("0"),
+  paymentTerms: text("payment_terms"),
+  minOrderAmount: decimal("min_order_amount", { precision: 10, scale: 2 }),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const employeeCommissions = pgTable("employee_commissions", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").references(() => employees.id).notNull(),
+  saleId: integer("sale_id").references(() => sales.id).notNull(),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull(),
+  commissionAmount: decimal("commission_amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertBranchSchema = createInsertSchema(branches).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true });
@@ -302,6 +420,15 @@ export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
 export const insertActivityLogSchema = createInsertSchema(activityLog).omit({ id: true, createdAt: true });
 export const insertReturnSchema = createInsertSchema(returns).omit({ id: true, createdAt: true });
 export const insertReturnItemSchema = createInsertSchema(returnItems).omit({ id: true });
+export const insertCashDrawerOperationSchema = createInsertSchema(cashDrawerOperations).omit({ id: true, createdAt: true });
+export const insertWarehouseSchema = createInsertSchema(warehouses).omit({ id: true, createdAt: true });
+export const insertWarehouseTransferSchema = createInsertSchema(warehouseTransfers).omit({ id: true, createdAt: true });
+export const insertProductBatchSchema = createInsertSchema(productBatches).omit({ id: true, createdAt: true });
+export const insertInventoryMovementSchema = createInsertSchema(inventoryMovements).omit({ id: true, createdAt: true });
+export const insertStockCountSchema = createInsertSchema(stockCounts).omit({ id: true, createdAt: true });
+export const insertStockCountItemSchema = createInsertSchema(stockCountItems).omit({ id: true });
+export const insertSupplierContractSchema = createInsertSchema(supplierContracts).omit({ id: true, createdAt: true });
+export const insertEmployeeCommissionSchema = createInsertSchema(employeeCommissions).omit({ id: true, createdAt: true });
 
 export type Branch = typeof branches.$inferSelect;
 export type InsertBranch = z.infer<typeof insertBranchSchema>;
@@ -343,3 +470,21 @@ export type Return = typeof returns.$inferSelect;
 export type InsertReturn = z.infer<typeof insertReturnSchema>;
 export type ReturnItem = typeof returnItems.$inferSelect;
 export type InsertReturnItem = z.infer<typeof insertReturnItemSchema>;
+export type CashDrawerOperation = typeof cashDrawerOperations.$inferSelect;
+export type InsertCashDrawerOperation = z.infer<typeof insertCashDrawerOperationSchema>;
+export type Warehouse = typeof warehouses.$inferSelect;
+export type InsertWarehouse = z.infer<typeof insertWarehouseSchema>;
+export type WarehouseTransfer = typeof warehouseTransfers.$inferSelect;
+export type InsertWarehouseTransfer = z.infer<typeof insertWarehouseTransferSchema>;
+export type ProductBatch = typeof productBatches.$inferSelect;
+export type InsertProductBatch = z.infer<typeof insertProductBatchSchema>;
+export type InventoryMovement = typeof inventoryMovements.$inferSelect;
+export type InsertInventoryMovement = z.infer<typeof insertInventoryMovementSchema>;
+export type StockCount = typeof stockCounts.$inferSelect;
+export type InsertStockCount = z.infer<typeof insertStockCountSchema>;
+export type StockCountItem = typeof stockCountItems.$inferSelect;
+export type InsertStockCountItem = z.infer<typeof insertStockCountItemSchema>;
+export type SupplierContract = typeof supplierContracts.$inferSelect;
+export type InsertSupplierContract = z.infer<typeof insertSupplierContractSchema>;
+export type EmployeeCommission = typeof employeeCommissions.$inferSelect;
+export type InsertEmployeeCommission = z.infer<typeof insertEmployeeCommissionSchema>;

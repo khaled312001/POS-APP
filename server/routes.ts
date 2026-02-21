@@ -169,6 +169,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createSaleItem({ ...item, saleId: sale.id });
           if (saleData.branchId) {
             await storage.adjustInventory(item.productId, saleData.branchId, -item.quantity);
+            await storage.createInventoryMovement({
+              productId: item.productId,
+              branchId: saleData.branchId,
+              type: "sale",
+              quantity: -item.quantity,
+              referenceType: "sale",
+              referenceId: sale.id,
+              employeeId: saleData.employeeId,
+            });
           }
         }
       }
@@ -191,6 +200,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: sale.id,
         details: `Sale ${sale.receiptNumber} completed for $${saleData.totalAmount}`,
       });
+      // Handle employee commission
+      if (saleData.employeeId) {
+        const emp = await storage.getEmployee(saleData.employeeId);
+        if (emp && Number(emp.commissionRate || 0) > 0) {
+          const commRate = Number(emp.commissionRate);
+          const commAmount = Number(saleData.totalAmount) * (commRate / 100);
+          await storage.createEmployeeCommission({
+            employeeId: saleData.employeeId,
+            saleId: sale.id,
+            commissionRate: String(commRate),
+            commissionAmount: String(commAmount.toFixed(2)),
+          });
+        }
+      }
       res.json(sale);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -383,6 +406,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createReturnItem({ ...item, returnId: ret.id });
           if (returnData.branchId) {
             await storage.adjustInventory(item.productId, returnData.branchId, item.quantity);
+            await storage.createInventoryMovement({
+              productId: item.productId,
+              branchId: returnData.branchId,
+              type: "return",
+              quantity: item.quantity,
+              referenceType: "return",
+              referenceId: ret.id,
+              employeeId: returnData.employeeId,
+            });
           }
         }
       }
@@ -400,6 +432,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.json(ret);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Cash Drawer Operations
+  app.get("/api/cash-drawer/:shiftId", async (req, res) => {
+    try { res.json(await storage.getCashDrawerOperations(Number(req.params.shiftId))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/cash-drawer", async (req, res) => {
+    try {
+      const op = await storage.createCashDrawerOperation(req.body);
+      await storage.createActivityLog({ employeeId: req.body.employeeId, action: "cash_drawer_" + req.body.type, entityType: "cash_drawer", entityId: op.id, details: `Cash drawer ${req.body.type}: $${req.body.amount}` });
+      res.json(op);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Warehouses
+  app.get("/api/warehouses", async (req, res) => {
+    try { res.json(await storage.getWarehouses(req.query.branchId ? Number(req.query.branchId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/warehouses", async (req, res) => {
+    try { res.json(await storage.createWarehouse(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.put("/api/warehouses/:id", async (req, res) => {
+    try { res.json(await storage.updateWarehouse(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Warehouse Transfers
+  app.get("/api/warehouse-transfers", async (_req, res) => {
+    try { res.json(await storage.getWarehouseTransfers()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/warehouse-transfers", async (req, res) => {
+    try {
+      const transfer = await storage.createWarehouseTransfer(req.body);
+      await storage.createInventoryMovement({ productId: req.body.productId, branchId: null, type: "transfer", quantity: req.body.quantity, referenceType: "transfer", referenceId: transfer.id, employeeId: req.body.employeeId, notes: `Transfer from warehouse ${req.body.fromWarehouseId} to ${req.body.toWarehouseId}` });
+      res.json(transfer);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Product Batches
+  app.get("/api/product-batches", async (req, res) => {
+    try { res.json(await storage.getProductBatches(req.query.productId ? Number(req.query.productId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/product-batches", async (req, res) => {
+    try { res.json(await storage.createProductBatch(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.put("/api/product-batches/:id", async (req, res) => {
+    try { res.json(await storage.updateProductBatch(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Inventory Movements
+  app.get("/api/inventory-movements", async (req, res) => {
+    try {
+      const productId = req.query.productId ? Number(req.query.productId) : undefined;
+      const limit = req.query.limit ? Number(req.query.limit) : undefined;
+      res.json(await storage.getInventoryMovements(productId, limit));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Stock Counts (Physical Inventory)
+  app.get("/api/stock-counts", async (_req, res) => {
+    try { res.json(await storage.getStockCounts()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get("/api/stock-counts/:id", async (req, res) => {
+    try {
+      const sc = await storage.getStockCount(Number(req.params.id));
+      if (!sc) return res.status(404).json({ error: "Stock count not found" });
+      const items = await storage.getStockCountItems(sc.id);
+      res.json({ ...sc, items });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/stock-counts", async (req, res) => {
+    try {
+      const { items, ...countData } = req.body;
+      const sc = await storage.createStockCount(countData);
+      if (items && items.length > 0) {
+        for (const item of items) {
+          await storage.createStockCountItem({ ...item, stockCountId: sc.id });
+        }
+      }
+      res.json(sc);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.put("/api/stock-counts/:id/approve", async (req, res) => {
+    try {
+      const sc = await storage.updateStockCount(Number(req.params.id), { status: "approved", approvedBy: req.body.approvedBy });
+      const items = await storage.getStockCountItems(sc.id);
+      for (const item of items) {
+        if (item.actualQuantity !== null && item.difference !== null && item.difference !== 0) {
+          await storage.adjustInventory(item.productId, sc.branchId, item.difference);
+          await storage.createInventoryMovement({ productId: item.productId, branchId: sc.branchId, type: "count", quantity: item.difference, referenceType: "manual", referenceId: sc.id, notes: `Stock count adjustment: system ${item.systemQuantity} → actual ${item.actualQuantity}` });
+        }
+      }
+      await storage.createActivityLog({ employeeId: req.body.approvedBy, action: "stock_count_approved", entityType: "stock_count", entityId: sc.id, details: `Stock count #${sc.id} approved with ${sc.discrepancies || 0} discrepancies` });
+      res.json(sc);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Supplier Contracts
+  app.get("/api/supplier-contracts", async (req, res) => {
+    try { res.json(await storage.getSupplierContracts(req.query.supplierId ? Number(req.query.supplierId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/supplier-contracts", async (req, res) => {
+    try { res.json(await storage.createSupplierContract(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.put("/api/supplier-contracts/:id", async (req, res) => {
+    try { res.json(await storage.updateSupplierContract(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Employee Commissions
+  app.get("/api/employee-commissions", async (req, res) => {
+    try { res.json(await storage.getEmployeeCommissions(req.query.employeeId ? Number(req.query.employeeId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/employee-commissions", async (req, res) => {
+    try { res.json(await storage.createEmployeeCommission(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Advanced Analytics
+  app.get("/api/analytics/employee-sales/:id", async (req, res) => {
+    try { res.json(await storage.getEmployeeSalesReport(Number(req.params.id))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get("/api/analytics/slow-moving", async (req, res) => {
+    try { res.json(await storage.getSlowMovingProducts(req.query.days ? Number(req.query.days) : 30)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get("/api/analytics/profit-by-product", async (_req, res) => {
+    try { res.json(await storage.getProfitByProduct()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get("/api/analytics/cashier-performance", async (_req, res) => {
+    try { res.json(await storage.getCashierPerformance()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get("/api/analytics/returns-report", async (_req, res) => {
+    try { res.json(await storage.getReturnsReport()); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   const httpServer = createServer(app);

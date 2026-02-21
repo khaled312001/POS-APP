@@ -5,12 +5,17 @@ import {
   customers, sales, saleItems, suppliers, purchaseOrders,
   purchaseOrderItems, shifts, expenses, tables, kitchenOrders,
   subscriptionPlans, subscriptions, syncQueue, activityLog, returns, returnItems,
+  cashDrawerOperations, warehouses, warehouseTransfers, productBatches,
+  inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions,
   type InsertBranch, type InsertEmployee, type InsertCategory,
   type InsertProduct, type InsertInventory, type InsertCustomer,
   type InsertSale, type InsertSaleItem, type InsertSupplier,
   type InsertPurchaseOrder, type InsertPurchaseOrderItem, type InsertShift, type InsertExpense,
   type InsertTable, type InsertKitchenOrder, type InsertSubscriptionPlan,
   type InsertSubscription, type InsertActivityLog, type InsertReturn, type InsertReturnItem,
+  type InsertCashDrawerOperation, type InsertWarehouse, type InsertWarehouseTransfer,
+  type InsertProductBatch, type InsertInventoryMovement, type InsertStockCount,
+  type InsertStockCountItem, type InsertSupplierContract, type InsertEmployeeCommission,
 } from "@shared/schema";
 
 export const storage = {
@@ -561,5 +566,195 @@ export const storage = {
     }
 
     return true;
+  },
+
+  // Cash Drawer Operations
+  async getCashDrawerOperations(shiftId: number) {
+    return db.select().from(cashDrawerOperations).where(eq(cashDrawerOperations.shiftId, shiftId)).orderBy(desc(cashDrawerOperations.createdAt));
+  },
+  async createCashDrawerOperation(data: InsertCashDrawerOperation) {
+    const [op] = await db.insert(cashDrawerOperations).values(data).returning();
+    return op;
+  },
+
+  // Warehouses
+  async getWarehouses(branchId?: number) {
+    if (branchId) return db.select().from(warehouses).where(and(eq(warehouses.branchId, branchId), eq(warehouses.isActive, true)));
+    return db.select().from(warehouses).where(eq(warehouses.isActive, true));
+  },
+  async createWarehouse(data: InsertWarehouse) {
+    const [wh] = await db.insert(warehouses).values(data).returning();
+    return wh;
+  },
+  async updateWarehouse(id: number, data: Partial<InsertWarehouse>) {
+    const [wh] = await db.update(warehouses).set(data).where(eq(warehouses.id, id)).returning();
+    return wh;
+  },
+
+  // Warehouse Transfers
+  async getWarehouseTransfers() {
+    return db.select().from(warehouseTransfers).orderBy(desc(warehouseTransfers.createdAt));
+  },
+  async createWarehouseTransfer(data: InsertWarehouseTransfer) {
+    const [transfer] = await db.insert(warehouseTransfers).values(data).returning();
+    return transfer;
+  },
+
+  // Product Batches
+  async getProductBatches(productId?: number) {
+    if (productId) return db.select().from(productBatches).where(and(eq(productBatches.productId, productId), eq(productBatches.isActive, true))).orderBy(productBatches.expiryDate);
+    return db.select().from(productBatches).where(eq(productBatches.isActive, true)).orderBy(productBatches.expiryDate);
+  },
+  async createProductBatch(data: InsertProductBatch) {
+    const [batch] = await db.insert(productBatches).values(data).returning();
+    return batch;
+  },
+  async updateProductBatch(id: number, data: Partial<InsertProductBatch>) {
+    const [batch] = await db.update(productBatches).set(data).where(eq(productBatches.id, id)).returning();
+    return batch;
+  },
+
+  // Inventory Movements
+  async getInventoryMovements(productId?: number, limit?: number) {
+    const l = limit || 100;
+    if (productId) return db.select().from(inventoryMovements).where(eq(inventoryMovements.productId, productId)).orderBy(desc(inventoryMovements.createdAt)).limit(l);
+    return db.select().from(inventoryMovements).orderBy(desc(inventoryMovements.createdAt)).limit(l);
+  },
+  async createInventoryMovement(data: InsertInventoryMovement) {
+    const [mov] = await db.insert(inventoryMovements).values(data).returning();
+    return mov;
+  },
+
+  // Stock Counts
+  async getStockCounts() {
+    return db.select().from(stockCounts).orderBy(desc(stockCounts.createdAt));
+  },
+  async getStockCount(id: number) {
+    const [sc] = await db.select().from(stockCounts).where(eq(stockCounts.id, id));
+    return sc;
+  },
+  async createStockCount(data: InsertStockCount) {
+    const [sc] = await db.insert(stockCounts).values(data).returning();
+    return sc;
+  },
+  async updateStockCount(id: number, data: Partial<InsertStockCount>) {
+    const [sc] = await db.update(stockCounts).set(data).where(eq(stockCounts.id, id)).returning();
+    return sc;
+  },
+  async getStockCountItems(stockCountId: number) {
+    return db.select().from(stockCountItems).where(eq(stockCountItems.stockCountId, stockCountId));
+  },
+  async createStockCountItem(data: InsertStockCountItem) {
+    const [item] = await db.insert(stockCountItems).values(data).returning();
+    return item;
+  },
+  async updateStockCountItem(id: number, data: Partial<InsertStockCountItem>) {
+    const [item] = await db.update(stockCountItems).set(data).where(eq(stockCountItems.id, id)).returning();
+    return item;
+  },
+
+  // Supplier Contracts
+  async getSupplierContracts(supplierId?: number) {
+    if (supplierId) return db.select().from(supplierContracts).where(and(eq(supplierContracts.supplierId, supplierId), eq(supplierContracts.isActive, true)));
+    return db.select().from(supplierContracts).where(eq(supplierContracts.isActive, true));
+  },
+  async createSupplierContract(data: InsertSupplierContract) {
+    const [contract] = await db.insert(supplierContracts).values(data).returning();
+    return contract;
+  },
+  async updateSupplierContract(id: number, data: Partial<InsertSupplierContract>) {
+    const [contract] = await db.update(supplierContracts).set(data).where(eq(supplierContracts.id, id)).returning();
+    return contract;
+  },
+
+  // Employee Commissions
+  async getEmployeeCommissions(employeeId?: number) {
+    if (employeeId) return db.select().from(employeeCommissions).where(eq(employeeCommissions.employeeId, employeeId)).orderBy(desc(employeeCommissions.createdAt));
+    return db.select().from(employeeCommissions).orderBy(desc(employeeCommissions.createdAt));
+  },
+  async createEmployeeCommission(data: InsertEmployeeCommission) {
+    const [comm] = await db.insert(employeeCommissions).values(data).returning();
+    return comm;
+  },
+
+  // Advanced Analytics
+  async getEmployeeSalesReport(employeeId: number) {
+    const result = await db.select({
+      count: sql<number>`count(*)`,
+      total: sql<string>`coalesce(sum(${sales.totalAmount}::numeric), 0)`,
+    }).from(sales).where(eq(sales.employeeId, employeeId));
+    return { salesCount: Number(result[0]?.count || 0), totalRevenue: Number(result[0]?.total || 0) };
+  },
+  async getSlowMovingProducts(days: number = 30) {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    const allProds = await db.select().from(products).where(eq(products.isActive, true));
+    const recentSaleItems = await db.select({
+      productId: saleItems.productId,
+      totalSold: sql<number>`sum(${saleItems.quantity})`,
+    }).from(saleItems)
+      .innerJoin(sales, eq(saleItems.saleId, sales.id))
+      .where(gte(sales.createdAt, cutoffDate))
+      .groupBy(saleItems.productId);
+    const soldMap = new Map(recentSaleItems.map(r => [r.productId, Number(r.totalSold)]));
+    return allProds.filter(p => !soldMap.has(p.id) || (soldMap.get(p.id) || 0) < 3).map(p => ({
+      ...p,
+      recentSold: soldMap.get(p.id) || 0,
+    }));
+  },
+  async getProfitByProduct() {
+    const result = await db.select({
+      productId: saleItems.productId,
+      productName: saleItems.productName,
+      totalRevenue: sql<string>`sum(${saleItems.total}::numeric)`,
+      totalSold: sql<number>`sum(${saleItems.quantity})`,
+    }).from(saleItems).groupBy(saleItems.productId, saleItems.productName);
+    const prodList = await db.select().from(products);
+    const prodMap = new Map(prodList.map(p => [p.id, p]));
+    return result.map(r => {
+      const prod = prodMap.get(r.productId);
+      const costPrice = Number(prod?.costPrice || 0);
+      const revenue = Number(r.totalRevenue || 0);
+      const totalCost = costPrice * Number(r.totalSold || 0);
+      return {
+        productId: r.productId,
+        productName: r.productName,
+        totalRevenue: revenue,
+        totalCost,
+        profit: revenue - totalCost,
+        totalSold: Number(r.totalSold || 0),
+        costPrice,
+      };
+    }).sort((a, b) => b.profit - a.profit);
+  },
+  async getCashierPerformance() {
+    const result = await db.select({
+      employeeId: sales.employeeId,
+      count: sql<number>`count(*)`,
+      total: sql<string>`coalesce(sum(${sales.totalAmount}::numeric), 0)`,
+      avgSale: sql<string>`coalesce(avg(${sales.totalAmount}::numeric), 0)`,
+    }).from(sales).groupBy(sales.employeeId);
+    const empList = await db.select().from(employees);
+    const empMap = new Map(empList.map(e => [e.id, e]));
+    return result.map(r => ({
+      employeeId: r.employeeId,
+      employeeName: empMap.get(r.employeeId!)?.name || "Unknown",
+      role: empMap.get(r.employeeId!)?.role || "unknown",
+      salesCount: Number(r.count || 0),
+      totalRevenue: Number(r.total || 0),
+      avgSaleValue: Number(r.avgSale || 0),
+    })).sort((a, b) => b.totalRevenue - a.totalRevenue);
+  },
+  async getReturnsReport() {
+    const result = await db.select({
+      count: sql<number>`count(*)`,
+      total: sql<string>`coalesce(sum(${returns.totalAmount}::numeric), 0)`,
+    }).from(returns);
+    const returnsList = await db.select().from(returns).orderBy(desc(returns.createdAt)).limit(20);
+    return {
+      totalReturns: Number(result[0]?.count || 0),
+      totalRefundAmount: Number(result[0]?.total || 0),
+      recentReturns: returnsList,
+    };
   },
 };
