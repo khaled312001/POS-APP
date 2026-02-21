@@ -8,6 +8,7 @@ import {
   Platform,
   FlatList,
   Dimensions,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -19,12 +20,13 @@ import { getQueryFn } from "@/lib/query-client";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const isTablet = SCREEN_WIDTH > 700;
 
-type TabType = "overview" | "sales" | "inventory";
+type TabType = "overview" | "sales" | "inventory" | "activity";
 
 const TAB_ICONS: Record<TabType, string> = {
   overview: "analytics",
   sales: "receipt",
   inventory: "cube",
+  activity: "list",
 };
 
 function GlassCard({ children, style }: { children: React.ReactNode; style?: any }) {
@@ -46,6 +48,8 @@ function PercentBar({ percent, color, height = 8 }: { percent: number; color: st
 export default function ReportsScreen() {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<TabType>("overview");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const { data: stats } = useQuery<any>({
     queryKey: ["/api/dashboard"],
@@ -65,6 +69,21 @@ export default function ReportsScreen() {
   const { data: allProducts = [] } = useQuery<any[]>({
     queryKey: ["/api/products"],
     queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  const { data: activityLog = [] } = useQuery<any[]>({
+    queryKey: ["/api/activity-log?limit=50"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  const salesQueryKey = dateFrom || dateTo 
+    ? `/api/analytics/sales-range?startDate=${dateFrom || "2000-01-01"}&endDate=${dateTo || "2099-12-31"}`
+    : null;
+
+  const { data: filteredSales = [] } = useQuery<any[]>({
+    queryKey: [salesQueryKey],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!(dateFrom || dateTo),
   });
 
   const topPad = Platform.OS === "web" ? 67 : 0;
@@ -289,12 +308,48 @@ export default function ReportsScreen() {
 
   const renderSales = () => (
     <>
+      <Text style={styles.sectionTitle}>Date Filter</Text>
+      <GlassCard>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 4 }}>From</Text>
+            <TextInput
+              style={{ backgroundColor: Colors.surfaceLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: Colors.text, fontSize: 14, borderWidth: 1, borderColor: Colors.cardBorder }}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={Colors.textMuted}
+              value={dateFrom}
+              onChangeText={setDateFrom}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 4 }}>To</Text>
+            <TextInput
+              style={{ backgroundColor: Colors.surfaceLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: Colors.text, fontSize: 14, borderWidth: 1, borderColor: Colors.cardBorder }}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={Colors.textMuted}
+              value={dateTo}
+              onChangeText={setDateTo}
+            />
+          </View>
+        </View>
+        {(dateFrom || dateTo) && (
+          <View style={{ marginTop: 10 }}>
+            <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: "600" }}>
+              {filteredSales.length} sales found in range
+            </Text>
+            <Pressable onPress={() => { setDateFrom(""); setDateTo(""); }} style={{ marginTop: 6 }}>
+              <Text style={{ color: Colors.danger, fontSize: 12 }}>Clear Filter</Text>
+            </Pressable>
+          </View>
+        )}
+      </GlassCard>
+
       <Text style={styles.sectionTitle}>Recent Sales</Text>
       <FlatList
-        data={salesData}
+        data={(dateFrom || dateTo) ? filteredSales : salesData}
         keyExtractor={(item: any) => String(item.id)}
         renderItem={renderSaleItem}
-        scrollEnabled={!!salesData.length}
+        scrollEnabled={!!((dateFrom || dateTo) ? filteredSales : salesData).length}
         ListEmptyComponent={
           <GlassCard>
             <View style={styles.empty}>
@@ -387,6 +442,64 @@ export default function ReportsScreen() {
     </>
   );
 
+  const renderActivity = () => {
+    const getActionIcon = (action: string) => {
+      switch (action) {
+        case "sale_created": return "cart";
+        case "login": return "log-in";
+        case "return_created": return "swap-horizontal";
+        case "shift_closed": return "time";
+        default: return "ellipse";
+      }
+    };
+    const getActionColor = (action: string) => {
+      switch (action) {
+        case "sale_created": return Colors.success;
+        case "login": return Colors.info;
+        case "return_created": return Colors.warning;
+        case "shift_closed": return Colors.secondary;
+        default: return Colors.textMuted;
+      }
+    };
+    return (
+      <>
+        <Text style={styles.sectionTitle}>Recent Activity</Text>
+        <FlatList
+          data={activityLog}
+          keyExtractor={(item: any) => String(item.id)}
+          scrollEnabled={!!activityLog.length}
+          renderItem={({ item }: { item: any }) => {
+            const color = getActionColor(item.action);
+            return (
+              <GlassCard style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 }}>
+                <View style={[styles.paymentIcon, { backgroundColor: color + "20" }]}>
+                  <Ionicons name={getActionIcon(item.action) as any} size={18} color={color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: Colors.text, fontSize: 14, fontWeight: "600" }}>{item.details || item.action}</Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                    {new Date(item.createdAt).toLocaleString()} | {item.action.replace(/_/g, " ")}
+                  </Text>
+                </View>
+                <View style={[styles.badge, { backgroundColor: color + "20" }]}>
+                  <Text style={[styles.badgeText, { color }]}>{item.action.replace(/_/g, " ")}</Text>
+                </View>
+              </GlassCard>
+            );
+          }}
+          ListEmptyComponent={
+            <GlassCard>
+              <View style={styles.empty}>
+                <Ionicons name="list-outline" size={40} color={Colors.textMuted} />
+                <Text style={styles.emptyText}>No activity recorded yet</Text>
+              </View>
+            </GlassCard>
+          }
+        />
+      </>
+    );
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top + topPad }]}>
       <LinearGradient
@@ -400,7 +513,7 @@ export default function ReportsScreen() {
       </LinearGradient>
 
       <View style={styles.tabRow}>
-        {(["overview", "sales", "inventory"] as const).map((t) => (
+        {(["overview", "sales", "inventory", "activity"] as const).map((t) => (
           <Pressable
             key={t}
             style={[styles.tabBtn, tab === t && styles.tabBtnActive]}
@@ -425,6 +538,7 @@ export default function ReportsScreen() {
         {tab === "overview" && renderOverview()}
         {tab === "sales" && renderSales()}
         {tab === "inventory" && renderInventory()}
+        {tab === "activity" && renderActivity()}
       </ScrollView>
     </View>
   );

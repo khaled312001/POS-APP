@@ -16,7 +16,7 @@ export default function ProductsScreen() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece" });
+  const [form, setForm] = useState({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece", expiryDate: "" });
 
   const { data: products = [] } = useQuery<any[]>({
     queryKey: ["/api/products", search ? `?search=${search}` : ""],
@@ -44,14 +44,14 @@ export default function ProductsScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/products"] }),
   });
 
-  const resetForm = () => setForm({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece" });
+  const resetForm = () => setForm({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece", expiryDate: "" });
 
   const openEdit = (p: any) => {
     setEditProduct(p);
     setForm({
       name: p.name, price: String(p.price), sku: p.sku || "",
       barcode: p.barcode || "", categoryId: p.categoryId ? String(p.categoryId) : "",
-      costPrice: p.costPrice ? String(p.costPrice) : "", unit: p.unit || "piece",
+      costPrice: p.costPrice ? String(p.costPrice) : "", unit: p.unit || "piece", expiryDate: p.expiryDate || "",
     });
     setShowForm(true);
   };
@@ -61,7 +61,7 @@ export default function ProductsScreen() {
     createMutation.mutate({
       name: form.name, price: form.price, sku: form.sku || undefined,
       barcode: form.barcode || undefined, costPrice: form.costPrice || undefined,
-      categoryId: form.categoryId ? Number(form.categoryId) : undefined, unit: form.unit,
+      categoryId: form.categoryId ? Number(form.categoryId) : undefined, unit: form.unit, expiryDate: form.expiryDate || undefined,
     });
   };
 
@@ -97,6 +97,11 @@ export default function ProductsScreen() {
             <View style={styles.productInfo}>
               <Text style={styles.productName}>{item.name}</Text>
               <Text style={styles.productMeta}>{item.sku || "No SKU"} | {getCatName(item.categoryId)}</Text>
+              {item.expiryDate && (
+                <Text style={[styles.productMeta, { color: new Date(item.expiryDate) < new Date() ? Colors.danger : new Date(item.expiryDate) < new Date(Date.now() + 30*24*60*60*1000) ? Colors.warning : Colors.textMuted }]}>
+                  Exp: {item.expiryDate}
+                </Text>
+              )}
             </View>
             <View style={styles.productRight}>
               <Text style={styles.productPrice}>${Number(item.price).toFixed(2)}</Text>
@@ -142,6 +147,8 @@ export default function ProductsScreen() {
                   <TextInput style={styles.input} value={form.barcode} onChangeText={(t) => setForm({ ...form, barcode: t })} placeholderTextColor={Colors.textMuted} placeholder="123456789" />
                 </View>
               </View>
+              <Text style={styles.label}>Expiry Date</Text>
+              <TextInput style={styles.input} value={form.expiryDate} onChangeText={(t) => setForm({ ...form, expiryDate: t })} placeholderTextColor={Colors.textMuted} placeholder="YYYY-MM-DD" />
               <Text style={styles.label}>Category</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catRow}>
                 {categories.map((cat: any) => (
