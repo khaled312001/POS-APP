@@ -47,6 +47,147 @@ function PercentBar({ percent, color, height = 8 }: { percent: number; color: st
   );
 }
 
+function BarChart({ data, height = 180, isRTL = false }: { data: { label: string; value: number; color: string }[]; height?: number; isRTL?: boolean }) {
+  if (!data.length) return null;
+  const maxVal = Math.max(...data.map(d => d.value), 1);
+  return (
+    <View style={{ height, flexDirection: isRTL ? "row-reverse" : "row", alignItems: "flex-end", gap: 6, paddingHorizontal: 4, paddingTop: 10 }}>
+      {data.map((item, i) => {
+        const barH = Math.max((item.value / maxVal) * (height - 40), 4);
+        return (
+          <View key={i} style={{ flex: 1, alignItems: "center", justifyContent: "flex-end" }}>
+            <Text style={{ color: Colors.text, fontSize: 10, fontWeight: "700", marginBottom: 4 }}>
+              {item.value >= 1000 ? `${(item.value / 1000).toFixed(1)}k` : item.value % 1 === 0 ? item.value : item.value.toFixed(1)}
+            </Text>
+            <LinearGradient
+              colors={[item.color, item.color + "80"]}
+              style={{ width: "100%", height: barH, borderRadius: 6, minWidth: 16, maxWidth: 50 }}
+            />
+            <Text style={{ color: Colors.textMuted, fontSize: 9, marginTop: 4, textAlign: "center" }} numberOfLines={1}>{item.label}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function DonutChart({ data, size = 140 }: { data: { label: string; value: number; color: string }[]; size?: number }) {
+  if (!data.length) return null;
+  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  let cumulative = 0;
+  const segments = data.map(d => {
+    const pct = (d.value / total) * 100;
+    const start = cumulative;
+    cumulative += pct;
+    return { ...d, pct, start };
+  });
+  const r = size / 2;
+  const strokeW = size * 0.2;
+  const innerR = r - strokeW;
+  return (
+    <View style={{ alignItems: "center" }}>
+      <View style={{ width: size, height: size, position: "relative" }}>
+        {segments.map((seg, i) => {
+          const startAngle = (seg.start / 100) * 360 - 90;
+          const endAngle = ((seg.start + seg.pct) / 100) * 360 - 90;
+          const startRad = (startAngle * Math.PI) / 180;
+          const endRad = (endAngle * Math.PI) / 180;
+          const largeArc = seg.pct > 50 ? 1 : 0;
+          const x1 = r + r * Math.cos(startRad);
+          const y1 = r + r * Math.sin(startRad);
+          const x2 = r + r * Math.cos(endRad);
+          const y2 = r + r * Math.sin(endRad);
+          const ix1 = r + innerR * Math.cos(endRad);
+          const iy1 = r + innerR * Math.sin(endRad);
+          const ix2 = r + innerR * Math.cos(startRad);
+          const iy2 = r + innerR * Math.sin(startRad);
+          return (
+            <View key={i} style={{ position: "absolute", width: size, height: size }}>
+              {Platform.OS === "web" ? (
+                <View style={{ width: size, height: size }}>
+                  <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+                    <path
+                      d={`M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} L ${ix1} ${iy1} A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix2} ${iy2} Z`}
+                      fill={seg.color}
+                    />
+                  </svg>
+                </View>
+              ) : (
+                <View style={{
+                  width: size, height: size, borderRadius: r,
+                  borderWidth: strokeW, borderColor: "transparent",
+                  position: "absolute",
+                  borderTopColor: i === 0 ? seg.color : "transparent",
+                  transform: [{ rotate: `${seg.start * 3.6}deg` }],
+                }} />
+              )}
+            </View>
+          );
+        })}
+        <View style={{ position: "absolute", top: strokeW, left: strokeW, width: size - strokeW * 2, height: size - strokeW * 2, borderRadius: (size - strokeW * 2) / 2, backgroundColor: Colors.card, justifyContent: "center", alignItems: "center" }}>
+          <Text style={{ color: Colors.text, fontSize: 16, fontWeight: "800" }}>{total >= 1000 ? `$${(total / 1000).toFixed(1)}k` : `$${total.toFixed(0)}`}</Text>
+          <Text style={{ color: Colors.textMuted, fontSize: 9 }}>Total</Text>
+        </View>
+      </View>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 10, marginTop: 12 }}>
+        {segments.map((seg, i) => (
+          <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: seg.color }} />
+            <Text style={{ color: Colors.textSecondary, fontSize: 11 }}>{seg.label} ({seg.pct.toFixed(0)}%)</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function MiniLineChart({ data, height = 100, color = Colors.accent }: { data: number[]; height?: number; color?: string }) {
+  if (data.length < 2) return null;
+  const maxVal = Math.max(...data, 1);
+  const minVal = Math.min(...data, 0);
+  const range = maxVal - minVal || 1;
+  const stepX = 100 / (data.length - 1);
+  const points = data.map((v, i) => ({
+    x: i * stepX,
+    y: 100 - ((v - minVal) / range) * 80 - 10,
+  }));
+
+  if (Platform.OS === "web") {
+    const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+    const areaD = `${pathD} L ${points[points.length - 1].x} 100 L ${points[0].x} 100 Z`;
+    return (
+      <View style={{ height, overflow: "hidden" }}>
+        <svg width="100%" height={height} viewBox="0 0 100 100" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id={`grad-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+              <stop offset="100%" stopColor={color} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={areaD} fill={`url(#grad-${color.replace("#", "")})`} />
+          <path d={pathD} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+          {points.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.y} r="3" fill={color} vectorEffect="non-scaling-stroke" />
+          ))}
+        </svg>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ height, flexDirection: "row", alignItems: "flex-end", gap: 2, paddingHorizontal: 2 }}>
+      {data.map((v, i) => {
+        const barH = Math.max(((v - minVal) / range) * (height - 20), 2);
+        return (
+          <View key={i} style={{ flex: 1, alignItems: "center", justifyContent: "flex-end" }}>
+            <View style={{ width: "80%", height: barH, backgroundColor: color, borderRadius: 3, opacity: 0.7 + (i / data.length) * 0.3 }} />
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function ReportsScreen() {
   const insets = useSafeAreaInsets();
   const { t, isRTL, rtlRow, rtlTextAlign, rtlText } = useLanguage();
@@ -225,6 +366,19 @@ export default function ReportsScreen() {
         </GlassCard>
       </View>
 
+      <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("revenueOverview")}</Text>
+      <GlassCard>
+        <BarChart
+          isRTL={isRTL}
+          data={[
+            { label: t("todayRevenue"), value: Number(todayRevenue), color: Colors.accent },
+            { label: t("weekRevenue"), value: Number(weekRevenue), color: Colors.info },
+            { label: t("monthRevenue"), value: Number(monthRevenue), color: Colors.secondary },
+            { label: t("totalRevenue"), value: Number(totalRevenue), color: Colors.success },
+          ]}
+        />
+      </GlassCard>
+
       <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("revenueVsExpenses")}</Text>
       <GlassCard>
         <View style={styles.revExpRow}>
@@ -257,6 +411,18 @@ export default function ReportsScreen() {
       </GlassCard>
 
       <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("topProducts")}</Text>
+      {topProducts.length > 0 && (
+        <GlassCard>
+          <BarChart
+            isRTL={isRTL}
+            data={topProducts.slice(0, 6).map((p: any) => ({
+              label: (p.name || "").substring(0, 8),
+              value: Number(p.revenue || 0),
+              color: Colors.accent,
+            }))}
+          />
+        </GlassCard>
+      )}
       {topProducts.length > 0 ? (
         <GlassCard>
           {topProducts.slice(0, 5).map((product: any, index: number) => (
@@ -285,6 +451,16 @@ export default function ReportsScreen() {
       )}
 
       <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("paymentMethods")}</Text>
+      {salesByPaymentMethod.length > 0 && (
+        <GlassCard>
+          <DonutChart
+            data={salesByPaymentMethod.map((m: any) => {
+              const methodColors: Record<string, string> = { cash: Colors.success, card: Colors.info, mobile: Colors.secondary };
+              return { label: m.method || "Other", value: Number(m.total || 0), color: methodColors[m.method?.toLowerCase()] || Colors.accent };
+            })}
+          />
+        </GlassCard>
+      )}
       {salesByPaymentMethod.length > 0 ? (
         <GlassCard>
           {salesByPaymentMethod.map((method: any, index: number) => {
@@ -477,6 +653,23 @@ export default function ReportsScreen() {
           </View>
         )}
       </GlassCard>
+
+      {((dateFrom || dateTo) ? filteredSales : salesData).length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("salesTrend")}</Text>
+          <GlassCard>
+            <MiniLineChart
+              data={((dateFrom || dateTo) ? filteredSales : salesData).slice(0, 15).reverse().map((s: any) => Number(s.totalAmount || 0))}
+              color={Colors.accent}
+              height={120}
+            />
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginTop: 8 }}>
+              <Text style={{ color: Colors.textMuted, fontSize: 10 }}>{t("oldest")}</Text>
+              <Text style={{ color: Colors.textMuted, fontSize: 10 }}>{t("latest")}</Text>
+            </View>
+          </GlassCard>
+        </>
+      )}
 
       <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("recentSales")}</Text>
       <FlatList
@@ -739,6 +932,38 @@ export default function ReportsScreen() {
             <Text style={[styles.statValue, rtlTextAlign]}>{cashierPerformance.length}</Text>
           </GlassCard>
         </View>
+
+        {cashierPerformance.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("performanceChart")}</Text>
+            <GlassCard>
+              <BarChart
+                isRTL={isRTL}
+                data={cashierPerformance.slice(0, 6).map((p: any) => ({
+                  label: p.employeeName?.split(" ")[0] || `#${p.employeeId}`,
+                  value: Number(p.totalRevenue || 0),
+                  color: p.role === "admin" ? Colors.danger : p.role === "manager" ? Colors.warning : Colors.info,
+                }))}
+              />
+            </GlassCard>
+          </>
+        )}
+
+        {profitByProduct.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("profitChart")}</Text>
+            <GlassCard>
+              <BarChart
+                isRTL={isRTL}
+                data={profitByProduct.slice(0, 8).map((p: any) => ({
+                  label: (p.productName || "").substring(0, 8),
+                  value: Number(p.profit || 0),
+                  color: (p.profit || 0) >= 0 ? Colors.success : Colors.danger,
+                }))}
+              />
+            </GlassCard>
+          </>
+        )}
 
         <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("cashierPerformance")}</Text>
         {cashierPerformance.length > 0 ? (
