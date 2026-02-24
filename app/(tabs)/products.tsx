@@ -349,20 +349,15 @@ export default function ProductsScreen() {
                   <TextInput style={[styles.input, rtlTextAlign]} value={form.costPrice} onChangeText={(v) => setForm({ ...form, costPrice: v })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" />
                 </View>
               </View>
-              <View style={[styles.row, isRTL && { flexDirection: "row-reverse" }]}>
-                <View style={styles.half}>
-                  <Text style={[styles.label, rtlTextAlign]}>SKU</Text>
-                  <TextInput style={[styles.input, rtlTextAlign]} value={form.sku} onChangeText={(v) => setForm({ ...form, sku: v })} placeholderTextColor={Colors.textMuted} placeholder="SKU-001" />
-                </View>
-                <View style={styles.half}>
-                  <Text style={[styles.label, rtlTextAlign]}>{t("barcode")}</Text>
-                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8 }}>
-                    <TextInput style={[styles.input, { flex: 1 }, rtlTextAlign]} value={form.barcode} onChangeText={(v) => setForm({ ...form, barcode: v })} placeholderTextColor={Colors.textMuted} placeholder="ABC-123456" />
-                    <Pressable style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" }} onPress={() => setShowBarcodeScanner(true)}>
-                      <Ionicons name="barcode-outline" size={22} color={Colors.textDark} />
-                    </Pressable>
-                  </View>
-                </View>
+              <Text style={[styles.label, rtlTextAlign]}>SKU</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={form.sku} onChangeText={(v) => setForm({ ...form, sku: v })} placeholderTextColor={Colors.textMuted} placeholder="SKU-001" />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("barcode")}</Text>
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, alignItems: "center" }}>
+                <TextInput style={[styles.input, { flex: 1 }, rtlTextAlign]} value={form.barcode} onChangeText={(v) => setForm({ ...form, barcode: v })} placeholderTextColor={Colors.textMuted} placeholder="ABC-123456" />
+                <Pressable style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" }} onPress={() => setShowBarcodeScanner(true)}>
+                  <Ionicons name="barcode-outline" size={22} color={Colors.textDark} />
+                </Pressable>
               </View>
               <Text style={[styles.label, rtlTextAlign]}>{t("expiryDateFull")}</Text>
               <Pressable
