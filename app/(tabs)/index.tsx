@@ -376,7 +376,11 @@ export default function POSScreen() {
                 <Pressable style={styles.productCard} onPress={() => handleAddToCart(item)}>
                   <View style={[styles.productCardTopBorder, { backgroundColor: catColor }]} />
                   <View style={[styles.productIcon, { backgroundColor: `${catColor}15` }]}>
-                    <Ionicons name={catIcon} size={26} color={catColor} />
+                    {item.image ? (
+                      <Image source={{ uri: item.image.startsWith("http") ? item.image : `${getApiUrl()}${item.image}` }} style={{ width: 44, height: 44, borderRadius: 12 }} resizeMode="cover" />
+                    ) : (
+                      <Ionicons name={catIcon} size={26} color={catColor} />
+                    )}
                   </View>
                   <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
                   <Text style={styles.productPrice}>${Number(item.price).toFixed(2)}</Text>
@@ -923,7 +927,7 @@ const styles = StyleSheet.create({
   productGrid: { padding: 10 },
   productCard: { flex: 1, margin: 5, backgroundColor: Colors.surface, borderRadius: 16, padding: 14, alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder, minWidth: 90, overflow: "hidden", position: "relative" as const },
   productCardTopBorder: { position: "absolute" as const, top: 0, left: 0, right: 0, height: 3, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
-  productIcon: { width: 54, height: 54, borderRadius: 16, justifyContent: "center", alignItems: "center", marginBottom: 10, marginTop: 4 },
+  productIcon: { width: 54, height: 54, borderRadius: 16, justifyContent: "center", alignItems: "center", marginBottom: 10, marginTop: 4, overflow: "hidden" as const },
   productName: { color: Colors.text, fontSize: 12, fontWeight: "600", textAlign: "center", marginBottom: 6, lineHeight: 16 },
   productPrice: { color: Colors.accent, fontSize: 15, fontWeight: "800" },
   productAddBadge: { position: "absolute" as const, top: 8, right: 8, width: 22, height: 22, borderRadius: 11, justifyContent: "center", alignItems: "center" },

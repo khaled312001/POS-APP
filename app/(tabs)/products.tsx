@@ -9,7 +9,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
-import { apiRequest, getQueryFn } from "@/lib/query-client";
+import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
@@ -232,7 +232,11 @@ export default function ProductsScreen() {
           renderItem={({ item }: { item: any }) => (
             <Pressable style={[styles.productCard, isRTL && { flexDirection: "row-reverse" }]} onPress={() => canManage ? openEdit(item) : null}>
               <View style={[styles.productIconWrap, isRTL ? { marginLeft: 12, marginRight: 0 } : {}]}>
-                <Ionicons name="cube" size={24} color={Colors.accent} />
+                {item.image ? (
+                  <Image source={{ uri: item.image.startsWith("http") ? item.image : `${getApiUrl()}${item.image}` }} style={{ width: 40, height: 40, borderRadius: 10 }} resizeMode="cover" />
+                ) : (
+                  <Ionicons name="cube" size={24} color={Colors.accent} />
+                )}
               </View>
               <View style={styles.productInfo}>
                 <Text style={[styles.productName, rtlTextAlign]}>{item.name}</Text>
@@ -286,7 +290,11 @@ export default function ProductsScreen() {
               setShowCategoryForm(true);
             }}>
               <View style={[styles.productIconWrap, isRTL ? { marginLeft: 12, marginRight: 0 } : {}, { backgroundColor: (item.color || "#7C3AED") + "20" }]}>
-                <Ionicons name={(item.icon || "grid") as any} size={24} color={item.color || "#7C3AED"} />
+                {item.image ? (
+                  <Image source={{ uri: item.image.startsWith("http") ? item.image : `${getApiUrl()}${item.image}` }} style={{ width: 40, height: 40, borderRadius: 10 }} resizeMode="cover" />
+                ) : (
+                  <Ionicons name={(item.icon || "grid") as any} size={24} color={item.color || "#7C3AED"} />
+                )}
               </View>
               <View style={styles.productInfo}>
                 <Text style={[styles.productName, rtlTextAlign]}>{item.name}</Text>
@@ -574,7 +582,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, color: Colors.text, marginLeft: 8, fontSize: 15 },
   list: { paddingHorizontal: 12 },
   productCard: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface, borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder },
-  productIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", marginRight: 12 },
+  productIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", marginRight: 12, overflow: "hidden" as const },
   productInfo: { flex: 1 },
   productName: { color: Colors.text, fontSize: 15, fontWeight: "600" },
   productMeta: { color: Colors.textMuted, fontSize: 12, marginTop: 2 },
