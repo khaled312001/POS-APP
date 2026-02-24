@@ -743,12 +743,12 @@ const ar: typeof en = {
   enterInitialStock: "أدخل كمية المخزون الأولية",
 
   // Shift Prompt
-  shiftPromptTitle: "ابدأ وردتك",
-  shiftPromptMessage: "هل تريد بدء وردتك الآن؟",
-  startShiftNow: "ابدأ الوردة",
+  shiftPromptTitle: "ابدأ وردیتك",
+  shiftPromptMessage: "هل تريد بدء وردیتك الآن؟",
+  startShiftNow: "ابدأ الوردية",
   skipForNow: "تخطي الآن",
   enterOpeningCash: "أدخل النقد الافتتاحي",
-  shiftStartedSuccess: "تم بدء الوردة بنجاح!",
+  shiftStartedSuccess: "تم بدء الوردية بنجاح!",
 
   // Store Settings
   storeSettings: "إعدادات المتجر",
