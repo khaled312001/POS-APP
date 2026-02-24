@@ -335,7 +335,7 @@ export default function ProductsScreen() {
               <Pressable onPress={() => pickImage("product")} style={{ alignItems: "center", marginBottom: 12, padding: 16, borderRadius: 12, borderWidth: 1, borderStyle: "dashed", borderColor: Colors.cardBorder, backgroundColor: Colors.surfaceLight }}>
                 {productImage ? (
                   <View style={{ alignItems: "center" }}>
-                    <Image source={{ uri: productImage }} style={{ width: 100, height: 100, borderRadius: 12 }} />
+                    <Image source={{ uri: productImage.startsWith("http") ? productImage : productImage.startsWith("/objects") ? `${getApiUrl()}${productImage}` : productImage }} style={{ width: 100, height: 100, borderRadius: 12 }} />
                     <Text style={{ color: Colors.accent, fontSize: 13, marginTop: 8 }}>{t("changeImage")}</Text>
                   </View>
                 ) : (
@@ -425,7 +425,7 @@ export default function ProductsScreen() {
               <Pressable onPress={() => pickImage("category")} style={{ alignItems: "center", marginBottom: 12, padding: 16, borderRadius: 12, borderWidth: 1, borderStyle: "dashed", borderColor: Colors.cardBorder, backgroundColor: Colors.surfaceLight }}>
                 {categoryImage ? (
                   <View style={{ alignItems: "center" }}>
-                    <Image source={{ uri: categoryImage }} style={{ width: 80, height: 80, borderRadius: 12 }} />
+                    <Image source={{ uri: categoryImage.startsWith("http") ? categoryImage : categoryImage.startsWith("/objects") ? `${getApiUrl()}${categoryImage}` : categoryImage }} style={{ width: 80, height: 80, borderRadius: 12 }} />
                     <Text style={{ color: Colors.accent, fontSize: 13, marginTop: 8 }}>{t("changeImage")}</Text>
                   </View>
                 ) : (
