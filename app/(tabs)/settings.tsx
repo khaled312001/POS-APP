@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet, Text, View, ScrollView, Pressable, Modal,
   TextInput, Alert, Platform, FlatList, Switch, Image,
@@ -103,6 +103,13 @@ export default function SettingsScreen() {
   const [storeLogo, setStoreLogo] = useState<string | null>(null);
   const [storeLogoUploading, setStoreLogoUploading] = useState(false);
 
+  const [showShiftMonitor, setShowShiftMonitor] = useState(false);
+  const [shiftMonitorTab, setShiftMonitorTab] = useState<"active" | "history" | "settings">("active");
+  const [defaultShiftDuration, setDefaultShiftDuration] = useState("8");
+  const [activeShiftsElapsed, setActiveShiftsElapsed] = useState<Record<number, string>>({});
+
+  const [showNotifications, setShowNotifications] = useState(false);
+
   const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: suppliers = [] } = useQuery<any[]>({ queryKey: ["/api/suppliers"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: branches = [] } = useQuery<any[]>({ queryKey: ["/api/branches"], queryFn: getQueryFn({ on401: "throw" }) });
@@ -116,6 +123,29 @@ export default function SettingsScreen() {
   const { data: batchesList = [] } = useQuery<any[]>({ queryKey: ["/api/product-batches"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: productsList = [] } = useQuery<any[]>({ queryKey: ["/api/products"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: storeSettings } = useQuery<any>({ queryKey: ["/api/store-settings"], queryFn: getQueryFn({ on401: "throw" }) });
+
+  const { data: allActiveShifts = [] } = useQuery<any[]>({
+    queryKey: ["/api/shifts/active"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    refetchInterval: 30000,
+    enabled: isAdmin,
+  });
+
+  const { data: notificationsList = [] } = useQuery<any[]>({
+    queryKey: [`/api/notifications/${employee?.id}`],
+    queryFn: getQueryFn({ on401: "throw" }),
+    refetchInterval: 30000,
+    enabled: !!employee?.id,
+  });
+
+  const { data: unreadCountData } = useQuery<{ count: number }>({
+    queryKey: [`/api/notifications/${employee?.id}/unread-count`],
+    queryFn: getQueryFn({ on401: "throw" }),
+    refetchInterval: 30000,
+    enabled: !!employee?.id,
+  });
+
+  const unreadCount = unreadCountData?.count || 0;
 
   const activeShift = shifts.find((s: any) => s.employeeId === employee?.id && s.startTime && !s.endTime && s.status === "open");
 
@@ -166,7 +196,44 @@ export default function SettingsScreen() {
 
   const clockOutMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/shifts/${id}/close`, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/shifts"] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/shifts"] }); qc.invalidateQueries({ queryKey: ["/api/shifts/active"] }); },
+    onError: (e: any) => Alert.alert(t("error"), e.message),
+  });
+
+  const forceCloseShiftMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("PUT", `/api/shifts/${id}/close`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/shifts"] });
+      qc.invalidateQueries({ queryKey: ["/api/shifts/active"] });
+      Alert.alert(t("success"), t("shiftForceClosed"));
+    },
+    onError: (e: any) => Alert.alert(t("error"), e.message),
+  });
+
+  const markNotificationReadMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("PUT", `/api/notifications/${id}/read`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/notifications/${employee?.id}`] });
+      qc.invalidateQueries({ queryKey: [`/api/notifications/${employee?.id}/unread-count`] });
+    },
+    onError: (e: any) => Alert.alert(t("error"), e.message),
+  });
+
+  const markAllNotificationsReadMutation = useMutation({
+    mutationFn: () => apiRequest("PUT", `/api/notifications/${employee?.id}/read-all`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/notifications/${employee?.id}`] });
+      qc.invalidateQueries({ queryKey: [`/api/notifications/${employee?.id}/unread-count`] });
+    },
+    onError: (e: any) => Alert.alert(t("error"), e.message),
+  });
+
+  const updateShiftMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/shifts/${id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/shifts"] });
+      qc.invalidateQueries({ queryKey: ["/api/shifts/active"] });
+    },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
@@ -318,6 +385,60 @@ export default function SettingsScreen() {
 
   const rtlTextAlign = isRTL ? { textAlign: "right" as const } : {};
 
+  useEffect(() => {
+    if (!allActiveShifts || allActiveShifts.length === 0) {
+      setActiveShiftsElapsed({});
+      return;
+    }
+    const interval = setInterval(() => {
+      const newElapsed: Record<number, string> = {};
+      allActiveShifts.forEach((s: any) => {
+        if (s.startTime) {
+          const elapsed = Date.now() - new Date(s.startTime).getTime();
+          const hours = Math.floor(elapsed / 3600000);
+          const mins = Math.floor((elapsed % 3600000) / 60000);
+          const secs = Math.floor((elapsed % 60000) / 1000);
+          newElapsed[s.id] = `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+        }
+      });
+      setActiveShiftsElapsed(newElapsed);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [allActiveShifts]);
+
+  const getShiftProgress = useCallback((shift: any) => {
+    const expectedHours = Number(shift.expectedDurationHours || defaultShiftDuration || 8);
+    const elapsed = Date.now() - new Date(shift.startTime).getTime();
+    const elapsedHours = elapsed / 3600000;
+    const progress = Math.min(elapsedHours / expectedHours, 1.5);
+    const isOvertime = elapsedHours > expectedHours;
+    return { progress, isOvertime, elapsedHours, expectedHours };
+  }, [defaultShiftDuration]);
+
+  const getNotificationIcon = useCallback((type: string): { name: string; color: string } => {
+    switch (type) {
+      case "shift_started": return { name: "play-circle", color: Colors.success };
+      case "shift_ended": return { name: "stop-circle", color: Colors.warning };
+      case "sale_completed": return { name: "cart", color: Colors.accent };
+      case "return_processed": return { name: "swap-horizontal", color: Colors.danger };
+      case "cash_drawer": return { name: "cash", color: "#F59E0B" };
+      default: return { name: "notifications", color: Colors.info };
+    }
+  }, []);
+
+  const getTimeAgo = useCallback((dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return t("justNow");
+    if (mins < 60) return `${mins}${t("minutesAgo")}`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}${t("hoursAgo")}`;
+    const days = Math.floor(hours / 24);
+    return `${days}${t("daysAgo")}`;
+  }, [t]);
+
+  const closedShifts = shifts.filter((s: any) => s.endTime && s.status === "closed");
+
   const topPad = Platform.OS === "web" ? 67 : 0;
   const roleColors: Record<string, string> = { admin: Colors.danger, manager: Colors.warning, cashier: Colors.info, owner: Colors.secondary };
 
@@ -331,7 +452,17 @@ export default function SettingsScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
       <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid]} style={styles.header}>
-        <Text style={styles.headerTitle}>{t("settingsMore")}</Text>
+        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={styles.headerTitle}>{t("settingsMore")}</Text>
+          <Pressable onPress={() => setShowNotifications(true)} style={{ position: "relative", padding: 4 }}>
+            <Ionicons name="notifications-outline" size={24} color={Colors.white} />
+            {unreadCount > 0 && (
+              <View style={smStyles.notifBadge}>
+                <Text style={smStyles.notifBadgeText}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
       </LinearGradient>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: (Platform.OS === "web" ? 84 : 60) + 20 }]}>
@@ -367,6 +498,7 @@ export default function SettingsScreen() {
             <SettingRow icon="cube" label={t("suppliers")} value={`${suppliers.length} ${t("suppliers")}`} onPress={() => setShowSuppliers(true)} color={Colors.success} rtl={isRTL} />
             <SettingRow icon="wallet" label={t("expenses")} value={`${expenses.length} ${t("expenses")}`} onPress={() => setShowExpenses(true)} color={Colors.warning} rtl={isRTL} />
             <SettingRow icon="time" label={t("attendance")} value={`${shifts.length} ${t("attendance")}`} onPress={() => setShowAttendance(true)} color={Colors.warning} rtl={isRTL} />
+            {isAdmin && <SettingRow icon="pulse" label={t("shiftMonitor")} value={`${allActiveShifts.length} ${t("activeShiftsCount")}`} onPress={() => { setShiftMonitorTab("active"); setShowShiftMonitor(true); }} color="#2FD3C6" rtl={isRTL} />}
             <SettingRow icon="document-text" label={t("purchaseOrders")} value={`${purchaseOrders.length} ${t("orders")}`} onPress={() => setShowPurchaseOrders(true)} color={Colors.info} rtl={isRTL} />
             <SettingRow icon="list" label={t("activityLog")} value={`${activityLog.length} ${t("entries")}`} onPress={() => setShowActivityLog(true)} color={Colors.secondary} rtl={isRTL} />
             <SettingRow icon="swap-horizontal" label={t("returnsRefunds")} value={`${returns.length} ${t("returns")}`} onPress={() => setShowReturnsManager(true)} color={Colors.danger} rtl={isRTL} />
@@ -1394,6 +1526,228 @@ export default function SettingsScreen() {
         </View>
       </Modal>
 
+      <Modal visible={showShiftMonitor} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "90%" }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t("shiftMonitor")}</Text>
+              <Pressable onPress={() => setShowShiftMonitor(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <View style={{ flexDirection: "row", gap: 6, marginBottom: 14 }}>
+              {(["active", "history", "settings"] as const).map((tab) => (
+                <Pressable key={tab} style={[smStyles.tab, shiftMonitorTab === tab && smStyles.tabActive]} onPress={() => setShiftMonitorTab(tab)}>
+                  <Text style={[smStyles.tabText, shiftMonitorTab === tab && smStyles.tabTextActive]}>{t(tab === "active" ? "activeShiftsTab" : tab === "history" ? "shiftHistory" : "shiftSettings")}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {shiftMonitorTab === "active" && (
+              <FlatList
+                data={allActiveShifts}
+                keyExtractor={(item: any) => String(item.id)}
+                scrollEnabled={!!allActiveShifts.length}
+                ListEmptyComponent={
+                  <View style={{ alignItems: "center", paddingVertical: 30 }}>
+                    <Ionicons name="checkmark-circle" size={40} color={Colors.success} />
+                    <Text style={{ color: Colors.textMuted, fontSize: 14, marginTop: 8 }}>{t("noActiveShiftsNow")}</Text>
+                  </View>
+                }
+                renderItem={({ item }: { item: any }) => {
+                  const emp = employees.find((e: any) => e.id === item.employeeId);
+                  const { progress, isOvertime, elapsedHours, expectedHours } = getShiftProgress(item);
+                  const progressColor = isOvertime ? Colors.danger : progress > 0.8 ? Colors.warning : Colors.accent;
+                  return (
+                    <View style={[smStyles.shiftCard, isOvertime && { borderColor: Colors.danger + "40" }]}>
+                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", marginBottom: 8 }}>
+                        <View style={[styles.empAvatar, { backgroundColor: (roleColors[emp?.role || "cashier"] || Colors.info) + "30" }]}>
+                          <Text style={styles.empInitial}>{emp?.name?.charAt(0) || "?"}</Text>
+                        </View>
+                        <View style={[styles.empInfo, isRTL && { alignItems: "flex-end" }]}>
+                          <Text style={styles.empName}>{emp?.name || `#${item.employeeId}`}</Text>
+                          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                            <View style={[styles.roleBadge, { backgroundColor: (roleColors[emp?.role || "cashier"] || Colors.info) + "20", marginTop: 0 }]}>
+                              <Text style={[styles.roleText, { color: roleColors[emp?.role || "cashier"] || Colors.info }]}>{emp?.role || "cashier"}</Text>
+                            </View>
+                            {isOvertime && (
+                              <View style={[styles.roleBadge, { backgroundColor: Colors.danger + "20", marginTop: 0 }]}>
+                                <Text style={[styles.roleText, { color: Colors.danger }]}>{t("overtime")}</Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                        <Pressable
+                          style={[styles.clockBtn, { backgroundColor: Colors.danger + "20" }]}
+                          onPress={() => {
+                            if (Platform.OS === "web") {
+                              if (window.confirm(t("forceCloseConfirm"))) forceCloseShiftMutation.mutate(item.id);
+                            } else {
+                              Alert.alert(t("forceCloseShift"), t("forceCloseConfirm"), [
+                                { text: t("cancel"), style: "cancel" },
+                                { text: t("forceClose"), style: "destructive", onPress: () => forceCloseShiftMutation.mutate(item.id) },
+                              ]);
+                            }
+                          }}
+                        >
+                          <Ionicons name="stop-circle" size={18} color={Colors.danger} />
+                        </Pressable>
+                      </View>
+                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 6 }}>
+                        <Text style={smStyles.shiftMeta}>{t("started")}: {new Date(item.startTime).toLocaleTimeString()}</Text>
+                        <Text style={[smStyles.shiftMeta, { color: progressColor, fontWeight: "700" as const }]}>{activeShiftsElapsed[item.id] || "00:00:00"}</Text>
+                      </View>
+                      <View style={smStyles.progressBarBg}>
+                        <View style={[smStyles.progressBarFill, { width: `${Math.min(progress * 100, 100)}%`, backgroundColor: progressColor }]} />
+                        {isOvertime && <View style={[smStyles.progressBarFill, { width: `${Math.min((progress - 1) * 100, 50)}%`, backgroundColor: Colors.danger, position: "absolute", right: 0, top: 0, bottom: 0, borderRadius: 4 }]} />}
+                      </View>
+                      <Text style={[smStyles.shiftMeta, { marginTop: 4 }]}>
+                        {elapsedHours.toFixed(1)}h / {expectedHours}h {t("expected")}
+                      </Text>
+                    </View>
+                  );
+                }}
+              />
+            )}
+
+            {shiftMonitorTab === "history" && (
+              <FlatList
+                data={closedShifts.slice(0, 20)}
+                keyExtractor={(item: any) => String(item.id)}
+                scrollEnabled={!!closedShifts.length}
+                ListEmptyComponent={
+                  <View style={{ alignItems: "center", paddingVertical: 30 }}>
+                    <Ionicons name="time-outline" size={40} color={Colors.textMuted} />
+                    <Text style={{ color: Colors.textMuted, fontSize: 14, marginTop: 8 }}>{t("noShiftHistory")}</Text>
+                  </View>
+                }
+                renderItem={({ item }: { item: any }) => {
+                  const emp = employees.find((e: any) => e.id === item.employeeId);
+                  return (
+                    <View style={smStyles.shiftCard}>
+                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", marginBottom: 6 }}>
+                        <View style={[styles.empAvatar, { backgroundColor: Colors.info + "30" }]}>
+                          <Text style={styles.empInitial}>{emp?.name?.charAt(0) || "?"}</Text>
+                        </View>
+                        <View style={[styles.empInfo, isRTL && { alignItems: "flex-end" }]}>
+                          <Text style={styles.empName}>{emp?.name || `#${item.employeeId}`}</Text>
+                          <Text style={styles.empMeta}>{formatDuration(item.startTime, item.endTime)}</Text>
+                        </View>
+                      </View>
+                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                        <View style={smStyles.statChip}>
+                          <Ionicons name="time-outline" size={12} color={Colors.info} />
+                          <Text style={smStyles.statChipText}>{new Date(item.startTime).toLocaleString()} - {new Date(item.endTime).toLocaleTimeString()}</Text>
+                        </View>
+                        <View style={smStyles.statChip}>
+                          <Ionicons name="cart-outline" size={12} color={Colors.accent} />
+                          <Text style={smStyles.statChipText}>${Number(item.totalSales || 0).toFixed(2)}</Text>
+                        </View>
+                        <View style={smStyles.statChip}>
+                          <Ionicons name="receipt-outline" size={12} color={Colors.warning} />
+                          <Text style={smStyles.statChipText}>{item.totalTransactions || 0} {t("txns")}</Text>
+                        </View>
+                        {item.openingCash != null && (
+                          <View style={smStyles.statChip}>
+                            <Ionicons name="cash-outline" size={12} color={Colors.success} />
+                            <Text style={smStyles.statChipText}>${Number(item.openingCash || 0).toFixed(2)} → ${Number(item.closingCash || 0).toFixed(2)}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  );
+                }}
+              />
+            )}
+
+            {shiftMonitorTab === "settings" && (
+              <ScrollView>
+                <Text style={styles.label}>{t("defaultShiftDuration")}</Text>
+                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 12, marginTop: 8 }}>
+                  <TextInput
+                    style={[styles.formInput, { flex: 1 }]}
+                    value={defaultShiftDuration}
+                    onChangeText={setDefaultShiftDuration}
+                    keyboardType="decimal-pad"
+                    placeholderTextColor={Colors.textMuted}
+                    placeholder="8"
+                  />
+                  <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>{t("hours")}</Text>
+                </View>
+                <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 8 }}>{t("defaultShiftDurationHint")}</Text>
+
+                {allActiveShifts.length > 0 && (
+                  <>
+                    <Text style={[styles.label, { marginTop: 20 }]}>{t("updateActiveShiftsDuration")}</Text>
+                    <Pressable style={styles.saveBtn} onPress={() => {
+                      const durationVal = parseFloat(defaultShiftDuration);
+                      if (isNaN(durationVal) || durationVal <= 0) return Alert.alert(t("error"), t("invalidDuration"));
+                      allActiveShifts.forEach((s: any) => {
+                        updateShiftMutation.mutate({ id: s.id, data: { expectedDurationHours: String(durationVal) } });
+                      });
+                    }}>
+                      <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
+                        <Ionicons name="refresh" size={18} color={Colors.white} />
+                        <Text style={styles.saveBtnText}>{t("applyToAllActive")}</Text>
+                      </LinearGradient>
+                    </Pressable>
+                  </>
+                )}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showNotifications} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "85%" }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t("notifications")}</Text>
+              <View style={styles.modalActions}>
+                {unreadCount > 0 && (
+                  <Pressable onPress={() => markAllNotificationsReadMutation.mutate()} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Ionicons name="checkmark-done" size={20} color={Colors.accent} />
+                    <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: "600" }}>{t("markAllRead")}</Text>
+                  </Pressable>
+                )}
+                <Pressable onPress={() => setShowNotifications(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              </View>
+            </View>
+            <FlatList
+              data={notificationsList}
+              keyExtractor={(item: any) => String(item.id)}
+              scrollEnabled={!!notificationsList.length}
+              ListEmptyComponent={
+                <View style={{ alignItems: "center", paddingVertical: 30 }}>
+                  <Ionicons name="notifications-off-outline" size={40} color={Colors.textMuted} />
+                  <Text style={{ color: Colors.textMuted, fontSize: 14, marginTop: 8 }}>{t("noNotifications")}</Text>
+                </View>
+              }
+              renderItem={({ item }: { item: any }) => {
+                const iconInfo = getNotificationIcon(item.type);
+                return (
+                  <Pressable
+                    style={[smStyles.notifItem, !item.isRead && smStyles.notifUnread]}
+                    onPress={() => { if (!item.isRead) markNotificationReadMutation.mutate(item.id); }}
+                  >
+                    <View style={[smStyles.notifIconWrap, { backgroundColor: iconInfo.color + "20" }]}>
+                      <Ionicons name={iconInfo.name as any} size={20} color={iconInfo.color} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between" }}>
+                        <Text style={[smStyles.notifTitle, !item.isRead && { color: Colors.text }]}>{item.title}</Text>
+                        {!item.isRead && <View style={smStyles.unreadDot} />}
+                      </View>
+                      <Text style={smStyles.notifMsg} numberOfLines={2}>{item.message}</Text>
+                      <Text style={smStyles.notifTime}>{item.createdAt ? getTimeAgo(item.createdAt) : ""}</Text>
+                    </View>
+                  </Pressable>
+                );
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={showStoreSettings} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -1479,4 +1833,26 @@ const styles = StyleSheet.create({
   saveBtnText: { color: Colors.white, fontSize: 16, fontWeight: "700" },
   clockBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
   clockBtnText: { fontSize: 13, fontWeight: "700" },
+});
+
+const smStyles = StyleSheet.create({
+  notifBadge: { position: "absolute", top: 0, right: 0, backgroundColor: Colors.danger, borderRadius: 10, minWidth: 18, height: 18, justifyContent: "center", alignItems: "center", paddingHorizontal: 4 },
+  notifBadgeText: { color: Colors.white, fontSize: 10, fontWeight: "800" },
+  tab: { flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.surfaceLight, alignItems: "center" },
+  tabActive: { backgroundColor: Colors.accent },
+  tabText: { color: Colors.textMuted, fontSize: 12, fontWeight: "600" },
+  tabTextActive: { color: Colors.textDark },
+  shiftCard: { backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: Colors.cardBorder },
+  shiftMeta: { color: Colors.textMuted, fontSize: 11 },
+  progressBarBg: { height: 6, backgroundColor: Colors.inputBg, borderRadius: 4, overflow: "hidden", position: "relative" as const },
+  progressBarFill: { height: 6, borderRadius: 4 },
+  statChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.surface, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  statChipText: { color: Colors.textMuted, fontSize: 10 },
+  notifItem: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 12, borderRadius: 12, marginBottom: 6, backgroundColor: Colors.surfaceLight },
+  notifUnread: { backgroundColor: Colors.accent + "08", borderWidth: 1, borderColor: Colors.accent + "20" },
+  notifIconWrap: { width: 38, height: 38, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  notifTitle: { color: Colors.textSecondary, fontSize: 13, fontWeight: "700" },
+  notifMsg: { color: Colors.textMuted, fontSize: 12, marginTop: 2 },
+  notifTime: { color: Colors.textMuted, fontSize: 10, marginTop: 4 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.accent },
 });
