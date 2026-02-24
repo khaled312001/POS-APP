@@ -396,6 +396,80 @@ function setupStripeRoutes(app: express.Application) {
   });
 }
 
+let paymentGatewayConfig: any = {
+  enabledMethods: ["cash", "card", "mobile", "nfc"],
+  stripe: {
+    enabled: true,
+    mode: "test",
+    currency: "usd",
+    autoCapture: true,
+  },
+  nfc: {
+    enabled: true,
+    provider: "stripe_tap",
+  },
+  cash: {
+    enabled: true,
+    requireExactAmount: false,
+  },
+  mobile: {
+    enabled: true,
+    providers: ["apple_pay", "google_pay"],
+  },
+};
+
+function setupPaymentGatewayRoutes(app: express.Application) {
+  app.get('/api/payment-gateway/config', async (_req, res) => {
+    try {
+      let stripeStatus = "disconnected";
+      let stripeMode = "test";
+      try {
+        const key = await getStripePublishableKey();
+        if (key) {
+          stripeStatus = "connected";
+          stripeMode = key.startsWith("pk_live") ? "live" : "test";
+        }
+      } catch {}
+      res.json({
+        ...paymentGatewayConfig,
+        stripe: {
+          ...paymentGatewayConfig.stripe,
+          status: stripeStatus,
+          mode: stripeMode,
+        },
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.put('/api/payment-gateway/config', async (req, res) => {
+    try {
+      const updates = req.body;
+      paymentGatewayConfig = { ...paymentGatewayConfig, ...updates };
+      res.json(paymentGatewayConfig);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post('/api/payment-gateway/test-stripe', async (_req, res) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const balance = await stripe.balance.retrieve();
+      const key = await getStripePublishableKey();
+      res.json({
+        success: true,
+        mode: key.startsWith("pk_live") ? "live" : "test",
+        currency: balance.available?.[0]?.currency || "usd",
+        available: balance.available?.map((b: any) => ({ amount: b.amount, currency: b.currency })),
+      });
+    } catch (e: any) {
+      res.json({ success: false, error: e.message });
+    }
+  });
+}
+
 (async () => {
   setupCors(app);
 
@@ -405,6 +479,7 @@ function setupStripeRoutes(app: express.Application) {
   setupRequestLogging(app);
 
   setupStripeRoutes(app);
+  setupPaymentGatewayRoutes(app);
 
   await initStripe();
 

@@ -109,6 +109,9 @@ export default function SettingsScreen() {
   const [activeShiftsElapsed, setActiveShiftsElapsed] = useState<Record<number, string>>({});
 
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showPaymentGateway, setShowPaymentGateway] = useState(false);
+  const [pgTestResult, setPgTestResult] = useState<any>(null);
+  const [pgTesting, setPgTesting] = useState(false);
 
   const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: suppliers = [] } = useQuery<any[]>({ queryKey: ["/api/suppliers"], queryFn: getQueryFn({ on401: "throw" }) });
@@ -123,6 +126,7 @@ export default function SettingsScreen() {
   const { data: batchesList = [] } = useQuery<any[]>({ queryKey: ["/api/product-batches"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: productsList = [] } = useQuery<any[]>({ queryKey: ["/api/products"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: storeSettings } = useQuery<any>({ queryKey: ["/api/store-settings"], queryFn: getQueryFn({ on401: "throw" }) });
+  const { data: pgConfig, refetch: refetchPgConfig } = useQuery<any>({ queryKey: ["/api/payment-gateway/config"], queryFn: getQueryFn({ on401: "throw" }), enabled: isAdmin });
 
   const { data: allActiveShifts = [] } = useQuery<any[]>({
     queryKey: ["/api/shifts/active"],
@@ -495,6 +499,7 @@ export default function SettingsScreen() {
               setStoreLogo(storeSettings?.logo || null);
               setShowStoreSettings(true);
             }} color={Colors.accent} rtl={isRTL} />}
+            {isAdmin && <SettingRow icon="card" label={t("paymentGateways")} value={pgConfig?.stripe?.status === "connected" ? t("stripeConnected") : t("notConfigured")} onPress={() => { setPgTestResult(null); setShowPaymentGateway(true); }} color="#7C3AED" rtl={isRTL} />}
             <SettingRow icon="cube" label={t("suppliers")} value={`${suppliers.length} ${t("suppliers")}`} onPress={() => setShowSuppliers(true)} color={Colors.success} rtl={isRTL} />
             <SettingRow icon="wallet" label={t("expenses")} value={`${expenses.length} ${t("expenses")}`} onPress={() => setShowExpenses(true)} color={Colors.warning} rtl={isRTL} />
             <SettingRow icon="time" label={t("attendance")} value={`${shifts.length} ${t("attendance")}`} onPress={() => setShowAttendance(true)} color={Colors.warning} rtl={isRTL} />
@@ -1792,9 +1797,214 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={showPaymentGateway} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={styles.modalTitle}>{t("paymentGateways")}</Text>
+              <Pressable onPress={() => setShowPaymentGateway(false)}>
+                <Ionicons name="close" size={24} color={Colors.textMuted} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={pgStyles.section}>
+                <View style={[pgStyles.gatewayHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                  <View style={[pgStyles.gatewayIcon, { backgroundColor: "#635BFF20" }]}>
+                    <Ionicons name="card" size={24} color="#635BFF" />
+                  </View>
+                  <View style={[pgStyles.gatewayInfo, isRTL && { alignItems: "flex-end" }]}>
+                    <Text style={pgStyles.gatewayName}>Stripe</Text>
+                    <View style={[pgStyles.statusRow, isRTL && { flexDirection: "row-reverse" }]}>
+                      <View style={[pgStyles.statusDot, { backgroundColor: pgConfig?.stripe?.status === "connected" ? Colors.success : Colors.danger }]} />
+                      <Text style={[pgStyles.statusText, { color: pgConfig?.stripe?.status === "connected" ? Colors.success : Colors.danger }]}>
+                        {pgConfig?.stripe?.status === "connected" ? t("connected") : t("disconnected")}
+                      </Text>
+                      {pgConfig?.stripe?.mode && (
+                        <View style={[pgStyles.modeBadge, pgConfig.stripe.mode === "live" && { backgroundColor: Colors.success + "20" }]}>
+                          <Text style={[pgStyles.modeText, pgConfig.stripe.mode === "live" && { color: Colors.success }]}>
+                            {pgConfig.stripe.mode === "live" ? t("liveMode") : t("testMode")}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                <View style={pgStyles.configGrid}>
+                  <View style={pgStyles.configItem}>
+                    <Text style={[pgStyles.configLabel, isRTL && { textAlign: "right" }]}>{t("currency")}</Text>
+                    <View style={[pgStyles.configValueRow, isRTL && { flexDirection: "row-reverse" }]}>
+                      <Ionicons name="cash-outline" size={16} color={Colors.accent} />
+                      <Text style={pgStyles.configValue}>{(pgConfig?.stripe?.currency || "usd").toUpperCase()}</Text>
+                    </View>
+                  </View>
+                  <View style={pgStyles.configItem}>
+                    <Text style={[pgStyles.configLabel, isRTL && { textAlign: "right" }]}>{t("autoCapture")}</Text>
+                    <Switch
+                      value={pgConfig?.stripe?.autoCapture !== false}
+                      onValueChange={async (val) => {
+                        await apiRequest("PUT", "/api/payment-gateway/config", { stripe: { ...pgConfig?.stripe, autoCapture: val } });
+                        refetchPgConfig();
+                      }}
+                      trackColor={{ false: Colors.inputBg, true: Colors.accent + "60" }}
+                      thumbColor={pgConfig?.stripe?.autoCapture !== false ? Colors.accent : Colors.textMuted}
+                    />
+                  </View>
+                </View>
+
+                <Pressable
+                  style={[pgStyles.testBtn, pgTesting && { opacity: 0.6 }]}
+                  onPress={async () => {
+                    setPgTesting(true);
+                    setPgTestResult(null);
+                    try {
+                      const res = await apiRequest("POST", "/api/payment-gateway/test-stripe");
+                      const data = await res.json();
+                      setPgTestResult(data);
+                    } catch (e: any) {
+                      setPgTestResult({ success: false, error: e.message });
+                    }
+                    setPgTesting(false);
+                  }}
+                  disabled={pgTesting}
+                >
+                  <Ionicons name={pgTesting ? "sync" : "flash"} size={18} color={Colors.white} />
+                  <Text style={pgStyles.testBtnText}>{pgTesting ? t("testing") : t("testConnection")}</Text>
+                </Pressable>
+
+                {pgTestResult && (
+                  <View style={[pgStyles.testResult, { borderColor: pgTestResult.success ? Colors.success + "40" : Colors.danger + "40", backgroundColor: pgTestResult.success ? Colors.success + "10" : Colors.danger + "10" }]}>
+                    <View style={[pgStyles.testResultHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                      <Ionicons name={pgTestResult.success ? "checkmark-circle" : "close-circle"} size={20} color={pgTestResult.success ? Colors.success : Colors.danger} />
+                      <Text style={[pgStyles.testResultText, { color: pgTestResult.success ? Colors.success : Colors.danger }]}>
+                        {pgTestResult.success ? t("connectionSuccess") : t("connectionFailed")}
+                      </Text>
+                    </View>
+                    {pgTestResult.success && pgTestResult.mode && (
+                      <Text style={pgStyles.testResultDetail}>
+                        {t("mode")}: {pgTestResult.mode === "live" ? t("liveMode") : t("testMode")} | {t("currency")}: {(pgTestResult.currency || "usd").toUpperCase()}
+                      </Text>
+                    )}
+                    {pgTestResult.error && <Text style={[pgStyles.testResultDetail, { color: Colors.danger }]}>{pgTestResult.error}</Text>}
+                  </View>
+                )}
+              </View>
+
+              <View style={pgStyles.divider} />
+
+              <Text style={[pgStyles.methodsTitle, isRTL && { textAlign: "right" }]}>{t("enabledPaymentMethods")}</Text>
+              {[
+                { key: "cash", icon: "cash", label: t("cash"), color: Colors.success },
+                { key: "card", icon: "card", label: t("card"), color: "#635BFF" },
+                { key: "nfc", icon: "wifi", label: t("nfcPay"), color: Colors.accent },
+                { key: "mobile", icon: "phone-portrait", label: t("mobile"), color: Colors.info },
+              ].map((method) => (
+                <View key={method.key} style={[pgStyles.methodRow, isRTL && { flexDirection: "row-reverse" }]}>
+                  <View style={[pgStyles.methodIconWrap, { backgroundColor: method.color + "20" }]}>
+                    <Ionicons name={method.icon as any} size={20} color={method.color} />
+                  </View>
+                  <Text style={[pgStyles.methodLabel, isRTL && { textAlign: "right" }]}>{method.label}</Text>
+                  <Switch
+                    value={pgConfig?.enabledMethods?.includes(method.key) !== false}
+                    onValueChange={async (val) => {
+                      const current = pgConfig?.enabledMethods || ["cash", "card", "mobile", "nfc"];
+                      const updated = val ? [...current, method.key] : current.filter((m: string) => m !== method.key);
+                      await apiRequest("PUT", "/api/payment-gateway/config", { enabledMethods: updated });
+                      refetchPgConfig();
+                    }}
+                    trackColor={{ false: Colors.inputBg, true: method.color + "60" }}
+                    thumbColor={pgConfig?.enabledMethods?.includes(method.key) !== false ? method.color : Colors.textMuted}
+                  />
+                </View>
+              ))}
+
+              <View style={pgStyles.divider} />
+
+              <View style={pgStyles.section}>
+                <Text style={[pgStyles.methodsTitle, isRTL && { textAlign: "right" }]}>{t("nfcSettings")}</Text>
+                <View style={[pgStyles.infoRow, isRTL && { flexDirection: "row-reverse" }]}>
+                  <View style={[pgStyles.gatewayIcon, { backgroundColor: Colors.accent + "20" }]}>
+                    <Ionicons name="wifi" size={20} color={Colors.accent} style={{ transform: [{ rotate: "90deg" }] }} />
+                  </View>
+                  <View style={[pgStyles.gatewayInfo, isRTL && { alignItems: "flex-end" }]}>
+                    <Text style={pgStyles.configLabel}>{t("nfcProvider")}</Text>
+                    <Text style={pgStyles.configValue}>Stripe Tap to Pay</Text>
+                  </View>
+                </View>
+                <View style={pgStyles.infoNote}>
+                  <Ionicons name="information-circle" size={16} color={Colors.info} />
+                  <Text style={[pgStyles.infoNoteText, isRTL && { textAlign: "right" }]}>{t("nfcInfo")}</Text>
+                </View>
+              </View>
+
+              <View style={pgStyles.divider} />
+
+              <View style={pgStyles.section}>
+                <Text style={[pgStyles.methodsTitle, isRTL && { textAlign: "right" }]}>{t("mobilePaySettings")}</Text>
+                {[
+                  { key: "apple_pay", icon: "logo-apple", label: "Apple Pay" },
+                  { key: "google_pay", icon: "logo-google", label: "Google Pay" },
+                ].map((mp) => (
+                  <View key={mp.key} style={[pgStyles.methodRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[pgStyles.methodIconWrap, { backgroundColor: Colors.textMuted + "20" }]}>
+                      <Ionicons name={mp.icon as any} size={20} color={Colors.text} />
+                    </View>
+                    <Text style={[pgStyles.methodLabel, isRTL && { textAlign: "right" }]}>{mp.label}</Text>
+                    <Switch
+                      value={pgConfig?.mobile?.providers?.includes(mp.key) !== false}
+                      onValueChange={async (val) => {
+                        const current = pgConfig?.mobile?.providers || ["apple_pay", "google_pay"];
+                        const updated = val ? [...current, mp.key] : current.filter((p: string) => p !== mp.key);
+                        await apiRequest("PUT", "/api/payment-gateway/config", { mobile: { ...pgConfig?.mobile, providers: updated } });
+                        refetchPgConfig();
+                      }}
+                      trackColor={{ false: Colors.inputBg, true: Colors.accent + "60" }}
+                      thumbColor={Colors.accent}
+                    />
+                  </View>
+                ))}
+              </View>
+
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
+
+const pgStyles = StyleSheet.create({
+  section: { marginBottom: 8 },
+  gatewayHeader: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 16 },
+  gatewayIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: "center", alignItems: "center" },
+  gatewayInfo: { flex: 1 },
+  gatewayName: { color: Colors.text, fontSize: 18, fontWeight: "700" },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusText: { fontSize: 13, fontWeight: "600" },
+  modeBadge: { backgroundColor: Colors.warning + "20", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginLeft: 6 },
+  modeText: { color: Colors.warning, fontSize: 11, fontWeight: "700" },
+  configGrid: { flexDirection: "row", gap: 12, marginBottom: 14 },
+  configItem: { flex: 1, backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: Colors.cardBorder },
+  configLabel: { color: Colors.textMuted, fontSize: 11, fontWeight: "600", textTransform: "uppercase" as const, letterSpacing: 0.5, marginBottom: 6 },
+  configValueRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  configValue: { color: Colors.text, fontSize: 15, fontWeight: "700" },
+  testBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#635BFF", borderRadius: 12, paddingVertical: 12 },
+  testBtnText: { color: Colors.white, fontSize: 14, fontWeight: "700" },
+  testResult: { borderRadius: 12, padding: 12, marginTop: 10, borderWidth: 1 },
+  testResultHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  testResultText: { fontSize: 14, fontWeight: "700" },
+  testResultDetail: { color: Colors.textMuted, fontSize: 12, marginTop: 6 },
+  divider: { height: 1, backgroundColor: Colors.cardBorder, marginVertical: 16 },
+  methodsTitle: { color: Colors.text, fontSize: 16, fontWeight: "700", marginBottom: 12 },
+  methodRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.cardBorder },
+  methodIconWrap: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  methodLabel: { flex: 1, color: Colors.text, fontSize: 15, fontWeight: "600" },
+  infoRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10 },
+  infoNote: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: Colors.info + "10", borderRadius: 10, padding: 10, marginTop: 4 },
+  infoNoteText: { color: Colors.textSecondary, fontSize: 12, flex: 1 },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
