@@ -381,6 +381,85 @@ const en = {
   servedBy: "Served by",
   thankYou: "Thank you for your purchase!",
   visitUs: "Visit us at",
+
+  // Settings validation messages
+  namePinRequired: "Name and PIN required",
+  companyNameRequired: "Company name required",
+  branchNameRequired: "Branch name is required",
+  descriptionAmountRequired: "Description and amount required",
+  pleaseSelectSupplier: "Please select a supplier",
+  amountRequired: "Amount is required",
+  warehouseNameRequired: "Warehouse name is required",
+  productBatchRequired: "Product and batch number are required",
+  saleNotFound: "Sale not found",
+  cashDrawerRecorded: "Cash drawer operation recorded",
+
+  // Delete confirmations
+  deleteBranch: "Delete Branch",
+  deleteExpense: "Delete Expense",
+  areYouSure: "Are you sure?",
+
+  // Form labels
+  product: "Product",
+  batchNumberFull: "Batch Number",
+  quantityFull: "Quantity",
+  none: "None",
+  type: "Type",
+  taxRatePercent: "Tax Rate (%)",
+  date: "Date",
+
+  // Printer settings
+  printerStatus: "Printer Status",
+  notConnected: "Not Connected",
+  autoPrintReceipts: "Auto-Print Receipts",
+  printAfterEverySale: "Print after every sale",
+  testPrint: "Test Print",
+  connectionInfo: "Connection Info",
+  printerConnectionDetails: "Connect a Bluetooth thermal printer via device settings. Supported printers: ESC/POS compatible thermal printers (58mm or 80mm).",
+
+  // Language picker
+  ltrDirection: "Left to Right (LTR)",
+  rtlDirection: "Right to Left (RTL)",
+
+  // Employee/Attendance
+  noEmail: "No email",
+  clockIn: "In",
+  clockOut: "Out",
+  shiftActiveLabel: "(Active)",
+
+  // Warehouse
+  createWarehouse: "Create Warehouse",
+  secondaryType: "Secondary",
+  coldStorageType: "Cold Storage",
+  warehouseAddressPlaceholder: "Warehouse address",
+
+  // Returns
+  noReason: "No reason",
+  store_credit: "Store Credit",
+
+  // Expense categories
+  rent: "Rent",
+  utilities: "Utilities",
+  salariesCategory: "Salaries",
+  supplies: "Supplies",
+  marketing: "Marketing",
+  maintenance: "Maintenance",
+  otherCategory: "Other",
+
+  // Placeholders
+  expenseDescription: "Expense description",
+  supplierNamePlaceholder: "Supplier name",
+  contactNamePlaceholder: "Contact name",
+  reasonForOperation: "Reason for operation",
+  optionalNotes: "Optional notes",
+
+  // Misc settings
+  durationLabel: "Duration",
+  deleteThisBatch: "Delete this batch?",
+  warehouseName: "Warehouse name",
+  secondary: "Secondary",
+  coldstorage: "Cold Storage",
+  warehouseAddress: "Warehouse address",
 };
 
 const ar: typeof en = {
@@ -766,6 +845,85 @@ const ar: typeof en = {
   servedBy: "خدمك",
   thankYou: "شكراً لتسوقكم!",
   visitUs: "زورونا على",
+
+  // Settings validation messages
+  namePinRequired: "الاسم ورمز PIN مطلوبان",
+  companyNameRequired: "اسم الشركة مطلوب",
+  branchNameRequired: "اسم الفرع مطلوب",
+  descriptionAmountRequired: "الوصف والمبلغ مطلوبان",
+  pleaseSelectSupplier: "يرجى اختيار مورد",
+  amountRequired: "المبلغ مطلوب",
+  warehouseNameRequired: "اسم المستودع مطلوب",
+  productBatchRequired: "المنتج ورقم الدفعة مطلوبان",
+  saleNotFound: "عملية البيع غير موجودة",
+  cashDrawerRecorded: "تم تسجيل عملية درج النقدية",
+
+  // Delete confirmations
+  deleteBranch: "حذف الفرع",
+  deleteExpense: "حذف المصروف",
+  areYouSure: "هل أنت متأكد؟",
+
+  // Form labels
+  product: "المنتج",
+  batchNumberFull: "رقم الدفعة",
+  quantityFull: "الكمية",
+  none: "بدون",
+  type: "النوع",
+  taxRatePercent: "نسبة الضريبة (%)",
+  date: "التاريخ",
+
+  // Printer settings
+  printerStatus: "حالة الطابعة",
+  notConnected: "غير متصل",
+  autoPrintReceipts: "طباعة تلقائية للإيصالات",
+  printAfterEverySale: "طباعة بعد كل عملية بيع",
+  testPrint: "طباعة تجريبية",
+  connectionInfo: "معلومات الاتصال",
+  printerConnectionDetails: "قم بتوصيل طابعة حرارية عبر البلوتوث من إعدادات الجهاز. الطابعات المدعومة: طابعات حرارية متوافقة مع ESC/POS (58 مم أو 80 مم).",
+
+  // Language picker
+  ltrDirection: "من اليسار لليمين (LTR)",
+  rtlDirection: "من اليمين لليسار (RTL)",
+
+  // Employee/Attendance
+  noEmail: "بدون بريد",
+  clockIn: "دخول",
+  clockOut: "خروج",
+  shiftActiveLabel: "(نشطة)",
+
+  // Warehouse
+  createWarehouse: "إنشاء مستودع",
+  secondaryType: "ثانوي",
+  coldStorageType: "تبريد",
+  warehouseAddressPlaceholder: "عنوان المستودع",
+
+  // Returns
+  noReason: "بدون سبب",
+  store_credit: "رصيد متجر",
+
+  // Expense categories
+  rent: "إيجار",
+  utilities: "مرافق",
+  salariesCategory: "رواتب",
+  supplies: "مستلزمات",
+  marketing: "تسويق",
+  maintenance: "صيانة",
+  otherCategory: "أخرى",
+
+  // Placeholders
+  expenseDescription: "وصف المصروف",
+  supplierNamePlaceholder: "اسم المورد",
+  contactNamePlaceholder: "اسم جهة الاتصال",
+  reasonForOperation: "سبب العملية",
+  optionalNotes: "ملاحظات اختيارية",
+
+  // Misc settings
+  durationLabel: "المدة",
+  deleteThisBatch: "حذف هذه الدفعة؟",
+  warehouseName: "اسم المستودع",
+  secondary: "ثانوي",
+  coldstorage: "تخزين بارد",
+  warehouseAddress: "عنوان المستودع",
 };
 
 export type TranslationKey = keyof typeof en;

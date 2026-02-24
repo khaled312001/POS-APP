@@ -137,55 +137,55 @@ export default function SettingsScreen() {
   const createEmpMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/employees", data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/employees"] }); setShowEmployeeForm(false); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const createSupMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/suppliers", data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/suppliers"] }); setShowSupplierForm(false); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const createExpenseMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/expenses", data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/expenses"] }); setShowExpenseForm(false); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const deleteExpenseMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/expenses/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/expenses"] }); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const clockInMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/shifts", data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/shifts"] }); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const clockOutMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/shifts/${id}/close`, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/shifts"] }); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const createPOMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/purchase-orders", data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/purchase-orders"] }); setShowPOForm(false); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const receivePOMutation = useMutation({
     mutationFn: (id: number) => apiRequest("POST", `/api/purchase-orders/${id}/receive`, { items: [] }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/purchase-orders"] }); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const createReturnMutation = useMutation({
     mutationFn: async (data: any) => {
       const sale = salesList.find((s: any) => String(s.id) === String(data.originalSaleId));
-      if (!sale) throw new Error("Sale not found");
+      if (!sale) throw new Error(t("saleNotFound"));
       const saleRes = await apiRequest("GET", `/api/sales/${sale.id}`);
       const saleDetail = await saleRes.json();
       const returnItems = (saleDetail.items || []).map((item: any) => ({
@@ -212,9 +212,9 @@ export default function SettingsScreen() {
       qc.invalidateQueries({ queryKey: ["/api/inventory"] });
       setShowReturnForm(false);
       setReturnForm({ originalSaleId: "", reason: "", type: "refund" });
-      Alert.alert("Success", "Return processed successfully");
+      Alert.alert(t("success"), t("returnProcessed"));
     },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const cashDrawerMutation = useMutation({
@@ -222,15 +222,15 @@ export default function SettingsScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/shifts"] });
       setCashDrawerForm({ type: "withdrawal", amount: "", reason: "" });
-      Alert.alert("Success", "Cash drawer operation recorded");
+      Alert.alert(t("success"), t("cashDrawerRecorded"));
     },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const createWarehouseMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/warehouses", data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/warehouses"] }); setShowWarehouseForm(false); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const createBranchMutation = useMutation({
@@ -239,30 +239,30 @@ export default function SettingsScreen() {
       return apiRequest("POST", "/api/branches", data);
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/branches"] }); setShowBranchForm(false); setEditBranch(null); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const deleteBranchMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/branches/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/branches"] }); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const createBatchMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/product-batches", data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/product-batches"] }); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const updateBatchMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/product-batches/${id}`, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/product-batches"] }); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
   const deleteBatchMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/product-batches/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/product-batches"] }); },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const updateStoreSettingsMutation = useMutation({
@@ -331,7 +331,7 @@ export default function SettingsScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
       <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid]} style={styles.header}>
-        <Text style={styles.headerTitle}>Settings & More</Text>
+        <Text style={styles.headerTitle}>{t("settingsMore")}</Text>
       </LinearGradient>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: (Platform.OS === "web" ? 84 : 60) + 20 }]}>
@@ -352,8 +352,8 @@ export default function SettingsScreen() {
         {canManage && (
           <>
             <Text style={styles.sectionTitle}>{t("management")}</Text>
-            {isAdmin && <SettingRow icon="people" label={t("employees")} value={`${employees.length} members`} onPress={() => setShowEmployees(true)} color={Colors.info} rtl={isRTL} />}
-            {isAdmin && <SettingRow icon="business" label={t("branches")} value={`${branches.length} locations`} onPress={() => setShowBranches(true)} color={Colors.secondary} rtl={isRTL} />}
+            {isAdmin && <SettingRow icon="people" label={t("employees")} value={`${employees.length} ${t("members")}`} onPress={() => setShowEmployees(true)} color={Colors.info} rtl={isRTL} />}
+            {isAdmin && <SettingRow icon="business" label={t("branches")} value={`${branches.length} ${t("locations")}`} onPress={() => setShowBranches(true)} color={Colors.secondary} rtl={isRTL} />}
             {isAdmin && <SettingRow icon="storefront-outline" label={t("storeSettings")} value={t("configureStore")} onPress={() => {
               setStoreForm({
                 name: storeSettings?.name || "",
@@ -364,27 +364,27 @@ export default function SettingsScreen() {
               setStoreLogo(storeSettings?.logo || null);
               setShowStoreSettings(true);
             }} color={Colors.accent} rtl={isRTL} />}
-            <SettingRow icon="cube" label={t("suppliers")} value={`${suppliers.length} suppliers`} onPress={() => setShowSuppliers(true)} color={Colors.success} rtl={isRTL} />
-            <SettingRow icon="wallet" label={t("expenses")} value={`${expenses.length} expenses`} onPress={() => setShowExpenses(true)} color={Colors.warning} rtl={isRTL} />
-            <SettingRow icon="time" label={t("attendance")} value={`${shifts.length} shifts`} onPress={() => setShowAttendance(true)} color={Colors.warning} rtl={isRTL} />
-            <SettingRow icon="document-text" label={t("purchaseOrders")} value={`${purchaseOrders.length} orders`} onPress={() => setShowPurchaseOrders(true)} color={Colors.info} rtl={isRTL} />
-            <SettingRow icon="list" label={t("activityLog")} value={`${activityLog.length} entries`} onPress={() => setShowActivityLog(true)} color={Colors.secondary} rtl={isRTL} />
-            <SettingRow icon="swap-horizontal" label={t("returnsRefunds")} value={`${returns.length} returns`} onPress={() => setShowReturnsManager(true)} color={Colors.danger} rtl={isRTL} />
+            <SettingRow icon="cube" label={t("suppliers")} value={`${suppliers.length} ${t("suppliers")}`} onPress={() => setShowSuppliers(true)} color={Colors.success} rtl={isRTL} />
+            <SettingRow icon="wallet" label={t("expenses")} value={`${expenses.length} ${t("expenses")}`} onPress={() => setShowExpenses(true)} color={Colors.warning} rtl={isRTL} />
+            <SettingRow icon="time" label={t("attendance")} value={`${shifts.length} ${t("attendance")}`} onPress={() => setShowAttendance(true)} color={Colors.warning} rtl={isRTL} />
+            <SettingRow icon="document-text" label={t("purchaseOrders")} value={`${purchaseOrders.length} ${t("orders")}`} onPress={() => setShowPurchaseOrders(true)} color={Colors.info} rtl={isRTL} />
+            <SettingRow icon="list" label={t("activityLog")} value={`${activityLog.length} ${t("entries")}`} onPress={() => setShowActivityLog(true)} color={Colors.secondary} rtl={isRTL} />
+            <SettingRow icon="swap-horizontal" label={t("returnsRefunds")} value={`${returns.length} ${t("returns")}`} onPress={() => setShowReturnsManager(true)} color={Colors.danger} rtl={isRTL} />
           </>
         )}
-        <SettingRow icon="cash" label={t("cashDrawer")} value={activeShift ? "Active Shift" : "No Active Shift"} onPress={() => setShowCashDrawer(true)} color={Colors.success} rtl={isRTL} />
+        <SettingRow icon="cash" label={t("cashDrawer")} value={activeShift ? t("activeShift") : t("noActiveShift")} onPress={() => setShowCashDrawer(true)} color={Colors.success} rtl={isRTL} />
         {canManage && (
           <>
-            <SettingRow icon="home" label={t("warehouses")} value={`${warehousesList.length} warehouses`} onPress={() => setShowWarehouseManager(true)} color={Colors.accent} rtl={isRTL} />
-            <SettingRow icon="layers" label={t("productBatches")} value={`${batchesList.length} batches`} onPress={() => { setBatchView("list"); setShowBatchManager(true); }} color={Colors.secondary} rtl={isRTL} />
+            <SettingRow icon="home" label={t("warehouses")} value={`${warehousesList.length} ${t("warehouses")}`} onPress={() => setShowWarehouseManager(true)} color={Colors.accent} rtl={isRTL} />
+            <SettingRow icon="layers" label={t("productBatches")} value={`${batchesList.length} ${t("batches")}`} onPress={() => { setBatchView("list"); setShowBatchManager(true); }} color={Colors.secondary} rtl={isRTL} />
           </>
         )}
 
         <Text style={styles.sectionTitle}>{t("system")}</Text>
         <SettingRow icon="language" label={t("language")} value={language === "ar" ? "العربية" : "English"} onPress={() => setShowLanguagePicker(true)} color={Colors.info} rtl={isRTL} />
-        <SettingRow icon="print" label="Receipt Printer" value="Not configured" onPress={() => setShowPrinterSettings(true)} color={Colors.textMuted} rtl={isRTL} />
-        <SettingRow icon="cloud-upload" label="Sync Status" value="Connected" color={Colors.success} rtl={isRTL} />
-        <SettingRow icon="information-circle" label="App Version" value="1.0.0" color={Colors.info} rtl={isRTL} />
+        <SettingRow icon="print" label={t("receiptPrinter")} value={t("notConfigured")} onPress={() => setShowPrinterSettings(true)} color={Colors.textMuted} rtl={isRTL} />
+        <SettingRow icon="cloud-upload" label={t("syncStatus")} value={t("connected")} color={Colors.success} rtl={isRTL} />
+        <SettingRow icon="information-circle" label={t("appVersion")} value="1.0.0" color={Colors.info} rtl={isRTL} />
 
         <Pressable style={styles.logoutBtn} onPress={() => { if (Platform.OS === "web") { if (window.confirm(t("logoutConfirm"))) logout(); } else { Alert.alert(t("logoutConfirm"), "", [{ text: t("cancel"), style: "cancel" }, { text: t("logout"), style: "destructive", onPress: () => logout() }]); } }}>
           <Ionicons name="log-out" size={20} color={Colors.danger} />
@@ -415,7 +415,7 @@ export default function SettingsScreen() {
                   </View>
                   <View style={styles.empInfo}>
                     <Text style={styles.empName}>{item.name}</Text>
-                    <Text style={styles.empMeta}>PIN: {item.pin} | {item.email || "No email"}</Text>
+                    <Text style={styles.empMeta}>PIN: {item.pin} | {item.email || t("noEmail")}</Text>
                   </View>
                   <View style={[styles.roleBadge, { backgroundColor: (roleColors[item.role] || Colors.info) + "20" }]}>
                     <Text style={[styles.roleText, { color: roleColors[item.role] || Colors.info }]}>{item.role}</Text>
@@ -431,30 +431,30 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>New Employee</Text>
+              <Text style={styles.modalTitle}>{t("newEmployee")}</Text>
               <Pressable onPress={() => setShowEmployeeForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
-              <Text style={styles.label}>Name *</Text>
-              <TextInput style={styles.input} value={empForm.name} onChangeText={(t) => setEmpForm({ ...empForm, name: t })} placeholderTextColor={Colors.textMuted} placeholder="Employee name" />
-              <Text style={styles.label}>PIN *</Text>
-              <TextInput style={styles.input} value={empForm.pin} onChangeText={(t) => setEmpForm({ ...empForm, pin: t })} keyboardType="number-pad" placeholderTextColor={Colors.textMuted} placeholder="4-digit PIN" maxLength={4} />
-              <Text style={styles.label}>Role</Text>
+              <Text style={styles.label}>{t("name")} *</Text>
+              <TextInput style={styles.input} value={empForm.name} onChangeText={(v) => setEmpForm({ ...empForm, name: v })} placeholderTextColor={Colors.textMuted} placeholder={t("employeeName2")} />
+              <Text style={styles.label}>{t("pin")} *</Text>
+              <TextInput style={styles.input} value={empForm.pin} onChangeText={(v) => setEmpForm({ ...empForm, pin: v })} keyboardType="number-pad" placeholderTextColor={Colors.textMuted} placeholder={t("fourDigitPin")} maxLength={4} />
+              <Text style={styles.label}>{t("role")}</Text>
               <View style={styles.roleRow}>
                 {["cashier", "manager", "admin", "owner"].map((r) => (
                   <Pressable key={r} style={[styles.roleChip, empForm.role === r && { backgroundColor: Colors.accent }]} onPress={() => setEmpForm({ ...empForm, role: r })}>
-                    <Text style={[styles.roleChipText, empForm.role === r && { color: Colors.textDark }]}>{r}</Text>
+                    <Text style={[styles.roleChipText, empForm.role === r && { color: Colors.textDark }]}>{t(r as any)}</Text>
                   </Pressable>
                 ))}
               </View>
-              <Text style={styles.label}>Email</Text>
-              <TextInput style={styles.input} value={empForm.email} onChangeText={(t) => setEmpForm({ ...empForm, email: t })} placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" />
+              <Text style={styles.label}>{t("email")}</Text>
+              <TextInput style={styles.input} value={empForm.email} onChangeText={(v) => setEmpForm({ ...empForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" />
               <Pressable style={styles.saveBtn} onPress={() => {
-                if (!empForm.name || !empForm.pin) return Alert.alert("Error", "Name and PIN required");
+                if (!empForm.name || !empForm.pin) return Alert.alert(t("error"), t("namePinRequired"));
                 createEmpMutation.mutate({ name: empForm.name, pin: empForm.pin, role: empForm.role, email: empForm.email || undefined, branchId: 1, permissions: empForm.role === "admin" ? ["all"] : ["pos"] });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>Create Employee</Text>
+                  <Text style={styles.saveBtnText}>{t("createEmployee")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -485,7 +485,7 @@ export default function SettingsScreen() {
                   </View>
                   <View style={styles.empInfo}>
                     <Text style={styles.empName}>{item.name}</Text>
-                    <Text style={styles.empMeta}>{item.contactName || "No contact"} | {item.phone || "No phone"}</Text>
+                    <Text style={styles.empMeta}>{item.contactName || t("noContact")} | {item.phone || t("noPhone")}</Text>
                   </View>
                 </View>
               )}
@@ -498,24 +498,24 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>New Supplier</Text>
+              <Text style={styles.modalTitle}>{t("newSupplier")}</Text>
               <Pressable onPress={() => setShowSupplierForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
-              <Text style={styles.label}>Company Name *</Text>
-              <TextInput style={styles.input} value={supForm.name} onChangeText={(t) => setSupForm({ ...supForm, name: t })} placeholderTextColor={Colors.textMuted} placeholder="Supplier name" />
-              <Text style={styles.label}>Contact Person</Text>
-              <TextInput style={styles.input} value={supForm.contactName} onChangeText={(t) => setSupForm({ ...supForm, contactName: t })} placeholderTextColor={Colors.textMuted} placeholder="Contact name" />
-              <Text style={styles.label}>Phone</Text>
-              <TextInput style={styles.input} value={supForm.phone} onChangeText={(t) => setSupForm({ ...supForm, phone: t })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+1234567890" />
-              <Text style={styles.label}>Email</Text>
-              <TextInput style={styles.input} value={supForm.email} onChangeText={(t) => setSupForm({ ...supForm, email: t })} placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" />
+              <Text style={styles.label}>{t("companyName")} *</Text>
+              <TextInput style={styles.input} value={supForm.name} onChangeText={(v) => setSupForm({ ...supForm, name: v })} placeholderTextColor={Colors.textMuted} placeholder={t("supplierNamePlaceholder")} />
+              <Text style={styles.label}>{t("contactPerson")}</Text>
+              <TextInput style={styles.input} value={supForm.contactName} onChangeText={(v) => setSupForm({ ...supForm, contactName: v })} placeholderTextColor={Colors.textMuted} placeholder={t("contactNamePlaceholder")} />
+              <Text style={styles.label}>{t("phone")}</Text>
+              <TextInput style={styles.input} value={supForm.phone} onChangeText={(v) => setSupForm({ ...supForm, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+1234567890" />
+              <Text style={styles.label}>{t("email")}</Text>
+              <TextInput style={styles.input} value={supForm.email} onChangeText={(v) => setSupForm({ ...supForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" />
               <Pressable style={styles.saveBtn} onPress={() => {
-                if (!supForm.name) return Alert.alert("Error", "Company name required");
+                if (!supForm.name) return Alert.alert(t("error"), t("companyNameRequired"));
                 createSupMutation.mutate({ name: supForm.name, contactName: supForm.contactName || undefined, phone: supForm.phone || undefined, email: supForm.email || undefined, paymentTerms: supForm.paymentTerms || undefined });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>Create Supplier</Text>
+                  <Text style={styles.saveBtnText}>{t("createSupplier")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -539,7 +539,7 @@ export default function SettingsScreen() {
               data={branches}
               keyExtractor={(item: any) => String(item.id)}
               scrollEnabled={!!branches.length}
-              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>No branches yet</Text>}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>{t("noBranches")}</Text>}
               renderItem={({ item }: { item: any }) => (
                 <View style={styles.empCard}>
                   <View style={[styles.empAvatar, { backgroundColor: Colors.secondary + "30" }]}>
@@ -547,13 +547,13 @@ export default function SettingsScreen() {
                   </View>
                   <View style={styles.empInfo}>
                     <Text style={styles.empName}>{item.name}</Text>
-                    <Text style={styles.empMeta}>{item.address || "No address"} | {item.currency || "USD"} | Tax: {item.taxRate || "0"}%</Text>
+                    <Text style={styles.empMeta}>{item.address || t("noAddress")} | {item.currency || "USD"} | {t("taxRate")}: {item.taxRate || "0"}%</Text>
                     {item.phone ? <Text style={styles.empMeta}>{item.phone}</Text> : null}
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     {item.isMain && (
                       <View style={[styles.roleBadge, { backgroundColor: Colors.accent + "20" }]}>
-                        <Text style={[styles.roleText, { color: Colors.accent }]}>Main</Text>
+                        <Text style={[styles.roleText, { color: Colors.accent }]}>{t("main")}</Text>
                       </View>
                     )}
                     <Pressable onPress={() => {
@@ -565,9 +565,9 @@ export default function SettingsScreen() {
                     </Pressable>
                     {!item.isMain && (
                       <Pressable onPress={() => {
-                        Alert.alert("Delete Branch", `Delete "${item.name}"?`, [
-                          { text: "Cancel", style: "cancel" },
-                          { text: "Delete", style: "destructive", onPress: () => deleteBranchMutation.mutate(item.id) },
+                        Alert.alert(t("deleteBranch"), `${t("delete")} "${item.name}"?`, [
+                          { text: t("cancel"), style: "cancel" },
+                          { text: t("delete"), style: "destructive", onPress: () => deleteBranchMutation.mutate(item.id) },
                         ]);
                       }}>
                         <Ionicons name="trash" size={18} color={Colors.danger} />
@@ -585,17 +585,17 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{editBranch ? "Edit Branch" : "New Branch"}</Text>
+              <Text style={styles.modalTitle}>{editBranch ? t("editBranch") : t("newBranch")}</Text>
               <Pressable onPress={() => { setShowBranchForm(false); setEditBranch(null); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
-              <Text style={styles.label}>Name *</Text>
-              <TextInput style={styles.input} value={branchForm.name} onChangeText={(v) => setBranchForm({ ...branchForm, name: v })} placeholderTextColor={Colors.textMuted} placeholder="Branch name" />
-              <Text style={styles.label}>Address</Text>
-              <TextInput style={styles.input} value={branchForm.address} onChangeText={(v) => setBranchForm({ ...branchForm, address: v })} placeholderTextColor={Colors.textMuted} placeholder="Branch address" />
-              <Text style={styles.label}>Phone</Text>
+              <Text style={styles.label}>{t("name")} *</Text>
+              <TextInput style={styles.input} value={branchForm.name} onChangeText={(v) => setBranchForm({ ...branchForm, name: v })} placeholderTextColor={Colors.textMuted} placeholder={t("branchName")} />
+              <Text style={styles.label}>{t("address")}</Text>
+              <TextInput style={styles.input} value={branchForm.address} onChangeText={(v) => setBranchForm({ ...branchForm, address: v })} placeholderTextColor={Colors.textMuted} placeholder={t("branchAddress")} />
+              <Text style={styles.label}>{t("phone")}</Text>
               <TextInput style={styles.input} value={branchForm.phone} onChangeText={(v) => setBranchForm({ ...branchForm, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+1234567890" />
-              <Text style={styles.label}>Currency</Text>
+              <Text style={styles.label}>{t("currency")}</Text>
               <View style={styles.roleRow}>
                 {["USD", "EGP", "EUR", "GBP", "SAR"].map((c) => (
                   <Pressable key={c} style={[styles.roleChip, branchForm.currency === c && { backgroundColor: Colors.accent }]} onPress={() => setBranchForm({ ...branchForm, currency: c })}>
@@ -603,14 +603,14 @@ export default function SettingsScreen() {
                   </Pressable>
                 ))}
               </View>
-              <Text style={styles.label}>Tax Rate (%)</Text>
+              <Text style={styles.label}>{t("taxRatePercent")}</Text>
               <TextInput style={styles.input} value={branchForm.taxRate} onChangeText={(v) => setBranchForm({ ...branchForm, taxRate: v })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" />
               <Pressable style={styles.saveBtn} onPress={() => {
-                if (!branchForm.name) return Alert.alert("Error", "Branch name is required");
+                if (!branchForm.name) return Alert.alert(t("error"), t("branchNameRequired"));
                 createBranchMutation.mutate({ name: branchForm.name, address: branchForm.address || undefined, phone: branchForm.phone || undefined, currency: branchForm.currency, taxRate: branchForm.taxRate || "0" });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>{editBranch ? "Update Branch" : "Create Branch"}</Text>
+                  <Text style={styles.saveBtnText}>{editBranch ? t("updateBranch") : t("createBranch")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -634,7 +634,7 @@ export default function SettingsScreen() {
               data={expenses}
               keyExtractor={(item: any) => String(item.id)}
               scrollEnabled={!!expenses.length}
-              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>No expenses recorded</Text>}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>{t("noExpenses")}</Text>}
               renderItem={({ item }: { item: any }) => (
                 <View style={styles.empCard}>
                   <View style={[styles.empAvatar, { backgroundColor: (expenseCategoryColors[item.categoryId] || expenseCategoryColors.other) + "30" }]}>
@@ -649,9 +649,9 @@ export default function SettingsScreen() {
                       <Text style={[styles.roleText, { color: expenseCategoryColors[item.categoryId] || expenseCategoryColors.other }]}>{item.categoryId || "other"}</Text>
                     </View>
                     <Pressable onPress={() => {
-                      Alert.alert("Delete Expense", `Delete "${item.description}"?`, [
-                        { text: "Cancel", style: "cancel" },
-                        { text: "Delete", style: "destructive", onPress: () => deleteExpenseMutation.mutate(item.id) },
+                      Alert.alert(t("deleteExpense"), `${t("delete")} "${item.description}"?`, [
+                        { text: t("cancel"), style: "cancel" },
+                        { text: t("delete"), style: "destructive", onPress: () => deleteExpenseMutation.mutate(item.id) },
                       ]);
                     }}>
                       <Ionicons name="trash" size={18} color={Colors.danger} />
@@ -668,15 +668,15 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Expense</Text>
+              <Text style={styles.modalTitle}>{t("addExpense")}</Text>
               <Pressable onPress={() => setShowExpenseForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
-              <Text style={styles.label}>Description *</Text>
-              <TextInput style={styles.input} value={expenseForm.description} onChangeText={(t) => setExpenseForm({ ...expenseForm, description: t })} placeholderTextColor={Colors.textMuted} placeholder="Expense description" />
-              <Text style={styles.label}>Amount *</Text>
-              <TextInput style={styles.input} value={expenseForm.amount} onChangeText={(t) => setExpenseForm({ ...expenseForm, amount: t })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" />
-              <Text style={styles.label}>Category</Text>
+              <Text style={styles.label}>{t("description")} *</Text>
+              <TextInput style={styles.input} value={expenseForm.description} onChangeText={(v) => setExpenseForm({ ...expenseForm, description: v })} placeholderTextColor={Colors.textMuted} placeholder={t("expenseDescription")} />
+              <Text style={styles.label}>{t("amount")} *</Text>
+              <TextInput style={styles.input} value={expenseForm.amount} onChangeText={(v) => setExpenseForm({ ...expenseForm, amount: v })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" />
+              <Text style={styles.label}>{t("category")}</Text>
               <View style={styles.roleRow}>
                 {expenseCategories.map((c) => (
                   <Pressable key={c} style={[styles.roleChip, expenseForm.category === c && { backgroundColor: expenseCategoryColors[c] }]} onPress={() => setExpenseForm({ ...expenseForm, category: c })}>
@@ -684,16 +684,16 @@ export default function SettingsScreen() {
                   </Pressable>
                 ))}
               </View>
-              <Text style={styles.label}>Date</Text>
-              <TextInput style={styles.input} value={expenseForm.date} onChangeText={(t) => setExpenseForm({ ...expenseForm, date: t })} placeholderTextColor={Colors.textMuted} placeholder="YYYY-MM-DD" />
-              <Text style={styles.label}>Notes</Text>
-              <TextInput style={[styles.input, { minHeight: 60 }]} value={expenseForm.notes} onChangeText={(t) => setExpenseForm({ ...expenseForm, notes: t })} placeholderTextColor={Colors.textMuted} placeholder="Optional notes" multiline />
+              <Text style={styles.label}>{t("date")}</Text>
+              <TextInput style={styles.input} value={expenseForm.date} onChangeText={(v) => setExpenseForm({ ...expenseForm, date: v })} placeholderTextColor={Colors.textMuted} placeholder="YYYY-MM-DD" />
+              <Text style={styles.label}>{t("notes")}</Text>
+              <TextInput style={[styles.input, { minHeight: 60 }]} value={expenseForm.notes} onChangeText={(v) => setExpenseForm({ ...expenseForm, notes: v })} placeholderTextColor={Colors.textMuted} placeholder={t("optionalNotes")} multiline />
               <Pressable style={styles.saveBtn} onPress={() => {
-                if (!expenseForm.description || !expenseForm.amount) return Alert.alert("Error", "Description and amount required");
+                if (!expenseForm.description || !expenseForm.amount) return Alert.alert(t("error"), t("descriptionAmountRequired"));
                 createExpenseMutation.mutate({ branchId: 1, categoryId: expenseForm.category, description: expenseForm.description, amount: parseFloat(expenseForm.amount), date: expenseForm.date, notes: expenseForm.notes || undefined });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>Add Expense</Text>
+                  <Text style={styles.saveBtnText}>{t("addExpense")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -716,20 +716,20 @@ export default function SettingsScreen() {
                 <View style={styles.empInfo}>
                   <Text style={styles.empName}>{employee.name}</Text>
                   {activeShift ? (
-                    <Text style={[styles.empMeta, { color: Colors.success }]}>Clocked In {activeShiftElapsed ? `| ${activeShiftElapsed}` : ""}</Text>
+                    <Text style={[styles.empMeta, { color: Colors.success }]}>{t("clockedIn")} {activeShiftElapsed ? `| ${activeShiftElapsed}` : ""}</Text>
                   ) : (
-                    <Text style={styles.empMeta}>Not clocked in</Text>
+                    <Text style={styles.empMeta}>{t("notClockedIn")}</Text>
                   )}
                 </View>
                 {activeShift ? (
                   <Pressable style={[styles.clockBtn, { backgroundColor: Colors.danger + "20" }]} onPress={() => clockOutMutation.mutate({ id: activeShift.id, data: {} })}>
                     <Ionicons name="stop-circle" size={20} color={Colors.danger} />
-                    <Text style={[styles.clockBtnText, { color: Colors.danger }]}>Out</Text>
+                    <Text style={[styles.clockBtnText, { color: Colors.danger }]}>{t("clockOut")}</Text>
                   </Pressable>
                 ) : (
                   <Pressable style={[styles.clockBtn, { backgroundColor: Colors.success + "20" }]} onPress={() => clockInMutation.mutate({ employeeId: employee.id, branchId: 1, startTime: new Date().toISOString(), status: "open" })}>
                     <Ionicons name="play-circle" size={20} color={Colors.success} />
-                    <Text style={[styles.clockBtnText, { color: Colors.success }]}>In</Text>
+                    <Text style={[styles.clockBtnText, { color: Colors.success }]}>{t("clockIn")}</Text>
                   </Pressable>
                 )}
               </View>
@@ -738,7 +738,7 @@ export default function SettingsScreen() {
               data={shifts}
               keyExtractor={(item: any) => String(item.id)}
               scrollEnabled={!!shifts.length}
-              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>No shifts recorded</Text>}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>{t("noShifts")}</Text>}
               renderItem={({ item }: { item: any }) => {
                 const emp = employees.find((e: any) => e.id === item.employeeId);
                 return (
@@ -750,7 +750,7 @@ export default function SettingsScreen() {
                       <Text style={styles.empName}>{emp?.name || `Employee #${item.employeeId}`}</Text>
                       <Text style={styles.empMeta}>
                         {new Date(item.startTime).toLocaleString()}
-                        {item.endTime ? ` - ${new Date(item.endTime).toLocaleString()}` : " (Active)"}
+                        {item.endTime ? ` - ${new Date(item.endTime).toLocaleString()}` : ` ${t("shiftActiveLabel")}`}
                       </Text>
                     </View>
                     {item.endTime && (
@@ -782,7 +782,7 @@ export default function SettingsScreen() {
               data={purchaseOrders}
               keyExtractor={(item: any) => String(item.id)}
               scrollEnabled={!!purchaseOrders.length}
-              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>No purchase orders</Text>}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>{t("noPurchaseOrders")}</Text>}
               renderItem={({ item }: { item: any }) => {
                 const sup = suppliers.find((s: any) => s.id === item.supplierId);
                 const statusColor = poStatusColors[item.status] || Colors.textMuted;
@@ -817,11 +817,11 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Create Purchase Order</Text>
+              <Text style={styles.modalTitle}>{t("createPurchaseOrder")}</Text>
               <Pressable onPress={() => setShowPOForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
-              <Text style={styles.label}>Supplier *</Text>
+              <Text style={styles.label}>{t("supplier")} *</Text>
               <View style={styles.roleRow}>
                 {suppliers.map((s: any) => (
                   <Pressable key={s.id} style={[styles.roleChip, poForm.supplierId === String(s.id) && { backgroundColor: Colors.accent }]} onPress={() => setPOForm({ ...poForm, supplierId: String(s.id) })}>
@@ -829,14 +829,14 @@ export default function SettingsScreen() {
                   </Pressable>
                 ))}
               </View>
-              <Text style={styles.label}>Notes</Text>
-              <TextInput style={[styles.input, { minHeight: 60 }]} value={poForm.notes} onChangeText={(t) => setPOForm({ ...poForm, notes: t })} placeholderTextColor={Colors.textMuted} placeholder="Optional notes" multiline />
+              <Text style={styles.label}>{t("notes")}</Text>
+              <TextInput style={[styles.input, { minHeight: 60 }]} value={poForm.notes} onChangeText={(v) => setPOForm({ ...poForm, notes: v })} placeholderTextColor={Colors.textMuted} placeholder={t("optionalNotes")} multiline />
               <Pressable style={styles.saveBtn} onPress={() => {
-                if (!poForm.supplierId) return Alert.alert("Error", "Please select a supplier");
+                if (!poForm.supplierId) return Alert.alert(t("error"), t("pleaseSelectSupplier"));
                 createPOMutation.mutate({ branchId: 1, supplierId: parseInt(poForm.supplierId), status: "draft", notes: poForm.notes || undefined });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>Create Order</Text>
+                  <Text style={styles.saveBtnText}>{t("createOrder")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -855,7 +855,7 @@ export default function SettingsScreen() {
               data={activityLog}
               keyExtractor={(item: any) => String(item.id)}
               scrollEnabled={!!activityLog.length}
-              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>No activity recorded</Text>}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>{t("noActivity")}</Text>}
               renderItem={({ item }: { item: any }) => {
                 const actionIcons: Record<string, string> = { sale_created: "cart", login: "log-in", return_created: "swap-horizontal", shift_closed: "time" };
                 const iconName = actionIcons[item.action] || "ellipse";
@@ -897,7 +897,7 @@ export default function SettingsScreen() {
               data={returns}
               keyExtractor={(item: any) => String(item.id)}
               scrollEnabled={!!returns.length}
-              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>No returns recorded</Text>}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>{t("noReturns")}</Text>}
               renderItem={({ item }: { item: any }) => (
                 <View style={styles.empCard}>
                   <View style={[styles.empAvatar, { backgroundColor: Colors.warning + "30" }]}>
@@ -905,7 +905,7 @@ export default function SettingsScreen() {
                   </View>
                   <View style={styles.empInfo}>
                     <Text style={styles.empName}>Return #{item.id} - Sale #{item.originalSaleId}</Text>
-                    <Text style={styles.empMeta}>${Number(item.totalAmount).toFixed(2)} | {item.reason || "No reason"} | {new Date(item.createdAt).toLocaleDateString()}</Text>
+                    <Text style={styles.empMeta}>${Number(item.totalAmount).toFixed(2)} | {item.reason || t("noReason")} | {new Date(item.createdAt).toLocaleDateString()}</Text>
                   </View>
                   <View style={[styles.roleBadge, { backgroundColor: (item.status === "completed" ? Colors.success : Colors.warning) + "20" }]}>
                     <Text style={[styles.roleText, { color: item.status === "completed" ? Colors.success : Colors.warning }]}>{item.status || "completed"}</Text>
@@ -921,11 +921,11 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Process Return</Text>
+              <Text style={styles.modalTitle}>{t("processReturn")}</Text>
               <Pressable onPress={() => setShowReturnForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
-              <Text style={styles.label}>Select Sale to Return *</Text>
+              <Text style={styles.label}>{t("selectSaleToReturn")}</Text>
               <FlatList
                 data={salesList.filter((s: any) => s.status === "completed").slice(0, 20)}
                 keyExtractor={(item: any) => String(item.id)}
@@ -943,22 +943,22 @@ export default function SettingsScreen() {
                   </Pressable>
                 )}
               />
-              <Text style={styles.label}>Return Type</Text>
+              <Text style={styles.label}>{t("returnType")}</Text>
               <View style={styles.roleRow}>
-                {["refund", "exchange", "store_credit"].map((t) => (
-                  <Pressable key={t} style={[styles.roleChip, returnForm.type === t && { backgroundColor: Colors.accent }]} onPress={() => setReturnForm({ ...returnForm, type: t })}>
-                    <Text style={[styles.roleChipText, returnForm.type === t && { color: Colors.textDark }]}>{t.replace("_", " ")}</Text>
+                {["refund", "exchange", "store_credit"].map((rt) => (
+                  <Pressable key={rt} style={[styles.roleChip, returnForm.type === rt && { backgroundColor: Colors.accent }]} onPress={() => setReturnForm({ ...returnForm, type: rt })}>
+                    <Text style={[styles.roleChipText, returnForm.type === rt && { color: Colors.textDark }]}>{t(rt as any)}</Text>
                   </Pressable>
                 ))}
               </View>
-              <Text style={styles.label}>Reason</Text>
-              <TextInput style={styles.input} value={returnForm.reason} onChangeText={(t) => setReturnForm({ ...returnForm, reason: t })} placeholderTextColor={Colors.textMuted} placeholder="Reason for return" />
+              <Text style={styles.label}>{t("reason")}</Text>
+              <TextInput style={styles.input} value={returnForm.reason} onChangeText={(v) => setReturnForm({ ...returnForm, reason: v })} placeholderTextColor={Colors.textMuted} placeholder={t("reasonForReturn")} />
               <Pressable style={styles.saveBtn} onPress={() => {
-                if (!returnForm.originalSaleId) return Alert.alert("Error", "Select a sale to return");
+                if (!returnForm.originalSaleId) return Alert.alert(t("error"), t("selectSaleError"));
                 createReturnMutation.mutate(returnForm);
               }}>
                 <LinearGradient colors={[Colors.warning, Colors.danger]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>Process Return</Text>
+                  <Text style={styles.saveBtnText}>{t("processReturn")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -979,29 +979,29 @@ export default function SettingsScreen() {
                   <View style={{ backgroundColor: Colors.success + "15", borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.success + "30" }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
                       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.success }} />
-                      <Text style={{ color: Colors.success, fontSize: 14, fontWeight: "700" }}>Active Shift</Text>
+                      <Text style={{ color: Colors.success, fontSize: 14, fontWeight: "700" }}>{t("activeShift")}</Text>
                     </View>
-                    <Text style={{ color: Colors.textMuted, fontSize: 12 }}>Opening Cash: ${Number(activeShift.openingCash || 0).toFixed(2)}</Text>
-                    <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>Duration: {activeShiftElapsed || "0:00"}</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{t("openingCash")}: ${Number(activeShift.openingCash || 0).toFixed(2)}</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>{t("durationLabel")}: {activeShiftElapsed || "0:00"}</Text>
                   </View>
 
-                  <Text style={styles.label}>Operation Type</Text>
+                  <Text style={styles.label}>{t("operationType")}</Text>
                   <View style={styles.roleRow}>
-                    {["withdrawal", "deposit", "count"].map((t) => (
-                      <Pressable key={t} style={[styles.roleChip, cashDrawerForm.type === t && { backgroundColor: Colors.accent }]} onPress={() => setCashDrawerForm({ ...cashDrawerForm, type: t })}>
-                        <Text style={[styles.roleChipText, cashDrawerForm.type === t && { color: Colors.textDark }]}>{t}</Text>
+                    {["withdrawal", "deposit", "count"].map((ct) => (
+                      <Pressable key={ct} style={[styles.roleChip, cashDrawerForm.type === ct && { backgroundColor: Colors.accent }]} onPress={() => setCashDrawerForm({ ...cashDrawerForm, type: ct })}>
+                        <Text style={[styles.roleChipText, cashDrawerForm.type === ct && { color: Colors.textDark }]}>{t(ct as any)}</Text>
                       </Pressable>
                     ))}
                   </View>
 
-                  <Text style={styles.label}>Amount *</Text>
-                  <TextInput style={styles.input} value={cashDrawerForm.amount} onChangeText={(t) => setCashDrawerForm({ ...cashDrawerForm, amount: t })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" />
+                  <Text style={styles.label}>{t("amount")} *</Text>
+                  <TextInput style={styles.input} value={cashDrawerForm.amount} onChangeText={(v) => setCashDrawerForm({ ...cashDrawerForm, amount: v })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" />
 
-                  <Text style={styles.label}>Reason</Text>
-                  <TextInput style={styles.input} value={cashDrawerForm.reason} onChangeText={(t) => setCashDrawerForm({ ...cashDrawerForm, reason: t })} placeholderTextColor={Colors.textMuted} placeholder="Reason for operation" />
+                  <Text style={styles.label}>{t("reason")}</Text>
+                  <TextInput style={styles.input} value={cashDrawerForm.reason} onChangeText={(v) => setCashDrawerForm({ ...cashDrawerForm, reason: v })} placeholderTextColor={Colors.textMuted} placeholder={t("reasonForOperation")} />
 
                   <Pressable style={styles.saveBtn} onPress={() => {
-                    if (!cashDrawerForm.amount) return Alert.alert("Error", "Amount is required");
+                    if (!cashDrawerForm.amount) return Alert.alert(t("error"), t("amountRequired"));
                     cashDrawerMutation.mutate({
                       shiftId: activeShift.id,
                       employeeId: employee?.id,
@@ -1011,15 +1011,15 @@ export default function SettingsScreen() {
                     });
                   }}>
                     <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                      <Text style={styles.saveBtnText}>Record Operation</Text>
+                      <Text style={styles.saveBtnText}>{t("recordOperation")}</Text>
                     </LinearGradient>
                   </Pressable>
                 </>
               ) : (
                 <View style={{ alignItems: "center", paddingVertical: 40 }}>
                   <Ionicons name="lock-closed" size={48} color={Colors.textMuted} />
-                  <Text style={{ color: Colors.textMuted, fontSize: 15, marginTop: 12 }}>No active shift</Text>
-                  <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 4, textAlign: "center" }}>Start a shift from the Attendance section to use the cash drawer</Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 15, marginTop: 12 }}>{t("noActiveShift")}</Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 4, textAlign: "center" }}>{t("noActiveShiftCashDrawer")}</Text>
                 </View>
               )}
             </ScrollView>
@@ -1043,7 +1043,7 @@ export default function SettingsScreen() {
               data={warehousesList}
               keyExtractor={(item: any) => String(item.id)}
               scrollEnabled={!!warehousesList.length}
-              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>No warehouses yet. Tap + to add one.</Text>}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>{t("noWarehouses")}</Text>}
               renderItem={({ item }: { item: any }) => (
                 <View style={styles.empCard}>
                   <View style={[styles.empAvatar, { backgroundColor: Colors.accent + "30" }]}>
@@ -1051,11 +1051,11 @@ export default function SettingsScreen() {
                   </View>
                   <View style={styles.empInfo}>
                     <Text style={styles.empName}>{item.name}</Text>
-                    <Text style={styles.empMeta}>{item.address || "No address"}</Text>
+                    <Text style={styles.empMeta}>{item.address || t("noAddress")}</Text>
                   </View>
                   {item.isDefault && (
                     <View style={[styles.roleBadge, { backgroundColor: Colors.accent + "20" }]}>
-                      <Text style={[styles.roleText, { color: Colors.accent }]}>Default</Text>
+                      <Text style={[styles.roleText, { color: Colors.accent }]}>{t("default")}</Text>
                     </View>
                   )}
                 </View>
@@ -1069,28 +1069,28 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>New Warehouse</Text>
+              <Text style={styles.modalTitle}>{t("newWarehouse")}</Text>
               <Pressable onPress={() => setShowWarehouseForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
-              <Text style={styles.label}>Name *</Text>
-              <TextInput style={styles.input} value={warehouseForm.name} onChangeText={(v) => setWarehouseForm({ ...warehouseForm, name: v })} placeholderTextColor={Colors.textMuted} placeholder="Warehouse name" />
-              <Text style={styles.label}>Address</Text>
-              <TextInput style={styles.input} value={warehouseForm.address} onChangeText={(v) => setWarehouseForm({ ...warehouseForm, address: v })} placeholderTextColor={Colors.textMuted} placeholder="Warehouse address" />
-              <Text style={styles.label}>Type</Text>
+              <Text style={styles.label}>{t("name")} *</Text>
+              <TextInput style={styles.input} value={warehouseForm.name} onChangeText={(v) => setWarehouseForm({ ...warehouseForm, name: v })} placeholderTextColor={Colors.textMuted} placeholder={t("warehouseName")} />
+              <Text style={styles.label}>{t("address")}</Text>
+              <TextInput style={styles.input} value={warehouseForm.address} onChangeText={(v) => setWarehouseForm({ ...warehouseForm, address: v })} placeholderTextColor={Colors.textMuted} placeholder={t("warehouseAddress")} />
+              <Text style={styles.label}>{t("type")}</Text>
               <View style={styles.roleRow}>
-                {["main", "secondary", "cold-storage"].map((t) => (
-                  <Pressable key={t} style={[styles.roleChip, warehouseForm.type === t && { backgroundColor: Colors.accent }]} onPress={() => setWarehouseForm({ ...warehouseForm, type: t })}>
-                    <Text style={[styles.roleChipText, warehouseForm.type === t && { color: Colors.textDark }]}>{t}</Text>
+                {["main", "secondary", "cold-storage"].map((wt) => (
+                  <Pressable key={wt} style={[styles.roleChip, warehouseForm.type === wt && { backgroundColor: Colors.accent }]} onPress={() => setWarehouseForm({ ...warehouseForm, type: wt })}>
+                    <Text style={[styles.roleChipText, warehouseForm.type === wt && { color: Colors.textDark }]}>{t(wt.replace("-", "") as any)}</Text>
                   </Pressable>
                 ))}
               </View>
               <Pressable style={styles.saveBtn} onPress={() => {
-                if (!warehouseForm.name) return Alert.alert("Error", "Warehouse name is required");
+                if (!warehouseForm.name) return Alert.alert(t("error"), t("warehouseNameRequired"));
                 createWarehouseMutation.mutate({ name: warehouseForm.name, address: warehouseForm.address || undefined, branchId: employee?.branchId || 1 });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>Create Warehouse</Text>
+                  <Text style={styles.saveBtnText}>{t("createWarehouse")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -1120,7 +1120,7 @@ export default function SettingsScreen() {
                   data={batchesList}
                   keyExtractor={(item: any) => String(item.id)}
                   scrollEnabled={!!batchesList.length}
-                  ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>No batches tracked yet</Text>}
+                  ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>{t("noBatches")}</Text>}
                   renderItem={({ item }: { item: any }) => {
                     const prod = productsList.find((p: any) => p.id === item.productId);
                     const isExpired = item.expiryDate && new Date(item.expiryDate) < new Date();
@@ -1201,12 +1201,12 @@ export default function SettingsScreen() {
                 <View style={styles.modalHeader}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                     <Pressable onPress={() => setBatchView("list")}><Ionicons name="arrow-back" size={24} color={Colors.text} /></Pressable>
-                    <Text style={styles.modalTitle}>{editBatch ? "Edit Batch" : "New Batch"}</Text>
+                    <Text style={styles.modalTitle}>{editBatch ? t("editBatch") : t("newBatch")}</Text>
                   </View>
                   <Pressable onPress={() => { setBatchView("list"); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
                 </View>
                 <ScrollView>
-                  <Text style={styles.label}>Product</Text>
+                  <Text style={styles.label}>{t("product")}</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
                     <View style={{ flexDirection: "row", gap: 8 }}>
                       {productsList.map((p: any) => (
@@ -1217,23 +1217,23 @@ export default function SettingsScreen() {
                     </View>
                   </ScrollView>
 
-                  <Text style={styles.label}>Batch Number</Text>
+                  <Text style={styles.label}>{t("batchNumber")}</Text>
                   <TextInput style={styles.formInput} placeholder="e.g. BATCH-001" placeholderTextColor={Colors.textMuted} value={batchForm.batchNumber} onChangeText={(v) => setBatchForm({ ...batchForm, batchNumber: v })} />
 
-                  <Text style={styles.label}>Quantity</Text>
-                  <TextInput style={styles.formInput} placeholder="Quantity" placeholderTextColor={Colors.textMuted} value={batchForm.quantity} onChangeText={(v) => setBatchForm({ ...batchForm, quantity: v })} keyboardType="number-pad" />
+                  <Text style={styles.label}>{t("quantity")}</Text>
+                  <TextInput style={styles.formInput} placeholder={t("quantity")} placeholderTextColor={Colors.textMuted} value={batchForm.quantity} onChangeText={(v) => setBatchForm({ ...batchForm, quantity: v })} keyboardType="number-pad" />
 
-                  <Text style={styles.label}>Expiry Date</Text>
+                  <Text style={styles.label}>{t("expiryDate")}</Text>
                   <TextInput style={styles.formInput} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.textMuted} value={batchForm.expiryDate} onChangeText={(v) => setBatchForm({ ...batchForm, expiryDate: v })} />
 
-                  <Text style={styles.label}>Cost Price</Text>
+                  <Text style={styles.label}>{t("costPrice")}</Text>
                   <TextInput style={styles.formInput} placeholder="0.00" placeholderTextColor={Colors.textMuted} value={batchForm.costPrice} onChangeText={(v) => setBatchForm({ ...batchForm, costPrice: v })} keyboardType="decimal-pad" />
 
-                  <Text style={styles.label}>Supplier</Text>
+                  <Text style={styles.label}>{t("supplier")}</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
                     <View style={{ flexDirection: "row", gap: 8 }}>
                       <Pressable style={[styles.roleChip, !batchForm.supplierId && { backgroundColor: Colors.accent }]} onPress={() => setBatchForm({ ...batchForm, supplierId: "" })}>
-                        <Text style={[styles.roleChipText, !batchForm.supplierId && { color: Colors.textDark }]}>None</Text>
+                        <Text style={[styles.roleChipText, !batchForm.supplierId && { color: Colors.textDark }]}>{t("none")}</Text>
                       </Pressable>
                       {suppliers.map((s: any) => (
                         <Pressable key={s.id} style={[styles.roleChip, batchForm.supplierId === String(s.id) && { backgroundColor: Colors.accent }]} onPress={() => setBatchForm({ ...batchForm, supplierId: String(s.id) })}>
@@ -1244,7 +1244,7 @@ export default function SettingsScreen() {
                   </ScrollView>
 
                   <Pressable style={styles.saveBtn} onPress={() => {
-                    if (!batchForm.productId || !batchForm.batchNumber) return Alert.alert("Error", "Product and batch number are required");
+                    if (!batchForm.productId || !batchForm.batchNumber) return Alert.alert(t("error"), t("productBatchRequired"));
                     const payload: any = {
                       productId: Number(batchForm.productId),
                       batchNumber: batchForm.batchNumber,
@@ -1262,26 +1262,26 @@ export default function SettingsScreen() {
                   }}>
                     <LinearGradient colors={[Colors.gradientStart, Colors.accent]} style={styles.saveBtnGradient}>
                       <Ionicons name="checkmark" size={20} color={Colors.white} />
-                      <Text style={styles.saveBtnText}>{editBatch ? "Update Batch" : "Create Batch"}</Text>
+                      <Text style={styles.saveBtnText}>{editBatch ? t("updateBatch") : t("createBatch")}</Text>
                     </LinearGradient>
                   </Pressable>
 
                   {editBatch && (
                     <Pressable style={[styles.saveBtn, { marginTop: 8 }]} onPress={() => {
                       if (Platform.OS === "web") {
-                        if (window.confirm("Delete this batch?")) {
+                        if (window.confirm(`${t("deleteBatch")}?`)) {
                           deleteBatchMutation.mutate(editBatch.id, { onSuccess: () => setBatchView("list") });
                         }
                       } else {
-                        Alert.alert("Delete Batch", "Are you sure?", [
-                          { text: "Cancel", style: "cancel" },
-                          { text: "Delete", style: "destructive", onPress: () => deleteBatchMutation.mutate(editBatch.id, { onSuccess: () => setBatchView("list") }) },
+                        Alert.alert(t("deleteBatch"), t("areYouSure"), [
+                          { text: t("cancel"), style: "cancel" },
+                          { text: t("delete"), style: "destructive", onPress: () => deleteBatchMutation.mutate(editBatch.id, { onSuccess: () => setBatchView("list") }) },
                         ]);
                       }
                     }}>
                       <View style={[styles.saveBtnGradient, { backgroundColor: Colors.danger + "20" }]}>
                         <Ionicons name="trash" size={20} color={Colors.danger} />
-                        <Text style={[styles.saveBtnText, { color: Colors.danger }]}>Delete Batch</Text>
+                        <Text style={[styles.saveBtnText, { color: Colors.danger }]}>{t("deleteBatch")}</Text>
                       </View>
                     </Pressable>
                   )}
@@ -1296,7 +1296,7 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Receipt Printer</Text>
+              <Text style={styles.modalTitle}>{t("receiptPrinter")}</Text>
               <Pressable onPress={() => setShowPrinterSettings(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
@@ -1305,12 +1305,12 @@ export default function SettingsScreen() {
                   <Ionicons name="print" size={20} color={Colors.danger} />
                 </View>
                 <View style={styles.empInfo}>
-                  <Text style={styles.empName}>Printer Status</Text>
-                  <Text style={[styles.empMeta, { color: Colors.danger }]}>Not Connected</Text>
+                  <Text style={styles.empName}>{t("printerStatus")}</Text>
+                  <Text style={[styles.empMeta, { color: Colors.danger }]}>{t("notConnected")}</Text>
                 </View>
               </View>
 
-              <Text style={styles.label}>Paper Size</Text>
+              <Text style={styles.label}>{t("paperSize")}</Text>
               <View style={styles.roleRow}>
                 {["58mm", "80mm"].map((s) => (
                   <Pressable key={s} style={[styles.roleChip, printerPaperSize === s && { backgroundColor: Colors.accent }]} onPress={() => setPrinterPaperSize(s)}>
@@ -1319,9 +1319,9 @@ export default function SettingsScreen() {
                 ))}
               </View>
 
-              <Text style={styles.label}>Auto-Print Receipts</Text>
+              <Text style={styles.label}>{t("autoPrintReceipts")}</Text>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 4 }}>
-                <Text style={{ color: Colors.text, fontSize: 14 }}>Print after every sale</Text>
+                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("printAfterEverySale")}</Text>
                 <Switch value={printerAutoPrint} onValueChange={setPrinterAutoPrint} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={printerAutoPrint ? Colors.accent : Colors.textMuted} />
               </View>
 
@@ -1335,20 +1335,20 @@ export default function SettingsScreen() {
                     printWindow.print();
                   }
                 } else {
-                  Alert.alert("Test Print", sampleReceipt);
+                  Alert.alert(t("testPrint"), sampleReceipt);
                 }
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>Test Print</Text>
+                  <Text style={styles.saveBtnText}>{t("testPrint")}</Text>
                 </LinearGradient>
               </Pressable>
 
               <View style={{ backgroundColor: Colors.info + "15", borderRadius: 12, padding: 14, marginTop: 8, borderWidth: 1, borderColor: Colors.info + "30" }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
                   <Ionicons name="information-circle" size={18} color={Colors.info} />
-                  <Text style={{ color: Colors.info, fontSize: 13, fontWeight: "600" }}>Connection Info</Text>
+                  <Text style={{ color: Colors.info, fontSize: 13, fontWeight: "600" }}>{t("connectionInfo")}</Text>
                 </View>
-                <Text style={{ color: Colors.textMuted, fontSize: 12, lineHeight: 18 }}>Connect a Bluetooth thermal printer via device settings. Supported printers: ESC/POS compatible thermal printers (58mm or 80mm).</Text>
+                <Text style={{ color: Colors.textMuted, fontSize: 12, lineHeight: 18 }}>{t("printerConnectionDetails")}</Text>
               </View>
             </ScrollView>
           </View>
