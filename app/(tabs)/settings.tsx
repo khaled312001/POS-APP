@@ -303,7 +303,7 @@ export default function SettingsScreen() {
         <SettingRow icon="cloud-upload" label="Sync Status" value="Connected" color={Colors.success} rtl={isRTL} />
         <SettingRow icon="information-circle" label="App Version" value="1.0.0" color={Colors.info} rtl={isRTL} />
 
-        <Pressable style={styles.logoutBtn} onPress={() => { Alert.alert(t("logoutConfirm"), "", [{ text: t("cancel"), style: "cancel" }, { text: t("logout"), style: "destructive", onPress: () => logout() }]); }}>
+        <Pressable style={styles.logoutBtn} onPress={() => { if (Platform.OS === "web") { if (window.confirm(t("logoutConfirm"))) logout(); } else { Alert.alert(t("logoutConfirm"), "", [{ text: t("cancel"), style: "cancel" }, { text: t("logout"), style: "destructive", onPress: () => logout() }]); } }}>
           <Ionicons name="log-out" size={20} color={Colors.danger} />
           <Text style={styles.logoutText}>{t("logout")}</Text>
         </Pressable>
