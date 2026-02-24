@@ -493,91 +493,115 @@ export default function POSScreen() {
 
       <Modal visible={showReceipt} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: "90%" }]}>
+          <View style={{ backgroundColor: Colors.surface, borderRadius: 16, width: "94%", maxWidth: 380, maxHeight: "90%", overflow: "hidden" }}>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.receiptHeader}>
+              <View style={{ backgroundColor: "#FFFFFF", padding: 20, margin: 12, borderRadius: 4 }}>
+                <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
+
                 {storeSettings?.logo && (
-                  <Image source={{ uri: storeSettings.logo.startsWith("http") ? storeSettings.logo : `${getApiUrl()}${storeSettings.logo}` }} style={{ width: 60, height: 60, borderRadius: 12, marginBottom: 8 }} />
-                )}
-                <Text style={styles.receiptStoreName}>{storeSettings?.name || "Barmagly POS"}</Text>
-                {storeSettings?.address && <Text style={{ color: Colors.textSecondary, fontSize: 12, textAlign: "center" }}>{storeSettings.address}</Text>}
-                {storeSettings?.phone && <Text style={{ color: Colors.textSecondary, fontSize: 12, textAlign: "center" }}>{storeSettings.phone}</Text>}
-              </View>
-
-              <View style={styles.receiptDivider} />
-
-              <View style={styles.receiptInfo}>
-                <Text style={[styles.receiptInfoText, rtlTextAlign]}>{t("receiptNumber")}: {lastSale?.receiptNumber || `#${lastSale?.id}`}</Text>
-                <Text style={[styles.receiptInfoText, rtlTextAlign]}>{t("receiptDate")}: {lastSale?.date ? new Date(lastSale.date).toLocaleDateString() : new Date().toLocaleDateString()}</Text>
-                <Text style={[styles.receiptInfoText, rtlTextAlign]}>{t("receiptTime")}: {lastSale?.date ? new Date(lastSale.date).toLocaleTimeString() : new Date().toLocaleTimeString()}</Text>
-                <Text style={[styles.receiptInfoText, rtlTextAlign]}>{t("servedBy")}: {lastSale?.employeeName || employee?.name}</Text>
-                {lastSale?.customerName && <Text style={[styles.receiptInfoText, rtlTextAlign]}>{t("customer")}: {lastSale?.customerName}</Text>}
-              </View>
-
-              <View style={styles.receiptDivider} />
-
-              {lastSale?.items?.map((item: any, idx: number) => (
-                <View key={idx} style={[styles.receiptItem, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Text style={[styles.receiptItemName, rtlTextAlign]}>{item.name} x{item.quantity}</Text>
-                  <Text style={[styles.receiptItemTotal, rtlTextAlign]}>${item.total.toFixed(2)}</Text>
-                </View>
-              ))}
-
-              <View style={styles.receiptDivider} />
-
-              <View style={styles.receiptTotals}>
-                <View style={[styles.receiptTotalRow, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Text style={[styles.receiptTotalLabel, rtlTextAlign]}>{t("subtotal")}</Text>
-                  <Text style={[styles.receiptTotalValue, rtlTextAlign]}>${lastSale?.subtotal?.toFixed(2)}</Text>
-                </View>
-                {(lastSale?.discount || 0) > 0 && (
-                  <View style={[styles.receiptTotalRow, isRTL && { flexDirection: "row-reverse" }]}>
-                    <Text style={[styles.receiptTotalLabel, { color: Colors.success }, rtlTextAlign]}>{t("discount")}</Text>
-                    <Text style={[styles.receiptTotalValue, { color: Colors.success }, rtlTextAlign]}>-${lastSale?.discount?.toFixed(2)}</Text>
+                  <View style={{ alignItems: "center", marginVertical: 8 }}>
+                    <Image source={{ uri: storeSettings.logo.startsWith("http") ? storeSettings.logo : `${getApiUrl()}${storeSettings.logo}` }} style={{ width: 50, height: 50, borderRadius: 6 }} resizeMode="contain" />
                   </View>
                 )}
-                <View style={[styles.receiptTotalRow, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Text style={[styles.receiptTotalLabel, rtlTextAlign]}>{t("tax")}</Text>
-                  <Text style={[styles.receiptTotalValue, rtlTextAlign]}>${lastSale?.tax?.toFixed(2)}</Text>
+
+                <Text style={{ textAlign: "center", color: "#000", fontSize: 16, fontWeight: "800", marginTop: 4 }}>{storeSettings?.name || "Barmagly POS"}</Text>
+                {storeSettings?.address && <Text style={{ textAlign: "center", color: "#333", fontSize: 10, marginTop: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.address}</Text>}
+                {storeSettings?.phone && <Text style={{ textAlign: "center", color: "#333", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.phone}</Text>}
+                {storeSettings?.email && <Text style={{ textAlign: "center", color: "#333", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.email}</Text>}
+
+                <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 6, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
+
+                <View style={{ marginVertical: 6 }}>
+                  <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptDate")}: {lastSale?.date ? new Date(lastSale.date).toLocaleDateString() : new Date().toLocaleDateString()}, {lastSale?.date ? new Date(lastSale.date).toLocaleTimeString() : new Date().toLocaleTimeString()}</Text>
+                  <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptNumber")}: {lastSale?.receiptNumber || `#${lastSale?.id}`}</Text>
+                  <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("servedBy")}: {lastSale?.employeeName || employee?.name}</Text>
+                  {lastSale?.customerName && <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("customer")}: {lastSale.customerName}</Text>}
                 </View>
-                <View style={[styles.receiptTotalRow, { borderTopWidth: 1, borderColor: Colors.cardBorder, paddingTop: 8, marginTop: 4 }, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Text style={[styles.receiptGrandLabel, rtlTextAlign]}>{t("total")}</Text>
-                  <Text style={[styles.receiptGrandValue, rtlTextAlign]}>${lastSale?.total?.toFixed(2)}</Text>
+
+                <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"─".repeat(36)}</Text>
+
+                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6, marginBottom: 4 }}>
+                  <Text style={{ color: "#000", fontSize: 11, fontWeight: "700", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", flex: 2 }}>Item</Text>
+                  <Text style={{ color: "#000", fontSize: 11, fontWeight: "700", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 40, textAlign: "center" }}>Qty</Text>
+                  <Text style={{ color: "#000", fontSize: 11, fontWeight: "700", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 65, textAlign: "right" }}>Total</Text>
                 </View>
-                <View style={[styles.receiptTotalRow, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Text style={[styles.receiptTotalLabel, rtlTextAlign]}>{t("paymentMethod")} ({lastSale?.paymentMethod})</Text>
-                  <Text style={[styles.receiptTotalValue, rtlTextAlign]}>
-                    {lastSale?.paymentMethod === "cash" ? `$${lastSale?.cashReceived?.toFixed(2)}` : `$${lastSale?.total?.toFixed(2)}`}
-                  </Text>
+
+                <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"─".repeat(36)}</Text>
+
+                {lastSale?.items?.map((item: any, idx: number) => (
+                  <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 }}>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", flex: 2 }} numberOfLines={1}>{item.name}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 40, textAlign: "center" }}>x{item.quantity}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 65, textAlign: "right" }}>${item.total.toFixed(2)}</Text>
+                  </View>
+                ))}
+
+                <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 4, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
+
+                <View style={{ marginTop: 6 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("subtotal")}:</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>${lastSale?.subtotal?.toFixed(2)}</Text>
+                  </View>
+                  {(lastSale?.discount || 0) > 0 && (
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("discount")}:</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>-${lastSale?.discount?.toFixed(2)}</Text>
+                    </View>
+                  )}
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("tax")}:</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>${lastSale?.tax?.toFixed(2)}</Text>
+                  </View>
+
+                  <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
+
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
+                    <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>TOTAL:</Text>
+                    <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>${lastSale?.total?.toFixed(2)}</Text>
+                  </View>
+
+                  <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
+
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2, marginTop: 4 }}>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("paymentMethod")}:</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", textTransform: "uppercase" }}>{lastSale?.paymentMethod}</Text>
+                  </View>
+                  {lastSale?.paymentMethod === "cash" && (
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("cash")}:</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>${lastSale?.cashReceived?.toFixed(2)}</Text>
+                    </View>
+                  )}
+                  {(lastSale?.change || 0) > 0 && (
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("change")}:</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>${lastSale?.change?.toFixed(2)}</Text>
+                    </View>
+                  )}
                 </View>
-                {(lastSale?.change || 0) > 0 && (
-                  <View style={[styles.receiptTotalRow, isRTL && { flexDirection: "row-reverse" }]}>
-                    <Text style={[styles.receiptTotalLabel, { color: Colors.warning }, rtlTextAlign]}>{t("change")}</Text>
-                    <Text style={[styles.receiptTotalValue, { color: Colors.warning }, rtlTextAlign]}>${lastSale?.change?.toFixed(2)}</Text>
+
+                {qrDataUrl && Platform.OS === "web" && (
+                  <View style={{ alignItems: "center", marginTop: 12 }}>
+                    <Image source={{ uri: qrDataUrl }} style={{ width: 80, height: 80 }} />
                   </View>
                 )}
-              </View>
 
-              {qrDataUrl && Platform.OS === "web" && (
-                <View style={styles.qrSection}>
-                  <Image source={{ uri: qrDataUrl }} style={styles.qrImage} />
-                  <Text style={[styles.qrLabel, rtlTextAlign]}>{t("receiptNumber")}</Text>
+                <View style={{ alignItems: "center", marginTop: 14 }}>
+                  <Text style={{ color: "#000", fontSize: 13, fontWeight: "700", textAlign: "center" }}>{t("thankYou")}</Text>
+                  {storeSettings?.address && <Text style={{ color: "#555", fontSize: 10, textAlign: "center", marginTop: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("visitUs")}: {storeSettings.address}</Text>}
+                  <Text style={{ color: "#999", fontSize: 9, textAlign: "center", marginTop: 6, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("poweredBy")}</Text>
+                  <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 6, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
                 </View>
-              )}
-
-              <View style={{ alignItems: "center", marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.cardBorder }}>
-                <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: "600", marginBottom: 4 }}>{t("thankYou")}</Text>
-                {storeSettings?.address && <Text style={{ color: Colors.textMuted, fontSize: 11, textAlign: "center" }}>{t("visitUs")}: {storeSettings.address}</Text>}
-                <Text style={styles.receiptFooter}>{t("poweredBy")}</Text>
               </View>
-
-              <Pressable style={styles.closeReceiptBtn} onPress={() => { setShowReceipt(false); setLastSale(null); setQrDataUrl(null); }}>
-                <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={[styles.closeReceiptGradient, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Ionicons name="checkmark" size={20} color={Colors.white} />
-                  <Text style={styles.closeReceiptText}>{t("newSale")}</Text>
-                </LinearGradient>
-              </Pressable>
             </ScrollView>
+
+            <Pressable style={{ margin: 12, marginTop: 0 }} onPress={() => { setShowReceipt(false); setLastSale(null); setQrDataUrl(null); }}>
+              <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={[styles.closeReceiptGradient, isRTL && { flexDirection: "row-reverse" }]}>
+                <Ionicons name="checkmark" size={20} color={Colors.white} />
+                <Text style={styles.closeReceiptText}>{t("newSale")}</Text>
+              </LinearGradient>
+            </Pressable>
           </View>
         </View>
       </Modal>
