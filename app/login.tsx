@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, Text, View, Pressable, Platform, Alert, Dimensions, FlatList, ActivityIndicator } from "react-native";
+import { StyleSheet, Text, View, Pressable, Platform, Alert, Dimensions, FlatList, ActivityIndicator, TextInput, Modal } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -44,6 +44,10 @@ export default function LoginScreen() {
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [screenDims, setScreenDims] = useState(Dimensions.get("window"));
+  const [showShiftPrompt, setShowShiftPrompt] = useState(false);
+  const [showOpeningCashInput, setShowOpeningCashInput] = useState(false);
+  const [openingCash, setOpeningCash] = useState("");
+  const [loggedInEmployee, setLoggedInEmployee] = useState<Employee | null>(null);
   useEffect(() => {
     const sub = Dimensions.addEventListener("change", ({ window }) => setScreenDims(window));
     return () => sub?.remove();
@@ -99,7 +103,19 @@ export default function LoginScreen() {
       const emp = await res.json();
       login(emp);
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace("/(tabs)");
+      
+      try {
+        const shiftRes = await apiRequest("GET", `/api/shifts/active/${emp.id}`);
+        const activeShift = await shiftRes.json();
+        if (!activeShift) {
+          setLoggedInEmployee(emp);
+          setShowShiftPrompt(true);
+        } else {
+          router.replace("/(tabs)");
+        }
+      } catch {
+        router.replace("/(tabs)");
+      }
     } catch (e: any) {
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert(t("loginFailed"), t("invalidPinTryAgain"));
@@ -107,6 +123,32 @@ export default function LoginScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleStartShift = async () => {
+    if (!loggedInEmployee) return;
+    try {
+      await apiRequest("POST", "/api/shifts", {
+        employeeId: loggedInEmployee.id,
+        branchId: loggedInEmployee.branchId || 1,
+        openingCash: openingCash ? Number(openingCash) : 0,
+      });
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(t("success"), t("shiftStartedSuccess"));
+    } catch (e: any) {
+      console.error("Failed to start shift:", e);
+    }
+    setShowShiftPrompt(false);
+    setShowOpeningCashInput(false);
+    setOpeningCash("");
+    router.replace("/(tabs)");
+  };
+
+  const handleSkipShift = () => {
+    setShowShiftPrompt(false);
+    setShowOpeningCashInput(false);
+    setOpeningCash("");
+    router.replace("/(tabs)");
   };
 
   const renderEmployeeCard = ({ item }: { item: Employee }) => {
@@ -217,6 +259,48 @@ export default function LoginScreen() {
           )}
         </View>
       </LinearGradient>
+      <Modal visible={showShiftPrompt} animationType="fade" transparent>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 24 }}>
+          <View style={{ backgroundColor: Colors.surface, borderRadius: 20, padding: 24, width: "100%", maxWidth: 380, borderWidth: 1, borderColor: Colors.cardBorder }}>
+            {!showOpeningCashInput ? (
+              <>
+                <View style={{ alignItems: "center", marginBottom: 20 }}>
+                  <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.accent + "20", justifyContent: "center", alignItems: "center", marginBottom: 12 }}>
+                    <Ionicons name="time-outline" size={30} color={Colors.accent} />
+                  </View>
+                  <Text style={{ color: Colors.text, fontSize: 20, fontWeight: "700", marginBottom: 8 }}>{t("shiftPromptTitle")}</Text>
+                  <Text style={{ color: Colors.textSecondary, fontSize: 14, textAlign: "center" }}>{t("shiftPromptMessage")}</Text>
+                </View>
+                <Pressable onPress={() => setShowOpeningCashInput(true)} style={{ backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10 }}>
+                  <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "700" }}>{t("startShiftNow")}</Text>
+                </Pressable>
+                <Pressable onPress={handleSkipShift} style={{ borderRadius: 12, paddingVertical: 14, alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder }}>
+                  <Text style={{ color: Colors.textSecondary, fontSize: 16, fontWeight: "500" }}>{t("skipForNow")}</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={{ color: Colors.text, fontSize: 18, fontWeight: "700", marginBottom: 16, textAlign: "center" }}>{t("enterOpeningCash")}</Text>
+                <TextInput
+                  style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, fontSize: 18, color: Colors.text, textAlign: "center", borderWidth: 1, borderColor: Colors.cardBorder, marginBottom: 16 }}
+                  value={openingCash}
+                  onChangeText={setOpeningCash}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor={Colors.textMuted}
+                  autoFocus
+                />
+                <Pressable onPress={handleStartShift} style={{ backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10 }}>
+                  <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "700" }}>{t("startShift")}</Text>
+                </Pressable>
+                <Pressable onPress={() => setShowOpeningCashInput(false)} style={{ borderRadius: 12, paddingVertical: 14, alignItems: "center" }}>
+                  <Text style={{ color: Colors.textSecondary, fontSize: 15 }}>{t("cancel")}</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

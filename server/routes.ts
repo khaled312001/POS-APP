@@ -725,8 +725,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Object Storage - Public file serving
-  app.get("/public-objects/:filePath(*)", async (req, res) => {
-    const filePath = req.params.filePath;
+  app.get("/public-objects/*filePath", async (req, res) => {
+    const filePath = (req.params as any).filePath;
     const objectStorageService = new ObjectStorageService();
     try {
       const file = await objectStorageService.searchPublicObject(filePath);
@@ -739,7 +739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Object Storage - Private file serving
-  app.get("/objects/:objectPath(*)", async (req, res) => {
+  app.get("/objects/*objectPath", async (req, res) => {
     const objectStorageService = new ObjectStorageService();
     try {
       const objectFile = await objectStorageService.getObjectEntityFile(req.path);

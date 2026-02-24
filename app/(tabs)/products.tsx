@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import {
   StyleSheet, Text, View, FlatList, Pressable, TextInput,
-  Modal, Alert, ScrollView, Platform, Dimensions,
+  Modal, Alert, ScrollView, Platform, Dimensions, Image,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -37,6 +38,10 @@ export default function ProductsScreen() {
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editCategory, setEditCategory] = useState<any>(null);
   const [catForm, setCatForm] = useState({ name: "", color: "#7C3AED", icon: "grid" });
+  const [productImage, setProductImage] = useState<string | null>(null);
+  const [categoryImage, setCategoryImage] = useState<string | null>(null);
+  const [initialStock, setInitialStock] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
 
   const { data: products = [] } = useQuery<any[]>({
     queryKey: ["/api/products", search ? `?search=${search}` : ""],
@@ -85,7 +90,7 @@ export default function ProductsScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/categories"] }),
   });
 
-  const resetForm = () => setForm({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece", expiryDate: "" });
+  const resetForm = () => { setForm({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece", expiryDate: "" }); setProductImage(null); setInitialStock(""); };
 
   const openEdit = (p: any) => {
     setEditProduct(p);
@@ -94,16 +99,66 @@ export default function ProductsScreen() {
       barcode: p.barcode || "", categoryId: p.categoryId ? String(p.categoryId) : "",
       costPrice: p.costPrice ? String(p.costPrice) : "", unit: p.unit || "piece", expiryDate: p.expiryDate || "",
     });
+    setProductImage(p.image || null);
     setShowForm(true);
   };
 
-  const handleSave = () => {
+  const pickImage = async (type: "product" | "category") => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const uri = result.assets[0].uri;
+      if (type === "product") setProductImage(uri);
+      else setCategoryImage(uri);
+    }
+  };
+
+  const uploadImage = async (uri: string): Promise<string | null> => {
+    try {
+      setImageUploading(true);
+      const uploadRes = await apiRequest("POST", "/api/objects/upload");
+      const { uploadURL } = await uploadRes.json();
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      await fetch(uploadURL, { method: "PUT", body: blob, headers: { "Content-Type": "image/jpeg" } });
+      const saveRes = await apiRequest("PUT", "/api/images/save", { imageURL: uploadURL });
+      const { objectPath } = await saveRes.json();
+      return objectPath;
+    } catch (e) {
+      console.error("Upload failed:", e);
+      return null;
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleSave = async () => {
     if (!form.name || !form.price) return Alert.alert(t("error"), t("productName") + " & " + t("price"));
-    createMutation.mutate({
+    let imagePath = editProduct?.image || null;
+    if (productImage && !productImage.startsWith("/objects")) {
+      imagePath = await uploadImage(productImage);
+    }
+    const productData: any = {
       name: form.name, price: form.price, sku: form.sku || undefined,
       barcode: form.barcode || undefined, costPrice: form.costPrice || undefined,
       categoryId: form.categoryId ? Number(form.categoryId) : undefined, unit: form.unit, expiryDate: form.expiryDate || undefined,
-    });
+      image: imagePath || undefined,
+    };
+    if (!editProduct && initialStock && Number(initialStock) > 0) {
+      apiRequest("POST", "/api/products-with-stock", { ...productData, initialStock: Number(initialStock), branchId: 1 })
+        .then(() => {
+          qc.invalidateQueries({ queryKey: ["/api/products"] });
+          qc.invalidateQueries({ queryKey: ["/api/inventory"] });
+          setShowForm(false); setEditProduct(null); resetForm(); setProductImage(null); setInitialStock("");
+        })
+        .catch((e: any) => Alert.alert(t("error"), e.message));
+    } else {
+      createMutation.mutate(productData);
+    }
   };
 
   const getStock = (productId: number) => {
@@ -227,6 +282,7 @@ export default function ProductsScreen() {
               if (!canManage) return;
               setEditCategory(item);
               setCatForm({ name: item.name, color: item.color || "#7C3AED", icon: item.icon || "grid" });
+              setCategoryImage(item.image || null);
               setShowCategoryForm(true);
             }}>
               <View style={[styles.productIconWrap, isRTL ? { marginLeft: 12, marginRight: 0 } : {}, { backgroundColor: (item.color || "#7C3AED") + "20" }]}>
@@ -267,6 +323,20 @@ export default function ProductsScreen() {
               <Pressable onPress={() => setShowForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={[styles.label, rtlTextAlign]}>{t("productImage")}</Text>
+              <Pressable onPress={() => pickImage("product")} style={{ alignItems: "center", marginBottom: 12, padding: 16, borderRadius: 12, borderWidth: 1, borderStyle: "dashed", borderColor: Colors.cardBorder, backgroundColor: Colors.surfaceLight }}>
+                {productImage ? (
+                  <View style={{ alignItems: "center" }}>
+                    <Image source={{ uri: productImage }} style={{ width: 100, height: 100, borderRadius: 12 }} />
+                    <Text style={{ color: Colors.accent, fontSize: 13, marginTop: 8 }}>{t("changeImage")}</Text>
+                  </View>
+                ) : (
+                  <View style={{ alignItems: "center" }}>
+                    <Ionicons name="camera-outline" size={32} color={Colors.textMuted} />
+                    <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 4 }}>{t("tapToAddImage")}</Text>
+                  </View>
+                )}
+              </Pressable>
               <Text style={[styles.label, rtlTextAlign]}>{t("productName")} *</Text>
               <TextInput style={[styles.input, rtlTextAlign]} value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} placeholderTextColor={Colors.textMuted} placeholder={t("productName")} />
               <View style={[styles.row, isRTL && { flexDirection: "row-reverse" }]}>
@@ -324,6 +394,12 @@ export default function ProductsScreen() {
                   </Pressable>
                 ))}
               </ScrollView>
+              {!editProduct && (
+                <View>
+                  <Text style={[styles.label, rtlTextAlign]}>{t("initialStock")}</Text>
+                  <TextInput style={[styles.input, rtlTextAlign]} value={initialStock} onChangeText={setInitialStock} keyboardType="number-pad" placeholderTextColor={Colors.textMuted} placeholder={t("enterInitialStock")} />
+                </View>
+              )}
               <Pressable style={styles.saveBtn} onPress={handleSave}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
                   <Text style={styles.saveBtnText}>{editProduct ? t("editProduct") : t("addProduct")}</Text>
@@ -342,6 +418,20 @@ export default function ProductsScreen() {
               <Pressable onPress={() => setShowCategoryForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={[styles.label, rtlTextAlign]}>{t("categoryImage")}</Text>
+              <Pressable onPress={() => pickImage("category")} style={{ alignItems: "center", marginBottom: 12, padding: 16, borderRadius: 12, borderWidth: 1, borderStyle: "dashed", borderColor: Colors.cardBorder, backgroundColor: Colors.surfaceLight }}>
+                {categoryImage ? (
+                  <View style={{ alignItems: "center" }}>
+                    <Image source={{ uri: categoryImage }} style={{ width: 80, height: 80, borderRadius: 12 }} />
+                    <Text style={{ color: Colors.accent, fontSize: 13, marginTop: 8 }}>{t("changeImage")}</Text>
+                  </View>
+                ) : (
+                  <View style={{ alignItems: "center" }}>
+                    <Ionicons name="camera-outline" size={28} color={Colors.textMuted} />
+                    <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 4 }}>{t("tapToAddImage")}</Text>
+                  </View>
+                )}
+              </Pressable>
               <Text style={[styles.label, rtlTextAlign]}>{t("name")} *</Text>
               <TextInput style={[styles.input, rtlTextAlign]} value={catForm.name} onChangeText={(v) => setCatForm({ ...catForm, name: v })} placeholderTextColor={Colors.textMuted} placeholder={t("category")} />
 
@@ -371,9 +461,13 @@ export default function ProductsScreen() {
                 ))}
               </View>
 
-              <Pressable style={styles.saveBtn} onPress={() => {
+              <Pressable style={styles.saveBtn} onPress={async () => {
                 if (!catForm.name) return Alert.alert(t("error"), t("name"));
-                createCategoryMutation.mutate({ name: catForm.name, color: catForm.color, icon: catForm.icon });
+                let imagePath = editCategory?.image || null;
+                if (categoryImage && !categoryImage.startsWith("/objects")) {
+                  imagePath = await uploadImage(categoryImage);
+                }
+                createCategoryMutation.mutate({ name: catForm.name, color: catForm.color, icon: catForm.icon, image: imagePath || undefined });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
                   <Text style={styles.saveBtnText}>{editCategory ? t("update") : t("create")} {t("category")}</Text>

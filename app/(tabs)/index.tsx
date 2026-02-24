@@ -10,7 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest, getQueryFn } from "@/lib/query-client";
+import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import * as Haptics from "expo-haptics";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { useLanguage } from "@/lib/language-context";
@@ -53,6 +53,11 @@ export default function POSScreen() {
 
   const { data: customers = [] } = useQuery<any[]>({
     queryKey: ["/api/customers"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  const { data: storeSettings } = useQuery<any>({
+    queryKey: ["/api/store-settings"],
     queryFn: getQueryFn({ on401: "throw" }),
   });
 
@@ -491,20 +496,22 @@ export default function POSScreen() {
           <View style={[styles.modalContent, { maxHeight: "90%" }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.receiptHeader}>
-                <View style={styles.receiptLogo}>
-                  <Ionicons name="cart" size={24} color={Colors.accent} />
-                </View>
-                <Text style={styles.receiptBrand}>Barmagly Smart POS</Text>
-                <Text style={styles.receiptSubtitle}>www.barmagly.tech</Text>
+                {storeSettings?.logo && (
+                  <Image source={{ uri: storeSettings.logo.startsWith("http") ? storeSettings.logo : `${getApiUrl()}${storeSettings.logo}` }} style={{ width: 60, height: 60, borderRadius: 12, marginBottom: 8 }} />
+                )}
+                <Text style={styles.receiptStoreName}>{storeSettings?.name || "Barmagly POS"}</Text>
+                {storeSettings?.address && <Text style={{ color: Colors.textSecondary, fontSize: 12, textAlign: "center" }}>{storeSettings.address}</Text>}
+                {storeSettings?.phone && <Text style={{ color: Colors.textSecondary, fontSize: 12, textAlign: "center" }}>{storeSettings.phone}</Text>}
               </View>
 
               <View style={styles.receiptDivider} />
 
               <View style={styles.receiptInfo}>
                 <Text style={[styles.receiptInfoText, rtlTextAlign]}>{t("receiptNumber")}: {lastSale?.receiptNumber || `#${lastSale?.id}`}</Text>
-                <Text style={[styles.receiptInfoText, rtlTextAlign]}>{lastSale?.date}</Text>
-                <Text style={[styles.receiptInfoText, rtlTextAlign]}>{lastSale?.employeeName}</Text>
-                <Text style={[styles.receiptInfoText, rtlTextAlign]}>{t("customer")}: {lastSale?.customerName}</Text>
+                <Text style={[styles.receiptInfoText, rtlTextAlign]}>{t("receiptDate")}: {lastSale?.date ? new Date(lastSale.date).toLocaleDateString() : new Date().toLocaleDateString()}</Text>
+                <Text style={[styles.receiptInfoText, rtlTextAlign]}>{t("receiptTime")}: {lastSale?.date ? new Date(lastSale.date).toLocaleTimeString() : new Date().toLocaleTimeString()}</Text>
+                <Text style={[styles.receiptInfoText, rtlTextAlign]}>{t("servedBy")}: {lastSale?.employeeName || employee?.name}</Text>
+                {lastSale?.customerName && <Text style={[styles.receiptInfoText, rtlTextAlign]}>{t("customer")}: {lastSale?.customerName}</Text>}
               </View>
 
               <View style={styles.receiptDivider} />
@@ -558,8 +565,11 @@ export default function POSScreen() {
                 </View>
               )}
 
-              <Text style={styles.receiptFooter}>{t("poweredBy")}</Text>
-              <Text style={styles.receiptFooter2}>info@barmagly.tech | +201010254819</Text>
+              <View style={{ alignItems: "center", marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.cardBorder }}>
+                <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: "600", marginBottom: 4 }}>{t("thankYou")}</Text>
+                {storeSettings?.address && <Text style={{ color: Colors.textMuted, fontSize: 11, textAlign: "center" }}>{t("visitUs")}: {storeSettings.address}</Text>}
+                <Text style={styles.receiptFooter}>{t("poweredBy")}</Text>
+              </View>
 
               <Pressable style={styles.closeReceiptBtn} onPress={() => { setShowReceipt(false); setLastSale(null); setQrDataUrl(null); }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={[styles.closeReceiptGradient, isRTL && { flexDirection: "row-reverse" }]}>
@@ -765,6 +775,7 @@ const styles = StyleSheet.create({
   completeBtnText: { color: Colors.white, fontSize: 16, fontWeight: "700" },
   receiptHeader: { alignItems: "center", paddingVertical: 16 },
   receiptLogo: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", marginBottom: 8 },
+  receiptStoreName: { color: Colors.text, fontSize: 18, fontWeight: "800", textAlign: "center" },
   receiptBrand: { color: Colors.text, fontSize: 18, fontWeight: "800" },
   receiptSubtitle: { color: Colors.textMuted, fontSize: 12, marginTop: 2 },
   receiptDivider: { height: 1, backgroundColor: Colors.cardBorder, marginVertical: 12 },

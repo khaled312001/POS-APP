@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import {
   StyleSheet, Text, View, ScrollView, Pressable, Modal,
-  TextInput, Alert, Platform, FlatList, Switch,
+  TextInput, Alert, Platform, FlatList, Switch, Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
@@ -97,6 +98,10 @@ export default function SettingsScreen() {
   const [showPrinterSettings, setShowPrinterSettings] = useState(false);
   const [printerPaperSize, setPrinterPaperSize] = useState("80mm");
   const [printerAutoPrint, setPrinterAutoPrint] = useState(false);
+  const [showStoreSettings, setShowStoreSettings] = useState(false);
+  const [storeForm, setStoreForm] = useState({ name: "", address: "", phone: "", email: "" });
+  const [storeLogo, setStoreLogo] = useState<string | null>(null);
+  const [storeLogoUploading, setStoreLogoUploading] = useState(false);
 
   const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: suppliers = [] } = useQuery<any[]>({ queryKey: ["/api/suppliers"], queryFn: getQueryFn({ on401: "throw" }) });
@@ -110,6 +115,7 @@ export default function SettingsScreen() {
   const { data: warehousesList = [] } = useQuery<any[]>({ queryKey: ["/api/warehouses"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: batchesList = [] } = useQuery<any[]>({ queryKey: ["/api/product-batches"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: productsList = [] } = useQuery<any[]>({ queryKey: ["/api/products"], queryFn: getQueryFn({ on401: "throw" }) });
+  const { data: storeSettings } = useQuery<any>({ queryKey: ["/api/store-settings"], queryFn: getQueryFn({ on401: "throw" }) });
 
   const activeShift = shifts.find((s: any) => s.employeeId === employee?.id && s.startTime && !s.endTime && s.status === "open");
 
@@ -259,6 +265,59 @@ export default function SettingsScreen() {
     onError: (e: any) => Alert.alert("Error", e.message),
   });
 
+  const updateStoreSettingsMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("PUT", "/api/store-settings", data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/store-settings"] }); setShowStoreSettings(false); Alert.alert(t("success"), t("storeSettingsSaved")); },
+    onError: (e: any) => Alert.alert(t("error"), e.message),
+  });
+
+  const pickStoreLogo = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setStoreLogo(result.assets[0].uri);
+    }
+  };
+
+  const uploadStoreLogo = async (uri: string): Promise<string | null> => {
+    try {
+      setStoreLogoUploading(true);
+      const uploadRes = await apiRequest("POST", "/api/objects/upload");
+      const { uploadURL } = await uploadRes.json();
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      await fetch(uploadURL, { method: "PUT", body: blob, headers: { "Content-Type": "image/jpeg" } });
+      const saveRes = await apiRequest("PUT", "/api/images/save", { imageURL: uploadURL });
+      const { objectPath } = await saveRes.json();
+      return objectPath;
+    } catch (e) {
+      console.error("Logo upload failed:", e);
+      return null;
+    } finally {
+      setStoreLogoUploading(false);
+    }
+  };
+
+  const handleSaveStoreSettings = async () => {
+    let logoPath = storeSettings?.logo || null;
+    if (storeLogo && !storeLogo.startsWith("/objects")) {
+      logoPath = await uploadStoreLogo(storeLogo);
+    }
+    updateStoreSettingsMutation.mutate({
+      name: storeForm.name || undefined,
+      address: storeForm.address || undefined,
+      phone: storeForm.phone || undefined,
+      email: storeForm.email || undefined,
+      logo: logoPath || undefined,
+    });
+  };
+
+  const rtlTextAlign = isRTL ? { textAlign: "right" as const } : {};
+
   const topPad = Platform.OS === "web" ? 67 : 0;
   const roleColors: Record<string, string> = { admin: Colors.danger, manager: Colors.warning, cashier: Colors.info, owner: Colors.secondary };
 
@@ -295,6 +354,16 @@ export default function SettingsScreen() {
             <Text style={styles.sectionTitle}>{t("management")}</Text>
             {isAdmin && <SettingRow icon="people" label={t("employees")} value={`${employees.length} members`} onPress={() => setShowEmployees(true)} color={Colors.info} rtl={isRTL} />}
             {isAdmin && <SettingRow icon="business" label={t("branches")} value={`${branches.length} locations`} onPress={() => setShowBranches(true)} color={Colors.secondary} rtl={isRTL} />}
+            {isAdmin && <SettingRow icon="storefront-outline" label={t("storeSettings")} value={t("configureStore")} onPress={() => {
+              setStoreForm({
+                name: storeSettings?.name || "",
+                address: storeSettings?.address || "",
+                phone: storeSettings?.phone || "",
+                email: storeSettings?.email || "",
+              });
+              setStoreLogo(storeSettings?.logo || null);
+              setShowStoreSettings(true);
+            }} color={Colors.accent} rtl={isRTL} />}
             <SettingRow icon="cube" label={t("suppliers")} value={`${suppliers.length} suppliers`} onPress={() => setShowSuppliers(true)} color={Colors.success} rtl={isRTL} />
             <SettingRow icon="wallet" label={t("expenses")} value={`${expenses.length} expenses`} onPress={() => setShowExpenses(true)} color={Colors.warning} rtl={isRTL} />
             <SettingRow icon="time" label={t("attendance")} value={`${shifts.length} shifts`} onPress={() => setShowAttendance(true)} color={Colors.warning} rtl={isRTL} />
@@ -1289,6 +1358,51 @@ export default function SettingsScreen() {
               </View>
               {language === "ar" && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
             </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showStoreSettings} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={[styles.modalTitle, rtlTextAlign]}>{t("storeSettings")}</Text>
+              <Pressable onPress={() => setShowStoreSettings(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={[styles.label, rtlTextAlign]}>{t("storeLogo")}</Text>
+              <Pressable onPress={pickStoreLogo} style={{ alignItems: "center", marginBottom: 16, padding: 20, borderRadius: 12, borderWidth: 1, borderStyle: "dashed", borderColor: Colors.cardBorder, backgroundColor: Colors.surfaceLight }}>
+                {storeLogo ? (
+                  <View style={{ alignItems: "center" }}>
+                    <Image source={{ uri: storeLogo }} style={{ width: 80, height: 80, borderRadius: 12 }} />
+                    <Text style={{ color: Colors.accent, fontSize: 13, marginTop: 8 }}>{t("changeImage")}</Text>
+                  </View>
+                ) : (
+                  <View style={{ alignItems: "center" }}>
+                    <Ionicons name="image-outline" size={32} color={Colors.textMuted} />
+                    <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 4 }}>{t("tapToAddImage")}</Text>
+                  </View>
+                )}
+              </Pressable>
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("storeName")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storeForm.name} onChangeText={(v) => setStoreForm({...storeForm, name: v})} placeholderTextColor={Colors.textMuted} placeholder={t("storeName")} />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("storeAddress")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storeForm.address} onChangeText={(v) => setStoreForm({...storeForm, address: v})} placeholderTextColor={Colors.textMuted} placeholder={t("storeAddress")} />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("storePhone")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storeForm.phone} onChangeText={(v) => setStoreForm({...storeForm, phone: v})} placeholderTextColor={Colors.textMuted} placeholder={t("storePhone")} keyboardType="phone-pad" />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("storeEmail")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storeForm.email} onChangeText={(v) => setStoreForm({...storeForm, email: v})} placeholderTextColor={Colors.textMuted} placeholder={t("storeEmail")} keyboardType="email-address" />
+
+              <Pressable style={{ marginTop: 16 }} onPress={handleSaveStoreSettings}>
+                <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ paddingVertical: 14, borderRadius: 12, alignItems: "center" }}>
+                  <Text style={{ color: Colors.white, fontSize: 16, fontWeight: "700" }}>{storeLogoUploading ? t("imageUploading") : t("save")}</Text>
+                </LinearGradient>
+              </Pressable>
+            </ScrollView>
           </View>
         </View>
       </Modal>
