@@ -3,6 +3,26 @@ import { createServer, type Server } from "node:http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
+const TIMESTAMP_FIELDS = [
+  "createdAt", "updatedAt", "expiryDate", "expectedDate", "receivedDate",
+  "startTime", "endTime", "startDate", "endDate", "nextBillingDate",
+  "date", "lastRestocked", "completedAt", "processedAt"
+];
+
+function sanitizeDates(data: any) {
+  const result = { ...data };
+  for (const field of TIMESTAMP_FIELDS) {
+    if (field in result) {
+      if (result[field] === "" || result[field] === null || result[field] === undefined) {
+        delete result[field];
+      } else if (typeof result[field] === "string") {
+        result[field] = new Date(result[field]);
+      }
+    }
+  }
+  return result;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard
   app.get("/api/dashboard", async (_req: Request, res: Response) => {
@@ -19,10 +39,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getBranches()); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/branches", async (req, res) => {
-    try { res.json(await storage.createBranch(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createBranch(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/branches/:id", async (req, res) => {
-    try { res.json(await storage.updateBranch(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateBranch(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.delete("/api/branches/:id", async (req, res) => {
     try { await storage.deleteBranch(Number(req.params.id)); res.json({ success: true }); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -40,10 +60,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/employees", async (req, res) => {
-    try { res.json(await storage.createEmployee(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createEmployee(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/employees/:id", async (req, res) => {
-    try { res.json(await storage.updateEmployee(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateEmployee(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.delete("/api/employees/:id", async (req, res) => {
     try { await storage.deleteEmployee(Number(req.params.id)); res.json({ success: true }); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -73,10 +93,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getCategories()); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/categories", async (req, res) => {
-    try { res.json(await storage.createCategory(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createCategory(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/categories/:id", async (req, res) => {
-    try { res.json(await storage.updateCategory(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateCategory(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.delete("/api/categories/:id", async (req, res) => {
     try { await storage.deleteCategory(Number(req.params.id)); res.json({ success: true }); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -102,26 +122,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/products", async (req, res) => {
     try {
-      const data = { ...req.body };
-      if (data.expiryDate === "" || data.expiryDate === null || data.expiryDate === undefined) { delete data.expiryDate; }
-      else if (data.expiryDate && typeof data.expiryDate === "string") { data.expiryDate = new Date(data.expiryDate); }
-      if (data.createdAt === "" || data.createdAt === null) { delete data.createdAt; }
-      else if (data.createdAt && typeof data.createdAt === "string") { data.createdAt = new Date(data.createdAt); }
-      if (data.updatedAt === "" || data.updatedAt === null) { delete data.updatedAt; }
-      else if (data.updatedAt && typeof data.updatedAt === "string") { data.updatedAt = new Date(data.updatedAt); }
-      res.json(await storage.createProduct(data));
+      res.json(await storage.createProduct(sanitizeDates(req.body)));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/products/:id", async (req, res) => {
     try {
-      const data = { ...req.body };
-      if (data.expiryDate === "" || data.expiryDate === null) { delete data.expiryDate; }
-      else if (data.expiryDate && typeof data.expiryDate === "string") { data.expiryDate = new Date(data.expiryDate); }
-      if (data.createdAt === "" || data.createdAt === null) { delete data.createdAt; }
-      else if (data.createdAt && typeof data.createdAt === "string") { data.createdAt = new Date(data.createdAt); }
-      if (data.updatedAt === "" || data.updatedAt === null) { delete data.updatedAt; }
-      else if (data.updatedAt && typeof data.updatedAt === "string") { data.updatedAt = new Date(data.updatedAt); }
-      res.json(await storage.updateProduct(Number(req.params.id), data));
+      res.json(await storage.updateProduct(Number(req.params.id), sanitizeDates(req.body)));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.delete("/api/products/:id", async (req, res) => {
@@ -133,7 +139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getInventory(req.query.branchId ? Number(req.query.branchId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/inventory", async (req, res) => {
-    try { res.json(await storage.upsertInventory(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.upsertInventory(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/inventory/adjust", async (req, res) => {
     try {
@@ -157,10 +163,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/customers", async (req, res) => {
-    try { res.json(await storage.createCustomer(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createCustomer(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/customers/:id", async (req, res) => {
-    try { res.json(await storage.updateCustomer(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateCustomer(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/customers/:id/loyalty", async (req, res) => {
     try { res.json(await storage.addLoyaltyPoints(Number(req.params.id), req.body.points)); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -186,7 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/sales", async (req, res) => {
     try {
-      const { items, ...saleData } = req.body;
+      const { items, ...saleData } = sanitizeDates(req.body);
       const receiptNumber = `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       const sale = await storage.createSale({ ...saleData, receiptNumber });
       if (items && items.length > 0) {
@@ -265,10 +271,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/suppliers", async (req, res) => {
-    try { res.json(await storage.createSupplier(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createSupplier(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/suppliers/:id", async (req, res) => {
-    try { res.json(await storage.updateSupplier(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateSupplier(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Purchase Orders
@@ -276,10 +282,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getPurchaseOrders()); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/purchase-orders", async (req, res) => {
-    try { res.json(await storage.createPurchaseOrder(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createPurchaseOrder(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/purchase-orders/:id", async (req, res) => {
-    try { res.json(await storage.updatePurchaseOrder(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updatePurchaseOrder(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Shifts
@@ -294,7 +300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/shifts", async (req, res) => {
     try {
-      const shift = await storage.createShift(req.body);
+      const shift = await storage.createShift(sanitizeDates(req.body));
       const emp = await storage.getEmployee(shift.employeeId);
       await storage.createActivityLog({
         employeeId: shift.employeeId,
@@ -317,13 +323,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.put("/api/shifts/:id", async (req, res) => {
     try {
-      const shift = await storage.updateShift(Number(req.params.id), req.body);
+      const shift = await storage.updateShift(Number(req.params.id), sanitizeDates(req.body));
       res.json(shift);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/shifts/:id/close", async (req, res) => {
     try {
-      const shift = await storage.closeShift(Number(req.params.id), req.body);
+      const shift = await storage.closeShift(Number(req.params.id), sanitizeDates(req.body));
       const emp = await storage.getEmployee(shift.employeeId);
       await storage.createActivityLog({
         employeeId: shift.employeeId,
@@ -353,7 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json({ count: await storage.getUnreadNotificationCount(Number(req.params.employeeId)) }); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/notifications", async (req, res) => {
-    try { res.json(await storage.createNotification(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createNotification(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/notifications/:id/read", async (req, res) => {
     try { res.json(await storage.markNotificationRead(Number(req.params.id))); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -367,7 +373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getExpenses()); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/expenses", async (req, res) => {
-    try { res.json(await storage.createExpense(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createExpense(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Tables
@@ -375,10 +381,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getTables(req.query.branchId ? Number(req.query.branchId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/tables", async (req, res) => {
-    try { res.json(await storage.createTable(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createTable(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/tables/:id", async (req, res) => {
-    try { res.json(await storage.updateTable(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateTable(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Kitchen Orders
@@ -386,10 +392,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getKitchenOrders(req.query.branchId ? Number(req.query.branchId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/kitchen-orders", async (req, res) => {
-    try { res.json(await storage.createKitchenOrder(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createKitchenOrder(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/kitchen-orders/:id", async (req, res) => {
-    try { res.json(await storage.updateKitchenOrder(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateKitchenOrder(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Subscriptions
@@ -397,13 +403,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getSubscriptionPlans()); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/subscription-plans", async (req, res) => {
-    try { res.json(await storage.createSubscriptionPlan(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createSubscriptionPlan(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.get("/api/subscriptions", async (_req, res) => {
     try { res.json(await storage.getSubscriptions()); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/subscriptions", async (req, res) => {
-    try { res.json(await storage.createSubscription(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createSubscription(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Delete Expense
@@ -424,7 +430,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add item to PO
   app.post("/api/purchase-orders/:id/items", async (req, res) => {
     try {
-      const item = await storage.createPurchaseOrderItem({ ...req.body, purchaseOrderId: Number(req.params.id) });
+      const item = await storage.createPurchaseOrderItem({ ...sanitizeDates(req.body), purchaseOrderId: Number(req.params.id) });
       res.json(item);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -492,7 +498,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/returns", async (req, res) => {
     try {
-      const { items, ...returnData } = req.body;
+      const { items, ...returnData } = sanitizeDates(req.body);
       const ret = await storage.createReturn(returnData);
       if (items && items.length > 0) {
         for (const item of items) {
@@ -544,7 +550,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/cash-drawer", async (req, res) => {
     try {
-      const op = await storage.createCashDrawerOperation(req.body);
+      const op = await storage.createCashDrawerOperation(sanitizeDates(req.body));
       await storage.createActivityLog({ employeeId: req.body.employeeId, action: "cash_drawer_" + req.body.type, entityType: "cash_drawer", entityId: op.id, details: `Cash drawer ${req.body.type}: $${req.body.amount}` });
       const cdEmp = await storage.getEmployee(req.body.employeeId);
       await storage.notifyAdmins(
@@ -565,10 +571,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getWarehouses(req.query.branchId ? Number(req.query.branchId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/warehouses", async (req, res) => {
-    try { res.json(await storage.createWarehouse(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createWarehouse(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/warehouses/:id", async (req, res) => {
-    try { res.json(await storage.updateWarehouse(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateWarehouse(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Warehouse Transfers
@@ -577,7 +583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/warehouse-transfers", async (req, res) => {
     try {
-      const transfer = await storage.createWarehouseTransfer(req.body);
+      const transfer = await storage.createWarehouseTransfer(sanitizeDates(req.body));
       await storage.createInventoryMovement({ productId: req.body.productId, branchId: null, type: "transfer", quantity: req.body.quantity, referenceType: "transfer", referenceId: transfer.id, employeeId: req.body.employeeId, notes: `Transfer from warehouse ${req.body.fromWarehouseId} to ${req.body.toWarehouseId}` });
       res.json(transfer);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -588,10 +594,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getProductBatches(req.query.productId ? Number(req.query.productId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/product-batches", async (req, res) => {
-    try { res.json(await storage.createProductBatch(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createProductBatch(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/product-batches/:id", async (req, res) => {
-    try { res.json(await storage.updateProductBatch(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateProductBatch(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.delete("/api/product-batches/:id", async (req, res) => {
     try { res.json(await storage.updateProductBatch(Number(req.params.id), { isActive: false })); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -620,7 +626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/stock-counts", async (req, res) => {
     try {
-      const { items, ...countData } = req.body;
+      const { items, ...countData } = sanitizeDates(req.body);
       const sc = await storage.createStockCount(countData);
       if (items && items.length > 0) {
         for (const item of items) {
@@ -650,10 +656,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getSupplierContracts(req.query.supplierId ? Number(req.query.supplierId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/supplier-contracts", async (req, res) => {
-    try { res.json(await storage.createSupplierContract(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createSupplierContract(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/supplier-contracts/:id", async (req, res) => {
-    try { res.json(await storage.updateSupplierContract(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateSupplierContract(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Employee Commissions
@@ -661,7 +667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getEmployeeCommissions(req.query.employeeId ? Number(req.query.employeeId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/employee-commissions", async (req, res) => {
-    try { res.json(await storage.createEmployeeCommission(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createEmployeeCommission(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Advanced Analytics
@@ -888,7 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create product with initial stock
   app.post("/api/products-with-stock", async (req, res) => {
     try {
-      const { initialStock, branchId, ...productData } = req.body;
+      const { initialStock, branchId, ...productData } = sanitizeDates(req.body);
       const product = await storage.createProduct(productData);
       if (initialStock && initialStock > 0 && branchId) {
         await storage.upsertInventory({ productId: product.id, branchId: Number(branchId), quantity: Number(initialStock) });
@@ -925,7 +931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const branches = await storage.getBranches();
       const mainBranch = branches.find((b: any) => b.isMain) || branches[0];
       if (!mainBranch) return res.status(404).json({ error: "No branch found" });
-      const updated = await storage.updateBranch(mainBranch.id, req.body);
+      const updated = await storage.updateBranch(mainBranch.id, sanitizeDates(req.body));
       res.json(updated);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
