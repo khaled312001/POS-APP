@@ -1177,10 +1177,16 @@ export default function SettingsScreen() {
                             <Ionicons name="create-outline" size={18} color={Colors.info} />
                           </Pressable>
                           <Pressable onPress={() => {
-                            Alert.alert(t("delete"), `${t("deleteBatch")}?`, [
-                              { text: t("cancel"), style: "cancel" },
-                              { text: t("delete"), style: "destructive", onPress: () => deleteBatchMutation.mutate(item.id) },
-                            ]);
+                            if (Platform.OS === "web") {
+                              if (confirm(`${t("deleteBatch")}?`)) {
+                                deleteBatchMutation.mutate(item.id);
+                              }
+                            } else {
+                              Alert.alert(t("delete"), `${t("deleteBatch")}?`, [
+                                { text: t("cancel"), style: "cancel" },
+                                { text: t("delete"), style: "destructive", onPress: () => deleteBatchMutation.mutate(item.id) },
+                              ]);
+                            }
                           }} style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.danger + "20", justifyContent: "center", alignItems: "center" }}>
                             <Ionicons name="trash-outline" size={18} color={Colors.danger} />
                           </Pressable>
