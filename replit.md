@@ -19,7 +19,7 @@ Key functional areas include:
 - **Financial Reports** – Profit by product analysis, cashier performance metrics, slow-moving product detection
 - **Smart Analytics** – Revenue projections (daily/monthly/yearly), stock reorder alerts, trend-based insights
 - **Professional Reports** – 6-tab reporting (Overview, Sales, Inventory, Returns, Finance, Activity) with CSV export for all report types
-- **Web Admin Dashboard** – Full analytics dashboard at /dashboard route with revenue stats, top products, payment methods breakdown, inventory alerts, recent sales (served by Express on port 5000)
+- **Web Admin Dashboard** – Comprehensive multi-page admin dashboard at /dashboard route with sidebar navigation, multi-branch monitoring, subscription management, revenue analytics with charts, payment donut charts, employee/customer management views, inventory alerts per branch, smart reports with revenue projections, and full data export (served by Express on port 5000). Uses Lucide icons and auto-refreshes every 30s. Pages: Overview, Branches, Sales & Revenue, Inventory, Employees, Customers, Subscriptions, Reports
 - **Settings & Admin** – Branch management, suppliers, purchase orders, expenses, shifts, warehouses, product batches
 - **Admin Shift Monitoring** – Real-time active shift tracking with elapsed time, progress bars, overtime detection, force-close capability, shift history, configurable shift duration
 - **In-App Notifications** – Bell icon with unread badge, auto-notifications for shift start/end, sales, returns, cash drawer operations, mark read/unread, priority levels

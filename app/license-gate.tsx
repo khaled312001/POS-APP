@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLicense } from '@/lib/license-context';
 import { Colors } from '@/constants/colors';
-import { ShieldAlert, ShieldCheck } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function LicenseGate() {
     const { isValidating, isValid, validateLicense, errorReason, deviceId } = useLicense();
@@ -32,7 +32,7 @@ export default function LicenseGate() {
     if (isValid) {
         return (
             <View style={styles.container}>
-                <ShieldCheck size={64} color={Colors.success} />
+                <Ionicons name="shield-checkmark" size={64} color={Colors.success} />
                 <Text style={styles.successText}>Store Activated</Text>
             </View>
         );
@@ -42,7 +42,7 @@ export default function LicenseGate() {
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
                 <View style={styles.iconContainer}>
-                    <ShieldAlert size={64} color={Colors.primary} />
+                    <Ionicons name="shield-outline" size={64} color={Colors.primary} />
                 </View>
 
                 <Text style={styles.title}>Barmagly Activation</Text>

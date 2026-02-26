@@ -45,3 +45,18 @@
 [2026-02-26T01:55:23.694Z] Fetching Super Admin dashboard stats...
 [2026-02-26T02:05:56.094Z] Fetching Super Admin dashboard stats...
 [2026-02-26T02:06:32.077Z] Fetching Super Admin dashboard stats...
+[2026-02-26T02:16:03.334Z] seedSuperAdminData started
+[2026-02-26T02:16:33.083Z] seedSuperAdminData started
+[2026-02-26T02:21:26.476Z] seedSuperAdminData started
+[2026-02-26T02:21:33.232Z] seedSuperAdminData started
+[2026-02-26T02:21:55.352Z] seedSuperAdminData started
+[2026-02-26T02:21:55.365Z] Existing tenants count: 0
+[2026-02-26T02:21:55.365Z] Checking for super admin: admin@barmagly.com
+[2026-02-26T02:21:55.391Z] Creating default branch for tenant 1
+[2026-02-26T02:21:55.395Z] Creating default admin for tenant 1
+[2026-02-26T02:21:55.416Z] Creating default branch for tenant 2
+[2026-02-26T02:21:55.421Z] Creating default admin for tenant 2
+[2026-02-26T02:21:55.440Z] Creating default branch for tenant 3
+[2026-02-26T02:21:55.445Z] Creating default admin for tenant 3
+[2026-02-26T02:23:19.240Z] seedSuperAdminData started
+[2026-02-26T02:23:19.255Z] Existing tenants count: 3

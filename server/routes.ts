@@ -147,6 +147,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Multi-branch dashboard stats
+  app.get("/api/dashboard/multi-branch", async (_req: Request, res: Response) => {
+    try {
+      const allBranches = await storage.getBranches();
+      const allEmployees = await storage.getEmployees();
+      const allInventory = await storage.getInventory();
+      const allSales = await storage.getSales({});
+      const allShifts = await storage.getShifts();
+      const allProducts = await storage.getProducts();
+      const allCategories = await storage.getCategories();
+      const allCustomers = await storage.getCustomers();
+
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - 7);
+      weekStart.setHours(0, 0, 0, 0);
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+
+      const branchStats = allBranches.map((branch: any) => {
+        const branchSales = allSales.filter((s: any) => s.branchId === branch.id);
+        const branchEmployees = allEmployees.filter((e: any) => e.branchId === branch.id);
+        const branchInventory = allInventory.filter((i: any) => i.branchId === branch.id);
+        const activeShifts = allShifts.filter((s: any) => s.branchId === branch.id && s.status === "open");
+
+        const todaySales = branchSales.filter((s: any) => s.createdAt && new Date(s.createdAt) >= todayStart);
+        const weekSales = branchSales.filter((s: any) => s.createdAt && new Date(s.createdAt) >= weekStart);
+        const monthSales = branchSales.filter((s: any) => s.createdAt && new Date(s.createdAt) >= monthStart);
+
+        const todayRevenue = todaySales.reduce((sum: number, s: any) => sum + Number(s.totalAmount || 0), 0);
+        const weekRevenue = weekSales.reduce((sum: number, s: any) => sum + Number(s.totalAmount || 0), 0);
+        const monthRevenue = monthSales.reduce((sum: number, s: any) => sum + Number(s.totalAmount || 0), 0);
+        const totalRevenue = branchSales.reduce((sum: number, s: any) => sum + Number(s.totalAmount || 0), 0);
+
+        const lowStockItems = branchInventory.filter((i: any) => (i.quantity || 0) <= (i.lowStockThreshold || 10));
+        const outOfStockItems = branchInventory.filter((i: any) => (i.quantity || 0) === 0);
+
+        const paymentBreakdown: Record<string, { count: number; total: number }> = {};
+        branchSales.forEach((s: any) => {
+          const method = s.paymentMethod || "cash";
+          if (!paymentBreakdown[method]) paymentBreakdown[method] = { count: 0, total: 0 };
+          paymentBreakdown[method].count++;
+          paymentBreakdown[method].total += Number(s.totalAmount || 0);
+        });
+
+        return {
+          id: branch.id,
+          name: branch.name,
+          address: branch.address,
+          phone: branch.phone,
+          isMain: branch.isMain,
+          isActive: branch.isActive,
+          currency: branch.currency || "USD",
+          todayRevenue,
+          weekRevenue,
+          monthRevenue,
+          totalRevenue,
+          todaySalesCount: todaySales.length,
+          totalSalesCount: branchSales.length,
+          employeeCount: branchEmployees.length,
+          activeEmployees: branchEmployees.filter((e: any) => e.isActive).length,
+          activeShifts: activeShifts.length,
+          inventoryCount: branchInventory.length,
+          lowStockCount: lowStockItems.length,
+          outOfStockCount: outOfStockItems.length,
+          paymentBreakdown,
+        };
+      });
+
+      const totalRevenue = allSales.reduce((sum: number, s: any) => sum + Number(s.totalAmount || 0), 0);
+      const todayTotalRevenue = allSales
+        .filter((s: any) => s.createdAt && new Date(s.createdAt) >= todayStart)
+        .reduce((sum: number, s: any) => sum + Number(s.totalAmount || 0), 0);
+      const monthTotalRevenue = allSales
+        .filter((s: any) => s.createdAt && new Date(s.createdAt) >= monthStart)
+        .reduce((sum: number, s: any) => sum + Number(s.totalAmount || 0), 0);
+
+      res.json({
+        summary: {
+          totalBranches: allBranches.length,
+          activeBranches: allBranches.filter((b: any) => b.isActive).length,
+          totalEmployees: allEmployees.length,
+          totalProducts: allProducts.length,
+          totalCategories: allCategories.length,
+          totalCustomers: allCustomers.length,
+          totalSales: allSales.length,
+          totalRevenue,
+          todayRevenue: todayTotalRevenue,
+          monthRevenue: monthTotalRevenue,
+          activeShifts: allShifts.filter((s: any) => s.status === "open").length,
+        },
+        branches: branchStats,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Subscription status for dashboard
+  app.get("/api/dashboard/subscriptions", async (_req: Request, res: Response) => {
+    try {
+      const tenantSubs = await storage.getTenantSubscriptions();
+      const tenants = await storage.getTenants();
+      const licenses = await storage.getLicenseKeys();
+
+      const subsWithTenant = tenantSubs.map((sub: any) => {
+        const tenant = tenants.find((t: any) => t.id === sub.tenantId);
+        const tenantLicenses = licenses.filter((l: any) => l.tenantId === sub.tenantId);
+        return {
+          ...sub,
+          tenantName: tenant?.businessName || "Unknown",
+          tenantEmail: tenant?.ownerEmail || "",
+          tenantStatus: tenant?.status || "unknown",
+          licenseCount: tenantLicenses.length,
+          activeLicenses: tenantLicenses.filter((l: any) => l.status === "active").length,
+        };
+      });
+
+      res.json({
+        subscriptions: subsWithTenant,
+        summary: {
+          total: tenantSubs.length,
+          active: tenantSubs.filter((s: any) => s.status === "active").length,
+          trial: tenantSubs.filter((s: any) => s.planType === "trial").length,
+          monthly: tenantSubs.filter((s: any) => s.planType === "monthly").length,
+          yearly: tenantSubs.filter((s: any) => s.planType === "yearly").length,
+          expiringSoon: tenantSubs.filter((s: any) => {
+            if (!s.endDate) return false;
+            const daysLeft = Math.ceil((new Date(s.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            return daysLeft > 0 && daysLeft <= 7;
+          }).length,
+          totalMRR: tenantSubs.filter((s: any) => s.status === "active" && s.planType === "monthly")
+            .reduce((sum: number, s: any) => sum + Number(s.price || 0), 0),
+        },
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // Branches
   app.get("/api/branches", async (_req, res) => {
     try { res.json(await storage.getBranches()); } catch (e: any) { res.status(500).json({ error: e.message }); }
