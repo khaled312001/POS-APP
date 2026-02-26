@@ -14,7 +14,7 @@ export const branches = pgTable("branches", {
   logo: text("logo"),
   isActive: boolean("is_active").default(true),
   isMain: boolean("is_main").default(false),
-  currency: text("currency").default("USD"),
+  currency: text("currency").default("CHF"),
   taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

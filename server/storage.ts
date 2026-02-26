@@ -535,7 +535,7 @@ export const storage = {
       address: "123 Main Street",
       phone: "+1234567890",
       isMain: true,
-      currency: "USD",
+      currency: "CHF",
       taxRate: "10",
     });
 
@@ -1176,7 +1176,7 @@ export const storage = {
         address: tenant.address || "Main Street",
         phone: tenant.ownerPhone || "123456789",
         isMain: true,
-        currency: "USD",
+        currency: "CHF",
         taxRate: "10",
       }).returning();
 

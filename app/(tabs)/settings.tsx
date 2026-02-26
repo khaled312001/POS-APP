@@ -92,7 +92,7 @@ export default function SettingsScreen() {
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const [showBranchForm, setShowBranchForm] = useState(false);
   const [editBranch, setEditBranch] = useState<any | null>(null);
-  const [branchForm, setBranchForm] = useState({ name: "", address: "", phone: "", currency: "USD", taxRate: "" });
+  const [branchForm, setBranchForm] = useState({ name: "", address: "", phone: "", currency: "CHF", taxRate: "" });
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState({ name: "", address: "", type: "main" });
   const [showPrinterSettings, setShowPrinterSettings] = useState(false);
@@ -666,7 +666,7 @@ export default function SettingsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("branches")}</Text>
               <View style={styles.modalActions}>
-                <Pressable onPress={() => { setBranchForm({ name: "", address: "", phone: "", currency: "USD", taxRate: "" }); setEditBranch(null); setShowBranchForm(true); }}>
+                <Pressable onPress={() => { setBranchForm({ name: "", address: "", phone: "", currency: "CHF", taxRate: "" }); setEditBranch(null); setShowBranchForm(true); }}>
                   <Ionicons name="add-circle" size={28} color={Colors.accent} />
                 </Pressable>
                 <Pressable onPress={() => setShowBranches(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
@@ -684,7 +684,7 @@ export default function SettingsScreen() {
                   </View>
                   <View style={styles.empInfo}>
                     <Text style={styles.empName}>{item.name}</Text>
-                    <Text style={styles.empMeta}>{item.address || t("noAddress")} | {item.currency || "USD"} | {t("taxRate")}: {item.taxRate || "0"}%</Text>
+                    <Text style={styles.empMeta}>{item.address || t("noAddress")} | {item.currency || "CHF"} | {t("taxRate")}: {item.taxRate || "0"}%</Text>
                     {item.phone ? <Text style={styles.empMeta}>{item.phone}</Text> : null}
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -695,7 +695,7 @@ export default function SettingsScreen() {
                     )}
                     <Pressable onPress={() => {
                       setEditBranch(item);
-                      setBranchForm({ name: item.name, address: item.address || "", phone: item.phone || "", currency: item.currency || "USD", taxRate: item.taxRate || "" });
+                      setBranchForm({ name: item.name, address: item.address || "", phone: item.phone || "", currency: item.currency || "CHF", taxRate: item.taxRate || "" });
                       setShowBranchForm(true);
                     }}>
                       <Ionicons name="pencil" size={18} color={Colors.info} />
@@ -734,7 +734,7 @@ export default function SettingsScreen() {
               <TextInput style={styles.input} value={branchForm.phone} onChangeText={(v) => setBranchForm({ ...branchForm, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+1234567890" />
               <Text style={styles.label}>{t("currency")}</Text>
               <View style={styles.roleRow}>
-                {["USD", "EGP", "EUR", "GBP", "SAR"].map((c) => (
+                {["CHF", "USD", "EGP", "EUR", "GBP", "SAR"].map((c) => (
                   <Pressable key={c} style={[styles.roleChip, branchForm.currency === c && { backgroundColor: Colors.accent }]} onPress={() => setBranchForm({ ...branchForm, currency: c })}>
                     <Text style={[styles.roleChipText, branchForm.currency === c && { color: Colors.textDark }]}>{c}</Text>
                   </Pressable>
@@ -779,7 +779,7 @@ export default function SettingsScreen() {
                   </View>
                   <View style={styles.empInfo}>
                     <Text style={styles.empName}>{item.description}</Text>
-                    <Text style={styles.empMeta}>${parseFloat(item.amount).toFixed(2)} | {new Date(item.date).toLocaleDateString()}</Text>
+                    <Text style={styles.empMeta}>CHF {parseFloat(item.amount).toFixed(2)} | {new Date(item.date).toLocaleDateString()}</Text>
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <View style={[styles.roleBadge, { backgroundColor: (expenseCategoryColors[item.categoryId] || expenseCategoryColors.other) + "20" }]}>
@@ -1042,7 +1042,7 @@ export default function SettingsScreen() {
                   </View>
                   <View style={styles.empInfo}>
                     <Text style={styles.empName}>Return #{item.id} - Sale #{item.originalSaleId}</Text>
-                    <Text style={styles.empMeta}>${Number(item.totalAmount).toFixed(2)} | {item.reason || t("noReason")} | {new Date(item.createdAt).toLocaleDateString()}</Text>
+                    <Text style={styles.empMeta}>CHF {Number(item.totalAmount).toFixed(2)} | {item.reason || t("noReason")} | {new Date(item.createdAt).toLocaleDateString()}</Text>
                   </View>
                   <View style={[styles.roleBadge, { backgroundColor: (item.status === "completed" ? Colors.success : Colors.warning) + "20" }]}>
                     <Text style={[styles.roleText, { color: item.status === "completed" ? Colors.success : Colors.warning }]}>{item.status || "completed"}</Text>
@@ -1074,7 +1074,7 @@ export default function SettingsScreen() {
                   >
                     <View style={styles.empInfo}>
                       <Text style={styles.empName}>{item.receiptNumber}</Text>
-                      <Text style={styles.empMeta}>${Number(item.totalAmount).toFixed(2)} | {new Date(item.createdAt).toLocaleDateString()} | {item.paymentMethod}</Text>
+                      <Text style={styles.empMeta}>CHF {Number(item.totalAmount).toFixed(2)} | {new Date(item.createdAt).toLocaleDateString()} | {item.paymentMethod}</Text>
                     </View>
                     {returnForm.originalSaleId === String(item.id) && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
                   </Pressable>
@@ -1463,7 +1463,7 @@ export default function SettingsScreen() {
               </View>
 
               <Pressable style={styles.saveBtn} onPress={() => {
-                const sampleReceipt = `================================\n        SAMPLE RECEIPT\n================================\nDate: ${new Date().toLocaleString()}\nReceipt #: TEST-001\n--------------------------------\nItem 1          x2     $10.00\nItem 2          x1      $5.50\n--------------------------------\nSubtotal:              $15.50\nTax (10%):              $1.55\n--------------------------------\nTOTAL:                 $17.05\n================================\n      Thank you!\n================================`;
+                const sampleReceipt = `================================\n        SAMPLE RECEIPT\n================================\nDate: ${new Date().toLocaleString()}\nReceipt #: TEST-001\n--------------------------------\nItem 1        x2  CHF 10.00\nItem 2        x1   CHF 5.50\n--------------------------------\nSubtotal:          CHF 15.50\nTax (10%):          CHF 1.55\n--------------------------------\nTOTAL:             CHF 17.05\n================================\n      Thank you!\n================================`;
                 if (Platform.OS === "web") {
                   const printWindow = window.open("", "_blank", "width=300,height=600");
                   if (printWindow) {
@@ -1644,7 +1644,7 @@ export default function SettingsScreen() {
                         </View>
                         <View style={smStyles.statChip}>
                           <Ionicons name="cart-outline" size={12} color={Colors.accent} />
-                          <Text style={smStyles.statChipText}>${Number(item.totalSales || 0).toFixed(2)}</Text>
+                          <Text style={smStyles.statChipText}>CHF {Number(item.totalSales || 0).toFixed(2)}</Text>
                         </View>
                         <View style={smStyles.statChip}>
                           <Ionicons name="receipt-outline" size={12} color={Colors.warning} />
@@ -1653,7 +1653,7 @@ export default function SettingsScreen() {
                         {item.openingCash != null && (
                           <View style={smStyles.statChip}>
                             <Ionicons name="cash-outline" size={12} color={Colors.success} />
-                            <Text style={smStyles.statChipText}>${Number(item.openingCash || 0).toFixed(2)} → ${Number(item.closingCash || 0).toFixed(2)}</Text>
+                            <Text style={smStyles.statChipText}>CHF {Number(item.openingCash || 0).toFixed(2)} → CHF {Number(item.closingCash || 0).toFixed(2)}</Text>
                           </View>
                         )}
                       </View>
@@ -1836,7 +1836,7 @@ export default function SettingsScreen() {
                     <Text style={[pgStyles.configLabel, isRTL && { textAlign: "right" }]}>{t("currency")}</Text>
                     <View style={[pgStyles.configValueRow, isRTL && { flexDirection: "row-reverse" }]}>
                       <Ionicons name="cash-outline" size={16} color={Colors.accent} />
-                      <Text style={pgStyles.configValue}>{(pgConfig?.stripe?.currency || "usd").toUpperCase()}</Text>
+                      <Text style={pgStyles.configValue}>{(pgConfig?.stripe?.currency || "chf").toUpperCase()}</Text>
                     </View>
                   </View>
                   <View style={pgStyles.configItem}>
@@ -1883,7 +1883,7 @@ export default function SettingsScreen() {
                     </View>
                     {pgTestResult.success && pgTestResult.mode && (
                       <Text style={pgStyles.testResultDetail}>
-                        {t("mode")}: {pgTestResult.mode === "live" ? t("liveMode") : t("testMode")} | {t("currency")}: {(pgTestResult.currency || "usd").toUpperCase()}
+                        {t("mode")}: {pgTestResult.mode === "live" ? t("liveMode") : t("testMode")} | {t("currency")}: {(pgTestResult.currency || "chf").toUpperCase()}
                       </Text>
                     )}
                     {pgTestResult.error && <Text style={[pgStyles.testResultDetail, { color: Colors.danger }]}>{pgTestResult.error}</Text>}

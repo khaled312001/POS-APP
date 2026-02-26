@@ -96,7 +96,7 @@ export default function CustomersScreen() {
                 <Ionicons name="star" size={12} color={Colors.warning} />
                 <Text style={styles.loyaltyText}>{item.loyaltyPoints || 0}</Text>
               </View>
-              <Text style={styles.totalSpent}>${Number(item.totalSpent || 0).toFixed(0)}</Text>
+              <Text style={styles.totalSpent}>CHF {Number(item.totalSpent || 0).toFixed(0)}</Text>
             </View>
           </Pressable>
         )}
@@ -159,7 +159,7 @@ export default function CustomersScreen() {
                     <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{t("loyaltyPoints")}</Text>
                   </View>
                   <View style={{ flex: 1, backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 14, alignItems: "center" }}>
-                    <Text style={{ color: Colors.accent, fontSize: 20, fontWeight: "800" }}>${Number(selectedCustomer.totalSpent || 0).toFixed(0)}</Text>
+                    <Text style={{ color: Colors.accent, fontSize: 20, fontWeight: "800" }}>CHF {Number(selectedCustomer.totalSpent || 0).toFixed(0)}</Text>
                     <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{t("totalSpent")}</Text>
                   </View>
                   <View style={{ flex: 1, backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 14, alignItems: "center" }}>
@@ -211,7 +211,7 @@ export default function CustomersScreen() {
                     <View key={sale.id} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8 }}>
                       <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center" }}>
                         <Text style={[{ color: Colors.text, fontSize: 14, fontWeight: "600" }, rtlTextAlign]}>Sale #{sale.id}</Text>
-                        <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: "700" }}>${Number(sale.totalAmount || 0).toFixed(2)}</Text>
+                        <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: "700" }}>CHF {Number(sale.totalAmount || 0).toFixed(2)}</Text>
                       </View>
                       <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginTop: 4 }}>
                         <Text style={{ color: Colors.textMuted, fontSize: 12 }}>

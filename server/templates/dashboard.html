@@ -566,7 +566,9 @@ let dashboardData = null, multiBranchData = null, subscriptionData = null, analy
 let refreshTimer = null;
 const REFRESH_INTERVAL = 30000;
 
+const CUR = 'CHF';
 function fmt(n) { return n == null || isNaN(n) ? '0.00' : Number(n).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtC(n) { return CUR + ' ' + fmt(n); }
 function fmtInt(n) { return n == null || isNaN(n) ? '0' : Number(n).toLocaleString('en-US'); }
 function fmtDate(d) { if(!d)return '--'; const dt=new Date(d); return isNaN(dt.getTime())?'--':dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
 function fmtDateTime(d) { if(!d)return '--'; const dt=new Date(d); return isNaN(dt.getTime())?'--':dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+dt.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}); }
@@ -607,10 +609,10 @@ function renderOverview() {
   if (!multiBranchData || !dashboardData) return;
   const s = multiBranchData.summary;
   const d = dashboardData;
-  document.getElementById('ov-todayRevenue').textContent = '$' + fmt(s.todayRevenue);
+  document.getElementById('ov-todayRevenue').textContent = fmtC(s.todayRevenue);
   document.getElementById('ov-todayCount').textContent = fmtInt(d.todaySalesCount) + ' transactions';
-  document.getElementById('ov-monthRevenue').textContent = '$' + fmt(s.monthRevenue);
-  document.getElementById('ov-totalRevenue').textContent = 'Total: $' + fmt(s.totalRevenue);
+  document.getElementById('ov-monthRevenue').textContent = fmtC(s.monthRevenue);
+  document.getElementById('ov-totalRevenue').textContent = 'Total: ' + fmtC(s.totalRevenue);
   document.getElementById('ov-activeBranches').textContent = fmtInt(s.activeBranches);
   document.getElementById('ov-activeShifts').textContent = fmtInt(s.activeShifts) + ' active shifts';
   document.getElementById('ov-totalEmployees').textContent = fmtInt(s.totalEmployees);
@@ -636,7 +638,7 @@ function renderBranchRevenueChart() {
   let html = '<div class="chart-container">';
   branches.forEach((b, i) => {
     const pct = Math.max(((b.monthRevenue||0)/maxRev)*100, 4);
-    html += `<div class="chart-bar" style="height:${pct}%;background:${colors[i%colors.length]}"><div class="tooltip">${b.name}: $${fmt(b.monthRevenue)}</div></div>`;
+    html += `<div class="chart-bar" style="height:${pct}%;background:${colors[i%colors.length]}"><div class="tooltip">${b.name}: ${fmtC(b.monthRevenue)}</div></div>`;
   });
   html += '</div><div class="chart-labels">';
   branches.forEach(b => { html += `<span>${b.name.length > 12 ? b.name.slice(0,12)+'...' : b.name}</span>`; });
@@ -664,17 +666,17 @@ function renderPaymentDonut() {
   let legend = '<div class="donut-legend">';
   methods.forEach((m, i) => {
     const pct = total > 0 ? (Number(m.total||0)/total*100).toFixed(1) : 0;
-    legend += `<div class="legend-item"><span class="legend-dot" style="background:${colors[i%colors.length]}"></span><span>${m.method||'Cash'} (${pct}%)</span><span class="legend-value">$${fmt(m.total)}</span></div>`;
+    legend += `<div class="legend-item"><span class="legend-dot" style="background:${colors[i%colors.length]}"></span><span>${m.method||'Cash'} (${pct}%)</span><span class="legend-value">${fmtC(m.total)}</span></div>`;
   });
   legend += '</div>';
-  container.innerHTML = `<svg class="donut-svg" viewBox="0 0 140 140">${paths}<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" fill="var(--text)" font-size="14" font-weight="700">$${total>=1000?(total/1000).toFixed(1)+'K':fmt(total)}</text></svg>${legend}`;
+  container.innerHTML = `<svg class="donut-svg" viewBox="0 0 140 140">${paths}<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" fill="var(--text)" font-size="12" font-weight="700">${CUR} ${total>=1000?(total/1000).toFixed(1)+'K':fmt(total)}</text></svg>${legend}`;
 }
 
 function renderOverviewTopProducts() {
   const products = dashboardData.topProducts;
   const tbody = document.getElementById('ov-topProducts');
   if (!products || !products.length) { tbody.innerHTML='<tr><td colspan="4" class="empty-state">No products yet</td></tr>'; return; }
-  tbody.innerHTML = products.slice(0,5).map((p,i) => `<tr><td><span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;font-size:12px;font-weight:700;${i<3?'background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff':'background:var(--surface2);color:var(--text2)'}">${i+1}</span></td><td style="font-weight:600">${p.name||'--'}</td><td>${fmtInt(p.totalSold)}</td><td style="color:var(--accent);font-weight:600">$${fmt(p.revenue)}</td></tr>`).join('');
+  tbody.innerHTML = products.slice(0,5).map((p,i) => `<tr><td><span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;font-size:12px;font-weight:700;${i<3?'background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff':'background:var(--surface2);color:var(--text2)'}">${i+1}</span></td><td style="font-weight:600">${p.name||'--'}</td><td>${fmtInt(p.totalSold)}</td><td style="color:var(--accent);font-weight:600">${fmtC(p.revenue)}</td></tr>`).join('');
 }
 
 function renderOverviewRecentSales() {
@@ -683,7 +685,7 @@ function renderOverviewRecentSales() {
   if (!sales || !sales.length) { tbody.innerHTML='<tr><td colspan="4" class="empty-state">No sales yet</td></tr>'; return; }
   const methodClass = m => ({card:'badge-purple',mobile:'badge-blue',nfc:'badge-teal'}[(m||'').toLowerCase()] || 'badge-teal');
   const statusClass = s => ({completed:'badge-green',refunded:'badge-red'}[(s||'').toLowerCase()] || 'badge-orange');
-  tbody.innerHTML = sales.slice(0,8).map(s => `<tr><td style="font-weight:600;font-size:12px">${s.receiptNumber||'--'}</td><td style="color:var(--accent);font-weight:600">$${fmt(s.totalAmount)}</td><td><span class="badge ${methodClass(s.paymentMethod)}">${s.paymentMethod||'Cash'}</span></td><td><span class="badge ${statusClass(s.status)}">${s.status||'completed'}</span></td></tr>`).join('');
+  tbody.innerHTML = sales.slice(0,8).map(s => `<tr><td style="font-weight:600;font-size:12px">${s.receiptNumber||'--'}</td><td style="color:var(--accent);font-weight:600">${fmtC(s.totalAmount)}</td><td><span class="badge ${methodClass(s.paymentMethod)}">${s.paymentMethod||'Cash'}</span></td><td><span class="badge ${statusClass(s.status)}">${s.status||'completed'}</span></td></tr>`).join('');
 }
 
 function renderBranches() {
@@ -695,17 +697,17 @@ function renderBranches() {
   const maxRev = Math.max(...branches.map(b => b.totalRevenue || 0), 1);
   container.innerHTML = branches.map(b => {
     const revPct = ((b.totalRevenue||0)/maxRev*100).toFixed(1);
-    const payments = Object.entries(b.paymentBreakdown || {}).map(([m,d]) => `<span class="branch-tag"><i data-lucide="credit-card" style="width:12px;height:12px"></i> ${m}: $${fmt(d.total)} (${d.count})</span>`).join('');
+    const payments = Object.entries(b.paymentBreakdown || {}).map(([m,d]) => `<span class="branch-tag"><i data-lucide="credit-card" style="width:12px;height:12px"></i> ${m}: ${fmtC(d.total)} (${d.count})</span>`).join('');
     return `<div class="branch-card ${b.isMain?'main-branch':''}">
       <div class="branch-header">
         <div class="branch-name">${b.isMain?'<span class="badge badge-teal" style="font-size:10px">MAIN</span>':''} ${b.name}</div>
         <div class="branch-status"><span class="status-dot ${b.isActive?'active':'inactive'}"></span>${b.isActive?'Active':'Inactive'}</div>
       </div>
       <div class="branch-metrics">
-        <div class="branch-metric"><div class="label">Today</div><div class="value">$${fmt(b.todayRevenue)}</div></div>
-        <div class="branch-metric"><div class="label">This Week</div><div class="value" style="color:var(--accent2)">$${fmt(b.weekRevenue)}</div></div>
-        <div class="branch-metric"><div class="label">This Month</div><div class="value" style="color:var(--blue)">$${fmt(b.monthRevenue)}</div></div>
-        <div class="branch-metric"><div class="label">All-Time</div><div class="value" style="color:var(--green)">$${fmt(b.totalRevenue)}</div></div>
+        <div class="branch-metric"><div class="label">Today</div><div class="value">${fmtC(b.todayRevenue)}</div></div>
+        <div class="branch-metric"><div class="label">This Week</div><div class="value" style="color:var(--accent2)">${fmtC(b.weekRevenue)}</div></div>
+        <div class="branch-metric"><div class="label">This Month</div><div class="value" style="color:var(--blue)">${fmtC(b.monthRevenue)}</div></div>
+        <div class="branch-metric"><div class="label">All-Time</div><div class="value" style="color:var(--green)">${fmtC(b.totalRevenue)}</div></div>
       </div>
       <div class="branch-footer">
         <span class="branch-tag"><i data-lucide="shopping-cart" style="width:12px;height:12px"></i> ${fmtInt(b.todaySalesCount)} today / ${fmtInt(b.totalSalesCount)} total</span>
@@ -728,14 +730,14 @@ function renderSales() {
   if (!dashboardData) return;
   const d = dashboardData;
   document.getElementById('sl-totalSales').textContent = fmtInt(d.totalSales);
-  document.getElementById('sl-totalRevenue').textContent = '$' + fmt(d.totalRevenue);
-  document.getElementById('sl-netProfit').textContent = (d.totalProfit >= 0 ? '+$' : '-$') + fmt(Math.abs(d.totalProfit || 0));
+  document.getElementById('sl-totalRevenue').textContent = fmtC(d.totalRevenue);
+  document.getElementById('sl-netProfit').textContent = (d.totalProfit >= 0 ? '+' : '-') + CUR + ' ' + fmt(Math.abs(d.totalProfit || 0));
   document.getElementById('sl-netProfit').style.color = d.totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
-  document.getElementById('sl-avgOrder').textContent = '$' + fmt(d.avgOrderValue);
-  document.getElementById('sl-today').textContent = '$' + fmt(d.todayRevenue);
-  document.getElementById('sl-week').textContent = '$' + fmt(d.weekRevenue);
-  document.getElementById('sl-month').textContent = '$' + fmt(d.monthRevenue);
-  document.getElementById('sl-expenses').textContent = '$' + fmt(d.totalExpenses);
+  document.getElementById('sl-avgOrder').textContent = fmtC(d.avgOrderValue);
+  document.getElementById('sl-today').textContent = fmtC(d.todayRevenue);
+  document.getElementById('sl-week').textContent = fmtC(d.weekRevenue);
+  document.getElementById('sl-month').textContent = fmtC(d.monthRevenue);
+  document.getElementById('sl-expenses').textContent = fmtC(d.totalExpenses);
 
   const methods = d.salesByPaymentMethod || [];
   const totalCount = methods.reduce((s,m) => s + Number(m.count||0), 0);
@@ -783,9 +785,9 @@ function renderCustomers() {
     const totalSpent = customers.reduce((s,c) => s + Number(c.totalSpent||0), 0);
     document.getElementById('cust-total').textContent = fmtInt(customers.length);
     document.getElementById('cust-loyalty').textContent = fmtInt(totalLoyalty);
-    document.getElementById('cust-spent').textContent = '$' + fmt(totalSpent);
+    document.getElementById('cust-spent').textContent = fmtC(totalSpent);
     const sorted = [...customers].sort((a,b) => Number(b.totalSpent||0) - Number(a.totalSpent||0)).slice(0,20);
-    document.getElementById('cust-table').innerHTML = sorted.length ? sorted.map(c => `<tr><td style="font-weight:600">${c.name}</td><td>${c.phone||'--'}</td><td>${fmtInt(c.visitCount)}</td><td style="color:var(--accent);font-weight:600">$${fmt(c.totalSpent)}</td><td><span class="badge badge-purple">${fmtInt(c.loyaltyPoints)} pts</span></td></tr>`).join('') : '<tr><td colspan="5" class="empty-state">No customers</td></tr>';
+    document.getElementById('cust-table').innerHTML = sorted.length ? sorted.map(c => `<tr><td style="font-weight:600">${c.name}</td><td>${c.phone||'--'}</td><td>${fmtInt(c.visitCount)}</td><td style="color:var(--accent);font-weight:600">${fmtC(c.totalSpent)}</td><td><span class="badge badge-purple">${fmtInt(c.loyaltyPoints)} pts</span></td></tr>`).join('') : '<tr><td colspan="5" class="empty-state">No customers</td></tr>';
   }).catch(() => {});
 }
 
@@ -794,7 +796,7 @@ function renderSubscriptions() {
   const s = subscriptionData.summary;
   document.getElementById('sub-total').textContent = fmtInt(s.total);
   document.getElementById('sub-active').textContent = fmtInt(s.active);
-  document.getElementById('sub-mrr').textContent = '$' + fmt(s.totalMRR);
+  document.getElementById('sub-mrr').textContent = fmtC(s.totalMRR);
   document.getElementById('sub-expiring').textContent = fmtInt(s.expiringSoon);
 
   const planDist = document.getElementById('sub-planDist');
@@ -825,9 +827,9 @@ function renderReports() {
 function doRenderReports() {
   const a = analyticsData;
   if (!a) return;
-  document.getElementById('rpt-projMonthly').textContent = '$' + fmt(a.projectedMonthlyRevenue);
-  document.getElementById('rpt-projYearly').textContent = '$' + fmt(a.projectedYearlyRevenue);
-  document.getElementById('rpt-avgDaily').textContent = '$' + fmt(a.avgDailyRevenue);
+  document.getElementById('rpt-projMonthly').textContent = fmtC(a.projectedMonthlyRevenue);
+  document.getElementById('rpt-projYearly').textContent = fmtC(a.projectedYearlyRevenue);
+  document.getElementById('rpt-avgDaily').textContent = fmtC(a.avgDailyRevenue);
   document.getElementById('rpt-slowMoving').textContent = fmtInt(a.slowMovingCount);
 
   const insights = a.insights || [];

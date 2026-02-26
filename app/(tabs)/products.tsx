@@ -261,7 +261,7 @@ export default function ProductsScreen() {
                 )}
               </View>
               <View style={[styles.productRight, isRTL && { alignItems: "flex-start" }]}>
-                <Text style={styles.productPrice}>${Number(item.price).toFixed(2)}</Text>
+                <Text style={styles.productPrice}>CHF {Number(item.price).toFixed(2)}</Text>
                 {canManage && (
                   <Pressable onPress={() => {
                     Alert.alert(t("delete"), `${t("delete")} ${item.name}?`, [

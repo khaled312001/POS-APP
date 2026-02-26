@@ -2,7 +2,7 @@
 
 ## Overview
 
-Barmagly Smart POS is a production-ready, tablet-optimized Point of Sale and Mini-ERP system designed for pharmacies, retail stores, cafes, and small businesses. It is branded under the Barmagly company (www.barmagly.tech, Egypt-based).
+Barmagly Smart POS is a production-ready, tablet-optimized Point of Sale and Mini-ERP system designed for pharmacies, retail stores, cafes, and small businesses. It is branded under the Barmagly company (www.barmagly.tech, Egypt-based). Default currency is **Swiss Franc (CHF)** throughout the entire application, landing page, dashboard, and Stripe integration.
 
 The application is built as an Expo (React Native) frontend with a Node.js/Express backend, backed by a PostgreSQL database. It targets web, iOS, and Android platforms with a dark-mode-first UI featuring a Blue → Purple → Teal gradient brand identity (accent color: #2FD3C6).
 

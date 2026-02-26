@@ -179,7 +179,7 @@ export default function POSScreen() {
           const amountInCents = Math.round(cart.total * 100);
           const chargeRes = await apiRequest("POST", "/api/stripe/pos-charge", {
             amount: amountInCents,
-            currency: "usd",
+            currency: "chf",
             token: "tok_visa",
             metadata: {
               employeeId: String(employee?.id || 1),
@@ -220,7 +220,7 @@ export default function POSScreen() {
           const amountInCents = Math.round(cart.total * 100);
           const chargeRes = await apiRequest("POST", "/api/stripe/pos-charge", {
             amount: amountInCents,
-            currency: "usd",
+            currency: "chf",
             token,
             metadata: {
               employeeId: String(employee?.id || 1),
@@ -383,7 +383,7 @@ export default function POSScreen() {
                     )}
                   </View>
                   <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-                  <Text style={styles.productPrice}>${Number(item.price).toFixed(2)}</Text>
+                  <Text style={styles.productPrice}>CHF {Number(item.price).toFixed(2)}</Text>
                   {item.barcode ? <Text style={styles.barcodeText}>{item.barcode}</Text> : null}
                   <View style={[styles.productAddBadge, { backgroundColor: `${catColor}20` }]}>
                     <Ionicons name="add" size={14} color={catColor} />
@@ -434,7 +434,7 @@ export default function POSScreen() {
               <View style={[styles.cartItem, isRTL && { flexDirection: "row-reverse" }]}>
                 <View style={styles.cartItemInfo}>
                   <Text style={[styles.cartItemName, rtlTextAlign]} numberOfLines={1}>{item.name}</Text>
-                  <Text style={[styles.cartItemPrice, rtlTextAlign]}>${(item.price * item.quantity).toFixed(2)}</Text>
+                  <Text style={[styles.cartItemPrice, rtlTextAlign]}>CHF {(item.price * item.quantity).toFixed(2)}</Text>
                 </View>
                 <View style={[styles.cartItemActions, isRTL && { flexDirection: "row-reverse" }]}>
                   <Pressable style={styles.qtyBtn} onPress={() => cart.updateQuantity(item.productId, item.quantity - 1)}>
@@ -459,21 +459,21 @@ export default function POSScreen() {
           <View style={styles.cartSummary}>
             <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("subtotal")}</Text>
-              <Text style={[styles.summaryValue, rtlTextAlign]}>${cart.subtotal.toFixed(2)}</Text>
+              <Text style={[styles.summaryValue, rtlTextAlign]}>CHF {cart.subtotal.toFixed(2)}</Text>
             </View>
             {cart.discount > 0 && (
               <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
                 <Text style={[styles.summaryLabel, { color: Colors.success }, rtlTextAlign]}>{t("discount")}</Text>
-                <Text style={[styles.summaryValue, { color: Colors.success }, rtlTextAlign]}>-${cart.discount.toFixed(2)}</Text>
+                <Text style={[styles.summaryValue, { color: Colors.success }, rtlTextAlign]}>-CHF {cart.discount.toFixed(2)}</Text>
               </View>
             )}
             <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("tax")} ({cart.taxRate}%)</Text>
-              <Text style={[styles.summaryValue, rtlTextAlign]}>${cart.tax.toFixed(2)}</Text>
+              <Text style={[styles.summaryValue, rtlTextAlign]}>CHF {cart.tax.toFixed(2)}</Text>
             </View>
             <View style={[styles.summaryRow, styles.totalRow, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.totalLabel, rtlTextAlign]}>{t("total")}</Text>
-              <Text style={[styles.totalValue, rtlTextAlign]}>${cart.total.toFixed(2)}</Text>
+              <Text style={[styles.totalValue, rtlTextAlign]}>CHF {cart.total.toFixed(2)}</Text>
             </View>
           </View>
 
@@ -493,7 +493,7 @@ export default function POSScreen() {
                   <Text style={styles.checkoutBtnText}>{t("checkout")}</Text>
                 </View>
                 <View style={styles.checkoutBtnPrice}>
-                  <Text style={styles.checkoutBtnPriceText}>${cart.total.toFixed(2)}</Text>
+                  <Text style={styles.checkoutBtnPriceText}>CHF {cart.total.toFixed(2)}</Text>
                 </View>
               </View>
             </LinearGradient>
@@ -512,7 +512,7 @@ export default function POSScreen() {
                 </Pressable>
               </View>
 
-              <Text style={styles.modalTotal}>${cart.total.toFixed(2)}</Text>
+              <Text style={styles.modalTotal}>CHF {cart.total.toFixed(2)}</Text>
 
               {selectedCustomer && (
                 <View style={[styles.customerInfo, isRTL && { flexDirection: "row-reverse" }]}>
@@ -556,7 +556,7 @@ export default function POSScreen() {
                     keyboardType="decimal-pad"
                   />
                   {cashReceived && Number(cashReceived) >= cart.total && (
-                    <Text style={styles.changeText}>{t("change")}: ${(Number(cashReceived) - cart.total).toFixed(2)}</Text>
+                    <Text style={styles.changeText}>{t("change")}: CHF {(Number(cashReceived) - cart.total).toFixed(2)}</Text>
                   )}
                 </View>
               )}
@@ -573,7 +573,7 @@ export default function POSScreen() {
                   </View>
                   <Text style={[styles.nfcPayTitle, rtlTextAlign]}>{t("tapToPay")}</Text>
                   <Text style={[styles.nfcPaySubtitle, rtlTextAlign]}>{t("holdCardNear")}</Text>
-                  <Text style={styles.nfcPayAmount}>${cart.total.toFixed(2)}</Text>
+                  <Text style={styles.nfcPayAmount}>CHF {cart.total.toFixed(2)}</Text>
                   <View style={[styles.nfcStatusBadge, 
                     nfcStatus === "success" && { backgroundColor: "rgba(16,185,129,0.15)" },
                     nfcStatus === "error" && { backgroundColor: "rgba(239,68,68,0.15)" },
@@ -667,7 +667,7 @@ export default function POSScreen() {
               {cart.items.map((item) => (
                 <View key={item.productId} style={[styles.checkoutItem, isRTL && { flexDirection: "row-reverse" }]}>
                   <Text style={[styles.checkoutItemName, rtlTextAlign]}>{item.name} x{item.quantity}</Text>
-                  <Text style={[styles.checkoutItemTotal, rtlTextAlign]}>${(item.price * item.quantity).toFixed(2)}</Text>
+                  <Text style={[styles.checkoutItemTotal, rtlTextAlign]}>CHF {(item.price * item.quantity).toFixed(2)}</Text>
                 </View>
               ))}
 
@@ -729,7 +729,7 @@ export default function POSScreen() {
                   <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 }}>
                     <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", flex: 2 }} numberOfLines={1}>{item.name}</Text>
                     <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 40, textAlign: "center" }}>x{item.quantity}</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 65, textAlign: "right" }}>${item.total.toFixed(2)}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 65, textAlign: "right" }}>CHF {item.total.toFixed(2)}</Text>
                   </View>
                 ))}
 
@@ -738,24 +738,24 @@ export default function POSScreen() {
                 <View style={{ marginTop: 6 }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                     <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("subtotal")}:</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>${lastSale?.subtotal?.toFixed(2)}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {lastSale?.subtotal?.toFixed(2)}</Text>
                   </View>
                   {(lastSale?.discount || 0) > 0 && (
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("discount")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>-${lastSale?.discount?.toFixed(2)}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>-CHF {lastSale?.discount?.toFixed(2)}</Text>
                     </View>
                   )}
                   <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                     <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("tax")}:</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>${lastSale?.tax?.toFixed(2)}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {lastSale?.tax?.toFixed(2)}</Text>
                   </View>
 
                   <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
 
                   <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
                     <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>TOTAL:</Text>
-                    <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>${lastSale?.total?.toFixed(2)}</Text>
+                    <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {lastSale?.total?.toFixed(2)}</Text>
                   </View>
 
                   <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
@@ -767,13 +767,13 @@ export default function POSScreen() {
                   {lastSale?.paymentMethod === "cash" && (
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("cash")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>${lastSale?.cashReceived?.toFixed(2)}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {lastSale?.cashReceived?.toFixed(2)}</Text>
                     </View>
                   )}
                   {(lastSale?.change || 0) > 0 && (
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("change")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>${lastSale?.change?.toFixed(2)}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {lastSale?.change?.toFixed(2)}</Text>
                     </View>
                   )}
                 </View>
@@ -854,7 +854,7 @@ export default function POSScreen() {
             </View>
             <View style={[styles.discountTypeRow, isRTL && { flexDirection: "row-reverse" }]}>
               <Pressable style={[styles.discountTypeBtn, discountType === "fixed" && styles.discountTypeBtnActive]} onPress={() => setDiscountType("fixed")}>
-                <Text style={[styles.discountTypeBtnText, discountType === "fixed" && { color: Colors.textDark }]}>{t("fixedAmount")} ($)</Text>
+                <Text style={[styles.discountTypeBtnText, discountType === "fixed" && { color: Colors.textDark }]}>{t("fixedAmount")} (CHF)</Text>
               </Pressable>
               <Pressable style={[styles.discountTypeBtn, discountType === "percent" && styles.discountTypeBtnActive]} onPress={() => setDiscountType("percent")}>
                 <Text style={[styles.discountTypeBtnText, discountType === "percent" && { color: Colors.textDark }]}>{t("percentage")} (%)</Text>

@@ -486,7 +486,7 @@
     }
 
     .price {
-      font-size: 4rem;
+      font-size: 2.8rem;
       font-weight: 800;
       margin: 2rem 0;
     }
@@ -950,7 +950,7 @@
       <div class="pricing-grid">
         <div class="pricing-card reveal">
           <h3 data-t="p1">Professional</h3>
-          <div class="price" id="p1-price">$29<span>/mo</span></div>
+          <div class="price" id="p1-price">CHF 49<span>/mo</span></div>
           <ul class="benefits">
             <li><i data-lucide="check-circle-2" style="width:18px; height:18px;"></i> <span data-t="b1">1 Branch
                 Location</span></li>
@@ -965,7 +965,7 @@
         <div class="pricing-card popular reveal">
           <div class="badge" data-t="best">Best Value</div>
           <h3 data-t="p2">Enterprise</h3>
-          <div class="price" id="p2-price">$79<span>/mo</span></div>
+          <div class="price" id="p2-price">CHF 149<span>/mo</span></div>
           <ul class="benefits">
             <li><i data-lucide="check-circle-2" style="width:18px; height:18px;"></i> <span data-t="b4">Infinite
                 Branching</span></li>
@@ -1191,7 +1191,7 @@
       currentBilling = type;
       document.getElementById('m-toggle').classList.toggle('active', type === 'monthly');
       document.getElementById('y-toggle').classList.toggle('active', type === 'yearly');
-      const data = { monthly: ['$29', '$79'], yearly: ['$278', '$758'] };
+      const data = { monthly: ['CHF 49', 'CHF 149'], yearly: ['CHF 470', 'CHF 1,430'] };
       document.getElementById('p1-price').innerHTML = data[type][0] + `<span>/${type === 'monthly' ? 'mo' : 'yr'}</span>`;
       document.getElementById('p2-price').innerHTML = data[type][1] + `<span>/${type === 'monthly' ? 'mo' : 'yr'}</span>`;
     }

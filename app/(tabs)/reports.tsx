@@ -125,7 +125,7 @@ function DonutChart({ data, size = 140 }: { data: { label: string; value: number
           );
         })}
         <View style={{ position: "absolute", top: strokeW, left: strokeW, width: size - strokeW * 2, height: size - strokeW * 2, borderRadius: (size - strokeW * 2) / 2, backgroundColor: Colors.card, justifyContent: "center", alignItems: "center" }}>
-          <Text style={{ color: Colors.text, fontSize: 16, fontWeight: "800" }}>{total >= 1000 ? `$${(total / 1000).toFixed(1)}k` : `$${total.toFixed(0)}`}</Text>
+          <Text style={{ color: Colors.text, fontSize: 16, fontWeight: "800" }}>{total >= 1000 ? `CHF ${(total / 1000).toFixed(1)}k` : `CHF ${total.toFixed(0)}`}</Text>
           <Text style={{ color: Colors.textMuted, fontSize: 9 }}>Total</Text>
         </View>
       </View>
@@ -336,7 +336,7 @@ export default function ReportsScreen() {
             <Ionicons name="today" size={20} color={Colors.accent} />
           </View>
           <Text style={[styles.statLabel, rtlTextAlign, rtlText]}>{t("todayRevenue")}</Text>
-          <Text style={[styles.statValue, rtlTextAlign]}>${Number(todayRevenue).toFixed(2)}</Text>
+          <Text style={[styles.statValue, rtlTextAlign]}>CHF {Number(todayRevenue).toFixed(2)}</Text>
           <Text style={[styles.statSub, rtlTextAlign, rtlText]}>{todaySalesCount} {t("transactions")}</Text>
         </GlassCard>
         <GlassCard style={styles.statCardHalf}>
@@ -344,7 +344,7 @@ export default function ReportsScreen() {
             <Ionicons name="calendar" size={20} color={Colors.info} />
           </View>
           <Text style={[styles.statLabel, rtlTextAlign, rtlText]}>{t("monthRevenue")}</Text>
-          <Text style={[styles.statValue, rtlTextAlign]}>${Number(weekRevenue).toFixed(2)}</Text>
+          <Text style={[styles.statValue, rtlTextAlign]}>CHF {Number(weekRevenue).toFixed(2)}</Text>
         </GlassCard>
       </View>
       <View style={[styles.statGrid, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
@@ -353,7 +353,7 @@ export default function ReportsScreen() {
             <Ionicons name="trending-up" size={20} color={Colors.secondary} />
           </View>
           <Text style={[styles.statLabel, rtlTextAlign, rtlText]}>{t("monthRevenue")}</Text>
-          <Text style={[styles.statValue, rtlTextAlign]}>${Number(monthRevenue).toFixed(2)}</Text>
+          <Text style={[styles.statValue, rtlTextAlign]}>CHF {Number(monthRevenue).toFixed(2)}</Text>
         </GlassCard>
         <GlassCard style={styles.statCardHalf}>
           <View style={[styles.statIconWrap, { backgroundColor: totalProfit >= 0 ? Colors.success + "20" : Colors.danger + "20" }]}>
@@ -387,7 +387,7 @@ export default function ReportsScreen() {
               <View style={[styles.revExpDot, { backgroundColor: Colors.accent }]} />
               <Text style={[styles.revExpLabel, rtlText]}>{t("revenue")}</Text>
             </View>
-            <Text style={[styles.revExpValue, rtlTextAlign]}>${Number(totalRevenue).toFixed(2)}</Text>
+            <Text style={[styles.revExpValue, rtlTextAlign]}>CHF {Number(totalRevenue).toFixed(2)}</Text>
             <View style={[styles.barTrack, { height: 12, marginTop: 6 }]}>
               <LinearGradient
                 colors={[Colors.gradientStart, Colors.accent]}
@@ -402,7 +402,7 @@ export default function ReportsScreen() {
               <View style={[styles.revExpDot, { backgroundColor: Colors.danger }]} />
               <Text style={[styles.revExpLabel, rtlText]}>{t("expenses")}</Text>
             </View>
-            <Text style={[styles.revExpValue, rtlTextAlign]}>${Number(totalExpenses).toFixed(2)}</Text>
+            <Text style={[styles.revExpValue, rtlTextAlign]}>CHF {Number(totalExpenses).toFixed(2)}</Text>
             <View style={[styles.barTrack, { height: 12, marginTop: 6 }]}>
               <View style={[styles.barFill, { width: `${(totalExpenses / revenueExpenseMax) * 100}%`, backgroundColor: Colors.danger, height: 12 }]} />
             </View>
@@ -433,7 +433,7 @@ export default function ReportsScreen() {
               <View style={styles.topProductInfo}>
                 <Text style={[styles.topProductName, rtlTextAlign, rtlText]} numberOfLines={1}>{product.name}</Text>
                 <View style={[styles.topProductMeta, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                  <Text style={styles.topProductRevenue}>${Number(product.revenue || 0).toFixed(2)}</Text>
+                  <Text style={styles.topProductRevenue}>CHF {Number(product.revenue || 0).toFixed(2)}</Text>
                   <Text style={[styles.topProductQty, rtlText]}>{product.totalSold || 0} {t("sold")}</Text>
                 </View>
                 <PercentBar percent={(product.revenue / topProductMax) * 100} color={Colors.accent} height={6} />
@@ -487,7 +487,7 @@ export default function ReportsScreen() {
                     <Text style={[styles.paymentName, rtlText]}>{method.method || "Unknown"}</Text>
                     <Text style={styles.paymentPct}>{pct.toFixed(0)}%</Text>
                   </View>
-                  <Text style={[styles.paymentAmount, rtlTextAlign, rtlText]}>${Number(method.total || 0).toFixed(2)} ({method.count || 0} {t("salesCount")})</Text>
+                  <Text style={[styles.paymentAmount, rtlTextAlign, rtlText]}>CHF {Number(method.total || 0).toFixed(2)} ({method.count || 0} {t("salesCount")})</Text>
                   <PercentBar percent={pct} color={color} height={6} />
                 </View>
               </View>
@@ -507,7 +507,7 @@ export default function ReportsScreen() {
       <View style={[styles.quickStatsGrid, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
         <GlassCard style={styles.quickStatCard}>
           <Ionicons name="pricetag" size={20} color={Colors.accent} />
-          <Text style={styles.quickStatValue}>${Number(avgOrderValue).toFixed(2)}</Text>
+          <Text style={styles.quickStatValue}>CHF {Number(avgOrderValue).toFixed(2)}</Text>
           <Text style={[styles.quickStatLabel, rtlText]}>{t("avgOrder")}</Text>
         </GlassCard>
         <GlassCard style={styles.quickStatCard}>
@@ -534,17 +534,17 @@ export default function ReportsScreen() {
             <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
               <View style={{ flex: 1, backgroundColor: Colors.accent + "10", borderRadius: 12, padding: 12 }}>
                 <Text style={[{ color: Colors.textMuted, fontSize: 11 }, rtlTextAlign, rtlText]}>{t("projectedMonthly")}</Text>
-                <Text style={[{ color: Colors.accent, fontSize: 18, fontWeight: "700" }, rtlTextAlign]}>${Number(predictions.projectedMonthlyRevenue || 0).toFixed(0)}</Text>
+                <Text style={[{ color: Colors.accent, fontSize: 18, fontWeight: "700" }, rtlTextAlign]}>CHF {Number(predictions.projectedMonthlyRevenue || 0).toFixed(0)}</Text>
               </View>
               <View style={{ flex: 1, backgroundColor: Colors.success + "10", borderRadius: 12, padding: 12 }}>
                 <Text style={[{ color: Colors.textMuted, fontSize: 11 }, rtlTextAlign, rtlText]}>{t("projectedYearly")}</Text>
-                <Text style={[{ color: Colors.success, fontSize: 18, fontWeight: "700" }, rtlTextAlign]}>${Number(predictions.projectedYearlyRevenue || 0).toFixed(0)}</Text>
+                <Text style={[{ color: Colors.success, fontSize: 18, fontWeight: "700" }, rtlTextAlign]}>CHF {Number(predictions.projectedYearlyRevenue || 0).toFixed(0)}</Text>
               </View>
             </View>
             <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
               <View style={{ flex: 1, backgroundColor: Colors.info + "10", borderRadius: 12, padding: 12 }}>
                 <Text style={[{ color: Colors.textMuted, fontSize: 11 }, rtlTextAlign, rtlText]}>{t("dailyAverage")}</Text>
-                <Text style={[{ color: Colors.info, fontSize: 18, fontWeight: "700" }, rtlTextAlign]}>${Number(predictions.avgDailyRevenue || 0).toFixed(2)}</Text>
+                <Text style={[{ color: Colors.info, fontSize: 18, fontWeight: "700" }, rtlTextAlign]}>CHF {Number(predictions.avgDailyRevenue || 0).toFixed(2)}</Text>
               </View>
               <View style={{ flex: 1, backgroundColor: Colors.warning + "10", borderRadius: 12, padding: 12 }}>
                 <Text style={[{ color: Colors.textMuted, fontSize: 11 }, rtlTextAlign, rtlText]}>{t("slowMoving")}</Text>
@@ -599,7 +599,7 @@ export default function ReportsScreen() {
             <Ionicons name="receipt-outline" size={16} color={Colors.accent} />
             <Text style={[styles.saleReceipt, rtlText]}>{item.receiptNumber}</Text>
           </View>
-          <Text style={styles.saleAmount}>${Number(item.totalAmount).toFixed(2)}</Text>
+          <Text style={styles.saleAmount}>CHF {Number(item.totalAmount).toFixed(2)}</Text>
         </View>
         <View style={[styles.saleBottom, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
           <Text style={[styles.saleDate, rtlText]}>{new Date(item.createdAt).toLocaleDateString()} {new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
@@ -781,7 +781,7 @@ export default function ReportsScreen() {
               </View>
               <View style={styles.inventoryInfo}>
                 <Text style={[styles.inventoryName, rtlTextAlign, rtlText]} numberOfLines={1}>{item.name}</Text>
-                <Text style={[styles.inventoryPrice, rtlTextAlign]}>${Number(item.price || 0).toFixed(2)}</Text>
+                <Text style={[styles.inventoryPrice, rtlTextAlign]}>CHF {Number(item.price || 0).toFixed(2)}</Text>
               </View>
             </View>
             <View style={[styles.inventoryRight, { marginLeft: isRTL ? 0 : 12, marginRight: isRTL ? 12 : 0 }]}>
@@ -877,7 +877,7 @@ export default function ReportsScreen() {
             <Ionicons name="cash" size={20} color={Colors.danger} />
           </View>
           <Text style={[styles.statLabel, rtlTextAlign, rtlText]}>{t("totalRefunds")}</Text>
-          <Text style={[styles.statValue, rtlTextAlign]}>${Number(returnsReport?.totalRefundAmount || 0).toFixed(2)}</Text>
+          <Text style={[styles.statValue, rtlTextAlign]}>CHF {Number(returnsReport?.totalRefundAmount || 0).toFixed(2)}</Text>
         </GlassCard>
       </View>
 
@@ -976,8 +976,8 @@ export default function ReportsScreen() {
                 <View style={styles.topProductInfo}>
                   <Text style={[styles.topProductName, rtlTextAlign, rtlText]}>{perf.employeeName}</Text>
                   <View style={[styles.topProductMeta, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                    <Text style={styles.topProductRevenue}>${Number(perf.totalRevenue).toFixed(2)}</Text>
-                    <Text style={[styles.topProductQty, rtlText]}>{perf.salesCount} {t("salesCount")} | {t("avg")} ${Number(perf.avgSaleValue).toFixed(2)}</Text>
+                    <Text style={styles.topProductRevenue}>CHF {Number(perf.totalRevenue).toFixed(2)}</Text>
+                    <Text style={[styles.topProductQty, rtlText]}>{perf.salesCount} {t("salesCount")} | {t("avg")} CHF {Number(perf.avgSaleValue).toFixed(2)}</Text>
                   </View>
                 </View>
                 <View style={[styles.badge, { backgroundColor: (perf.role === "admin" ? Colors.danger : perf.role === "manager" ? Colors.warning : Colors.info) + "20" }]}>

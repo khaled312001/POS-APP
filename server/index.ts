@@ -335,7 +335,7 @@ function setupStripeRoutes(app: express.Application) {
 
   app.post('/api/stripe/create-payment-intent', async (req, res) => {
     try {
-      const { amount, currency = 'usd', metadata } = req.body;
+      const { amount, currency = 'chf', metadata } = req.body;
       if (!amount || amount <= 0) {
         return res.status(400).json({ error: 'Valid amount is required' });
       }
@@ -386,7 +386,7 @@ function setupStripeRoutes(app: express.Application) {
 
   app.post('/api/stripe/pos-charge', async (req, res) => {
     try {
-      const { amount, currency = 'usd', token, metadata } = req.body;
+      const { amount, currency = 'chf', token, metadata } = req.body;
       if (!amount || amount <= 0) {
         return res.status(400).json({ error: 'Valid amount is required' });
       }
@@ -429,7 +429,7 @@ let paymentGatewayConfig: any = {
   stripe: {
     enabled: true,
     mode: "test",
-    currency: "usd",
+    currency: "chf",
     autoCapture: true,
   },
   nfc: {
@@ -489,7 +489,7 @@ function setupPaymentGatewayRoutes(app: express.Application) {
       res.json({
         success: true,
         mode: key.startsWith("pk_live") ? "live" : "test",
-        currency: balance.available?.[0]?.currency || "usd",
+        currency: balance.available?.[0]?.currency || "chf",
         available: balance.available?.map((b: any) => ({ amount: b.amount, currency: b.currency })),
       });
     } catch (e: any) {
