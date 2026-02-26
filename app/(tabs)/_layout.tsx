@@ -6,86 +6,103 @@ import { Colors } from "@/constants/colors";
 import { BlurView } from "expo-blur";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import { useLicense } from "@/lib/license-context";
+import { Text, View } from "react-native";
 
 export default function TabLayout() {
   const { isLoggedIn, isCashier } = useAuth();
   const { t, isRTL } = useLanguage();
+  const { subscription } = useLicense();
+
   if (!isLoggedIn) {
     return <Redirect href="/login" />;
   }
 
+  const showWarningUrl = "https://barmagly.com/upgrade"; // Or a modal
+
+  const banner = subscription?.requiresUpgrade ? (
+    <View style={{ backgroundColor: Colors.warning, padding: 12, paddingTop: Platform.OS === 'ios' ? 44 : 24, paddingBottom: 12 }}>
+      <Text style={{ color: '#000', fontWeight: 'bold', textAlign: 'center', fontSize: 13 }}>
+        ⚠️ Your {subscription.plan} subscription {subscription.daysRemaining > 0 ? `expires in ${subscription.daysRemaining} days` : 'has expired'}. Contact super admin to avoid service interruption.
+      </Text>
+    </View>
+  ) : null;
+
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors.accent,
-        tabBarInactiveTintColor: Colors.tabInactive,
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: Platform.OS === "ios" ? "transparent" : Colors.tabBar,
-          borderTopWidth: 0,
-          elevation: 0,
-          height: Platform.OS === "web" ? 84 : 60,
-          paddingBottom: Platform.OS === "web" ? 34 : 6,
-          paddingTop: 6,
-          position: "absolute" as const,
-          direction: isRTL ? "rtl" : "ltr",
-        },
-        tabBarBackground: () =>
-          Platform.OS === "ios" ? (
-            <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
-          ) : null,
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: "600" as const,
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: t("pos"),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cart" size={size} color={color} />
-          ),
+    <View style={{ flex: 1, backgroundColor: Colors.background }}>
+      {banner}
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: Colors.accent,
+          tabBarInactiveTintColor: Colors.tabInactive,
+          headerShown: false,
+          tabBarStyle: {
+            backgroundColor: Platform.OS === "ios" ? "transparent" : Colors.tabBar,
+            borderTopWidth: 0,
+            elevation: 0,
+            height: Platform.OS === "web" ? 84 : 60,
+            paddingBottom: Platform.OS === "web" ? 34 : 6,
+            paddingTop: 6,
+            position: "absolute" as const,
+            direction: isRTL ? "rtl" : "ltr",
+          },
+          tabBarBackground: () =>
+            Platform.OS === "ios" ? (
+              <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
+            ) : null,
+          tabBarLabelStyle: {
+            fontSize: 10,
+            fontWeight: "600" as const,
+          },
         }}
-      />
-      <Tabs.Screen
-        name="products"
-        options={{
-          title: t("products"),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="grid" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="customers"
-        options={{
-          title: t("customers"),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="reports"
-        options={{
-          title: t("reports"),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="stats-chart" size={size} color={color} />
-          ),
-          href: isCashier ? null : undefined,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: t("more"),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="menu" size={size} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: t("pos"),
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="cart" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="products"
+          options={{
+            title: t("products"),
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="grid" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="customers"
+          options={{
+            title: t("customers"),
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="people" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="reports"
+          options={{
+            title: t("reports"),
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="stats-chart" size={size} color={color} />
+            ),
+            href: isCashier ? null : undefined,
+          }}
+        />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            title: t("more"),
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="menu" size={size} color={color} />
+            ),
+          }}
+        />
+      </Tabs>
+    </View>
   );
 }

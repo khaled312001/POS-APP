@@ -11,6 +11,13 @@ async function getCredentials() {
       : null;
 
   if (!xReplitToken) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('X-Replit-Token not found. Using dummy credentials for local development.');
+      return {
+        publishableKey: 'pk_test_dummy',
+        secretKey: 'sk_test_dummy',
+      };
+    }
     throw new Error('X-Replit-Token not found for repl/depl');
   }
 

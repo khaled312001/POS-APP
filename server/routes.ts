@@ -23,7 +23,120 @@ function sanitizeDates(data: any) {
   return result;
 }
 
+import * as bcrypt from "bcrypt";
+import * as crypto from "crypto";
+import { addDays, addMonths, addYears } from "date-fns";
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Landing Page Subscription
+  app.post("/api/landing/subscribe", async (req, res) => {
+    try {
+      const {
+        businessName,
+        ownerName,
+        ownerEmail,
+        ownerPhone,
+        planType, // trial, monthly, yearly
+        planName,
+        paymentMethod, // stripe, bank
+        receiptUrl,
+        stripeToken
+      } = req.body;
+
+      if (!businessName || !ownerName || !ownerEmail) {
+        return res.status(400).json({ error: "Required fields are missing" });
+      }
+
+      // 1. Check if tenant already exists
+      const existing = await storage.getTenantByEmail(ownerEmail);
+      if (existing) {
+        return res.status(400).json({ error: "A store with this email already exists" });
+      }
+
+      // 2. Create Tenant
+      // Generate a temporary password (e.g., ownerName lower + 123)
+      const tempPassword = "admin" + Math.floor(1000 + Math.random() * 9000);
+      const passwordHash = await bcrypt.hash("admin123", 10); // Default for now, or use generated
+
+      const tenant = await storage.createTenant({
+        businessName,
+        ownerName,
+        ownerEmail,
+        ownerPhone: ownerPhone || null,
+        passwordHash,
+        status: planType === "trial" ? "active" : "active", // In a real app, "pending" for bank
+        maxBranches: planName === "pro" ? 5 : 1,
+        maxEmployees: planName === "pro" ? 999 : 5,
+        metadata: {
+          signupDate: new Date().toISOString(),
+          paymentMethod,
+          receiptUrl: receiptUrl || null
+        }
+      });
+
+      // 3. Create Subscription
+      const startDate = new Date();
+      let endDate = new Date();
+      let status = "active";
+
+      if (planType === "monthly") {
+        endDate = addMonths(startDate, 1);
+      } else if (planType === "yearly") {
+        endDate = addYears(startDate, 1);
+      } else {
+        endDate = addDays(startDate, 30);
+        status = "active"; // Trial
+      }
+
+      const subscription = await storage.createTenantSubscription({
+        tenantId: tenant.id,
+        planType,
+        planName: planName || "Starter",
+        price: planType === "trial" ? "0" : (planName === "pro" ? "79.00" : "29.00"),
+        status,
+        startDate,
+        endDate,
+        autoRenew: planType !== "trial",
+        paymentMethod: paymentMethod || "manual"
+      });
+
+      // 4. Generate License Key
+      const randomSegments = Array.from({ length: 4 }, () =>
+        crypto.randomBytes(2).toString('hex').toUpperCase()
+      );
+      const licenseKey = `BARMAGLY-${randomSegments.join('-')}`;
+
+      await storage.createLicenseKey({
+        licenseKey,
+        tenantId: tenant.id,
+        subscriptionId: subscription.id,
+        status: "active",
+        maxActivations: planName === "pro" ? 10 : 3,
+        expiresAt: endDate,
+        notes: `Subscription from landing page: ${planName}`
+      });
+
+      // 5. Create Welcome Notification
+      await storage.createTenantNotification({
+        tenantId: tenant.id,
+        type: "info",
+        title: "Welcome to Barmagly!",
+        message: `Your account for ${businessName} has been created successfully. Use the mobile app to activate with your license key.`,
+        priority: "normal"
+      });
+
+      res.json({
+        success: true,
+        tenantId: tenant.id,
+        licenseKey,
+        tempPassword: "admin123" // In a real app, we'd email this
+      });
+    } catch (e: any) {
+      console.error("Subscription error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // Dashboard
   app.get("/api/dashboard", async (_req: Request, res: Response) => {
     try {
@@ -50,7 +163,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Employees
   app.get("/api/employees", async (_req, res) => {
-    try { res.json(await storage.getEmployees()); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const emps = await storage.getEmployees();
+      console.log(`[DEBUG] /api/employees: Found ${emps.length} employees`);
+      res.json(emps);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.get("/api/employees/:id", async (req, res) => {
     try {
@@ -693,7 +810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDate = req.query.startDate as string || "2000-01-01";
       const endDate = req.query.endDate as string || "2099-12-31";
       const salesData = await storage.getSalesByDateRange(new Date(startDate), new Date(endDate));
-      
+
       const headers = ["Receipt #", "Date", "Total", "Payment Method", "Status", "Employee ID", "Customer ID"];
       const rows = salesData.map((s: any) => [
         s.receiptNumber || `#${s.id}`,
@@ -704,7 +821,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         s.employeeId,
         s.customerId || "Walk-in",
       ]);
-      
+
       const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", `attachment; filename=sales-report-${startDate}-to-${endDate}.csv`);
@@ -728,7 +845,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         p.lowStockThreshold || 10,
         p.isActive ? "Active" : "Inactive",
       ]);
-      
+
       const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", "attachment; filename=inventory-report.csv");
@@ -749,7 +866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Number(p.profit).toFixed(2),
         Number(p.costPrice).toFixed(2),
       ]);
-      
+
       const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", "attachment; filename=profit-report.csv");
@@ -769,7 +886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Number(p.totalRevenue).toFixed(2),
         Number(p.avgSaleValue).toFixed(2),
       ]);
-      
+
       const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", "attachment; filename=employee-performance-report.csv");
@@ -785,12 +902,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const slowMoving = await storage.getSlowMovingProducts(30);
       const allProds = await storage.getProducts();
       const lowStockData = await storage.getLowStockItems();
-      
+
       // Simple predictions based on trends
       const avgDailyRevenue = Number(stats.monthRevenue || 0) / 30;
       const projectedMonthly = avgDailyRevenue * 30;
       const projectedYearly = avgDailyRevenue * 365;
-      
+
       // Stock predictions
       const stockAlerts = lowStockData.map((item: any) => {
         const prod = allProds.find((p: any) => p.id === item.productId);
@@ -803,7 +920,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           recommendation: `Reorder ${Math.max(50 - (item.quantity || 0), 20)} units`,
         };
       });
-      
+
       // Best performing categories
       const categoryPerf = topProducts.reduce((acc: any, p: any) => {
         const prod = allProds.find((pr: any) => pr.id === p.productId);
@@ -813,7 +930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         acc[catId].count += Number(p.totalSold || 0);
         return acc;
       }, {});
-      
+
       res.json({
         projectedMonthlyRevenue: projectedMonthly,
         projectedYearlyRevenue: projectedYearly,

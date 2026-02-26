@@ -1,8 +1,9 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { registerSuperAdminRoutes } from "./superAdminRoutes";
 import { runMigrations } from "stripe-replit-sync";
-import { getStripeSync, getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
+import { getStripeSync, getStripePublishableKey, getUncachableStripeClient, getStripeSecretKey } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 import * as fs from "fs";
 import * as path from "path";
@@ -136,12 +137,10 @@ function serveExpoManifest(platform: string, res: Response) {
 function serveLandingPage({
   req,
   res,
-  landingPageTemplate,
   appName,
 }: {
   req: Request;
   res: Response;
-  landingPageTemplate: string;
   appName: string;
 }) {
   const forwardedProto = req.header("x-forwarded-proto");
@@ -154,7 +153,15 @@ function serveLandingPage({
   log(`baseUrl`, baseUrl);
   log(`expsUrl`, expsUrl);
 
-  const html = landingPageTemplate
+  const templatePath = path.resolve(
+    process.cwd(),
+    "server",
+    "templates",
+    "landing-page.html"
+  );
+  const template = fs.readFileSync(templatePath, "utf-8");
+
+  const html = template
     .replace(/BASE_URL_PLACEHOLDER/g, baseUrl)
     .replace(/EXPS_URL_PLACEHOLDER/g, expsUrl)
     .replace(/APP_NAME_PLACEHOLDER/g, appName);
@@ -176,8 +183,6 @@ function configureExpoAndLanding(app: express.Application) {
     "templates",
     "dashboard.html",
   );
-  const landingPageTemplate = fs.readFileSync(templatePath, "utf-8");
-  const dashboardTemplate = fs.readFileSync(dashboardPath, "utf-8");
   const appName = getAppName();
 
   log("Serving static Expo files with dynamic manifest routing");
@@ -187,12 +192,30 @@ function configureExpoAndLanding(app: express.Application) {
       return next();
     }
 
-    if (req.path === "/dashboard") {
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      return res.status(200).send(dashboardTemplate);
+    if (req.path.startsWith("/super_admin")) {
+      const superAdminTemplatePath = path.resolve(
+        process.cwd(),
+        "server",
+        "templates",
+        req.path === "/super_admin/login" ? "super-admin-login.html" : "super-admin-dashboard.html"
+      );
+
+      try {
+        const superAdminTemplate = fs.readFileSync(superAdminTemplatePath, "utf-8");
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.status(200).send(superAdminTemplate);
+      } catch (err) {
+        return res.status(404).send("Super Admin Template not found");
+      }
     }
 
-    if (req.path !== "/" && req.path !== "/manifest") {
+    if (req.path === "/dashboard") {
+      const dbTemplate = fs.readFileSync(dashboardPath, "utf-8");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(dbTemplate);
+    }
+
+    if (req.path !== "/landing" && req.path !== "/manifest") {
       return next();
     }
 
@@ -201,11 +224,10 @@ function configureExpoAndLanding(app: express.Application) {
       return serveExpoManifest(platform, res);
     }
 
-    if (req.path === "/") {
+    if (req.path === "/landing") {
       return serveLandingPage({
         req,
         res,
-        landingPageTemplate,
         appName,
       });
     }
@@ -253,6 +275,12 @@ async function initStripe() {
     log('Stripe schema ready');
 
     const stripeSync = await getStripeSync();
+    const secretKey = await getStripeSecretKey();
+
+    if (!secretKey || secretKey.includes('dummy')) {
+      log('Stripe: Dummy or missing key detected. Skipping webhook setup and sync.');
+      return;
+    }
 
     log('Setting up managed webhook...');
     const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
@@ -429,7 +457,7 @@ function setupPaymentGatewayRoutes(app: express.Application) {
           stripeStatus = "connected";
           stripeMode = key.startsWith("pk_live") ? "live" : "test";
         }
-      } catch {}
+      } catch { }
       res.json({
         ...paymentGatewayConfig,
         stripe: {
@@ -483,8 +511,27 @@ function setupPaymentGatewayRoutes(app: express.Application) {
 
   await initStripe();
 
+  // Seed super admin data and initial POS data
+  try {
+    const { storage } = await import("./storage");
+    await storage.seedSuperAdminData();
+    await storage.seedInitialData();
+
+    // Ensure all existing tenants have at least one branch and admin
+    const tenants = await storage.getTenants();
+    for (const tenant of tenants) {
+      await storage.ensureTenantData(tenant.id);
+    }
+    // Comprehensive demo data for all tables
+    const { seedAllDemoData } = await import("./seedAllDemoData");
+    await seedAllDemoData();
+  } catch (err) {
+    log("Error seeding initial data:", err);
+  }
+
   configureExpoAndLanding(app);
 
+  registerSuperAdminRoutes(app);
   const server = await registerRoutes(app);
 
   setupErrorHandler(app);
@@ -493,11 +540,18 @@ function setupPaymentGatewayRoutes(app: express.Application) {
   server.listen(
     {
       port,
-      host: "0.0.0.0",
-      reusePort: true,
+      host: "127.0.0.1",
     },
     () => {
       log(`express server serving on port ${port}`);
     },
-  );
+  ).on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      log(`[ERROR] Port ${port} is already in use.`);
+      log(`Try running: npx kill-port ${port}`);
+      process.exit(1);
+    } else {
+      throw err;
+    }
+  });
 })();

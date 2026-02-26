@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { useLanguage } from "@/lib/language-context";
+import { useLicense } from "@/lib/license-context";
 
 interface Employee {
   id: number;
@@ -39,6 +40,7 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
   const { t, isRTL, rtlTextAlign, rtlText } = useLanguage();
+  const { logoutLicense } = useLicense();
   const [mode, setMode] = useState<"select" | "pin">("select");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [pin, setPin] = useState("");
@@ -103,7 +105,7 @@ export default function LoginScreen() {
       const emp = await res.json();
       login(emp);
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
+
       try {
         const shiftRes = await apiRequest("GET", `/api/shifts/active/${emp.id}`);
         const activeShift = await shiftRes.json();
@@ -211,6 +213,12 @@ export default function LoginScreen() {
                   }
                 />
               )}
+
+              <Pressable onPress={logoutLicense} style={{ marginTop: 20 }}>
+                <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 14, textDecorationLine: "underline" }}>
+                  {t("deactivateDevice") || "Deactivate Device (Testing)"}
+                </Text>
+              </Pressable>
             </View>
           ) : (
             <View style={styles.pinContainer}>

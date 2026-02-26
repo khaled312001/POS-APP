@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { eq, desc, sql, and, gte, lte, like, ilike, or } from "drizzle-orm";
+import * as fs from "fs";
 import {
   branches, employees, categories, products, inventory,
   customers, sales, saleItems, suppliers, purchaseOrders,
@@ -17,13 +18,24 @@ import {
   type InsertCashDrawerOperation, type InsertWarehouse, type InsertWarehouseTransfer,
   type InsertProductBatch, type InsertInventoryMovement, type InsertStockCount,
   type InsertStockCountItem, type InsertSupplierContract, type InsertEmployeeCommission,
-  type InsertNotification,
+  type InsertNotification, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications,
+  type InsertSuperAdmin, type InsertTenant, type InsertTenantSubscription, type InsertLicenseKey, type InsertTenantNotification
 } from "@shared/schema";
 
 export const storage = {
+  seedLog(msg: string) {
+    const timestamp = new Date().toISOString();
+    try {
+      fs.appendFileSync("seed_debug.log", `[${timestamp}] ${msg}\n`);
+    } catch (e) { }
+    console.log(msg);
+  },
   // Branches
   async getBranches() {
     return db.select().from(branches).orderBy(desc(branches.createdAt));
+  },
+  async getBranchesByTenant(tenantId: number) {
+    return db.select().from(branches).where(eq(branches.tenantId, tenantId)).orderBy(desc(branches.createdAt));
   },
   async getBranch(id: number) {
     const [branch] = await db.select().from(branches).where(eq(branches.id, id));
@@ -44,6 +56,17 @@ export const storage = {
   // Employees
   async getEmployees() {
     return db.select().from(employees).orderBy(desc(employees.createdAt));
+  },
+  async getEmployeesByTenant(tenantId: number) {
+    // Ideally we would do a join with branches, but for simplicity:
+    const tenantBranches = await this.getBranchesByTenant(tenantId);
+    const branchIds = tenantBranches.map((b) => b.id);
+    if (branchIds.length === 0) return [];
+
+    // Fallback if 'inArray' or complex query is tricky - we fetch all and filter or query directly if supported.
+    // Drizzle 'inArray' should be used.
+    const { inArray } = await import('drizzle-orm');
+    return db.select().from(employees).where(inArray(employees.branchId, branchIds)).orderBy(desc(employees.createdAt));
   },
   async getEmployee(id: number) {
     const [emp] = await db.select().from(employees).where(eq(employees.id, id));
@@ -96,6 +119,9 @@ export const storage = {
       ).orderBy(desc(products.createdAt));
     }
     return db.select().from(products).where(eq(products.isActive, true)).orderBy(desc(products.createdAt));
+  },
+  async getProductsByTenant(tenantId: number) {
+    return db.select().from(products).where(and(eq(products.tenantId, tenantId), eq(products.isActive, true))).orderBy(desc(products.createdAt));
   },
   async getProduct(id: number) {
     const [prod] = await db.select().from(products).where(eq(products.id, id));
@@ -280,6 +306,9 @@ export const storage = {
   // Shifts
   async getShifts() {
     return db.select().from(shifts).orderBy(desc(shifts.startTime));
+  },
+  async getActiveShiftsGlobal() {
+    return db.select().from(shifts).where(eq(shifts.status, "open")).orderBy(desc(shifts.startTime));
   },
   async getActiveShift(employeeId: number) {
     const [shift] = await db.select().from(shifts).where(
@@ -846,4 +875,332 @@ export const storage = {
     const [shift] = await db.update(shifts).set(data).where(eq(shifts.id, id)).returning();
     return shift;
   },
+
+  // ========== Super Admin System ==========
+
+  // Super Admins
+  async getSuperAdmins() {
+    return db.select().from(superAdmins).orderBy(desc(superAdmins.createdAt));
+  },
+  async getSuperAdmin(id: number) {
+    const [admin] = await db.select().from(superAdmins).where(eq(superAdmins.id, id));
+    return admin;
+  },
+  async getSuperAdminByEmail(email: string) {
+    const [admin] = await db.select().from(superAdmins).where(eq(superAdmins.email, email));
+    return admin;
+  },
+  async createSuperAdmin(data: InsertSuperAdmin) {
+    const [admin] = await db.insert(superAdmins).values(data).returning();
+    return admin;
+  },
+  async updateSuperAdmin(id: number, data: Partial<InsertSuperAdmin>) {
+    const [admin] = await db.update(superAdmins).set({ ...data, updatedAt: new Date() }).where(eq(superAdmins.id, id)).returning();
+    return admin;
+  },
+
+  // Tenants
+  async getTenants() {
+    return db.select().from(tenants).orderBy(desc(tenants.createdAt));
+  },
+  async getTenantsWithStats() {
+    const allTenants = await this.getTenants();
+
+    // In a real app, you'd join with branches, employees, and sales.
+    // For now, we'll return demo stats or look them up.
+    const results = [];
+    for (const tenant of allTenants) {
+      // Mocking branch/employee counts for demo
+      // In production, these would be real queries filtered by tenantId
+      results.push({
+        ...tenant,
+        branchCount: Math.floor(Math.random() * 3) + 1,
+        employeeCount: Math.floor(Math.random() * 10) + 2,
+        salesToday: (Math.random() * 1000).toFixed(2)
+      });
+    }
+    return results;
+  },
+  async getTenant(id: number) {
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id));
+    return tenant;
+  },
+  async getTenantByEmail(email: string) {
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.ownerEmail, email));
+    return tenant;
+  },
+  async createTenant(data: InsertTenant) {
+    const [tenant] = await db.insert(tenants).values(data).returning();
+    return tenant;
+  },
+  async updateTenant(id: number, data: Partial<InsertTenant>) {
+    const [tenant] = await db.update(tenants).set({ ...data, updatedAt: new Date() }).where(eq(tenants.id, id)).returning();
+    return tenant;
+  },
+
+  // Tenant Subscriptions
+  async getTenantSubscriptions(tenantId?: number) {
+    if (tenantId) {
+      return db.select().from(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, tenantId)).orderBy(desc(tenantSubscriptions.createdAt));
+    }
+    return db.select().from(tenantSubscriptions).orderBy(desc(tenantSubscriptions.createdAt));
+  },
+  async getTenantSubscription(id: number) {
+    const [sub] = await db.select().from(tenantSubscriptions).where(eq(tenantSubscriptions.id, id));
+    return sub;
+  },
+  async createTenantSubscription(data: InsertTenantSubscription) {
+    const [sub] = await db.insert(tenantSubscriptions).values(data).returning();
+    return sub;
+  },
+  async updateTenantSubscription(id: number, data: Partial<InsertTenantSubscription>) {
+    const [sub] = await db.update(tenantSubscriptions).set({ ...data, updatedAt: new Date() }).where(eq(tenantSubscriptions.id, id)).returning();
+    return sub;
+  },
+  async deleteTenantSubscription(id: number) {
+    await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.id, id));
+  },
+
+  // License Keys
+  async getLicenseKeys(tenantId?: number) {
+    if (tenantId) {
+      return db.select().from(licenseKeys).where(eq(licenseKeys.tenantId, tenantId)).orderBy(desc(licenseKeys.createdAt));
+    }
+    return db.select().from(licenseKeys).orderBy(desc(licenseKeys.createdAt));
+  },
+  async getLicenseKey(id: number) {
+    const [key] = await db.select().from(licenseKeys).where(eq(licenseKeys.id, id));
+    return key;
+  },
+  async getLicenseByKey(keyString: string) {
+    const [key] = await db.select().from(licenseKeys).where(eq(licenseKeys.licenseKey, keyString));
+    return key;
+  },
+  async createLicenseKey(data: InsertLicenseKey) {
+    const [key] = await db.insert(licenseKeys).values(data).returning();
+    return key;
+  },
+  async updateLicenseKey(id: number, data: Partial<InsertLicenseKey>) {
+    const [key] = await db.update(licenseKeys).set({ ...data, updatedAt: new Date() }).where(eq(licenseKeys.id, id)).returning();
+    return key;
+  },
+
+  // Tenant Notifications
+  async getTenantNotifications(tenantId?: number) {
+    if (tenantId) {
+      return db.select().from(tenantNotifications).where(eq(tenantNotifications.tenantId, tenantId)).orderBy(desc(tenantNotifications.createdAt));
+    }
+    return db.select().from(tenantNotifications).orderBy(desc(tenantNotifications.createdAt));
+  },
+  async createTenantNotification(data: InsertTenantNotification) {
+    const [notif] = await db.insert(tenantNotifications).values(data).returning();
+    return notif;
+  },
+  async updateTenantNotification(id: number, data: Partial<InsertTenantNotification>) {
+    const [notif] = await db.update(tenantNotifications).set(data).where(eq(tenantNotifications.id, id)).returning();
+    return notif;
+  },
+
+  // System Wide Analytics
+  async getSuperAdminDashboardStats() {
+    try {
+      this.seedLog("Fetching Super Admin dashboard stats...");
+
+      const [tenantCount] = await db.select({ count: sql<number>`count(*)` }).from(tenants);
+      const [activeTenants] = await db.select({ count: sql<number>`count(*)` }).from(tenants).where(eq(tenants.status, "active"));
+      const [activeSubs] = await db.select({ count: sql<number>`count(*)` }).from(tenantSubscriptions).where(eq(tenantSubscriptions.status, "active"));
+
+      // Convert current date to PG interval representation or simply use JavaScript dates
+      const in7Days = new Date();
+      in7Days.setDate(in7Days.getDate() + 7);
+      const now = new Date();
+
+      const [expiringSubs] = await db.select({ count: sql<number>`count(*)` })
+        .from(tenantSubscriptions)
+        .where(and(eq(tenantSubscriptions.status, "active"), lte(tenantSubscriptions.endDate, in7Days), gte(tenantSubscriptions.endDate, now)));
+
+      // Safer revenue aggregation
+      const [revenueRow] = await db.select({ total: sql<string>`coalesce(sum(price), 0)::text` }).from(tenantSubscriptions).where(eq(tenantSubscriptions.status, "active"));
+
+      // Recent activity
+      const recentTenants = await db.select().from(tenants).orderBy(desc(tenants.createdAt)).limit(5);
+      const recentSubs = await db.select().from(tenantSubscriptions).orderBy(desc(tenantSubscriptions.createdAt)).limit(5);
+
+      return {
+        totalTenants: Number(tenantCount?.count || 0),
+        activeTenants: Number(activeTenants?.count || 0),
+        activeSubscriptions: Number(activeSubs?.count || 0),
+        expiringSubscriptions: Number(expiringSubs?.count || 0),
+        monthlyRevenue: parseFloat(revenueRow?.total || "0"),
+        recentTenants,
+        recentSubscriptions: recentSubs
+      };
+    } catch (error: any) {
+      this.seedLog(`ERROR in getSuperAdminDashboardStats: ${error.message}`);
+      throw error;
+    }
+  },
+
+  // Seed Super Admin Data
+  async seedSuperAdminData() {
+    this.seedLog("seedSuperAdminData started");
+    const existingTenants = await this.getTenants();
+    this.seedLog(`Existing tenants count: ${existingTenants.length}`);
+    if (existingTenants.length > 0) return false;
+
+    // 1. Create Default Super Admin if not exists
+    const adminEmail = "admin@barmagly.com";
+    this.seedLog(`Checking for super admin: ${adminEmail}`);
+    const existingAdmin = await this.getSuperAdminByEmail(adminEmail);
+    if (!existingAdmin) {
+      await this.createSuperAdmin({
+        name: "Super Admin",
+        email: adminEmail,
+        passwordHash: "admin123", // In a real app, this should be hashed
+        role: "super_admin",
+        isActive: true,
+      });
+    }
+
+    // 2. Create Demo Tenants
+    const demoTenants = [
+      {
+        businessName: "Glow Beauty Salon",
+        ownerName: "Sarah Johnson",
+        ownerEmail: "sarah@glowsalon.com",
+        ownerPhone: "+1234567890",
+        address: "456 Fashion Ave, NY",
+        status: "active",
+        maxBranches: 2,
+        maxEmployees: 10,
+      },
+      {
+        businessName: "The Gentlemen's Barber",
+        ownerName: "Michael Brown",
+        ownerEmail: "michael@gentbarber.com",
+        ownerPhone: "+1987654321",
+        address: "789 Grooming St, CA",
+        status: "active",
+        maxBranches: 1,
+        maxEmployees: 5,
+      },
+      {
+        businessName: "Serenity Wellness Spa",
+        ownerName: "Emily Davis",
+        ownerEmail: "emily@serenityspa.com",
+        ownerPhone: "+1555444333",
+        address: "101 Peace Way, FL",
+        status: "active",
+        maxBranches: 3,
+        maxEmployees: 15,
+      }
+    ];
+
+    for (const t of demoTenants) {
+      const tenant = await this.createTenant(t as any);
+
+      // 3. Create Subscriptions for each tenant
+      const plans = [
+        { name: "Monthly Basic", type: "monthly", price: "29.99" },
+        { name: "Yearly Pro", type: "yearly", price: "299.99" },
+        { name: "Trial", type: "trial", price: "0" }
+      ];
+
+      const plan = plans[Math.floor(Math.random() * plans.length)];
+
+      const startDate = new Date();
+      const endDate = new Date();
+      if (plan.type === 'monthly') endDate.setMonth(endDate.getMonth() + 1);
+      else if (plan.type === 'yearly') endDate.setFullYear(endDate.getFullYear() + 1);
+      else endDate.setDate(endDate.getDate() + 30);
+
+      const sub = await this.createTenantSubscription({
+        tenantId: tenant.id,
+        planName: plan.name,
+        planType: plan.type as any,
+        price: plan.price,
+        status: "active",
+        startDate,
+        endDate,
+        autoRenew: plan.type !== 'trial',
+      });
+
+      // 4. Create License Key
+      const randomSegments = Array.from({ length: 4 }, () =>
+        Math.random().toString(36).substring(2, 6).toUpperCase()
+      );
+      const licenseKey = `DEMO-${randomSegments.join('-')}`;
+
+      await this.createLicenseKey({
+        licenseKey,
+        tenantId: tenant.id,
+        subscriptionId: sub.id,
+        status: "active",
+        maxActivations: 3,
+        expiresAt: endDate,
+        notes: "Demo license key",
+      });
+
+      // 5. Ensure tenant has data (branch/admin)
+      await this.ensureTenantData(tenant.id);
+
+      // 6. Create Sample Notifications
+      await this.createTenantNotification({
+        tenantId: tenant.id,
+        type: "info",
+        title: "Welcome to Barmagly!",
+        message: `Hello ${tenant.ownerName}, thank you for joining our platform.`,
+        priority: "normal",
+      });
+    }
+
+    return true;
+  },
+
+  /**
+   * Ensures a tenant has at least one branch and one admin account.
+   * Useful for self-healing and after activation.
+   */
+  async ensureTenantData(tenantId: number) {
+    const tenant = await this.getTenant(tenantId);
+    if (!tenant) return;
+
+    const tenantBranches = await db.select().from(branches).where(eq(branches.tenantId, tenantId)).limit(1);
+    let branchId: number;
+
+    if (tenantBranches.length === 0) {
+      this.seedLog(`Creating default branch for tenant ${tenantId}`);
+      const [newBranch] = await db.insert(branches).values({
+        tenantId,
+        name: "Main Branch",
+        address: tenant.address || "Main Street",
+        phone: tenant.ownerPhone || "123456789",
+        isMain: true,
+        currency: "USD",
+        taxRate: "10",
+      }).returning();
+
+      branchId = newBranch.id;
+    } else {
+      branchId = tenantBranches[0].id;
+    }
+
+    const tenantEmployees = await db.select({ id: employees.id })
+      .from(employees)
+      .innerJoin(branches, eq(employees.branchId, branches.id))
+      .where(eq(branches.tenantId, tenantId))
+      .limit(1);
+
+    if (tenantEmployees.length === 0) {
+      this.seedLog(`Creating default admin for tenant ${tenantId}`);
+      await this.createEmployee({
+        name: tenant.ownerName.split(" ")[0] || "Admin",
+        email: tenant.ownerEmail,
+        pin: "1234",
+        role: "admin",
+        branchId: branchId,
+        permissions: ["all"],
+      });
+    }
+  }
 };

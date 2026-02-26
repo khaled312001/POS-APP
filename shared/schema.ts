@@ -6,6 +6,7 @@ import { relations } from "drizzle-orm";
 
 export const branches = pgTable("branches", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id), // Added for multi-tenancy
   name: text("name").notNull(),
   address: text("address"),
   phone: text("phone"),
@@ -51,6 +52,7 @@ export const categories = pgTable("categories", {
 
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id), // Added for multi-tenancy
   name: text("name").notNull(),
   nameAr: text("name_ar"),
   description: text("description"),
@@ -117,7 +119,7 @@ export const sales = pgTable("sales", {
   changeAmount: decimal("change_amount", { precision: 10, scale: 2 }).default("0"),
   tableNumber: text("table_number"),
   orderType: text("order_type").default("dine_in"),
-  paymentDetails: jsonb("payment_details").$type<{method: string; amount: number}[]>(),
+  paymentDetails: jsonb("payment_details").$type<{ method: string; amount: number }[]>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -421,6 +423,93 @@ export const employeeCommissions = pgTable("employee_commissions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ========== Super Admin System Tables ==========
+
+export const superAdmins = pgTable("super_admins", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: text("role").default("super_admin"),
+  isActive: boolean("is_active").default(true),
+  lastLogin: timestamp("last_login"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const tenants = pgTable("tenants", {
+  id: serial("id").primaryKey(),
+  businessName: text("business_name").notNull(),
+  ownerName: text("owner_name").notNull(),
+  ownerEmail: text("owner_email").notNull().unique(),
+  ownerPhone: text("owner_phone"),
+  passwordHash: text("password_hash"),
+  address: text("address"),
+  logo: text("logo"),
+  status: text("status").default("active"), // active, suspended, expired, trial
+  maxBranches: integer("max_branches").default(1),
+  maxEmployees: integer("max_employees").default(5),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const tenantSubscriptions = pgTable("tenant_subscriptions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  planType: text("plan_type").notNull().default("trial"), // trial, monthly, yearly
+  planName: text("plan_name").notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).default("0"),
+  status: text("status").default("active"), // active, expired, cancelled, pending
+  startDate: timestamp("start_date").defaultNow(),
+  endDate: timestamp("end_date"),
+  trialEndsAt: timestamp("trial_ends_at"),
+  autoRenew: boolean("auto_renew").default(false),
+  paymentMethod: text("payment_method"),
+  lastPaymentDate: timestamp("last_payment_date"),
+  nextPaymentDate: timestamp("next_payment_date"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancellationReason: text("cancellation_reason"),
+  features: jsonb("features").$type<string[]>().default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const licenseKeys = pgTable("license_keys", {
+  id: serial("id").primaryKey(),
+  licenseKey: text("license_key").notNull().unique(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  subscriptionId: integer("subscription_id").references(() => tenantSubscriptions.id),
+  status: text("status").default("active"), // active, expired, revoked, pending
+  activatedAt: timestamp("activated_at"),
+  expiresAt: timestamp("expires_at"),
+  lastValidatedAt: timestamp("last_validated_at"),
+  deviceInfo: text("device_info"),
+  maxActivations: integer("max_activations").default(3),
+  currentActivations: integer("current_activations").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const tenantNotifications = pgTable("tenant_notifications", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id),
+  type: text("type").notNull(), // warning, promotion, info, expiry_alert, upgrade_offer
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  priority: text("priority").default("normal"), // low, normal, high, urgent
+  isRead: boolean("is_read").default(false),
+  isDismissed: boolean("is_dismissed").default(false),
+  actionUrl: text("action_url"),
+  actionLabel: text("action_label"),
+  expiresAt: timestamp("expires_at"),
+  sentBy: integer("sent_by").references(() => superAdmins.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ========== Insert Schemas ==========
+
 export const insertBranchSchema = createInsertSchema(branches).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true });
@@ -451,6 +540,14 @@ export const insertStockCountSchema = createInsertSchema(stockCounts).omit({ id:
 export const insertStockCountItemSchema = createInsertSchema(stockCountItems).omit({ id: true });
 export const insertSupplierContractSchema = createInsertSchema(supplierContracts).omit({ id: true, createdAt: true });
 export const insertEmployeeCommissionSchema = createInsertSchema(employeeCommissions).omit({ id: true, createdAt: true });
+
+export const insertSuperAdminSchema = createInsertSchema(superAdmins).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTenantSubscriptionSchema = createInsertSchema(tenantSubscriptions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertLicenseKeySchema = createInsertSchema(licenseKeys).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTenantNotificationSchema = createInsertSchema(tenantNotifications).omit({ id: true, createdAt: true });
+
+// ========== Type Exports ==========
 
 export type Branch = typeof branches.$inferSelect;
 export type InsertBranch = z.infer<typeof insertBranchSchema>;
@@ -512,3 +609,14 @@ export type SupplierContract = typeof supplierContracts.$inferSelect;
 export type InsertSupplierContract = z.infer<typeof insertSupplierContractSchema>;
 export type EmployeeCommission = typeof employeeCommissions.$inferSelect;
 export type InsertEmployeeCommission = z.infer<typeof insertEmployeeCommissionSchema>;
+
+export type SuperAdmin = typeof superAdmins.$inferSelect;
+export type InsertSuperAdmin = z.infer<typeof insertSuperAdminSchema>;
+export type Tenant = typeof tenants.$inferSelect;
+export type InsertTenant = z.infer<typeof insertTenantSchema>;
+export type TenantSubscription = typeof tenantSubscriptions.$inferSelect;
+export type InsertTenantSubscription = z.infer<typeof insertTenantSubscriptionSchema>;
+export type LicenseKey = typeof licenseKeys.$inferSelect;
+export type InsertLicenseKey = z.infer<typeof insertLicenseKeySchema>;
+export type TenantNotification = typeof tenantNotifications.$inferSelect;
+export type InsertTenantNotification = z.infer<typeof insertTenantNotificationSchema>;
