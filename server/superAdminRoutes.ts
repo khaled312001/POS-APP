@@ -492,19 +492,22 @@ export function registerSuperAdminRoutes(app: Express) {
 
     // ========== Public API for POS App App to Validate License ==========
 
-    // Public endpoint - called by the mobile app on startup
     app.post("/api/license/validate", async (req, res) => {
         try {
             const { licenseKey, deviceId, email, password } = req.body;
+            console.log(`[LICENSE VALIDATION] Attempting to validate key: "${licenseKey}" for device: "${deviceId}"`);
 
             if (!licenseKey) {
+                console.log(`[LICENSE VALIDATION] Reason: Missing key`);
                 return res.status(400).json({ isValid: false, reason: "License key is missing", code: "MISSING_KEY" });
             }
 
             // 1. Verify License Key existence
             const keyRecord = await storage.getLicenseByKey(licenseKey);
+            console.log(`[LICENSE VALIDATION] DB Record Found:`, keyRecord ? keyRecord.licenseKey : "NULL");
 
             if (!keyRecord) {
+                console.log(`[LICENSE VALIDATION] Reason: Record not found in DB`);
                 return res.status(404).json({ isValid: false, reason: "Invalid license key", code: "INVALID_KEY" });
             }
 

@@ -15,9 +15,13 @@ export default function LicenseGate() {
     const router = useRouter();
 
     const handleValidate = async () => {
-        if (!email.trim() || !password.trim() || !key.trim()) return;
+        const cleanEmail = email.trim();
+        const cleanPassword = password.trim();
+        const cleanKey = key.replace(/\s+/g, '').toUpperCase();
+
+        if (!cleanEmail || !cleanPassword || !cleanKey) return;
         setLoading(true);
-        await validateLicense(key.trim(), email.trim(), password.trim());
+        await validateLicense(cleanKey, cleanEmail, cleanPassword);
         setLoading(false);
     };
 

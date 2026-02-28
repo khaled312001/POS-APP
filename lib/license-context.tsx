@@ -82,12 +82,8 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
         const dId = overrideDeviceId || deviceId;
 
         try {
-            // Updated API URL to match the current local environment if needed
             let apiUrl = getApiUrl();
-            if (Platform.OS !== "web" && apiUrl.includes("localhost")) {
-                // If running on physical device, localhost won't work. Fallback to a common local IP if not set.
-                apiUrl = "http://192.168.1.78:5000";
-            }
+
 
             const body: any = { licenseKey: key, deviceId: dId };
             if (email) body.email = email;
