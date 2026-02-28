@@ -350,7 +350,7 @@
 
                 // Success! Save token and redirect
                 localStorage.setItem('super_admin_token', data.token);
-                localStorage.setItem('super_admin_user', JSON.stringify(data.user));
+                localStorage.setItem('super_admin_user', JSON.stringify(data.admin || data.user));
 
                 // Keep button in loading state while redirecting
                 window.location.href = '/super_admin/dashboard';

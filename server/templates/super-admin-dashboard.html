@@ -1248,10 +1248,14 @@
         }
 
         const userJson = localStorage.getItem('super_admin_user');
-        if (userJson) {
-            const user = JSON.parse(userJson);
-            document.getElementById('userName').innerText = user.name;
-            document.getElementById('userAvatar').innerText = user.name.charAt(0).toUpperCase();
+        if (userJson && userJson !== 'undefined') {
+            try {
+                const user = JSON.parse(userJson);
+                document.getElementById('userName').innerText = user.name || 'Admin';
+                document.getElementById('userAvatar').innerText = (user.name || 'A').charAt(0).toUpperCase();
+            } catch (e) {
+                console.error('Failed to parse user data', e);
+            }
         }
 
         document.getElementById('logoutBtn').addEventListener('click', () => {
