@@ -398,10 +398,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Employees
-  app.get("/api/employees", async (_req, res) => {
+  app.get("/api/employees", async (req, res) => {
     try {
-      const emps = await storage.getEmployees();
-      console.log(`[DEBUG] /api/employees: Found ${emps.length} employees`);
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      const emps = tenantId
+        ? await storage.getEmployeesByTenant(tenantId)
+        : await storage.getEmployees();
+      console.log(`[DEBUG] /api/employees: Found ${emps.length} employees (tenantId: ${tenantId || 'all'})`);
       res.json(emps);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -1403,7 +1406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mainBranch = branches.find((b: any) => b.isMain) || branches[0];
       if (!mainBranch) return res.status(404).json({ error: "No branch found" });
 
-      const tenant = await storage.getTenant(mainBranch.tenantId);
+      const tenant = mainBranch.tenantId ? await storage.getTenant(mainBranch.tenantId) : null;
       res.json({
         ...mainBranch,
         storeType: tenant?.storeType || "supermarket"

@@ -180,3 +180,5 @@
 [2026-02-28T17:19:25.894Z] Fetching Super Admin dashboard stats...
 [2026-02-28T17:19:33.728Z] seedSuperAdminData started
 [2026-02-28T17:19:33.744Z] Existing tenants count: 4
+[2026-02-28T23:08:17.731Z] seedSuperAdminData started
+[2026-02-28T23:08:20.559Z] Existing tenants count: 4

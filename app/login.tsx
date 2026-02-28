@@ -41,7 +41,7 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
   const { t, isRTL, rtlTextAlign, rtlText } = useLanguage();
-  const { logoutLicense } = useLicense();
+  const { logoutLicense, tenant } = useLicense();
   const [mode, setMode] = useState<"select" | "pin">("select");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [pin, setPin] = useState("");
@@ -65,7 +65,7 @@ export default function LoginScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : 0;
 
   const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({
-    queryKey: ["/api/employees"],
+    queryKey: [tenant?.id ? `/api/employees?tenantId=${tenant.id}` : "/api/employees"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 

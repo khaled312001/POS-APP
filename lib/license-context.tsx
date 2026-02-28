@@ -69,15 +69,14 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                 await validateLicense(storedKey, undefined, undefined, id || undefined);
             } else {
                 setIsValid(false);
-                setIsValidating(false);
             }
+            setIsValidating(false);
         }
 
         initDeviceAndCheckLicense();
     }, []);
 
     const validateLicense = async (key: string, email?: string, password?: string, overrideDeviceId?: string): Promise<boolean> => {
-        setIsValidating(true);
         setErrorReason(null);
         const dId = overrideDeviceId || deviceId;
 
@@ -105,7 +104,6 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                 setIsValid(true);
                 setTenant(data.tenant);
                 setSubscription(data.subscription);
-                setIsValidating(false);
                 return true;
             } else {
                 await AsyncStorage.removeItem("barmagly_license_key");
@@ -113,7 +111,6 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                 setErrorReason(data.reason || "Invalid license key");
                 setTenant(null);
                 setSubscription(null);
-                setIsValidating(false);
                 return false;
             }
         } catch (err: any) {
@@ -123,7 +120,6 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
             let targetUrl = getApiUrl();
 
             setErrorReason(`Could not connect to validation server (${targetUrl}). Check your internet connection or server status. Details: ${err.message}`);
-            setIsValidating(false);
             return false;
         }
     };
