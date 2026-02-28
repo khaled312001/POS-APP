@@ -42,7 +42,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         async function initDeviceAndCheckLicense() {
             // 1. Get or generate Device ID
-            let id = await AsyncStorage.getItem("barmagly_device_id");
+            let id: string | null = await AsyncStorage.getItem("barmagly_device_id");
             if (!id) {
                 if (Platform.OS === 'android') {
                     // Use getAndroidId() as suggests by lint, or fallback to androidId if available
@@ -52,20 +52,25 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                 } else {
                     id = `web-${Date.now()}`;
                 }
-                await AsyncStorage.setItem("barmagly_device_id", id);
+
+                if (id) {
+                    await AsyncStorage.setItem("barmagly_device_id", id);
+                    setDeviceId(id);
+                }
+            } else {
+                setDeviceId(id);
             }
-            if (id) setDeviceId(id);
 
             // 2. Check for existing license key
             const storedKey = await AsyncStorage.getItem("barmagly_license_key");
 
-            // TEMPORARY BYPASS FOR DEBUGGING
-            setIsValid(true);
-            setIsValidating(false);
-            return;
-
-            // 3. Validate existing key
-            await validateLicense(storedKey || "", undefined, undefined, id || undefined);
+            if (storedKey) {
+                // 3. Validate existing key
+                await validateLicense(storedKey, undefined, undefined, id || undefined);
+            } else {
+                setIsValid(false);
+                setIsValidating(false);
+            }
         }
 
         initDeviceAndCheckLicense();
