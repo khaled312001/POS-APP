@@ -17,7 +17,7 @@ import { useLanguage } from "@/lib/language-context";
 
 export default function POSScreen() {
   const insets = useSafeAreaInsets();
-  const { employee, isCashier, canManage } = useAuth();
+  const { employee, isCashier, canManage, login } = useAuth();
   const qc = useQueryClient();
   const cart = useCart();
   const { t, isRTL, rtlTextAlign, rtlText, rtlRow } = useLanguage();
@@ -52,6 +52,11 @@ export default function POSScreen() {
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showReprintReceipt, setShowReprintReceipt] = useState(false);
   const [reprintQrDataUrl, setReprintQrDataUrl] = useState<string | null>(null);
+  const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
+  const [switchTarget, setSwitchTarget] = useState<any>(null);
+  const [switchPin, setSwitchPin] = useState("");
+  const [switchLoading, setSwitchLoading] = useState(false);
+  const [switchError, setSwitchError] = useState("");
 
   const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["/api/categories"],
@@ -61,6 +66,12 @@ export default function POSScreen() {
   const { data: products = [] } = useQuery<any[]>({
     queryKey: ["/api/products", search ? `?search=${search}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  const { data: allEmployees = [] } = useQuery<any[]>({
+    queryKey: ["/api/employees"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: showAccountSwitcher,
   });
 
   const { data: customers = [] } = useQuery<any[]>({
@@ -89,7 +100,7 @@ export default function POSScreen() {
           const QRCode = require("qrcode");
           const url = await QRCode.toDataURL(`barmagly:receipt:${data.receiptNumber || data.id}`, { width: 200, margin: 1, color: { dark: "#0A0E27", light: "#FFFFFF" } });
           setReprintQrDataUrl(url);
-        } catch {}
+        } catch { }
       }
       setShowReprintReceipt(true);
     } catch {
@@ -388,6 +399,40 @@ export default function POSScreen() {
 
   const topPad = Platform.OS === "web" ? 67 : 0;
 
+  const handleSwitchAccount = async (pinCode: string) => {
+    if (!switchTarget) return;
+    setSwitchLoading(true);
+    setSwitchError("");
+    try {
+      const res = await apiRequest("POST", "/api/employees/login", { pin: pinCode, employeeId: switchTarget.id });
+      const emp = await res.json();
+      cart.clearCart();
+      login(emp);
+      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setShowAccountSwitcher(false);
+      setSwitchTarget(null);
+      setSwitchPin("");
+      qc.invalidateQueries();
+    } catch {
+      setSwitchError(t("invalidPin" as any) || "Invalid PIN");
+      setSwitchPin("");
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setSwitchLoading(false);
+    }
+  };
+
+  const handleSwitchPinPress = (digit: string) => {
+    if (switchPin.length < 4) {
+      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const newPin = switchPin + digit;
+      setSwitchPin(newPin);
+      if (newPin.length === 4) {
+        handleSwitchAccount(newPin);
+      }
+    }
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
       <View style={styles.header}>
@@ -395,10 +440,17 @@ export default function POSScreen() {
           <View style={[styles.headerContent, isRTL && { flexDirection: "row-reverse" }]}>
             <Text style={[styles.headerTitle, rtlTextAlign]}>Barmagly POS</Text>
             <View style={[styles.headerRight, isRTL && { flexDirection: "row-reverse" }]}>
-              <Pressable onPress={() => setShowInvoiceHistory(true)} style={{ padding: 4 }}>
-                <Ionicons name="receipt-outline" size={22} color={Colors.white} />
+              <Pressable onPress={() => setShowInvoiceHistory(true)} style={styles.headerInvoiceBtn}>
+                <Ionicons name="receipt-outline" size={28} color={Colors.white} />
+                <Text style={styles.headerInvoiceLabel}>{t("invoices" as any)}</Text>
               </Pressable>
-              {employee && <Text style={[styles.employeeName, rtlTextAlign]}>{employee.name}</Text>}
+              {employee && (
+                <Pressable onPress={() => setShowAccountSwitcher(true)} style={styles.headerAvatarBtn}>
+                  <LinearGradient colors={[Colors.accent, Colors.gradientStart]} style={styles.headerAvatarCircle}>
+                    <Text style={styles.headerAvatarText}>{employee.name.charAt(0).toUpperCase()}</Text>
+                  </LinearGradient>
+                </Pressable>
+              )}
             </View>
           </View>
         </LinearGradient>
@@ -478,7 +530,7 @@ export default function POSScreen() {
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={styles.categoryChipGradient}
               >
-                <Ionicons name="grid" size={16} color={!selectedCategory ? Colors.white : Colors.accent} />
+                <Ionicons name="grid" size={22} color={!selectedCategory ? Colors.white : Colors.accent} />
                 <Text style={[styles.categoryChipText, !selectedCategory && styles.categoryChipTextAll]}>{t("allCategories")}</Text>
               </LinearGradient>
             </Pressable>
@@ -493,7 +545,7 @@ export default function POSScreen() {
                 >
                   <View style={styles.categoryChipInner}>
                     <View style={[styles.categoryDot, { backgroundColor: cat.color || Colors.accent }]} />
-                    <Ionicons name={iconName} size={16} color={isActive ? (cat.color || Colors.accent) : Colors.textSecondary} />
+                    <Ionicons name={iconName} size={22} color={isActive ? (cat.color || Colors.accent) : Colors.textSecondary} />
                     <Text style={[styles.categoryChipText, isActive && { color: cat.color || Colors.accent }]}>{cat.name}</Text>
                   </View>
                 </Pressable>
@@ -1210,6 +1262,117 @@ export default function POSScreen() {
         </View>
       </Modal>
 
+      {/* Account Switcher Modal */}
+      <Modal visible={showAccountSwitcher} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "85%" }]}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={[styles.modalTitle, rtlTextAlign]}>{t("switchAccount" as any)}</Text>
+              <Pressable onPress={() => { setShowAccountSwitcher(false); setSwitchTarget(null); setSwitchPin(""); setSwitchError(""); }}>
+                <Ionicons name="close" size={24} color={Colors.text} />
+              </Pressable>
+            </View>
+
+            {!switchTarget ? (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {employee && (
+                  <View style={styles.switchCurrentAccount}>
+                    <LinearGradient colors={[Colors.accent, Colors.gradientStart]} style={styles.switchCurrentAvatar}>
+                      <Text style={styles.switchCurrentAvatarText}>{employee.name.charAt(0).toUpperCase()}</Text>
+                    </LinearGradient>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.switchCurrentName, rtlTextAlign]}>{employee.name}</Text>
+                      <Text style={[styles.switchCurrentRole, rtlTextAlign]}>{employee.role}</Text>
+                    </View>
+                    <View style={styles.switchActiveBadge}>
+                      <View style={styles.switchActiveDot} />
+                      <Text style={styles.switchActiveText}>{t("active" as any)}</Text>
+                    </View>
+                  </View>
+                )}
+
+                <Text style={[styles.switchSectionTitle, rtlTextAlign]}>{t("employees" as any)}</Text>
+
+                {allEmployees.filter((e: any) => e.id !== employee?.id).map((emp: any) => {
+                  const roleColors: Record<string, string> = { admin: Colors.danger, manager: Colors.warning, cashier: Colors.info, owner: Colors.secondary };
+                  const roleColor = roleColors[emp.role?.toLowerCase()] || Colors.info;
+                  return (
+                    <Pressable key={emp.id} style={styles.switchEmployeeCard} onPress={() => { setSwitchTarget(emp); setSwitchPin(""); setSwitchError(""); }}>
+                      <View style={[styles.switchEmployeeAvatar, { borderColor: roleColor }]}>
+                        <Text style={styles.switchEmployeeAvatarText}>{emp.name.charAt(0).toUpperCase()}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.switchEmployeeName, rtlTextAlign]}>{emp.name}</Text>
+                        <View style={[styles.switchRoleBadge, { backgroundColor: roleColor }]}>
+                          <Text style={styles.switchRoleBadgeText}>{emp.role}</Text>
+                        </View>
+                      </View>
+                      <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={20} color={Colors.textMuted} />
+                    </Pressable>
+                  );
+                })}
+
+                {allEmployees.filter((e: any) => e.id !== employee?.id).length === 0 && (
+                  <Text style={{ color: Colors.textMuted, fontSize: 14, textAlign: "center", marginTop: 20 }}>{t("noEmployees" as any)}</Text>
+                )}
+              </ScrollView>
+            ) : (
+              <View style={styles.switchPinSection}>
+                <Pressable style={styles.switchBackBtn} onPress={() => { setSwitchTarget(null); setSwitchPin(""); setSwitchError(""); }}>
+                  <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={22} color={Colors.text} />
+                </Pressable>
+
+                <View style={styles.switchPinAvatar}>
+                  <LinearGradient colors={[Colors.accent, Colors.gradientStart]} style={styles.switchPinAvatarCircle}>
+                    <Text style={styles.switchPinAvatarText}>{switchTarget.name.charAt(0).toUpperCase()}</Text>
+                  </LinearGradient>
+                  <Text style={[styles.switchPinName, rtlTextAlign]}>{switchTarget.name}</Text>
+                </View>
+
+                <Text style={[styles.switchPinLabel, rtlTextAlign]}>{t("enterPinToSwitch" as any)}</Text>
+
+                <View style={styles.switchPinDots}>
+                  {[0, 1, 2, 3].map((i) => (
+                    <View key={i} style={[styles.switchDot, i < switchPin.length && styles.switchDotFilled]} />
+                  ))}
+                </View>
+
+                {switchError ? (
+                  <View style={styles.switchErrorRow}>
+                    <Ionicons name="alert-circle" size={16} color={Colors.danger} />
+                    <Text style={styles.switchErrorText}>{switchError}</Text>
+                  </View>
+                ) : null}
+
+                {switchLoading ? (
+                  <View style={{ paddingVertical: 20 }}>
+                    <Text style={{ color: Colors.accent, textAlign: "center", fontSize: 14, fontWeight: "600" }}>{t("processing" as any)}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.switchKeypad}>
+                    {["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"].map((key) => {
+                      if (key === "") return <View key="empty" style={styles.switchKeyBtn} />;
+                      if (key === "del") {
+                        return (
+                          <Pressable key="del" style={styles.switchKeyBtn} onPress={() => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSwitchPin(switchPin.slice(0, -1)); }}>
+                            <Ionicons name="backspace" size={24} color={Colors.text} />
+                          </Pressable>
+                        );
+                      }
+                      return (
+                        <Pressable key={key} style={styles.switchKeyBtn} onPress={() => handleSwitchPinPress(key)}>
+                          <Text style={styles.switchKeyText}>{key}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       <BarcodeScanner
         visible={showScanner}
         onScanned={handleBarcodeScan}
@@ -1235,16 +1398,16 @@ const styles = StyleSheet.create({
   searchRow: { paddingHorizontal: 14, paddingTop: 14 },
   searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 14, paddingHorizontal: 14, height: 44, borderWidth: 1, borderColor: Colors.inputBorder },
   searchInput: { flex: 1, color: Colors.text, marginLeft: 8, fontSize: 15 },
-  categoriesRow: { maxHeight: 64, marginTop: 12, marginBottom: 4 },
-  categoriesContent: { paddingHorizontal: 14, gap: 8, alignItems: "center" },
-  categoryChip: { borderRadius: 24, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.cardBorder, overflow: "hidden" },
-  categoryChipAll: { borderColor: Colors.accent, borderWidth: 1.5 },
+  categoriesRow: { maxHeight: 100, marginTop: 12, marginBottom: 6 },
+  categoriesContent: { paddingHorizontal: 14, gap: 10, alignItems: "center" },
+  categoryChip: { borderRadius: 28, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.cardBorder, overflow: "hidden" },
+  categoryChipAll: { borderColor: Colors.accent, borderWidth: 2 },
   categoryChipAllActive: { borderColor: Colors.gradientStart },
-  categoryChipGradient: { flexDirection: "row", alignItems: "center", paddingHorizontal: 18, paddingVertical: 12, gap: 7 },
-  categoryChipInner: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, gap: 6 },
-  categoryChipText: { color: Colors.textSecondary, fontSize: 13, fontWeight: "600" },
-  categoryChipTextAll: { color: Colors.white, fontWeight: "700" },
-  categoryDot: { width: 7, height: 7, borderRadius: 4 },
+  categoryChipGradient: { flexDirection: "row", alignItems: "center", paddingHorizontal: 22, paddingVertical: 16, gap: 10 },
+  categoryChipInner: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 16, gap: 8 },
+  categoryChipText: { color: Colors.textSecondary, fontSize: 16, fontWeight: "700" },
+  categoryChipTextAll: { color: Colors.white, fontWeight: "800" },
+  categoryDot: { width: 10, height: 10, borderRadius: 5 },
   productGrid: { padding: 10 },
   productCard: { flex: 1, margin: 5, backgroundColor: Colors.surface, borderRadius: 16, padding: 14, alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder, minWidth: 90, overflow: "hidden", position: "relative" as const },
   productCardTopBorder: { position: "absolute" as const, top: 0, left: 0, right: 0, height: 3, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
@@ -1386,4 +1549,43 @@ const styles = StyleSheet.create({
   callNumber: { color: Colors.white, fontSize: 18, fontWeight: "800" },
   callCustomer: { color: Colors.white, fontSize: 14, fontWeight: "600", marginTop: 2 },
   callActionBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: "center", alignItems: "center" },
+
+  // Header Invoice & Avatar
+  headerInvoiceBtn: { flexDirection: "row" as const, alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.15)", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  headerInvoiceLabel: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" as const },
+  headerAvatarBtn: { padding: 2 },
+  headerAvatarCircle: { width: 42, height: 42, borderRadius: 21, justifyContent: "center" as const, alignItems: "center" as const, borderWidth: 2, borderColor: "rgba(255,255,255,0.4)" },
+  headerAvatarText: { color: "#FFFFFF", fontSize: 20, fontWeight: "800" as const },
+
+  // Account Switcher
+  switchCurrentAccount: { flexDirection: "row" as const, alignItems: "center", gap: 14, backgroundColor: Colors.surfaceLight, borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: Colors.accent + "30" },
+  switchCurrentAvatar: { width: 50, height: 50, borderRadius: 25, justifyContent: "center" as const, alignItems: "center" as const },
+  switchCurrentAvatarText: { color: "#FFFFFF", fontSize: 22, fontWeight: "800" as const },
+  switchCurrentName: { color: Colors.text, fontSize: 17, fontWeight: "700" as const },
+  switchCurrentRole: { color: Colors.textSecondary, fontSize: 13, fontWeight: "500" as const, textTransform: "capitalize" as const, marginTop: 2 },
+  switchActiveBadge: { flexDirection: "row" as const, alignItems: "center", gap: 5, backgroundColor: Colors.success + "20", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
+  switchActiveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.success },
+  switchActiveText: { color: Colors.success, fontSize: 12, fontWeight: "700" as const },
+  switchSectionTitle: { color: Colors.textSecondary, fontSize: 13, fontWeight: "600" as const, textTransform: "uppercase" as const, letterSpacing: 1, marginBottom: 12 },
+  switchEmployeeCard: { flexDirection: "row" as const, alignItems: "center", gap: 14, backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder },
+  switchEmployeeAvatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: "rgba(0,0,0,0.2)", justifyContent: "center" as const, alignItems: "center" as const, borderWidth: 2 },
+  switchEmployeeAvatarText: { color: Colors.text, fontSize: 20, fontWeight: "700" as const },
+  switchEmployeeName: { color: Colors.text, fontSize: 15, fontWeight: "600" as const, marginBottom: 4 },
+  switchRoleBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, alignSelf: "flex-start" as const },
+  switchRoleBadgeText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" as const, textTransform: "capitalize" as const },
+  switchPinSection: { alignItems: "center" as const, paddingVertical: 10 },
+  switchBackBtn: { alignSelf: "flex-start" as const, padding: 6, marginBottom: 8 },
+  switchPinAvatar: { alignItems: "center" as const, marginBottom: 20 },
+  switchPinAvatarCircle: { width: 70, height: 70, borderRadius: 35, justifyContent: "center" as const, alignItems: "center" as const, marginBottom: 10 },
+  switchPinAvatarText: { color: "#FFFFFF", fontSize: 30, fontWeight: "800" as const },
+  switchPinName: { color: Colors.text, fontSize: 20, fontWeight: "700" as const },
+  switchPinLabel: { color: Colors.textSecondary, fontSize: 14, fontWeight: "500" as const, marginBottom: 20 },
+  switchPinDots: { flexDirection: "row" as const, gap: 18, marginBottom: 24 },
+  switchDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: Colors.cardBorder, backgroundColor: "transparent" },
+  switchDotFilled: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  switchErrorRow: { flexDirection: "row" as const, alignItems: "center", gap: 6, marginBottom: 12 },
+  switchErrorText: { color: Colors.danger, fontSize: 13, fontWeight: "500" as const },
+  switchKeypad: { flexDirection: "row" as const, flexWrap: "wrap" as const, width: 260, justifyContent: "center" as const },
+  switchKeyBtn: { width: 260 / 3, height: 58, justifyContent: "center" as const, alignItems: "center" as const },
+  switchKeyText: { color: Colors.text, fontSize: 26, fontWeight: "600" as const },
 });

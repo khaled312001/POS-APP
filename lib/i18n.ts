@@ -531,6 +531,13 @@ const en = {
   secondary: "Secondary",
   coldstorage: "Cold Storage",
   warehouseAddress: "Warehouse address",
+
+  // Account Switching
+  switchAccount: "Switch Account",
+  invoices: "Invoices",
+  enterPinToSwitch: "Enter PIN to switch",
+  accountSwitched: "Account switched successfully",
+  deactivateDevice: "Deactivate Device",
 };
 
 const ar: typeof en = {
@@ -1066,6 +1073,13 @@ const ar: typeof en = {
   secondary: "ثانوي",
   coldstorage: "تخزين بارد",
   warehouseAddress: "عنوان المستودع",
+
+  // Account Switching
+  switchAccount: "تبديل الحساب",
+  invoices: "الفواتير",
+  enterPinToSwitch: "أدخل رمز PIN للتبديل",
+  accountSwitched: "تم تبديل الحساب بنجاح",
+  deactivateDevice: "إلغاء تفعيل الجهاز",
 };
 
 export type TranslationKey = keyof typeof en;
