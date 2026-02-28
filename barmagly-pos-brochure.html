@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barmagly POS — نظام نقاط البيع الذكي</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Noto+Kufi+Arabic:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --secondary: #ec4899;
+            --accent: #2FD3C6;
+            --dark: #0A0E27;
+            --darker: #060918;
+            --light: #f8fafc;
+            --gray: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+            --glass: rgba(15, 23, 42, 0.6);
+            --success: #10B981;
+            --warning: #F59E0B;
+        }
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Kufi Arabic', 'Plus Jakarta Sans', sans-serif;
+            background: #1a1a2e;
+            color: var(--light);
+            line-height: 1.7;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+        }
+
+        /* ========== A4 PAGE ========== */
+        .a4-page {
+            width: 210mm;
+            height: 297mm;
+            margin: 0 auto;
+            padding: 0;
+            background: var(--dark);
+            position: relative;
+            overflow: hidden;
+            page-break-after: always;
+            page-break-inside: avoid;
+        }
+
+        @media screen {
+            .a4-page {
+                margin: 20px auto;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+                border-radius: 4px;
+            }
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+
+            .a4-page {
+                margin: 0;
+                box-shadow: none;
+                border-radius: 0;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        /* ========== COVER ========== */
+        .cover {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            height: 100%;
+            padding: 40mm 20mm;
+            background:
+                radial-gradient(circle at 20% 15%, rgba(99, 102, 241, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 85%, rgba(236, 72, 153, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(47, 211, 198, 0.08) 0%, transparent 60%),
+                var(--dark);
+        }
+
+        .cover::before {
+            content: '';
+            position: absolute;
+            top: -150px;
+            right: -150px;
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.12), transparent 70%);
+        }
+
+        .cover .badge {
+            display: inline-block;
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid var(--primary-glow);
+            padding: 7px 24px;
+            border-radius: 50px;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 25px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cover .logo {
+            font-size: 48px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #818cf8, #f472b6, #2FD3C6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cover .subtitle {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--light);
+            margin-bottom: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cover .desc {
+            font-size: 12px;
+            color: var(--gray);
+            max-width: 420px;
+            margin-bottom: 35px;
+            position: relative;
+            z-index: 1;
+            line-height: 2;
+        }
+
+        .chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+            max-width: 480px;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 10.5px;
+            font-weight: 600;
+            color: var(--light);
+        }
+
+        .chip .em {
+            font-size: 16px;
+        }
+
+        .cover-contact {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cover-contact .ci {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            color: var(--gray);
+        }
+
+        .cover-contact .ci .dot {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: rgba(99, 102, 241, 0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        /* ========== CONTENT PAGE ========== */
+        .content-page {
+            height: 100%;
+            padding: 18mm 20mm 15mm;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .content-page::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary), var(--accent));
+        }
+
+        .pg-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .pg-logo {
+            font-size: 13px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #818cf8, #f472b6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .pg-num {
+            font-size: 9px;
+            color: var(--gray);
+            font-weight: 600;
+        }
+
+        .sec-title {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .sec-title .gt {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sec-desc {
+            font-size: 10.5px;
+            color: var(--gray);
+            margin-bottom: 18px;
+            line-height: 1.8;
+            flex-shrink: 0;
+        }
+
+        /* ========== STORE CARDS ========== */
+        .stores-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            flex: 1;
+        }
+
+        .store-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+        }
+
+        .store-card .si {
+            font-size: 22px;
+            margin-bottom: 6px;
+        }
+
+        .store-card h3 {
+            font-size: 11px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            color: var(--light);
+        }
+
+        .store-card p {
+            font-size: 9px;
+            color: var(--gray);
+            line-height: 1.7;
+        }
+
+        .tags {
+            margin-top: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .tag {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 8px;
+            font-weight: 600;
+        }
+
+        /* ========== FEATURE GRID ========== */
+        .f-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .f-grid.g3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .f-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 11px 13px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+        }
+
+        .f-item .fi {
+            flex-shrink: 0;
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            background: rgba(99, 102, 241, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .f-item h4 {
+            font-size: 9.5px;
+            font-weight: 700;
+            color: var(--light);
+            margin-bottom: 2px;
+        }
+
+        .f-item p {
+            font-size: 8px;
+            color: var(--gray);
+            line-height: 1.5;
+        }
+
+        /* ========== SUB TITLE ========== */
+        .sub-t {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--accent);
+            margin: 16px 0 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .sub-t::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ========== HIGHLIGHT ========== */
+        .hl-box {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.07));
+            border: 1px solid var(--primary-glow);
+            border-radius: 14px;
+            padding: 18px 20px;
+            margin: 14px 0;
+            flex-shrink: 0;
+        }
+
+        .hl-box h3 {
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: var(--light);
+        }
+
+        .hl-box p {
+            font-size: 9px;
+            color: var(--gray);
+            line-height: 1.9;
+        }
+
+        /* ========== CONTACT PAGE ========== */
+        .contact-inner {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 30mm 25mm;
+            background:
+                radial-gradient(circle at 50% 30%, rgba(99, 102, 241, 0.2) 0%, transparent 60%),
+                radial-gradient(circle at 50% 70%, rgba(236, 72, 153, 0.15) 0%, transparent 60%),
+                var(--dark);
+        }
+
+        .contact-inner .big-logo {
+            font-size: 38px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #818cf8, #f472b6, #2FD3C6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+        }
+
+        .contact-inner h2 {
+            font-size: 22px;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+
+        .contact-inner .tl {
+            font-size: 11px;
+            color: var(--gray);
+            margin-bottom: 35px;
+            max-width: 400px;
+        }
+
+        .cta-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 14px 45px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 700;
+            text-decoration: none;
+            margin-bottom: 35px;
+        }
+
+        .c-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+            max-width: 450px;
+            width: 100%;
+            margin-bottom: 35px;
+        }
+
+        .cc {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            text-align: center;
+        }
+
+        .cc .cci {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+
+        .cc h4 {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--light);
+            margin-bottom: 4px;
+        }
+
+        .cc p {
+            font-size: 9.5px;
+            color: var(--gray);
+            direction: ltr;
+        }
+
+        .cc.full {
+            grid-column: span 2;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.07));
+            border-color: var(--primary-glow);
+        }
+
+        .footer-line {
+            margin-top: 30px;
+            padding-top: 18px;
+            border-top: 1px solid var(--border);
+            font-size: 9px;
+            color: var(--gray);
+        }
+
+        /* ========== PRINT BTN ========== */
+        .print-btn {
+            position: fixed;
+            bottom: 25px;
+            left: 25px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 14px 30px;
+            border-radius: 50px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 10px 30px var(--primary-glow);
+            z-index: 1000;
+            font-family: 'Noto Kufi Arabic', sans-serif;
+            transition: all 0.3s;
+        }
+
+        .print-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+        }
+
+        /* ========== PAGE FOOTER ========== */
+        .pg-footer {
+            margin-top: auto;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 8px;
+            color: var(--gray);
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <button class="print-btn no-print" onclick="window.print()">📄 حفظ كـ PDF</button>
+
+    <!-- ==================== PAGE 1: COVER ==================== -->
+    <div class="a4-page">
+        <div class="cover">
+            <div class="badge">⚡ نظام نقاط بيع سحابي متكامل — جاهز للتسليم الفوري</div>
+            <div class="logo">Barmagly POS</div>
+            <div class="subtitle">نظام نقاط البيع الذكي</div>
+            <p class="desc">
+                الحل المتكامل لإدارة أعمالك التجارية بأعلى كفاءة — يعمل على الموبايل والتابلت والويب.
+                نظام SaaS جاهز لبيع الاشتراكات لعدد غير محدود من المتاجر.
+            </p>
+
+            <div class="chips">
+                <div class="chip"><span class="em">🏬</span> مولات تجارية</div>
+                <div class="chip"><span class="em">🛒</span> سوبرماركت</div>
+                <div class="chip"><span class="em">👗</span> محلات ملابس</div>
+                <div class="chip"><span class="em">🍽️</span> مطاعم وكافيهات</div>
+                <div class="chip"><span class="em">💊</span> صيدليات</div>
+                <div class="chip"><span class="em">💄</span> صالونات تجميل</div>
+                <div class="chip"><span class="em">📱</span> إلكترونيات</div>
+                <div class="chip"><span class="em">🏪</span> مستلزمات متنوعة</div>
+            </div>
+
+            <div class="cover-contact">
+                <div class="ci">
+                    <div class="dot">🌐</div><span>www.barmagly.tech</span>
+                </div>
+                <div class="ci">
+                    <div class="dot">📍</div><span style="direction:ltr">Hardstrasse 201, 8005 Zürich</span>
+                </div>
+                <div class="ci">
+                    <div class="dot">📞</div><span style="direction:ltr">+41 77 941 21 26</span>
+                </div>
+                <div class="ci">
+                    <div class="dot">✉️</div><span>info@barmagly.tech</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PAGE 2: STORE TYPES ==================== -->
+    <div class="a4-page">
+        <div class="content-page">
+            <div class="pg-header">
+                <span class="pg-logo">Barmagly POS</span>
+                <span class="pg-num">02 / 07</span>
+            </div>
+
+            <div class="sec-title"><span>🏪</span><span class="gt">من يمكنه استخدام النظام؟</span></div>
+            <p class="sec-desc">Barmagly POS مصمم ليناسب جميع أنواع الأنشطة التجارية — نظام واحد مرن يخدم عشرات
+                القطاعات:</p>
+
+            <div class="stores-grid">
+                <div class="store-card">
+                    <div class="si">🏬</div>
+                    <h3>المولات والمراكز التجارية</h3>
+                    <p>إدارة عشرات المحلات تحت سقف واحد. كل محل بحسابه المنفصل مع لوحة تحكم مركزية.</p>
+                    <div class="tags"><span class="tag">إدارة مركزية</span><span class="tag">Multi-Tenant</span><span
+                            class="tag">فروع متعددة</span></div>
+                </div>
+                <div class="store-card">
+                    <div class="si">🛒</div>
+                    <h3>السوبرماركت والبقالات</h3>
+                    <p>مسح باركود سريع، تتبع مخزون تلقائي، تنبيهات صلاحية، إدارة موردين وأوامر شراء.</p>
+                    <div class="tags"><span class="tag">باركود</span><span class="tag">مخزون تلقائي</span><span
+                            class="tag">صلاحية</span></div>
+                </div>
+                <div class="store-card">
+                    <div class="si">👗</div>
+                    <h3>محلات الملابس والأزياء</h3>
+                    <p>دعم المتغيرات (ألوان، أحجام)، صور المنتجات، نقاط ولاء العملاء، خصومات مرنة.</p>
+                    <div class="tags"><span class="tag">متغيرات</span><span class="tag">نقاط ولاء</span><span
+                            class="tag">خصومات</span></div>
+                </div>
+                <div class="store-card">
+                    <div class="si">🍽️</div>
+                    <h3>المطاعم والكافيهات</h3>
+                    <p>نظام طاولات، طلبات مطبخ فورية، إضافات وتخصيصات، Dine-in و Takeaway.</p>
+                    <div class="tags"><span class="tag">طاولات</span><span class="tag">نظام مطبخ</span><span
+                            class="tag">إضافات</span></div>
+                </div>
+                <div class="store-card">
+                    <div class="si">💊</div>
+                    <h3>الصيدليات</h3>
+                    <p>تتبع تواريخ الصلاحية، إدارة الدفعات (Batches)، تنبيهات مخزون، عقود موردين.</p>
+                    <div class="tags"><span class="tag">Batches</span><span class="tag">صلاحية</span><span
+                            class="tag">عقود موردين</span></div>
+                </div>
+                <div class="store-card">
+                    <div class="si">💄</div>
+                    <h3>صالونات التجميل</h3>
+                    <p>إدارة عملاء VIP، عمولات الموظفين التلقائية، تقارير أداء مفصلة لكل عامل.</p>
+                    <div class="tags"><span class="tag">عمولات</span><span class="tag">VIP</span><span
+                            class="tag">تقارير أداء</span></div>
+                </div>
+                <div class="store-card">
+                    <div class="si">📱</div>
+                    <h3>محلات الإلكترونيات</h3>
+                    <p>إدارة أرقام تسلسلية، ضمانات، مرتجعات واستبدال، تتبع مفصل لكل قطعة.</p>
+                    <div class="tags"><span class="tag">أرقام تسلسلية</span><span class="tag">مرتجعات</span><span
+                            class="tag">SKU</span></div>
+                </div>
+                <div class="store-card">
+                    <div class="si">🏪</div>
+                    <h3>محلات المستلزمات المتنوعة</h3>
+                    <p>مكتبات، أدوات منزلية، مستلزمات مكتبية — نظام مرن يتكيف مع أي منتج.</p>
+                    <div class="tags"><span class="tag">مرونة تامة</span><span class="tag">تصنيفات مفتوحة</span><span
+                            class="tag">استيراد جماعي</span></div>
+                </div>
+            </div>
+
+            <div class="pg-footer">
+                <span>www.barmagly.tech</span>
+                <span>Barmagly POS — نظام نقاط البيع الذكي</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PAGE 3: POS + PRODUCTS + CUSTOMERS ==================== -->
+    <div class="a4-page">
+        <div class="content-page">
+            <div class="pg-header">
+                <span class="pg-logo">Barmagly POS</span>
+                <span class="pg-num">03 / 07</span>
+            </div>
+
+            <div class="sec-title"><span>💳</span><span class="gt">شاشة نقطة البيع (POS)</span></div>
+
+            <div class="f-grid">
+                <div class="f-item">
+                    <div class="fi">🛒</div>
+                    <div>
+                        <h4>سلة مبيعات ذكية</h4>
+                        <p>إضافة المنتجات بنقرة مع حساب الإجمالي والخصومات والضرائب تلقائياً</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📷</div>
+                    <div>
+                        <h4>ماسح الباركود</h4>
+                        <p>مسح الباركود بكاميرا الجهاز لإضافة المنتجات فوراً</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">💵</div>
+                    <div>
+                        <h4>5 طرق دفع</h4>
+                        <p>نقدي، بطاقة (Stripe)، QR Code، NFC Tap to Pay، موبايل</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🏷️</div>
+                    <div>
+                        <h4>خصومات مرنة</h4>
+                        <p>خصم بنسبة أو مبلغ ثابت مع حد أقصى لصلاحيات الكاشير</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🧾</div>
+                    <div>
+                        <h4>إيصالات وطباعة</h4>
+                        <p>إيصال لكل عملية مع طباعة تلقائية على طابعة حرارية ESC/POS</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🍽️</div>
+                    <div>
+                        <h4>طاولات وطلبات</h4>
+                        <p>ربط الطلبات بالطاولات مع أنواع: Dine-in / Takeaway</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">👤</div>
+                    <div>
+                        <h4>ربط العميل بالفاتورة</h4>
+                        <p>اختيار عميل مسجل أو عميل عابر مع تتبع المشتريات</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📲</div>
+                    <div>
+                        <h4>دفع QR Code</h4>
+                        <p>توليد QR Code ليقوم العميل بمسحه والدفع من هاتفه</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-t">📦 إدارة المنتجات</div>
+            <div class="f-grid">
+                <div class="f-item">
+                    <div class="fi">📝</div>
+                    <div>
+                        <h4>بيانات شاملة</h4>
+                        <p>اسم عربي/إنجليزي، صور، باركود، SKU، سعر بيع وتكلفة</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🎨</div>
+                    <div>
+                        <h4>تصنيفات بصرية</h4>
+                        <p>تصنيفات بألوان وأيقونات وصور مع تصنيفات فرعية</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">⚙️</div>
+                    <div>
+                        <h4>إضافات ومتغيرات</h4>
+                        <p>Modifiers (حجم، إضافات) و Variants (ألوان، مقاسات)</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📥</div>
+                    <div>
+                        <h4>استيراد جماعي</h4>
+                        <p>استيراد من Excel/CSV دفعة واحدة لآلاف المنتجات</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-t">👥 إدارة العملاء ونقاط الولاء</div>
+            <div class="f-grid">
+                <div class="f-item">
+                    <div class="fi">⭐</div>
+                    <div>
+                        <h4>نقاط الولاء</h4>
+                        <p>تجميع نقاط تلقائياً مع كل عملية شراء</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">💰</div>
+                    <div>
+                        <h4>رصيد المتجر</h4>
+                        <p>رصيد ائتماني (Store Credit) للعملاء</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🔍</div>
+                    <div>
+                        <h4>بحث ذكي</h4>
+                        <p>بالاسم أو الهاتف أو البريد مع تاريخ المشتريات</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📞</div>
+                    <div>
+                        <h4>هوية المتصل (Caller ID)</h4>
+                        <p>تعريف العميل تلقائياً عند الاتصال الهاتفي</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pg-footer">
+                <span>www.barmagly.tech</span>
+                <span>Barmagly POS — نظام نقاط البيع الذكي</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PAGE 4: REPORTS + EMPLOYEES ==================== -->
+    <div class="a4-page">
+        <div class="content-page">
+            <div class="pg-header">
+                <span class="pg-logo">Barmagly POS</span>
+                <span class="pg-num">04 / 07</span>
+            </div>
+
+            <div class="sec-title"><span>📊</span><span class="gt">التقارير والتحليلات المتقدمة</span></div>
+
+            <div class="f-grid g3">
+                <div class="f-item">
+                    <div class="fi">📈</div>
+                    <div>
+                        <h4>نظرة عامة</h4>
+                        <p>إيرادات يومية/أسبوعية/شهرية مع رسوم بيانية تفاعلية</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🧾</div>
+                    <div>
+                        <h4>تقرير المبيعات</h4>
+                        <p>كل العمليات بالتفصيل مع فلترة بالتاريخ</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📦</div>
+                    <div>
+                        <h4>تقرير المخزون</h4>
+                        <p>حالة المخزون مع تنبيهات منخفض وحرج</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">💰</div>
+                    <div>
+                        <h4>التقرير المالي</h4>
+                        <p>أرباح، مصروفات، صافي ربح مع مقارنة</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🔄</div>
+                    <div>
+                        <h4>تقرير المرتجعات</h4>
+                        <p>عدد المرتجعات وإجمالي المبالغ المستردة</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🔮</div>
+                    <div>
+                        <h4>توقعات ذكية</h4>
+                        <p>توقعات شهرية وسنوية بناءً على البيانات</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">👤</div>
+                    <div>
+                        <h4>أداء الكاشير</h4>
+                        <p>تقييم أداء كل كاشير بالأرقام</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📉</div>
+                    <div>
+                        <h4>منتجات بطيئة</h4>
+                        <p>تحديد المنتجات التي لم تُبع 30 يوم</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📤</div>
+                    <div>
+                        <h4>تصدير CSV</h4>
+                        <p>تصدير مبيعات، مخزون، أرباح، أداء</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-t">👨‍💼 إدارة الموظفين والورديات</div>
+            <div class="f-grid">
+                <div class="f-item">
+                    <div class="fi">🔐</div>
+                    <div>
+                        <h4>تسجيل دخول PIN</h4>
+                        <p>كل موظف برمز 4 أرقام مع 4 أدوار: مالك، مدير، مسؤول، كاشير</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">⏰</div>
+                    <div>
+                        <h4>نظام ورديات متقدم</h4>
+                        <p>بدء/إنهاء مع حساب وقت إضافي وإغلاق إجباري</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">💸</div>
+                    <div>
+                        <h4>عمولات تلقائية</h4>
+                        <p>حساب عمولة كل موظف على المبيعات تلقائياً</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🛡️</div>
+                    <div>
+                        <h4>صلاحيات دقيقة</h4>
+                        <p>تحكم كامل: الكاشير لا يرى التقارير أو الإعدادات</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📋</div>
+                    <div>
+                        <h4>مراقبة الورديات</h4>
+                        <p>لوحة مراقبة حية للورديات النشطة مع وقت كل وردية</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📊</div>
+                    <div>
+                        <h4>تقرير حضور</h4>
+                        <p>سجل حضور وانصراف مع عدد ساعات العمل</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pg-footer">
+                <span>www.barmagly.tech</span>
+                <span>Barmagly POS — نظام نقاط البيع الذكي</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PAGE 5: INVENTORY + SUPPLIERS + EXPENSES ==================== -->
+    <div class="a4-page">
+        <div class="content-page">
+            <div class="pg-header">
+                <span class="pg-logo">Barmagly POS</span>
+                <span class="pg-num">05 / 07</span>
+            </div>
+
+            <div class="sec-title"><span>🏢</span><span class="gt">الفروع والمخزون والمشتريات</span></div>
+
+            <div class="f-grid">
+                <div class="f-item">
+                    <div class="fi">🏪</div>
+                    <div>
+                        <h4>فروع غير محدودة</h4>
+                        <p>كل فرع بعملة وضريبة وشعار وإعدادات خاصة</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📊</div>
+                    <div>
+                        <h4>مخزون ذكي</h4>
+                        <p>تتبع تلقائي، تنبيهات، نقاط إعادة طلب، جرد</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🏭</div>
+                    <div>
+                        <h4>مستودعات متعددة</h4>
+                        <p>مستودعات عادية وتخزين بارد مع تحويلات بينها</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📋</div>
+                    <div>
+                        <h4>دفعات المنتجات</h4>
+                        <p>تتبع Batch بتاريخ صلاحية وتكلفة ومورد منفصل</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📝</div>
+                    <div>
+                        <h4>حركات المخزون</h4>
+                        <p>سجل كامل لكل حركة: دخول، خروج، تعديل، نقل</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🔢</div>
+                    <div>
+                        <h4>جرد المخزون</h4>
+                        <p>مقارنة الكمية الفعلية بالنظام مع تقرير الفروقات</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-t">🚚 إدارة الموردين والمشتريات</div>
+            <div class="f-grid">
+                <div class="f-item">
+                    <div class="fi">📇</div>
+                    <div>
+                        <h4>سجل الموردين</h4>
+                        <p>بيانات كاملة مع شروط الدفع والأرصدة</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📄</div>
+                    <div>
+                        <h4>أوامر الشراء</h4>
+                        <p>إنشاء وتتبع: مسودة ← مطلوب ← مستلم</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📑</div>
+                    <div>
+                        <h4>عقود الموردين</h4>
+                        <p>عقود بمعدلات خصم وشروط وحد أدنى للطلب</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">✅</div>
+                    <div>
+                        <h4>استلام البضائع</h4>
+                        <p>تسجيل المستلم وتحديث المخزون تلقائياً</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-t">💰 المصروفات ودرج النقدية والمرتجعات</div>
+            <div class="f-grid">
+                <div class="f-item">
+                    <div class="fi">📝</div>
+                    <div>
+                        <h4>تسجيل المصروفات</h4>
+                        <p>7 تصنيفات: إيجار، خدمات، رواتب، تسويق، صيانة، مستلزمات، أخرى</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">💵</div>
+                    <div>
+                        <h4>درج النقدية</h4>
+                        <p>سحب وإيداع وجرد مع أسباب وموافقات المسؤولين</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">↩️</div>
+                    <div>
+                        <h4>مرتجعات مرنة</h4>
+                        <p>استرداد، استبدال، رصيد متجر مع فترة سماح 30 يوم</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📋</div>
+                    <div>
+                        <h4>سجل النشاط</h4>
+                        <p>تسجيل كامل لكل عملية: من فعل ماذا ومتى</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pg-footer">
+                <span>www.barmagly.tech</span>
+                <span>Barmagly POS — نظام نقاط البيع الذكي</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PAGE 6: SETTINGS + CALLER ID + SAAS ==================== -->
+    <div class="a4-page">
+        <div class="content-page">
+            <div class="pg-header">
+                <span class="pg-logo">Barmagly POS</span>
+                <span class="pg-num">06 / 07</span>
+            </div>
+
+            <div class="sec-title"><span>⚙️</span><span class="gt">إعدادات النظام والميزات المتقدمة</span></div>
+
+            <!-- Caller ID Highlight -->
+            <div class="hl-box">
+                <h3>📞 ربط مع جهاز الاتصال — هوية المتصل (Caller ID)</h3>
+                <p>
+                    ميزة فريدة تربط النظام بجهاز الاتصال الهاتفي (FRITZ!Card عبر CAPI) لتعريف العميل تلقائياً عند
+                    الاتصال.
+                    يظهر اسم العميل وبياناته فوراً على شاشة الكاشير عبر WebSocket في الوقت الحقيقي.
+                    يمكن اختبار الميزة بوضع المحاكاة قبل ربط الجهاز الفعلي.
+                </p>
+            </div>
+
+            <div class="f-grid">
+                <div class="f-item">
+                    <div class="fi">🏪</div>
+                    <div>
+                        <h4>إعدادات المتجر</h4>
+                        <p>اسم، عنوان، هاتف، بريد، شعار، نوع النشاط مع رفع لوجو</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">💳</div>
+                    <div>
+                        <h4>بوابات الدفع</h4>
+                        <p>إعداد Stripe مع وضع اختبار/إنتاج واختبار الاتصال</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🖨️</div>
+                    <div>
+                        <h4>طابعة الإيصالات</h4>
+                        <p>دعم ESC/POS حرارية (58mm/80mm) Bluetooth وUSB</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🔔</div>
+                    <div>
+                        <h4>نظام الإشعارات</h4>
+                        <p>تنبيهات فورية بأولويات مع تحديد كمقروء</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📥</div>
+                    <div>
+                        <h4>استيراد جماعي</h4>
+                        <p>استيراد منتجات وعملاء من Excel/CSV دفعة واحدة</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🌍</div>
+                    <div>
+                        <h4>دعم اللغات</h4>
+                        <p>عربي (RTL) + إنجليزي (LTR) مع تبديل فوري</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🔄</div>
+                    <div>
+                        <h4>مزامنة البيانات</h4>
+                        <p>مزامنة تلقائية مع قائمة انتظار للعمليات</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🍳</div>
+                    <div>
+                        <h4>نظام المطبخ</h4>
+                        <p>طلبات فورية للمطبخ: معلق ← قيد التحضير ← جاهز</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SaaS Section -->
+            <div class="sub-t">🔐 نظام SaaS — اِبيع النظام كخدمة!</div>
+
+            <div class="hl-box" style="margin-top: 0;">
+                <h3>💎 نظام Multi-Tenant كامل</h3>
+                <p>
+                    بيانات كل متجر منفصلة تماماً. اشتراكات مرنة (تجريبي / شهري / سنوي). مفاتيح ترخيص فريدة مع حد أقصى
+                    للأجهزة.
+                    شاشة تنشيط أنيقة. لوحة Super Admin لإدارة كل المتاجر والاشتراكات والإشعارات والنسخ الاحتياطي.
+                </p>
+            </div>
+
+            <div class="f-grid">
+                <div class="f-item">
+                    <div class="fi">🔑</div>
+                    <div>
+                        <h4>مفاتيح ترخيص</h4>
+                        <p>مفاتيح فريدة لكل عميل مع حد أقصى للأجهزة</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">📋</div>
+                    <div>
+                        <h4>خطط اشتراك</h4>
+                        <p>تجريبي / شهري / سنوي بتسعير وميزات مختلفة</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">🛡️</div>
+                    <div>
+                        <h4>لوحة Super Admin</h4>
+                        <p>إدارة المتاجر والتراخيص والإشعارات مركزياً</p>
+                    </div>
+                </div>
+                <div class="f-item">
+                    <div class="fi">💾</div>
+                    <div>
+                        <h4>نسخ احتياطي</h4>
+                        <p>نسخ احتياطي لبيانات المتاجر مع استيراد جماعي</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pg-footer">
+                <span>www.barmagly.tech</span>
+                <span>Barmagly POS — نظام نقاط البيع الذكي</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PAGE 7: CONTACT ==================== -->
+    <div class="a4-page">
+        <div class="contact-inner">
+            <div class="big-logo">Barmagly POS</div>
+            <h2>جاهز لتطوير أعمالك؟</h2>
+            <p class="tl">النظام جاهز للتسليم الفوري بكامل الكود المصدري مع دعم فني شامل وتوثيق كامل</p>
+
+            <a href="https://www.barmagly.tech" class="cta-btn">🚀 تواصل معنا الآن</a>
+
+            <div class="c-cards">
+                <div class="cc">
+                    <div class="cci">🌐</div>
+                    <h4>الموقع الإلكتروني</h4>
+                    <p>www.barmagly.tech</p>
+                </div>
+                <div class="cc">
+                    <div class="cci">📞</div>
+                    <h4>الهاتف</h4>
+                    <p>+41 77 941 21 26</p>
+                </div>
+                <div class="cc">
+                    <div class="cci">✉️</div>
+                    <h4>البريد الإلكتروني</h4>
+                    <p>info@barmagly.tech</p>
+                </div>
+                <div class="cc">
+                    <div class="cci">📍</div>
+                    <h4>المقر الرئيسي</h4>
+                    <p>Hardstrasse 201, 8005 Zürich, Switzerland</p>
+                </div>
+                <div class="cc full">
+                    <div class="cci">⚡</div>
+                    <h4>ماذا تحصل عليه؟</h4>
+                    <p>كامل الكود المصدري + دعم فني + توثيق شامل + تركيب وإعداد + تدريب على الاستخدام</p>
+                </div>
+            </div>
+
+            <div class="footer-line">
+                © 2026 Barmagly — برمجلي. جميع الحقوق محفوظة. | Hardstrasse 201, 8005 Zürich, Switzerland
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
