@@ -1398,7 +1398,7 @@ const styles = StyleSheet.create({
   searchRow: { paddingHorizontal: 14, paddingTop: 14 },
   searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 14, paddingHorizontal: 14, height: 44, borderWidth: 1, borderColor: Colors.inputBorder },
   searchInput: { flex: 1, color: Colors.text, marginLeft: 8, fontSize: 15 },
-  categoriesRow: { maxHeight: 100, marginTop: 12, marginBottom: 6 },
+  categoriesRow: { flexGrow: 0, flexShrink: 0, minHeight: 75, marginTop: 12, marginBottom: 6 },
   categoriesContent: { paddingHorizontal: 14, gap: 10, alignItems: "center" },
   categoryChip: { borderRadius: 28, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.cardBorder, overflow: "hidden" },
   categoryChipAll: { borderColor: Colors.accent, borderWidth: 2 },
