@@ -6,10 +6,21 @@ export function getApiUrl(): string {
   }
 
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    const origin = window.location.origin;
-    if (origin && !origin.includes('localhost:8081') && !origin.includes('localhost:8082')) {
-      return origin;
+    const hostname = window.location.hostname;
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:5000';
     }
+
+    if (hostname.includes('.replit.app')) {
+      return window.location.origin;
+    }
+
+    if (hostname.includes('.worf.replit.dev') || hostname.includes('.kirk.replit.dev') || hostname.includes('.picard.replit.dev')) {
+      return `https://${hostname}:5000`;
+    }
+
+    return window.location.origin;
   }
 
   if (process.env.EXPO_PUBLIC_DOMAIN) {
@@ -18,9 +29,5 @@ export function getApiUrl(): string {
     return `${protocol}://${domain}`;
   }
 
-  if (Platform.OS === 'web') {
-    return "http://localhost:5000";
-  }
-
-  return "http://localhost:5000";
+  return 'http://localhost:5000';
 }
