@@ -61,12 +61,14 @@ export default function POSScreen() {
   const [switchError, setSwitchError] = useState("");
   const [selectedProductForOptions, setSelectedProductForOptions] = useState<any>(null);
 
+  const tenantId = tenant?.id;
+
   const { data: categories = [] } = useQuery<any[]>({
-    queryKey: ["/api/categories"],
+    queryKey: ["/api/categories", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
   });
 
-  const tenantId = tenant?.id;
   const { data: products = [] } = useQuery<any[]>({
     queryKey: ["/api/products", tenantId ? `?tenantId=${tenantId}` : (search ? `?search=${search}` : "")],
     queryFn: getQueryFn({ on401: "throw" }),
