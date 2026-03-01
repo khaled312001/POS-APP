@@ -9,7 +9,7 @@ export function getApiUrl(): string {
     const hostname = window.location.hostname;
 
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:5000';
+      return 'http://localhost:5001';
     }
 
     if (hostname.includes('.replit.app')) {
@@ -29,5 +29,5 @@ export function getApiUrl(): string {
     return `${protocol}://${domain}`;
   }
 
-  return 'http://localhost:5000';
+  return 'http://localhost:5001';
 }
