@@ -1,15 +1,12 @@
-/**
- * Seed script for Pizza Lemon Restaurant
- * Creates tenant, branch, employees, categories, products with images
- * Run: npx tsx scripts/seed-pizzalemon.ts
- */
-
 import { db } from "../server/db";
 import {
     tenants, branches, employees, categories, products, inventory,
     tenantSubscriptions, licenseKeys, tenantNotifications, saleItems, sales,
 } from "../shared/schema";
 import { eq, inArray, sql } from "drizzle-orm";
+import * as fs from "fs";
+import * as path from "path";
+import * as https from "https";
 
 // ============= PIZZA LEMON DATA =============
 
@@ -47,10 +44,7 @@ const CATEGORIES_DATA = [
     { name: "Bier", nameAr: "بيرة", color: "#F59E0B", icon: "beer" },
 ];
 
-// Image base URL pattern from the website
 const IMG_BASE = "https://pizzalemon.ch/lemon/image/cache/catalog/pizzalink_import";
-
-// ============= ALL PRODUCTS =============
 
 interface ProductData {
     name: string;
@@ -62,85 +56,84 @@ interface ProductData {
     sku: string;
     barcode: string;
     unit: string;
-    sizes?: string; // JSON of size options
+    variants?: any[];
 }
 
 const PRODUCTS_DATA: ProductData[] = [
-    // ===================== PIZZA (33cm prices, ~45cm is 2x) =====================
-    { name: "Margherita", description: "Tomatensauce, Mozzarella, Oregano", price: "15.00", costPrice: "4.00", category: "Pizza", image: `${IMG_BASE}/margherita-500x500.png`, sku: "PZ-001", barcode: "7610001000001", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "15.00" }, { name: "45cm (Gross)", price: "28.00" }]) },
-    { name: "Prosciutto", description: "Tomatensauce, Mozzarella, Schinken", price: "16.50", costPrice: "5.00", category: "Pizza", image: `${IMG_BASE}/prosciutto-500x500.png`, sku: "PZ-002", barcode: "7610001000002", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "16.50" }, { name: "45cm (Gross)", price: "31.00" }]) },
-    { name: "Funghi", description: "Tomatensauce, Mozzarella, Champignons", price: "16.50", costPrice: "5.00", category: "Pizza", image: `${IMG_BASE}/funghi-500x500.png`, sku: "PZ-003", barcode: "7610001000003", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "16.50" }, { name: "45cm (Gross)", price: "31.00" }]) },
-    { name: "Salami", description: "Tomatensauce, Mozzarella, Salami", price: "16.50", costPrice: "5.00", category: "Pizza", image: `${IMG_BASE}/salami-500x500.png`, sku: "PZ-004", barcode: "7610001000004", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "16.50" }, { name: "45cm (Gross)", price: "31.00" }]) },
-    { name: "Napoli", description: "Tomatensauce, Mozzarella, Sardellen, Kapern, Oliven", price: "17.00", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/napoli-500x500.png`, sku: "PZ-005", barcode: "7610001000005", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "17.00" }, { name: "45cm (Gross)", price: "32.00" }]) },
-    { name: "Hawaii", description: "Tomatensauce, Mozzarella, Schinken, Ananas", price: "17.00", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/hawaii-500x500.png`, sku: "PZ-006", barcode: "7610001000006", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "17.00" }, { name: "45cm (Gross)", price: "33.00" }]) },
-    { name: "Prosciutto e Funghi", description: "Tomatensauce, Mozzarella, Schinken, Champignons", price: "17.00", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/prosciutto_e_funghi-500x500.png`, sku: "PZ-007", barcode: "7610001000007", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "17.00" }, { name: "45cm (Gross)", price: "33.00" }]) },
-    { name: "Tonno", description: "Tomatensauce, Mozzarella, Thunfisch, Zwiebeln", price: "17.50", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/tonno-500x500.png`, sku: "PZ-008", barcode: "7610001000008", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "17.50" }, { name: "45cm (Gross)", price: "33.00" }]) },
-    { name: "Diavola", description: "Tomatensauce, Mozzarella, Salami Piccante, Peperoncini", price: "17.50", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/diavola-500x500.png`, sku: "PZ-009", barcode: "7610001000009", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "17.50" }, { name: "45cm (Gross)", price: "33.00" }]) },
-    { name: "Quattro Formaggi", description: "Tomatensauce, Mozzarella, Gorgonzola, Parmesan, Emmentaler", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/quattro_formaggi-500x500.png`, sku: "PZ-010", barcode: "7610001000010", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "18.00" }, { name: "45cm (Gross)", price: "34.00" }]) },
-    { name: "Quattro Stagioni", description: "Tomatensauce, Mozzarella, Schinken, Champignons, Peperoni, Artischocken", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/quattro_stagioni-500x500.png`, sku: "PZ-011", barcode: "7610001000011", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "18.00" }, { name: "45cm (Gross)", price: "34.00" }]) },
-    { name: "Verdura", description: "Tomatensauce, Mozzarella, Gemüse, Peperoni, Champignons, Mais, Oliven", price: "17.50", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/verdura-500x500.png`, sku: "PZ-012", barcode: "7610001000012", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "17.50" }, { name: "45cm (Gross)", price: "33.00" }]) },
-    { name: "Spinat", description: "Tomatensauce, Mozzarella, Spinat, Knoblauch", price: "17.00", costPrice: "5.00", category: "Pizza", image: `${IMG_BASE}/spinat-500x500.png`, sku: "PZ-013", barcode: "7610001000013", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "17.00" }, { name: "45cm (Gross)", price: "33.00" }]) },
+    { name: "Margherita", description: "Tomatensauce, Mozzarella, Oregano", price: "15.00", costPrice: "4.00", category: "Pizza", image: `${IMG_BASE}/margherita-500x500.png`, sku: "PZ-001", barcode: "7610001000001", unit: "piece", variants: [{ name: "33cm (Normal)", price: 15.00, sku: "PZ-001-N", stock: 0 }, { name: "45cm (Gross)", price: 28.00, sku: "PZ-001-G", stock: 0 }] },
+    { name: "Prosciutto", description: "Tomatensauce, Mozzarella, Schinken", price: "16.50", costPrice: "5.00", category: "Pizza", image: `${IMG_BASE}/prosciutto-500x500.png`, sku: "PZ-002", barcode: "7610001000002", unit: "piece", variants: [{ name: "33cm (Normal)", price: 16.50, sku: "PZ-002-N", stock: 0 }, { name: "45cm (Gross)", price: 31.00, sku: "PZ-002-G", stock: 0 }] },
+    { name: "Funghi", description: "Tomatensauce, Mozzarella, Champignons", price: "16.50", costPrice: "5.00", category: "Pizza", image: `${IMG_BASE}/funghi-500x500.png`, sku: "PZ-003", barcode: "7610001000003", unit: "piece", variants: [{ name: "33cm (Normal)", price: 16.50, sku: "PZ-003-N", stock: 0 }, { name: "45cm (Gross)", price: 31.00, sku: "PZ-003-G", stock: 0 }] },
+    { name: "Salami", description: "Tomatensauce, Mozzarella, Salami", price: "16.50", costPrice: "5.00", category: "Pizza", image: `${IMG_BASE}/salami-500x500.png`, sku: "PZ-004", barcode: "7610001000004", unit: "piece", variants: [{ name: "33cm (Normal)", price: 16.50, sku: "PZ-004-N", stock: 0 }, { name: "45cm (Gross)", price: 31.00, sku: "PZ-004-G", stock: 0 }] },
+    { name: "Napoli", description: "Tomatensauce, Mozzarella, Sardellen, Kapern, Oliven", price: "17.00", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/napoli-500x500.png`, sku: "PZ-005", barcode: "7610001000005", unit: "piece", variants: [{ name: "33cm (Normal)", price: 17.00, sku: "PZ-005-N", stock: 0 }, { name: "45cm (Gross)", price: 32.00, sku: "PZ-005-G", stock: 0 }] },
+    { name: "Hawaii", description: "Tomatensauce, Mozzarella, Schinken, Ananas", price: "17.00", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/hawaii-500x500.png`, sku: "PZ-006", barcode: "7610001000006", unit: "piece", variants: [{ name: "33cm (Normal)", price: 17.00, sku: "PZ-006-N", stock: 0 }, { name: "45cm (Gross)", price: 33.00, sku: "PZ-006-G", stock: 0 }] },
+    { name: "Prosciutto e Funghi", description: "Tomatensauce, Mozzarella, Schinken, Champignons", price: "17.00", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/prosciutto_e_funghi-500x500.png`, sku: "PZ-007", barcode: "7610001000007", unit: "piece", variants: [{ name: "33cm (Normal)", price: 17.00, sku: "PZ-007-N", stock: 0 }, { name: "45cm (Gross)", price: 33.00, sku: "PZ-007-G", stock: 0 }] },
+    { name: "Tonno", description: "Tomatensauce, Mozzarella, Thunfisch, Zwiebeln", price: "17.50", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/tonno-500x500.png`, sku: "PZ-008", barcode: "7610001000008", unit: "piece", variants: [{ name: "33cm (Normal)", price: 17.50, sku: "PZ-008-N", stock: 0 }, { name: "45cm (Gross)", price: 33.00, sku: "PZ-008-G", stock: 0 }] },
+    { name: "Diavola", description: "Tomatensauce, Mozzarella, Salami Piccante, Peperoncini", price: "17.50", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/diavola-500x500.png`, sku: "PZ-009", barcode: "7610001000009", unit: "piece", variants: [{ name: "33cm (Normal)", price: 17.50, sku: "PZ-009-N", stock: 0 }, { name: "45cm (Gross)", price: 33.00, sku: "PZ-009-G", stock: 0 }] },
+    { name: "Quattro Formaggi", description: "Tomatensauce, Mozzarella, Gorgonzola, Parmesan, Emmentaler", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/quattro_formaggi-500x500.png`, sku: "PZ-010", barcode: "7610001000010", unit: "piece", variants: [{ name: "33cm (Normal)", price: 18.00, sku: "PZ-010-N", stock: 0 }, { name: "45cm (Gross)", price: 34.00, sku: "PZ-010-G", stock: 0 }] },
+    { name: "Quattro Stagioni", description: "Tomatensauce, Mozzarella, Schinken, Champignons, Peperoni, Artischocken", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/quattro_stagioni-500x500.png`, sku: "PZ-011", barcode: "7610001000011", unit: "piece", variants: [{ name: "33cm (Normal)", price: 18.00, sku: "PZ-011-N", stock: 0 }, { name: "45cm (Gross)", price: 34.00, sku: "PZ-011-G", stock: 0 }] },
+    { name: "Verdura", description: "Tomatensauce, Mozzarella, Gemüse, Peperoni, Champignons, Mais, Oliven", price: "17.50", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/verdura-500x500.png`, sku: "PZ-012", barcode: "7610001000012", unit: "piece", variants: [{ name: "33cm (Normal)", price: 17.50, sku: "PZ-012-N", stock: 0 }, { name: "45cm (Gross)", price: 33.00, sku: "PZ-012-G", stock: 0 }] },
+    { name: "Spinat", description: "Tomatensauce, Mozzarella, Spinat, Knoblauch", price: "17.00", costPrice: "5.00", category: "Pizza", image: `${IMG_BASE}/spinat-500x500.png`, sku: "PZ-013", barcode: "7610001000013", unit: "piece", variants: [{ name: "33cm (Normal)", price: 17.00, sku: "PZ-013-N", stock: 0 }, { name: "45cm (Gross)", price: 33.00, sku: "PZ-013-G", stock: 0 }] },
     { name: "Calzone", description: "Tomatensauce, Mozzarella, Schinken, Champignons (geschlossen)", price: "17.50", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/calzone-500x500.png`, sku: "PZ-014", barcode: "7610001000014", unit: "piece" },
     { name: "Calzone Kebab", description: "Tomatensauce, Mozzarella, Kebabfleisch (geschlossen)", price: "18.50", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/calzone_kebab-500x500.png`, sku: "PZ-015", barcode: "7610001000015", unit: "piece" },
     { name: "Calzone Verdura", description: "Tomatensauce, Mozzarella, Gemüse (geschlossen)", price: "17.50", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/calzone_verdura-500x500.png`, sku: "PZ-016", barcode: "7610001000016", unit: "piece" },
-    { name: "Kebab Pizza", description: "Tomatensauce, Mozzarella, Kebabfleisch, Zwiebeln, Peperoni", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/kebab_pizza-500x500.png`, sku: "PZ-017", barcode: "7610001000017", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "18.00" }, { name: "45cm (Gross)", price: "34.00" }]) },
-    { name: "Carbonara", description: "Rahmsauce, Mozzarella, Speck, Ei", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/carbonara-500x500.png`, sku: "PZ-018", barcode: "7610001000018", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "18.00" }, { name: "45cm (Gross)", price: "34.00" }]) },
-    { name: "Gorgonzola", description: "Rahmsauce, Mozzarella, Gorgonzola, Walnüsse", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/gorgonzola-500x500.png`, sku: "PZ-019", barcode: "7610001000019", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "18.00" }, { name: "45cm (Gross)", price: "34.00" }]) },
-    { name: "Frutti di Mare", description: "Tomatensauce, Mozzarella, Meeresfrüchte", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/frutti_di_mare-500x500.png`, sku: "PZ-020", barcode: "7610001000020", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "19.00" }, { name: "45cm (Gross)", price: "36.00" }]) },
-    { name: "Gamberetti", description: "Tomatensauce, Mozzarella, Crevetten, Knoblauch", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/gamberetti-500x500.png`, sku: "PZ-021", barcode: "7610001000021", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "19.00" }, { name: "45cm (Gross)", price: "36.00" }]) },
-    { name: "Siciliana", description: "Tomatensauce, Mozzarella, Sardellen, Oliven, Kapern", price: "17.50", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/siciliana-500x500.png`, sku: "PZ-022", barcode: "7610001000022", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "17.50" }, { name: "45cm (Gross)", price: "33.00" }]) },
-    { name: "Fiorentina", description: "Tomatensauce, Mozzarella, Spinat, Ei", price: "17.50", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/fiorentina-500x500.png`, sku: "PZ-023", barcode: "7610001000023", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "17.50" }, { name: "45cm (Gross)", price: "33.00" }]) },
-    { name: "Poulet", description: "Tomatensauce, Mozzarella, Pouletbrust, Mais", price: "18.50", costPrice: "6.50", category: "Pizza", image: `${IMG_BASE}/poulet-500x500.png`, sku: "PZ-024", barcode: "7610001000024", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "18.50" }, { name: "45cm (Gross)", price: "35.00" }]) },
-    { name: "Americano", description: "Tomatensauce, Mozzarella, Schinken, Spiegelei", price: "17.50", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/americano-500x500.png`, sku: "PZ-025", barcode: "7610001000025", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "17.50" }, { name: "45cm (Gross)", price: "33.00" }]) },
-    { name: "Arrabiata", description: "Tomatensauce, Mozzarella, scharfe Salami, Peperoncini, Tabasco", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/arrabiata-500x500.png`, sku: "PZ-026", barcode: "7610001000026", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "18.00" }, { name: "45cm (Gross)", price: "34.00" }]) },
-    { name: "Piccante", description: "Tomatensauce, Mozzarella, Peperoncini, scharfe Sauce", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/piccante-500x500.png`, sku: "PZ-027", barcode: "7610001000027", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "18.00" }, { name: "45cm (Gross)", price: "34.00" }]) },
-    { name: "Italiano", description: "Tomatensauce, Mozzarella, Parmaschinken, Rucola, Parmesan", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/italiano-500x500.png`, sku: "PZ-028", barcode: "7610001000028", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "19.00" }, { name: "45cm (Gross)", price: "36.00" }]) },
-    { name: "Porcini", description: "Rahmsauce, Mozzarella, Steinpilze, Kräuter", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/porcini-500x500.png`, sku: "PZ-029", barcode: "7610001000029", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "19.00" }, { name: "45cm (Gross)", price: "36.00" }]) },
-    { name: "Profumata", description: "Tomatensauce, Büffelmozzarella, Cherrytomaten, Basilikum", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/profumata-500x500.png`, sku: "PZ-030", barcode: "7610001000030", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "19.00" }, { name: "45cm (Gross)", price: "36.00" }]) },
-    { name: "Padrone", description: "Tomatensauce, Mozzarella, Rindfleisch, Zwiebeln, Peperoni", price: "19.50", costPrice: "7.50", category: "Pizza", image: `${IMG_BASE}/padrone-500x500.png`, sku: "PZ-031", barcode: "7610001000031", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "19.50" }, { name: "45cm (Gross)", price: "37.00" }]) },
-    { name: "Pizzaiolo", description: "Tomatensauce, Mozzarella, Schinken, Salami, Peperoni, Champignons", price: "18.50", costPrice: "6.50", category: "Pizza", image: `${IMG_BASE}/pizzaiolo-500x500.png`, sku: "PZ-032", barcode: "7610001000032", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "18.50" }, { name: "45cm (Gross)", price: "35.00" }]) },
-    { name: "A'Casa", description: "Tomatensauce, Mozzarella, Geflügelgeschnetzeltes, Peperoni, Ei", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/acasa-500x500.png`, sku: "PZ-033", barcode: "7610001000033", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "19.00" }, { name: "45cm (Gross)", price: "36.00" }]) },
-    { name: "Lemon Pizza", description: "Tomatensauce, Mozzarella, Kalbfleisch, Knoblauch, Scharf, Kräuterbutter", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/lemon-500x500.png`, sku: "PZ-034", barcode: "7610001000034", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "19.00" }, { name: "45cm (Gross)", price: "36.00" }]) },
-    { name: "Raclette", description: "Tomatensauce, Mozzarella, Raclettekäse, Kartoffeln", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/raclette-500x500.png`, sku: "PZ-035", barcode: "7610001000035", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "19.00" }, { name: "45cm (Gross)", price: "36.00" }]) },
-    { name: "Schloss Pizza", description: "Tomatensauce, Mozzarella, Spezial Belag (Hausspezialität)", price: "20.00", costPrice: "8.00", category: "Pizza", image: `${IMG_BASE}/schloss_pizza-500x500.png`, sku: "PZ-036", barcode: "7610001000036", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "20.00" }, { name: "45cm (Gross)", price: "38.00" }]) },
-    { name: "Spezial", description: "Tomatensauce, Mozzarella, Alles drauf (Chef Spezial)", price: "20.00", costPrice: "8.00", category: "Pizza", image: `${IMG_BASE}/spezial-500x500.png`, sku: "PZ-037", barcode: "7610001000037", unit: "piece", sizes: JSON.stringify([{ name: "33cm (Normal)", price: "20.00" }, { name: "45cm (Gross)", price: "38.00" }]) },
+    { name: "Kebab Pizza", description: "Tomatensauce, Mozzarella, Kebabfleisch, Zwiebeln, Peperoni", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/kebab_pizza-500x500.png`, sku: "PZ-017", barcode: "7610001000017", unit: "piece", variants: [{ name: "33cm (Normal)", price: 18.00, sku: "PZ-017-N", stock: 0 }, { name: "45cm (Gross)", price: 34.00, sku: "PZ-017-G", stock: 0 }] },
+    { name: "Carbonara", description: "Rahmsauce, Mozzarella, Speck, Ei", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/carbonara-500x500.png`, sku: "PZ-018", barcode: "7610001000018", unit: "piece", variants: [{ name: "33cm (Normal)", price: 18.00, sku: "PZ-018-N", stock: 0 }, { name: "45cm (Gross)", price: 34.00, sku: "PZ-018-G", stock: 0 }] },
+    { name: "Gorgonzola", description: "Rahmsauce, Mozzarella, Gorgonzola, Walnüsse", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/gorgonzola-500x500.png`, sku: "PZ-019", barcode: "7610001000019", unit: "piece", variants: [{ name: "33cm (Normal)", price: 18.00, sku: "PZ-019-N", stock: 0 }, { name: "45cm (Gross)", price: 34.00, sku: "PZ-019-G", stock: 0 }] },
+    { name: "Frutti di Mare", description: "Tomatensauce, Mozzarella, Meeresfrüchte", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/frutti_di_mare-500x500.png`, sku: "PZ-020", barcode: "7610001000020", unit: "piece", variants: [{ name: "33cm (Normal)", price: 19.00, sku: "PZ-020-N", stock: 0 }, { name: "45cm (Gross)", price: 36.00, sku: "PZ-020-G", stock: 0 }] },
+    { name: "Gamberetti", description: "Tomatensauce, Mozzarella, Crevetten, Knoblauch", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/gamberetti-500x500.png`, sku: "PZ-021", barcode: "7610001000021", unit: "piece", variants: [{ name: "33cm (Normal)", price: 19.00, sku: "PZ-021-N", stock: 0 }, { name: "45cm (Gross)", price: 36.00, sku: "PZ-021-G", stock: 0 }] },
+    { name: "Siciliana", description: "Tomatensauce, Mozzarella, Sardellen, Oliven, Kapern", price: "17.50", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/siciliana-500x500.png`, sku: "PZ-022", barcode: "7610001000022", unit: "piece", variants: [{ name: "33cm (Normal)", price: 17.50, sku: "PZ-022-N", stock: 0 }, { name: "45cm (Gross)", price: 33.00, sku: "PZ-022-G", stock: 0 }] },
+    { name: "Fiorentina", description: "Tomatensauce, Mozzarella, Spinat, Ei", price: "17.50", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/fiorentina-500x500.png`, sku: "PZ-023", barcode: "7610001000023", unit: "piece", variants: [{ name: "33cm (Normal)", price: 17.50, sku: "PZ-023-N", stock: 0 }, { name: "45cm (Gross)", price: 33.00, sku: "PZ-023-G", stock: 0 }] },
+    { name: "Poulet", description: "Tomatensauce, Mozzarella, Pouletbrust, Mais", price: "18.50", costPrice: "6.50", category: "Pizza", image: `${IMG_BASE}/poulet-500x500.png`, sku: "PZ-024", barcode: "7610001000024", unit: "piece", variants: [{ name: "33cm (Normal)", price: 18.50, sku: "PZ-024-N", stock: 0 }, { name: "45cm (Gross)", price: 35.00, sku: "PZ-024-G", stock: 0 }] },
+    { name: "Americano", description: "Tomatensauce, Mozzarella, Schinken, Spiegelei", price: "17.50", costPrice: "5.50", category: "Pizza", image: `${IMG_BASE}/americano-500x500.png`, sku: "PZ-025", barcode: "7610001000025", unit: "piece", variants: [{ name: "33cm (Normal)", price: 17.50, sku: "PZ-025-N", stock: 0 }, { name: "45cm (Gross)", price: 33.00, sku: "PZ-025-G", stock: 0 }] },
+    { name: "Arrabiata", description: "Tomatensauce, Mozzarella, scharfe Salami, Peperoncini, Tabasco", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/arrabiata-500x500.png`, sku: "PZ-026", barcode: "7610001000026", unit: "piece", variants: [{ name: "33cm (Normal)", price: 18.00, sku: "PZ-026-N", stock: 0 }, { name: "45cm (Gross)", price: 34.00, sku: "PZ-026-G", stock: 0 }] },
+    { name: "Piccante", description: "Tomatensauce, Mozzarella, Peperoncini, scharfe Sauce", price: "18.00", costPrice: "6.00", category: "Pizza", image: `${IMG_BASE}/piccante-500x500.png`, sku: "PZ-027", barcode: "7610001000027", unit: "piece", variants: [{ name: "33cm (Normal)", price: 18.00, sku: "PZ-027-N", stock: 0 }, { name: "45cm (Gross)", price: 34.00, sku: "PZ-027-G", stock: 0 }] },
+    { name: "Italiano", description: "Tomatensauce, Mozzarella, Parmaschinken, Rucola, Parmesan", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/italiano-500x500.png`, sku: "PZ-028", barcode: "7610001000028", unit: "piece", variants: [{ name: "33cm (Normal)", price: 19.00, sku: "PZ-028-N", stock: 0 }, { name: "45cm (Gross)", price: 36.00, sku: "PZ-028-G", stock: 0 }] },
+    { name: "Porcini", description: "Rahmsauce, Mozzarella, Steinpilze, Kräuter", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/porcini-500x500.png`, sku: "PZ-029", barcode: "7610001000029", unit: "piece", variants: [{ name: "33cm (Normal)", price: 19.00, sku: "PZ-029-N", stock: 0 }, { name: "45cm (Gross)", price: 36.00, sku: "PZ-029-G", stock: 0 }] },
+    { name: "Profumata", description: "Tomatensauce, Büffelmozzarella, Cherrytomaten, Basilikum", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/profumata-500x500.png`, sku: "PZ-030", barcode: "7610001000030", unit: "piece", variants: [{ name: "33cm (Normal)", price: 19.00, sku: "PZ-030-N", stock: 0 }, { name: "45cm (Gross)", price: 36.00, sku: "PZ-030-G", stock: 0 }] },
+    { name: "Padrone", description: "Tomatensauce, Mozzarella, Rindfleisch, Zwiebeln, Peperoni", price: "19.50", costPrice: "7.50", category: "Pizza", image: `${IMG_BASE}/padrone-500x500.png`, sku: "PZ-031", barcode: "7610001000031", unit: "piece", variants: [{ name: "33cm (Normal)", price: 19.50, sku: "PZ-031-N", stock: 0 }, { name: "45cm (Gross)", price: 37.00, sku: "PZ-031-G", stock: 0 }] },
+    { name: "Pizzaiolo", description: "Tomatensauce, Mozzarella, Schinken, Salami, Peperoni, Champignons", price: "18.50", costPrice: "6.50", category: "Pizza", image: `${IMG_BASE}/pizzaiolo-500x500.png`, sku: "PZ-032", barcode: "7610001000032", unit: "piece", variants: [{ name: "33cm (Normal)", price: 18.50, sku: "PZ-032-N", stock: 0 }, { name: "45cm (Gross)", price: 35.00, sku: "PZ-032-G", stock: 0 }] },
+    { name: "A'Casa", description: "Tomatensauce, Mozzarella, Geflügelgeschnetzeltes, Peperoni, Ei", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/acasa-500x500.png`, sku: "PZ-033", barcode: "7610001000033", unit: "piece", variants: [{ name: "33cm (Normal)", price: 19.00, sku: "PZ-033-N", stock: 0 }, { name: "45cm (Gross)", price: 36.00, sku: "PZ-033-G", stock: 0 }] },
+    { name: "Lemon Pizza", description: "Tomatensauce, Mozzarella, Kalbfleisch, Knoblauch, Scharf, Kräuterbutter", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/lemon-500x500.png`, sku: "PZ-034", barcode: "7610001000034", unit: "piece", variants: [{ name: "33cm (Normal)", price: 19.00, sku: "PZ-034-N", stock: 0 }, { name: "45cm (Gross)", price: 36.00, sku: "PZ-034-G", stock: 0 }] },
+    { name: "Raclette", description: "Tomatensauce, Mozzarella, Raclettekäse, Kartoffeln", price: "19.00", costPrice: "7.00", category: "Pizza", image: `${IMG_BASE}/raclette-500x500.png`, sku: "PZ-035", barcode: "7610001000035", unit: "piece", variants: [{ name: "33cm (Normal)", price: 19.00, sku: "PZ-035-N", stock: 0 }, { name: "45cm (Gross)", price: 36.00, sku: "PZ-035-G", stock: 0 }] },
+    { name: "Schloss Pizza", description: "Tomatensauce, Mozzarella, Spezial Belag (Hausspezialität)", price: "20.00", costPrice: "8.00", category: "Pizza", image: `${IMG_BASE}/schloss_pizza-500x500.png`, sku: "PZ-036", barcode: "7610001000036", unit: "piece", variants: [{ name: "33cm (Normal)", price: 20.00, sku: "PZ-036-N", stock: 0 }, { name: "45cm (Gross)", price: 38.00, sku: "PZ-036-G", stock: 0 }] },
+    { name: "Spezial", description: "Tomatensauce, Mozzarella, Alles drauf (Chef Spezial)", price: "20.00", costPrice: "8.00", category: "Pizza", image: `${IMG_BASE}/spezial-500x500.png`, sku: "PZ-037", barcode: "7610001000037", unit: "piece", variants: [{ name: "33cm (Normal)", price: 20.00, sku: "PZ-037-N", stock: 0 }, { name: "45cm (Gross)", price: 38.00, sku: "PZ-037-G", stock: 0 }] },
 
     // ===================== DÖNER / FINGERFOOD =====================
-    { name: "Döner Kebab im Taschenbrot", description: "Kebabfleisch im Fladenbrot mit Salat und Sauce", price: "10.50", costPrice: "3.50", category: "Döner / Fingerfood", image: `${IMG_BASE}/doner_kebab-500x500.png`, sku: "DF-001", barcode: "7610002000001", unit: "piece" },
+    { name: "Döner Kebab im Taschenbrot", description: "Kebabfleisch im Fladenbrot with Salat and Sauce", price: "10.50", costPrice: "3.50", category: "Döner / Fingerfood", image: `${IMG_BASE}/doner_kebab-500x500.png`, sku: "DF-001", barcode: "7610002000001", unit: "piece" },
     { name: "Döner Kebab im Dürüm", description: "Kebabfleisch im dünnen Fladenbrot gerollt", price: "11.50", costPrice: "4.00", category: "Döner / Fingerfood", image: `${IMG_BASE}/doner_durum-500x500.png`, sku: "DF-002", barcode: "7610002000002", unit: "piece" },
-    { name: "Döner Box", description: "Döner Kebab mit Pommes frites in der Box", price: "13.00", costPrice: "4.50", category: "Döner / Fingerfood", image: `${IMG_BASE}/doner_box-500x500.png`, sku: "DF-003", barcode: "7610002000003", unit: "piece" },
+    { name: "Döner Box", description: "Döner Kebab with Pommes frites in the Box", price: "13.00", costPrice: "4.50", category: "Döner / Fingerfood", image: `${IMG_BASE}/doner_box-500x500.png`, sku: "DF-003", barcode: "7610002000003", unit: "piece" },
     { name: "Extra Kebap", description: "Extra Portion Kebabfleisch", price: "5.00", costPrice: "2.00", category: "Döner / Fingerfood", image: `${IMG_BASE}/extra_kebap-500x500.png`, sku: "DF-004", barcode: "7610002000004", unit: "piece" },
-    { name: "Cevapcici im Taschenbrot", description: "Cevapcici im Fladenbrot mit Salat und Sauce", price: "11.50", costPrice: "4.00", category: "Döner / Fingerfood", image: `${IMG_BASE}/cevapcici-500x500.png`, sku: "DF-005", barcode: "7610002000005", unit: "piece" },
-    { name: "Hamburger", description: "Klassischer Hamburger mit Salat und Sauce", price: "8.50", costPrice: "3.00", category: "Döner / Fingerfood", image: `${IMG_BASE}/hamburger-500x500.png`, sku: "DF-006", barcode: "7610002000006", unit: "piece" },
-    { name: "Cheeseburger", description: "Hamburger mit Käse, Salat und Sauce", price: "9.50", costPrice: "3.50", category: "Döner / Fingerfood", image: `${IMG_BASE}/cheeseburger-500x500.png`, sku: "DF-007", barcode: "7610002000007", unit: "piece" },
-    { name: "Chicken Nuggets Box", description: "Chicken Nuggets mit Pommes frites und Sauce", price: "12.50", costPrice: "4.00", category: "Döner / Fingerfood", image: `${IMG_BASE}/chicken_nuggets-500x500.png`, sku: "DF-008", barcode: "7610002000008", unit: "piece" },
+    { name: "Cevapcici im Taschenbrot", description: "Cevapcici im Fladenbrot with Salat and Sauce", price: "11.50", costPrice: "4.00", category: "Döner / Fingerfood", image: `${IMG_BASE}/cevapcici-500x500.png`, sku: "DF-005", barcode: "7610002000005", unit: "piece" },
+    { name: "Hamburger", description: "Klassischer Hamburger with Salat and Sauce", price: "8.50", costPrice: "3.00", category: "Döner / Fingerfood", image: `${IMG_BASE}/hamburger-500x500.png`, sku: "DF-006", barcode: "7610002000006", unit: "piece" },
+    { name: "Cheeseburger", description: "Hamburger with Käse, Salat and Sauce", price: "9.50", costPrice: "3.50", category: "Döner / Fingerfood", image: `${IMG_BASE}/cheeseburger-500x500.png`, sku: "DF-007", barcode: "7610002000007", unit: "piece" },
+    { name: "Chicken Nuggets Box", description: "Chicken Nuggets with Pommes frites and Sauce", price: "12.50", costPrice: "4.00", category: "Döner / Fingerfood", image: `${IMG_BASE}/chicken_nuggets-500x500.png`, sku: "DF-008", barcode: "7610002000008", unit: "piece" },
     { name: "Pommes frites (Normal)", description: "Pommes frites Portion Normal", price: "6.50", costPrice: "1.50", category: "Döner / Fingerfood", image: `${IMG_BASE}/pommes-500x500.png`, sku: "DF-009", barcode: "7610002000009", unit: "piece" },
     { name: "Pommes frites (Gross)", description: "Pommes frites Portion Gross", price: "9.50", costPrice: "2.50", category: "Döner / Fingerfood", image: `${IMG_BASE}/pommes_gross-500x500.png`, sku: "DF-010", barcode: "7610002000010", unit: "piece" },
-    { name: "Falafel im Taschenbrot", description: "Falafel im Fladenbrot mit Salat und Hummus", price: "10.50", costPrice: "3.50", category: "Döner / Fingerfood", image: `${IMG_BASE}/falafel-500x500.png`, sku: "DF-011", barcode: "7610002000011", unit: "piece" },
+    { name: "Falafel im Taschenbrot", description: "Falafel im Fladenbrot with Salat and Hummus", price: "10.50", costPrice: "3.50", category: "Döner / Fingerfood", image: `${IMG_BASE}/falafel-500x500.png`, sku: "DF-011", barcode: "7610002000011", unit: "piece" },
 
     // ===================== PIDE =====================
-    { name: "Pide mit Hackfleisch", description: "Türkisches Fladenbrot mit Hackfleisch und Gewürzen", price: "16.50", costPrice: "5.50", category: "Pide", image: `${IMG_BASE}/pide_hackfleisch-500x500.png`, sku: "PI-001", barcode: "7610003000001", unit: "piece" },
-    { name: "Pide mit Käse", description: "Türkisches Fladenbrot mit geschmolzenem Käse", price: "15.50", costPrice: "5.00", category: "Pide", image: `${IMG_BASE}/pide_kase-500x500.png`, sku: "PI-002", barcode: "7610003000002", unit: "piece" },
-    { name: "Pide mit Käse & Ei", description: "Türkisches Fladenbrot mit Käse und Spiegelei", price: "17.50", costPrice: "6.00", category: "Pide", image: `${IMG_BASE}/pide_kase_ei-500x500.png`, sku: "PI-003", barcode: "7610003000003", unit: "piece" },
-    { name: "Pide mit Spinat & Käse", description: "Türkisches Fladenbrot mit Spinat und Käse", price: "17.00", costPrice: "5.50", category: "Pide", image: `${IMG_BASE}/pide_spinat-500x500.png`, sku: "PI-004", barcode: "7610003000004", unit: "piece" },
-    { name: "Lemon Pide / Etli Ekmek", description: "Hausspezialität: Fladenbrot mit Fleisch und Gewürzen", price: "19.50", costPrice: "7.00", category: "Pide", image: `${IMG_BASE}/lemon_pide-500x500.png`, sku: "PI-005", barcode: "7610003000005", unit: "piece" },
-    { name: "Wunschpide", description: "Individuelle Pide mit Wunsch-Belag", price: "18.50", costPrice: "6.50", category: "Pide", image: `${IMG_BASE}/wunschpide-500x500.png`, sku: "PI-006", barcode: "7610003000006", unit: "piece" },
+    { name: "Pide mit Hackfleisch", description: "Türkisches Fladenbrot with Hackfleisch and Gewürzen", price: "16.50", costPrice: "5.50", category: "Pide", image: `${IMG_BASE}/pide_hackfleisch-500x500.png`, sku: "PI-001", barcode: "7610003000001", unit: "piece" },
+    { name: "Pide mit Käse", description: "Türkisches Fladenbrot with geschmolzenem Käse", price: "15.50", costPrice: "5.00", category: "Pide", image: `${IMG_BASE}/pide_kase-500x500.png`, sku: "PI-002", barcode: "7610003000002", unit: "piece" },
+    { name: "Pide mit Käse & Ei", description: "Türkisches Fladenbrot with Käse and Spiegelei", price: "17.50", costPrice: "6.00", category: "Pide", image: `${IMG_BASE}/pide_kase_ei-500x500.png`, sku: "PI-003", barcode: "7610003000003", unit: "piece" },
+    { name: "Pide mit Spinat & Käse", description: "Türkisches Fladenbrot with Spinat and Käse", price: "17.00", costPrice: "5.50", category: "Pide", image: `${IMG_BASE}/pide_spinat-500x500.png`, sku: "PI-004", barcode: "7610003000004", unit: "piece" },
+    { name: "Lemon Pide / Etli Ekmek", description: "Hausspezialität: Fladenbrot with Fleisch and Gewürzen", price: "19.50", costPrice: "7.00", category: "Pide", image: `${IMG_BASE}/lemon_pide-500x500.png`, sku: "PI-005", barcode: "7610003000005", unit: "piece" },
+    { name: "Wunschpide", description: "Individuelle Pide with Wunsch-Belag", price: "18.50", costPrice: "6.50", category: "Pide", image: `${IMG_BASE}/wunschpide-500x500.png`, sku: "PI-006", barcode: "7610003000006", unit: "piece" },
 
     // ===================== TELLERGERICHTE =====================
-    { name: "Döner Teller", description: "Döner Kebab mit Pommes frites oder Reis und Salat", price: "18.50", costPrice: "6.50", category: "Tellergerichte", image: `${IMG_BASE}/doner_teller-500x500.png`, sku: "TG-001", barcode: "7610004000001", unit: "piece" },
-    { name: "Cevapcici Teller", description: "10 Stück Cevapcici mit Pommes frites und Salat", price: "18.50", costPrice: "6.50", category: "Tellergerichte", image: `${IMG_BASE}/cevapcici_teller-500x500.png`, sku: "TG-002", barcode: "7610004000002", unit: "piece" },
-    { name: "Fischknusperli Teller", description: "Knusprige Fischstücke mit Pommes frites und Salat", price: "18.50", costPrice: "6.50", category: "Tellergerichte", image: `${IMG_BASE}/fischknusperli-500x500.png`, sku: "TG-003", barcode: "7610004000003", unit: "piece" },
-    { name: "Chicken Nuggets Teller", description: "Chicken Nuggets mit Pommes frites und Salat", price: "18.50", costPrice: "6.50", category: "Tellergerichte", image: `${IMG_BASE}/nuggets_teller-500x500.png`, sku: "TG-004", barcode: "7610004000004", unit: "piece" },
+    { name: "Döner Teller", description: "Döner Kebab with Pommes frites or Reis and Salat", price: "18.50", costPrice: "6.50", category: "Tellergerichte", image: `${IMG_BASE}/doner_teller-500x500.png`, sku: "TG-001", barcode: "7610004000001", unit: "piece" },
+    { name: "Cevapcici Teller", description: "10 Stück Cevapcici with Pommes frites and Salat", price: "18.50", costPrice: "6.50", category: "Tellergerichte", image: `${IMG_BASE}/cevapcici_teller-500x500.png`, sku: "TG-002", barcode: "7610004000002", unit: "piece" },
+    { name: "Fischknusperli Teller", description: "Knusprige Fischstücke with Pommes frites and Salat", price: "18.50", costPrice: "6.50", category: "Tellergerichte", image: `${IMG_BASE}/fischknusperli-500x500.png`, sku: "TG-003", barcode: "7610004000003", unit: "piece" },
+    { name: "Chicken Nuggets Teller", description: "Chicken Nuggets with Pommes frites and Salat", price: "18.50", costPrice: "6.50", category: "Tellergerichte", image: `${IMG_BASE}/nuggets_teller-500x500.png`, sku: "TG-004", barcode: "7610004000004", unit: "piece" },
 
     // ===================== LAHMACUN =====================
-    { name: "Lahmacun", description: "Türkische Pizza mit Hackfleisch, Tomaten, Zwiebeln, Petersilie", price: "9.50", costPrice: "3.00", category: "Lahmacun", image: `${IMG_BASE}/lahmacun-500x500.png`, sku: "LH-001", barcode: "7610005000001", unit: "piece" },
-    { name: "Lahmacun mit Käse", description: "Lahmacun mit extra Käse überbacken", price: "11.50", costPrice: "4.00", category: "Lahmacun", image: `${IMG_BASE}/lahmacun_kase-500x500.png`, sku: "LH-002", barcode: "7610005000002", unit: "piece" },
-    { name: "Lahmacun mit Döner", description: "Lahmacun gefüllt mit Döner Kebab und Salat", price: "12.50", costPrice: "4.50", category: "Lahmacun", image: `${IMG_BASE}/lahmacun_doner-500x500.png`, sku: "LH-003", barcode: "7610005000003", unit: "piece" },
+    { name: "Lahmacun", description: "Türkische Pizza with Hackfleisch, Tomaten, Zwiebeln, Petersilie", price: "9.50", costPrice: "3.00", category: "Lahmacun", image: `${IMG_BASE}/lahmacun-500x500.png`, sku: "LH-001", barcode: "7610005000001", unit: "piece" },
+    { name: "Lahmacun mit Käse", description: "Lahmacun with extra Käse überbacken", price: "11.50", costPrice: "4.00", category: "Lahmacun", image: `${IMG_BASE}/lahmacun_kase-500x500.png`, sku: "LH-002", barcode: "7610005000002", unit: "piece" },
+    { name: "Lahmacun mit Döner", description: "Lahmacun gefüllt with Döner Kebab and Salat", price: "12.50", costPrice: "4.50", category: "Lahmacun", image: `${IMG_BASE}/lahmacun_doner-500x500.png`, sku: "LH-003", barcode: "7610005000003", unit: "piece" },
 
     // ===================== SALAT =====================
-    { name: "Gemischter Salat", description: "Frischer gemischter Salat mit Dressing", price: "9.50", costPrice: "3.00", category: "Salat", image: `${IMG_BASE}/gemischter_salat-500x500.png`, sku: "SA-001", barcode: "7610006000001", unit: "piece" },
-    { name: "Griechischer Salat", description: "Salat mit Feta, Oliven, Tomaten, Gurken, Zwiebeln", price: "11.50", costPrice: "4.00", category: "Salat", image: `${IMG_BASE}/griechischer_salat-500x500.png`, sku: "SA-002", barcode: "7610006000002", unit: "piece" },
-    { name: "Poulet Salat", description: "Salat mit gegrillter Pouletbrust", price: "14.50", costPrice: "5.00", category: "Salat", image: `${IMG_BASE}/poulet_salat-500x500.png`, sku: "SA-003", barcode: "7610006000003", unit: "piece" },
+    { name: "Gemischter Salat", description: "Frischer gemischter Salat with Dressing", price: "9.50", costPrice: "3.00", category: "Salat", image: `${IMG_BASE}/gemischter_salat-500x500.png`, sku: "SA-001", barcode: "7610006000001", unit: "piece" },
+    { name: "Griechischer Salat", description: "Salat with Feta, Oliven, Tomaten, Gurken, Zwiebeln", price: "11.50", costPrice: "4.00", category: "Salat", image: `${IMG_BASE}/griechischer_salat-500x500.png`, sku: "SA-002", barcode: "7610006000002", unit: "piece" },
+    { name: "Poulet Salat", description: "Salat with gegrillter Pouletbrust", price: "14.50", costPrice: "5.00", category: "Salat", image: `${IMG_BASE}/poulet_salat-500x500.png`, sku: "SA-003", barcode: "7610006000003", unit: "piece" },
     { name: "Knoblibrot", description: "2 Stück Knoblauchbrot", price: "8.00", costPrice: "2.50", category: "Salat", image: `${IMG_BASE}/knoblibrot-500x500.png`, sku: "SA-004", barcode: "7610006000004", unit: "piece" },
 
     // ===================== DESSERT =====================
@@ -166,188 +159,158 @@ const PRODUCTS_DATA: ProductData[] = [
     { name: "Feldschlösschen 0.5l", description: "Feldschlösschen Bier 0.5 Liter", price: "6.00", costPrice: "2.50", category: "Bier", image: `${IMG_BASE}/feldschlosschen-500x500.png`, sku: "BI-001", barcode: "7610010000001", unit: "bottle" },
 ];
 
-async function seedPizzaLemon() {
-    console.log("🍕 Starting Pizza Lemon seed...\n");
+async function downloadImage(url: string, filename: string): Promise<string> {
+    const uploadDir = path.resolve(process.cwd(), "uploads", "products");
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    const filePath = path.join(uploadDir, filename);
 
-    // 0. CLEANUP - Delete existing Pizza Lemon data if it exists
+    return new Promise((resolve, reject) => {
+        const options = {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        };
+
+        https.get(url, options, (response) => {
+            if (response.statusCode === 200) {
+                const file = fs.createWriteStream(filePath);
+                response.pipe(file);
+                file.on('finish', () => {
+                    file.close();
+                    resolve(`/uploads/products/${filename}`);
+                });
+            } else if (response.statusCode === 301 || response.statusCode === 302) {
+                // Follow redirect
+                downloadImage(response.headers.location!, filename).then(resolve).catch(reject);
+            } else {
+                reject(`HTTP ${response.statusCode}`);
+            }
+        }).on('error', (err) => {
+            reject(err.message);
+        });
+    });
+}
+
+async function seedPizzaLemon() {
+    console.log("🍕 Starting Pizza Lemon seed with image download and variants...\n");
+
+    // 0. CLEANUP
     console.log("🧹 Cleaning up existing Pizza Lemon data...");
     const existingTenant = await db.select().from(tenants).where(eq(tenants.ownerEmail, "admin@pizzalemon.ch"));
     if (existingTenant.length > 0) {
         const tenantId = existingTenant[0].id;
-        console.log(`   Found existing tenant ID: ${tenantId}, cleaning up...`);
-
-        // Get branch IDs for this tenant
-        const tenantBranches = await db.select().from(branches).where(eq(branches.tenantId, tenantId));
-        const branchIds = tenantBranches.map(b => b.id);
-
-        // Get product IDs for this tenant
-        const tenantProducts = await db.select().from(products).where(eq(products.tenantId, tenantId));
-        const productIds = tenantProducts.map(p => p.id);
-
-        // Delete inventory for these products/branches
-        if (branchIds.length > 0) {
-            await db.delete(inventory).where(inArray(inventory.branchId, branchIds));
-            await db.delete(employees).where(inArray(employees.branchId, branchIds));
-        }
-        if (productIds.length > 0) {
-            await db.delete(inventory).where(inArray(inventory.productId, productIds));
-        }
-
-        // Delete products, categories, branches
-        await db.delete(products).where(eq(products.tenantId, tenantId));
-        await db.delete(categories).where(eq(categories.tenantId, tenantId));
-        await db.delete(branches).where(eq(branches.tenantId, tenantId));
-
-        // Delete tenant subscriptions, license keys, notifications
         await db.delete(licenseKeys).where(eq(licenseKeys.tenantId, tenantId));
         await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, tenantId));
         await db.delete(tenantNotifications).where(eq(tenantNotifications.tenantId, tenantId));
 
-        // Delete tenant
+        const tenantBranches = await db.select().from(branches).where(eq(branches.tenantId, tenantId));
+        const branchIds = tenantBranches.map(b => b.id);
+        if (branchIds.length > 0) {
+            await db.delete(inventory).where(inArray(inventory.branchId, branchIds));
+            await db.delete(employees).where(inArray(employees.branchId, branchIds));
+            await db.delete(branches).where(eq(branches.tenantId, tenantId));
+        }
+
+        await db.delete(products).where(eq(products.tenantId, tenantId));
+        await db.delete(categories).where(eq(categories.tenantId, tenantId));
         await db.delete(tenants).where(eq(tenants.id, tenantId));
         console.log("   ✅ Existing data cleaned up!");
-    } else {
-        console.log("   No existing data found, proceeding...");
     }
 
     // 1. CREATE TENANT
-    console.log("1️⃣ Creating Pizza Lemon tenant...");
     const [tenant] = await db.insert(tenants).values(TENANT_DATA as any).returning();
-    console.log(`   ✅ Tenant created: ID ${tenant.id} - ${tenant.businessName}`);
 
     // 2. CREATE SUBSCRIPTION
-    console.log("2️⃣ Creating subscription...");
-    const startDate = new Date();
     const endDate = new Date();
-    endDate.setFullYear(endDate.getFullYear() + 1); // 1 year subscription
-
+    endDate.setFullYear(endDate.getFullYear() + 1);
     const [sub] = await db.insert(tenantSubscriptions).values({
         tenantId: tenant.id,
         planName: "Yearly Pro",
         planType: "yearly",
         price: "299.99",
         status: "active",
-        startDate,
+        startDate: new Date(),
         endDate,
         autoRenew: true,
     }).returning();
-    console.log(`   ✅ Subscription created: ${sub.planName} until ${endDate.toISOString().split('T')[0]}`);
 
     // 3. CREATE LICENSE KEY
-    console.log("3️⃣ Creating license key...");
-    const licenseKeyValue = "LEMON-2026-PIZZA-ZURI";
-    const [license] = await db.insert(licenseKeys).values({
-        licenseKey: licenseKeyValue,
+    await db.insert(licenseKeys).values({
+        licenseKey: "LEMON-2026-PIZZA-ZURI",
         tenantId: tenant.id,
         subscriptionId: sub.id,
         status: "active",
         maxActivations: 5,
         expiresAt: endDate,
-        notes: "Pizza Lemon Restaurant - Main License",
-    }).returning();
-    console.log(`   ✅ License key: ${licenseKeyValue}`);
+    });
 
     // 4. CREATE BRANCH
-    console.log("4️⃣ Creating branch...");
-    const [branch] = await db.insert(branches).values({
-        ...BRANCH_DATA,
-        tenantId: tenant.id,
-    }).returning();
-    console.log(`   ✅ Branch created: ID ${branch.id} - ${branch.name}`);
+    const [branch] = await db.insert(branches).values({ ...BRANCH_DATA, tenantId: tenant.id }).returning();
 
-    // 5. CREATE EMPLOYEES (Admin + Cashier)
-    console.log("5️⃣ Creating employees...");
-    const [admin] = await db.insert(employees).values({
-        name: "Admin Lemon",
-        email: "admin@pizzalemon.ch",
-        pin: "1234",
-        role: "admin",
-        branchId: branch.id,
-        permissions: ["all"],
-    }).returning();
-    console.log(`   ✅ Admin created: ${admin.name} (PIN: 1234)`);
-
-    const [cashier] = await db.insert(employees).values({
-        name: "Cashier Lemon",
-        email: "cashier@pizzalemon.ch",
-        pin: "0000",
-        role: "cashier",
-        branchId: branch.id,
-        permissions: ["pos", "customers"],
-    }).returning();
-    console.log(`   ✅ Cashier created: ${cashier.name} (PIN: 0000)`);
+    // 5. CREATE EMPLOYEES
+    await db.insert(employees).values([
+        { name: "Admin Lemon", email: "admin@pizzalemon.ch", pin: "1234", role: "admin", branchId: branch.id, permissions: ["all"] },
+        { name: "Cashier Lemon", email: "cashier@pizzalemon.ch", pin: "0000", role: "cashier", branchId: branch.id, permissions: ["pos", "customers"] }
+    ]);
 
     // 6. CREATE CATEGORIES
-    console.log("6️⃣ Creating categories...");
     const categoryMap: Record<string, number> = {};
     for (const cat of CATEGORIES_DATA) {
-        const [created] = await db.insert(categories).values({
-            ...cat,
-            tenantId: tenant.id,
-        } as any).returning();
+        const [created] = await db.insert(categories).values({ ...cat, tenantId: tenant.id } as any).returning();
         categoryMap[cat.name] = created.id;
-        console.log(`   ✅ Category: ${cat.name} (ID: ${created.id})`);
     }
 
     // 7. CREATE PRODUCTS
-    console.log("7️⃣ Creating products...");
+    console.log("7️⃣ Creating products and downloading images...");
     let productCount = 0;
     for (const prod of PRODUCTS_DATA) {
         const categoryId = categoryMap[prod.category];
-        if (!categoryId) {
-            console.log(`   ⚠️ Category not found for: ${prod.name} (${prod.category})`);
-            continue;
+
+        let localImagePath = prod.image;
+        try {
+            const ext = path.extname(prod.image.split('?')[0]) || ".png";
+            const filename = `${prod.sku}${ext}`;
+            localImagePath = await downloadImage(prod.image, filename);
+            process.stdout.write(".");
+        } catch (e) {
+            console.log(`\n   ⚠️ Image download failed for ${prod.name}, using remote URL`);
         }
 
-        const productData: any = {
+        const [created] = await db.insert(products).values({
             name: prod.name,
             description: prod.description,
             price: prod.price,
             costPrice: prod.costPrice,
             categoryId,
             tenantId: tenant.id,
-            image: prod.image,
+            image: localImagePath,
             sku: prod.sku,
             barcode: prod.barcode,
             unit: prod.unit,
             isActive: true,
-        };
+            trackInventory: false, // Restaurants don't track raw inventory for cooked food
+            variants: prod.variants || []
+        }).returning();
 
-        const [created] = await db.insert(products).values(productData).returning();
-
-        // Create initial inventory
-        await db.insert(inventory).values({
-            productId: created.id,
-            branchId: branch.id,
-            quantity: 100,
-        }).onConflictDoNothing();
+        // Create initial inventory dummy (even if not tracked)
+        await db.insert(inventory).values({ productId: created.id, branchId: branch.id, quantity: 999 });
 
         productCount++;
     }
-    console.log(`   ✅ ${productCount} products created with inventory`);
+    console.log(`\n   ✅ ${productCount} products created`);
 
-    // 8. CREATE NOTIFICATION
-    console.log("8️⃣ Creating welcome notification...");
+    // 8. NOTIFICATION
     await db.insert(tenantNotifications).values({
         tenantId: tenant.id,
         type: "info",
         title: "Willkommen bei Barmagly POS!",
-        message: `Hallo Pizza Lemon Team! Ihr POS-System ist bereit. Admin PIN: 1234, Cashier PIN: 0000`,
+        message: `Hallo Team! Ihr POS-System ist bereit mit lokalen Bildern und Größen-Optionen.`,
         priority: "normal",
     });
 
-    console.log("\n🎉 ====================================");
-    console.log("   PIZZA LEMON SETUP COMPLETE!");
-    console.log("   ====================================");
-    console.log(`   Tenant ID: ${tenant.id}`);
-    console.log(`   Branch ID: ${branch.id}`);
-    console.log(`   License Key: ${licenseKeyValue}`);
-    console.log(`   Admin PIN: 1234`);
-    console.log(`   Cashier PIN: 0000`);
-    console.log(`   Products: ${productCount}`);
-    console.log(`   Categories: ${CATEGORIES_DATA.length}`);
-    console.log("   ====================================\n");
-
+    console.log(`\n🎉 PIZZA LEMON SETUP COMPLETE! Tenant ID: ${tenant.id}`);
     process.exit(0);
 }
 

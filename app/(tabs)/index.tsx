@@ -59,6 +59,7 @@ export default function POSScreen() {
   const [switchPin, setSwitchPin] = useState("");
   const [switchLoading, setSwitchLoading] = useState(false);
   const [switchError, setSwitchError] = useState("");
+  const [selectedProductForOptions, setSelectedProductForOptions] = useState<any>(null);
 
   const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["/api/categories"],
@@ -375,6 +376,11 @@ export default function POSScreen() {
   });
 
   const handleAddToCart = useCallback((product: any) => {
+    // If product has variants, show options modal
+    if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
+      setSelectedProductForOptions(product);
+      return;
+    }
     cart.addItem({ id: product.id, name: product.name, price: Number(product.price) });
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, [cart]);
@@ -590,6 +596,9 @@ export default function POSScreen() {
                   </View>
                   <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
                   <Text style={styles.productPrice}>CHF {Number(item.price).toFixed(2)}</Text>
+                  {tenant?.storeType !== "restaurant" && item.trackInventory && (
+                    <Text style={[styles.barcodeText, { color: Colors.textSecondary }]}>Stock: {item.quantity || 0}</Text>
+                  )}
                   {item.barcode ? <Text style={styles.barcodeText}>{item.barcode}</Text> : null}
                   <View style={[styles.productAddBadge, { backgroundColor: `${catColor}20` }]}>
                     <Ionicons name="add" size={14} color={catColor} />
@@ -643,11 +652,11 @@ export default function POSScreen() {
                   <Text style={[styles.cartItemPrice, rtlTextAlign]}>CHF {(item.price * item.quantity).toFixed(2)}</Text>
                 </View>
                 <View style={[styles.cartItemActions, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Pressable style={styles.qtyBtn} onPress={() => cart.updateQuantity(item.productId, item.quantity - 1)}>
+                  <Pressable style={styles.qtyBtn} onPress={() => cart.updateQuantity(item.id, item.quantity - 1)}>
                     <Ionicons name="remove" size={16} color={Colors.text} />
                   </Pressable>
                   <Text style={styles.qtyText}>{item.quantity}</Text>
-                  <Pressable style={styles.qtyBtn} onPress={() => cart.updateQuantity(item.productId, item.quantity + 1)}>
+                  <Pressable style={styles.qtyBtn} onPress={() => cart.updateQuantity(item.id, item.quantity + 1)}>
                     <Ionicons name="add" size={16} color={Colors.text} />
                   </Pressable>
                 </View>
@@ -707,6 +716,57 @@ export default function POSScreen() {
         </View>
       </View>
 
+      <Modal visible={!!selectedProductForOptions} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxWidth: 400 }]}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={[styles.modalTitle, rtlTextAlign]}>{selectedProductForOptions?.name}</Text>
+              <Pressable onPress={() => setSelectedProductForOptions(null)}>
+                <Ionicons name="close" size={24} color={Colors.text} />
+              </Pressable>
+            </View>
+
+            <Text style={[styles.sectionLabel, { marginBottom: 16 }, rtlTextAlign]}>{t("selectSize" as any) || "Select Size"}</Text>
+
+            <View style={{ gap: 12 }}>
+              {selectedProductForOptions?.variants?.map((v: any, idx: number) => (
+                <Pressable
+                  key={idx}
+                  style={({ pressed }) => [
+                    styles.paymentBtn,
+                    { width: "100%", justifyContent: "space-between", paddingHorizontal: 16 },
+                    pressed && { opacity: 0.7 }
+                  ]}
+                  onPress={() => {
+                    cart.addItem({
+                      id: selectedProductForOptions.id,
+                      name: selectedProductForOptions.name,
+                      price: Number(selectedProductForOptions.price),
+                      variant: v
+                    });
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSelectedProductForOptions(null);
+                  }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    <Ionicons name="radio-button-on" size={20} color={Colors.accent} />
+                    <Text style={styles.paymentBtnText}>{v.name}</Text>
+                  </View>
+                  <Text style={[styles.paymentBtnText, { fontWeight: "bold", color: Colors.accent }]}>CHF {Number(v.price).toFixed(2)}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Pressable
+              style={[styles.checkoutBtn, { marginTop: 20, backgroundColor: Colors.cardBorder }]}
+              onPress={() => setSelectedProductForOptions(null)}
+            >
+              <Text style={[styles.checkoutBtnText, { color: Colors.textSecondary }]}>{t("cancel")}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={showCheckout} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -734,11 +794,11 @@ export default function POSScreen() {
               <Text style={[styles.sectionLabel, rtlTextAlign]}>{t("paymentMethod")}</Text>
               <View style={[styles.paymentMethods, isRTL && { flexDirection: "row-reverse" }]}>
                 {[
-                  { key: "cash",   icon: "cash" as const,           label: t("cash")   },
-                  { key: "card",   icon: "card" as const,           label: t("card")   },
-                  { key: "twint",  icon: "phone-portrait" as const, label: "TWINT"     },
+                  { key: "cash", icon: "cash" as const, label: t("cash") },
+                  { key: "card", icon: "card" as const, label: t("card") },
+                  { key: "twint", icon: "phone-portrait" as const, label: "TWINT" },
                   { key: "mobile", icon: "phone-portrait" as const, label: t("mobile") },
-                  { key: "nfc",    icon: "wifi" as const,           label: t("nfcPay") },
+                  { key: "nfc", icon: "wifi" as const, label: t("nfcPay") },
                 ].map((m) => (
                   <Pressable
                     key={m.key}

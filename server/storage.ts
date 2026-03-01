@@ -183,7 +183,23 @@ export const storage = {
     return inv;
   },
   async getLowStockItems(branchId?: number) {
-    const result = await db.select().from(inventory);
+    let result = await db.select().from(inventory);
+    if (branchId) {
+      result = result.filter(item => item.branchId === branchId);
+    }
+
+    // Filter out items for restaurant tenants as they have unlimited stock
+    const { inArray } = await import('drizzle-orm');
+    const restaurantTenants = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.storeType, "restaurant"));
+    const restaurantTenantIds = restaurantTenants.map(t => t.id);
+
+    if (restaurantTenantIds.length > 0) {
+      // Find branches of these restaurants
+      const restaurantBranches = await db.select({ id: branches.id }).from(branches).where(inArray(branches.tenantId, restaurantTenantIds));
+      const restaurantBranchIds = restaurantBranches.map(b => b.id);
+      result = result.filter(item => !restaurantBranchIds.includes(item.branchId));
+    }
+
     return result.filter(item => (item.quantity || 0) <= (item.lowStockThreshold || 10));
   },
 
@@ -562,7 +578,12 @@ export const storage = {
         customerCountQuery = db.select({ count: sql<number>`count(*)` }).from(customers).where(eq(customers.tenantId, tenantId));
         productCountQuery = db.select({ count: sql<number>`count(*)` }).from(products).where(and(eq(products.tenantId, tenantId), eq(products.isActive, true)));
 
-        lowStockQuery = db.select({ count: sql<number>`count(*)` }).from(inventory).where(and(sql`quantity <= low_stock_threshold`, inArray(inventory.branchId, branchIds)));
+        const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId));
+        const isRestaurant = tenant?.storeType === "restaurant";
+
+        lowStockQuery = isRestaurant
+          ? db.select({ count: sql<number>`0` })
+          : db.select({ count: sql<number>`count(*)` }).from(inventory).where(and(sql`quantity <= low_stock_threshold`, inArray(inventory.branchId, branchIds)));
 
         todaySalesQuery = db.select({
           count: sql<number>`count(*)`,

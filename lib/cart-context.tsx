@@ -10,11 +10,19 @@ export interface CartItem {
   notes?: string;
 }
 
+interface AddItemProps {
+  id: number;
+  name: string;
+  price: number;
+  variant?: { name: string; price: number };
+  modifiers?: { name: string; option: string; price: number }[];
+}
+
 interface CartContextValue {
   items: CartItem[];
-  addItem: (product: { id: number; name: string; price: number }) => void;
-  removeItem: (productId: number) => void;
-  updateQuantity: (productId: number, quantity: number) => void;
+  addItem: (product: AddItemProps) => void;
+  removeItem: (itemId: number) => void; // Changed to itemId to be unique
+  updateQuantity: (itemId: number, quantity: number) => void;
   clearCart: () => void;
   subtotal: number;
   itemCount: number;
@@ -42,27 +50,45 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [tableNumber, setTableNumber] = useState("");
   const [orderType, setOrderType] = useState("dine_in");
 
-  const addItem = useCallback((product: { id: number; name: string; price: number }) => {
+  const addItem = useCallback((product: AddItemProps) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.productId === product.id);
+      // Find if item with SAME productId and SAME variant/modifiers exists
+      const variantName = product.variant?.name;
+      const existing = prev.find((i) =>
+        i.productId === product.id &&
+        (variantName ? i.name.includes(variantName) : !i.name.includes("(")) &&
+        JSON.stringify(i.modifiers || []) === JSON.stringify(product.modifiers || [])
+      );
+
       if (existing) {
         return prev.map((i) =>
-          i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i
+          i.id === existing.id ? { ...i, quantity: i.quantity + 1 } : i
         );
       }
-      return [...prev, { id: Date.now(), productId: product.id, name: product.name, price: product.price, quantity: 1 }];
+
+      const itemName = variantName ? `${product.name} (${variantName})` : product.name;
+      const itemPrice = product.variant ? product.variant.price : product.price;
+
+      return [...prev, {
+        id: Date.now(),
+        productId: product.id,
+        name: itemName,
+        price: itemPrice,
+        quantity: 1,
+        modifiers: product.modifiers
+      }];
     });
   }, []);
 
-  const removeItem = useCallback((productId: number) => {
-    setItems((prev) => prev.filter((i) => i.productId !== productId));
+  const removeItem = useCallback((itemId: number) => {
+    setItems((prev) => prev.filter((i) => i.id !== itemId));
   }, []);
 
-  const updateQuantity = useCallback((productId: number, quantity: number) => {
+  const updateQuantity = useCallback((itemId: number, quantity: number) => {
     if (quantity <= 0) {
-      setItems((prev) => prev.filter((i) => i.productId !== productId));
+      setItems((prev) => prev.filter((i) => i.id !== itemId));
     } else {
-      setItems((prev) => prev.map((i) => (i.productId === productId ? { ...i, quantity } : i)));
+      setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity } : i)));
     }
   }, []);
 
