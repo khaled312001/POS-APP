@@ -1322,13 +1322,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Smart Predictions / Analytics
-  app.get("/api/analytics/predictions", async (_req, res) => {
+  app.get("/api/analytics/predictions", async (req, res) => {
     try {
-      const stats = await storage.getDashboardStats();
-      const topProducts = await storage.getTopProducts(10);
-      const slowMoving = await storage.getSlowMovingProducts(30);
-      const allProds = await storage.getProducts();
-      const lowStockData = await storage.getLowStockItems();
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      const stats = await storage.getDashboardStats(tenantId);
+      const limit = 10;
+      const topProducts = stats.topProducts || [];
+      const slowMoving = await storage.getSlowMovingProducts(30); // Need to update slowMoving to tenantId if needed
+      const allProds = tenantId ? await storage.getProductsByTenant(tenantId) : await storage.getProducts();
+      // Low stock data needs branch filtering
+      let lowStockData = await storage.getLowStockItems();
+      if (tenantId) {
+        const branches = await storage.getBranchesByTenant(tenantId);
+        const branchIds = branches.map(b => b.id);
+        lowStockData = lowStockData.filter(item => branchIds.includes(item.branchId));
+      }
 
       // Simple predictions based on trends
       const avgDailyRevenue = Number(stats.monthRevenue || 0) / 30;
@@ -1454,7 +1462,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get active shift for employee
   app.get("/api/shifts/active/:employeeId", async (req, res) => {
     try {
-      const shifts = await storage.getShifts();
+      // Pass the tenantId if provided to getShifts
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      const shifts = await storage.getShifts(tenantId);
       const active = shifts.find((s: any) => s.employeeId === Number(req.params.employeeId) && s.status === "open");
       res.json(active || null);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -1463,7 +1473,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get store settings (main branch + tenant info)
   app.get("/api/store-settings", async (req: any, res) => {
     try {
-      const branches = await storage.getBranches();
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      let branches = [];
+      if (tenantId) {
+        branches = await storage.getBranchesByTenant(tenantId);
+      } else {
+        branches = await storage.getBranches();
+      }
+
       const mainBranch = branches.find((b: any) => b.isMain) || branches[0];
       if (!mainBranch) return res.status(404).json({ error: "No branch found" });
 
@@ -1478,8 +1495,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update store settings (update main branch + tenant storeType)
   app.put("/api/store-settings", async (req: any, res) => {
     try {
-      const { storeType, ...branchData } = sanitizeDates(req.body);
-      const branches = await storage.getBranches();
+      const { storeType, tenantId: bodyTenantId, ...branchData } = sanitizeDates(req.body);
+      // Use tenantId from query or body to find the right branch
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : (bodyTenantId ? Number(bodyTenantId) : undefined);
+
+      let branches = [];
+      if (tenantId) {
+        branches = await storage.getBranchesByTenant(tenantId);
+      } else {
+        branches = await storage.getBranches();
+      }
+
       const mainBranch = branches.find((b: any) => b.isMain) || branches[0];
       if (!mainBranch) return res.status(404).json({ error: "No branch found" });
 
