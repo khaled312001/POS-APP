@@ -55,6 +55,8 @@ const poStatusColors: Record<string, string> = {
   received: Colors.success,
 };
 
+const EMPTY_SHIFTS: any[] = [];
+
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
@@ -137,12 +139,13 @@ export default function SettingsScreen() {
   const { data: storeSettings } = useQuery<any>({ queryKey: ["/api/store-settings"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: pgConfig, refetch: refetchPgConfig } = useQuery<any>({ queryKey: ["/api/payment-gateway/config"], queryFn: getQueryFn({ on401: "throw" }), enabled: isAdmin });
 
-  const { data: allActiveShifts = [] } = useQuery<any[]>({
+  const { data: allActiveShiftsRaw } = useQuery<any[]>({
     queryKey: ["/api/shifts/active"],
     queryFn: getQueryFn({ on401: "throw" }),
     refetchInterval: 30000,
     enabled: isAdmin,
   });
+  const allActiveShifts = allActiveShiftsRaw ?? EMPTY_SHIFTS;
 
   const { data: notificationsList = [] } = useQuery<any[]>({
     queryKey: [`/api/notifications/${employee?.id}`],
