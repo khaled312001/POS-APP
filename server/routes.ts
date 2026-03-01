@@ -30,6 +30,36 @@ import * as crypto from "crypto";
 import { addDays, addMonths, addYears } from "date-fns";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+
+  // ── One-time production seed endpoint ─────────────────────────────────────
+  // Ensures Pizza Lemon store exists in whatever DB this server is connected to.
+  // Safe to call multiple times – seedPizzaLemon() is idempotent.
+  app.post("/api/admin/seed-pizza-lemon", async (_req, res) => {
+    try {
+      const { seedPizzaLemon } = await import("./seedPizzaLemon");
+      await seedPizzaLemon();
+      res.json({ success: true, message: "Pizza Lemon store seeded (or already existed)." });
+    } catch (e: any) {
+      console.error("[SEED API] Error:", e);
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // ── DB health check (returns license key status) ──────────────────────────
+  app.get("/api/admin/check-pizza-lemon", async (_req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { tenants, licenseKeys } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const [tenant] = await db.select().from(tenants).where(eq(tenants.ownerEmail, "admin@pizzalemon.ch"));
+      if (!tenant) return res.json({ found: false, message: "Pizza Lemon not found in this database." });
+      const licenses = await db.select().from(licenseKeys).where(eq(licenseKeys.tenantId, tenant.id));
+      res.json({ found: true, tenantId: tenant.id, status: tenant.status, licenses: licenses.map(l => ({ key: l.licenseKey, status: l.status })) });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // Landing Page Subscription
   app.post("/api/landing/subscribe", async (req, res) => {
     try {

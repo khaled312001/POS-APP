@@ -24,6 +24,13 @@ externalPort = 3001
 
 [env]
 PORT = "5000"
+DATABASE_URL = "postgresql://neondb_owner:npg_eMqwIhUg8p2G@ep-long-sound-ajwt8qyz.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require"
+NEON_DATABASE_URL = "postgresql://neondb_owner:npg_eMqwIhUg8p2G@ep-long-sound-ajwt8qyz.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require"
+PGDATABASE = "neondb"
+PGHOST = "ep-long-sound-ajwt8qyz.c-3.us-east-2.aws.neon.tech"
+PGPORT = "5432"
+PGUSER = "neondb_owner"
+PGPASSWORD = "npg_eMqwIhUg8p2G"
 
 [agent]
 stack = "EXPO"

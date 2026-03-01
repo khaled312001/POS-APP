@@ -4,7 +4,10 @@
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_eMqwIhUg8p2G@ep-long-sound-ajwt8qyz.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require\" node -e \":*)",
       "WebFetch(domain:pizzalemon.ch)",
       "Bash(xargs grep:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_eMqwIhUg8p2G@ep-long-sound-ajwt8qyz.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require\" npx tsx:*)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_eMqwIhUg8p2G@ep-long-sound-ajwt8qyz.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require\":*)",
+      "Bash(node:*)"
     ]
   }
 }
