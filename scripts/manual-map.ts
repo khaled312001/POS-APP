@@ -2,7 +2,7 @@ import { config } from "dotenv";
 config();
 import { db } from "../server/db";
 import { products, tenants } from "@shared/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, and } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 import https from "https";
