@@ -148,9 +148,9 @@ export function registerSuperAdminRoutes(app: Express) {
 
   app.post("/api/super-admin/licenses/generate", requireSuperAdmin, async (req: Request, res: Response) => {
     try {
-      const { tenantId, subscriptionId, maxActivations, expiresAt, notes } = req.body;
+      const { tenantId, subscriptionId, maxActivations, expiresAt, notes, customKey } = req.body;
       const segments = Array.from({ length: 4 }, () => crypto.randomBytes(2).toString("hex").toUpperCase());
-      const licenseKey = `BARMAGLY-${segments.join("-")}`;
+      const licenseKey = customKey || `BARMAGLY-${segments.join("-")}`;
 
       const key = await storage.createLicenseKey({
         licenseKey, tenantId,
