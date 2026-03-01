@@ -254,6 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: tenant.id,
           name: tenant.businessName,
           logo: tenant.logo,
+          storeType: tenant.storeType,
         },
         subscription: subInfo,
       });

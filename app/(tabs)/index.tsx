@@ -718,24 +718,24 @@ export default function POSScreen() {
 
       <Modal visible={!!selectedProductForOptions} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxWidth: 400 }]}>
+          <View style={[styles.modalContent, { maxWidth: 420, padding: 28 }]}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Text style={[styles.modalTitle, rtlTextAlign]}>{selectedProductForOptions?.name}</Text>
-              <Pressable onPress={() => setSelectedProductForOptions(null)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+              <View>
+                <Text style={[styles.modalTitle, rtlTextAlign, { fontSize: 24, fontWeight: "900" }]}>{selectedProductForOptions?.name}</Text>
+                <Text style={[styles.sectionLabel, { marginTop: 4, marginBottom: 0 }, rtlTextAlign]}>{t("selectSize" as any) || "Select Size"}</Text>
+              </View>
+              <Pressable onPress={() => setSelectedProductForOptions(null)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={24} color={Colors.textMuted} />
               </Pressable>
             </View>
 
-            <Text style={[styles.sectionLabel, { marginBottom: 16 }, rtlTextAlign]}>{t("selectSize" as any) || "Select Size"}</Text>
-
-            <View style={{ gap: 12 }}>
+            <View style={{ gap: 12, marginTop: 20 }}>
               {selectedProductForOptions?.variants?.map((v: any, idx: number) => (
                 <Pressable
                   key={idx}
                   style={({ pressed }) => [
-                    styles.paymentBtn,
-                    { width: "100%", justifyContent: "space-between", paddingHorizontal: 16 },
-                    pressed && { opacity: 0.7 }
+                    styles.variantBtn,
+                    pressed && { opacity: 0.8, backgroundColor: Colors.accent + "20" }
                   ]}
                   onPress={() => {
                     cart.addItem({
@@ -748,20 +748,26 @@ export default function POSScreen() {
                     setSelectedProductForOptions(null);
                   }}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                    <Ionicons name="radio-button-on" size={20} color={Colors.accent} />
-                    <Text style={styles.paymentBtnText}>{v.name}</Text>
+                  <View style={[styles.variantBtnInner, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                      <View style={styles.variantIconCircle}>
+                        <Ionicons name="options-outline" size={20} color={Colors.accent} />
+                      </View>
+                      <Text style={styles.variantBtnName}>{v.name}</Text>
+                    </View>
+                    <View style={styles.variantPriceTag}>
+                      <Text style={styles.variantBtnPrice}>CHF {Number(v.price).toFixed(2)}</Text>
+                    </View>
                   </View>
-                  <Text style={[styles.paymentBtnText, { fontWeight: "bold", color: Colors.accent }]}>CHF {Number(v.price).toFixed(2)}</Text>
                 </Pressable>
               ))}
             </View>
 
             <Pressable
-              style={[styles.checkoutBtn, { marginTop: 20, backgroundColor: Colors.cardBorder }]}
+              style={styles.modalCancelBtn}
               onPress={() => setSelectedProductForOptions(null)}
             >
-              <Text style={[styles.checkoutBtnText, { color: Colors.textSecondary }]}>{t("cancel")}</Text>
+              <Text style={styles.modalCancelBtnText}>{t("cancel")}</Text>
             </Pressable>
           </View>
         </View>
@@ -1663,4 +1669,13 @@ const styles = StyleSheet.create({
   switchKeypad: { flexDirection: "row" as const, flexWrap: "wrap" as const, width: 260, justifyContent: "center" as const },
   switchKeyBtn: { width: 260 / 3, height: 58, justifyContent: "center" as const, alignItems: "center" as const },
   switchKeyText: { color: Colors.text, fontSize: 26, fontWeight: "600" as const },
+  modalCloseBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.05)", justifyContent: "center", alignItems: "center" },
+  variantBtn: { borderRadius: 18, backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.cardBorder, overflow: "hidden" as const, elevation: 4, boxShadow: "0px 2px 4px rgba(0,0,0,0.2)" },
+  variantBtnInner: { flexDirection: "row" as const, alignItems: "center", justifyContent: "space-between", padding: 16 },
+  variantIconCircle: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(47, 211, 198, 0.1)", justifyContent: "center" as const, alignItems: "center" as const },
+  variantBtnName: { color: Colors.white, fontSize: 16, fontWeight: "700" as const },
+  variantPriceTag: { backgroundColor: "rgba(47, 211, 198, 0.15)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  variantBtnPrice: { color: Colors.accent, fontSize: 16, fontWeight: "800" as const },
+  modalCancelBtn: { marginTop: 24, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: Colors.cardBorder, alignItems: "center" as const },
+  modalCancelBtnText: { color: Colors.textMuted, fontSize: 15, fontWeight: "600" as const },
 });

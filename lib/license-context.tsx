@@ -16,6 +16,7 @@ interface TenantInfo {
     id: number;
     name: string;
     logo: string | null;
+    storeType: string | null;
 }
 
 interface LicenseContextType {
