@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Redirect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLicense } from "@/lib/license-context";
 import { View, ActivityIndicator } from "react-native";
@@ -16,7 +16,7 @@ export default function IndexScreen() {
             try {
                 const seen = await AsyncStorage.getItem("hasSeenIntro");
                 setHasSeenIntro(seen === "true");
-            } catch (e) {
+            } catch {
                 setHasSeenIntro(false);
             }
         }
@@ -26,9 +26,9 @@ export default function IndexScreen() {
     useEffect(() => {
         if (isValidating || hasSeenIntro === null || hasRouted.current) return;
 
-        // Use setTimeout to ensure the navigation state is ready for replace
-        setTimeout(() => {
+        setTimeout(async () => {
             hasRouted.current = true;
+
             if (!hasSeenIntro) {
                 router.replace("/intro" as any);
                 return;
@@ -36,15 +36,26 @@ export default function IndexScreen() {
 
             if (isValid === false) {
                 router.replace("/license-gate" as any);
-            } else {
-                router.replace("/login" as any);
+                return;
             }
+
+            // License is valid – check if an employee session is already saved
+            try {
+                const saved = await AsyncStorage.getItem("barmagly_employee");
+                if (saved) {
+                    router.replace("/(tabs)" as any);
+                    return;
+                }
+            } catch {
+                // ignore AsyncStorage errors
+            }
+
+            router.replace("/login" as any);
         }, 0);
     }, [isValidating, hasSeenIntro, isValid, router]);
 
-    // Optionally return a fallback loading screen while deciding where to route
     return (
-        <View style={{ flex: 1, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{ flex: 1, backgroundColor: Colors.surface, justifyContent: "center", alignItems: "center" }}>
             <ActivityIndicator size="large" color={Colors.primary} />
         </View>
     );

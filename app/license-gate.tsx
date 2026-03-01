@@ -57,8 +57,8 @@ export default function LicenseGate() {
                     <Ionicons name="shield-outline" size={64} color={Colors.primary} />
                 </View>
 
-                <Text style={styles.title}>Barmagly Activation</Text>
-                <Text style={styles.subtitle}>Enter your store credentials and license key.</Text>
+                <Text style={styles.title}>Store Activation</Text>
+                <Text style={styles.subtitle}>Enter your store credentials and license key to get started.</Text>
 
                 {errorReason && (
                     <View style={styles.errorContainer}>
@@ -120,8 +120,7 @@ export default function LicenseGate() {
                 </TouchableOpacity>
 
                 <View style={styles.footer}>
-                    <Text style={styles.footerText}>Device ID: {deviceId}</Text>
-                    <Text style={styles.footerText}>Need help? Contact support.</Text>
+                    <Text style={styles.footerText}>Need help? Contact your store administrator.</Text>
                 </View>
             </View>
         </SafeAreaView>

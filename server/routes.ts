@@ -467,7 +467,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Products
   app.get("/api/products", async (req, res) => {
-    try { res.json(await storage.getProducts(req.query.search as string)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      if (tenantId) {
+        res.json(await storage.getProductsByTenant(tenantId));
+      } else {
+        res.json(await storage.getProducts(req.query.search as string));
+      }
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // Download Products Excel Template (must be before :id route)

@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, Pressable, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
@@ -11,8 +11,7 @@ import { useLanguage } from '@/lib/language-context';
 export default function IntroScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { width } = Dimensions.get('window');
-    const { t, language, setLanguage, isRTL, rtlText } = useLanguage();
+    const { language, setLanguage, isRTL, rtlText } = useLanguage();
 
     const handleStart = async () => {
         await AsyncStorage.setItem('hasSeenIntro', 'true');
@@ -22,16 +21,6 @@ export default function IntroScreen() {
     const toggleLanguage = () => {
         setLanguage(language === 'en' ? 'ar' : 'en');
     };
-
-    const title = language === 'en' ? 'Welcome to Barmagly' : 'مرحباً بك في برمجي';
-    const subtitle = language === 'en'
-        ? 'Your all-in-one Smart POS system. Fast, reliable, and easy to use. Manage your store operations seamlessly from any device.'
-        : 'نظام نقاط البيع الذكي المتكامل الخاص بك. سريع وموثوق وسهل الاستخدام. أدر عمليات متجرك بسلاسة من أي جهاز.';
-
-    const feat1 = language === 'en' ? 'Complete Inventory Management' : 'إدارة متكاملة للمخزون';
-    const feat2 = language === 'en' ? 'Multi-Account Support' : 'دعم متعدد الحسابات';
-    const feat3 = language === 'en' ? 'Secure License Activation' : 'تفعيل ترخيص آمن';
-    const btnText = language === 'en' ? 'Get Started' : 'البدء';
 
     return (
         <View style={styles.container}>
@@ -53,24 +42,14 @@ export default function IntroScreen() {
                     <View style={styles.iconContainer}>
                         <Ionicons name="storefront" size={80} color={Colors.white} />
                     </View>
-
-                    <Text style={[styles.title, rtlText]}>{title}</Text>
-                    <Text style={[styles.subtitle, rtlText]}>{subtitle}</Text>
-
-                    <View style={styles.features}>
-                        <View style={[styles.featureItem, isRTL ? { flexDirection: 'row-reverse' } : {}]}>
-                            <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
-                            <Text style={[styles.featureText, rtlText, isRTL ? { marginRight: 12 } : { marginLeft: 12 }]}>{feat1}</Text>
-                        </View>
-                        <View style={[styles.featureItem, isRTL ? { flexDirection: 'row-reverse' } : {}]}>
-                            <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
-                            <Text style={[styles.featureText, rtlText, isRTL ? { marginRight: 12 } : { marginLeft: 12 }]}>{feat2}</Text>
-                        </View>
-                        <View style={[styles.featureItem, isRTL ? { flexDirection: 'row-reverse' } : {}]}>
-                            <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
-                            <Text style={[styles.featureText, rtlText, isRTL ? { marginRight: 12 } : { marginLeft: 12 }]}>{feat3}</Text>
-                        </View>
-                    </View>
+                    <Text style={[styles.title, rtlText]}>
+                        {language === 'en' ? 'Welcome' : 'مرحباً'}
+                    </Text>
+                    <Text style={[styles.subtitle, rtlText]}>
+                        {language === 'en'
+                            ? 'Activate your store to get started.'
+                            : 'قم بتفعيل متجرك للبدء.'}
+                    </Text>
                 </View>
 
                 <View style={styles.footer}>
@@ -78,7 +57,9 @@ export default function IntroScreen() {
                         style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, isRTL ? { flexDirection: 'row-reverse' } : {}]}
                         onPress={handleStart}
                     >
-                        <Text style={[styles.buttonText, rtlText, isRTL ? { marginLeft: 8 } : { marginRight: 8 }]}>{btnText}</Text>
+                        <Text style={[styles.buttonText, rtlText, isRTL ? { marginLeft: 8 } : { marginRight: 8 }]}>
+                            {language === 'en' ? 'Get Started' : 'البدء'}
+                        </Text>
                         <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={20} color={Colors.background} />
                     </Pressable>
                 </View>
@@ -142,26 +123,6 @@ const styles = StyleSheet.create({
         lineHeight: 24,
         color: 'rgba(255,255,255,0.8)',
         textAlign: 'center',
-        marginBottom: 48,
-    },
-    features: {
-        width: '100%',
-        maxWidth: 400,
-        gap: 16,
-    },
-    featureItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        padding: 16,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.15)',
-    },
-    featureText: {
-        color: Colors.white,
-        fontSize: 16,
-        fontWeight: '600',
     },
     footer: {
         paddingHorizontal: 32,
@@ -177,7 +138,6 @@ const styles = StyleSheet.create({
         maxWidth: 400,
         paddingVertical: 18,
         borderRadius: 16,
-        boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.15)",
         elevation: 8,
     },
     buttonPressed: {

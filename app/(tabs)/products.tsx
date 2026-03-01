@@ -13,13 +13,16 @@ import { Colors } from "@/constants/colors";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { useAuth } from "@/lib/auth-context";
+import { useLicense } from "@/lib/license-context";
 import { useLanguage } from "@/lib/language-context";
 
 export default function ProductsScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const { canManage } = useAuth();
+  const { tenant } = useLicense();
   const { t, isRTL, rtlTextAlign, rtlText } = useLanguage();
+  const tenantId = tenant?.id;
   const [screenDims, setScreenDims] = useState(Dimensions.get("window"));
   useEffect(() => {
     const sub = Dimensions.addEventListener("change", ({ window }) => setScreenDims(window));
@@ -45,7 +48,7 @@ export default function ProductsScreen() {
   const [imageUploading, setImageUploading] = useState(false);
 
   const { data: products = [] } = useQuery<any[]>({
-    queryKey: ["/api/products", search ? `?search=${search}` : ""],
+    queryKey: ["/api/products", tenantId ? `?tenantId=${tenantId}` : (search ? `?search=${search}` : "")],
     queryFn: getQueryFn({ on401: "throw" }),
   });
 
@@ -246,7 +249,7 @@ export default function ProductsScreen() {
                       reader.onload = async (ev) => {
                         try {
                           const base64 = (ev.target?.result as string).split(",")[1];
-                          const res = await apiRequest("POST", "/api/products/import", { fileBase64: base64, tenantId: 1, branchId: 1 });
+                          const res = await apiRequest("POST", "/api/products/import", { fileBase64: base64, tenantId: tenantId || 1, branchId: 1 });
                           const data = await res.json();
                           if (data.success) {
                             Alert.alert(t("success"), `${(t as any)("imported") || "Imported"} ${data.count} ${t("products")}`);
@@ -273,7 +276,7 @@ export default function ProductsScreen() {
                       reader.onloadend = async () => {
                         try {
                           const base64 = (reader.result as string).split(",")[1];
-                          const res = await apiRequest("POST", "/api/products/import", { fileBase64: base64, tenantId: 1, branchId: 1 });
+                          const res = await apiRequest("POST", "/api/products/import", { fileBase64: base64, tenantId: tenantId || 1, branchId: 1 });
                           const data = await res.json();
                           if (data.success) {
                             Alert.alert(t("success"), `${(t as any)("imported") || "Imported"} ${data.count} ${t("products")}`);

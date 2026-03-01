@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
+import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import * as Haptics from "expo-haptics";
 import BarcodeScanner from "@/components/BarcodeScanner";
@@ -18,6 +19,7 @@ import { useLanguage } from "@/lib/language-context";
 export default function POSScreen() {
   const insets = useSafeAreaInsets();
   const { employee, isCashier, canManage, login } = useAuth();
+  const { tenant } = useLicense();
   const qc = useQueryClient();
   const cart = useCart();
   const { t, isRTL, rtlTextAlign, rtlText, rtlRow } = useLanguage();
@@ -63,10 +65,22 @@ export default function POSScreen() {
     queryFn: getQueryFn({ on401: "throw" }),
   });
 
+  const tenantId = tenant?.id;
   const { data: products = [] } = useQuery<any[]>({
-    queryKey: ["/api/products", search ? `?search=${search}` : ""],
+    queryKey: ["/api/products", tenantId ? `?tenantId=${tenantId}` : (search ? `?search=${search}` : "")],
     queryFn: getQueryFn({ on401: "throw" }),
+    enabled: true,
   });
+
+  // Only show categories that have products for this tenant
+  const activeCategoryIds = React.useMemo(() => {
+    return new Set(products.map((p: any) => p.categoryId).filter(Boolean));
+  }, [products]);
+
+  const tenantCategories = React.useMemo(() => {
+    if (activeCategoryIds.size === 0) return categories;
+    return (categories as any[]).filter((c: any) => activeCategoryIds.has(c.id));
+  }, [categories, activeCategoryIds]);
 
   const { data: allEmployees = [] } = useQuery<any[]>({
     queryKey: ["/api/employees"],
@@ -115,7 +129,7 @@ export default function POSScreen() {
       const itemsText = (inv.items || []).map((item: any) =>
         `${item.productName || item.name}  x${item.quantity}  CHF ${Number(item.total || (item.unitPrice * item.quantity)).toFixed(2)}`
       ).join("\n");
-      const receiptText = `${storeSettings?.name || "Barmagly POS"}\n${storeSettings?.address || ""}\n${"─".repeat(30)}\n${t("receiptNumber")}: ${inv.receiptNumber || "#" + inv.id}\n${t("receiptDate")}: ${new Date(inv.createdAt || inv.date).toLocaleString()}\n${"─".repeat(30)}\n${itemsText}\n${"─".repeat(30)}\nTOTAL: CHF ${Number(inv.totalAmount).toFixed(2)}\n${t("paymentMethod")}: ${(inv.paymentMethod || "cash").toUpperCase()}\n${"═".repeat(30)}\n${t("thankYou")}`;
+      const receiptText = `${storeSettings?.name || tenant?.name || "POS System"}\n${storeSettings?.address || ""}\n${"─".repeat(30)}\n${t("receiptNumber")}: ${inv.receiptNumber || "#" + inv.id}\n${t("receiptDate")}: ${new Date(inv.createdAt || inv.date).toLocaleString()}\n${"─".repeat(30)}\n${itemsText}\n${"─".repeat(30)}\nTOTAL: CHF ${Number(inv.totalAmount).toFixed(2)}\n${t("paymentMethod")}: ${(inv.paymentMethod || "cash").toUpperCase()}\n${"═".repeat(30)}\n${t("thankYou")}`;
       Alert.alert(t("printInvoice"), receiptText);
       return;
     }
@@ -127,7 +141,7 @@ export default function POSScreen() {
           `<tr><td style="text-align:left">${item.productName || item.name}</td><td style="text-align:center">x${item.quantity}</td><td style="text-align:right">CHF ${Number(item.total || (item.unitPrice * item.quantity)).toFixed(2)}</td></tr>`
         ).join("");
         printWindow.document.write(`<html><head><title>Receipt ${inv.receiptNumber || inv.id}</title><style>body{font-family:'Courier New',monospace;font-size:12px;width:300px;margin:0 auto;padding:20px}table{width:100%;border-collapse:collapse}td{padding:2px 0}.center{text-align:center}.right{text-align:right}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}.dbl{border-top:2px solid #000;margin:8px 0}</style></head><body>`);
-        printWindow.document.write(`<div class="dbl"></div><p class="center bold" style="font-size:16px">${storeSettings?.name || "Barmagly POS"}</p>`);
+        printWindow.document.write(`<div class="dbl"></div><p class="center bold" style="font-size:16px">${storeSettings?.name || tenant?.name || "POS System"}</p>`);
         if (storeSettings?.address) printWindow.document.write(`<p class="center">${storeSettings.address}</p>`);
         if (storeSettings?.phone) printWindow.document.write(`<p class="center">${storeSettings.phone}</p>`);
         printWindow.document.write(`<div class="line"></div>`);
@@ -534,7 +548,7 @@ export default function POSScreen() {
                 <Text style={[styles.categoryChipText, !selectedCategory && styles.categoryChipTextAll]}>{t("allCategories")}</Text>
               </LinearGradient>
             </Pressable>
-            {categories.map((cat: any) => {
+            {tenantCategories.map((cat: any) => {
               const isActive = selectedCategory === cat.id;
               const iconName = (cat.icon || "cube") as keyof typeof Ionicons.glyphMap;
               return (
@@ -720,10 +734,11 @@ export default function POSScreen() {
               <Text style={[styles.sectionLabel, rtlTextAlign]}>{t("paymentMethod")}</Text>
               <View style={[styles.paymentMethods, isRTL && { flexDirection: "row-reverse" }]}>
                 {[
-                  { key: "cash", icon: "cash" as const, label: t("cash") },
-                  { key: "card", icon: "card" as const, label: t("card") },
+                  { key: "cash",   icon: "cash" as const,           label: t("cash")   },
+                  { key: "card",   icon: "card" as const,           label: t("card")   },
+                  { key: "twint",  icon: "phone-portrait" as const, label: "TWINT"     },
                   { key: "mobile", icon: "phone-portrait" as const, label: t("mobile") },
-                  { key: "nfc", icon: "wifi" as const, label: t("nfcPay") },
+                  { key: "nfc",    icon: "wifi" as const,           label: t("nfcPay") },
                 ].map((m) => (
                   <Pressable
                     key={m.key}
@@ -893,7 +908,7 @@ export default function POSScreen() {
                   </View>
                 )}
 
-                <Text style={{ textAlign: "center", color: "#000", fontSize: 16, fontWeight: "800", marginTop: 4 }}>{storeSettings?.name || "Barmagly POS"}</Text>
+                <Text style={{ textAlign: "center", color: "#000", fontSize: 16, fontWeight: "800", marginTop: 4 }}>{storeSettings?.name || tenant?.name || "POS System"}</Text>
                 {storeSettings?.address && <Text style={{ textAlign: "center", color: "#333", fontSize: 10, marginTop: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.address}</Text>}
                 {storeSettings?.phone && <Text style={{ textAlign: "center", color: "#333", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.phone}</Text>}
                 {storeSettings?.email && <Text style={{ textAlign: "center", color: "#333", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.email}</Text>}
@@ -1167,7 +1182,7 @@ export default function POSScreen() {
                     </View>
                   )}
 
-                  <Text style={{ textAlign: "center", color: "#000", fontSize: 16, fontWeight: "800", marginTop: 4 }}>{storeSettings?.name || "Barmagly POS"}</Text>
+                  <Text style={{ textAlign: "center", color: "#000", fontSize: 16, fontWeight: "800", marginTop: 4 }}>{storeSettings?.name || tenant?.name || "POS System"}</Text>
                   {storeSettings?.address && <Text style={{ textAlign: "center", color: "#333", fontSize: 10, marginTop: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.address}</Text>}
                   {storeSettings?.phone && <Text style={{ textAlign: "center", color: "#333", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.phone}</Text>}
 

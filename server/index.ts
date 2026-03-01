@@ -443,7 +443,7 @@ let paymentGatewayConfig: any = {
   },
   mobile: {
     enabled: true,
-    providers: ["apple_pay", "google_pay"],
+    providers: ["twint", "apple_pay", "google_pay"],
   },
 };
 
@@ -526,6 +526,10 @@ function setupPaymentGatewayRoutes(app: express.Application) {
     // Comprehensive demo data for all tables
     const { seedAllDemoData } = await import("./seedAllDemoData");
     await seedAllDemoData();
+
+    // Pizza Lemon store (real restaurant data from pizzalemon.ch)
+    const { seedPizzaLemon } = await import("./seedPizzaLemon");
+    await seedPizzaLemon();
   } catch (err) {
     log("Error seeding initial data:", err);
   }

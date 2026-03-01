@@ -187,10 +187,9 @@ export default function LoginScreen() {
         <View style={styles.content}>
           <View style={styles.logoWrap}>
             <View style={styles.logoCircle}>
-              <Ionicons name="cart" size={36} color={Colors.accent} />
+              <Ionicons name="storefront" size={36} color={Colors.accent} />
             </View>
-            <Text style={styles.appName}>Barmagly</Text>
-            <Text style={[styles.appDesc, rtlText]}>{t("smartPosSystem")}</Text>
+            <Text style={styles.appName}>{tenant?.name || "POS System"}</Text>
           </View>
 
           {mode === "select" ? (
@@ -215,22 +214,24 @@ export default function LoginScreen() {
                 />
               )}
 
-              <Pressable
-                onPress={async () => {
-                  try {
-                    await AsyncStorage.removeItem("hasSeenIntro");
-                    await logoutLicense();
-                    router.replace("/");
-                  } catch (e) {
-                    console.error("Reset failed", e);
-                  }
-                }}
-                style={{ marginTop: 20 }}
-              >
-                <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 14, textDecorationLine: "underline" }}>
-                  Reset App Flow (Testing)
-                </Text>
-              </Pressable>
+              {__DEV__ && (
+                <Pressable
+                  onPress={async () => {
+                    try {
+                      await AsyncStorage.removeItem("hasSeenIntro");
+                      await logoutLicense();
+                      router.replace("/");
+                    } catch (e) {
+                      console.error("Reset failed", e);
+                    }
+                  }}
+                  style={{ marginTop: 20 }}
+                >
+                  <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, textDecorationLine: "underline" }}>
+                    Reset App Flow (Dev Only)
+                  </Text>
+                </Pressable>
+              )}
             </View>
           ) : (
             <View style={styles.pinContainer}>
