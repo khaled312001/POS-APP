@@ -3,1115 +3,1296 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Barmagly Super Admin | Dashboard</title>
+  <title>Barmagly Super Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-dark: #0A0E17;
-      --bg-sidebar: #0D1220;
-      --bg-card: rgba(18, 24, 38, 0.85);
-      --primary: #2FD3C6;
-      --primary-hover: #26b1a6;
-      --primary-dim: rgba(47, 211, 198, 0.12);
-      --text-main: #FFFFFF;
-      --text-muted: #94A3B8;
-      --danger: #ef4444;
-      --warning: #f59e0b;
-      --success: #22c55e;
-      --border: rgba(47, 211, 198, 0.15);
-      --border-subtle: rgba(255,255,255,0.07);
-      --sidebar-w: 240px;
+      --bg: #0A0E17; --sidebar: #0D1220; --card: rgba(18,24,38,0.9);
+      --pr: #2FD3C6; --pr2: #26b1a6; --pr-dim: rgba(47,211,198,0.1);
+      --tx: #fff; --mu: #94A3B8; --bd: rgba(255,255,255,0.07);
+      --bd2: rgba(47,211,198,0.18); --danger: #ef4444; --warn: #f59e0b;
+      --ok: #22c55e; --sw: 230px;
     }
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; font-family:'Inter',sans-serif; }
-    body { background: var(--bg-dark); color: var(--text-main); min-height:100vh; display:flex; }
-
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif}
+    body{background:var(--bg);color:var(--tx);min-height:100vh;display:flex}
     /* ── SIDEBAR ── */
-    .sidebar {
-      width: var(--sidebar-w);
-      min-height: 100vh;
-      background: var(--bg-sidebar);
-      border-right: 1px solid var(--border-subtle);
-      display: flex;
-      flex-direction: column;
-      position: fixed;
-      left: 0; top: 0; bottom: 0;
-      z-index: 100;
-    }
-    .sidebar-logo {
-      padding: 24px 20px 20px;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .sidebar-logo .brand { font-size:17px; font-weight:700; color:var(--text-main); }
-    .sidebar-logo .badge {
-      display:inline-block; margin-top:4px; padding:2px 8px;
-      background: var(--primary-dim); color:var(--primary);
-      border:1px solid var(--border); border-radius:100px;
-      font-size:10px; font-weight:600; letter-spacing:1px; text-transform:uppercase;
-    }
-    .sidebar-nav { flex:1; padding:16px 0; overflow-y:auto; }
-    .nav-section { padding:8px 20px 4px; font-size:10px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted); }
-    .nav-item {
-      display:flex; align-items:center; gap:10px;
-      padding:10px 20px; cursor:pointer;
-      color:var(--text-muted); font-size:14px; font-weight:500;
-      transition: all 0.15s; border-left:3px solid transparent;
-    }
-    .nav-item:hover { color:var(--text-main); background:rgba(255,255,255,0.04); }
-    .nav-item.active { color:var(--primary); background:var(--primary-dim); border-left-color:var(--primary); }
-    .nav-item svg { width:16px; height:16px; flex-shrink:0; }
-
-    .sidebar-footer {
-      padding:16px 20px;
-      border-top:1px solid var(--border-subtle);
-    }
-    .admin-info { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
-    .admin-avatar {
-      width:34px; height:34px; border-radius:10px;
-      background:var(--primary-dim); border:1px solid var(--border);
-      display:flex; align-items:center; justify-content:center;
-      font-size:14px; font-weight:700; color:var(--primary); flex-shrink:0;
-    }
-    .admin-name { font-size:13px; font-weight:600; color:var(--text-main); }
-    .admin-role { font-size:11px; color:var(--text-muted); }
-    .btn-logout {
-      width:100%; padding:8px; background:rgba(239,68,68,0.1);
-      color:var(--danger); border:1px solid rgba(239,68,68,0.2);
-      border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;
-      transition:all 0.15s;
-    }
-    .btn-logout:hover { background:rgba(239,68,68,0.2); }
-
+    .sb{width:var(--sw);min-height:100vh;background:var(--sidebar);border-right:1px solid var(--bd);display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;z-index:100;overflow-y:auto}
+    .sb-logo{padding:22px 18px 16px;border-bottom:1px solid var(--bd)}
+    .sb-brand{font-size:16px;font-weight:700}
+    .sb-badge{display:inline-block;margin-top:4px;padding:2px 8px;background:var(--pr-dim);color:var(--pr);border:1px solid var(--bd2);border-radius:100px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
+    .sb-nav{flex:1;padding:12px 0}
+    .nav-sec{padding:10px 18px 3px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--mu)}
+    .ni{display:flex;align-items:center;gap:9px;padding:9px 18px;cursor:pointer;color:var(--mu);font-size:13px;font-weight:500;transition:all .15s;border-left:3px solid transparent;user-select:none}
+    .ni:hover{color:var(--tx);background:rgba(255,255,255,0.04)}
+    .ni.active{color:var(--pr);background:var(--pr-dim);border-left-color:var(--pr)}
+    .ni svg{width:15px;height:15px;flex-shrink:0}
+    .sb-foot{padding:14px 18px;border-top:1px solid var(--bd)}
+    .av{width:32px;height:32px;border-radius:9px;background:var(--pr-dim);border:1px solid var(--bd2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--pr);flex-shrink:0}
+    .admin-row{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+    .an{font-size:13px;font-weight:600}
+    .ae{font-size:11px;color:var(--mu)}
+    .btn-lo{width:100%;padding:7px;background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.2);border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+    .btn-lo:hover{background:rgba(239,68,68,.2)}
     /* ── MAIN ── */
-    .main {
-      margin-left: var(--sidebar-w);
-      flex:1; min-height:100vh;
-      display:flex; flex-direction:column;
-    }
-    .topbar {
-      padding:18px 32px;
-      border-bottom:1px solid var(--border-subtle);
-      display:flex; align-items:center; justify-content:space-between;
-      background:rgba(10,14,23,0.6); backdrop-filter:blur(8px);
-      position:sticky; top:0; z-index:50;
-    }
-    .topbar-title { font-size:18px; font-weight:700; }
-    .topbar-sub { font-size:13px; color:var(--text-muted); margin-top:2px; }
-    .topbar-right { display:flex; align-items:center; gap:12px; }
-    .health-dot {
-      width:8px; height:8px; border-radius:50%; background:var(--success);
-      box-shadow:0 0 6px var(--success); animation:pulse 2s infinite;
-    }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-    .health-label { font-size:12px; color:var(--text-muted); }
-
-    .content { padding:32px; flex:1; }
-
+    .main{margin-left:var(--sw);flex:1;min-height:100vh;display:flex;flex-direction:column}
+    .topbar{padding:16px 28px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;background:rgba(10,14,23,.8);backdrop-filter:blur(8px);position:sticky;top:0;z-index:50}
+    .tb-title{font-size:17px;font-weight:700}
+    .tb-sub{font-size:12px;color:var(--mu);margin-top:1px}
+    .tb-r{display:flex;align-items:center;gap:10px}
+    .hdot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok);animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    .hlabel{font-size:12px;color:var(--mu)}
+    .content{padding:26px;flex:1}
     /* ── VIEWS ── */
-    .view { display:none; }
-    .view.active { display:block; }
-
+    .view{display:none}
+    .view.active{display:block}
     /* ── STAT CARDS ── */
-    .stats-grid {
-      display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
-      gap:16px; margin-bottom:28px;
-    }
-    .stat-card {
-      background:var(--bg-card); border:1px solid var(--border-subtle);
-      border-radius:14px; padding:20px;
-      transition:border-color 0.2s;
-    }
-    .stat-card:hover { border-color:var(--border); }
-    .stat-label { font-size:12px; font-weight:500; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; }
-    .stat-value { font-size:28px; font-weight:800; color:var(--text-main); line-height:1; }
-    .stat-sub { font-size:12px; color:var(--text-muted); margin-top:4px; }
-    .stat-icon { float:right; margin-top:-4px; opacity:0.25; }
-    .stat-icon svg { width:28px; height:28px; }
-
-    /* ── SECTION HEADERS ── */
-    .section-header {
-      display:flex; align-items:center; justify-content:space-between;
-      margin-bottom:16px;
-    }
-    .section-title { font-size:15px; font-weight:700; }
-
+    .sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;margin-bottom:24px}
+    .sc{background:var(--card);border:1px solid var(--bd);border-radius:13px;padding:18px;transition:border-color .2s}
+    .sc:hover{border-color:var(--bd2)}
+    .sl{font-size:11px;font-weight:500;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px}
+    .sv{font-size:26px;font-weight:800;line-height:1}
+    .ss{font-size:11px;color:var(--mu);margin-top:3px}
     /* ── TABLE ── */
-    .table-wrap {
-      background:var(--bg-card); border:1px solid var(--border-subtle);
-      border-radius:14px; overflow:hidden; margin-bottom:24px;
-    }
-    table { width:100%; border-collapse:collapse; font-size:13px; }
-    thead th {
-      padding:12px 16px; text-align:left;
-      background:rgba(0,0,0,0.2);
-      font-size:11px; font-weight:600; color:var(--text-muted);
-      text-transform:uppercase; letter-spacing:0.5px;
-      border-bottom:1px solid var(--border-subtle);
-    }
-    tbody tr { border-bottom:1px solid var(--border-subtle); transition:background 0.1s; }
-    tbody tr:last-child { border-bottom:none; }
-    tbody tr:hover { background:rgba(255,255,255,0.03); }
-    tbody td { padding:12px 16px; color:var(--text-main); vertical-align:middle; }
-
-    /* ── BADGES ── */
-    .badge {
-      display:inline-flex; align-items:center;
-      padding:3px 8px; border-radius:100px;
-      font-size:11px; font-weight:600;
-    }
-    .badge-green  { background:rgba(34,197,94,0.12);  color:#22c55e; border:1px solid rgba(34,197,94,0.2); }
-    .badge-red    { background:rgba(239,68,68,0.12);  color:#ef4444; border:1px solid rgba(239,68,68,0.2); }
-    .badge-yellow { background:rgba(245,158,11,0.12); color:#f59e0b; border:1px solid rgba(245,158,11,0.2); }
-    .badge-blue   { background:rgba(59,130,246,0.12); color:#60a5fa; border:1px solid rgba(59,130,246,0.2); }
-    .badge-gray   { background:rgba(148,163,184,0.1); color:#94a3b8; border:1px solid rgba(148,163,184,0.15); }
-
+    .tw{background:var(--card);border:1px solid var(--bd);border-radius:13px;overflow:hidden;margin-bottom:20px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead th{padding:11px 14px;text-align:left;background:rgba(0,0,0,.25);font-size:11px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bd)}
+    tbody tr{border-bottom:1px solid var(--bd);transition:background .1s}
+    tbody tr:last-child{border-bottom:none}
+    tbody tr:hover{background:rgba(255,255,255,.025)}
+    tbody td{padding:11px 14px;vertical-align:middle}
+    /* ── BADGE ── */
+    .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:600}
+    .bg{background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.2)}
+    .br{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2)}
+    .by{background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.2)}
+    .bb{background:rgba(59,130,246,.12);color:#60a5fa;border:1px solid rgba(59,130,246,.2)}
+    .bm{background:rgba(168,85,247,.12);color:#c084fc;border:1px solid rgba(168,85,247,.2)}
+    .bgr{background:rgba(148,163,184,.1);color:#94a3b8;border:1px solid rgba(148,163,184,.15)}
     /* ── BUTTONS ── */
-    .btn {
-      display:inline-flex; align-items:center; gap:6px;
-      padding:8px 14px; border-radius:8px; font-size:13px; font-weight:500;
-      cursor:pointer; border:none; transition:all 0.15s;
-    }
-    .btn svg { width:14px; height:14px; }
-    .btn-primary { background:var(--primary); color:#000; }
-    .btn-primary:hover { background:var(--primary-hover); }
-    .btn-outline { background:transparent; color:var(--text-muted); border:1px solid var(--border-subtle); }
-    .btn-outline:hover { color:var(--text-main); border-color:var(--border); }
-    .btn-danger { background:rgba(239,68,68,0.1); color:var(--danger); border:1px solid rgba(239,68,68,0.2); }
-    .btn-danger:hover { background:rgba(239,68,68,0.2); }
-    .btn-sm { padding:5px 10px; font-size:12px; }
-
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;text-decoration:none}
+    .btn svg{width:13px;height:13px}
+    .btn-p{background:var(--pr);color:#000}
+    .btn-p:hover{background:var(--pr2)}
+    .btn-o{background:transparent;color:var(--mu);border:1px solid var(--bd)}
+    .btn-o:hover{color:var(--tx);border-color:var(--bd2)}
+    .btn-d{background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.2)}
+    .btn-d:hover{background:rgba(239,68,68,.2)}
+    .btn-sm{padding:4px 9px;font-size:11px}
     /* ── CARDS ROW ── */
-    .cards-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
-    @media(max-width:900px){ .cards-row{ grid-template-columns:1fr; } }
-    .card {
-      background:var(--bg-card); border:1px solid var(--border-subtle);
-      border-radius:14px; padding:20px;
-    }
-    .card-title { font-size:14px; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
-
+    .cr{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+    @media(max-width:900px){.cr{grid-template-columns:1fr}}
+    .card{background:var(--card);border:1px solid var(--bd);border-radius:13px;padding:18px}
+    .ct{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:7px;color:var(--tx)}
+    .ct svg{width:14px;height:14px;color:var(--pr)}
+    /* ── SECTION HEADER ── */
+    .sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:gap}
+    .sh-l{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     /* ── MODAL ── */
-    .modal-overlay {
-      position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px);
-      display:none; align-items:center; justify-content:center; z-index:1000;
-    }
-    .modal-overlay.open { display:flex; }
-    .modal {
-      background:#111827; border:1px solid var(--border); border-radius:20px;
-      padding:28px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto;
-    }
-    .modal-title { font-size:17px; font-weight:700; margin-bottom:20px; }
-    .form-row { margin-bottom:16px; }
-    .form-row label { display:block; font-size:12px; font-weight:500; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; }
-    .form-row input, .form-row select, .form-row textarea {
-      width:100%; padding:10px 12px;
-      background:rgba(0,0,0,0.3); border:1px solid var(--border-subtle);
-      border-radius:8px; font-size:14px; color:var(--text-main); outline:none;
-      transition:border-color 0.15s;
-    }
-    .form-row input:focus, .form-row select:focus, .form-row textarea:focus { border-color:var(--primary); }
-    .form-row select option { background:#111827; }
-    .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
-
-    /* ── LOADER ── */
-    .spinner {
-      width:36px; height:36px; border:3px solid rgba(47,211,198,0.15);
-      border-top-color:var(--primary); border-radius:50%;
-      animation:spin 0.7s linear infinite; margin:40px auto;
-    }
-    @keyframes spin { to{ transform:rotate(360deg); } }
-    .loading-state { text-align:center; padding:40px; color:var(--text-muted); }
-
+    .mo{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px}
+    .mo.open{display:flex}
+    .md{background:#111827;border:1px solid var(--bd2);border-radius:18px;padding:26px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto}
+    .md-title{font-size:16px;font-weight:700;margin-bottom:18px}
+    .fr{margin-bottom:14px}
+    .fr label{display:block;font-size:11px;font-weight:500;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+    .fr input,.fr select,.fr textarea{width:100%;padding:9px 11px;background:rgba(0,0,0,.3);border:1px solid var(--bd);border-radius:8px;font-size:13px;color:var(--tx);outline:none;transition:border-color .15s}
+    .fr input:focus,.fr select:focus,.fr textarea:focus{border-color:var(--pr)}
+    .fr select option{background:#111827}
+    .fr-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .ma{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+    /* ── SPINNER ── */
+    .spin{width:30px;height:30px;border:2px solid rgba(47,211,198,.15);border-top-color:var(--pr);border-radius:50%;animation:spin .7s linear infinite;margin:32px auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .ls{text-align:center;padding:32px;color:var(--mu);font-size:13px}
     /* ── TOAST ── */
-    #toast {
-      position:fixed; bottom:24px; right:24px; z-index:9999;
-      background:#1e293b; border:1px solid var(--border);
-      border-radius:10px; padding:12px 18px;
-      font-size:13px; font-weight:500; color:var(--text-main);
-      box-shadow:0 8px 24px rgba(0,0,0,0.4);
-      transform:translateY(80px); opacity:0;
-      transition:all 0.3s; pointer-events:none;
-    }
-    #toast.show { transform:translateY(0); opacity:1; }
-    #toast.success { border-color:rgba(34,197,94,0.4); color:#22c55e; }
-    #toast.error { border-color:rgba(239,68,68,0.4); color:#ef4444; }
-
-    /* ── SEARCH BAR ── */
-    .search-bar {
-      padding:10px 14px; background:rgba(0,0,0,0.2);
-      border:1px solid var(--border-subtle); border-radius:10px;
-      font-size:13px; color:var(--text-main); outline:none;
-      width:240px; transition:border-color 0.15s;
-    }
-    .search-bar:focus { border-color:var(--border); }
-    .search-bar::placeholder { color:var(--text-muted); }
-
-    /* ── HEALTH ── */
-    .health-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
-    .health-item {
-      background:rgba(0,0,0,0.2); border:1px solid var(--border-subtle);
-      border-radius:10px; padding:14px; text-align:center;
-    }
-    .health-item .hi-val { font-size:22px; font-weight:700; color:var(--primary); }
-    .health-item .hi-label { font-size:11px; color:var(--text-muted); margin-top:4px; }
+    #toast{position:fixed;bottom:22px;right:22px;z-index:9999;background:#1e293b;border:1px solid var(--bd2);border-radius:10px;padding:11px 16px;font-size:13px;font-weight:500;color:var(--tx);box-shadow:0 8px 24px rgba(0,0,0,.4);transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none}
+    #toast.show{transform:translateY(0);opacity:1}
+    #toast.ok{border-color:rgba(34,197,94,.4);color:#22c55e}
+    #toast.err{border-color:rgba(239,68,68,.4);color:#ef4444}
+    /* ── SEARCH ── */
+    .srch{padding:9px 12px;background:rgba(0,0,0,.2);border:1px solid var(--bd);border-radius:9px;font-size:13px;color:var(--tx);outline:none;width:220px;transition:border-color .15s}
+    .srch:focus{border-color:var(--bd2)}
+    .srch::placeholder{color:var(--mu)}
+    /* ── TABS ── */
+    .tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--bd);padding-bottom:0}
+    .tab{padding:9px 16px;font-size:13px;font-weight:500;color:var(--mu);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;margin-bottom:-1px}
+    .tab:hover{color:var(--tx)}
+    .tab.active{color:var(--pr);border-bottom-color:var(--pr)}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+    /* ── STORE SELECTOR ── */
+    .store-sel{display:flex;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+    .store-sel select{padding:10px 14px;background:var(--card);border:1px solid var(--bd2);border-radius:10px;font-size:14px;font-weight:600;color:var(--tx);outline:none;min-width:280px}
+    .store-sel select option{background:#111827}
+    /* ── INLINE ROW DETAIL ── */
+    .detail-row td{padding:0!important}
+    .detail-inner{background:rgba(0,0,0,.3);padding:16px 18px;border-top:1px solid var(--bd)}
+    /* ── HEALTH GRID ── */
+    .hg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+    .hi{background:rgba(0,0,0,.2);border:1px solid var(--bd);border-radius:10px;padding:13px;text-align:center}
+    .hv{font-size:20px;font-weight:700;color:var(--pr)}
+    .hl{font-size:11px;color:var(--mu);margin-top:3px}
+    /* color dot */
+    .cdot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
+    .empty{text-align:center;color:var(--mu);padding:28px;font-size:13px}
   </style>
 </head>
 <body>
 
 <!-- SIDEBAR -->
-<nav class="sidebar">
-  <div class="sidebar-logo">
-    <div class="brand">Barmagly POS</div>
-    <span class="badge">Super Admin</span>
+<nav class="sb">
+  <div class="sb-logo">
+    <div class="sb-brand">Barmagly POS</div>
+    <span class="sb-badge">Super Admin</span>
   </div>
-  <div class="sidebar-nav">
-    <div class="nav-section">Main</div>
-    <div class="nav-item active" onclick="showView('dashboard')">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-      Dashboard
-    </div>
-    <div class="nav-section">Management</div>
-    <div class="nav-item" onclick="showView('tenants')">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-      Tenants
-    </div>
-    <div class="nav-item" onclick="showView('subscriptions')">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>
-      Subscriptions
-    </div>
-    <div class="nav-item" onclick="showView('licenses')">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-      License Keys
-    </div>
-    <div class="nav-section">Monitoring</div>
-    <div class="nav-item" onclick="showView('analytics')">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-      Analytics
-    </div>
-    <div class="nav-item" onclick="showView('system')">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
-      System Health
-    </div>
-    <div class="nav-item" onclick="showView('notifications')">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-      Notifications
-    </div>
-    <div class="nav-section">Account</div>
-    <div class="nav-item" onclick="showView('settings')">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-      Settings
-    </div>
+  <div class="sb-nav">
+    <div class="nav-sec">Overview</div>
+    <div class="ni active" onclick="show('dashboard')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Dashboard</div>
+    <div class="nav-sec">Stores</div>
+    <div class="ni" onclick="show('storemanager')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>Store Manager</div>
+    <div class="nav-sec">Platform</div>
+    <div class="ni" onclick="show('tenants')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Tenants</div>
+    <div class="ni" onclick="show('subscriptions')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>Subscriptions</div>
+    <div class="ni" onclick="show('licenses')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>License Keys</div>
+    <div class="nav-sec">Analytics</div>
+    <div class="ni" onclick="show('analytics')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>Analytics</div>
+    <div class="ni" onclick="show('system')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>System Health</div>
+    <div class="ni" onclick="show('notifications')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>Notifications</div>
+    <div class="nav-sec">Account</div>
+    <div class="ni" onclick="show('settings')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Settings</div>
   </div>
-  <div class="sidebar-footer">
-    <div class="admin-info">
-      <div class="admin-avatar" id="adminInitial">S</div>
-      <div>
-        <div class="admin-name" id="adminName">Super Admin</div>
-        <div class="admin-role" id="adminEmail">admin@barmagly.com</div>
-      </div>
+  <div class="sb-foot">
+    <div class="admin-row">
+      <div class="av" id="adminInit">S</div>
+      <div><div class="an" id="adminName">Super Admin</div><div class="ae" id="adminEmail">admin@barmagly.com</div></div>
     </div>
-    <button class="btn-logout" onclick="logout()">Sign Out</button>
+    <button class="btn-lo" onclick="logout()">Sign Out</button>
   </div>
 </nav>
 
 <!-- MAIN -->
 <main class="main">
   <div class="topbar">
-    <div>
-      <div class="topbar-title" id="viewTitle">Dashboard</div>
-      <div class="topbar-sub" id="viewSub">Overview of your platform</div>
-    </div>
-    <div class="topbar-right">
-      <div class="health-dot" id="healthDot"></div>
-      <span class="health-label" id="healthLabel">Checking...</span>
-    </div>
+    <div><div class="tb-title" id="vTitle">Dashboard</div><div class="tb-sub" id="vSub">Platform overview</div></div>
+    <div class="tb-r"><div class="hdot" id="hdot"></div><span class="hlabel" id="hlabel">Checking...</span></div>
   </div>
-
   <div class="content">
 
-    <!-- ── DASHBOARD VIEW ── -->
+    <!-- ══════════ DASHBOARD ══════════ -->
     <div class="view active" id="view-dashboard">
-      <div class="stats-grid" id="statsGrid">
-        <div class="loading-state"><div class="spinner"></div></div>
+      <div class="sg" id="sg"><div class="ls"><div class="spin"></div></div></div>
+      <div class="cr">
+        <div class="card"><div class="ct"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16"/></svg>Active Stores</div><div id="storeList"><div class="spin"></div></div></div>
+        <div class="card"><div class="ct"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>Revenue by Tenant</div><div id="revList"><div class="spin"></div></div></div>
       </div>
-      <div class="cards-row">
-        <div class="card">
-          <div class="card-title">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="var(--primary)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16"/></svg>
-            Active Stores
-          </div>
-          <div id="storeList"><div class="spinner"></div></div>
+    </div>
+
+    <!-- ══════════ STORE MANAGER ══════════ -->
+    <div class="view" id="view-storemanager">
+      <div class="store-sel">
+        <select id="storePicker" onchange="onStorePick()">
+          <option value="">— Select a store —</option>
+        </select>
+        <span id="storePickerInfo" style="font-size:13px;color:var(--mu)"></span>
+      </div>
+      <div id="storeContent" style="display:none">
+        <div class="tabs">
+          <div class="tab active" onclick="storeTab('overview')">Overview</div>
+          <div class="tab" onclick="storeTab('products')">Products</div>
+          <div class="tab" onclick="storeTab('categories')">Categories</div>
+          <div class="tab" onclick="storeTab('branches')">Branches</div>
+          <div class="tab" onclick="storeTab('employees')">Employees</div>
+          <div class="tab" onclick="storeTab('customers')">Customers</div>
+          <div class="tab" onclick="storeTab('sales')">Sales</div>
+          <div class="tab" onclick="storeTab('inventory')">Inventory</div>
         </div>
-        <div class="card">
-          <div class="card-title">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="var(--primary)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-            Revenue by Tenant
+
+        <!-- Overview Tab -->
+        <div class="tab-panel active" id="sp-overview">
+          <div class="sg" id="storeStats"></div>
+          <div class="cr">
+            <div class="card"><div class="ct">Recent Sales</div><div id="recentSales"><div class="spin"></div></div></div>
+            <div class="card"><div class="ct">Top Products</div><div id="topProds"><div class="spin"></div></div></div>
           </div>
-          <div id="revenueList"><div class="spinner"></div></div>
+          <div class="card"><div class="ct">Employees</div><div id="empOverview"></div></div>
+        </div>
+
+        <!-- Products Tab -->
+        <div class="tab-panel" id="sp-products">
+          <div class="sh">
+            <div class="sh-l">
+              <input class="srch" placeholder="Search products…" oninput="ft('prodTbl',this.value)">
+              <select id="catFilter" onchange="filterByCat()" style="padding:9px 12px;background:rgba(0,0,0,.2);border:1px solid var(--bd);border-radius:9px;font-size:13px;color:var(--tx);outline:none"><option value="">All Categories</option></select>
+            </div>
+            <button class="btn btn-p" onclick="openM('mProd')">+ Add Product</button>
+          </div>
+          <div class="tw"><table><thead><tr><th>Name</th><th>Price</th><th>Cost</th><th>SKU</th><th>Barcode</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead><tbody id="prodTbl"><tr><td colspan="8" class="ls"><div class="spin"></div></td></tr></tbody></table></div>
+        </div>
+
+        <!-- Categories Tab -->
+        <div class="tab-panel" id="sp-categories">
+          <div class="sh">
+            <input class="srch" placeholder="Search categories…" oninput="ft('catTbl',this.value)">
+            <button class="btn btn-p" onclick="openM('mCat')">+ Add Category</button>
+          </div>
+          <div class="tw"><table><thead><tr><th>ID</th><th>Name</th><th>Color</th><th>Products</th><th>Actions</th></tr></thead><tbody id="catTbl"><tr><td colspan="5" class="ls"><div class="spin"></div></td></tr></tbody></table></div>
+        </div>
+
+        <!-- Branches Tab -->
+        <div class="tab-panel" id="sp-branches">
+          <div class="sh">
+            <input class="srch" placeholder="Search branches…" oninput="ft('brTbl',this.value)">
+            <button class="btn btn-p" onclick="openM('mBranch')">+ Add Branch</button>
+          </div>
+          <div class="tw"><table><thead><tr><th>ID</th><th>Name</th><th>Address</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="brTbl"><tr><td colspan="6" class="ls"><div class="spin"></div></td></tr></tbody></table></div>
+        </div>
+
+        <!-- Employees Tab -->
+        <div class="tab-panel" id="sp-employees">
+          <div class="sh">
+            <input class="srch" placeholder="Search employees…" oninput="ft('empTbl',this.value)">
+            <button class="btn btn-p" onclick="openM('mEmp')">+ Add Employee</button>
+          </div>
+          <div class="tw"><table><thead><tr><th>Name</th><th>Role</th><th>PIN</th><th>Branch</th><th>Status</th><th>Actions</th></tr></thead><tbody id="empTbl"><tr><td colspan="6" class="ls"><div class="spin"></div></td></tr></tbody></table></div>
+        </div>
+
+        <!-- Customers Tab -->
+        <div class="tab-panel" id="sp-customers">
+          <div class="sh">
+            <input class="srch" placeholder="Search customers…" oninput="ft('cusTbl',this.value)">
+            <button class="btn btn-p" onclick="openM('mCust')">+ Add Customer</button>
+          </div>
+          <div class="tw"><table><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Loyalty Pts</th><th>Total Spent</th><th>Visits</th><th>Actions</th></tr></thead><tbody id="cusTbl"><tr><td colspan="7" class="ls"><div class="spin"></div></td></tr></tbody></table></div>
+        </div>
+
+        <!-- Sales Tab -->
+        <div class="tab-panel" id="sp-sales">
+          <div class="sh">
+            <input class="srch" placeholder="Search sales…" oninput="ft('salTbl',this.value)">
+            <span style="font-size:13px;color:var(--mu)" id="salTotal"></span>
+          </div>
+          <div class="tw"><table><thead><tr><th>Receipt#</th><th>Date</th><th>Items</th><th>Payment</th><th>Total</th><th>Employee</th><th>Actions</th></tr></thead><tbody id="salTbl"><tr><td colspan="7" class="ls"><div class="spin"></div></td></tr></tbody></table></div>
+        </div>
+
+        <!-- Inventory Tab -->
+        <div class="tab-panel" id="sp-inventory">
+          <div class="sh">
+            <div class="sh-l">
+              <input class="srch" placeholder="Search inventory…" oninput="ft('invTbl',this.value)">
+              <select id="branchFilter" onchange="loadInventory()" style="padding:9px 12px;background:rgba(0,0,0,.2);border:1px solid var(--bd);border-radius:9px;font-size:13px;color:var(--tx);outline:none"><option value="">All Branches</option></select>
+            </div>
+            <button class="btn btn-p" onclick="openM('mInvAdj')">Adjust Stock</button>
+          </div>
+          <div class="tw"><table><thead><tr><th>Product</th><th>Branch</th><th>Qty</th><th>Low Stock</th><th>Actions</th></tr></thead><tbody id="invTbl"><tr><td colspan="5" class="ls"><div class="spin"></div></td></tr></tbody></table></div>
         </div>
       </div>
     </div>
 
-    <!-- ── TENANTS VIEW ── -->
+    <!-- ══════════ TENANTS ══════════ -->
     <div class="view" id="view-tenants">
-      <div class="section-header">
-        <input class="search-bar" placeholder="Search tenants..." oninput="filterTable('tenantTable', this.value)">
-        <button class="btn btn-primary" onclick="openModal('addTenantModal')">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          Add Tenant
-        </button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th><th>Business</th><th>Owner</th><th>Status</th>
-              <th>Branches</th><th>Employees</th><th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="tenantTable"><tr><td colspan="7" class="loading-state"><div class="spinner"></div></td></tr></tbody>
-        </table>
-      </div>
+      <div class="sh"><input class="srch" placeholder="Search tenants…" oninput="ft('tTbl',this.value)"><button class="btn btn-p" onclick="openM('mTenant')">+ Add Tenant</button></div>
+      <div class="tw"><table><thead><tr><th>ID</th><th>Business</th><th>Owner</th><th>Type</th><th>Status</th><th>Limits</th><th>Actions</th></tr></thead><tbody id="tTbl"><tr><td colspan="7" class="ls"><div class="spin"></div></td></tr></tbody></table></div>
     </div>
 
-    <!-- ── SUBSCRIPTIONS VIEW ── -->
+    <!-- ══════════ SUBSCRIPTIONS ══════════ -->
     <div class="view" id="view-subscriptions">
-      <div class="section-header">
-        <input class="search-bar" placeholder="Search subscriptions..." oninput="filterTable('subTable', this.value)">
-        <button class="btn btn-primary" onclick="openModal('addSubModal')">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          New Subscription
-        </button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>ID</th><th>Tenant</th><th>Plan</th><th>Status</th><th>Price</th><th>Expires</th><th>Actions</th></tr>
-          </thead>
-          <tbody id="subTable"><tr><td colspan="7" class="loading-state"><div class="spinner"></div></td></tr></tbody>
-        </table>
-      </div>
+      <div class="sh"><input class="srch" placeholder="Search…" oninput="ft('subTbl',this.value)"><button class="btn btn-p" onclick="openM('mSub')">+ New Subscription</button></div>
+      <div class="tw"><table><thead><tr><th>ID</th><th>Tenant</th><th>Plan</th><th>Status</th><th>Price</th><th>Expires</th><th>Actions</th></tr></thead><tbody id="subTbl"><tr><td colspan="7" class="ls"><div class="spin"></div></td></tr></tbody></table></div>
     </div>
 
-    <!-- ── LICENSES VIEW ── -->
+    <!-- ══════════ LICENSES ══════════ -->
     <div class="view" id="view-licenses">
-      <div class="section-header">
-        <input class="search-bar" placeholder="Search licenses..." oninput="filterTable('licTable', this.value)">
-        <button class="btn btn-primary" onclick="openModal('addLicModal')">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          Generate License
-        </button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Key</th><th>Tenant</th><th>Status</th><th>Activations</th><th>Expires</th><th>Actions</th></tr>
-          </thead>
-          <tbody id="licTable"><tr><td colspan="6" class="loading-state"><div class="spinner"></div></td></tr></tbody>
-        </table>
-      </div>
+      <div class="sh"><input class="srch" placeholder="Search…" oninput="ft('licTbl',this.value)"><button class="btn btn-p" onclick="openM('mLic')">+ Generate Key</button></div>
+      <div class="tw"><table><thead><tr><th>Key</th><th>Tenant</th><th>Status</th><th>Activations</th><th>Expires</th><th>Actions</th></tr></thead><tbody id="licTbl"><tr><td colspan="6" class="ls"><div class="spin"></div></td></tr></tbody></table></div>
     </div>
 
-    <!-- ── ANALYTICS VIEW ── -->
+    <!-- ══════════ ANALYTICS ══════════ -->
     <div class="view" id="view-analytics">
-      <div class="stats-grid" id="analyticsStats">
-        <div class="loading-state"><div class="spinner"></div></div>
+      <div class="sg" id="aSg"><div class="ls"><div class="spin"></div></div></div>
+      <div class="cr">
+        <div class="card"><div class="ct">Monthly Revenue</div><div id="aMonthly"><div class="spin"></div></div></div>
+        <div class="card"><div class="ct">Plan Breakdown</div><div id="aPlan"><div class="spin"></div></div></div>
       </div>
-      <div class="cards-row">
-        <div class="card">
-          <div class="card-title">Monthly Revenue (last 6 months)</div>
-          <div id="monthlyRevenue"><div class="spinner"></div></div>
-        </div>
-        <div class="card">
-          <div class="card-title">Plan Breakdown</div>
-          <div id="planBreakdown"><div class="spinner"></div></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title">Sales by Tenant</div>
-        <div id="salesByTenant"><div class="spinner"></div></div>
-      </div>
+      <div class="card" style="margin-bottom:20px"><div class="ct">Sales by Tenant</div><div id="aSales"><div class="spin"></div></div></div>
     </div>
 
-    <!-- ── SYSTEM HEALTH VIEW ── -->
+    <!-- ══════════ SYSTEM ══════════ -->
     <div class="view" id="view-system">
-      <div class="card" style="margin-bottom:20px">
-        <div class="card-title">System Status</div>
-        <div class="health-grid" id="healthGrid"><div class="spinner"></div></div>
-      </div>
-      <div class="card">
-        <div class="card-title">Active Shifts</div>
-        <div id="activeShifts"><div class="spinner"></div></div>
-      </div>
+      <div class="card" style="margin-bottom:18px"><div class="ct">System Status</div><div class="hg" id="hGrid"><div class="spin"></div></div></div>
+      <div class="card"><div class="ct">Active Shifts</div><div id="shifts"><div class="spin"></div></div></div>
     </div>
 
-    <!-- ── NOTIFICATIONS VIEW ── -->
+    <!-- ══════════ NOTIFICATIONS ══════════ -->
     <div class="view" id="view-notifications">
-      <div class="section-header">
-        <div class="section-title">Tenant Notifications</div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-outline" onclick="openModal('broadcastModal')">Broadcast</button>
-          <button class="btn btn-primary" onclick="openModal('notifModal')">Send Notification</button>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Tenant</th><th>Title</th><th>Type</th><th>Priority</th><th>Read</th><th>Actions</th></tr></thead>
-          <tbody id="notifTable"><tr><td colspan="6" class="loading-state"><div class="spinner"></div></td></tr></tbody>
-        </table>
-      </div>
+      <div class="sh"><div class="sh-l"></div><div style="display:flex;gap:8px"><button class="btn btn-o" onclick="openM('mBcast')">Broadcast</button><button class="btn btn-p" onclick="openM('mNotif')">Send Notification</button></div></div>
+      <div class="tw"><table><thead><tr><th>Tenant</th><th>Title</th><th>Type</th><th>Priority</th><th>Read</th><th>Actions</th></tr></thead><tbody id="nTbl"><tr><td colspan="6" class="ls"><div class="spin"></div></td></tr></tbody></table></div>
     </div>
 
-    <!-- ── SETTINGS VIEW ── -->
+    <!-- ══════════ SETTINGS ══════════ -->
     <div class="view" id="view-settings">
-      <div class="card" style="max-width:480px">
-        <div class="card-title">Change Password</div>
-        <div class="form-row">
-          <label>Current Password</label>
-          <input type="password" id="curPwd" placeholder="••••••••">
-        </div>
-        <div class="form-row">
-          <label>New Password</label>
-          <input type="password" id="newPwd" placeholder="••••••••">
-        </div>
-        <div class="form-row">
-          <label>Confirm New Password</label>
-          <input type="password" id="confPwd" placeholder="••••••••">
-        </div>
-        <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
+      <div class="card" style="max-width:460px">
+        <div class="ct">Change Password</div>
+        <div class="fr"><label>Current Password</label><input type="password" id="cp1" placeholder="••••••••"></div>
+        <div class="fr"><label>New Password</label><input type="password" id="cp2" placeholder="••••••••"></div>
+        <div class="fr"><label>Confirm New Password</label><input type="password" id="cp3" placeholder="••••••••"></div>
+        <button class="btn btn-p" onclick="changePwd()">Update Password</button>
       </div>
     </div>
 
-  </div><!-- /content -->
-</main><!-- /main -->
-
-<!-- ── MODALS ── -->
-
-<!-- Add Tenant -->
-<div class="modal-overlay" id="addTenantModal">
-  <div class="modal">
-    <div class="modal-title">Add New Tenant</div>
-    <div class="form-row"><label>Business Name *</label><input id="t_businessName" placeholder="Acme Corp"></div>
-    <div class="form-row"><label>Owner Name *</label><input id="t_ownerName" placeholder="John Doe"></div>
-    <div class="form-row"><label>Owner Email *</label><input id="t_ownerEmail" type="email" placeholder="john@example.com"></div>
-    <div class="form-row"><label>Owner Phone</label><input id="t_ownerPhone" placeholder="+1 555 000"></div>
-    <div class="form-row"><label>Status</label>
-      <select id="t_status"><option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option></select>
-    </div>
-    <div class="form-row"><label>Max Branches</label><input id="t_maxBranches" type="number" value="1" min="1"></div>
-    <div class="form-row"><label>Max Employees</label><input id="t_maxEmployees" type="number" value="5" min="1"></div>
-    <div class="form-row"><label>Store Type</label>
-      <select id="t_storeType"><option value="supermarket">Supermarket</option><option value="restaurant">Restaurant</option><option value="cafe">Cafe</option><option value="retail">Retail</option></select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal('addTenantModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="addTenant()">Create Tenant</button>
-    </div>
   </div>
-</div>
+</main>
 
-<!-- Add Subscription -->
-<div class="modal-overlay" id="addSubModal">
-  <div class="modal">
-    <div class="modal-title">New Subscription</div>
-    <div class="form-row"><label>Tenant *</label><select id="sub_tenantId"></select></div>
-    <div class="form-row"><label>Plan Type</label>
-      <select id="sub_planType"><option value="trial">Trial</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select>
-    </div>
-    <div class="form-row"><label>Plan Name</label><input id="sub_planName" placeholder="Starter" value="Starter"></div>
-    <div class="form-row"><label>Price</label><input id="sub_price" type="number" step="0.01" placeholder="0.00"></div>
-    <div class="form-row"><label>Status</label>
-      <select id="sub_status"><option value="active">Active</option><option value="inactive">Inactive</option><option value="cancelled">Cancelled</option></select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal('addSubModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="addSubscription()">Create</button>
-    </div>
-  </div>
-</div>
+<!-- ══════════ MODALS ══════════ -->
 
-<!-- Generate License -->
-<div class="modal-overlay" id="addLicModal">
-  <div class="modal">
-    <div class="modal-title">Generate License Key</div>
-    <div class="form-row"><label>Tenant *</label><select id="lic_tenantId"></select></div>
-    <div class="form-row"><label>Max Activations</label><input id="lic_maxAct" type="number" value="3" min="1"></div>
-    <div class="form-row"><label>Expires At</label><input id="lic_expires" type="date"></div>
-    <div class="form-row"><label>Custom Key (optional)</label><input id="lic_customKey" placeholder="Leave blank to auto-generate"></div>
-    <div class="form-row"><label>Notes</label><input id="lic_notes" placeholder="Internal notes..."></div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal('addLicModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="generateLicense()">Generate</button>
-    </div>
-  </div>
-</div>
+<!-- ADD / EDIT PRODUCT -->
+<div class="mo" id="mProd"><div class="md">
+  <div class="md-title" id="mProdTitle">Add Product</div>
+  <input type="hidden" id="pId">
+  <div class="fr-row"><div class="fr"><label>Name *</label><input id="pName" placeholder="Product name"></div><div class="fr"><label>Name (Arabic)</label><input id="pNameAr" placeholder="اسم المنتج"></div></div>
+  <div class="fr-row"><div class="fr"><label>Price *</label><input id="pPrice" type="number" step="0.01" placeholder="0.00"></div><div class="fr"><label>Cost Price</label><input id="pCost" type="number" step="0.01" placeholder="0.00"></div></div>
+  <div class="fr-row"><div class="fr"><label>SKU</label><input id="pSku" placeholder="SKU-001"></div><div class="fr"><label>Barcode</label><input id="pBarcode" placeholder="123456789"></div></div>
+  <div class="fr-row"><div class="fr"><label>Category</label><select id="pCat"></select></div><div class="fr"><label>Unit</label><select id="pUnit"><option value="piece">Piece</option><option value="kg">KG</option><option value="liter">Liter</option><option value="box">Box</option><option value="pack">Pack</option></select></div></div>
+  <div class="fr"><label>Description</label><textarea id="pDesc" rows="2" placeholder="Optional description…"></textarea></div>
+  <div class="fr-row"><div class="fr"><label>Tax Rate %</label><input id="pTax" type="number" step="0.01" placeholder="0"></div><div class="fr"><label>Status</label><select id="pStatus"><option value="true">Active</option><option value="false">Inactive</option></select></div></div>
+  <div class="ma"><button class="btn btn-o" onclick="closeM('mProd')">Cancel</button><button class="btn btn-p" onclick="saveProd()">Save Product</button></div>
+</div></div>
 
-<!-- Notification -->
-<div class="modal-overlay" id="notifModal">
-  <div class="modal">
-    <div class="modal-title">Send Notification</div>
-    <div class="form-row"><label>Tenant *</label><select id="notif_tenantId"></select></div>
-    <div class="form-row"><label>Title *</label><input id="notif_title" placeholder="Notification title"></div>
-    <div class="form-row"><label>Message *</label><textarea id="notif_message" rows="3" placeholder="Your message..."></textarea></div>
-    <div class="form-row"><label>Type</label>
-      <select id="notif_type"><option value="info">Info</option><option value="warning">Warning</option><option value="success">Success</option><option value="error">Error</option></select>
-    </div>
-    <div class="form-row"><label>Priority</label>
-      <select id="notif_priority"><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal('notifModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="sendNotification()">Send</button>
-    </div>
-  </div>
-</div>
+<!-- ADD / EDIT CATEGORY -->
+<div class="mo" id="mCat"><div class="md">
+  <div class="md-title" id="mCatTitle">Add Category</div>
+  <input type="hidden" id="cId">
+  <div class="fr"><label>Name *</label><input id="cName" placeholder="e.g. Beverages"></div>
+  <div class="fr"><label>Name (Arabic)</label><input id="cNameAr" placeholder="e.g. مشروبات"></div>
+  <div class="fr"><label>Color</label><input id="cColor" type="color" value="#2FD3C6" style="height:40px;width:100%;border-radius:8px;cursor:pointer"></div>
+  <div class="fr"><label>Description</label><input id="cDesc" placeholder="Optional description…"></div>
+  <div class="ma"><button class="btn btn-o" onclick="closeM('mCat')">Cancel</button><button class="btn btn-p" onclick="saveCat()">Save Category</button></div>
+</div></div>
 
-<!-- Broadcast -->
-<div class="modal-overlay" id="broadcastModal">
-  <div class="modal">
-    <div class="modal-title">Broadcast to All Tenants</div>
-    <div class="form-row"><label>Title *</label><input id="bc_title" placeholder="Announcement title"></div>
-    <div class="form-row"><label>Message *</label><textarea id="bc_message" rows="3" placeholder="Your message..."></textarea></div>
-    <div class="form-row"><label>Type</label>
-      <select id="bc_type"><option value="info">Info</option><option value="warning">Warning</option><option value="success">Success</option></select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal('broadcastModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="broadcastNotification()">Broadcast</button>
-    </div>
-  </div>
-</div>
+<!-- ADD / EDIT BRANCH -->
+<div class="mo" id="mBranch"><div class="md">
+  <div class="md-title" id="mBrTitle">Add Branch</div>
+  <input type="hidden" id="bId">
+  <div class="fr"><label>Branch Name *</label><input id="bName" placeholder="Main Branch"></div>
+  <div class="fr"><label>Address</label><input id="bAddr" placeholder="Street, City"></div>
+  <div class="fr-row"><div class="fr"><label>Phone</label><input id="bPhone" placeholder="+1 555 000"></div><div class="fr"><label>Status</label><select id="bStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></div></div>
+  <div class="ma"><button class="btn btn-o" onclick="closeM('mBranch')">Cancel</button><button class="btn btn-p" onclick="saveBranch()">Save Branch</button></div>
+</div></div>
 
-<!-- Toast -->
+<!-- ADD / EDIT EMPLOYEE -->
+<div class="mo" id="mEmp"><div class="md">
+  <div class="md-title" id="mEmpTitle">Add Employee</div>
+  <input type="hidden" id="eId">
+  <div class="fr-row"><div class="fr"><label>Name *</label><input id="eName" placeholder="John Doe"></div><div class="fr"><label>PIN (4-6 digits)</label><input id="ePin" type="text" maxlength="6" placeholder="1234"></div></div>
+  <div class="fr-row"><div class="fr"><label>Role</label><select id="eRole"><option value="cashier">Cashier</option><option value="manager">Manager</option><option value="admin">Admin</option><option value="waiter">Waiter</option></select></div><div class="fr"><label>Branch</label><select id="eBranch"></select></div></div>
+  <div class="fr-row"><div class="fr"><label>Phone</label><input id="ePhone" placeholder="+1 555 000"></div><div class="fr"><label>Email</label><input id="eEmail" type="email" placeholder="emp@store.com"></div></div>
+  <div class="fr-row"><div class="fr"><label>Salary</label><input id="eSal" type="number" step="0.01" placeholder="0.00"></div><div class="fr"><label>Commission %</label><input id="eComm" type="number" step="0.01" placeholder="0"></div></div>
+  <div class="fr-row"><div class="fr"><label>Status</label><select id="eStatus"><option value="true">Active</option><option value="false">Inactive</option></select></div><div class="fr"></div></div>
+  <div class="ma"><button class="btn btn-o" onclick="closeM('mEmp')">Cancel</button><button class="btn btn-p" onclick="saveEmp()">Save Employee</button></div>
+</div></div>
+
+<!-- ADD / EDIT CUSTOMER -->
+<div class="mo" id="mCust"><div class="md">
+  <div class="md-title" id="mCustTitle">Add Customer</div>
+  <input type="hidden" id="custId">
+  <div class="fr-row"><div class="fr"><label>Name *</label><input id="custName" placeholder="John Doe"></div><div class="fr"><label>Phone</label><input id="custPhone" placeholder="+1 555 000"></div></div>
+  <div class="fr"><label>Email</label><input id="custEmail" type="email" placeholder="customer@email.com"></div>
+  <div class="fr"><label>Address</label><input id="custAddr" placeholder="123 Main St"></div>
+  <div class="fr-row"><div class="fr"><label>Loyalty Points</label><input id="custPts" type="number" value="0"></div><div class="fr"><label>Notes</label><input id="custNotes" placeholder="VIP, etc."></div></div>
+  <div class="ma"><button class="btn btn-o" onclick="closeM('mCust')">Cancel</button><button class="btn btn-p" onclick="saveCust()">Save Customer</button></div>
+</div></div>
+
+<!-- SALE DETAIL -->
+<div class="mo" id="mSaleDetail"><div class="md">
+  <div class="md-title">Sale Details</div>
+  <div id="saleDetailContent"></div>
+  <div class="ma"><button class="btn btn-o" onclick="closeM('mSaleDetail')">Close</button></div>
+</div></div>
+
+<!-- INVENTORY ADJUST -->
+<div class="mo" id="mInvAdj"><div class="md">
+  <div class="md-title">Adjust Stock</div>
+  <div class="fr"><label>Product *</label><select id="invProd"></select></div>
+  <div class="fr"><label>Branch *</label><select id="invBr"></select></div>
+  <div class="fr"><label>Adjustment (+ add / - remove)</label><input id="invAdj" type="number" placeholder="e.g. 10 or -5"></div>
+  <div class="fr"><label>Set Absolute Quantity</label><input id="invAbs" type="number" placeholder="Leave blank to use adjustment above"></div>
+  <div class="ma"><button class="btn btn-o" onclick="closeM('mInvAdj')">Cancel</button><button class="btn btn-p" onclick="saveInvAdj()">Save</button></div>
+</div></div>
+
+<!-- ADD TENANT -->
+<div class="mo" id="mTenant"><div class="md">
+  <div class="md-title">Add Tenant</div>
+  <div class="fr-row"><div class="fr"><label>Business Name *</label><input id="tBiz" placeholder="Acme Corp"></div><div class="fr"><label>Store Type</label><select id="tType"><option value="supermarket">Supermarket</option><option value="restaurant">Restaurant</option><option value="cafe">Cafe</option><option value="retail">Retail</option></select></div></div>
+  <div class="fr-row"><div class="fr"><label>Owner Name *</label><input id="tOwner" placeholder="John Doe"></div><div class="fr"><label>Owner Email *</label><input id="tEmail" type="email" placeholder="owner@biz.com"></div></div>
+  <div class="fr-row"><div class="fr"><label>Phone</label><input id="tPhone" placeholder="+1 555 000"></div><div class="fr"><label>Status</label><select id="tStatus"><option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option></select></div></div>
+  <div class="fr-row"><div class="fr"><label>Max Branches</label><input id="tBr" type="number" value="1" min="1"></div><div class="fr"><label>Max Employees</label><input id="tEmp" type="number" value="5" min="1"></div></div>
+  <div class="ma"><button class="btn btn-o" onclick="closeM('mTenant')">Cancel</button><button class="btn btn-p" onclick="saveTenant()">Create Tenant</button></div>
+</div></div>
+
+<!-- ADD SUBSCRIPTION -->
+<div class="mo" id="mSub"><div class="md">
+  <div class="md-title">New Subscription</div>
+  <div class="fr"><label>Tenant *</label><select id="sTenant"></select></div>
+  <div class="fr-row"><div class="fr"><label>Plan Type</label><select id="sPlan"><option value="trial">Trial</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div><div class="fr"><label>Plan Name</label><input id="sPlanName" value="Starter"></div></div>
+  <div class="fr-row"><div class="fr"><label>Price</label><input id="sPrice" type="number" step="0.01" placeholder="0.00"></div><div class="fr"><label>Status</label><select id="sStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></div></div>
+  <div class="ma"><button class="btn btn-o" onclick="closeM('mSub')">Cancel</button><button class="btn btn-p" onclick="saveSub()">Create</button></div>
+</div></div>
+
+<!-- GENERATE LICENSE -->
+<div class="mo" id="mLic"><div class="md">
+  <div class="md-title">Generate License Key</div>
+  <div class="fr"><label>Tenant *</label><select id="lTenant"></select></div>
+  <div class="fr-row"><div class="fr"><label>Max Activations</label><input id="lMax" type="number" value="3" min="1"></div><div class="fr"><label>Expires At</label><input id="lExp" type="date"></div></div>
+  <div class="fr"><label>Custom Key (optional)</label><input id="lKey" placeholder="Leave blank to auto-generate"></div>
+  <div class="fr"><label>Notes</label><input id="lNotes" placeholder="Internal notes…"></div>
+  <div class="ma"><button class="btn btn-o" onclick="closeM('mLic')">Cancel</button><button class="btn btn-p" onclick="saveLic()">Generate</button></div>
+</div></div>
+
+<!-- SEND NOTIFICATION -->
+<div class="mo" id="mNotif"><div class="md">
+  <div class="md-title">Send Notification</div>
+  <div class="fr"><label>Tenant *</label><select id="nTenant"></select></div>
+  <div class="fr"><label>Title *</label><input id="nTitle" placeholder="Notification title"></div>
+  <div class="fr"><label>Message *</label><textarea id="nMsg" rows="3" placeholder="Your message…"></textarea></div>
+  <div class="fr-row"><div class="fr"><label>Type</label><select id="nType"><option value="info">Info</option><option value="warning">Warning</option><option value="success">Success</option><option value="error">Error</option></select></div><div class="fr"><label>Priority</label><select id="nPri"><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></div></div>
+  <div class="ma"><button class="btn btn-o" onclick="closeM('mNotif')">Cancel</button><button class="btn btn-p" onclick="sendNotif()">Send</button></div>
+</div></div>
+
+<!-- BROADCAST -->
+<div class="mo" id="mBcast"><div class="md">
+  <div class="md-title">Broadcast to All Tenants</div>
+  <div class="fr"><label>Title *</label><input id="bcTitle" placeholder="Announcement"></div>
+  <div class="fr"><label>Message *</label><textarea id="bcMsg" rows="3" placeholder="Your message…"></textarea></div>
+  <div class="fr"><label>Type</label><select id="bcType"><option value="info">Info</option><option value="warning">Warning</option><option value="success">Success</option></select></div>
+  <div class="ma"><button class="btn btn-o" onclick="closeM('mBcast')">Cancel</button><button class="btn btn-p" onclick="broadcast()">Broadcast</button></div>
+</div></div>
+
 <div id="toast"></div>
 
 <script>
-// ── STATE ──
-let token = localStorage.getItem('super_admin_token');
-let currentView = 'dashboard';
-let allTenants = [];
-
-// ── AUTH CHECK ──
-if (!token) {
-  window.location.href = '/super_admin/login';
-}
-
-// Load admin info
+/* ══════════════════════════════════════════════════════
+   AUTH
+══════════════════════════════════════════════════════ */
+const token = localStorage.getItem('super_admin_token');
+if (!token) location.href = '/super_admin/login';
 try {
-  const user = JSON.parse(localStorage.getItem('super_admin_user') || '{}');
-  if (user.name) {
-    document.getElementById('adminName').textContent = user.name;
-    document.getElementById('adminInitial').textContent = user.name[0].toUpperCase();
-  }
-  if (user.email) {
-    document.getElementById('adminEmail').textContent = user.email;
-  }
-} catch(e) {}
+  const u = JSON.parse(localStorage.getItem('super_admin_user')||'{}');
+  if(u.name){ document.getElementById('adminName').textContent=u.name; document.getElementById('adminInit').textContent=u.name[0].toUpperCase(); }
+  if(u.email) document.getElementById('adminEmail').textContent=u.email;
+} catch(e){}
 
-// ── API ──
+/* ══════════════════════════════════════════════════════
+   API HELPERS
+══════════════════════════════════════════════════════ */
 async function api(method, path, body) {
-  const opts = {
-    method,
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
-  };
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch('/api/super-admin' + path, opts);
-  if (res.status === 401) { logout(); return null; }
-  return res.json();
-}
-
-// ── TOAST ──
-let toastTimer;
-function toast(msg, type = '') {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = 'show ' + type;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.className = ''; }, 3000);
-}
-
-// ── VIEWS ──
-const viewMeta = {
-  dashboard:     { title: 'Dashboard',      sub: 'Platform overview' },
-  tenants:       { title: 'Tenants',        sub: 'Manage all store tenants' },
-  subscriptions: { title: 'Subscriptions',  sub: 'Billing & subscription plans' },
-  licenses:      { title: 'License Keys',   sub: 'Manage software licenses' },
-  analytics:     { title: 'Analytics',      sub: 'Revenue & usage metrics' },
-  system:        { title: 'System Health',  sub: 'Server & database status' },
-  notifications: { title: 'Notifications',  sub: 'Send messages to tenants' },
-  settings:      { title: 'Settings',       sub: 'Account & preferences' },
-};
-
-function showView(name) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('view-' + name).classList.add('active');
-  document.querySelectorAll('.nav-item').forEach(n => {
-    if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + name + "'")) {
-      n.classList.add('active');
-    }
-  });
-  const meta = viewMeta[name] || { title: name, sub: '' };
-  document.getElementById('viewTitle').textContent = meta.title;
-  document.getElementById('viewSub').textContent = meta.sub;
-  currentView = name;
-  loadView(name);
-}
-
-function loadView(name) {
-  if (name === 'dashboard')     loadDashboard();
-  if (name === 'tenants')       loadTenants();
-  if (name === 'subscriptions') loadSubscriptions();
-  if (name === 'licenses')      loadLicenses();
-  if (name === 'analytics')     loadAnalytics();
-  if (name === 'system')        loadSystem();
-  if (name === 'notifications') loadNotifications();
-}
-
-// ── MODALS ──
-function openModal(id) {
-  document.getElementById(id).classList.add('open');
-  if (id === 'addSubModal' || id === 'addLicModal' || id === 'notifModal') populateTenantSelects();
-}
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal-overlay').forEach(o => {
-  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
-});
-
-async function populateTenantSelects() {
-  if (!allTenants.length) allTenants = await api('GET', '/tenants') || [];
-  const opts = allTenants.map(t => `<option value="${t.id}">${t.businessName}</option>`).join('');
-  ['sub_tenantId','lic_tenantId','notif_tenantId'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = opts;
-  });
-}
-
-// ── UTILS ──
-function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
-}
-function fmtCurr(n) {
-  return '$' + parseFloat(n || 0).toFixed(2);
-}
-function statusBadge(s) {
-  const map = { active:'green', inactive:'gray', suspended:'red', cancelled:'red', trial:'blue', expired:'yellow', revoked:'red', pending:'yellow' };
-  const c = map[s] || 'gray';
-  return `<span class="badge badge-${c}">${s}</span>`;
-}
-
-function filterTable(tbodyId, q) {
-  const tbody = document.getElementById(tbodyId);
-  if (!tbody) return;
-  const rows = tbody.querySelectorAll('tr');
-  const lq = q.toLowerCase();
-  rows.forEach(r => {
-    r.style.display = r.textContent.toLowerCase().includes(lq) ? '' : 'none';
-  });
-}
-
-// ── HEALTH ──
-async function checkHealth() {
   try {
-    const h = await api('GET', '/system/health');
-    if (h && h.status === 'healthy') {
-      document.getElementById('healthDot').style.background = 'var(--success)';
-      document.getElementById('healthLabel').textContent = 'System Healthy';
-    }
-  } catch(e) {
-    document.getElementById('healthDot').style.background = 'var(--danger)';
-    document.getElementById('healthLabel').textContent = 'System Error';
-  }
+    const opts = { method, headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`} };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch('/api/super-admin' + path, opts);
+    if (res.status === 401) { logout(); return null; }
+    const data = await res.json();
+    if (!res.ok) { console.warn('API error', path, data); return null; }
+    return data;
+  } catch(e) { console.error(e); return null; }
+}
+// regular (non-super-admin) routes
+async function rapi(method, path, body) {
+  try {
+    const opts = { method, headers:{'Content-Type':'application/json'} };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(path, opts);
+    const data = await res.json();
+    if (!res.ok) { console.warn('API error', path, data); return null; }
+    return data;
+  } catch(e) { console.error(e); return null; }
+}
+
+/* ══════════════════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════════════════ */
+let toastT;
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'show ' + type;
+  clearTimeout(toastT); toastT = setTimeout(()=>{ el.className=''; }, 3200);
+}
+
+/* ══════════════════════════════════════════════════════
+   VIEWS
+══════════════════════════════════════════════════════ */
+const META = {
+  dashboard:     ['Dashboard','Platform overview'],
+  storemanager:  ['Store Manager','Full control over any store'],
+  tenants:       ['Tenants','Manage all store tenants'],
+  subscriptions: ['Subscriptions','Billing & subscription plans'],
+  licenses:      ['License Keys','Manage software licenses'],
+  analytics:     ['Analytics','Revenue & usage metrics'],
+  system:        ['System Health','Server & database status'],
+  notifications: ['Notifications','Send messages to tenants'],
+  settings:      ['Settings','Account & preferences'],
+};
+let curView = 'dashboard';
+function show(v) {
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n=>{
+    n.classList.toggle('active', n.getAttribute('onclick')?.includes(`'${v}'`));
+  });
+  document.getElementById('view-'+v).classList.add('active');
+  const m = META[v]||[v,''];
+  document.getElementById('vTitle').textContent = m[0];
+  document.getElementById('vSub').textContent = m[1];
+  curView = v;
+  if(v==='dashboard')     loadDash();
+  if(v==='storemanager')  initStoreMgr();
+  if(v==='tenants')       loadTenants();
+  if(v==='subscriptions') loadSubs();
+  if(v==='licenses')      loadLics();
+  if(v==='analytics')     loadAnalytics();
+  if(v==='system')        loadSystem();
+  if(v==='notifications') loadNotifs();
+}
+
+/* ══════════════════════════════════════════════════════
+   MODALS
+══════════════════════════════════════════════════════ */
+function openM(id) { document.getElementById(id).classList.add('open'); }
+function closeM(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.mo').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open'); }));
+
+/* ══════════════════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════════════════ */
+function fmtD(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function fmtDT(d){ if(!d) return '—'; return new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }
+function fmtM(n){ return '$'+parseFloat(n||0).toFixed(2); }
+function n(v){ return v??0; }
+function badge(s){
+  const m={active:'bg',inactive:'bgr',suspended:'br',cancelled:'br',trial:'bb',expired:'by',revoked:'br',pending:'by',true:'bg',false:'bgr',healthy:'bg',info:'bb',warning:'by',success:'bg',error:'br',normal:'bgr',high:'by',urgent:'br',cashier:'bb',manager:'bm',admin:'br',waiter:'bb'};
+  return `<span class="badge ${m[String(s)]||'bgr'}">${s}</span>`;
+}
+function ft(id, q){
+  const tb = document.getElementById(id); if(!tb) return;
+  tb.querySelectorAll('tr').forEach(r=>{ r.style.display=r.textContent.toLowerCase().includes(q.toLowerCase())?'':'none'; });
+}
+function iBtn(icon,cls,onclick){ return `<button class="btn btn-sm ${cls}" onclick="${onclick}" title="${icon}" style="margin-right:3px">${icon}</button>`; }
+
+/* ══════════════════════════════════════════════════════
+   HEALTH CHECK
+══════════════════════════════════════════════════════ */
+async function checkHealth(){
+  const h = await api('GET','/system/health');
+  const dot = document.getElementById('hdot');
+  const lbl = document.getElementById('hlabel');
+  if(h?.status==='healthy'){ dot.style.background='var(--ok)'; lbl.textContent='System Healthy'; }
+  else { dot.style.background='var(--danger)'; lbl.textContent='Issue Detected'; }
 }
 checkHealth();
 
-// ── DASHBOARD ──
-async function loadDashboard() {
-  // Stats
-  const stats = await api('GET', '/analytics/overview');
-  if (stats) {
-    document.getElementById('statsGrid').innerHTML = [
-      { label:'Total Tenants',       val: stats.totalTenants,       sub: `${stats.activeTenants} active` },
-      { label:'Subscriptions',       val: stats.totalSubscriptions, sub: `${stats.activeSubscriptions} active, ${stats.expiringSubscriptions} expiring` },
-      { label:'License Keys',        val: stats.totalLicenses,      sub: `${stats.activeLicenses} active` },
-      { label:'Branches',            val: stats.totalBranches,      sub: '' },
-      { label:'Employees',           val: stats.totalEmployees,     sub: '' },
-      { label:'Products',            val: stats.totalProducts,      sub: '' },
-      { label:'Total Sales',         val: stats.totalSales,         sub: '' },
-      { label:'Sub Revenue',         val: fmtCurr(stats.subscriptionRevenue), sub: '' },
-      { label:'Sales Revenue',       val: fmtCurr(stats.totalSalesRevenue),   sub: '' },
-    ].map(s => `
-      <div class="stat-card">
-        <div class="stat-label">${s.label}</div>
-        <div class="stat-value">${s.val}</div>
-        ${s.sub ? `<div class="stat-sub">${s.sub}</div>` : ''}
-      </div>
-    `).join('');
+/* ══════════════════════════════════════════════════════
+   DASHBOARD
+══════════════════════════════════════════════════════ */
+async function loadDash(){
+  const ov = await api('GET','/analytics/overview');
+  const sg = document.getElementById('sg');
+  if(!ov){ sg.innerHTML='<div class="ls">Failed to load stats. Check API connection.</div>'; }
+  else {
+    sg.innerHTML = [
+      {l:'Total Tenants',   v:n(ov.totalTenants),         s:`${n(ov.activeTenants)} active`},
+      {l:'Subscriptions',   v:n(ov.totalSubscriptions),   s:`${n(ov.activeSubscriptions)} active · ${n(ov.expiringSubscriptions)} expiring`},
+      {l:'License Keys',    v:n(ov.totalLicenses),        s:`${n(ov.activeLicenses)} active`},
+      {l:'Branches',        v:n(ov.totalBranches),        s:''},
+      {l:'Employees',       v:n(ov.totalEmployees),       s:''},
+      {l:'Products',        v:n(ov.totalProducts),        s:''},
+      {l:'Total Sales',     v:n(ov.totalSales),           s:''},
+      {l:'Sub Revenue',     v:fmtM(ov.subscriptionRevenue),  s:''},
+      {l:'Sales Revenue',   v:fmtM(ov.totalSalesRevenue),    s:''},
+    ].map(x=>`<div class="sc"><div class="sl">${x.l}</div><div class="sv">${x.v}</div>${x.s?`<div class="ss">${x.s}</div>`:''}</div>`).join('');
   }
-
   // Stores
-  const stores = await api('GET', '/all-stores');
-  if (stores) {
-    document.getElementById('storeList').innerHTML = stores.slice(0,8).map(s => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-subtle)">
-        <div>
-          <div style="font-size:13px;font-weight:600">${s.businessName}</div>
-          <div style="font-size:11px;color:var(--text-muted)">${s.branchCount} branches · ${s.employeeCount} employees</div>
-        </div>
-        ${statusBadge(s.status)}
-      </div>
-    `).join('') || '<div style="color:var(--text-muted);font-size:13px">No stores yet.</div>';
-  }
-
+  const stores = await api('GET','/all-stores');
+  const sl = document.getElementById('storeList');
+  if(!stores||!stores.length){ sl.innerHTML='<div class="ls">No stores yet.</div>'; }
+  else sl.innerHTML = stores.slice(0,8).map(s=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)">
+      <div><div style="font-size:13px;font-weight:600">${s.businessName}</div><div style="font-size:11px;color:var(--mu)">${s.branchCount} branches · ${s.employeeCount} employees</div></div>
+      ${badge(s.status)}
+    </div>`).join('');
   // Revenue
-  const rev = await api('GET', '/analytics/revenue');
-  if (rev && rev.revenueByTenant) {
-    document.getElementById('revenueList').innerHTML = rev.revenueByTenant.slice(0,8).map(r => `
-      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-subtle)">
-        <div style="font-size:13px;font-weight:500">${r.businessName}</div>
-        <div style="font-size:13px;color:var(--primary);font-weight:700">${fmtCurr(r.revenue)}</div>
-      </div>
-    `).join('') || '<div style="color:var(--text-muted);font-size:13px">No revenue data yet.</div>';
-  }
+  const rev = await api('GET','/analytics/revenue');
+  const rl = document.getElementById('revList');
+  if(!rev?.revenueByTenant?.length){ rl.innerHTML='<div class="ls">No revenue data.</div>'; }
+  else rl.innerHTML = rev.revenueByTenant.slice(0,8).map(r=>`
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd)">
+      <span style="font-size:13px;font-weight:500">${r.businessName}</span>
+      <span style="font-size:13px;color:var(--pr);font-weight:700">${fmtM(r.revenue)}</span>
+    </div>`).join('');
 }
 
-// ── TENANTS ──
-async function loadTenants() {
-  allTenants = await api('GET', '/tenants') || [];
-  document.getElementById('tenantTable').innerHTML = allTenants.map(t => `
-    <tr>
-      <td style="color:var(--text-muted)">#${t.id}</td>
-      <td><div style="font-weight:600">${t.businessName}</div><div style="font-size:11px;color:var(--text-muted)">${t.storeType || ''}</div></td>
-      <td><div>${t.ownerName}</div><div style="font-size:11px;color:var(--text-muted)">${t.ownerEmail}</div></td>
-      <td>${statusBadge(t.status)}</td>
-      <td>${t.maxBranches}</td>
-      <td>${t.maxEmployees}</td>
-      <td>
-        <button class="btn btn-sm btn-danger" onclick="deleteTenant(${t.id}, '${t.businessName.replace(/'/g,"\\'")}')">Delete</button>
-      </td>
-    </tr>
-  `).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">No tenants found</td></tr>';
+/* ══════════════════════════════════════════════════════
+   STORE MANAGER STATE
+══════════════════════════════════════════════════════ */
+let SM = { tenantId:null, tenant:null, branches:[], products:[], categories:[], employees:[], curTab:'overview' };
+
+async function initStoreMgr(){
+  const tenants = await api('GET','/tenants') || [];
+  const sel = document.getElementById('storePicker');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Select a store —</option>' +
+    tenants.map(t=>`<option value="${t.id}" ${String(t.id)===String(cur)?'selected':''}>${t.businessName} (${t.ownerEmail})</option>`).join('');
+  if(cur) onStorePick();
 }
 
-async function addTenant() {
+async function onStorePick(){
+  const id = parseInt(document.getElementById('storePicker').value);
+  document.getElementById('storeContent').style.display = id ? 'block' : 'none';
+  if(!id){ SM.tenantId=null; return; }
+  SM.tenantId = id;
+  document.getElementById('storePickerInfo').textContent = 'Loading…';
+  // Load branches and products for caches
+  const [branches, products, categories, employees] = await Promise.all([
+    api('GET',`/stores/${id}/branches`),
+    api('GET',`/stores/${id}/products`),
+    rapi('GET',`/api/categories?tenantId=${id}`),
+    api('GET',`/stores/${id}/employees`),
+  ]);
+  SM.branches   = branches   || [];
+  SM.products   = products   || [];
+  SM.categories = categories || [];
+  SM.employees  = employees  || [];
+  document.getElementById('storePickerInfo').textContent =
+    `${SM.branches.length} branches · ${SM.employees.length} employees · ${SM.products.length} products`;
+  loadStoreTab(SM.curTab);
+}
+
+function storeTab(t){
+  SM.curTab = t;
+  document.querySelectorAll('.tab').forEach((el,i)=>{
+    const tabs=['overview','products','categories','branches','employees','customers','sales','inventory'];
+    el.classList.toggle('active', tabs[i]===t);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('sp-'+t).classList.add('active');
+  if(SM.tenantId) loadStoreTab(t);
+}
+
+function loadStoreTab(t){
+  if(t==='overview')    loadStoreOverview();
+  if(t==='products')    loadStoreProducts();
+  if(t==='categories')  loadStoreCategories();
+  if(t==='branches')    loadStoreBranches();
+  if(t==='employees')   loadStoreEmployees();
+  if(t==='customers')   loadStoreCustomers();
+  if(t==='sales')       loadStoreSales();
+  if(t==='inventory')   loadInventory();
+}
+
+/* ── Store Overview ── */
+async function loadStoreOverview(){
+  const id = SM.tenantId;
+  const [sales, customers] = await Promise.all([
+    rapi('GET',`/api/sales?tenantId=${id}&limit=200`),
+    rapi('GET',`/api/customers?tenantId=${id}`),
+  ]);
+  const salesArr = Array.isArray(sales) ? sales : [];
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todaySales = salesArr.filter(s=>new Date(s.createdAt)>=today);
+  const totalRev = salesArr.reduce((a,s)=>a+parseFloat(s.total||s.totalAmount||0),0);
+  const todayRev = todaySales.reduce((a,s)=>a+parseFloat(s.total||s.totalAmount||0),0);
+  document.getElementById('storeStats').innerHTML = [
+    {l:'Total Sales',   v:salesArr.length,       s:`Today: ${todaySales.length}`},
+    {l:'Total Revenue', v:fmtM(totalRev),         s:`Today: ${fmtM(todayRev)}`},
+    {l:'Customers',     v:(customers||[]).length, s:''},
+    {l:'Products',      v:SM.products.length,     s:''},
+    {l:'Employees',     v:SM.employees.length,    s:''},
+    {l:'Branches',      v:SM.branches.length,     s:''},
+  ].map(x=>`<div class="sc"><div class="sl">${x.l}</div><div class="sv">${x.v}</div>${x.s?`<div class="ss">${x.s}</div>`:''}</div>`).join('');
+
+  // Recent sales
+  document.getElementById('recentSales').innerHTML = salesArr.slice(0,8).map(s=>`
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd);font-size:13px">
+      <span style="color:var(--mu)">${fmtDT(s.createdAt)}</span>
+      <span style="color:var(--pr);font-weight:700">${fmtM(s.total||s.totalAmount)}</span>
+    </div>`).join('') || '<div class="empty">No sales yet</div>';
+
+  // Top products by frequency
+  const freq = {};
+  salesArr.forEach(s=>{ const pId=s.productId; if(pId){ freq[pId]=(freq[pId]||0)+1; } });
+  const topProd = SM.products.sort((a,b)=>(freq[b.id]||0)-(freq[a.id]||0)).slice(0,6);
+  document.getElementById('topProds').innerHTML = topProd.map(p=>`
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--bd);font-size:13px">
+      <span style="font-weight:500">${p.name}</span>
+      <span style="color:var(--pr);font-weight:700">${fmtM(p.price)}</span>
+    </div>`).join('') || '<div class="empty">No products yet</div>';
+
+  // Employees
+  document.getElementById('empOverview').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr>
+        <th style="text-align:left;padding:8px 12px;font-size:11px;color:var(--mu);border-bottom:1px solid var(--bd)">Name</th>
+        <th style="text-align:left;padding:8px 12px;font-size:11px;color:var(--mu);border-bottom:1px solid var(--bd)">Role</th>
+        <th style="text-align:left;padding:8px 12px;font-size:11px;color:var(--mu);border-bottom:1px solid var(--bd)">Status</th>
+      </tr></thead>
+      <tbody>${SM.employees.map(e=>`<tr>
+        <td style="padding:9px 12px;font-weight:500">${e.name}</td>
+        <td style="padding:9px 12px">${badge(e.role||'cashier')}</td>
+        <td style="padding:9px 12px">${badge(e.isActive?'active':'inactive')}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+/* ── Store Products ── */
+async function loadStoreProducts(){
+  const id = SM.tenantId;
+  const prods = await rapi('GET',`/api/products?tenantId=${id}`);
+  SM.products = prods || [];
+  // populate category filter
+  const catSel = document.getElementById('catFilter');
+  catSel.innerHTML = '<option value="">All Categories</option>' +
+    SM.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  // populate product modal category
+  document.getElementById('pCat').innerHTML = '<option value="">None</option>' +
+    SM.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  renderProds(SM.products);
+}
+function renderProds(prods){
+  const catMap = Object.fromEntries(SM.categories.map(c=>[c.id,c]));
+  document.getElementById('prodTbl').innerHTML = prods.map(p=>`<tr>
+    <td><div style="font-weight:600">${p.name}</div>${p.nameAr?`<div style="font-size:11px;color:var(--mu)">${p.nameAr}</div>`:''}</td>
+    <td style="color:var(--pr);font-weight:700">${fmtM(p.price)}</td>
+    <td style="color:var(--mu)">${p.costPrice?fmtM(p.costPrice):'—'}</td>
+    <td style="font-size:12px;color:var(--mu)">${p.sku||'—'}</td>
+    <td style="font-size:12px;font-family:monospace">${p.barcode||'—'}</td>
+    <td>${catMap[p.categoryId]?`<span style="display:inline-flex;align-items:center;gap:5px"><span class="cdot" style="background:${catMap[p.categoryId].color||'#666'}"></span>${catMap[p.categoryId].name}</span>`:'—'}</td>
+    <td>${badge(p.isActive?'active':'inactive')}</td>
+    <td>${iBtn('✏️','btn-o',`editProd(${p.id})`)}${iBtn('🗑️','btn-d',`delProd(${p.id},'${p.name.replace(/'/g,"\\'")}')`)}</td>
+  </tr>`).join('') || '<tr><td colspan="8" class="empty">No products yet</td></tr>';
+}
+function filterByCat(){
+  const cId = parseInt(document.getElementById('catFilter').value)||null;
+  renderProds(cId ? SM.products.filter(p=>p.categoryId===cId) : SM.products);
+}
+function editProd(id){
+  const p = SM.products.find(x=>x.id===id); if(!p) return;
+  document.getElementById('mProdTitle').textContent='Edit Product';
+  document.getElementById('pId').value=id;
+  document.getElementById('pName').value=p.name||'';
+  document.getElementById('pNameAr').value=p.nameAr||'';
+  document.getElementById('pPrice').value=p.price||'';
+  document.getElementById('pCost').value=p.costPrice||'';
+  document.getElementById('pSku').value=p.sku||'';
+  document.getElementById('pBarcode').value=p.barcode||'';
+  document.getElementById('pCat').value=p.categoryId||'';
+  document.getElementById('pUnit').value=p.unit||'piece';
+  document.getElementById('pDesc').value=p.description||'';
+  document.getElementById('pTax').value=p.taxRate||0;
+  document.getElementById('pStatus').value=String(p.isActive!==false);
+  openM('mProd');
+}
+async function saveProd(){
+  const id = document.getElementById('pId').value;
   const body = {
-    businessName: document.getElementById('t_businessName').value,
-    ownerName: document.getElementById('t_ownerName').value,
-    ownerEmail: document.getElementById('t_ownerEmail').value,
-    ownerPhone: document.getElementById('t_ownerPhone').value,
-    status: document.getElementById('t_status').value,
-    maxBranches: parseInt(document.getElementById('t_maxBranches').value),
-    maxEmployees: parseInt(document.getElementById('t_maxEmployees').value),
-    storeType: document.getElementById('t_storeType').value,
+    name: document.getElementById('pName').value,
+    nameAr: document.getElementById('pNameAr').value||null,
+    price: document.getElementById('pPrice').value,
+    costPrice: document.getElementById('pCost').value||null,
+    sku: document.getElementById('pSku').value||null,
+    barcode: document.getElementById('pBarcode').value||null,
+    categoryId: parseInt(document.getElementById('pCat').value)||null,
+    unit: document.getElementById('pUnit').value,
+    description: document.getElementById('pDesc').value||null,
+    taxRate: document.getElementById('pTax').value||'0',
+    isActive: document.getElementById('pStatus').value==='true',
+    tenantId: SM.tenantId,
+    trackInventory: true, taxable: true,
   };
-  if (!body.businessName || !body.ownerName || !body.ownerEmail) {
-    toast('Please fill required fields', 'error'); return;
+  if(!body.name||!body.price){ toast('Name and price are required','err'); return; }
+  const res = id ? await rapi('PUT',`/api/products/${id}`,body) : await rapi('POST','/api/products',body);
+  if(res&&(res.id||res.success)){ toast(id?'Product updated':'Product created','ok'); closeM('mProd'); document.getElementById('pId').value=''; document.getElementById('mProdTitle').textContent='Add Product'; loadStoreProducts(); }
+  else toast('Failed to save product','err');
+}
+async function delProd(id,name){
+  if(!confirm(`Delete product "${name}"?`)) return;
+  const res = await rapi('DELETE',`/api/products/${id}`);
+  if(res?.success){ toast('Product deleted','ok'); loadStoreProducts(); } else toast('Failed','err');
+}
+
+/* ── Store Categories ── */
+async function loadStoreCategories(){
+  const cats = await rapi('GET',`/api/categories?tenantId=${SM.tenantId}`);
+  SM.categories = cats || [];
+  const prodCount = (cId)=> SM.products.filter(p=>p.categoryId===cId).length;
+  document.getElementById('catTbl').innerHTML = SM.categories.map(c=>`<tr>
+    <td style="color:var(--mu)">#${c.id}</td>
+    <td><span style="display:inline-flex;align-items:center;gap:7px"><span class="cdot" style="background:${c.color||'#666'}"></span><span style="font-weight:600">${c.name}</span></span></td>
+    <td><span style="background:${c.color||'#666'};padding:2px 8px;border-radius:6px;font-size:12px">${c.color||'#666'}</span></td>
+    <td>${prodCount(c.id)}</td>
+    <td>${iBtn('✏️','btn-o',`editCat(${c.id})`)}${iBtn('🗑️','btn-d',`delCat(${c.id},'${c.name.replace(/'/g,"\\'")}')`)}</td>
+  </tr>`).join('') || '<tr><td colspan="5" class="empty">No categories yet</td></tr>';
+}
+function editCat(id){
+  const c = SM.categories.find(x=>x.id===id); if(!c) return;
+  document.getElementById('mCatTitle').textContent='Edit Category';
+  document.getElementById('cId').value=id;
+  document.getElementById('cName').value=c.name||'';
+  document.getElementById('cNameAr').value=c.nameAr||'';
+  document.getElementById('cColor').value=c.color||'#2FD3C6';
+  document.getElementById('cDesc').value=c.description||'';
+  openM('mCat');
+}
+async function saveCat(){
+  const id = document.getElementById('cId').value;
+  const body = { name:document.getElementById('cName').value, nameAr:document.getElementById('cNameAr').value||null, color:document.getElementById('cColor').value, description:document.getElementById('cDesc').value||null, tenantId:SM.tenantId };
+  if(!body.name){ toast('Name is required','err'); return; }
+  const res = id ? await rapi('PUT',`/api/categories/${id}`,body) : await rapi('POST','/api/categories',body);
+  if(res&&(res.id||res.success)){ toast(id?'Category updated':'Category created','ok'); closeM('mCat'); document.getElementById('cId').value=''; document.getElementById('mCatTitle').textContent='Add Category'; loadStoreCategories(); }
+  else toast('Failed to save category','err');
+}
+async function delCat(id,name){
+  if(!confirm(`Delete category "${name}"?`)) return;
+  const res = await rapi('DELETE',`/api/categories/${id}`);
+  if(res?.success){ toast('Deleted','ok'); loadStoreCategories(); } else toast('Failed','err');
+}
+
+/* ── Store Branches ── */
+async function loadStoreBranches(){
+  const bs = await api('GET',`/stores/${SM.tenantId}/branches`);
+  SM.branches = bs || [];
+  document.getElementById('brTbl').innerHTML = SM.branches.map(b=>`<tr>
+    <td style="color:var(--mu)">#${b.id}</td>
+    <td style="font-weight:600">${b.name}</td>
+    <td style="color:var(--mu)">${b.address||'—'}</td>
+    <td style="color:var(--mu)">${b.phone||'—'}</td>
+    <td>${badge(b.isActive!==false?'active':'inactive')}</td>
+    <td>${iBtn('✏️','btn-o',`editBranch(${b.id})`)}${iBtn('🗑️','btn-d',`delBranch(${b.id},'${b.name.replace(/'/g,"\\'")}')`)}</td>
+  </tr>`).join('') || '<tr><td colspan="6" class="empty">No branches yet</td></tr>';
+  // refresh branch dropdown in employee modal
+  document.getElementById('eBranch').innerHTML = SM.branches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  document.getElementById('branchFilter').innerHTML = '<option value="">All Branches</option>' + SM.branches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  document.getElementById('invBr').innerHTML = SM.branches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+}
+function editBranch(id){
+  const b = SM.branches.find(x=>x.id===id); if(!b) return;
+  document.getElementById('mBrTitle').textContent='Edit Branch';
+  document.getElementById('bId').value=id;
+  document.getElementById('bName').value=b.name||'';
+  document.getElementById('bAddr').value=b.address||'';
+  document.getElementById('bPhone').value=b.phone||'';
+  document.getElementById('bStatus').value=b.isActive!==false?'active':'inactive';
+  openM('mBranch');
+}
+async function saveBranch(){
+  const id = document.getElementById('bId').value;
+  const body = { name:document.getElementById('bName').value, address:document.getElementById('bAddr').value||null, phone:document.getElementById('bPhone').value||null, isActive:document.getElementById('bStatus').value==='active', tenantId:SM.tenantId };
+  if(!body.name){ toast('Name is required','err'); return; }
+  let res;
+  if(id) res = await api('PUT',`/branches/${id}`,body);
+  else   res = await api('POST',`/stores/${SM.tenantId}/branches`,body);
+  if(res&&(res.id||res.success)){ toast(id?'Branch updated':'Branch created','ok'); closeM('mBranch'); document.getElementById('bId').value=''; document.getElementById('mBrTitle').textContent='Add Branch'; loadStoreBranches(); }
+  else toast('Failed to save branch','err');
+}
+async function delBranch(id,name){
+  if(!confirm(`Delete branch "${name}"?`)) return;
+  const res = await api('DELETE',`/branches/${id}`);
+  if(res?.success){ toast('Deleted','ok'); loadStoreBranches(); } else toast('Failed','err');
+}
+
+/* ── Store Employees ── */
+async function loadStoreEmployees(){
+  const emps = await api('GET',`/stores/${SM.tenantId}/employees`);
+  SM.employees = emps || [];
+  const brMap = Object.fromEntries(SM.branches.map(b=>[b.id,b.name]));
+  document.getElementById('empTbl').innerHTML = SM.employees.map(e=>`<tr>
+    <td><div style="font-weight:600">${e.name}</div>${e.email?`<div style="font-size:11px;color:var(--mu)">${e.email}</div>`:''}</td>
+    <td>${badge(e.role||'cashier')}</td>
+    <td style="font-family:monospace;font-size:12px">${e.pin||'—'}</td>
+    <td style="color:var(--mu)">${brMap[e.branchId]||'—'}</td>
+    <td>${badge(e.isActive!==false?'active':'inactive')}</td>
+    <td>${iBtn('✏️','btn-o',`editEmp(${e.id})`)}${iBtn('🔑','btn-o',`resetEmpPwd(${e.id},'${e.name.replace(/'/g,"\\'")}')`,)}${iBtn('🗑️','btn-d',`delEmp(${e.id},'${e.name.replace(/'/g,"\\'")}')`)}</td>
+  </tr>`).join('') || '<tr><td colspan="6" class="empty">No employees yet</td></tr>';
+}
+function editEmp(id){
+  const e = SM.employees.find(x=>x.id===id); if(!e) return;
+  document.getElementById('mEmpTitle').textContent='Edit Employee';
+  document.getElementById('eId').value=id;
+  document.getElementById('eName').value=e.name||'';
+  document.getElementById('ePin').value=e.pin||'';
+  document.getElementById('eRole').value=e.role||'cashier';
+  document.getElementById('eBranch').value=e.branchId||'';
+  document.getElementById('ePhone').value=e.phone||'';
+  document.getElementById('eEmail').value=e.email||'';
+  document.getElementById('eSal').value=e.salary||'';
+  document.getElementById('eComm').value=e.commissionRate||'';
+  document.getElementById('eStatus').value=String(e.isActive!==false);
+  openM('mEmp');
+}
+async function saveEmp(){
+  const id = document.getElementById('eId').value;
+  const body = { name:document.getElementById('eName').value, pin:document.getElementById('ePin').value, role:document.getElementById('eRole').value, branchId:parseInt(document.getElementById('eBranch').value)||null, phone:document.getElementById('ePhone').value||null, email:document.getElementById('eEmail').value||null, salary:document.getElementById('eSal').value||null, commissionRate:document.getElementById('eComm').value||'0', isActive:document.getElementById('eStatus').value==='true' };
+  if(!body.name){ toast('Name is required','err'); return; }
+  let res;
+  if(id) res = await api('PUT',`/employees/${id}`,body);
+  else   res = await api('POST',`/stores/${SM.tenantId}/employees`,body);
+  if(res&&(res.id||res.success)){ toast(id?'Employee updated':'Employee created','ok'); closeM('mEmp'); document.getElementById('eId').value=''; document.getElementById('mEmpTitle').textContent='Add Employee'; loadStoreEmployees(); }
+  else toast('Failed to save employee','err');
+}
+async function resetEmpPwd(id,name){
+  const np = prompt(`Set new PIN for ${name}:`); if(!np) return;
+  const res = await api('PUT',`/employees/${id}`,{pin:np});
+  if(res?.id){ toast('PIN updated','ok'); loadStoreEmployees(); } else toast('Failed','err');
+}
+async function delEmp(id,name){
+  if(!confirm(`Delete employee "${name}"?`)) return;
+  const res = await api('DELETE',`/employees/${id}`);
+  if(res?.success){ toast('Deleted','ok'); loadStoreEmployees(); } else toast('Failed','err');
+}
+
+/* ── Store Customers ── */
+async function loadStoreCustomers(){
+  const custs = await rapi('GET',`/api/customers?tenantId=${SM.tenantId}`);
+  document.getElementById('cusTbl').innerHTML = (custs||[]).map(c=>`<tr>
+    <td style="font-weight:600">${c.name}</td>
+    <td style="color:var(--mu)">${c.phone||'—'}</td>
+    <td style="color:var(--mu)">${c.email||'—'}</td>
+    <td style="color:var(--pr);font-weight:600">${n(c.loyaltyPoints)} pts</td>
+    <td>${fmtM(c.totalSpent)}</td>
+    <td>${n(c.visitCount)}</td>
+    <td>${iBtn('✏️','btn-o',`editCust(${c.id},'${c.name.replace(/'/g,"\\'")}','${(c.phone||'').replace(/'/g,"\\'")}','${(c.email||'').replace(/'/g,"\\'")}','${(c.address||'').replace(/'/g,"\\'")}',${n(c.loyaltyPoints)},'${(c.notes||'').replace(/'/g,"\\'")}')`)}\
+      ${iBtn('🗑️','btn-d',`delCust(${c.id},'${c.name.replace(/'/g,"\\'")}')`)}</td>
+  </tr>`).join('') || '<tr><td colspan="7" class="empty">No customers yet</td></tr>';
+}
+function editCust(id,name,phone,email,addr,pts,notes){
+  document.getElementById('mCustTitle').textContent='Edit Customer';
+  document.getElementById('custId').value=id;
+  document.getElementById('custName').value=name;
+  document.getElementById('custPhone').value=phone;
+  document.getElementById('custEmail').value=email;
+  document.getElementById('custAddr').value=addr;
+  document.getElementById('custPts').value=pts;
+  document.getElementById('custNotes').value=notes;
+  openM('mCust');
+}
+async function saveCust(){
+  const id = document.getElementById('custId').value;
+  const body = { name:document.getElementById('custName').value, phone:document.getElementById('custPhone').value||null, email:document.getElementById('custEmail').value||null, address:document.getElementById('custAddr').value||null, loyaltyPoints:parseInt(document.getElementById('custPts').value)||0, notes:document.getElementById('custNotes').value||null, tenantId:SM.tenantId, isActive:true };
+  if(!body.name){ toast('Name is required','err'); return; }
+  const res = id ? await rapi('PUT',`/api/customers/${id}`,body) : await rapi('POST','/api/customers',body);
+  if(res&&(res.id||res.success)){ toast(id?'Customer updated':'Customer created','ok'); closeM('mCust'); document.getElementById('custId').value=''; document.getElementById('mCustTitle').textContent='Add Customer'; loadStoreCustomers(); }
+  else toast('Failed to save customer','err');
+}
+async function delCust(id,name){
+  if(!confirm(`Delete customer "${name}"?`)) return;
+  toast('Customer delete not supported via API – mark inactive instead','err');
+}
+
+/* ── Store Sales ── */
+async function loadStoreSales(){
+  const sales = await rapi('GET',`/api/sales?tenantId=${SM.tenantId}&limit=500`);
+  const arr = Array.isArray(sales) ? sales : [];
+  const total = arr.reduce((a,s)=>a+parseFloat(s.total||s.totalAmount||0),0);
+  document.getElementById('salTotal').textContent = `${arr.length} sales · Total: ${fmtM(total)}`;
+  const empMap = Object.fromEntries(SM.employees.map(e=>[e.id,e.name]));
+  document.getElementById('salTbl').innerHTML = arr.map(s=>`<tr>
+    <td style="font-family:monospace;font-size:12px;color:var(--pr)">${s.receiptNumber||'#'+s.id}</td>
+    <td style="color:var(--mu)">${fmtDT(s.createdAt)}</td>
+    <td>${n(s.itemCount)||'—'}</td>
+    <td>${badge(s.paymentMethod||'cash')}</td>
+    <td style="font-weight:700;color:var(--pr)">${fmtM(s.total||s.totalAmount)}</td>
+    <td style="color:var(--mu)">${empMap[s.employeeId]||'—'}</td>
+    <td>${iBtn('👁️','btn-o',`viewSale(${s.id})`)}</td>
+  </tr>`).join('') || '<tr><td colspan="7" class="empty">No sales yet</td></tr>';
+}
+async function viewSale(id){
+  const sale = await rapi('GET',`/api/sales/${id}`);
+  if(!sale){ toast('Failed to load sale','err'); return; }
+  const items = sale.items || [];
+  document.getElementById('saleDetailContent').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div><div style="font-size:11px;color:var(--mu);margin-bottom:3px">RECEIPT</div><div style="font-weight:700;color:var(--pr)">${sale.receiptNumber||'#'+sale.id}</div></div>
+      <div><div style="font-size:11px;color:var(--mu);margin-bottom:3px">DATE</div><div>${fmtDT(sale.createdAt)}</div></div>
+      <div><div style="font-size:11px;color:var(--mu);margin-bottom:3px">PAYMENT</div><div>${badge(sale.paymentMethod||'cash')}</div></div>
+      <div><div style="font-size:11px;color:var(--mu);margin-bottom:3px">STATUS</div><div>${badge(sale.status||'completed')}</div></div>
+      <div><div style="font-size:11px;color:var(--mu);margin-bottom:3px">SUBTOTAL</div><div>${fmtM(sale.subtotal||sale.totalAmount)}</div></div>
+      <div><div style="font-size:11px;color:var(--mu);margin-bottom:3px">TOTAL</div><div style="font-size:18px;font-weight:800;color:var(--pr)">${fmtM(sale.total||sale.totalAmount)}</div></div>
+    </div>
+    ${sale.discount?`<div style="margin-bottom:12px;font-size:13px;color:var(--warn)">Discount: ${fmtM(sale.discount)}</div>`:''}
+    <div style="font-size:12px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Items</div>
+    <div class="tw"><table><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+    <tbody>${items.map(i=>`<tr>
+      <td style="font-weight:500">${i.productName||i.name||'#'+i.productId}</td>
+      <td>${i.quantity}</td>
+      <td>${fmtM(i.price||i.unitPrice)}</td>
+      <td style="font-weight:700;color:var(--pr)">${fmtM(i.total||(parseFloat(i.quantity)*parseFloat(i.price||i.unitPrice||0)))}</td>
+    </tr>`).join('')}</tbody></table></div>
+    ${sale.notes?`<div style="margin-top:12px;font-size:13px;color:var(--mu)">Notes: ${sale.notes}</div>`:''}`;
+  openM('mSaleDetail');
+}
+
+/* ── Inventory ── */
+async function loadInventory(){
+  const brId = parseInt(document.getElementById('branchFilter')?.value)||null;
+  const inv = await rapi('GET',`/api/inventory${brId?`?branchId=${brId}`:''}`);
+  const prodMap = Object.fromEntries(SM.products.map(p=>[p.id,p]));
+  const brMap = Object.fromEntries(SM.branches.map(b=>[b.id,b.name]));
+  // populate product select in modal
+  document.getElementById('invProd').innerHTML = SM.products.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  document.getElementById('invTbl').innerHTML = (inv||[]).map(i=>{
+    const prod = prodMap[i.productId]||{};
+    const low = i.quantity <= (i.lowStockThreshold||5);
+    return `<tr>
+      <td style="font-weight:600">${prod.name||'#'+i.productId}</td>
+      <td style="color:var(--mu)">${brMap[i.branchId]||'—'}</td>
+      <td style="font-size:16px;font-weight:700;color:${low?'var(--danger)':'var(--pr)'}">${i.quantity}</td>
+      <td>${low?`<span class="badge br">Low Stock</span>`:'<span class="badge bg">OK</span>'}</td>
+      <td>${iBtn('±','btn-o',`openInvAdj(${i.productId},${i.branchId})`)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty">No inventory data. Select a branch or add products.</td></tr>';
+}
+function openInvAdj(prodId, brId){
+  document.getElementById('invProd').value = prodId;
+  document.getElementById('invBr').value = brId;
+  document.getElementById('invAdj').value = '';
+  document.getElementById('invAbs').value = '';
+  openM('mInvAdj');
+}
+async function saveInvAdj(){
+  const prodId = parseInt(document.getElementById('invProd').value);
+  const brId = parseInt(document.getElementById('invBr').value);
+  const adj = document.getElementById('invAdj').value;
+  const abs = document.getElementById('invAbs').value;
+  if(!prodId||!brId){ toast('Select product and branch','err'); return; }
+  let res;
+  if(abs!==''){
+    res = await rapi('POST','/api/inventory',{productId:prodId,branchId:brId,quantity:parseInt(abs)});
+  } else if(adj!==''){
+    res = await rapi('POST','/api/inventory/adjust',{productId:prodId,branchId:brId,adjustment:parseInt(adj)});
+  } else { toast('Enter adjustment or absolute quantity','err'); return; }
+  if(res){ toast('Inventory updated','ok'); closeM('mInvAdj'); loadInventory(); }
+  else toast('Failed','err');
+}
+
+/* ══════════════════════════════════════════════════════
+   TENANTS
+══════════════════════════════════════════════════════ */
+let allTenants = [];
+async function loadTenants(){
+  allTenants = await api('GET','/tenants') || [];
+  document.getElementById('tTbl').innerHTML = allTenants.map(t=>`<tr>
+    <td style="color:var(--mu)">#${t.id}</td>
+    <td><div style="font-weight:600">${t.businessName}</div><div style="font-size:11px;color:var(--mu)">${t.ownerEmail}</div></td>
+    <td>${t.ownerName}</td>
+    <td>${badge(t.storeType||'retail')}</td>
+    <td>${badge(t.status)}</td>
+    <td style="font-size:12px;color:var(--mu)">${t.maxBranches}br / ${t.maxEmployees}emp</td>
+    <td>${iBtn('🏪','btn-p btn-sm',`gotoStore(${t.id})`)}${iBtn('🗑️','btn-d',`delTenant(${t.id},'${t.businessName.replace(/'/g,"\\'")}')`)}</td>
+  </tr>`).join('') || '<tr><td colspan="7" class="empty">No tenants yet</td></tr>';
+}
+function gotoStore(id){ document.getElementById('storePicker').value=id; show('storemanager'); }
+async function saveTenant(){
+  const body = { businessName:document.getElementById('tBiz').value, ownerName:document.getElementById('tOwner').value, ownerEmail:document.getElementById('tEmail').value, ownerPhone:document.getElementById('tPhone').value||null, storeType:document.getElementById('tType').value, status:document.getElementById('tStatus').value, maxBranches:parseInt(document.getElementById('tBr').value), maxEmployees:parseInt(document.getElementById('tEmp').value) };
+  if(!body.businessName||!body.ownerName||!body.ownerEmail){ toast('Fill required fields','err'); return; }
+  const res = await api('POST','/tenants',body);
+  if(res?.id){ toast('Tenant created','ok'); closeM('mTenant'); loadTenants(); }
+  else toast('Failed to create tenant','err');
+}
+async function delTenant(id,name){
+  if(!confirm(`Delete tenant "${name}"? This removes ALL data for this store.`)) return;
+  const res = await api('DELETE',`/tenants/${id}`);
+  if(res?.success){ toast('Deleted','ok'); loadTenants(); } else toast('Failed','err');
+}
+
+/* ══════════════════════════════════════════════════════
+   SUBSCRIPTIONS
+══════════════════════════════════════════════════════ */
+async function loadSubs(){
+  const subs = await api('GET','/subscriptions') || [];
+  document.getElementById('subTbl').innerHTML = subs.map(s=>`<tr>
+    <td style="color:var(--mu)">#${s.id}</td>
+    <td>${s.tenant?.businessName||s.tenantId}</td>
+    <td><div style="font-weight:600">${s.planName}</div><div style="font-size:11px;color:var(--mu)">${s.planType}</div></td>
+    <td>${badge(s.status)}</td>
+    <td style="color:var(--pr);font-weight:700">${fmtM(s.price)}</td>
+    <td>${fmtD(s.endDate)}</td>
+    <td>
+      ${iBtn('+30d','btn-o',`extSub(${s.id})`)}
+      ${iBtn('🗑️','btn-d',`delSub(${s.id})`)}
+    </td>
+  </tr>`).join('') || '<tr><td colspan="7" class="empty">No subscriptions</td></tr>';
+}
+async function saveSub(){
+  const body = { tenantId:parseInt(document.getElementById('sTenant').value), planType:document.getElementById('sPlan').value, planName:document.getElementById('sPlanName').value, price:document.getElementById('sPrice').value, status:document.getElementById('sStatus').value };
+  const res = await api('POST','/subscriptions',body);
+  if(res?.id){ toast('Subscription created','ok'); closeM('mSub'); loadSubs(); } else toast('Failed','err');
+}
+async function extSub(id){
+  const res = await api('POST',`/subscriptions/${id}/extend`,{days:30});
+  if(res?.id){ toast('+30 days added','ok'); loadSubs(); } else toast('Failed','err');
+}
+async function delSub(id){
+  if(!confirm('Delete subscription?')) return;
+  const res = await api('DELETE',`/subscriptions/${id}`);
+  if(res?.success){ toast('Deleted','ok'); loadSubs(); } else toast('Failed','err');
+}
+
+/* ══════════════════════════════════════════════════════
+   LICENSES
+══════════════════════════════════════════════════════ */
+async function loadLics(){
+  const keys = await api('GET','/licenses') || [];
+  document.getElementById('licTbl').innerHTML = keys.map(k=>`<tr>
+    <td style="font-family:monospace;font-size:12px;color:var(--pr)">${k.licenseKey}</td>
+    <td>${k.tenant?.businessName||k.tenantId||'—'}</td>
+    <td>${badge(k.status)}</td>
+    <td>${n(k.activationCount)} / ${k.maxActivations}</td>
+    <td>${fmtD(k.expiresAt)}</td>
+    <td>
+      ${iBtn('📋','btn-o',`copyKey('${k.licenseKey}')`)}
+      ${iBtn('🚫','btn-d',`revokeLic(${k.id})`)}
+    </td>
+  </tr>`).join('') || '<tr><td colspan="6" class="empty">No license keys</td></tr>';
+}
+function copyKey(k){ navigator.clipboard.writeText(k).then(()=>toast('Copied!','ok')); }
+async function saveLic(){
+  const body = { tenantId:parseInt(document.getElementById('lTenant').value), maxActivations:parseInt(document.getElementById('lMax').value)||3, expiresAt:document.getElementById('lExp').value||null, customKey:document.getElementById('lKey').value||null, notes:document.getElementById('lNotes').value||null };
+  const res = await api('POST','/licenses/generate',body);
+  if(res?.id){ toast('License: '+res.licenseKey,'ok'); closeM('mLic'); loadLics(); } else toast('Failed','err');
+}
+async function revokeLic(id){
+  if(!confirm('Revoke this license?')) return;
+  const res = await api('PATCH',`/licenses/${id}/revoke`);
+  if(res?.id){ toast('Revoked','ok'); loadLics(); } else toast('Failed','err');
+}
+
+/* ══════════════════════════════════════════════════════
+   ANALYTICS
+══════════════════════════════════════════════════════ */
+async function loadAnalytics(){
+  const ov = await api('GET','/analytics/overview');
+  document.getElementById('aSg').innerHTML = ov ? [
+    {l:'Sub Revenue',   v:fmtM(ov.subscriptionRevenue)},
+    {l:'Sales Revenue', v:fmtM(ov.totalSalesRevenue)},
+    {l:'Expiring Subs', v:n(ov.expiringSubscriptions), s:'within 7 days'},
+    {l:'Customers',     v:n(ov.totalCustomers)},
+  ].map(x=>`<div class="sc"><div class="sl">${x.l}</div><div class="sv">${x.v}</div>${x.s?`<div class="ss">${x.s}</div>`:''}</div>`).join('')
+  : '<div class="ls">Failed to load</div>';
+
+  const rev = await api('GET','/analytics/revenue');
+  if(rev){
+    document.getElementById('aMonthly').innerHTML = (rev.monthly||[]).map(m=>`
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd);font-size:13px">
+        <span style="color:var(--mu)">${m.month}</span>
+        <div><span style="font-weight:700;color:var(--pr)">${fmtM(m.revenue)}</span><span style="font-size:11px;color:var(--mu);margin-left:8px">${m.count} subs</span></div>
+      </div>`).join('') || '<div class="empty">No data</div>';
+    document.getElementById('aPlan').innerHTML = Object.entries(rev.planBreakdown||{}).map(([plan,d])=>`
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd);font-size:13px">
+        <div><span style="font-weight:600;text-transform:capitalize">${plan}</span><span style="font-size:11px;color:var(--mu);margin-left:8px">${d.count} tenants</span></div>
+        <span style="font-weight:700;color:var(--pr)">${fmtM(d.revenue)}</span>
+      </div>`).join('') || '<div class="empty">No data</div>';
   }
-  const res = await api('POST', '/tenants', body);
-  if (res && res.id) {
-    toast('Tenant created successfully', 'success');
-    closeModal('addTenantModal');
-    loadTenants();
-  } else {
-    toast(res?.error || 'Failed to create tenant', 'error');
+  const sales = await api('GET','/analytics/sales');
+  if(sales){
+    document.getElementById('aSales').innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr>
+        <th style="text-align:left;padding:8px 12px;font-size:11px;color:var(--mu);border-bottom:1px solid var(--bd)">Tenant</th>
+        <th style="text-align:right;padding:8px 12px;font-size:11px;color:var(--mu);border-bottom:1px solid var(--bd)">Sales</th>
+        <th style="text-align:right;padding:8px 12px;font-size:11px;color:var(--mu);border-bottom:1px solid var(--bd)">Revenue</th>
+        <th style="text-align:right;padding:8px 12px;font-size:11px;color:var(--mu);border-bottom:1px solid var(--bd)">Today</th>
+      </tr></thead>
+      <tbody>${(sales.tenants||[]).map(t=>`<tr>
+        <td style="padding:10px 12px;font-weight:500">${t.businessName}</td>
+        <td style="padding:10px 12px;text-align:right;color:var(--mu)">${t.totalSales}</td>
+        <td style="padding:10px 12px;text-align:right;font-weight:700;color:var(--pr)">${fmtM(t.totalRevenue)}</td>
+        <td style="padding:10px 12px;text-align:right;color:var(--mu)">${t.todaySales} / ${fmtM(t.todayRevenue)}</td>
+      </tr>`).join('')}</tbody></table>`;
   }
 }
 
-async function deleteTenant(id, name) {
-  if (!confirm(`Delete tenant "${name}"? This cannot be undone.`)) return;
-  const res = await api('DELETE', `/tenants/${id}`);
-  if (res && res.success) {
-    toast('Tenant deleted', 'success');
-    loadTenants();
-  } else {
-    toast(res?.error || 'Failed to delete', 'error');
-  }
+/* ══════════════════════════════════════════════════════
+   SYSTEM
+══════════════════════════════════════════════════════ */
+async function loadSystem(){
+  const h = await api('GET','/system/health');
+  if(h) document.getElementById('hGrid').innerHTML = [
+    {v:h.status,            l:'Status'},
+    {v:h.uptimeFormatted,   l:'Uptime'},
+    {v:h.memoryUsed+'MB',   l:'Memory Used'},
+    {v:h.memoryTotal+'MB',  l:'Memory Total'},
+    {v:h.activeShifts,      l:'Active Shifts'},
+    {v:h.nodeVersion,       l:'Node Version'},
+    {v:h.environment,       l:'Environment'},
+  ].map(i=>`<div class="hi"><div class="hv">${i.v}</div><div class="hl">${i.l}</div></div>`).join('');
+  const shifts = await api('GET','/active-shifts');
+  document.getElementById('shifts').innerHTML = (shifts&&shifts.length)
+    ? shifts.map(s=>`<div style="padding:8px 0;border-bottom:1px solid var(--bd);font-size:13px">Shift #${s.id} — Started: ${fmtD(s.startTime)}</div>`).join('')
+    : '<div class="empty">No active shifts</div>';
 }
 
-// ── SUBSCRIPTIONS ──
-async function loadSubscriptions() {
-  const subs = await api('GET', '/subscriptions') || [];
-  document.getElementById('subTable').innerHTML = subs.map(s => `
-    <tr>
-      <td style="color:var(--text-muted)">#${s.id}</td>
-      <td>${s.tenant?.businessName || s.tenantId}</td>
-      <td><div style="font-weight:600">${s.planName}</div><div style="font-size:11px;color:var(--text-muted)">${s.planType}</div></td>
-      <td>${statusBadge(s.status)}</td>
-      <td style="color:var(--primary);font-weight:600">${fmtCurr(s.price)}</td>
-      <td>${fmtDate(s.endDate)}</td>
-      <td>
-        <button class="btn btn-sm btn-outline" onclick="extendSub(${s.id})">+30d</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteSub(${s.id})">Delete</button>
-      </td>
-    </tr>
-  `).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">No subscriptions found</td></tr>';
+/* ══════════════════════════════════════════════════════
+   NOTIFICATIONS
+══════════════════════════════════════════════════════ */
+async function loadNotifs(){
+  const notifs = await api('GET','/tenant-notifications') || [];
+  document.getElementById('nTbl').innerHTML = notifs.map(n=>`<tr>
+    <td>${n.tenantId}</td>
+    <td style="font-weight:500">${n.title}</td>
+    <td>${badge(n.type)}</td>
+    <td>${badge(n.priority)}</td>
+    <td>${n.isRead?'<span style="color:var(--ok)">Yes</span>':'<span style="color:var(--mu)">No</span>'}</td>
+    <td>${!n.isRead?iBtn('✓','btn-o',`markRead(${n.id})`):''}</td>
+  </tr>`).join('') || '<tr><td colspan="6" class="empty">No notifications</td></tr>';
+}
+async function sendNotif(){
+  const body = { tenantId:parseInt(document.getElementById('nTenant').value), title:document.getElementById('nTitle').value, message:document.getElementById('nMsg').value, type:document.getElementById('nType').value, priority:document.getElementById('nPri').value };
+  if(!body.title||!body.message){ toast('Title and message required','err'); return; }
+  const res = await api('POST','/tenant-notifications',body);
+  if(res?.id){ toast('Sent','ok'); closeM('mNotif'); loadNotifs(); } else toast('Failed','err');
+}
+async function broadcast(){
+  const body = { title:document.getElementById('bcTitle').value, message:document.getElementById('bcMsg').value, type:document.getElementById('bcType').value };
+  if(!body.title||!body.message){ toast('Title and message required','err'); return; }
+  const res = await api('POST','/tenant-notifications/broadcast',body);
+  if(res?.success){ toast(`Sent to ${res.sent} tenants`,'ok'); closeM('mBcast'); loadNotifs(); } else toast('Failed','err');
+}
+async function markRead(id){
+  const res = await api('PATCH',`/tenant-notifications/${id}/read`);
+  if(res?.id){ toast('Marked read','ok'); loadNotifs(); }
 }
 
-async function addSubscription() {
-  const body = {
-    tenantId: parseInt(document.getElementById('sub_tenantId').value),
-    planType: document.getElementById('sub_planType').value,
-    planName: document.getElementById('sub_planName').value,
-    price: document.getElementById('sub_price').value,
-    status: document.getElementById('sub_status').value,
-  };
-  const res = await api('POST', '/subscriptions', body);
-  if (res && res.id) {
-    toast('Subscription created', 'success');
-    closeModal('addSubModal');
-    loadSubscriptions();
-  } else {
-    toast(res?.error || 'Failed to create subscription', 'error');
-  }
+/* ══════════════════════════════════════════════════════
+   SETTINGS
+══════════════════════════════════════════════════════ */
+async function changePwd(){
+  const c=document.getElementById('cp1').value, nw=document.getElementById('cp2').value, cf=document.getElementById('cp3').value;
+  if(!c||!nw){ toast('Fill all fields','err'); return; }
+  if(nw!==cf){ toast('Passwords do not match','err'); return; }
+  const res = await api('POST','/change-password',{currentPassword:c,newPassword:nw});
+  if(res?.success){ toast('Password changed','ok'); document.getElementById('cp1').value=document.getElementById('cp2').value=document.getElementById('cp3').value=''; }
+  else toast(res?.error||'Failed','err');
 }
 
-async function extendSub(id) {
-  const res = await api('POST', `/subscriptions/${id}/extend`, { days: 30 });
-  if (res && res.id) { toast('+30 days added', 'success'); loadSubscriptions(); }
-  else toast(res?.error || 'Failed', 'error');
+/* ══════════════════════════════════════════════════════
+   POPULATE TENANT SELECTS IN MODALS
+══════════════════════════════════════════════════════ */
+async function fillTenantSelects(){
+  if(!allTenants.length) allTenants = await api('GET','/tenants') || [];
+  const opts = allTenants.map(t=>`<option value="${t.id}">${t.businessName}</option>`).join('');
+  ['sTenant','lTenant','nTenant'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=opts; });
 }
+// Hook modal opens that need tenant lists
+const _origOpenM = openM;
+window.openM = function(id){
+  _origOpenM(id);
+  if(['mSub','mLic','mNotif','mBcast'].includes(id)) fillTenantSelects();
+};
 
-async function deleteSub(id) {
-  if (!confirm('Delete this subscription?')) return;
-  const res = await api('DELETE', `/subscriptions/${id}`);
-  if (res && res.success) { toast('Deleted', 'success'); loadSubscriptions(); }
-  else toast(res?.error || 'Failed', 'error');
-}
+/* ══════════════════════════════════════════════════════
+   LOGOUT
+══════════════════════════════════════════════════════ */
+function logout(){ localStorage.removeItem('super_admin_token'); localStorage.removeItem('super_admin_user'); location.href='/super_admin/login'; }
 
-// ── LICENSES ──
-async function loadLicenses() {
-  const keys = await api('GET', '/licenses') || [];
-  document.getElementById('licTable').innerHTML = keys.map(k => `
-    <tr>
-      <td style="font-family:monospace;font-size:12px;color:var(--primary)">${k.licenseKey}</td>
-      <td>${k.tenant?.businessName || k.tenantId || '—'}</td>
-      <td>${statusBadge(k.status)}</td>
-      <td>${k.activationCount || 0} / ${k.maxActivations}</td>
-      <td>${fmtDate(k.expiresAt)}</td>
-      <td>
-        <button class="btn btn-sm btn-outline" onclick="copyKey('${k.licenseKey}')">Copy</button>
-        <button class="btn btn-sm btn-danger" onclick="revokeLic(${k.id})">Revoke</button>
-      </td>
-    </tr>
-  `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No license keys found</td></tr>';
-}
-
-function copyKey(key) {
-  navigator.clipboard.writeText(key).then(() => toast('Copied to clipboard', 'success'));
-}
-
-async function generateLicense() {
-  const tenantId = parseInt(document.getElementById('lic_tenantId').value);
-  const body = {
-    tenantId,
-    maxActivations: parseInt(document.getElementById('lic_maxAct').value) || 3,
-    expiresAt: document.getElementById('lic_expires').value || null,
-    customKey: document.getElementById('lic_customKey').value || null,
-    notes: document.getElementById('lic_notes').value || null,
-  };
-  const res = await api('POST', '/licenses/generate', body);
-  if (res && res.id) {
-    toast('License generated: ' + res.licenseKey, 'success');
-    closeModal('addLicModal');
-    loadLicenses();
-  } else {
-    toast(res?.error || 'Failed', 'error');
-  }
-}
-
-async function revokeLic(id) {
-  if (!confirm('Revoke this license key?')) return;
-  const res = await api('PATCH', `/licenses/${id}/revoke`);
-  if (res && res.id) { toast('License revoked', 'success'); loadLicenses(); }
-  else toast(res?.error || 'Failed', 'error');
-}
-
-// ── ANALYTICS ──
-async function loadAnalytics() {
-  const ov = await api('GET', '/analytics/overview');
-  if (ov) {
-    document.getElementById('analyticsStats').innerHTML = [
-      { label:'Subscription Revenue', val: fmtCurr(ov.subscriptionRevenue) },
-      { label:'Sales Revenue',        val: fmtCurr(ov.totalSalesRevenue) },
-      { label:'Expiring Soon',        val: ov.expiringSubscriptions, sub: 'within 7 days' },
-      { label:'Total Customers',      val: ov.totalCustomers },
-    ].map(s => `
-      <div class="stat-card">
-        <div class="stat-label">${s.label}</div>
-        <div class="stat-value">${s.val}</div>
-        ${s.sub ? `<div class="stat-sub">${s.sub}</div>` : ''}
-      </div>
-    `).join('');
-  }
-
-  const rev = await api('GET', '/analytics/revenue');
-  if (rev) {
-    // Monthly
-    document.getElementById('monthlyRevenue').innerHTML = (rev.monthly || []).map(m => `
-      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-subtle)">
-        <span style="color:var(--text-muted);font-size:13px">${m.month}</span>
-        <div>
-          <span style="font-weight:600;color:var(--primary)">${fmtCurr(m.revenue)}</span>
-          <span style="font-size:11px;color:var(--text-muted);margin-left:8px">${m.count} subs</span>
-        </div>
-      </div>
-    `).join('') || '<div style="color:var(--text-muted);font-size:13px">No data</div>';
-
-    // Plans
-    document.getElementById('planBreakdown').innerHTML = Object.entries(rev.planBreakdown || {}).map(([plan, d]) => `
-      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-subtle)">
-        <div>
-          <span style="font-weight:600;font-size:13px;text-transform:capitalize">${plan}</span>
-          <span style="font-size:11px;color:var(--text-muted);margin-left:8px">${d.count} tenants</span>
-        </div>
-        <span style="font-weight:600;color:var(--primary)">${fmtCurr(d.revenue)}</span>
-      </div>
-    `).join('') || '<div style="color:var(--text-muted);font-size:13px">No data</div>';
-  }
-
-  const sales = await api('GET', '/analytics/sales');
-  if (sales) {
-    document.getElementById('salesByTenant').innerHTML = `
-      <table style="width:100%;border-collapse:collapse;font-size:13px">
-        <thead><tr>
-          <th style="text-align:left;padding:8px 12px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border-subtle)">Tenant</th>
-          <th style="text-align:right;padding:8px 12px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border-subtle)">Total Sales</th>
-          <th style="text-align:right;padding:8px 12px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border-subtle)">Revenue</th>
-          <th style="text-align:right;padding:8px 12px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border-subtle)">Today</th>
-        </tr></thead>
-        <tbody>
-          ${(sales.tenants || []).map(t => `
-            <tr>
-              <td style="padding:10px 12px;font-weight:500">${t.businessName}</td>
-              <td style="padding:10px 12px;text-align:right;color:var(--text-muted)">${t.totalSales}</td>
-              <td style="padding:10px 12px;text-align:right;font-weight:600;color:var(--primary)">${fmtCurr(t.totalRevenue)}</td>
-              <td style="padding:10px 12px;text-align:right;color:var(--text-muted)">${t.todaySales} / ${fmtCurr(t.todayRevenue)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
-  }
-}
-
-// ── SYSTEM ──
-async function loadSystem() {
-  const h = await api('GET', '/system/health');
-  if (h) {
-    document.getElementById('healthGrid').innerHTML = [
-      { val: h.status,           label: 'Status' },
-      { val: h.uptimeFormatted,  label: 'Uptime' },
-      { val: h.memoryUsed + 'MB',label: 'Memory Used' },
-      { val: h.memoryTotal + 'MB',label: 'Memory Total' },
-      { val: h.activeShifts,     label: 'Active Shifts' },
-      { val: h.nodeVersion,      label: 'Node Version' },
-      { val: h.environment,      label: 'Environment' },
-    ].map(i => `
-      <div class="health-item">
-        <div class="hi-val">${i.val}</div>
-        <div class="hi-label">${i.label}</div>
-      </div>
-    `).join('');
-  }
-
-  const shifts = await api('GET', '/active-shifts');
-  if (shifts && shifts.length) {
-    document.getElementById('activeShifts').innerHTML = shifts.map(s => `
-      <div style="padding:8px 0;border-bottom:1px solid var(--border-subtle);font-size:13px">
-        Shift #${s.id} &mdash; Started: ${fmtDate(s.startTime)}
-      </div>
-    `).join('');
-  } else {
-    document.getElementById('activeShifts').innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:12px 0">No active shifts</div>';
-  }
-}
-
-// ── NOTIFICATIONS ──
-async function loadNotifications() {
-  const notifs = await api('GET', '/tenant-notifications') || [];
-  document.getElementById('notifTable').innerHTML = notifs.map(n => `
-    <tr>
-      <td>${n.tenantId}</td>
-      <td style="font-weight:500">${n.title}</td>
-      <td>${statusBadge(n.type)}</td>
-      <td>${statusBadge(n.priority)}</td>
-      <td>${n.isRead ? '<span style="color:var(--success)">Yes</span>' : '<span style="color:var(--text-muted)">No</span>'}</td>
-      <td>
-        ${!n.isRead ? `<button class="btn btn-sm btn-outline" onclick="markRead(${n.id})">Mark Read</button>` : ''}
-      </td>
-    </tr>
-  `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No notifications</td></tr>';
-}
-
-async function sendNotification() {
-  const body = {
-    tenantId: parseInt(document.getElementById('notif_tenantId').value),
-    title: document.getElementById('notif_title').value,
-    message: document.getElementById('notif_message').value,
-    type: document.getElementById('notif_type').value,
-    priority: document.getElementById('notif_priority').value,
-  };
-  if (!body.title || !body.message) { toast('Title and message required', 'error'); return; }
-  const res = await api('POST', '/tenant-notifications', body);
-  if (res && res.id) {
-    toast('Notification sent', 'success');
-    closeModal('notifModal');
-    loadNotifications();
-  } else {
-    toast(res?.error || 'Failed', 'error');
-  }
-}
-
-async function broadcastNotification() {
-  const body = {
-    title: document.getElementById('bc_title').value,
-    message: document.getElementById('bc_message').value,
-    type: document.getElementById('bc_type').value,
-  };
-  if (!body.title || !body.message) { toast('Title and message required', 'error'); return; }
-  const res = await api('POST', '/tenant-notifications/broadcast', body);
-  if (res && res.success) {
-    toast(`Broadcast sent to ${res.sent} tenants`, 'success');
-    closeModal('broadcastModal');
-    loadNotifications();
-  } else {
-    toast(res?.error || 'Failed', 'error');
-  }
-}
-
-async function markRead(id) {
-  const res = await api('PATCH', `/tenant-notifications/${id}/read`);
-  if (res && res.id) { toast('Marked as read', 'success'); loadNotifications(); }
-}
-
-// ── SETTINGS ──
-async function changePassword() {
-  const cur = document.getElementById('curPwd').value;
-  const nw = document.getElementById('newPwd').value;
-  const conf = document.getElementById('confPwd').value;
-  if (!cur || !nw) { toast('Fill all fields', 'error'); return; }
-  if (nw !== conf) { toast('Passwords do not match', 'error'); return; }
-  const res = await api('POST', '/change-password', { currentPassword: cur, newPassword: nw });
-  if (res && res.success) {
-    toast('Password changed successfully', 'success');
-    document.getElementById('curPwd').value = '';
-    document.getElementById('newPwd').value = '';
-    document.getElementById('confPwd').value = '';
-  } else {
-    toast(res?.error || 'Failed to change password', 'error');
-  }
-}
-
-// ── LOGOUT ──
-function logout() {
-  localStorage.removeItem('super_admin_token');
-  localStorage.removeItem('super_admin_user');
-  window.location.href = '/super_admin/login';
-}
-
-// ── INIT ──
-loadDashboard();
+/* ══════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════ */
+loadDash();
 </script>
 </body>
 </html>
