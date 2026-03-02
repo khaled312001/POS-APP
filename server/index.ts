@@ -193,6 +193,13 @@ function configureExpoAndLanding(app: express.Application) {
       return next();
     }
 
+    if (req.path === "/favicon.ico") {
+      // Inline SVG favicon – prevents 404 noise
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0A0E17"/><text x="16" y="23" text-anchor="middle" font-size="20" fill="#2FD3C6">B</text></svg>`;
+      res.setHeader("Content-Type", "image/svg+xml");
+      return res.status(200).send(svg);
+    }
+
     if (req.path.startsWith("/super_admin")) {
       const superAdminTemplatePath = path.resolve(
         process.cwd(),

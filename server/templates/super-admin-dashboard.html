@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Barmagly Super Admin</title>
+  <link rel="icon" href="/favicon.ico" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
@@ -159,6 +160,11 @@
     <div class="ni" onclick="show('analytics')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>Analytics</div>
     <div class="ni" onclick="show('system')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>System Health</div>
     <div class="ni" onclick="show('notifications')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>Notifications</div>
+    <div class="ni" onclick="show('reports')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Reports</div>
+    <div class="ni" onclick="show('activity')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Activity Log</div>
+    <div class="ni" onclick="show('expenses')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>Expenses</div>
+    <div class="ni" onclick="show('shifts')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>Shifts</div>
+    <div class="ni" onclick="show('backup')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/></svg>Backup & Restore</div>
     <div class="nav-sec">Account</div>
     <div class="ni" onclick="show('settings')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Settings</div>
   </div>
@@ -327,6 +333,84 @@
     <div class="view" id="view-notifications">
       <div class="sh"><div class="sh-l"></div><div style="display:flex;gap:8px"><button class="btn btn-o" onclick="openM('mBcast')">Broadcast</button><button class="btn btn-p" onclick="openM('mNotif')">Send Notification</button></div></div>
       <div class="tw"><table><thead><tr><th>Tenant</th><th>Title</th><th>Type</th><th>Priority</th><th>Read</th><th>Actions</th></tr></thead><tbody id="nTbl"><tr><td colspan="6" class="ls"><div class="spin"></div></td></tr></tbody></table></div>
+    </div>
+
+    <!-- ══════════ REPORTS ══════════ -->
+    <div class="view" id="view-reports">
+      <div class="sh">
+        <div class="sh-l"><span style="font-size:13px;color:var(--mu)">Full store-by-store summary report</span></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-o" onclick="exportReportCSV()">⬇ Export CSV</button>
+          <button class="btn btn-p" onclick="loadReports()">↻ Refresh</button>
+        </div>
+      </div>
+      <div class="sg" id="rptStats"><div class="ls"><div class="spin"></div></div></div>
+      <div class="tw"><table id="rptTable">
+        <thead><tr><th>Store</th><th>Owner</th><th>Type</th><th>Status</th><th>Branches</th><th>Employees</th><th>Products</th><th>Sales</th><th>Revenue</th><th>Subscription</th><th>Joined</th></tr></thead>
+        <tbody id="rptTbl"><tr><td colspan="11" class="ls"><div class="spin"></div></td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- ══════════ ACTIVITY LOG ══════════ -->
+    <div class="view" id="view-activity">
+      <div class="sh">
+        <input class="srch" placeholder="Filter activity…" oninput="ft('actTbl',this.value)">
+        <button class="btn btn-p" onclick="loadActivity()">↻ Refresh</button>
+      </div>
+      <div class="tw"><table><thead><tr><th>Time</th><th>Action</th><th>Entity</th><th>Details</th><th>Employee</th></tr></thead>
+        <tbody id="actTbl"><tr><td colspan="5" class="ls"><div class="spin"></div></td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- ══════════ EXPENSES ══════════ -->
+    <div class="view" id="view-expenses">
+      <div class="sg" id="expStats"><div class="ls"><div class="spin"></div></div></div>
+      <div class="sh" style="margin-top:8px">
+        <input class="srch" placeholder="Filter expenses…" oninput="ft('expTbl',this.value)">
+        <button class="btn btn-p" onclick="loadExpenses()">↻ Refresh</button>
+      </div>
+      <div class="tw"><table><thead><tr><th>Store (Tenant ID)</th><th>Category</th><th>Amount</th><th>Description</th><th>Date</th></tr></thead>
+        <tbody id="expTbl"><tr><td colspan="5" class="ls"><div class="spin"></div></td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- ══════════ SHIFTS ══════════ -->
+    <div class="view" id="view-shifts">
+      <div class="sh">
+        <input class="srch" placeholder="Filter shifts…" oninput="ft('shiftTbl',this.value)">
+        <button class="btn btn-p" onclick="loadShifts()">↻ Refresh</button>
+      </div>
+      <div class="tw"><table><thead><tr><th>ID</th><th>Employee</th><th>Branch</th><th>Start</th><th>End</th><th>Status</th><th>Opening Cash</th><th>Closing Cash</th><th>Sales</th></tr></thead>
+        <tbody id="shiftTbl"><tr><td colspan="9" class="ls"><div class="spin"></div></td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- ══════════ BACKUP ══════════ -->
+    <div class="view" id="view-backup">
+      <div class="cr" style="margin-bottom:20px">
+        <div class="card">
+          <div class="ct">Manual Backup</div>
+          <p style="font-size:13px;color:var(--mu);margin-bottom:14px">Create an on-demand backup of one or all stores. Backups include products, employees, sales, customers, and subscriptions.</p>
+          <div class="fr"><label>Store (leave blank for ALL)</label><select id="bkTenant"><option value="">— All Stores —</option></select></div>
+          <button class="btn btn-p" onclick="createBackup()" id="bkBtn">Create Backup Now</button>
+        </div>
+        <div class="card">
+          <div class="ct">Auto-Backup Schedule</div>
+          <div class="hi" style="margin-bottom:12px"><div class="hv" style="color:var(--ok)">Active</div><div class="hl">Daily auto-backup is running</div></div>
+          <p style="font-size:13px;color:var(--mu);margin-bottom:8px">Every store is automatically backed up once every 24 hours. Backups older than 30 days are automatically deleted.</p>
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mu)">
+            <span class="hdot" style="width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok)"></span>
+            Running – next run in ~24h from server start
+          </div>
+        </div>
+      </div>
+      <div class="sh">
+        <div class="section-title" style="font-size:14px;font-weight:700">Backup Files</div>
+        <button class="btn btn-o" onclick="loadBackups()">↻ Refresh</button>
+      </div>
+      <div class="tw"><table><thead><tr><th>Filename</th><th>Size</th><th>Created</th><th>Actions</th></tr></thead>
+        <tbody id="bkTbl"><tr><td colspan="4" class="ls"><div class="spin"></div></td></tr></tbody>
+      </table></div>
     </div>
 
     <!-- ══════════ SETTINGS ══════════ -->
@@ -529,6 +613,11 @@ const META = {
   analytics:     ['Analytics','Revenue & usage metrics'],
   system:        ['System Health','Server & database status'],
   notifications: ['Notifications','Send messages to tenants'],
+  reports:       ['Reports','Full summary across all stores'],
+  activity:      ['Activity Log','All platform actions in real time'],
+  expenses:      ['Expenses','Cross-store expense monitoring'],
+  shifts:        ['Shifts','All employee shifts across stores'],
+  backup:        ['Backup & Restore','Automated and manual backups'],
   settings:      ['Settings','Account & preferences'],
 };
 let curView = 'dashboard';
@@ -550,6 +639,11 @@ function show(v) {
   if(v==='analytics')     loadAnalytics();
   if(v==='system')        loadSystem();
   if(v==='notifications') loadNotifs();
+  if(v==='reports')       loadReports();
+  if(v==='activity')      loadActivity();
+  if(v==='expenses')      loadExpenses();
+  if(v==='shifts')        loadShifts();
+  if(v==='backup')        { loadBackups(); fillBkTenants(); }
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1283,6 +1377,150 @@ window.openM = function(id){
   _origOpenM(id);
   if(['mSub','mLic','mNotif','mBcast'].includes(id)) fillTenantSelects();
 };
+
+/* ══════════════════════════════════════════════════════
+   REPORTS
+══════════════════════════════════════════════════════ */
+let reportData = [];
+async function loadReports(){
+  document.getElementById('rptTbl').innerHTML = '<tr><td colspan="11" class="ls"><div class="spin"></div></td></tr>';
+  reportData = await api('GET','/reports/summary') || [];
+  const totalRev = reportData.reduce((a,r)=>a+r.totalRevenue,0);
+  const totalSales = reportData.reduce((a,r)=>a+r.totalSales,0);
+  document.getElementById('rptStats').innerHTML = [
+    {l:'Total Stores',    v:reportData.length},
+    {l:'Active Stores',   v:reportData.filter(r=>r.status==='active').length},
+    {l:'Total Revenue',   v:fmtM(totalRev)},
+    {l:'Total Sales',     v:totalSales},
+    {l:'Total Employees', v:reportData.reduce((a,r)=>a+r.employees,0)},
+    {l:'Total Products',  v:reportData.reduce((a,r)=>a+r.products,0)},
+  ].map(x=>`<div class="sc"><div class="sl">${x.l}</div><div class="sv">${x.v}</div></div>`).join('');
+  document.getElementById('rptTbl').innerHTML = reportData.map(r=>`<tr>
+    <td><div style="font-weight:600">${r.businessName}</div><div style="font-size:11px;color:var(--mu)">${r.ownerEmail}</div></td>
+    <td style="color:var(--mu)">${r.ownerEmail}</td>
+    <td>${badge(r.storeType||'retail')}</td>
+    <td>${badge(r.status)}</td>
+    <td style="text-align:center">${r.branches}</td>
+    <td style="text-align:center">${r.employees}</td>
+    <td style="text-align:center">${r.products}</td>
+    <td style="text-align:center">${r.totalSales}</td>
+    <td style="font-weight:700;color:var(--pr)">${fmtM(r.totalRevenue)}</td>
+    <td>${r.subscription?`<span class="badge bb">${r.subscription.plan}</span> <span style="font-size:11px;color:var(--mu)">until ${fmtD(r.subscription.expires)}</span>`:'<span class="badge bgr">None</span>'}</td>
+    <td style="color:var(--mu)">${fmtD(r.createdAt)}</td>
+  </tr>`).join('') || '<tr><td colspan="11" class="empty">No data</td></tr>';
+}
+function exportReportCSV(){
+  if(!reportData.length){ toast('Load reports first','err'); return; }
+  const hdr = ['Store','Email','Type','Status','Branches','Employees','Products','Sales','Revenue','Plan','Joined'];
+  const rows = reportData.map(r=>[r.businessName,r.ownerEmail,r.storeType,r.status,r.branches,r.employees,r.products,r.totalSales,r.totalRevenue.toFixed(2),r.subscription?.plan||'None',r.createdAt?.split('T')[0]||'']);
+  const csv = [hdr,...rows].map(r=>r.join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='stores_report.csv'; a.click();
+}
+
+/* ══════════════════════════════════════════════════════
+   ACTIVITY LOG
+══════════════════════════════════════════════════════ */
+async function loadActivity(){
+  const log = await api('GET','/activity?limit=300') || [];
+  document.getElementById('actTbl').innerHTML = log.map(e=>`<tr>
+    <td style="color:var(--mu);font-size:12px;white-space:nowrap">${fmtDT(e.createdAt)}</td>
+    <td>${badge(e.action||'action')}</td>
+    <td style="font-size:12px">${e.entityType||'—'} ${e.entityId?'#'+e.entityId:''}</td>
+    <td style="font-size:12px;color:var(--mu);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.details||'—'}</td>
+    <td style="color:var(--mu)">${e.employeeId?'#'+e.employeeId:'—'}</td>
+  </tr>`).join('') || '<tr><td colspan="5" class="empty">No activity yet</td></tr>';
+}
+
+/* ══════════════════════════════════════════════════════
+   EXPENSES
+══════════════════════════════════════════════════════ */
+async function loadExpenses(){
+  const [expenses, byTenant] = await Promise.all([
+    api('GET','/expenses'),
+    api('GET','/expenses/by-tenant'),
+  ]);
+  const arr = expenses || [];
+  const totalExp = arr.reduce((a,e)=>a+parseFloat(e.amount||0),0);
+  document.getElementById('expStats').innerHTML = [
+    {l:'Total Expenses',   v:fmtM(totalExp)},
+    {l:'Expense Records',  v:arr.length},
+    {l:'Stores w/ Expenses', v:(byTenant||[]).filter(t=>t.totalExpenses>0).length},
+  ].map(x=>`<div class="sc"><div class="sl">${x.l}</div><div class="sv">${x.v}</div></div>`).join('');
+  // Append per-tenant totals
+  if(byTenant?.length){
+    const extra = byTenant.filter(t=>t.totalExpenses>0).map(t=>`<div class="sc"><div class="sl">${t.businessName}</div><div class="sv" style="font-size:18px">${fmtM(t.totalExpenses)}</div></div>`).join('');
+    document.getElementById('expStats').innerHTML += extra;
+  }
+  document.getElementById('expTbl').innerHTML = arr.map(e=>`<tr>
+    <td style="color:var(--mu)">Tenant ${e.tenantId||'—'} / Branch ${e.branchId||'—'}</td>
+    <td>${badge(e.category||'other')}</td>
+    <td style="font-weight:700;color:var(--danger)">${fmtM(e.amount)}</td>
+    <td style="color:var(--mu)">${e.description||'—'}</td>
+    <td style="color:var(--mu)">${fmtD(e.date||e.createdAt)}</td>
+  </tr>`).join('') || '<tr><td colspan="5" class="empty">No expenses recorded</td></tr>';
+}
+
+/* ══════════════════════════════════════════════════════
+   SHIFTS
+══════════════════════════════════════════════════════ */
+async function loadShifts(){
+  const shifts = await api('GET','/shifts/all') || [];
+  document.getElementById('shiftTbl').innerHTML = shifts.map(s=>`<tr>
+    <td style="color:var(--mu)">#${s.id}</td>
+    <td style="color:var(--mu)">${s.employeeId?'Emp #'+s.employeeId:'—'}</td>
+    <td style="color:var(--mu)">${s.branchId?'Branch #'+s.branchId:'—'}</td>
+    <td>${fmtDT(s.startTime)}</td>
+    <td>${s.endTime?fmtDT(s.endTime):'<span class="badge bg">Active</span>'}</td>
+    <td>${badge(s.status||'open')}</td>
+    <td>${fmtM(s.openingCash)}</td>
+    <td>${s.closingCash!=null?fmtM(s.closingCash):'—'}</td>
+    <td style="color:var(--pr);font-weight:600">${fmtM(s.totalSales)}</td>
+  </tr>`).join('') || '<tr><td colspan="9" class="empty">No shifts found</td></tr>';
+}
+
+/* ══════════════════════════════════════════════════════
+   BACKUP
+══════════════════════════════════════════════════════ */
+async function fillBkTenants(){
+  if(!allTenants.length) allTenants = await api('GET','/tenants') || [];
+  document.getElementById('bkTenant').innerHTML = '<option value="">— All Stores —</option>' +
+    allTenants.map(t=>`<option value="${t.id}">${t.businessName}</option>`).join('');
+}
+async function loadBackups(){
+  const files = await api('GET','/backup/list') || [];
+  document.getElementById('bkTbl').innerHTML = files.map(f=>`<tr>
+    <td style="font-family:monospace;font-size:12px;color:var(--pr)">${f.filename}</td>
+    <td style="color:var(--mu)">${(f.size/1024).toFixed(1)} KB</td>
+    <td style="color:var(--mu)">${fmtDT(f.createdAt)}</td>
+    <td>
+      <button class="btn btn-sm btn-p" onclick="dlBackup('${f.filename}')">⬇ Download</button>
+      ${iBtn('🗑️','btn-d',`deleteBackup('${f.filename}')`)}
+    </td>
+  </tr>`).join('') || '<tr><td colspan="4" class="empty">No backups yet. Create one above.</td></tr>';
+}
+async function createBackup(){
+  const tenantId = document.getElementById('bkTenant').value;
+  const btn = document.getElementById('bkBtn');
+  btn.textContent = 'Creating…'; btn.disabled = true;
+  const res = await api('POST','/backup/create', tenantId ? {tenantId:parseInt(tenantId)} : {});
+  btn.textContent = 'Create Backup Now'; btn.disabled = false;
+  if(res?.success){
+    toast(tenantId ? `Backup created: ${res.filename}` : `${res.count} store(s) backed up`,'ok');
+    loadBackups();
+  } else toast('Backup failed','err');
+}
+async function dlBackup(filename){
+  const res = await fetch(`/api/super-admin/backup/download/${filename}`,{headers:{'Authorization':`Bearer ${token}`}});
+  if(!res.ok){ toast('Download failed','err'); return; }
+  const blob = await res.blob();
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
+}
+async function deleteBackup(filename){
+  if(!confirm(`Delete backup ${filename}?`)) return;
+  const res = await api('DELETE',`/backup/${filename}`);
+  if(res?.success){ toast('Deleted','ok'); loadBackups(); } else toast('Failed','err');
+}
 
 /* ══════════════════════════════════════════════════════
    LOGOUT

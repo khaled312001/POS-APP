@@ -1,11 +1,70 @@
 import type { Express, Request, Response } from "express";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
+import * as fs from "fs";
+import * as path from "path";
 import { storage } from "./storage";
 import { generateToken, requireSuperAdmin, SuperAdminRequest } from "./superAdminAuth";
 import { addMonths, addYears, addDays } from "date-fns";
 import { db } from "./db";
 import { eq, desc, sql, and, gte, lte, sum } from "drizzle-orm";
+
+// ── BACKUP HELPERS ────────────────────────────────────────────────────────
+const BACKUP_DIR = path.resolve(process.cwd(), "backups");
+if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+
+async function createTenantBackup(tenantId: number): Promise<string> {
+  const tenant = await storage.getTenant(tenantId);
+  if (!tenant) throw new Error("Tenant not found");
+  const [branches, employees, products, customers, subs, licenses] = await Promise.all([
+    storage.getBranchesByTenant(tenantId),
+    storage.getEmployeesByTenant(tenantId),
+    storage.getProductsByTenant(tenantId),
+    storage.getCustomers(undefined, tenantId),
+    storage.getTenantSubscriptions(tenantId),
+    storage.getLicenseKeys(tenantId),
+  ]);
+  const sales = await storage.getSales({ tenantId, limit: 10000 });
+  const snapshot = {
+    exportedAt: new Date().toISOString(),
+    tenant: { ...tenant, passwordHash: "[REDACTED]" },
+    branches, employees: employees.map((e: any) => ({ ...e, pin: "[REDACTED]", passwordHash: "[REDACTED]" })),
+    products, customers, subscriptions: subs, licenses: licenses.map((l: any) => ({ ...l })), sales,
+  };
+  const filename = `backup_tenant_${tenantId}_${Date.now()}.json`;
+  const filepath = path.join(BACKUP_DIR, filename);
+  fs.writeFileSync(filepath, JSON.stringify(snapshot, null, 2));
+  return filename;
+}
+
+// Prune backups older than 30 days
+function pruneOldBackups() {
+  try {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    fs.readdirSync(BACKUP_DIR).forEach(f => {
+      const fp = path.join(BACKUP_DIR, f);
+      if (fs.statSync(fp).mtimeMs < cutoff) fs.unlinkSync(fp);
+    });
+  } catch (e) { console.error("[BACKUP] Prune error:", e); }
+}
+
+// Auto-backup scheduler (runs once a day)
+let autoBackupInterval: ReturnType<typeof setInterval> | null = null;
+function startAutoBackup() {
+  if (autoBackupInterval) return;
+  autoBackupInterval = setInterval(async () => {
+    console.log("[BACKUP] Running daily auto-backup…");
+    pruneOldBackups();
+    try {
+      const tenants = await storage.getTenants();
+      for (const t of tenants) {
+        try { await createTenantBackup(t.id); } catch (e) { console.error(`[BACKUP] Failed for tenant ${t.id}:`, e); }
+      }
+      console.log(`[BACKUP] Done – ${tenants.length} stores backed up.`);
+    } catch (e) { console.error("[BACKUP] Error:", e); }
+  }, 24 * 60 * 60 * 1000); // 24 h
+}
+startAutoBackup();
 
 export function registerSuperAdminRoutes(app: Express) {
   // ── AUTH ──────────────────────────────────────────────────────────────
@@ -58,7 +117,7 @@ export function registerSuperAdminRoutes(app: Express) {
       const [totalSales] = await db.select({ count: sql<number>`count(*)` }).from(sales);
       const [totalCustomers] = await db.select({ count: sql<number>`count(*)` }).from(customers);
       const [revenueRow] = await db.select({ total: sql<string>`coalesce(sum(cast(price as decimal)), 0)::text` }).from(tenantSubscriptions).where(eq(tenantSubscriptions.status, "active"));
-      const [salesRevenue] = await db.select({ total: sql<string>`coalesce(sum(cast(total as decimal)), 0)::text` }).from(sales);
+      const [salesRevenue] = await db.select({ total: sql<string>`coalesce(sum(cast(total_amount as decimal)), 0)::text` }).from(sales);
 
       // Expiring subs within 7 days
       const in7Days = new Date(); in7Days.setDate(in7Days.getDate() + 7);
@@ -143,14 +202,14 @@ export function registerSuperAdminRoutes(app: Express) {
 
       for (const t of allTenants) {
         const tenantSales = await storage.getSales({ tenantId: t.id, limit: 1000 });
-        const total = tenantSales.reduce((acc: number, s: any) => acc + parseFloat(s.total || "0"), 0);
+        const total = tenantSales.reduce((acc: number, s: any) => acc + parseFloat(s.totalAmount || "0"), 0);
         grandTotal += total;
         grandCount += tenantSales.length;
 
         // Today's sales
         const today = new Date(); today.setHours(0,0,0,0);
         const todaySales = tenantSales.filter((s: any) => new Date(s.createdAt) >= today);
-        const todayTotal = todaySales.reduce((acc: number, s: any) => acc + parseFloat(s.total || "0"), 0);
+        const todayTotal = todaySales.reduce((acc: number, s: any) => acc + parseFloat(s.totalAmount || "0"), 0);
 
         result.push({
           tenantId: t.id,
@@ -682,11 +741,127 @@ export function registerSuperAdminRoutes(app: Express) {
 
   // ── BACKUP ────────────────────────────────────────────────────────────
   app.get("/api/super-admin/backup/list", requireSuperAdmin, async (_req: Request, res: Response) => {
-    res.json([]);
+    try {
+      const files = fs.readdirSync(BACKUP_DIR)
+        .filter(f => f.endsWith(".json"))
+        .map(f => {
+          const stat = fs.statSync(path.join(BACKUP_DIR, f));
+          return { filename: f, size: stat.size, createdAt: stat.mtime.toISOString() };
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      res.json(files);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.post("/api/super-admin/backup/create", requireSuperAdmin, async (_req: Request, res: Response) => {
-    res.json({ success: true, message: "Backup feature coming soon" });
+  app.post("/api/super-admin/backup/create", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.body;
+      if (tenantId) {
+        const filename = await createTenantBackup(parseInt(tenantId));
+        res.json({ success: true, filename });
+      } else {
+        // Backup all tenants
+        const tenants = await storage.getTenants();
+        const results: string[] = [];
+        for (const t of tenants) {
+          try { results.push(await createTenantBackup(t.id)); } catch (e) { /* skip failed */ }
+        }
+        res.json({ success: true, count: results.length, files: results });
+      }
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/super-admin/backup/download/:filename", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const filename = path.basename(req.params.filename); // prevent traversal
+      const filepath = path.join(BACKUP_DIR, filename);
+      if (!fs.existsSync(filepath)) return res.status(404).json({ error: "Backup not found" });
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(fs.readFileSync(filepath));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete("/api/super-admin/backup/:filename", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const filename = path.basename(req.params.filename);
+      const filepath = path.join(BACKUP_DIR, filename);
+      if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── EXPENSES (cross-tenant) ────────────────────────────────────────────
+  app.get("/api/super-admin/expenses", requireSuperAdmin, async (_req: Request, res: Response) => {
+    try {
+      const { expenses } = await import("@shared/schema");
+      const rows = await db.select().from(expenses).orderBy(desc(expenses.createdAt)).limit(500);
+      res.json(rows);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/super-admin/expenses/by-tenant", requireSuperAdmin, async (_req: Request, res: Response) => {
+    try {
+      const { expenses } = await import("@shared/schema");
+      const tenants = await storage.getTenants();
+      const result = [];
+      for (const t of tenants) {
+        const branchesList = await storage.getBranchesByTenant(t.id);
+        const branchIds = branchesList.map((b: any) => b.id);
+        let total = 0;
+        if (branchIds.length > 0) {
+          const { inArray } = await import("drizzle-orm");
+          const rows = await db.select().from(expenses).where(inArray(expenses.branchId, branchIds));
+          total = rows.reduce((acc: number, e: any) => acc + parseFloat(e.amount || "0"), 0);
+        }
+        result.push({ tenantId: t.id, businessName: t.businessName, totalExpenses: total });
+      }
+      res.json(result);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── SHIFTS (cross-tenant) ─────────────────────────────────────────────
+  app.get("/api/super-admin/shifts/all", requireSuperAdmin, async (_req: Request, res: Response) => {
+    try {
+      const { shifts, employees, branches } = await import("@shared/schema");
+      const rows = await db.select().from(shifts).orderBy(desc(shifts.startTime)).limit(200);
+      res.json(rows);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── ACTIVITY LOG (global) ─────────────────────────────────────────────
+  app.get("/api/super-admin/activity", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 200;
+      const log = await storage.getActivityLog(limit);
+      res.json(log);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── REPORTS ───────────────────────────────────────────────────────────
+  app.get("/api/super-admin/reports/summary", requireSuperAdmin, async (_req: Request, res: Response) => {
+    try {
+      const tenants = await storage.getTenants();
+      const subs = await storage.getTenantSubscriptions();
+      const report = [];
+      for (const t of tenants) {
+        const sales = await storage.getSales({ tenantId: t.id, limit: 10000 });
+        const revenue = sales.reduce((a: number, s: any) => a + parseFloat(s.totalAmount || "0"), 0);
+        const activeSub = subs.find((s: any) => s.tenantId === t.id && s.status === "active");
+        const employees = await storage.getEmployeesByTenant(t.id);
+        const products = await storage.getProductsByTenant(t.id);
+        const branches = await storage.getBranchesByTenant(t.id);
+        report.push({
+          tenantId: t.id, businessName: t.businessName, ownerEmail: t.ownerEmail,
+          status: t.status, storeType: t.storeType,
+          branches: branches.length, employees: employees.length, products: products.length,
+          totalSales: sales.length, totalRevenue: revenue,
+          subscription: activeSub ? { plan: activeSub.planName, expires: activeSub.endDate } : null,
+          createdAt: t.createdAt,
+        });
+      }
+      res.json(report);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // ── BULK IMPORT ───────────────────────────────────────────────────────
