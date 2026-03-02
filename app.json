@@ -27,7 +27,17 @@
       }
     },
     "web": {
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "Barmagly POS",
+      "shortName": "Barmagly",
+      "description": "Point of Sale system for modern restaurants and stores",
+      "themeColor": "#2FD3C6",
+      "backgroundColor": "#0A0E17",
+      "lang": "en",
+      "scope": "/",
+      "startUrl": "/",
+      "display": "standalone",
+      "bundler": "metro"
     },
     "plugins": [
       [

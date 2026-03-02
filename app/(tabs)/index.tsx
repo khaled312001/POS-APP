@@ -60,8 +60,21 @@ export default function POSScreen() {
   const [switchLoading, setSwitchLoading] = useState(false);
   const [switchError, setSwitchError] = useState("");
   const [selectedProductForOptions, setSelectedProductForOptions] = useState<any>(null);
+  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [selectedToppings, setSelectedToppings] = useState<string[]>([]);
+  const [showToppingsStep, setShowToppingsStep] = useState(false);
 
   const tenantId = tenant?.id;
+
+  const PIZZA_TOPPINGS = [
+    "Tomatoes", "Sliced tomatoes", "Garlic", "Onions", "Capers", "Olives",
+    "Oregano", "Vegetables", "Spinach", "Pepperoni", "Corn", "Broccoli",
+    "Artichokes", "Arugula", "Pineapple", "Mushrooms", "Ham", "Spicy salami",
+    "Salami", "Bacon", "Prosciutto", "Lamb", "Chicken", "Kebab", "Minced Meat",
+    "Mayonnaise", "Anchovies", "Shrimp", "Tuna", "Ketchup", "Mozzarella",
+    "Gorgonzola", "Parmesan", "Mascarpone", "Kaeserand", "Cocktail Sauce",
+    "Spicy Sauce", "Yogurt Sauce",
+  ];
 
   const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["/api/categories", tenantId ? `?tenantId=${tenantId}` : ""],
@@ -86,25 +99,26 @@ export default function POSScreen() {
   }, [categories, activeCategoryIds]);
 
   const { data: allEmployees = [] } = useQuery<any[]>({
-    queryKey: ["/api/employees"],
+    queryKey: ["/api/employees", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
-    enabled: showAccountSwitcher,
+    enabled: showAccountSwitcher && !!tenantId,
   });
 
   const { data: customers = [] } = useQuery<any[]>({
-    queryKey: ["/api/customers"],
+    queryKey: ["/api/customers", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
   });
 
   const { data: storeSettings } = useQuery<any>({
-    queryKey: ["/api/store-settings"],
+    queryKey: ["/api/store-settings", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
   });
 
   const { data: salesHistory = [] } = useQuery<any[]>({
-    queryKey: ["/api/sales"],
+    queryKey: ["/api/sales", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
-    enabled: showInvoiceHistory,
+    enabled: showInvoiceHistory && !!tenantId,
   });
 
   const loadInvoiceDetails = async (saleId: number) => {
@@ -167,6 +181,27 @@ export default function POSScreen() {
       }
     }
   };
+
+  const isPizzaProduct = useCallback((product: any) => {
+    if (!product) return false;
+    const name = (product.name || "").toLowerCase();
+    const catName = (categories as any[]).find((c: any) => c.id === product.categoryId)?.name?.toLowerCase() || "";
+    return name.includes("pizza") || catName.includes("pizza");
+  }, [categories]);
+
+  useEffect(() => {
+    if (storeSettings?.taxRate !== undefined) {
+      cart.setTaxRate(Number(storeSettings.taxRate) || 0);
+    }
+  }, [storeSettings?.taxRate]);
+
+  useEffect(() => {
+    if (cart.orderType === "delivery" && storeSettings?.deliveryFee) {
+      cart.setDeliveryFee(Number(storeSettings.deliveryFee) || 0);
+    } else {
+      cart.setDeliveryFee(0);
+    }
+  }, [cart.orderType, storeSettings?.deliveryFee]);
 
   useEffect(() => {
     apiRequest("POST", "/api/seed").catch(() => { });
@@ -232,20 +267,111 @@ export default function POSScreen() {
     return num.length >= 15 && mm && yy && mm.length === 2 && yy.length >= 2 && cardCvc.length >= 3;
   };
 
+  const autoPrint3Copies = (saleData: any, cartItems: typeof cart.items, cartSubtotal: number, cartTax: number, cartDiscount: number, cartTotal: number, cartDeliveryFee: number, pmMethod: string, cashAmt: number, custName: string, empName: string) => {
+    if (Platform.OS !== "web") return;
+    const printWin = window.open("", "_blank", "width=420,height=700");
+    if (!printWin) return;
+    const storeName = storeSettings?.name || tenant?.name || "POS System";
+    const storeAddr = storeSettings?.address || "";
+    const storePhone = storeSettings?.phone || "";
+    const receiptNum = saleData?.receiptNumber || `#${saleData?.id}`;
+    const dateStr = new Date().toLocaleDateString();
+    const timeStr = new Date().toLocaleTimeString();
+    const itemsHtml = cartItems.map((i) =>
+      `<tr><td>${i.name}</td><td style="text-align:center">x${i.quantity}</td><td style="text-align:right">CHF ${(i.price * i.quantity).toFixed(2)}</td></tr>`
+    ).join("");
+    const kitchenItemsHtml = cartItems.map((i) =>
+      `<tr><td style="font-size:14px;font-weight:bold">${i.name}</td><td style="text-align:center;font-size:14px;font-weight:bold">x${i.quantity}</td></tr>`
+    ).join("");
+    const deliveryRow = cartDeliveryFee > 0 ? `<tr><td>Delivery:</td><td class="right">CHF ${cartDeliveryFee.toFixed(2)}</td></tr>` : "";
+    const changeRow = pmMethod === "cash" && cashAmt > cartTotal ? `<tr><td>Change:</td><td class="right">CHF ${(cashAmt - cartTotal).toFixed(2)}</td></tr>` : "";
+
+    const fullReceipt = (copyLabel: string) => `
+<div class="receipt">
+  <p class="center label">${copyLabel}</p>
+  <p class="center bold big">${storeName}</p>
+  ${storeAddr ? `<p class="center small">${storeAddr}</p>` : ""}
+  ${storePhone ? `<p class="center small">${storePhone}</p>` : ""}
+  <div class="dline"></div>
+  <p class="small">Date: ${dateStr} ${timeStr}</p>
+  <p class="small">Receipt: ${receiptNum}</p>
+  <p class="small">Cashier: ${empName}</p>
+  <p class="small">Customer: ${custName}</p>
+  <div class="line"></div>
+  <table width="100%"><thead><tr><th style="text-align:left">Item</th><th>Qty</th><th style="text-align:right">Total</th></tr></thead><tbody>${itemsHtml}</tbody></table>
+  <div class="line"></div>
+  <table width="100%">
+    <tr><td>Subtotal:</td><td class="right">CHF ${cartSubtotal.toFixed(2)}</td></tr>
+    ${cartDiscount > 0 ? `<tr><td>Discount:</td><td class="right">-CHF ${cartDiscount.toFixed(2)}</td></tr>` : ""}
+    <tr><td>Tax:</td><td class="right">CHF ${cartTax.toFixed(2)}</td></tr>
+    ${deliveryRow}
+  </table>
+  <div class="dline"></div>
+  <table width="100%"><tr><td class="bold big">TOTAL:</td><td class="right bold big">CHF ${cartTotal.toFixed(2)}</td></tr></table>
+  <div class="dline"></div>
+  <p class="small">Payment: ${pmMethod.toUpperCase()}</p>
+  ${changeRow ? `<table width="100%">${changeRow}</table>` : ""}
+  <p class="center bold" style="margin-top:12px">Thank you!</p>
+</div>`;
+
+    const kitchenReceipt = `
+<div class="receipt">
+  <p class="center label">*** KITCHEN ORDER ***</p>
+  <p class="center bold big">${storeName}</p>
+  <div class="dline"></div>
+  <p class="small">Date: ${dateStr} ${timeStr}</p>
+  <p class="small">Receipt: ${receiptNum}</p>
+  ${pmMethod === "delivery" ? `<p class="bold" style="font-size:14px;text-align:center">⚡ DELIVERY ORDER ⚡</p>` : ""}
+  <div class="line"></div>
+  <table width="100%"><tbody>${kitchenItemsHtml}</tbody></table>
+  <div class="dline"></div>
+  <p class="center bold" style="font-size:14px">-- Prepare Now --</p>
+</div>`;
+
+    printWin.document.write(`<html><head><title>Receipt</title><style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Courier New',monospace;font-size:11px;width:300px;margin:0 auto}
+      .receipt{padding:12px;margin-bottom:4px}
+      .center{text-align:center}.right{text-align:right}.bold{font-weight:bold}.big{font-size:14px}.small{font-size:10px}
+      .label{font-size:12px;font-weight:bold;border:1px solid #000;padding:2px 8px;display:inline-block;margin:0 auto 6px auto}
+      .line{border-top:1px dashed #000;margin:6px 0}.dline{border-top:2px solid #000;margin:6px 0}
+      table{width:100%;border-collapse:collapse}td,th{padding:2px 0}
+      @media print{.pagebreak{page-break-after:always}}
+    </style></head><body>`);
+    printWin.document.write(fullReceipt("★ CUSTOMER COPY ★"));
+    printWin.document.write(`<div class="pagebreak"></div>`);
+    printWin.document.write(fullReceipt("★ RESTAURANT / DELIVERY COPY ★"));
+    printWin.document.write(`<div class="pagebreak"></div>`);
+    printWin.document.write(kitchenReceipt);
+    printWin.document.write("</body></html>");
+    printWin.document.close();
+    printWin.print();
+  };
+
   const completeSaleAfterPayment = (saleData: any) => {
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const saleItems = cart.items.map((i) => ({ name: i.name, quantity: i.quantity, price: i.price, total: i.price * i.quantity }));
+    const custName = selectedCustomer?.name || t("walkIn");
+    const empName = employee?.name || "Staff";
+    const cashAmt = Number(cashReceived) || 0;
+    // Auto-print 3 copies on web
+    autoPrint3Copies(
+      saleData, cart.items, cart.subtotal, cart.tax, cart.discount, cart.total, cart.deliveryFee,
+      paymentMethod, cashAmt, custName, empName
+    );
     setLastSale({
       ...saleData,
-      items: cart.items.map((i) => ({ name: i.name, quantity: i.quantity, price: i.price, total: i.price * i.quantity })),
+      items: saleItems,
       subtotal: cart.subtotal,
       tax: cart.tax,
       discount: cart.discount,
+      deliveryFee: cart.deliveryFee,
       total: cart.total,
       paymentMethod,
-      cashReceived: Number(cashReceived) || 0,
-      change: paymentMethod === "cash" && cashReceived ? Number(cashReceived) - cart.total : 0,
-      customerName: selectedCustomer?.name || t("walkIn"),
-      employeeName: employee?.name || "Staff",
+      cashReceived: cashAmt,
+      change: paymentMethod === "cash" && cashReceived ? cashAmt - cart.total : 0,
+      customerName: custName,
+      employeeName: empName,
       date: new Date().toLocaleString(),
     });
     generateQR(`barmagly:receipt:${saleData.receiptNumber || saleData.id}`);
@@ -380,14 +506,23 @@ export default function POSScreen() {
   });
 
   const handleAddToCart = useCallback((product: any) => {
-    // If product has variants, show options modal
+    // If product has variants, show options modal (size selection + pizza toppings)
     if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
       setSelectedProductForOptions(product);
+      setShowToppingsStep(false);
+      return;
+    }
+    // Pizza without variants: skip to toppings directly
+    if (isPizzaProduct(product)) {
+      setSelectedProductForOptions(product);
+      setSelectedVariant(null);
+      setSelectedToppings([]);
+      setShowToppingsStep(true);
       return;
     }
     cart.addItem({ id: product.id, name: product.name, price: Number(product.price) });
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [cart]);
+  }, [cart, isPizzaProduct]);
 
   const handleBarcodeScan = useCallback(async (barcode: string) => {
     try {
@@ -722,57 +857,125 @@ export default function POSScreen() {
 
       <Modal visible={!!selectedProductForOptions} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxWidth: 420, padding: 28 }]}>
+          <View style={[styles.modalContent, { maxWidth: 420, padding: 28, maxHeight: "88%" }]}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <View>
-                <Text style={[styles.modalTitle, rtlTextAlign, { fontSize: 24, fontWeight: "900" }]}>{selectedProductForOptions?.name}</Text>
-                <Text style={[styles.sectionLabel, { marginTop: 4, marginBottom: 0 }, rtlTextAlign]}>{t("selectSize" as any) || "Select Size"}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalTitle, rtlTextAlign, { fontSize: 22, fontWeight: "900" }]}>{selectedProductForOptions?.name}</Text>
+                <Text style={[styles.sectionLabel, { marginTop: 4, marginBottom: 0 }, rtlTextAlign]}>
+                  {showToppingsStep ? "Select Toppings" : (t("selectSize" as any) || "Select Size")}
+                </Text>
               </View>
-              <Pressable onPress={() => setSelectedProductForOptions(null)} style={styles.modalCloseBtn}>
+              <Pressable onPress={() => { setSelectedProductForOptions(null); setSelectedVariant(null); setSelectedToppings([]); setShowToppingsStep(false); }} style={styles.modalCloseBtn}>
                 <Ionicons name="close" size={24} color={Colors.textMuted} />
               </Pressable>
             </View>
 
-            <View style={{ gap: 12, marginTop: 20 }}>
-              {selectedProductForOptions?.variants?.map((v: any, idx: number) => (
+            {!showToppingsStep ? (
+              <View style={{ gap: 12, marginTop: 20 }}>
+                {selectedProductForOptions?.variants?.map((v: any, idx: number) => (
+                  <Pressable
+                    key={idx}
+                    style={({ pressed }) => [
+                      styles.variantBtn,
+                      pressed && { opacity: 0.8, backgroundColor: Colors.accent + "20" }
+                    ]}
+                    onPress={() => {
+                      if (isPizzaProduct(selectedProductForOptions)) {
+                        setSelectedVariant(v);
+                        setSelectedToppings([]);
+                        setShowToppingsStep(true);
+                      } else {
+                        cart.addItem({
+                          id: selectedProductForOptions.id,
+                          name: selectedProductForOptions.name,
+                          price: Number(selectedProductForOptions.price),
+                          variant: v
+                        });
+                        if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setSelectedProductForOptions(null);
+                      }
+                    }}
+                  >
+                    <View style={[styles.variantBtnInner, isRTL && { flexDirection: "row-reverse" }]}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                        <View style={styles.variantIconCircle}>
+                          <Ionicons name="options-outline" size={20} color={Colors.accent} />
+                        </View>
+                        <Text style={styles.variantBtnName}>{v.name}</Text>
+                      </View>
+                      <View style={styles.variantPriceTag}>
+                        <Text style={styles.variantBtnPrice}>CHF {Number(v.price).toFixed(2)}</Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <ScrollView style={{ marginTop: 16 }} showsVerticalScrollIndicator={false}>
+                <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: 12 }}>
+                  Size: {selectedVariant?.name} — CHF {Number(selectedVariant?.price).toFixed(2)}
+                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {PIZZA_TOPPINGS.map((topping) => {
+                    const isSelected = selectedToppings.includes(topping);
+                    return (
+                      <Pressable
+                        key={topping}
+                        onPress={() => {
+                          setSelectedToppings((prev) =>
+                            isSelected ? prev.filter((t) => t !== topping) : [...prev, topping]
+                          );
+                        }}
+                        style={{
+                          paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
+                          backgroundColor: isSelected ? Colors.accent : Colors.surfaceLight,
+                          borderWidth: 1.5, borderColor: isSelected ? Colors.accent : Colors.cardBorder,
+                        }}
+                      >
+                        <Text style={{ color: isSelected ? Colors.textDark : Colors.text, fontSize: 13, fontWeight: "600" }}>
+                          {topping}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
                 <Pressable
-                  key={idx}
-                  style={({ pressed }) => [
-                    styles.variantBtn,
-                    pressed && { opacity: 0.8, backgroundColor: Colors.accent + "20" }
-                  ]}
+                  style={{ marginTop: 20, borderRadius: 14, overflow: "hidden" }}
                   onPress={() => {
+                    const toppingsSuffix = selectedToppings.length > 0 ? ` [${selectedToppings.join(", ")}]` : "";
                     cart.addItem({
                       id: selectedProductForOptions.id,
-                      name: selectedProductForOptions.name,
+                      name: selectedProductForOptions.name + toppingsSuffix,
                       price: Number(selectedProductForOptions.price),
-                      variant: v
+                      variant: selectedVariant,
                     });
                     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     setSelectedProductForOptions(null);
+                    setSelectedVariant(null);
+                    setSelectedToppings([]);
+                    setShowToppingsStep(false);
                   }}
                 >
-                  <View style={[styles.variantBtnInner, isRTL && { flexDirection: "row-reverse" }]}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-                      <View style={styles.variantIconCircle}>
-                        <Ionicons name="options-outline" size={20} color={Colors.accent} />
-                      </View>
-                      <Text style={styles.variantBtnName}>{v.name}</Text>
-                    </View>
-                    <View style={styles.variantPriceTag}>
-                      <Text style={styles.variantBtnPrice}>CHF {Number(v.price).toFixed(2)}</Text>
-                    </View>
-                  </View>
+                  <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ paddingVertical: 14, alignItems: "center", borderRadius: 14 }}>
+                    <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "800" }}>
+                      Add to Cart{selectedToppings.length > 0 ? ` (${selectedToppings.length} toppings)` : ""}
+                    </Text>
+                  </LinearGradient>
                 </Pressable>
-              ))}
-            </View>
+                <Pressable style={{ marginTop: 8 }} onPress={() => setShowToppingsStep(false)}>
+                  <Text style={{ color: Colors.textMuted, textAlign: "center", padding: 8 }}>← Back to sizes</Text>
+                </Pressable>
+              </ScrollView>
+            )}
 
-            <Pressable
-              style={styles.modalCancelBtn}
-              onPress={() => setSelectedProductForOptions(null)}
-            >
-              <Text style={styles.modalCancelBtnText}>{t("cancel")}</Text>
-            </Pressable>
+            {!showToppingsStep && (
+              <Pressable
+                style={styles.modalCancelBtn}
+                onPress={() => { setSelectedProductForOptions(null); setSelectedVariant(null); setSelectedToppings([]); setShowToppingsStep(false); }}
+              >
+                <Text style={styles.modalCancelBtnText}>{t("cancel")}</Text>
+              </Pressable>
+            )}
           </View>
         </View>
       </Modal>
@@ -947,6 +1150,12 @@ export default function POSScreen() {
                   <Text style={[styles.checkoutItemTotal, rtlTextAlign]}>CHF {(item.price * item.quantity).toFixed(2)}</Text>
                 </View>
               ))}
+              {cart.deliveryFee > 0 && (
+                <View style={[styles.checkoutItem, isRTL && { flexDirection: "row-reverse" }]}>
+                  <Text style={[styles.checkoutItemName, rtlTextAlign, { color: Colors.info }]}>Delivery Fee</Text>
+                  <Text style={[styles.checkoutItemTotal, rtlTextAlign, { color: Colors.info }]}>CHF {cart.deliveryFee.toFixed(2)}</Text>
+                </View>
+              )}
 
               <Pressable
                 style={[styles.completeBtn, (saleMutation.isPending || cardProcessing || nfcStatus === "reading" || (paymentMethod === "card" && !isCardValid())) && { opacity: 0.5 }]}
@@ -1027,6 +1236,12 @@ export default function POSScreen() {
                     <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("tax")}:</Text>
                     <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {lastSale?.tax?.toFixed(2)}</Text>
                   </View>
+                  {(lastSale?.deliveryFee || 0) > 0 && (
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Delivery Fee:</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(lastSale?.deliveryFee).toFixed(2)}</Text>
+                    </View>
+                  )}
 
                   <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
 

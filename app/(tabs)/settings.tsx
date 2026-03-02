@@ -102,7 +102,7 @@ export default function SettingsScreen() {
   const [printerPaperSize, setPrinterPaperSize] = useState("80mm");
   const [printerAutoPrint, setPrinterAutoPrint] = useState(false);
   const [showStoreSettings, setShowStoreSettings] = useState(false);
-  const [storeForm, setStoreForm] = useState({ name: "", address: "", phone: "", email: "", storeType: "supermarket" });
+  const [storeForm, setStoreForm] = useState({ name: "", address: "", phone: "", email: "", storeType: "supermarket", taxRate: "", deliveryFee: "" });
   const [storeLogo, setStoreLogo] = useState<string | null>(null);
   const [storeLogoUploading, setStoreLogoUploading] = useState(false);
 
@@ -397,6 +397,8 @@ export default function SettingsScreen() {
       email: storeForm.email || undefined,
       logo: logoPath || undefined,
       storeType: storeForm.storeType || "supermarket",
+      taxRate: storeForm.taxRate !== "" ? storeForm.taxRate : undefined,
+      deliveryFee: storeForm.deliveryFee !== "" ? storeForm.deliveryFee : undefined,
     });
   };
 
@@ -509,6 +511,8 @@ export default function SettingsScreen() {
                 phone: storeSettings?.phone || "",
                 email: storeSettings?.email || "",
                 storeType: storeSettings?.storeType || "supermarket",
+                taxRate: storeSettings?.taxRate != null ? String(storeSettings.taxRate) : "",
+                deliveryFee: storeSettings?.deliveryFee != null ? String(storeSettings.deliveryFee) : "",
               });
               setStoreLogo(storeSettings?.logo || null);
               setShowStoreSettings(true);
@@ -534,7 +538,7 @@ export default function SettingsScreen() {
         )}
 
         <Text style={styles.sectionTitle}>{t("system")}</Text>
-        <SettingRow icon="language" label={t("language")} value={language === "ar" ? "العربية" : "English"} onPress={() => setShowLanguagePicker(true)} color={Colors.info} rtl={isRTL} />
+        <SettingRow icon="language" label={t("language")} value={language === "ar" ? "العربية" : language === "de" ? "Deutsch" : "English"} onPress={() => setShowLanguagePicker(true)} color={Colors.info} rtl={isRTL} />
         <SettingRow icon="print" label={t("receiptPrinter")} value={t("notConfigured")} onPress={() => setShowPrinterSettings(true)} color={Colors.textMuted} rtl={isRTL} />
         <SettingRow icon="cloud-upload" label={t("syncStatus")} value={t("connected")} color={Colors.success} rtl={isRTL} />
         <SettingRow icon="information-circle" label={t("appVersion")} value="1.0.0" color={Colors.info} rtl={isRTL} />
@@ -1510,7 +1514,7 @@ export default function SettingsScreen() {
 
       <Modal visible={showLanguagePicker} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxWidth: 340, maxHeight: 300 }]}>
+          <View style={[styles.modalContent, { maxWidth: 340, maxHeight: 420 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("language")}</Text>
               <Pressable onPress={() => setShowLanguagePicker(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
@@ -1542,6 +1546,20 @@ export default function SettingsScreen() {
                 <Text style={styles.empMeta}>Right to Left (RTL)</Text>
               </View>
               {language === "ar" && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
+            </Pressable>
+            <Pressable
+              testID="lang-de"
+              style={[styles.empCard, language === "de" && { borderWidth: 2, borderColor: Colors.accent }]}
+              onPress={() => { setLanguage("de"); setShowLanguagePicker(false); }}
+            >
+              <View style={[styles.empAvatar, { backgroundColor: Colors.warning + "30" }]}>
+                <Text style={{ fontSize: 20 }}>🇩🇪</Text>
+              </View>
+              <View style={styles.empInfo}>
+                <Text style={styles.empName}>Deutsch</Text>
+                <Text style={styles.empMeta}>Left to Right (LTR)</Text>
+              </View>
+              {language === "de" && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
             </Pressable>
           </View>
         </View>
@@ -1823,6 +1841,26 @@ export default function SettingsScreen() {
                   </Pressable>
                 ))}
               </View>
+
+              <Text style={[styles.label, rtlTextAlign]}>Tax Rate (%)</Text>
+              <TextInput
+                style={[styles.input, rtlTextAlign]}
+                value={storeForm.taxRate}
+                onChangeText={(v) => setStoreForm({ ...storeForm, taxRate: v })}
+                placeholderTextColor={Colors.textMuted}
+                placeholder="e.g. 7.7"
+                keyboardType="decimal-pad"
+              />
+
+              <Text style={[styles.label, rtlTextAlign]}>Delivery Fee (CHF)</Text>
+              <TextInput
+                style={[styles.input, rtlTextAlign]}
+                value={storeForm.deliveryFee}
+                onChangeText={(v) => setStoreForm({ ...storeForm, deliveryFee: v })}
+                placeholderTextColor={Colors.textMuted}
+                placeholder="e.g. 5.00"
+                keyboardType="decimal-pad"
+              />
 
               <Pressable style={{ marginTop: 16 }} onPress={handleSaveStoreSettings}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ paddingVertical: 14, borderRadius: 12, alignItems: "center" }}>

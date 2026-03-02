@@ -18,9 +18,20 @@ export default function IntroScreen() {
         router.replace('/license-gate');
     };
 
-    const toggleLanguage = () => {
-        setLanguage(language === 'en' ? 'ar' : 'en');
+    const cycleLanguage = () => {
+        if (language === 'en') setLanguage('ar');
+        else if (language === 'ar') setLanguage('de');
+        else setLanguage('en');
     };
+
+    const langLabel = language === 'en' ? 'عربي' : language === 'ar' ? 'Deutsch' : 'English';
+    const welcomeText = language === 'en' ? 'Welcome' : language === 'ar' ? 'مرحباً' : 'Willkommen';
+    const subtitleText = language === 'en'
+        ? 'Activate your store to get started.'
+        : language === 'ar'
+        ? 'قم بتفعيل متجرك للبدء.'
+        : 'Aktivieren Sie Ihren Store, um zu beginnen.';
+    const startText = language === 'en' ? 'Get Started' : language === 'ar' ? 'البدء' : 'Loslegen';
 
     return (
         <View style={styles.container}>
@@ -31,11 +42,11 @@ export default function IntroScreen() {
                 end={{ x: 1, y: 1 }}
             >
                 <TouchableOpacity
-                    onPress={toggleLanguage}
+                    onPress={cycleLanguage}
                     style={[styles.langButton, { top: Math.max(insets.top + 16, 40) }]}
                 >
                     <Ionicons name="language" size={20} color={Colors.white} />
-                    <Text style={styles.langText}>{language === 'en' ? 'عربي' : 'English'}</Text>
+                    <Text style={styles.langText}>{langLabel}</Text>
                 </TouchableOpacity>
 
                 <View style={styles.content}>
@@ -43,12 +54,10 @@ export default function IntroScreen() {
                         <Ionicons name="storefront" size={80} color={Colors.white} />
                     </View>
                     <Text style={[styles.title, rtlText]}>
-                        {language === 'en' ? 'Welcome' : 'مرحباً'}
+                        {welcomeText}
                     </Text>
                     <Text style={[styles.subtitle, rtlText]}>
-                        {language === 'en'
-                            ? 'Activate your store to get started.'
-                            : 'قم بتفعيل متجرك للبدء.'}
+                        {subtitleText}
                     </Text>
                 </View>
 
@@ -58,7 +67,7 @@ export default function IntroScreen() {
                         onPress={handleStart}
                     >
                         <Text style={[styles.buttonText, rtlText, isRTL ? { marginLeft: 8 } : { marginRight: 8 }]}>
-                            {language === 'en' ? 'Get Started' : 'البدء'}
+                            {startText}
                         </Text>
                         <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={20} color={Colors.background} />
                     </Pressable>

@@ -1,1236 +1,1129 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Barmagly POS | High-Performance Cloud Solution</title>
-
-  <!-- Fonts -->
+  <title>Barmagly POS | Cloud-Powered Point of Sale for Modern Businesses</title>
+  <meta name="description" content="Barmagly POS — The all-in-one cloud POS system built for restaurants, cafés, and retail stores. Multi-branch, multi-language, Stripe payments, inventory, CRM and more.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Noto+Kufi+Arabic:wght@300;400;500;600;700;800&display=swap"
-    rel="stylesheet">
-
-  <!-- Scripts -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900&family=Noto+Kufi+Arabic:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://js.stripe.com/v3/"></script>
-
   <style>
     :root {
-      --primary: #6366f1;
-      --primary-glow: rgba(99, 102, 241, 0.4);
-      --secondary: #ec4899;
-      --dark: #0f172a;
-      --darkER: #020617;
-      --light: #f8fafc;
-      --gray: #94a3b8;
-      --border: rgba(255, 255, 255, 0.1);
-      --glass: rgba(15, 23, 42, 0.6);
-      --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      --container-padding: 5%;
-      --mesh-1: radial-gradient(at 100% 0%, hsla(231, 100%, 77%, 1) 0, transparent 50%);
-      --mesh-2: radial-gradient(at 0% 100%, hsla(331, 100%, 75%, 1) 0, transparent 50%);
+      --bg: #050B18;
+      --bg2: #080F1E;
+      --surface: rgba(255,255,255,0.04);
+      --surface2: rgba(255,255,255,0.07);
+      --border: rgba(255,255,255,0.09);
+      --primary: #2FD3C6;
+      --primary-dark: #1fada2;
+      --primary-glow: rgba(47,211,198,0.25);
+      --indigo: #6366f1;
+      --indigo-glow: rgba(99,102,241,0.3);
+      --pink: #e879f9;
+      --gold: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --text: #f0f4f8;
+      --muted: #7b8fa6;
+      --muted2: #506070;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --transition: all 0.35s cubic-bezier(0.4,0,0.2,1);
+      --shadow: 0 20px 60px rgba(0,0,0,0.5);
+      --font: 'Inter', sans-serif;
+      --font-ar: 'Noto Kufi Arabic', sans-serif;
     }
-
-    [dir="rtl"] {
-      font-family: 'Noto Kufi Arabic', sans-serif;
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      scroll-behavior: smooth;
-    }
-
+    [dir="rtl"] { font-family: var(--font-ar); }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior: smooth; }
     body {
-      background-color: var(--darkER);
-      color: var(--light);
-      line-height: 1.6;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
       overflow-x: hidden;
-      background-image:
-        radial-gradient(circle at 10% 10%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
-        radial-gradient(circle at 90% 90%, rgba(236, 72, 153, 0.15) 0%, transparent 40%),
-        var(--mesh-1), var(--mesh-2);
+    }
+    body::before {
+      content:'';
+      position:fixed; inset:0;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(47,211,198,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 90% 80%, rgba(99,102,241,0.1) 0%, transparent 50%),
+        radial-gradient(ellipse 50% 30% at 10% 90%, rgba(232,121,249,0.06) 0%, transparent 50%);
+      pointer-events:none; z-index:0;
     }
 
-    /* Utilities */
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 0 var(--container-padding);
+    /* ── Utility ─────────────────────────────────── */
+    .container { max-width:1180px; margin:0 auto; padding:0 24px; position:relative; z-index:1; }
+    .section-py { padding:100px 0; }
+    .text-primary { color: var(--primary); }
+    .text-muted { color: var(--muted); }
+    .chip {
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 16px; border-radius:100px;
+      font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+      background:rgba(47,211,198,.1); color:var(--primary);
+      border:1px solid rgba(47,211,198,.25); margin-bottom:20px;
     }
+    .reveal { opacity:0; transform:translateY(24px); transition:opacity .5s ease, transform .5s ease; }
+    .reveal.visible { opacity:1; transform:translateY(0); }
 
-    .reveal {
-      opacity: 0;
-      transform: translateY(20px);
-      transition: var(--transition);
-    }
-
-    .reveal.active {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .section-py {
-      padding: 8rem 0;
-    }
-
-    /* Floating WhatsApp */
-    .whatsapp-float {
-      position: fixed;
-      bottom: 30px;
-      right: 30px;
-      width: 60px;
-      height: 60px;
-      background: #25d366;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 10px 30px rgba(37, 211, 102, 0.4);
-      z-index: 1000;
-      cursor: pointer;
-      transition: var(--transition);
-      animation: pulse 2s infinite;
-    }
-
-    [dir="rtl"] .whatsapp-float {
-      right: auto;
-      left: 30px;
-    }
-
-    .whatsapp-float:hover {
-      transform: scale(1.1) translateY(-5px);
-    }
-
-    @keyframes pulse {
-      0% {
-        box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.6);
-      }
-
-      70% {
-        box-shadow: 0 0 0 15px rgba(37, 211, 102, 0);
-      }
-
-      100% {
-        box-shadow: 0 0 0 0 rgba(37, 211, 102, 0);
-      }
-    }
-
-    /* Navbar */
+    /* ── Navbar ──────────────────────────────────── */
     nav {
-      position: fixed;
-      top: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 90%;
-      max-width: 1200px;
-      padding: 1rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      backdrop-filter: blur(16px);
-      background: var(--glass);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      z-index: 1000;
-      transition: var(--transition);
+      position:fixed; top:20px; left:50%; transform:translateX(-50%);
+      width:calc(100% - 48px); max-width:1180px;
+      display:flex; align-items:center; justify-content:space-between;
+      padding:14px 24px;
+      background:rgba(5,11,24,0.8); backdrop-filter:blur(20px);
+      border:1px solid var(--border); border-radius:20px;
+      z-index:9999; transition:var(--transition);
     }
-
-    nav.scrolled {
-      top: 12px;
-      transform: translateX(-50%) scale(0.98);
-      background: rgba(2, 6, 23, 0.9);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    nav.scrolled { background:rgba(5,11,24,0.95); box-shadow:0 8px 32px rgba(0,0,0,.4); }
+    .nav-logo {
+      display:flex; align-items:center; gap:12px;
+      font-size:1.3rem; font-weight:800; text-decoration:none; color:var(--text);
     }
-
-    .logo {
-      font-size: 1.5rem;
-      font-weight: 800;
-      background: linear-gradient(135deg, #818cf8, #f472b6);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .nav-logo-icon {
+      width:38px; height:38px; border-radius:10px;
+      background:linear-gradient(135deg,rgba(47,211,198,.2),rgba(47,211,198,.05));
+      border:1px solid rgba(47,211,198,.4);
+      display:flex; align-items:center; justify-content:center;
+      font-size:18px; font-weight:900; color:var(--primary);
     }
-
-    .nav-links {
-      display: flex;
-      gap: 2.5rem;
-      align-items: center;
+    .nav-links { display:flex; align-items:center; gap:28px; }
+    .nav-links a { color:var(--muted); text-decoration:none; font-size:.9rem; font-weight:500; transition:color .2s; }
+    .nav-links a:hover { color:var(--text); }
+    .nav-right { display:flex; align-items:center; gap:12px; }
+    .btn-nav {
+      padding:9px 22px; border-radius:100px; font-size:.85rem; font-weight:700;
+      cursor:pointer; transition:var(--transition); text-decoration:none; border:none;
     }
-
-    .nav-links a {
-      color: var(--light);
-      text-decoration: none;
-      font-weight: 500;
-      opacity: 0.7;
-      transition: var(--transition);
-      font-size: 0.95rem;
-      position: relative;
+    .btn-nav-ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
+    .btn-nav-ghost:hover { color:var(--text); border-color:rgba(255,255,255,.2); }
+    .btn-nav-primary { background:var(--primary); color:#000; }
+    .btn-nav-primary:hover { background:var(--primary-dark); transform:translateY(-1px); }
+    .lang-btn {
+      padding:7px 14px; border-radius:100px; font-size:.8rem; font-weight:600;
+      background:var(--surface); border:1px solid var(--border); color:var(--muted);
+      cursor:pointer; transition:var(--transition);
     }
+    .lang-btn:hover { color:var(--text); }
+    .hamburger { display:none; cursor:pointer; flex-direction:column; gap:5px; }
+    .hamburger span { width:24px; height:2px; background:var(--text); border-radius:2px; transition:var(--transition); }
 
-    .nav-links a::after {
-      content: '';
-      position: absolute;
-      bottom: -5px;
-      left: 0;
-      width: 0%;
-      height: 2px;
-      background: var(--primary);
-      transition: 0.3s;
-    }
-
-    .nav-links a:hover {
-      opacity: 1;
-    }
-
-    .nav-links a:hover::after {
-      width: 100%;
-    }
-
-    .lang-toggle {
-      padding: 0.6rem 1.4rem;
-      border: 1px solid var(--border);
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--light);
-      border-radius: 50px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: var(--transition);
-    }
-
-    .lang-toggle:hover {
-      background: var(--primary);
-      transform: scale(1.05);
-    }
-
-    /* Hero */
+    /* ── Hero ────────────────────────────────────── */
     .hero {
-      padding: 12rem 0 8rem;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      position: relative;
+      min-height:100vh; display:flex; align-items:center; padding:160px 0 100px;
+      text-align:center; position:relative; z-index:1;
     }
-
-    .hero-badge {
-      background: rgba(99, 102, 241, 0.1);
-      border: 1px solid var(--primary-glow);
-      padding: 0.6rem 1.8rem;
-      border-radius: 50px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--primary);
-      margin-bottom: 2.5rem;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
+    .hero-inner { display:flex; flex-direction:column; align-items:center; width:100%; }
     .hero h1 {
-      font-size: clamp(2.5rem, 8vw, 5.5rem);
-      font-weight: 800;
-      line-height: 1.05;
-      letter-spacing: -0.04em;
-      margin-bottom: 1.5rem;
-      max-width: 1100px;
+      font-size:clamp(2.6rem,7vw,5rem); font-weight:900; line-height:1.08;
+      letter-spacing:-.04em; margin-bottom:24px; max-width:900px;
     }
-
-    .hero p {
-      font-size: 1.3rem;
-      color: var(--gray);
-      max-width: 800px;
-      margin-bottom: 3.5rem;
-      font-weight: 400;
+    .hero h1 .grad {
+      background:linear-gradient(135deg, var(--primary) 0%, #6366f1 50%, var(--pink) 100%);
+      -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
     }
-
-    .btn {
-      padding: 1.2rem 3rem;
-      font-size: 1.1rem;
-      font-weight: 700;
-      border-radius: 16px;
-      cursor: pointer;
-      transition: var(--transition);
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
+    .hero-sub { font-size:1.15rem; color:var(--muted); max-width:680px; margin-bottom:40px; line-height:1.7; }
+    .hero-cta { display:flex; gap:14px; flex-wrap:wrap; justify-content:center; }
+    .btn-hero-primary {
+      padding:16px 36px; border-radius:14px; font-size:1rem; font-weight:700;
+      background:var(--primary); color:#000; border:none; cursor:pointer;
+      box-shadow:0 8px 32px var(--primary-glow); transition:var(--transition); text-decoration:none;
     }
-
-    .btn-primary {
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-      color: white;
-      border: none;
-      box-shadow: 0 10px 40px var(--primary-glow);
+    .btn-hero-primary:hover { transform:translateY(-3px); box-shadow:0 16px 48px var(--primary-glow); }
+    .btn-hero-ghost {
+      padding:16px 36px; border-radius:14px; font-size:1rem; font-weight:600;
+      background:var(--surface); color:var(--text); border:1px solid var(--border);
+      cursor:pointer; transition:var(--transition); text-decoration:none;
     }
-
-    .btn-primary:hover {
-      transform: translateY(-3px) scale(1.02);
-      box-shadow: 0 20px 50px var(--primary-glow);
+    .btn-hero-ghost:hover { background:var(--surface2); border-color:rgba(255,255,255,.18); }
+    .hero-stats {
+      display:flex; gap:48px; margin-top:72px; padding-top:48px;
+      border-top:1px solid var(--border); justify-content:center; flex-wrap:wrap;
     }
-
-    /* Icon Wrapper */
-    .icon {
-      width: 24px;
-      height: 24px;
-      stroke-width: 2.5;
+    .hero-stat { text-align:center; }
+    .hero-stat-num { font-size:2.2rem; font-weight:900; color:var(--primary); }
+    .hero-stat-label { font-size:.8rem; color:var(--muted); font-weight:500; margin-top:4px; }
+    .hero-mockup {
+      margin-top:80px; width:100%; max-width:900px;
+      border-radius:20px; overflow:hidden;
+      border:1px solid var(--border);
+      box-shadow:0 40px 120px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.04);
     }
-
-    /* Stats */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 4rem;
-      width: 100%;
-      max-width: 1000px;
-      margin-top: 6rem;
-      border-top: 1px solid var(--border);
-      padding-top: 4rem;
+    .hero-mockup-bar {
+      background:#0d1424; padding:14px 20px;
+      display:flex; align-items:center; gap:8px;
     }
-
-    .stat-item h2 {
-      font-size: 3.5rem;
-      font-weight: 800;
-      color: white;
-      margin-bottom: 0.5rem;
+    .dot { width:12px; height:12px; border-radius:50%; }
+    .dot-r { background:#ff5f57; }
+    .dot-y { background:#ffbd2e; }
+    .dot-g { background:#28c840; }
+    .hero-mockup-body {
+      background:linear-gradient(180deg, #0a1628 0%, #050b18 100%);
+      padding:40px; min-height:320px;
+      display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;
     }
-
-    .stat-item p {
-      color: var(--gray);
-      font-size: 1rem;
-      font-weight: 500;
+    .mock-card {
+      background:var(--surface); border:1px solid var(--border); border-radius:14px;
+      padding:20px; display:flex; flex-direction:column; gap:10px;
     }
+    .mock-card-label { font-size:.7rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.08em; }
+    .mock-card-val { font-size:1.6rem; font-weight:900; color:var(--text); }
+    .mock-card-badge { font-size:.7rem; padding:3px 10px; border-radius:100px; font-weight:700; width:fit-content; }
+    .badge-green { background:rgba(16,185,129,.15); color:#10b981; }
+    .badge-blue { background:rgba(99,102,241,.15); color:#818cf8; }
+    .badge-gold { background:rgba(245,158,11,.15); color:#f59e0b; }
+    .mock-bar { height:6px; border-radius:3px; background:var(--surface2); overflow:hidden; margin-top:6px; }
+    .mock-bar-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,var(--primary),#6366f1); }
 
-    /* Features */
-    .section-header {
-      text-align: center;
-      margin-bottom: 6rem;
-    }
-
-    .section-header h2 {
-      font-size: 3.5rem;
-      font-weight: 800;
-      margin-bottom: 1.5rem;
-      letter-spacing: -0.02em;
-    }
-
-    .section-header p {
-      color: var(--gray);
-      font-size: 1.2rem;
-      max-width: 700px;
-      margin: 0 auto;
-    }
-
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-      gap: 2.5rem;
-      margin-bottom: 4rem;
-    }
-
+    /* ── Features ────────────────────────────────── */
+    .section-header { text-align:center; margin-bottom:64px; }
+    .section-header h2 { font-size:clamp(1.9rem,4vw,2.8rem); font-weight:800; letter-spacing:-.03em; margin-bottom:16px; }
+    .section-header p { font-size:1.05rem; color:var(--muted); max-width:600px; margin:0 auto; }
+    .features-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
     .feature-card {
-      padding: 3.5rem 2.5rem;
-      background: var(--glass);
-      border: 1px solid var(--border);
-      border-radius: 32px;
-      transition: var(--transition);
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      text-align: left;
+      background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+      padding:28px; transition:var(--transition); position:relative; overflow:hidden;
     }
-
-    [dir="rtl"] .feature-card {
-      text-align: right;
-      align-items: flex-start;
+    .feature-card::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg,var(--primary),#6366f1); opacity:0; transition:.3s;
     }
-
-    .feature-card:hover {
-      border-color: var(--primary-glow);
-      background: rgba(255, 255, 255, 0.04);
-      transform: translateY(-8px);
+    .feature-card:hover { border-color:rgba(47,211,198,.25); transform:translateY(-4px); }
+    .feature-card:hover::before { opacity:1; }
+    .feature-icon {
+      width:50px; height:50px; border-radius:14px; display:flex; align-items:center;
+      justify-content:center; font-size:22px; margin-bottom:18px;
+      background:rgba(47,211,198,.1); border:1px solid rgba(47,211,198,.2);
     }
+    .feature-card h3 { font-size:1.05rem; font-weight:700; margin-bottom:10px; }
+    .feature-card p { font-size:.88rem; color:var(--muted); line-height:1.6; }
 
-    .feature-card i {
-      display: inline-flex;
-      padding: 1.25rem;
-      background: rgba(99, 102, 241, 0.1);
-      color: var(--primary);
-      border-radius: 20px;
-      margin-bottom: 2rem;
-    }
-
-    /* How it Works */
-    .steps-container {
-      position: relative;
-    }
-
-    .step-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6rem;
-      align-items: center;
-      margin-bottom: 8rem;
-    }
-
-    .step-info {
-      position: relative;
-    }
-
-    .step-info .num {
-      font-size: 8rem;
-      font-weight: 800;
-      position: absolute;
-      top: -60px;
-      left: -20px;
-      z-index: -1;
-      opacity: 0.05;
-    }
-
-    .step-info h3 {
-      font-size: 2.2rem;
-      margin-bottom: 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: 15px;
-    }
-
-    .step-info p {
-      font-size: 1.15rem;
-      color: var(--gray);
-    }
-
-    .step-visual {
-      aspect-ratio: 16/10;
-      background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.1), transparent);
-      border: 1px solid var(--border);
-      border-radius: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: var(--gray);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .step-visual::after {
-      content: 'Module Interface Preview';
-      opacity: 0.3;
-    }
-
-    /* Pricing */
+    /* ── Pricing ─────────────────────────────────── */
     .pricing-toggle {
-      display: inline-flex;
-      background: var(--glass);
-      padding: 6px;
-      border-radius: 50px;
-      border: 1px solid var(--border);
+      display:flex; align-items:center; gap:16px; justify-content:center; margin-bottom:56px;
     }
-
-    .toggle-btn {
-      padding: 0.8rem 2rem;
-      border-radius: 50px;
-      cursor: pointer;
-      font-weight: 700;
-      transition: 0.3s;
+    .toggle-label { font-size:.95rem; font-weight:600; color:var(--muted); cursor:pointer; transition:color .2s; }
+    .toggle-label.active { color:var(--text); }
+    .toggle-switch {
+      width:56px; height:30px; background:var(--surface); border:1px solid var(--border);
+      border-radius:100px; position:relative; cursor:pointer; transition:var(--transition);
     }
-
-    .toggle-btn.active {
-      background: var(--primary);
-      color: white;
+    .toggle-switch.on { background:var(--primary); border-color:var(--primary); }
+    .toggle-knob {
+      position:absolute; top:3px; left:3px;
+      width:22px; height:22px; background:#fff; border-radius:50%; transition:var(--transition);
     }
-
-    .pricing-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 2rem;
-      max-width: 1100px;
-      margin: 0 auto;
+    .toggle-switch.on .toggle-knob { left:29px; }
+    .save-badge {
+      display:inline-flex; padding:4px 12px; border-radius:100px;
+      background:rgba(16,185,129,.15); color:#10b981; font-size:.75rem; font-weight:700;
     }
-
+    .pricing-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; max-width:960px; margin:0 auto; }
     .pricing-card {
-      padding: 4rem 3rem;
-      background: var(--glass);
-      border: 1px solid var(--border);
-      border-radius: 40px;
-      position: relative;
+      background:var(--surface); border:1px solid var(--border); border-radius:20px;
+      padding:36px; position:relative; transition:var(--transition); overflow:hidden;
     }
-
-    .pricing-card.popular {
-      border: 2px solid var(--primary);
-      background: rgba(99, 102, 241, 0.05);
-      transform: scale(1.05);
+    .pricing-card.featured {
+      background:linear-gradient(160deg, rgba(47,211,198,.1) 0%, rgba(99,102,241,.08) 100%);
+      border-color:rgba(47,211,198,.4);
+      box-shadow:0 0 60px rgba(47,211,198,.12);
     }
-
-    .badge {
-      position: absolute;
-      top: 20px;
-      right: 30px;
-      background: var(--primary);
-      padding: 0.4rem 1.2rem;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      font-weight: 800;
+    .pricing-badge {
+      position:absolute; top:-1px; right:28px;
+      background:linear-gradient(135deg,var(--primary),#6366f1);
+      color:#000; font-size:.7rem; font-weight:800; letter-spacing:.08em;
+      padding:6px 18px; border-radius:0 0 12px 12px; text-transform:uppercase;
     }
-
-    .price {
-      font-size: 2.8rem;
-      font-weight: 800;
-      margin: 2rem 0;
+    .pricing-plan-name { font-size:.8rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; margin-bottom:8px; }
+    .pricing-price { display:flex; align-items:flex-end; gap:8px; margin:16px 0; }
+    .pricing-amount { font-size:3.2rem; font-weight:900; line-height:1; color:var(--text); }
+    .pricing-period { font-size:.9rem; color:var(--muted); padding-bottom:8px; }
+    .pricing-tagline { font-size:.85rem; color:var(--muted); margin-bottom:28px; padding-bottom:28px; border-bottom:1px solid var(--border); }
+    .pricing-features { list-style:none; display:flex; flex-direction:column; gap:12px; margin-bottom:32px; }
+    .pricing-features li { display:flex; align-items:flex-start; gap:12px; font-size:.875rem; }
+    .pricing-features li .check { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+    .check-yes { background:rgba(47,211,198,.15); color:var(--primary); font-size:10px; font-weight:900; }
+    .check-addon { background:rgba(99,102,241,.15); color:#818cf8; font-size:10px; font-weight:900; }
+    .pricing-cta {
+      width:100%; padding:14px; border-radius:12px; font-size:.95rem; font-weight:700;
+      cursor:pointer; transition:var(--transition); border:none;
     }
-
-    .price span {
-      font-size: 1rem;
-      color: var(--gray);
+    .pricing-cta-primary { background:var(--primary); color:#000; box-shadow:0 6px 24px var(--primary-glow); }
+    .pricing-cta-primary:hover { transform:translateY(-2px); box-shadow:0 12px 36px var(--primary-glow); }
+    .pricing-cta-ghost { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+    .pricing-cta-ghost:hover { border-color:rgba(255,255,255,.2); background:rgba(255,255,255,.08); }
+    .addon-section { max-width:960px; margin:48px auto 0; }
+    .addon-title { font-size:1.1rem; font-weight:700; text-align:center; margin-bottom:24px; color:var(--muted); }
+    .addon-title span { color:var(--text); }
+    .addons-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    .addon-card {
+      background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+      padding:22px; text-align:center; transition:var(--transition); cursor:pointer;
     }
+    .addon-card:hover { border-color:rgba(99,102,241,.4); transform:translateY(-2px); }
+    .addon-card.selected { border-color:rgba(99,102,241,.5); background:rgba(99,102,241,.08); }
+    .addon-card-icon { font-size:28px; margin-bottom:10px; }
+    .addon-card-name { font-size:.9rem; font-weight:700; margin-bottom:4px; }
+    .addon-card-desc { font-size:.78rem; color:var(--muted); margin-bottom:12px; }
+    .addon-card-price { font-size:1.1rem; font-weight:800; color:#818cf8; }
 
-    .benefits {
-      list-style: none;
-      margin-bottom: 3rem;
+    /* ── Comparison Table ─────────────────────────── */
+    .compare-table { width:100%; border-collapse:collapse; margin-top:48px; }
+    .compare-table th, .compare-table td { padding:14px 20px; text-align:left; border-bottom:1px solid var(--border); font-size:.875rem; }
+    .compare-table th { font-size:.75rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+    .compare-table tr:hover td { background:rgba(255,255,255,.02); }
+    .compare-table td:first-child { color:var(--muted); }
+    .compare-table td:not(:first-child) { text-align:center; font-weight:600; }
+    .compare-table th:not(:first-child) { text-align:center; }
+    .compare-check { color:var(--primary); font-weight:900; }
+    .compare-dash { color:var(--muted2); }
+    .compare-addon-text { color:#818cf8; font-size:.78rem; }
+
+    /* ── CTA Section ──────────────────────────────── */
+    .cta-section {
+      text-align:center; padding:100px 0;
+      background:linear-gradient(180deg, transparent, rgba(47,211,198,.04) 50%, transparent);
     }
+    .cta-section h2 { font-size:clamp(1.8rem,4vw,2.8rem); font-weight:900; letter-spacing:-.03em; margin-bottom:16px; }
+    .cta-section p { font-size:1.05rem; color:var(--muted); margin-bottom:40px; }
 
-    .benefits li {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 1.2rem;
-      color: var(--gray);
-      font-weight: 500;
-    }
-
-    .benefits li i {
-      color: #10b981;
-    }
-
-    /* FAQ */
-    .faq-grid {
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    .faq-item {
-      background: var(--glass);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      margin-bottom: 1rem;
-      transition: 0.3s;
-    }
-
-    .faq-item:hover {
-      border-color: rgba(255, 255, 255, 0.2);
-    }
-
-    .faq-q {
-      padding: 1.8rem 2.5rem;
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: 700;
-      font-size: 1.1rem;
-    }
-
-    .faq-a {
-      padding: 0 2.5rem;
-      max-height: 0;
-      overflow: hidden;
-      transition: 0.4s ease;
-      color: var(--gray);
-    }
-
-    .faq-item.is-open .faq-a {
-      padding-bottom: 2rem;
-      max-height: 500px;
-    }
-
-    .faq-item i {
-      transition: 0.3s;
-    }
-
-    .faq-item.is-open i {
-      transform: rotate(180deg);
-    }
-
-    /* Testimonials */
-    .testimonials-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 2rem;
-      margin-top: 4rem;
-    }
-
-    .testimonial-card {
-      padding: 3rem;
-      background: var(--glass);
-      border: 1px solid var(--border);
-      border-radius: 32px;
-      position: relative;
-      transition: var(--transition);
-    }
-
-    .testimonial-card:hover {
-      transform: translateY(-10px);
-      border-color: var(--primary-glow);
-    }
-
-    .testimonial-card .quote {
-      font-size: 1.1rem;
-      font-style: italic;
-      margin-bottom: 2rem;
-      color: var(--light);
-    }
-
-    .testimonial-author {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-    }
-
-    .author-img {
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      background: var(--primary-glow);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      color: white;
-    }
-
-    .author-info h4 {
-      font-size: 1rem;
-      margin-bottom: 2px;
-    }
-
-    .author-info p {
-      font-size: 0.85rem;
-      color: var(--gray);
-    }
-
-    .stars {
-      color: #fbbf24;
-      margin-bottom: 1rem;
-      display: flex;
-      gap: 4px;
-    }
-
-    /* Responsiveness */
-    @media (max-width: 1024px) {
-      .step-row {
-        grid-template-columns: 1fr;
-        gap: 3rem;
-        text-align: center;
-      }
-
-      .step-row:nth-child(even) {
-        direction: ltr;
-      }
-
-      .step-info h3 {
-        justify-content: center;
-      }
-
-      .stats-grid {
-        gap: 2rem;
-      }
-    }
-
-    @media (max-width: 768px) {
-      :root {
-        --container-padding: 2rem;
-      }
-
-      .hero h1 {
-        font-size: 3.5rem;
-      }
-
-      .stats-grid {
-        grid-template-columns: 1fr;
-        border: none;
-        padding-top: 0;
-        gap: 3rem;
-      }
-
-      .section-header h2 {
-        font-size: 2.5rem;
-      }
-
-      .stat-item h2 {
-        font-size: 3rem;
-      }
-
-      .nav-links {
-        display: none;
-      }
-
-      .whatsapp-float {
-        width: 55px;
-        height: 55px;
-        bottom: 20px;
-        right: 20px;
-      }
-
-      .pricing-card.popular {
-        transform: none;
-        margin: 2rem 0;
-      }
-    }
-
-    /* Modal */
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(2, 6, 23, 0.95);
-      z-index: 2000;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      backdrop-filter: blur(20px);
-    }
-
-    .form-container {
-      background: var(--dark);
-      border: 1px solid var(--border);
-      width: 95%;
-      max-width: 550px;
-      padding: 4rem;
-      border-radius: 40px;
-      position: relative;
-    }
-
-    .form-container h2 {
-      font-size: 2.2rem;
-      margin-bottom: 2rem;
-    }
-
-    input {
-      width: 100%;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border);
-      padding: 1.2rem;
-      border-radius: 12px;
-      color: white;
-      margin-bottom: 1.5rem;
-      outline: none;
-      transition: 0.3s;
-    }
-
-    input:focus {
-      border-color: var(--primary);
-      background: rgba(255, 255, 255, 0.06);
-    }
-
-    .close-modal {
-      position: absolute;
-      top: 30px;
-      right: 30px;
-      cursor: pointer;
-      opacity: 0.5;
-    }
-
-    .close-modal:hover {
-      opacity: 1;
-      transform: rotate(90deg);
-    }
-
-    /* Form Steps Animations */
-    .form-step {
-      display: none;
-      animation: fadeIn 0.5s ease;
-    }
-
-    .form-step.active {
-      display: block;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    /* Responsive Adjustments for Form */
-    @media (max-height: 800px) {
-      .form-container {
-        padding: 2.5rem;
-        max-height: 90vh;
-        overflow-y: auto;
-      }
-
-      .form-container h2 {
-        font-size: 1.8rem;
-        margin-bottom: 1.5rem;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .form-container {
-        padding: 2rem 1.5rem;
-        border-radius: 24px;
-      }
-
-      .btn {
-        padding: 1rem 2rem;
-        font-size: 1rem;
-      }
-    }
-
-    /* Enhanced Visuals */
-    .step-visual img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transition: var(--transition);
-    }
-
-    .step-visual:hover img {
-      transform: scale(1.05);
-    }
-
+    /* ── Footer ───────────────────────────────────── */
     footer {
-      padding: 6rem 0;
-      border-top: 1px solid var(--border);
-      background: #010411;
+      border-top:1px solid var(--border); padding:60px 0 40px;
+      background:rgba(5,11,24,.95);
+    }
+    .footer-grid { display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:48px; margin-bottom:48px; }
+    .footer-brand-name { font-size:1.2rem; font-weight:800; margin-bottom:12px; color:var(--text); }
+    .footer-brand-desc { font-size:.85rem; color:var(--muted); line-height:1.7; max-width:280px; }
+    .footer-col-title { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:16px; }
+    .footer-col a { display:block; color:var(--muted); text-decoration:none; font-size:.85rem; margin-bottom:10px; transition:color .2s; }
+    .footer-col a:hover { color:var(--text); }
+    .footer-bottom { display:flex; justify-content:space-between; align-items:center; padding-top:28px; border-top:1px solid var(--border); }
+    .footer-copy { font-size:.8rem; color:var(--muted2); }
+
+    /* ── WhatsApp ─────────────────────────────────── */
+    .wa-float {
+      position:fixed; bottom:28px; right:28px;
+      width:56px; height:56px; border-radius:50%; background:#25d366;
+      display:flex; align-items:center; justify-content:center;
+      box-shadow:0 8px 24px rgba(37,211,102,.4); cursor:pointer;
+      z-index:9998; transition:var(--transition); text-decoration:none;
+      animation: wa-pulse 2.5s infinite;
+    }
+    .wa-float:hover { transform:scale(1.1); }
+    @keyframes wa-pulse {
+      0%,100% { box-shadow:0 8px 24px rgba(37,211,102,.4); }
+      50% { box-shadow:0 8px 40px rgba(37,211,102,.7); }
     }
 
-    footer .logo {
-      margin-bottom: 1rem;
-      justify-content: center;
+    /* ── Modal ────────────────────────────────────── */
+    .modal-overlay {
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,.7); backdrop-filter:blur(8px);
+      z-index:99999; align-items:center; justify-content:center; padding:20px;
+    }
+    .modal-overlay.open { display:flex; }
+    .modal {
+      background:#0d1629; border:1px solid var(--border); border-radius:24px;
+      width:100%; max-width:560px; max-height:90vh; overflow-y:auto;
+      box-shadow:var(--shadow); position:relative;
+    }
+    .modal-header {
+      padding:28px 32px 20px; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .modal-header h3 { font-size:1.2rem; font-weight:800; }
+    .modal-close { background:none; border:none; color:var(--muted); cursor:pointer; font-size:1.4rem; line-height:1; }
+    .modal-body { padding:28px 32px; }
+    .modal-step { display:none; }
+    .modal-step.active { display:block; }
+    .plan-summary {
+      background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+      padding:20px; margin-bottom:24px;
+    }
+    .plan-summary-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+    .plan-summary-name { font-weight:700; font-size:1rem; }
+    .plan-summary-price { font-size:1.4rem; font-weight:900; color:var(--primary); }
+    .plan-summary-period { font-size:.8rem; color:var(--muted); }
+    .plan-summary-addons { font-size:.8rem; color:#818cf8; margin-top:6px; }
+    .form-group { margin-bottom:20px; }
+    .form-label { display:block; font-size:.8rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; }
+    .form-input {
+      width:100%; padding:13px 16px; border-radius:var(--radius-sm);
+      background:rgba(255,255,255,.05); border:1px solid var(--border);
+      color:var(--text); font-size:.95rem; outline:none; transition:border-color .2s;
+    }
+    .form-input:focus { border-color:rgba(47,211,198,.5); }
+    .form-input::placeholder { color:var(--muted); }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .stripe-field {
+      padding:13px 16px; border-radius:var(--radius-sm);
+      background:rgba(255,255,255,.05); border:1px solid var(--border);
+      transition:border-color .2s;
+    }
+    .stripe-field.focused { border-color:rgba(47,211,198,.5); }
+    .modal-footer {
+      padding:20px 32px 28px; border-top:1px solid var(--border);
+      display:flex; flex-direction:column; gap:12px;
+    }
+    .btn-modal-submit {
+      width:100%; padding:15px; border-radius:12px; border:none;
+      background:var(--primary); color:#000; font-size:.98rem; font-weight:800;
+      cursor:pointer; transition:var(--transition);
+    }
+    .btn-modal-submit:hover { background:var(--primary-dark); transform:translateY(-1px); }
+    .btn-modal-submit:disabled { opacity:.6; cursor:not-allowed; transform:none; }
+    .btn-modal-back {
+      background:none; border:1px solid var(--border); color:var(--muted); width:100%;
+      padding:12px; border-radius:12px; cursor:pointer; font-size:.9rem; font-weight:600; transition:var(--transition);
+    }
+    .btn-modal-back:hover { border-color:rgba(255,255,255,.2); color:var(--text); }
+    .ssl-note { display:flex; align-items:center; gap:8px; justify-content:center; font-size:.75rem; color:var(--muted2); }
+    .modal-success { text-align:center; padding:20px 0; }
+    .modal-success-icon { font-size:60px; margin-bottom:16px; }
+    .modal-success h3 { font-size:1.5rem; font-weight:800; margin-bottom:8px; }
+    .modal-success p { color:var(--muted); font-size:.9rem; line-height:1.7; }
+    .modal-error { padding:12px 16px; border-radius:10px; background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.2); color:#fca5a5; font-size:.85rem; margin-bottom:16px; }
+
+    /* ── Responsive ───────────────────────────────── */
+    @media(max-width:900px) {
+      .features-grid { grid-template-columns:1fr 1fr; }
+      .pricing-grid { grid-template-columns:1fr; }
+      .addons-grid { grid-template-columns:1fr 1fr; }
+      .footer-grid { grid-template-columns:1fr 1fr; }
+    }
+    @media(max-width:700px) {
+      .features-grid { grid-template-columns:1fr; }
+      .addons-grid { grid-template-columns:1fr; }
+      .nav-links { display:none; }
+      .hamburger { display:flex; }
+      .hero h1 { font-size:2.4rem; }
+      .hero-stats { gap:28px; }
+      .hero-mockup-body { grid-template-columns:1fr; }
+      .footer-grid { grid-template-columns:1fr; gap:32px; }
+      .form-row { grid-template-columns:1fr; }
+      .compare-table { font-size:.78rem; }
+      .compare-table th, .compare-table td { padding:10px 12px; }
+    }
+    @media(max-width:480px) {
+      .hero-cta { flex-direction:column; align-items:stretch; }
+      .btn-hero-primary, .btn-hero-ghost { text-align:center; }
     }
   </style>
 </head>
-
 <body>
 
-  <div class="whatsapp-float" onclick="openWhatsApp()">
-    <i data-lucide="message-circle" class="icon" style="width: 30px; height: 30px;"></i>
+<!-- WhatsApp -->
+<a class="wa-float" href="https://wa.me/41000000000" target="_blank" title="Chat with us on WhatsApp">
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+</a>
+
+<!-- Nav -->
+<nav id="navbar">
+  <a class="nav-logo" href="#">
+    <div class="nav-logo-icon">B</div>
+    Barmagly
+  </a>
+  <div class="nav-links">
+    <a href="#features" data-en="Features" data-ar="المميزات" data-de="Funktionen">Features</a>
+    <a href="#pricing" data-en="Pricing" data-ar="الأسعار" data-de="Preise">Pricing</a>
+    <a href="#compare" data-en="Compare" data-ar="المقارنة" data-de="Vergleich">Compare</a>
   </div>
+  <div class="nav-right">
+    <button class="lang-btn" id="langBtn">عربي</button>
+    <a href="BASE_URL_PLACEHOLDER/super_admin/login" class="btn-nav btn-nav-ghost" data-en="Admin Login" data-ar="تسجيل الدخول" data-de="Admin Login">Admin Login</a>
+    <button class="btn-nav btn-nav-primary" onclick="openModal('monthly')" data-en="Get Started" data-ar="ابدأ الآن" data-de="Jetzt starten">Get Started</button>
+  </div>
+  <div class="hamburger" id="hamburger">
+    <span></span><span></span><span></span>
+  </div>
+</nav>
 
-  <nav id="navbar">
-    <a href="#" class="logo">
-      <i data-lucide="rocket" class="icon" style="color: var(--primary);"></i>
-      Barmagly
-    </a>
-    <div class="nav-links">
-      <a href="#features" data-t="nav_f">Features</a>
-      <a href="#how" data-t="nav_h">Process</a>
-      <a href="#pricing" data-t="nav_p">Pricing</a>
-      <a href="#faq" data-t="nav_q">FAQ</a>
-      <button class="lang-toggle" onclick="toggleLanguage()">العربية</button>
-    </div>
-  </nav>
-
-  <main>
-    <header class="hero container">
-      <div class="hero-badge reveal">
-        <i data-lucide="zap" style="width:16px; height:16px;"></i>
-        <span data-t="badge">Empowering 1,200+ Businesses Globally</span>
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-inner">
+      <div class="chip" data-en="🚀 Trusted by 500+ stores across Europe & Middle East" data-ar="🚀 موثوق به من أكثر من 500 متجر عبر أوروبا والشرق الأوسط" data-de="🚀 Von 500+ Geschäften in Europa & Nahost vertraut">
+        🚀 Trusted by 500+ stores across Europe &amp; Middle East
       </div>
-      <h1 class="reveal" data-t="h_title">The Smarter Way to Manage Your Sales & Growth</h1>
-      <p class="reveal" data-t="h_sub">Barmagly provides an ultra-fast, reliable cloud POS ecosystem that automates your
-        inventory, staff, and customer insights.</p>
-      <div class="reveal" style="display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center;">
-        <button class="btn btn-primary" onclick="openSubscribe('trial')" data-t="b_trial">
-          Start 30-Day Free Trial
-          <i data-lucide="arrow-right" class="icon"></i>
-        </button>
-        <button class="btn" style="border: 1px solid var(--border);" onclick="openWhatsApp()" data-t="b_demo">
-          <i data-lucide="play-circle" class="icon"></i>
-          Watch Demo
-        </button>
+      <h1>
+        <span data-en="The POS System" data-ar="نظام نقاط البيع" data-de="Das Kassensystem">The POS System</span><br>
+        <span class="grad" data-en="Built for Growth" data-ar="المصمم للنمو" data-de="Für Wachstum gebaut">Built for Growth</span>
+      </h1>
+      <p data-en="Barmagly POS is a cloud-powered, multi-tenant point-of-sale platform for restaurants, cafés, and retail stores. Manage sales, inventory, employees, and customers — all in one place, in English, Arabic, and German."
+         data-ar="برمجلي POS هو نظام نقاط بيع سحابي متعدد المستأجرين للمطاعم والمقاهي ومتاجر التجزئة. إدارة المبيعات والمخزون والموظفين والعملاء — كل ذلك في مكان واحد."
+         data-de="Barmagly POS ist eine cloudbasierte, mandantenfähige Kassenlösung für Restaurants, Cafés und Einzelhandelsgeschäfte. Verwalten Sie Verkäufe, Inventar, Mitarbeiter und Kunden — alles an einem Ort.">
+        Barmagly POS is a cloud-powered, multi-tenant point-of-sale platform for restaurants, cafés, and retail stores. Manage sales, inventory, employees, and customers — all in one place, in English, Arabic, and German.
+      </p>
+      <div class="hero-cta">
+        <button class="btn-hero-primary" onclick="openModal('annual')" data-en="Start Free Trial" data-ar="ابدأ تجربة مجانية" data-de="Kostenlos testen">Start Free Trial</button>
+        <a class="btn-hero-ghost" href="#features" data-en="See Features ↓" data-ar="شاهد المميزات ↓" data-de="Funktionen ansehen ↓">See Features ↓</a>
       </div>
-
-      <div class="stats-grid reveal">
-        <div class="stat-item">
-          <h2>2M+</h2>
-          <p data-t="s1">Transactions</p>
-        </div>
-        <div class="stat-item">
-          <h2>99%</h2>
-          <p data-t="s2">Client Retention</p>
-        </div>
-        <div class="stat-item">
-          <h2>24/7</h2>
-          <p data-t="s3">Live Support</p>
-        </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><div class="hero-stat-num">500+</div><div class="hero-stat-label" data-en="Active Stores" data-ar="متجر نشط" data-de="Aktive Filialen">Active Stores</div></div>
+        <div class="hero-stat"><div class="hero-stat-num">CHF 12M+</div><div class="hero-stat-label" data-en="Revenue Processed" data-ar="إيرادات تمت معالجتها" data-de="Verarbeiteter Umsatz">Revenue Processed</div></div>
+        <div class="hero-stat"><div class="hero-stat-num">99.9%</div><div class="hero-stat-label" data-en="System Uptime" data-ar="وقت تشغيل النظام" data-de="System-Verfügbarkeit">System Uptime</div></div>
+        <div class="hero-stat"><div class="hero-stat-num">3</div><div class="hero-stat-label" data-en="Languages" data-ar="لغات" data-de="Sprachen">Languages</div></div>
       </div>
-    </header>
-
-    <section id="features" class="section-py container">
-      <div class="section-header reveal">
-        <h2 data-t="f_t">Powerful Modules</h2>
-        <p data-t="f_s">Hardware-agnostic software that transforms any device into a professional retail terminal.</p>
-      </div>
-      <div class="features-grid">
-        <div class="feature-card reveal">
-          <i data-lucide="shield-check" style="width:32px; height:32px;"></i>
-          <h3 data-t="f1_t">Absolute Security</h3>
-          <p data-t="f1_d">End-to-end encrypted daily backups and role-based access controls for your team.</p>
+      <!-- Mockup Dashboard -->
+      <div class="hero-mockup reveal">
+        <div class="hero-mockup-bar">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <span style="margin-left:12px;font-size:.75rem;color:var(--muted)">Barmagly POS — Live Dashboard</span>
         </div>
-        <div class="feature-card reveal">
-          <i data-lucide="layout-dashboard" style="width:32px; height:32px;"></i>
-          <h3 data-t="f2_t">Real-time Analytics</h3>
-          <p data-t="f2_d">Monitor sales, inventory levels, and top-performing employees from any location world-wide.
-          </p>
-        </div>
-        <div class="feature-card reveal">
-          <i data-lucide="wifi-off" style="width:32px; height:32px;"></i>
-          <h3 data-t="f3_t">Offline Continuity</h3>
-          <p data-t="f3_d">Our local-first sync technology ensures your business never stops, even without internet.</p>
-        </div>
-      </div>
-    </section>
-
-    <section id="how" class="section-py container steps-container">
-      <div class="section-header reveal">
-        <h2 data-t="h_t">Getting Started in Seconds</h2>
-      </div>
-      <div class="step-row reveal">
-        <div class="step-info">
-          <span class="num">01</span>
-          <h3 data-t="st1_t">
-            <i data-lucide="user-plus" class="icon"></i>
-            Register Account
-          </h3>
-          <p data-t="st1_d">Complete our high-speed registration wizard. Input your business details and get instant
-            access.</p>
-        </div>
-        <div class="step-visual">
-          <img src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&q=80&w=800"
-            alt="Cloud POS Registration">
-        </div>
-      </div>
-      <div class="step-row reveal">
-        <div class="step-info">
-          <span class="num">02</span>
-          <h3 data-t="st2_t">
-            <i data-lucide="box" class="icon"></i>
-            Sync Inventory
-          </h3>
-          <p data-t="st2_d">Bulk import your products or add them manually. Set up categories, taxes, and stock alerts.
-          </p>
-        </div>
-        <div class="step-visual">
-          <img src="https://images.unsplash.com/photo-1556740758-90de374c12ad?auto=format&fit=crop&q=80&w=800"
-            alt="Inventory Management">
-        </div>
-      </div>
-    </section>
-
-    <section id="pricing" class="section-py container">
-      <div class="section-header reveal">
-        <h2 data-t="p_t">Simple, Scaleable Plans</h2>
-        <div class="pricing-toggle">
-          <div class="toggle-btn active" id="m-toggle" onclick="setBilling('monthly')" data-t="mon">Monthly</div>
-          <div class="toggle-btn" id="y-toggle" onclick="setBilling('yearly')" data-t="yea">Annually</div>
-        </div>
-      </div>
-      <div class="pricing-grid">
-        <div class="pricing-card reveal">
-          <h3 data-t="p1">Professional</h3>
-          <div class="price" id="p1-price">CHF 49<span>/mo</span></div>
-          <ul class="benefits">
-            <li><i data-lucide="check-circle-2" style="width:18px; height:18px;"></i> <span data-t="b1">1 Branch
-                Location</span></li>
-            <li><i data-lucide="check-circle-2" style="width:18px; height:18px;"></i> <span data-t="b2">Up to 5
-                Employees</span></li>
-            <li><i data-lucide="check-circle-2" style="width:18px; height:18px;"></i> <span data-t="b3">Standard
-                Analytics</span></li>
-          </ul>
-          <button class="btn btn-primary" style="width: 100%;" onclick="openSubscribe('starter')" data-t="p_btn">Choose
-            Plan</button>
-        </div>
-        <div class="pricing-card popular reveal">
-          <div class="badge" data-t="best">Best Value</div>
-          <h3 data-t="p2">Enterprise</h3>
-          <div class="price" id="p2-price">CHF 149<span>/mo</span></div>
-          <ul class="benefits">
-            <li><i data-lucide="check-circle-2" style="width:18px; height:18px;"></i> <span data-t="b4">Infinite
-                Branching</span></li>
-            <li><i data-lucide="check-circle-2" style="width:18px; height:18px;"></i> <span data-t="b5">Global Inventory
-                Sync</span></li>
-            <li><i data-lucide="check-circle-2" style="width:18px; height:18px;"></i> <span data-t="b6">AI Market
-                Predictions</span></li>
-          </ul>
-          <button class="btn btn-primary" style="width: 100%;" onclick="openSubscribe('pro')" data-t="p_btn">Choose
-            Plan</button>
-        </div>
-      </div>
-    </section>
-
-    <section id="testimonials" class="section-py container">
-      <div class="section-header reveal">
-        <h2 data-t="t_t">Trusted by Industry Leaders</h2>
-      </div>
-      <div class="testimonials-grid">
-        <div class="testimonial-card reveal">
-          <div class="stars">
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
+        <div class="hero-mockup-body">
+          <div class="mock-card">
+            <div class="mock-card-label" data-en="Today's Sales" data-ar="مبيعات اليوم" data-de="Heutige Verkäufe">Today's Sales</div>
+            <div class="mock-card-val">CHF 4,820</div>
+            <div class="mock-card-badge badge-green">↑ 18% vs yesterday</div>
+            <div class="mock-bar"><div class="mock-bar-fill" style="width:74%"></div></div>
           </div>
-          <p class="quote" data-t="t1_q">"The best POS system we've ever used. The transition was seamless and the speed
-            is incredible."</p>
-          <div class="testimonial-author">
-            <div class="author-img">JS</div>
-            <div class="author-info">
-              <h4>John Smith</h4>
-              <p>CEO, Tech Retail</p>
-            </div>
+          <div class="mock-card">
+            <div class="mock-card-label" data-en="Orders" data-ar="الطلبات" data-de="Bestellungen">Orders</div>
+            <div class="mock-card-val">143</div>
+            <div class="mock-card-badge badge-blue">Avg CHF 33.7</div>
+            <div class="mock-bar"><div class="mock-bar-fill" style="width:60%"></div></div>
           </div>
-        </div>
-        <div class="testimonial-card reveal">
-          <div class="stars">
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
+          <div class="mock-card">
+            <div class="mock-card-label" data-en="Low Stock Alerts" data-ar="تنبيهات نقص المخزون" data-de="Niedrige Lagerbestände">Low Stock Alerts</div>
+            <div class="mock-card-val">7</div>
+            <div class="mock-card-badge badge-gold">Action needed</div>
+            <div class="mock-bar"><div class="mock-bar-fill" style="width:35%;background:linear-gradient(90deg,#f59e0b,#ef4444)"></div></div>
           </div>
-          <p class="quote" data-t="t2_q">"The offline sync mode saved us during a major internet outage. Highly
-            recommended."</p>
-          <div class="testimonial-author">
-            <div class="author-img">AL</div>
-            <div class="author-info">
-              <h4>Ahmed Lotfy</h4>
-              <p>Manager, Cairo Supermarket</p>
-            </div>
-          </div>
-        </div>
-        <div class="testimonial-card reveal">
-          <div class="stars">
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
-            <i data-lucide="star" style="width:16px; height:16px; fill: currentColor;"></i>
-          </div>
-          <p class="quote" data-t="t3_q">"Analytics were game changing. We grew our revenue by 30% in just 2 months."
-          </p>
-          <div class="testimonial-author">
-            <div class="author-img">ME</div>
-            <div class="author-info">
-              <h4>Maria Elena</h4>
-              <p>Founder, Bloom Boutique</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="faq" class="section-py container">
-      <div class="section-header reveal">
-        <h2 data-t="q_t">Questions?</h2>
-      </div>
-      <div class="faq-grid">
-        <div class="faq-item reveal">
-          <div class="faq-q">Which printers are supported? <i data-lucide="chevron-down"></i></div>
-          <div class="faq-a">We support all standard ESC/POS thermal printers via Bluetooth, USB, and Network.</div>
-        </div>
-        <div class="faq-item reveal">
-          <div class="faq-q">Can I export my data? <i data-lucide="chevron-down"></i></div>
-          <div class="faq-a">Absolutely. All reports can be exported to Excel, PDF, or CSV with one click.</div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <div class="modal" id="subscribe-modal">
-    <div class="form-container">
-      <i data-lucide="x" class="close-modal" onclick="closeModal()"></i>
-      <div class="form-step active" id="step-1">
-        <h2 data-t="f_s1">Store Setup</h2>
-        <input type="text" id="business_name" placeholder="Legal Business Name">
-        <input type="email" id="owner_email" placeholder="Business Email">
-        <input type="tel" id="owner_phone" placeholder="Contact Phone">
-        <button class="btn btn-primary" style="width: 100%;" onclick="nextStep(2)">
-          Continue
-          <i data-lucide="arrow-right" class="icon"></i>
-        </button>
-      </div>
-      <div class="form-step" id="step-2">
-        <h2 data-t="f_s2">Activation</h2>
-        <p style="color: var(--gray); margin-bottom: 2rem;">Choose your preferred activation method.</p>
-        <button class="btn btn-primary" style="width: 100%;" onclick="processOrder()" data-t="f_act">Complete
-          Setup</button>
-      </div>
-      <div class="form-step" id="step-success">
-        <div style="text-align: center;">
-          <i data-lucide="party-popper"
-            style="width:80px; height:80px; color: var(--primary); margin-bottom: 2rem;"></i>
-          <h2 data-t="f_ok">Registration Complete!</h2>
-          <p data-t="f_ok_d">Your cloud portal is being provisioned. Check your inbox for login links.</p>
-          <button class="btn btn-primary" style="margin-top: 3rem;" onclick="location.reload()">Great, thanks!</button>
         </div>
       </div>
     </div>
   </div>
+</section>
 
-  <footer class="container">
-    <a href="#" class="logo">
-      <i data-lucide="rocket" class="icon"></i>
-      Barmagly
-    </a>
-    <p style="color: var(--gray); text-align: center; font-size: 0.9rem;">&copy; 2026 Barmagly POS Solutions. All rights
-      reserved.</p>
-  </footer>
+<!-- FEATURES -->
+<section class="section-py" id="features">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="chip" data-en="Everything you need" data-ar="كل ما تحتاجه" data-de="Alles was Sie brauchen">Everything you need</div>
+      <h2 data-en="A Complete POS Ecosystem" data-ar="نظام نقاط بيع متكامل" data-de="Ein vollständiges Kassensystem">A Complete POS <span class="text-primary">Ecosystem</span></h2>
+      <p data-en="From the first transaction to enterprise scale — Barmagly covers every corner of your business operations." data-ar="من أول معاملة حتى النطاق المؤسسي — برمجلي يغطي كل جانب من جوانب عملياتك التجارية." data-de="Vom ersten Verkauf bis zur Unternehmensskala — Barmagly deckt jeden Aspekt Ihrer Geschäftsabläufe ab.">From the first transaction to enterprise scale — Barmagly covers every corner of your business operations.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon">🛒</div>
+        <h3 data-en="Smart POS Terminal" data-ar="طرفية بيع ذكية" data-de="Intelligentes Kassensystem">Smart POS Terminal</h3>
+        <p data-en="Lightning-fast checkout with barcode scanning, custom modifiers, pizza topping builder, delivery/dine-in/takeaway modes, and cash or card payment." data-ar="دفع فائق السرعة مع مسح الباركود، إضافات مخصصة، وأوضاع التوصيل/الجلوس/الاصطحاب." data-de="Blitzschneller Checkout mit Barcode-Scanner, Sondermodifikatoren, Pizza-Belag-Builder und Liefer-/Essen-/Mitnehm-Modi.">Lightning-fast checkout with barcode scanning, custom modifiers, pizza topping builder, delivery/dine-in/takeaway modes, and cash or card payment.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">📦</div>
+        <h3 data-en="Inventory Management" data-ar="إدارة المخزون" data-de="Lagerverwaltung">Inventory Management</h3>
+        <p data-en="Real-time stock tracking, low-stock alerts, batch management with expiry dates, supplier purchase orders, and automatic reorder points." data-ar="تتبع المخزون في الوقت الفعلي، تنبيهات نقص المخزون، إدارة الدفعات مع تواريخ الانتهاء." data-de="Echtzeit-Bestandsverfolgung, Niedrigbestand-Warnungen, Chargenverwaltung mit Ablaufdaten und automatische Nachbestellpunkte.">Real-time stock tracking, low-stock alerts, batch management with expiry dates, supplier purchase orders, and automatic reorder points.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">👥</div>
+        <h3 data-en="Employee & Shift Management" data-ar="إدارة الموظفين والورديات" data-de="Mitarbeiter- & Schichtverwaltung">Employee & Shift Management</h3>
+        <p data-en="PIN-based employee authentication, role permissions (admin/manager/cashier), shift tracking with opening/closing cash counts, and attendance logs." data-ar="مصادقة الموظفين بالرمز السري، صلاحيات الأدوار، تتبع الورديات مع عد النقد." data-de="PIN-basierte Mitarbeiterauthentifizierung, Rollenberechtigungen, Schichtverfolgung mit Kassenzählung.">PIN-based employee authentication, role permissions (admin/manager/cashier), shift tracking with opening/closing cash counts, and attendance logs.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">💳</div>
+        <h3 data-en="Payment Gateway" data-ar="بوابة الدفع" data-de="Zahlungsgateway">Payment Gateway</h3>
+        <p data-en="Integrated Stripe payments with card, NFC/contactless, TWINT, and cash. 3-copy auto-print invoices (customer, kitchen, delivery). Full refund support." data-ar="مدفوعات Stripe المتكاملة مع البطاقة والنقد وطباعة الفواتير التلقائية ثلاثة نسخ." data-de="Integrierte Stripe-Zahlungen mit Karte, NFC, TWINT und Bargeld. 3-facher Auto-Druck von Rechnungen.">Integrated Stripe payments with card, NFC/contactless, TWINT, and cash. 3-copy auto-print invoices (customer, kitchen, delivery). Full refund support.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">📊</div>
+        <h3 data-en="Analytics & Reports" data-ar="التحليلات والتقارير" data-de="Analysen & Berichte">Analytics & Reports</h3>
+        <p data-en="Daily, weekly, and monthly sales dashboards. Product performance, employee sales, tax reporting, expense tracking, and Excel exports." data-ar="لوحات معلومات المبيعات اليومية والأسبوعية والشهرية. أداء المنتجات، مبيعات الموظفين." data-de="Tägliche, wöchentliche und monatliche Verkaufs-Dashboards. Produktleistung, Mitarbeiterverkäufe und Excel-Exporte.">Daily, weekly, and monthly sales dashboards. Product performance, employee sales, tax reporting, expense tracking, and Excel exports.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">🤝</div>
+        <h3 data-en="Customer CRM & Loyalty" data-ar="إدارة علاقات العملاء والولاء" data-de="Kunden-CRM & Treue">Customer CRM & Loyalty</h3>
+        <p data-en="Customer profiles with purchase history, loyalty points, caller ID integration, credit balances, and birthday reminders for personalized service." data-ar="ملفات تعريف العملاء مع سجل الشراء ونقاط الولاء وتكامل معرف المتصل." data-de="Kundenprofile mit Kaufhistorie, Treuepunkten, Anruferkennung und Geburtstagsbenachrichtigungen.">Customer profiles with purchase history, loyalty points, caller ID integration, credit balances, and birthday reminders for personalized service.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">🏢</div>
+        <h3 data-en="Multi-Branch Management" data-ar="إدارة الفروع المتعددة" data-de="Filialsystem">Multi-Branch Management</h3>
+        <p data-en="Manage unlimited store locations from one super-admin dashboard. Each branch with its own inventory, staff, and performance metrics." data-ar="إدارة مواقع المتاجر من لوحة تحكم واحدة. كل فرع بمخزونه وموظفيه ومقاييس أدائه." data-de="Unbegrenzte Filialen aus einem Super-Admin-Dashboard verwalten. Jede Filiale mit eigenem Inventar und Personal.">Manage unlimited store locations from one super-admin dashboard. Each branch with its own inventory, staff, and performance metrics.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">🔒</div>
+        <h3 data-en="Enterprise Security" data-ar="أمان مؤسسي" data-de="Unternehmenssicherheit">Enterprise Security</h3>
+        <p data-en="Device-bound license keys, role-based access control, JWT authentication, encrypted data storage, and automatic daily encrypted backups." data-ar="مفاتيح ترخيص مرتبطة بالجهاز، تحكم في الوصول المستند إلى الأدوار، ونسخ احتياطية مشفرة يومية." data-de="Gerätegebundene Lizenzschlüssel, rollenbasierte Zugriffskontrolle und automatische verschlüsselte tägliche Backups.">Device-bound license keys, role-based access control, JWT authentication, encrypted data storage, and automatic daily encrypted backups.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">🌍</div>
+        <h3 data-en="Multi-Language Support" data-ar="دعم متعدد اللغات" data-de="Mehrsprachige Unterstützung">Multi-Language Support</h3>
+        <p data-en="Full RTL Arabic, English, and German support throughout the entire app — menus, receipts, invoices, notifications, and settings." data-ar="دعم كامل للغة العربية RTL والإنجليزية والألمانية في التطبيق بأكمله." data-de="Vollständige RTL-Arabisch-, Englisch- und Deutsch-Unterstützung in der gesamten App — Menüs, Belege, Rechnungen.">Full RTL Arabic, English, and German support throughout the entire app — menus, receipts, invoices, notifications, and settings.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
-  <script>
-    // Init Lucide Icons
-    lucide.createIcons();
+<!-- PRICING -->
+<section class="section-py" id="pricing">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="chip" data-en="Transparent Pricing" data-ar="أسعار شفافة" data-de="Transparente Preise">Transparent Pricing</div>
+      <h2 data-en="Choose Your Plan" data-ar="اختر خطتك" data-de="Wählen Sie Ihren Plan">Choose Your <span class="text-primary">Plan</span></h2>
+      <p data-en="Simple pricing that grows with your business. Switch plans anytime." data-ar="أسعار بسيطة تنمو مع عملك. غير خطتك في أي وقت." data-de="Einfache Preise, die mit Ihrem Unternehmen wachsen. Jederzeit den Plan wechseln.">Simple pricing that grows with your business. Switch plans anytime.</p>
+    </div>
 
-    const i18n = {
-      en: {
-        nav_f: "Features", nav_h: "Process", nav_p: "Pricing", nav_q: "FAQ",
-        badge: "Empowering 1,200+ Businesses Globally",
-        h_title: "The Smarter Way to Manage Your Sales & Growth",
-        h_sub: "Barmagly provides an ultra-fast, reliable cloud POS ecosystem that automates your inventory, staff, and customer insights.",
-        b_trial: "Start 30-Day Free Trial", b_demo: "Watch Demo",
-        s1: "Transactions", s2: "Retention", s3: "Live Support",
-        f_t: "Powerful Modules", f_s: "Hardware-agnostic software that transforms any device into a professional terminal.",
-        f1_t: "Absolute Security", f1_d: "End-to-end encrypted daily backups and team role controls.",
-        f2_t: "Real-time Analytics", f2_d: "Monitor sales, inventory, and staff from any location.",
-        f3_t: "Offline Continuity", f3_d: "Proprietary sync technology keeps you selling without internet.",
-        h_t: "Getting Started in Seconds", st1_t: "Register Account", st1_d: "Input your business details and get instant access.",
-        st2_t: "Sync Inventory", st2_d: "Bulk import products or add manually with taxes.",
-        p_t: "Simple, Scaleable Plans", mon: "Monthly", yea: "Annually",
-        p1: "Professional", p2: "Enterprise", b1: "1 Branch Location", b2: "Up to 5 Employees", b3: "Standard Analytics",
-        b4: "Infinite Branching", b5: "Global Inventory Sync", b6: "AI Market Predictions",
-        best: "Best Value", p_btn: "Choose Plan", q_t: "Questions?", f_s1: "Store Setup", f_s2: "Activation",
-        f_act: "Complete Setup", f_ok: "Registration Complete!", f_ok_d: "Check your inbox for login links.",
-        t_t: "Trusted by Industry Leaders",
-        t1_q: '"The best POS system we\'ve ever used. The transition was seamless and the speed is incredible."',
-        t2_q: '"The offline sync mode saved us during a major internet outage. Highly recommended."',
-        t3_q: '"Analytics were game changing. We grew our revenue by 30% in just 2 months."'
-      },
-      ar: {
-        nav_f: "المميزات", nav_h: "كيفية البدء", nav_p: "الأسعار", nav_q: "الأسئلة",
-        badge: "ندعم أكثر من 1,200 متجر حول العالم",
-        h_title: "الطريقة الأذكى لإدارة مبيعاتك ونمو متجرك",
-        h_sub: "نقدم لك نظاماً سحابياً فائق السرعة والموثوقية لأتمتة المخزون، الموظفين، ورؤى العملاء.",
-        b_trial: "ابدأ 30 يوماً مجاناً", b_demo: "شاهد العرض",
-        s1: "مليون عملية مبيعات", s2: "رضا العملاء", s3: "دعم مباشر",
-        f_t: "وحدات تشغيل قوية", f_s: "برمجيات مرنة تحول أي جهاز إلى نقطة بيع احترافية متكاملة.",
-        f1_t: "أمان مطلق", f1_d: "تشفير كامل للبيانات، نسخ احتياطي يومي، وصلاحيات دقيقة للفريق.",
-        f2_t: "تحليلات فورية", f2_d: "راقب مبيعاتك، مخزونك، وأداء موظفيك من أي مكان.",
-        f3_t: "استمرارية الأوفلاين", f3_d: "تقنية المزامنة تضمن استمرار البيع حتى بدون إنترنت.",
-        h_t: "ابدأ نشاطك في ثوانٍ", st1_t: "سجل حسابك", st1_d: "أدخل بيانات نشاطك واحصل على وصول فوري للنظام.",
-        st2_t: "ارفع مخزونك", st2_d: "استورد منتجاتك دفعة واحدة أو يدوياً مع إعدادات الضرائب.",
-        p_t: "خطط بسيطة ومرنة", mon: "شهري", yea: "سنوي",
-        p1: "المهنية", p2: "المؤسسات", b1: "فرع واحد فقط", b2: "حتى 5 موظفين", b3: "تحليلات أساسية",
-        b4: "فروع غير محدودة", b5: "مزامنة عالمية", b6: "توقعات السوق بالذكاء الاصطناعي",
-        best: "الأفضل قيمة", p_btn: "اختر الخطة", q_t: "لديك استفسار؟", f_s1: "إعداد المتجر", f_s2: "التفعيل",
-        f_act: "إتمام الإعداد", f_ok: "اكتمل التسجيل!", f_ok_d: "راجع بريدك الإلكتروني لروابط الدخول.",
-        t_t: "موثوق من قادة الصناعة",
-        t1_q: '"أفضل نظام نقطة بيع استخدمناه على الإطلاق. كان الانتقال سلساً والسرعة مذهلة."',
-        t2_q: '"أنقذنا وضع المزامنة في الأوفلاين خلال انقطاع كبير للإنترنت. نوصي به بشدة."',
-        t3_q: '"كانت التحليلات مذهلة. قمنا بزيادة إيراداتنا بنسبة 30٪ في شهرين فقط."'
+    <div class="pricing-toggle">
+      <span class="toggle-label active" id="lbl-monthly" data-en="Monthly" data-ar="شهري" data-de="Monatlich">Monthly</span>
+      <div class="toggle-switch" id="billingToggle" onclick="toggleBilling()">
+        <div class="toggle-knob"></div>
+      </div>
+      <span class="toggle-label" id="lbl-annual" data-en="Annual" data-ar="سنوي" data-de="Jährlich">Annual</span>
+      <span class="save-badge" data-en="Save 33%" data-ar="وفر 33%" data-de="33% sparen">Save 33%</span>
+    </div>
+
+    <div class="pricing-grid">
+      <!-- Monthly Plan -->
+      <div class="pricing-card reveal" id="card-monthly">
+        <div class="pricing-plan-name" data-en="Professional" data-ar="احترافي" data-de="Professional">Professional</div>
+        <div class="pricing-price">
+          <div class="pricing-amount" id="monthly-price">CHF 149</div>
+          <div class="pricing-period" data-en="/ month" data-ar="/ شهر" data-de="/ Monat">/ month</div>
+        </div>
+        <div class="pricing-tagline" data-en="Everything you need to run a modern store. Add premium services à la carte." data-ar="كل ما تحتاجه لإدارة متجر حديث. أضف الخدمات المميزة بشكل منفصل." data-de="Alles, was Sie für einen modernen Store brauchen. Premium-Dienste à la carte hinzufügen.">Everything you need to run a modern store. Add premium services à la carte.</div>
+        <ul class="pricing-features">
+          <li><span class="check check-yes">✓</span><span data-en="Full POS Terminal (unlimited products)" data-ar="نقطة بيع كاملة (منتجات غير محدودة)" data-de="Vollständiges Kassensystem (unbegrenzte Produkte)">Full POS Terminal (unlimited products)</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Multi-branch (up to 3 locations)" data-ar="متعدد الفروع (حتى 3 مواقع)" data-de="Mehrere Filialen (bis zu 3 Standorte)">Multi-branch (up to 3 locations)</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Inventory & purchase orders" data-ar="المخزون وأوامر الشراء" data-de="Inventar & Bestellungen">Inventory & purchase orders</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Employee & shift management" data-ar="إدارة الموظفين والورديات" data-de="Mitarbeiter- & Schichtverwaltung">Employee & shift management</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Customer CRM & loyalty points" data-ar="إدارة العملاء ونقاط الولاء" data-de="Kunden-CRM & Treuepunkte">Customer CRM & loyalty points</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Stripe, card, cash & NFC payments" data-ar="مدفوعات Stripe والبطاقة والنقد" data-de="Stripe, Karte, Bargeld & NFC-Zahlungen">Stripe, card, cash & NFC payments</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="3-language app (EN/AR/DE)" data-ar="تطبيق 3 لغات" data-de="3-sprachige App (EN/AR/DE)">3-language app (EN/AR/DE)</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Daily automated backups" data-ar="نسخ احتياطية يومية تلقائية" data-de="Tägliche automatische Backups">Daily automated backups</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Analytics & Excel reports" data-ar="التحليلات وتقارير Excel" data-de="Analysen & Excel-Berichte">Analytics & Excel reports</span></li>
+          <li><span class="check check-addon">+</span><span style="color:#818cf8" data-en="Website & App: +CHF 49/mo" data-ar="موقع وتطبيق: +49 فرنك/شهر" data-de="Website & App: +CHF 49/Mo">Website & App: +CHF 49/mo</span></li>
+          <li><span class="check check-addon">+</span><span style="color:#818cf8" data-en="Social Media Marketing: +CHF 99/mo" data-ar="التسويق عبر وسائل التواصل: +99 فرنك/شهر" data-de="Social-Media-Marketing: +CHF 99/Mo">Social Media Marketing: +CHF 99/mo</span></li>
+          <li><span class="check check-addon">+</span><span style="color:#818cf8" data-en="Sales Automation: +CHF 79/mo" data-ar="أتمتة المبيعات: +79 فرنك/شهر" data-de="Verkaufsautomatisierung: +CHF 79/Mo">Sales Automation: +CHF 79/mo</span></li>
+        </ul>
+        <button class="pricing-cta pricing-cta-ghost" onclick="openModal('monthly')" data-en="Start with Professional" data-ar="ابدأ بالخطة الاحترافية" data-de="Mit Professional starten">Start with Professional</button>
+      </div>
+
+      <!-- Annual / Growth Plan -->
+      <div class="pricing-card featured reveal" id="card-annual">
+        <div class="pricing-badge" data-en="BEST VALUE" data-ar="أفضل قيمة" data-de="BESTES ANGEBOT">BEST VALUE</div>
+        <div class="pricing-plan-name" data-en="Growth" data-ar="النمو" data-de="Wachstum">Growth</div>
+        <div class="pricing-price">
+          <div class="pricing-amount" id="annual-price">CHF 100</div>
+          <div class="pricing-period" data-en="/ month" data-ar="/ شهر" data-de="/ Monat">/ month</div>
+        </div>
+        <div class="pricing-tagline" id="annual-tagline" data-en="Billed CHF 1,200/year — Save CHF 588 vs monthly plan" data-ar="يُفوتر بـ 1200 فرنك/سنة — وفر 588 فرنك مقارنة بالخطة الشهرية" data-de="Jährlich CHF 1.200 — Sparen Sie CHF 588 im Vergleich zum Monatsplan">Billed CHF 1,200/year — Save CHF 588 vs monthly plan</div>
+        <ul class="pricing-features">
+          <li><span class="check check-yes">✓</span><span data-en="Everything in Professional" data-ar="كل شيء في الخطة الاحترافية" data-de="Alles in Professional">Everything in Professional</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Unlimited branches" data-ar="فروع غير محدودة" data-de="Unbegrenzte Filialen">Unlimited branches</span></li>
+          <li><span class="check check-yes">✓</span><span style="font-weight:700;color:var(--primary)" data-en="Custom Website + Web App — INCLUDED" data-ar="موقع مخصص + تطبيق ويب — مشمول" data-de="Individuelle Website + Web-App — INKLUSIVE">Custom Website + Web App — INCLUDED</span></li>
+          <li><span class="check check-yes">✓</span><span style="font-weight:700;color:var(--primary)" data-en="Social Media Marketing — INCLUDED" data-ar="التسويق عبر وسائل التواصل — مشمول" data-de="Social-Media-Marketing — INKLUSIVE">Social Media Marketing — INCLUDED</span></li>
+          <li><span class="check check-yes">✓</span><span style="font-weight:700;color:var(--primary)" data-en="Sales Automation — INCLUDED" data-ar="أتمتة المبيعات — مشمول" data-de="Verkaufsautomatisierung — INKLUSIVE">Sales Automation — INCLUDED</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Dedicated account manager" data-ar="مدير حساب مخصص" data-de="Persönlicher Ansprechpartner">Dedicated account manager</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Priority 24/7 support" data-ar="دعم أولوية 24/7" data-de="Prioritäts-24/7-Support">Priority 24/7 support</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Advanced analytics & custom reports" data-ar="تحليلات متقدمة وتقارير مخصصة" data-de="Erweiterte Analysen & individuelle Berichte">Advanced analytics & custom reports</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="API access for integrations" data-ar="وصول API للتكاملات" data-de="API-Zugang für Integrationen">API access for integrations</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="White-label branding options" data-ar="خيارات علامة تجارية بيضاء" data-de="White-Label-Branding-Optionen">White-label branding options</span></li>
+        </ul>
+        <button class="pricing-cta pricing-cta-primary" onclick="openModal('annual')" data-en="Start Growth Plan" data-ar="ابدأ خطة النمو" data-de="Wachstumsplan starten">Start Growth Plan</button>
+      </div>
+    </div>
+
+    <!-- Add-ons for Monthly -->
+    <div class="addon-section reveal" id="addon-section">
+      <div class="addon-title">
+        <span data-en="Supercharge your Professional plan with" data-ar="عزز خطتك الاحترافية مع" data-de="Erweitern Sie Ihren Professional-Plan mit">Supercharge your Professional plan with</span>
+        <span data-en="optional add-ons" data-ar="الإضافات الاختيارية" data-de="optionalen Erweiterungen"> optional add-ons</span>
+      </div>
+      <div class="addons-grid">
+        <div class="addon-card" id="addon-website">
+          <div class="addon-card-icon">🌐</div>
+          <div class="addon-card-name" data-en="Website & Web App" data-ar="موقع وتطبيق ويب" data-de="Website & Web-App">Website & Web App</div>
+          <div class="addon-card-desc" data-en="Professional branded website + PWA for your business. Built and maintained by us." data-ar="موقع مخصص + تطبيق PWA لعملك. يُبنى ويُصان من قبلنا." data-de="Professionelle Website + PWA für Ihr Unternehmen. Von uns erstellt und gepflegt.">Professional branded website + PWA for your business.</div>
+          <div class="addon-card-price">+CHF 49/mo</div>
+        </div>
+        <div class="addon-card" id="addon-social">
+          <div class="addon-card-icon">📱</div>
+          <div class="addon-card-name" data-en="Social Media Marketing" data-ar="التسويق عبر وسائل التواصل" data-de="Social-Media-Marketing">Social Media Marketing</div>
+          <div class="addon-card-desc" data-en="Monthly content calendar, posts, stories, and ad campaign management for IG, FB & TikTok." data-ar="تقويم محتوى شهري ومنشورات وإدارة حملات إعلانية." data-de="Monatlicher Content-Kalender, Posts, Stories und Anzeigenkampagnen-Management.">Monthly content calendar, posts, and ad campaign management.</div>
+          <div class="addon-card-price">+CHF 99/mo</div>
+        </div>
+        <div class="addon-card" id="addon-sales">
+          <div class="addon-card-icon">🚀</div>
+          <div class="addon-card-name" data-en="Sales Automation" data-ar="أتمتة المبيعات" data-de="Verkaufsautomatisierung">Sales Automation</div>
+          <div class="addon-card-desc" data-en="Automated email campaigns, loyalty rewards, upsell triggers, and abandoned order recovery." data-ar="حملات بريد إلكتروني تلقائية ومكافآت الولاء وعرض المنتجات." data-de="Automatisierte E-Mail-Kampagnen, Treueprogramme und Wiederherstellung aufgegebener Bestellungen.">Automated email campaigns, loyalty rewards, and order recovery.</div>
+          <div class="addon-card-price">+CHF 79/mo</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON TABLE -->
+<section class="section-py" id="compare" style="padding-top:0">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2 data-en="Plan Comparison" data-ar="مقارنة الخطط" data-de="Planvergleich">Plan <span class="text-primary">Comparison</span></h2>
+    </div>
+    <div style="overflow-x:auto" class="reveal">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th data-en="Feature" data-ar="الميزة" data-de="Funktion">Feature</th>
+            <th data-en="Professional CHF 149/mo" data-ar="احترافي 149 فرنك/شهر" data-de="Professional CHF 149/Mo">Professional<br><small>CHF 149/mo</small></th>
+            <th style="color:var(--primary)" data-en="Growth CHF 100/mo (annual)" data-ar="النمو 100 فرنك/شهر (سنوي)" data-de="Wachstum CHF 100/Mo (jährlich)">Growth<br><small>CHF 100/mo (annual)</small></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td data-en="POS Terminal" data-ar="نقطة البيع" data-de="Kassensystem">POS Terminal</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td data-en="Products & Categories" data-ar="المنتجات والفئات" data-de="Produkte & Kategorien">Products & Categories</td><td class="compare-check">Unlimited</td><td class="compare-check">Unlimited</td></tr>
+          <tr><td data-en="Branches" data-ar="الفروع" data-de="Filialen">Branches</td><td>Up to 3</td><td class="compare-check">Unlimited</td></tr>
+          <tr><td data-en="Employees" data-ar="الموظفون" data-de="Mitarbeiter">Employees</td><td class="compare-check">Unlimited</td><td class="compare-check">Unlimited</td></tr>
+          <tr><td data-en="Inventory Management" data-ar="إدارة المخزون" data-de="Lagerverwaltung">Inventory Management</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td data-en="Customer CRM & Loyalty" data-ar="إدارة العملاء والولاء" data-de="Kunden-CRM & Treue">Customer CRM & Loyalty</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td data-en="Stripe / Card / NFC Payments" data-ar="مدفوعات Stripe/بطاقة/NFC" data-de="Stripe / Karte / NFC Zahlungen">Stripe / Card / NFC Payments</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td data-en="3-Language App (EN/AR/DE)" data-ar="تطبيق 3 لغات" data-de="3-sprachige App">3-Language App (EN/AR/DE)</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td data-en="Analytics & Reports" data-ar="التحليلات والتقارير" data-de="Analysen & Berichte">Analytics & Reports</td><td>Basic</td><td class="compare-check">Advanced</td></tr>
+          <tr><td data-en="API Access" data-ar="وصول API" data-de="API-Zugang">API Access</td><td><span class="compare-dash">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td data-en="Dedicated Account Manager" data-ar="مدير حساب مخصص" data-de="Persönlicher Ansprechpartner">Dedicated Account Manager</td><td><span class="compare-dash">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td data-en="Custom Website + Web App" data-ar="موقع مخصص + تطبيق ويب" data-de="Individuelle Website + Web-App">Custom Website + Web App</td><td><span class="compare-addon-text">+CHF 49/mo</span></td><td style="color:var(--primary);font-weight:700">Included</td></tr>
+          <tr><td data-en="Social Media Marketing" data-ar="التسويق عبر وسائل التواصل" data-de="Social-Media-Marketing">Social Media Marketing</td><td><span class="compare-addon-text">+CHF 99/mo</span></td><td style="color:var(--primary);font-weight:700">Included</td></tr>
+          <tr><td data-en="Sales Automation" data-ar="أتمتة المبيعات" data-de="Verkaufsautomatisierung">Sales Automation</td><td><span class="compare-addon-text">+CHF 79/mo</span></td><td style="color:var(--primary);font-weight:700">Included</td></tr>
+          <tr><td data-en="Support" data-ar="الدعم" data-de="Support">Support</td><td>Email & Chat</td><td class="compare-check">Priority 24/7</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="container">
+    <div class="chip" data-en="Start Today" data-ar="ابدأ اليوم" data-de="Heute starten">Start Today</div>
+    <h2 data-en="Ready to transform your business?" data-ar="هل أنت مستعد لتحويل عملك؟" data-de="Bereit, Ihr Unternehmen zu transformieren?">Ready to <span class="text-primary">transform</span> your business?</h2>
+    <p data-en="Join hundreds of stores already using Barmagly POS. Get your license key and start selling in minutes." data-ar="انضم إلى مئات المتاجر التي تستخدم برمجلي POS. احصل على مفتاح الترخيص الخاص بك وابدأ البيع في دقائق." data-de="Schließen Sie sich Hunderten von Filialen an, die bereits Barmagly POS verwenden. Holen Sie sich Ihren Lizenzschlüssel und beginnen Sie in Minuten.">Join hundreds of stores already using Barmagly POS. Get your license key and start selling in minutes.</p>
+    <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+      <button class="btn-hero-primary" onclick="openModal('annual')" data-en="Get Growth Plan — CHF 1,200/yr" data-ar="احصل على خطة النمو — 1200 فرنك/سنة" data-de="Wachstumsplan — CHF 1.200/Jahr">Get Growth Plan — CHF 1,200/yr</button>
+      <button class="btn-hero-ghost" onclick="openModal('monthly')" data-en="Start Monthly — CHF 149/mo" data-ar="ابدأ شهرياً — 149 فرنك/شهر" data-de="Monatlich starten — CHF 149/Mo">Start Monthly — CHF 149/mo</button>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand-name">Barmagly POS</div>
+        <div class="footer-brand-desc" data-en="Cloud-powered point-of-sale for the modern restaurant, café, and retail store. Trusted across Europe & the Middle East." data-ar="نقطة بيع سحابية للمطعم والمقهى ومتجر التجزئة الحديث." data-de="Cloud-basiertes Kassensystem für moderne Restaurants, Cafés und Einzelhandelsgeschäfte.">Cloud-powered point-of-sale for the modern restaurant, café, and retail store. Trusted across Europe & the Middle East.</div>
+      </div>
+      <div class="footer-col">
+        <div class="footer-col-title" data-en="Product" data-ar="المنتج" data-de="Produkt">Product</div>
+        <a href="#features" data-en="Features" data-ar="المميزات" data-de="Funktionen">Features</a>
+        <a href="#pricing" data-en="Pricing" data-ar="الأسعار" data-de="Preise">Pricing</a>
+        <a href="#compare" data-en="Compare Plans" data-ar="مقارنة الخطط" data-de="Pläne vergleichen">Compare Plans</a>
+      </div>
+      <div class="footer-col">
+        <div class="footer-col-title" data-en="Company" data-ar="الشركة" data-de="Unternehmen">Company</div>
+        <a href="#" data-en="About" data-ar="عنا" data-de="Über uns">About</a>
+        <a href="#" data-en="Contact" data-ar="التواصل" data-de="Kontakt">Contact</a>
+        <a href="https://wa.me/41000000000" data-en="WhatsApp Support" data-ar="دعم واتساب" data-de="WhatsApp-Support">WhatsApp Support</a>
+      </div>
+      <div class="footer-col">
+        <div class="footer-col-title" data-en="Access" data-ar="الوصول" data-de="Zugang">Access</div>
+        <a href="BASE_URL_PLACEHOLDER/super_admin/login" data-en="Admin Login" data-ar="تسجيل الدخول للمشرف" data-de="Admin-Login">Admin Login</a>
+        <a href="#" onclick="openModal('monthly');return false" data-en="Get License" data-ar="احصل على ترخيص" data-de="Lizenz erhalten">Get License</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span class="footer-copy">© 2025 Barmagly POS. All rights reserved.</span>
+      <span class="footer-copy">🇨🇭 Swiss Quality Software</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ═══════════════════════ SUBSCRIPTION MODAL ═══════════════════════ -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title" data-en="Start Your Plan" data-ar="ابدأ خطتك" data-de="Starten Sie Ihren Plan">Start Your Plan</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-error" class="modal-error" style="display:none"></div>
+
+      <!-- Step 1: Business Info -->
+      <div class="modal-step active" id="step1">
+        <div class="plan-summary" id="plan-summary-box">
+          <div class="plan-summary-top">
+            <span class="plan-summary-name" id="summary-plan-name">Growth Plan</span>
+            <div>
+              <div class="plan-summary-price" id="summary-price">CHF 1,200</div>
+              <div class="plan-summary-period" id="summary-period">per year</div>
+            </div>
+          </div>
+          <div class="plan-summary-addons" id="summary-addons" style="display:none"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-en="Business Name *" data-ar="اسم الشركة *" data-de="Unternehmensname *">Business Name *</label>
+          <input class="form-input" id="f-business" type="text" placeholder="e.g. Pizza Palace" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" data-en="Owner Name *" data-ar="اسم المالك *" data-de="Name des Inhabers *">Owner Name *</label>
+            <input class="form-input" id="f-name" type="text" placeholder="Full name" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-en="Phone" data-ar="الهاتف" data-de="Telefon">Phone</label>
+            <input class="form-input" id="f-phone" type="tel" placeholder="+41 79 000 0000">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-en="Business Email *" data-ar="البريد الإلكتروني للأعمال *" data-de="Geschäfts-E-Mail *">Business Email *</label>
+          <input class="form-input" id="f-email" type="email" placeholder="you@yourbusiness.com" required>
+        </div>
+        <!-- Add-ons for monthly plan -->
+        <div id="addon-picker" style="display:none">
+          <div class="form-label" style="margin-bottom:12px" data-en="Optional Add-ons" data-ar="إضافات اختيارية" data-de="Optionale Erweiterungen">Optional Add-ons</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <label style="display:flex;align-items:center;gap:12px;cursor:pointer;font-size:.88rem">
+              <input type="checkbox" id="ao-website" onchange="updateAddons()" style="width:16px;height:16px;accent-color:var(--primary)">
+              <span>🌐 <span data-en="Website & App" data-ar="موقع وتطبيق" data-de="Website & App">Website & App</span> <span style="color:#818cf8;font-weight:700">+CHF 49/mo</span></span>
+            </label>
+            <label style="display:flex;align-items:center;gap:12px;cursor:pointer;font-size:.88rem">
+              <input type="checkbox" id="ao-social" onchange="updateAddons()" style="width:16px;height:16px;accent-color:var(--primary)">
+              <span>📱 <span data-en="Social Media Marketing" data-ar="التسويق عبر وسائل التواصل" data-de="Social-Media-Marketing">Social Media Marketing</span> <span style="color:#818cf8;font-weight:700">+CHF 99/mo</span></span>
+            </label>
+            <label style="display:flex;align-items:center;gap:12px;cursor:pointer;font-size:.88rem">
+              <input type="checkbox" id="ao-sales" onchange="updateAddons()" style="width:16px;height:16px;accent-color:var(--primary)">
+              <span>🚀 <span data-en="Sales Automation" data-ar="أتمتة المبيعات" data-de="Verkaufsautomatisierung">Sales Automation</span> <span style="color:#818cf8;font-weight:700">+CHF 79/mo</span></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Payment -->
+      <div class="modal-step" id="step2">
+        <div class="plan-summary" id="payment-summary">
+          <div class="plan-summary-top">
+            <span class="plan-summary-name" id="pay-plan-name">Growth Plan</span>
+            <div>
+              <div class="plan-summary-price" id="pay-price">CHF 1,200</div>
+              <div class="plan-summary-period" id="pay-period">due today</div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-en="Card Number" data-ar="رقم البطاقة" data-de="Kartennummer">Card Number</label>
+          <div class="stripe-field" id="card-number-el"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" data-en="Expiry" data-ar="انتهاء الصلاحية" data-de="Ablaufdatum">Expiry</label>
+            <div class="stripe-field" id="card-expiry-el"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">CVC</label>
+            <div class="stripe-field" id="card-cvc-el"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Success -->
+      <div class="modal-step" id="step3">
+        <div class="modal-success">
+          <div class="modal-success-icon">🎉</div>
+          <h3 data-en="You're All Set!" data-ar="أنت على استعداد!" data-de="Sie sind startklar!">You're All Set!</h3>
+          <p>
+            <span data-en="Your license key has been sent to" data-ar="تم إرسال مفتاح الترخيص إلى" data-de="Ihr Lizenzschlüssel wurde gesendet an">Your license key has been sent to</span>
+            <strong id="success-email"></strong>.
+            <br><br>
+            <span data-en="Open the Barmagly POS app and enter your email, password, and license key to activate your store." data-ar="افتح تطبيق برمجلي POS وأدخل بريدك الإلكتروني وكلمة المرور ومفتاح الترخيص لتفعيل متجرك." data-de="Öffnen Sie die Barmagly POS App und geben Sie Ihre E-Mail, Ihr Passwort und Ihren Lizenzschlüssel ein, um Ihr Geschäft zu aktivieren.">Open the Barmagly POS app and enter your email, password, and license key to activate your store.</span>
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" id="modal-footer">
+      <button class="btn-modal-submit" id="modal-next-btn" onclick="modalNext()">
+        <span data-en="Continue to Payment →" data-ar="المتابعة للدفع →" data-de="Weiter zur Zahlung →">Continue to Payment →</span>
+      </button>
+      <button class="btn-modal-back" id="modal-back-btn" style="display:none" onclick="modalBack()">
+        <span data-en="← Back" data-ar="→ رجوع" data-de="← Zurück">← Back</span>
+      </button>
+      <div class="ssl-note">
+        <span>🔒</span>
+        <span data-en="Secured by Stripe · 256-bit SSL encryption" data-ar="مؤمن بواسطة Stripe · تشفير SSL 256 بت" data-de="Gesichert durch Stripe · 256-Bit-SSL-Verschlüsselung">Secured by Stripe · 256-bit SSL encryption</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════ LANGUAGE ═══════ */
+const LANGS = ['en','ar','de'];
+let lang = localStorage.getItem('barmagly_lang') || 'en';
+const DIR = { en:'ltr', ar:'rtl', de:'ltr' };
+const LANG_NAMES = { en:'عربي / DE', ar:'English / DE', de:'عربي / EN' };
+const NEXT_LANG = { en:'ar', ar:'de', de:'en' };
+
+function applyLang(l) {
+  lang = l;
+  localStorage.setItem('barmagly_lang', l);
+  document.documentElement.lang = l;
+  document.documentElement.dir = DIR[l];
+  document.querySelectorAll(`[data-${l}]`).forEach(el => {
+    const txt = el.getAttribute(`data-${l}`);
+    if(txt) el.textContent = txt;
+  });
+  document.getElementById('langBtn').textContent = LANG_NAMES[l];
+  updatePricingUI();
+}
+
+document.getElementById('langBtn').addEventListener('click', () => {
+  applyLang(NEXT_LANG[lang]);
+});
+
+/* ═══════ NAVBAR ═══════ */
+window.addEventListener('scroll', () => {
+  document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 40);
+});
+
+/* ═══════ REVEAL ═══════ */
+const ro = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if(e.isIntersecting) { e.target.classList.add('visible'); ro.unobserve(e.target); } });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => ro.observe(el));
+
+/* ═══════ BILLING TOGGLE ═══════ */
+let isAnnual = false;
+function toggleBilling() {
+  isAnnual = !isAnnual;
+  document.getElementById('billingToggle').classList.toggle('on', isAnnual);
+  document.getElementById('lbl-monthly').classList.toggle('active', !isAnnual);
+  document.getElementById('lbl-annual').classList.toggle('active', isAnnual);
+  document.getElementById('addon-section').style.opacity = isAnnual ? '.3' : '1';
+  document.getElementById('addon-section').style.pointerEvents = isAnnual ? 'none' : 'auto';
+  updatePricingUI();
+}
+
+function updatePricingUI() {
+  const monthly = document.getElementById('monthly-price');
+  const annualP = document.getElementById('annual-price');
+  const annualT = document.getElementById('annual-tagline');
+  if(isAnnual) {
+    monthly.textContent = 'CHF 100';
+    annualP.textContent = 'CHF 100';
+    annualT.textContent = annualT.getAttribute(`data-${lang}`) || 'Billed CHF 1,200/year — Save CHF 588 vs monthly plan';
+  } else {
+    monthly.textContent = 'CHF 149';
+    annualP.textContent = 'CHF 100';
+  }
+}
+
+/* ═══════ MODAL ═══════ */
+let stripe, cardNumber, cardExpiry, cardCvc, stripeReady = false;
+let currentPlan = 'annual';
+let modalStep = 1;
+
+function initStripe() {
+  if(stripeReady) return;
+  try {
+    stripe = Stripe('pk_test_51placeholder');
+    const elements = stripe.elements({ appearance: { theme:'night', variables: { colorPrimary:'#2FD3C6', borderRadius:'10px' } } });
+    const style = { style: { base: { color:'#f0f4f8', fontSize:'15px', fontFamily:'Inter,sans-serif', '::placeholder':{color:'#506070'} } } };
+    cardNumber = elements.create('cardNumber', style);
+    cardExpiry = elements.create('cardExpiry', style);
+    cardCvc = elements.create('cardCvc', style);
+    cardNumber.mount('#card-number-el');
+    cardExpiry.mount('#card-expiry-el');
+    cardCvc.mount('#card-cvc-el');
+    ['cardNumber','cardExpiry','cardCvc'].forEach((name,i) => {
+      const el = [cardNumber,cardExpiry,cardCvc][i];
+      const container = document.getElementById(['card-number-el','card-expiry-el','card-cvc-el'][i]);
+      el.on('focus', () => container.classList.add('focused'));
+      el.on('blur', () => container.classList.remove('focused'));
+    });
+    stripeReady = true;
+  } catch(e) { console.warn('Stripe init failed:', e); }
+}
+
+function openModal(plan) {
+  currentPlan = plan;
+  modalStep = 1;
+  document.getElementById('step1').classList.add('active');
+  document.getElementById('step2').classList.remove('active');
+  document.getElementById('step3').classList.remove('active');
+  document.getElementById('modal-back-btn').style.display = 'none';
+  document.getElementById('modal-footer').style.display = 'flex';
+  setError('');
+  updateModalSummary();
+  document.getElementById('modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setTimeout(initStripe, 300);
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('modal').addEventListener('click', e => { if(e.target === document.getElementById('modal')) closeModal(); });
+
+function updateModalSummary() {
+  const isAnnualPlan = currentPlan === 'annual';
+  const planNames = { en: isAnnualPlan ? 'Growth Plan (Annual)' : 'Professional Plan (Monthly)', ar: isAnnualPlan ? 'خطة النمو (سنوية)' : 'الخطة الاحترافية (شهرية)', de: isAnnualPlan ? 'Wachstumsplan (Jährlich)' : 'Professional-Plan (Monatlich)' };
+  const planName = planNames[lang] || planNames.en;
+  document.getElementById('summary-plan-name').textContent = planName;
+  document.getElementById('pay-plan-name').textContent = planName;
+  const price = isAnnualPlan ? 'CHF 1,200' : 'CHF 149';
+  const period = isAnnualPlan ? (lang==='ar'?'في السنة': lang==='de'?'pro Jahr':'per year') : (lang==='ar'?'في الشهر': lang==='de'?'pro Monat':'per month');
+  document.getElementById('summary-price').textContent = price;
+  document.getElementById('pay-price').textContent = price;
+  document.getElementById('summary-period').textContent = period;
+  document.getElementById('pay-period').textContent = lang==='ar'?'مستحق اليوم': lang==='de'?'fällig heute':'due today';
+  document.getElementById('modal-title').textContent = lang==='ar'?'ابدأ خطتك': lang==='de'?'Starten Sie Ihren Plan':'Start Your Plan';
+  const addonPicker = document.getElementById('addon-picker');
+  addonPicker.style.display = isAnnualPlan ? 'none' : 'block';
+  updateAddons();
+}
+
+function updateAddons() {
+  if(currentPlan === 'annual') {
+    document.getElementById('summary-addons').style.display = 'none';
+    return;
+  }
+  const addons = [];
+  if(document.getElementById('ao-website').checked) addons.push('🌐 Website & App (+CHF 49/mo)');
+  if(document.getElementById('ao-social').checked) addons.push('📱 Social Media (+CHF 99/mo)');
+  if(document.getElementById('ao-sales').checked) addons.push('🚀 Sales Auto (+CHF 79/mo)');
+  const box = document.getElementById('summary-addons');
+  if(addons.length) {
+    box.style.display = 'block';
+    box.textContent = addons.join(' · ');
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+function setError(msg) {
+  const el = document.getElementById('modal-error');
+  el.style.display = msg ? 'block' : 'none';
+  el.textContent = msg;
+}
+
+async function modalNext() {
+  if(modalStep === 1) {
+    const business = document.getElementById('f-business').value.trim();
+    const name = document.getElementById('f-name').value.trim();
+    const email = document.getElementById('f-email').value.trim();
+    const phone = document.getElementById('f-phone').value.trim();
+    if(!business || !name || !email) {
+      setError(lang==='ar'?'يرجى ملء جميع الحقول المطلوبة': lang==='de'?'Bitte füllen Sie alle Pflichtfelder aus':'Please fill in all required fields.');
+      return;
+    }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError(lang==='ar'?'يرجى إدخال بريد إلكتروني صالح': lang==='de'?'Bitte geben Sie eine gültige E-Mail-Adresse ein':'Please enter a valid email address.');
+      return;
+    }
+    setError('');
+    document.getElementById('step1').classList.remove('active');
+    document.getElementById('step2').classList.add('active');
+    document.getElementById('modal-back-btn').style.display = '';
+    modalStep = 2;
+  } else if(modalStep === 2) {
+    await submitPayment();
+  }
+}
+
+function modalBack() {
+  if(modalStep === 2) {
+    document.getElementById('step2').classList.remove('active');
+    document.getElementById('step1').classList.add('active');
+    document.getElementById('modal-back-btn').style.display = 'none';
+    setError('');
+    modalStep = 1;
+  }
+}
+
+async function submitPayment() {
+  const btn = document.getElementById('modal-next-btn');
+  btn.disabled = true;
+  btn.textContent = lang==='ar'?'جارٍ المعالجة...' : lang==='de'?'Wird verarbeitet...' : 'Processing...';
+  setError('');
+
+  try {
+    const business = document.getElementById('f-business').value.trim();
+    const name = document.getElementById('f-name').value.trim();
+    const email = document.getElementById('f-email').value.trim();
+    const phone = document.getElementById('f-phone').value.trim();
+    const isAnnualPlan = currentPlan === 'annual';
+    const addons = [];
+    if(!isAnnualPlan) {
+      if(document.getElementById('ao-website').checked) addons.push('website');
+      if(document.getElementById('ao-social').checked) addons.push('social');
+      if(document.getElementById('ao-sales').checked) addons.push('sales');
+    }
+
+    // Try Stripe tokenization
+    let stripeToken = null;
+    if(stripeReady && cardNumber) {
+      const { token, error } = await stripe.createToken(cardNumber, { name });
+      if(error) {
+        setError(error.message);
+        btn.disabled = false;
+        btn.textContent = lang==='ar'?'أكمل الاشتراك': lang==='de'?'Abonnement abschließen':'Complete Subscription';
+        return;
       }
-    };
-
-    let currentLang = 'en';
-    let currentBilling = 'monthly';
-    let currentPlan = 'starter';
-
-    function toggleLanguage() {
-      currentLang = currentLang === 'en' ? 'ar' : 'en';
-      document.documentElement.lang = currentLang;
-      document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
-      document.querySelector('.lang-toggle').innerText = currentLang === 'en' ? 'العربية' : 'English';
-      document.querySelectorAll('[data-t]').forEach(el => {
-        const key = el.getAttribute('data-t');
-        el.innerText = i18n[currentLang][key];
-      });
-      lucide.createIcons(); // Re-render for direction if needed
+      stripeToken = token.id;
     }
 
-    function openWhatsApp() { window.open('https://wa.me/201019686001?text=Interested in Barmagly POS', '_blank'); }
-
-    // Animations
-    const revealObs = new IntersectionObserver((entries) => {
-      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('active'); });
-    }, { threshold: 0.1 });
-    document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
-
-    // Sticky Nav
-    window.addEventListener('scroll', () => {
-      document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 40);
+    // Submit to server
+    const res = await fetch('/api/landing/subscribe', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        businessName: business,
+        ownerName: name,
+        ownerEmail: email,
+        ownerPhone: phone || null,
+        planType: isAnnualPlan ? 'yearly' : 'monthly',
+        planName: isAnnualPlan ? 'pro' : 'starter',
+        addons,
+        paymentMethod: stripeToken ? 'stripe' : 'bank',
+        stripeToken,
+        lang,
+      })
     });
 
-    // FAQ
-    document.querySelectorAll('.faq-q').forEach(q => {
-      q.addEventListener('click', () => q.parentElement.classList.toggle('is-open'));
-    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Subscription failed');
 
-    // Pricing
-    function setBilling(type) {
-      currentBilling = type;
-      document.getElementById('m-toggle').classList.toggle('active', type === 'monthly');
-      document.getElementById('y-toggle').classList.toggle('active', type === 'yearly');
-      const data = { monthly: ['CHF 49', 'CHF 149'], yearly: ['CHF 470', 'CHF 1,430'] };
-      document.getElementById('p1-price').innerHTML = data[type][0] + `<span>/${type === 'monthly' ? 'mo' : 'yr'}</span>`;
-      document.getElementById('p2-price').innerHTML = data[type][1] + `<span>/${type === 'monthly' ? 'mo' : 'yr'}</span>`;
-    }
+    // Success
+    document.getElementById('success-email').textContent = email;
+    document.getElementById('step2').classList.remove('active');
+    document.getElementById('step3').classList.add('active');
+    document.getElementById('modal-footer').style.display = 'none';
 
-    // Subscriptions
-    function openSubscribe(plan) {
-      currentPlan = plan;
-      document.getElementById('subscribe-modal').style.display = 'flex';
-      nextStep(1); // Reset to first step
-    }
-    function closeModal() { document.getElementById('subscribe-modal').style.display = 'none'; }
-    function nextStep(n) {
-      document.querySelectorAll('.form-step').forEach(s => s.classList.remove('active'));
-      const step = document.getElementById(typeof n === 'string' ? `step-${n}` : `step-${n}`);
-      if (step) step.classList.add('active');
-    }
+  } catch(e) {
+    setError(e.message || (lang==='ar'?'حدث خطأ، يرجى المحاولة مرة أخرى': lang==='de'?'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.':'Something went wrong. Please try again.'));
+    btn.disabled = false;
+    btn.textContent = lang==='ar'?'أكمل الاشتراك': lang==='de'?'Abonnement abschließen':'Complete Subscription';
+  }
+}
 
-    async function processOrder() {
-      const btn = document.getElementById('submit-btn');
-      const data = {
-        businessName: document.getElementById('business_name').value,
-        ownerEmail: document.getElementById('owner_email').value,
-        ownerPhone: document.getElementById('owner_phone').value,
-        planType: currentBilling,
-        planName: currentPlan,
-        ownerName: 'Admin'
-      };
-      try {
-        const res = await fetch('/api/landing/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        const result = await res.json();
-        if (result.success) nextStep('success');
-        else alert(result.error);
-      } catch (e) { alert('Connection error'); }
-    }
-  </script>
+// Update submit button text based on step
+const nextBtn = document.getElementById('modal-next-btn');
+const origHandler = nextBtn.onclick;
+document.getElementById('modal').addEventListener('click', () => {
+  if(modalStep === 2) {
+    nextBtn.querySelector('span').setAttribute('data-en','Complete & Pay →');
+    nextBtn.querySelector('span').setAttribute('data-ar','إكمال والدفع →');
+    nextBtn.querySelector('span').setAttribute('data-de','Abschließen & Bezahlen →');
+    applyLang(lang);
+  }
+});
+
+// Init
+applyLang(lang);
+</script>
 </body>
-
 </html>

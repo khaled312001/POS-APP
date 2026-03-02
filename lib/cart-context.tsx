@@ -31,6 +31,8 @@ interface CartContextValue {
   taxRate: number;
   setTaxRate: (r: number) => void;
   tax: number;
+  deliveryFee: number;
+  setDeliveryFee: (f: number) => void;
   total: number;
   customerId: number | null;
   setCustomerId: (id: number | null) => void;
@@ -45,7 +47,8 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
-  const [taxRate, setTaxRate] = useState(10);
+  const [taxRate, setTaxRate] = useState(7.7);
+  const [deliveryFee, setDeliveryFee] = useState(0);
   const [customerId, setCustomerId] = useState<number | null>(null);
   const [tableNumber, setTableNumber] = useState("");
   const [orderType, setOrderType] = useState("dine_in");
@@ -101,17 +104,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price * i.quantity, 0), [items]);
   const tax = useMemo(() => ((subtotal - discount) * taxRate) / 100, [subtotal, discount, taxRate]);
-  const total = useMemo(() => subtotal - discount + tax, [subtotal, discount, tax]);
+  const total = useMemo(() => subtotal - discount + tax + deliveryFee, [subtotal, discount, tax, deliveryFee]);
   const itemCount = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items]);
 
   const value = useMemo(
     () => ({
       items, addItem, removeItem, updateQuantity, clearCart,
       subtotal, itemCount, discount, setDiscount, taxRate, setTaxRate,
-      tax, total, customerId, setCustomerId, tableNumber, setTableNumber,
-      orderType, setOrderType,
+      tax, deliveryFee, setDeliveryFee, total, customerId, setCustomerId,
+      tableNumber, setTableNumber, orderType, setOrderType,
     }),
-    [items, subtotal, itemCount, discount, taxRate, tax, total, customerId, tableNumber, orderType]
+    [items, subtotal, itemCount, discount, taxRate, tax, deliveryFee, total, customerId, tableNumber, orderType]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

@@ -200,6 +200,67 @@ function configureExpoAndLanding(app: express.Application) {
       return res.status(200).send(svg);
     }
 
+    // PWA manifest – enables "Install App" prompt in browsers
+    if (req.path === "/manifest.json") {
+      const manifest = {
+        name: "Barmagly POS",
+        short_name: "Barmagly",
+        description: "Point of Sale system for modern restaurants and stores",
+        start_url: "/",
+        display: "standalone",
+        background_color: "#0A0E17",
+        theme_color: "#2FD3C6",
+        orientation: "any",
+        icons: [
+          { src: "/assets/images/icon.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+          { src: "/assets/images/icon.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
+        ],
+        categories: ["business", "productivity"],
+        lang: "en"
+      };
+      res.setHeader("Content-Type", "application/manifest+json");
+      return res.status(200).json(manifest);
+    }
+
+    // Minimal service worker for PWA offline caching
+    if (req.path === "/sw.js") {
+      const sw = `
+const CACHE_NAME = 'barmagly-pos-v1';
+const STATIC_ASSETS = ['/'];
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC_ASSETS)));
+  self.skipWaiting();
+});
+self.addEventListener('activate', (e) => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch', (e) => {
+  if (e.request.url.includes('/api/')) return;
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+});`;
+      res.setHeader("Content-Type", "application/javascript");
+      res.setHeader("Cache-Control", "no-cache");
+      return res.status(200).send(sw);
+    }
+
+    // Inject PWA tags into the main app index.html for installability
+    if (req.path === "/" || req.path === "/index.html") {
+      const indexPath = path.resolve(process.cwd(), "static-build", "index.html");
+      if (fs.existsSync(indexPath)) {
+        let html = fs.readFileSync(indexPath, "utf-8");
+        const pwaHead = `<link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#2FD3C6"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Barmagly POS"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">`;
+        const pwaScript = `<script>if('serviceWorker'in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js'));}</script>`;
+        if (!html.includes('/manifest.json')) {
+          html = html.replace('</head>', pwaHead + pwaScript + '</head>');
+        } else if (!html.includes('/sw.js')) {
+          html = html.replace('</body>', pwaScript + '</body>');
+        }
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.status(200).send(html);
+      }
+    }
+
     if (req.path.startsWith("/super_admin")) {
       const superAdminTemplatePath = path.resolve(
         process.cwd(),

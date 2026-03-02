@@ -16,6 +16,7 @@ export const branches = pgTable("branches", {
   isMain: boolean("is_main").default(false),
   currency: text("currency").default("CHF"),
   taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0"),
+  deliveryFee: decimal("delivery_fee", { precision: 10, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
