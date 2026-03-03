@@ -127,25 +127,25 @@ export default function SettingsScreen() {
   const [callerIdStatus, setCallerIdStatus] = useState<"idle" | "testing" | "done">("idle");
 
   const { data: employees = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/employees?tenantId=${tenant.id}` : "/api/employees"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
-  const { data: suppliers = [] } = useQuery<any[]>({ queryKey: ["/api/suppliers"], queryFn: getQueryFn({ on401: "throw" }) });
-  const { data: branches = [] } = useQuery<any[]>({ queryKey: ["/api/branches"], queryFn: getQueryFn({ on401: "throw" }) });
-  const { data: shifts = [] } = useQuery<any[]>({ queryKey: ["/api/shifts"], queryFn: getQueryFn({ on401: "throw" }) });
-  const { data: expenses = [] } = useQuery<any[]>({ queryKey: ["/api/expenses"], queryFn: getQueryFn({ on401: "throw" }) });
-  const { data: purchaseOrders = [] } = useQuery<any[]>({ queryKey: ["/api/purchase-orders"], queryFn: getQueryFn({ on401: "throw" }) });
-  const { data: activityLog = [] } = useQuery<any[]>({ queryKey: ["/api/activity-log"], queryFn: getQueryFn({ on401: "throw" }) });
-  const { data: returns = [] } = useQuery<any[]>({ queryKey: ["/api/returns"], queryFn: getQueryFn({ on401: "throw" }) });
-  const { data: salesList = [] } = useQuery<any[]>({ queryKey: ["/api/sales?limit=50"], queryFn: getQueryFn({ on401: "throw" }) });
-  const { data: warehousesList = [] } = useQuery<any[]>({ queryKey: ["/api/warehouses"], queryFn: getQueryFn({ on401: "throw" }) });
-  const { data: batchesList = [] } = useQuery<any[]>({ queryKey: ["/api/product-batches"], queryFn: getQueryFn({ on401: "throw" }) });
-  const { data: productsList = [] } = useQuery<any[]>({ queryKey: ["/api/products"], queryFn: getQueryFn({ on401: "throw" }) });
-  const { data: storeSettings } = useQuery<any>({ queryKey: ["/api/store-settings"], queryFn: getQueryFn({ on401: "throw" }) });
+  const { data: suppliers = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/suppliers?tenantId=${tenant.id}` : "/api/suppliers"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
+  const { data: branches = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/branches?tenantId=${tenant.id}` : "/api/branches"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
+  const { data: shifts = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/shifts?tenantId=${tenant.id}` : "/api/shifts"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
+  const { data: expenses = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/expenses?tenantId=${tenant.id}` : "/api/expenses"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
+  const { data: purchaseOrders = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/purchase-orders?tenantId=${tenant.id}` : "/api/purchase-orders"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
+  const { data: activityLog = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/activity-log?tenantId=${tenant.id}` : "/api/activity-log"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
+  const { data: returns = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/returns?tenantId=${tenant.id}` : "/api/returns"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
+  const { data: salesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/sales?limit=50&tenantId=${tenant.id}` : "/api/sales?limit=50"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
+  const { data: warehousesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/warehouses?tenantId=${tenant.id}` : "/api/warehouses"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
+  const { data: batchesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/product-batches?tenantId=${tenant.id}` : "/api/product-batches"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
+  const { data: productsList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/products?tenantId=${tenant.id}` : "/api/products"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
+  const { data: storeSettings } = useQuery<any>({ queryKey: [tenant?.id ? `/api/store-settings?tenantId=${tenant.id}` : "/api/store-settings"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
   const { data: pgConfig, refetch: refetchPgConfig } = useQuery<any>({ queryKey: ["/api/payment-gateway/config"], queryFn: getQueryFn({ on401: "throw" }), enabled: isAdmin });
 
   const { data: allActiveShiftsRaw } = useQuery<any[]>({
-    queryKey: ["/api/shifts/active"],
+    queryKey: [tenant?.id ? `/api/shifts/active?tenantId=${tenant.id}` : "/api/shifts/active"],
     queryFn: getQueryFn({ on401: "throw" }),
     refetchInterval: 30000,
-    enabled: isAdmin,
+    enabled: isAdmin && !!tenant?.id,
   });
   const allActiveShifts = allActiveShiftsRaw ?? EMPTY_SHIFTS;
 
@@ -189,20 +189,20 @@ export default function SettingsScreen() {
   });
 
   const createSupMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/suppliers", data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/suppliers"] }); setShowSupplierForm(false); },
+    mutationFn: (data: any) => apiRequest("POST", "/api/suppliers", { ...data, tenantId: tenant?.id }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/suppliers?tenantId=${tenant.id}` : "/api/suppliers"] }); setShowSupplierForm(false); },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const createExpenseMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/expenses", data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/expenses"] }); setShowExpenseForm(false); },
+    mutationFn: (data: any) => apiRequest("POST", "/api/expenses", { ...data, tenantId: tenant?.id }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/expenses?tenantId=${tenant.id}` : "/api/expenses"] }); setShowExpenseForm(false); },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const deleteExpenseMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/expenses/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/expenses"] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/expenses?tenantId=${tenant.id}` : "/api/expenses"] }); },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
@@ -256,14 +256,14 @@ export default function SettingsScreen() {
   });
 
   const createPOMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/purchase-orders", data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/purchase-orders"] }); setShowPOForm(false); },
+    mutationFn: (data: any) => apiRequest("POST", "/api/purchase-orders", { ...data, tenantId: tenant?.id }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/purchase-orders?tenantId=${tenant.id}` : "/api/purchase-orders"] }); setShowPOForm(false); },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const receivePOMutation = useMutation({
     mutationFn: (id: number) => apiRequest("POST", `/api/purchase-orders/${id}/receive`, { items: [] }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/purchase-orders"] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/purchase-orders?tenantId=${tenant.id}` : "/api/purchase-orders"] }); },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
@@ -287,13 +287,14 @@ export default function SettingsScreen() {
         type: data.type,
         totalAmount: sale.totalAmount,
         refundMethod: sale.paymentMethod,
-        branchId: employee?.branchId || 1,
+        branchId: employee?.branchId || branches[0]?.id || 1,
+        tenantId: tenant?.id,
         items: returnItems,
       });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/returns"] });
-      qc.invalidateQueries({ queryKey: ["/api/sales"] });
+      qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/returns?tenantId=${tenant.id}` : "/api/returns"] });
+      qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/sales?limit=50&tenantId=${tenant.id}` : "/api/sales?limit=50"] });
       qc.invalidateQueries({ queryKey: ["/api/inventory"] });
       setShowReturnForm(false);
       setReturnForm({ originalSaleId: "", reason: "", type: "refund" });
@@ -320,16 +321,17 @@ export default function SettingsScreen() {
 
   const createBranchMutation = useMutation({
     mutationFn: (data: any) => {
-      if (editBranch) return apiRequest("PUT", `/api/branches/${editBranch.id}`, data);
-      return apiRequest("POST", "/api/branches", data);
+      const payload = { ...data, tenantId: tenant?.id };
+      if (editBranch) return apiRequest("PUT", `/api/branches/${editBranch.id}`, payload);
+      return apiRequest("POST", "/api/branches", payload);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/branches"] }); setShowBranchForm(false); setEditBranch(null); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/branches?tenantId=${tenant.id}` : "/api/branches"] }); setShowBranchForm(false); setEditBranch(null); },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const deleteBranchMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/branches/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/branches"] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/branches?tenantId=${tenant.id}` : "/api/branches"] }); },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 

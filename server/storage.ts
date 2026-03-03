@@ -257,6 +257,10 @@ export const storage = {
     const [cust] = await db.update(customers).set({ ...data, updatedAt: new Date() }).where(eq(customers.id, id)).returning();
     return cust;
   },
+  async deleteCustomer(id: number) {
+    const [cust] = await db.delete(customers).where(eq(customers.id, id)).returning();
+    return cust;
+  },
   async addLoyaltyPoints(id: number, points: number) {
     const cust = await this.getCustomer(id);
     if (!cust) return null;
@@ -331,7 +335,16 @@ export const storage = {
   },
 
   // Purchase Orders
-  async getPurchaseOrders() {
+  async getPurchaseOrders(tenantId?: number) {
+    if (tenantId) {
+      const tenantBranches = await this.getBranchesByTenant(tenantId);
+      const branchIds = tenantBranches.map(b => b.id);
+      if (branchIds.length > 0) {
+        const { inArray } = await import('drizzle-orm');
+        return db.select().from(purchaseOrders).where(inArray(purchaseOrders.branchId, branchIds)).orderBy(desc(purchaseOrders.createdAt));
+      }
+      return [];
+    }
     return db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt));
   },
   async createPurchaseOrder(data: InsertPurchaseOrder) {
@@ -488,9 +501,17 @@ export const storage = {
     return sub;
   },
 
-  // Activity Log
-  async getActivityLog(limit?: number) {
+  async getActivityLog(limit?: number, tenantId?: number) {
     const l = limit || 50;
+    if (tenantId) {
+      const emps = await this.getEmployeesByTenant(tenantId);
+      const empIds = emps.map(e => e.id);
+      if (empIds.length > 0) {
+        const { inArray } = await import('drizzle-orm');
+        return db.select().from(activityLog).where(inArray(activityLog.employeeId, empIds)).orderBy(desc(activityLog.createdAt)).limit(l);
+      }
+      return [];
+    }
     return db.select().from(activityLog).orderBy(desc(activityLog.createdAt)).limit(l);
   },
   async createActivityLog(data: InsertActivityLog) {
@@ -499,7 +520,16 @@ export const storage = {
   },
 
   // Returns
-  async getReturns() {
+  async getReturns(tenantId?: number) {
+    if (tenantId) {
+      const tenantBranches = await this.getBranchesByTenant(tenantId);
+      const branchIds = tenantBranches.map(b => b.id);
+      if (branchIds.length > 0) {
+        const { inArray } = await import('drizzle-orm');
+        return db.select().from(returns).where(inArray(returns.branchId, branchIds)).orderBy(desc(returns.createdAt));
+      }
+      return [];
+    }
     return db.select().from(returns).orderBy(desc(returns.createdAt));
   },
   async getReturn(id: number) {
@@ -821,8 +851,17 @@ export const storage = {
   },
 
   // Warehouses
-  async getWarehouses(branchId?: number) {
+  async getWarehouses(branchId?: number, tenantId?: number) {
     if (branchId) return db.select().from(warehouses).where(and(eq(warehouses.branchId, branchId), eq(warehouses.isActive, true)));
+    if (tenantId) {
+      const tenantBranches = await this.getBranchesByTenant(tenantId);
+      const branchIds = tenantBranches.map(b => b.id);
+      if (branchIds.length > 0) {
+        const { inArray } = await import('drizzle-orm');
+        return db.select().from(warehouses).where(and(inArray(warehouses.branchId, branchIds), eq(warehouses.isActive, true)));
+      }
+      return [];
+    }
     return db.select().from(warehouses).where(eq(warehouses.isActive, true));
   },
   async createWarehouse(data: InsertWarehouse) {
@@ -844,9 +883,19 @@ export const storage = {
   },
 
   // Product Batches
-  async getProductBatches(productId?: number) {
-    if (productId) return db.select().from(productBatches).where(and(eq(productBatches.productId, productId), eq(productBatches.isActive, true))).orderBy(productBatches.expiryDate);
-    return db.select().from(productBatches).where(eq(productBatches.isActive, true)).orderBy(productBatches.expiryDate);
+  async getProductBatches(productId?: number, tenantId?: number) {
+    const conditions = [eq(productBatches.isActive, true)];
+    if (productId) conditions.push(eq(productBatches.productId, productId));
+    if (tenantId) {
+      const tenantBranches = await this.getBranchesByTenant(tenantId);
+      const branchIds = tenantBranches.map(b => b.id);
+      if (branchIds.length > 0) {
+        const { inArray } = await import('drizzle-orm');
+        conditions.push(inArray(productBatches.branchId, branchIds));
+      } else { return []; }
+    }
+    const { and } = await import('drizzle-orm');
+    return db.select().from(productBatches).where(and(...conditions)).orderBy(productBatches.expiryDate);
   },
   async createProductBatch(data: InsertProductBatch) {
     const [batch] = await db.insert(productBatches).values(data).returning();

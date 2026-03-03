@@ -11,12 +11,14 @@ import { Colors } from "@/constants/colors";
 import { apiRequest, getQueryFn } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import { useLicense } from "@/lib/license-context";
 
 export default function CustomersScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const { canManage } = useAuth();
   const { t, isRTL, rtlTextAlign, rtlText } = useLanguage();
+  const { tenant } = useLicense();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editCustomer, setEditCustomer] = useState<any>(null);
@@ -25,7 +27,9 @@ export default function CustomersScreen() {
   const [showDetail, setShowDetail] = useState(false);
 
   const { data: customers = [] } = useQuery<any[]>({
-    queryKey: ["/api/customers", search ? `?search=${search}` : ""],
+    queryKey: [
+      tenant?.id ? `/api/customers?tenantId=${tenant.id}${search ? `&search=${search}` : ""}` : "/api/customers"
+    ],
     queryFn: getQueryFn({ on401: "throw" }),
   });
 
@@ -38,10 +42,20 @@ export default function CustomersScreen() {
   const saveMutation = useMutation({
     mutationFn: (data: any) => apiRequest(editCustomer ? "PUT" : "POST", editCustomer ? `/api/customers/${editCustomer.id}` : "/api/customers", data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/customers"] });
+      qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/customers?tenantId=${tenant.id}${search ? `&search=${search}` : ""}` : "/api/customers"] });
       setShowForm(false);
       setEditCustomer(null);
       setForm({ name: "", email: "", phone: "", address: "", notes: "" });
+    },
+    onError: (e: any) => Alert.alert(t("error"), e.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/customers/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/customers?tenantId=${tenant.id}${search ? `&search=${search}` : ""}` : "/api/customers"] });
+      setShowDetail(false);
+      setSelectedCustomer(null);
     },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
@@ -54,7 +68,14 @@ export default function CustomersScreen() {
 
   const handleSave = () => {
     if (!form.name) return Alert.alert(t("error"), t("customerName"));
-    saveMutation.mutate({ name: form.name, email: form.email || undefined, phone: form.phone || undefined, address: form.address || undefined, notes: form.notes || undefined });
+    saveMutation.mutate({
+      name: form.name,
+      email: form.email || undefined,
+      phone: form.phone || undefined,
+      address: form.address || undefined,
+      notes: form.notes || undefined,
+      tenantId: tenant?.id
+    });
   };
 
   const topPad = Platform.OS === "web" ? 67 : 0;
@@ -138,7 +159,7 @@ export default function CustomersScreen() {
               <Text style={[styles.modalTitle, rtlTextAlign]}>{t("customerDetails")}</Text>
               <Pressable onPress={() => setShowDetail(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
-            
+
             {selectedCustomer && (
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={{ alignItems: "center", marginBottom: 20 }}>
@@ -196,11 +217,22 @@ export default function CustomersScreen() {
                         <Text style={{ color: Colors.white, fontSize: 14, fontWeight: "600" }}>{t("edit")}</Text>
                       </LinearGradient>
                     </Pressable>
+                    <Pressable style={{ flex: 1, borderRadius: 12, overflow: "hidden" }} onPress={() => {
+                      Alert.alert(t("deleteCustomer") || "Delete Customer", `${t("delete")} "${selectedCustomer.name}"?`, [
+                        { text: t("cancel"), style: "cancel" },
+                        { text: t("delete"), style: "destructive", onPress: () => deleteMutation.mutate(selectedCustomer.id) },
+                      ]);
+                    }}>
+                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", backgroundColor: Colors.danger, alignItems: "center", justifyContent: "center", paddingVertical: 12, gap: 6 }}>
+                        <Ionicons name="trash-outline" size={18} color={Colors.white} />
+                        <Text style={{ color: Colors.white, fontSize: 14, fontWeight: "600" }}>{t("delete")}</Text>
+                      </View>
+                    </Pressable>
                   </View>
                 )}
 
                 <Text style={[{ color: Colors.textSecondary, fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }, rtlTextAlign]}>{t("purchaseHistory")}</Text>
-                
+
                 {customerSales.length === 0 ? (
                   <View style={{ alignItems: "center", paddingVertical: 24 }}>
                     <Ionicons name="receipt-outline" size={36} color={Colors.textMuted} />
