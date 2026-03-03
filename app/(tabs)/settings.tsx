@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 
 function SettingRow({ icon, label, value, onPress, color, rtl }: { icon: string; label: string; value?: string; onPress?: () => void; color?: string; rtl?: boolean }) {
@@ -62,6 +63,7 @@ export default function SettingsScreen() {
   const qc = useQueryClient();
   const { employee, logout, isAdmin, canManage, isCashier } = useAuth();
   const { t, isRTL, language, setLanguage } = useLanguage();
+  const { tenant } = useLicense();
   const [showEmployees, setShowEmployees] = useState(false);
   const [showSuppliers, setShowSuppliers] = useState(false);
   const [showBranches, setShowBranches] = useState(false);
@@ -124,7 +126,7 @@ export default function SettingsScreen() {
   const [testPhoneNumber, setTestPhoneNumber] = useState("0551234567");
   const [callerIdStatus, setCallerIdStatus] = useState<"idle" | "testing" | "done">("idle");
 
-  const { data: employees = [] } = useQuery<any[]>({ queryKey: ["/api/employees"], queryFn: getQueryFn({ on401: "throw" }) });
+  const { data: employees = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/employees?tenantId=${tenant.id}` : "/api/employees"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
   const { data: suppliers = [] } = useQuery<any[]>({ queryKey: ["/api/suppliers"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: branches = [] } = useQuery<any[]>({ queryKey: ["/api/branches"], queryFn: getQueryFn({ on401: "throw" }) });
   const { data: shifts = [] } = useQuery<any[]>({ queryKey: ["/api/shifts"], queryFn: getQueryFn({ on401: "throw" }) });
@@ -182,7 +184,7 @@ export default function SettingsScreen() {
 
   const createEmpMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/employees", data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/employees"] }); setShowEmployeeForm(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/employees?tenantId=${tenant.id}` : "/api/employees"] }); setShowEmployeeForm(false); },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
@@ -608,7 +610,7 @@ export default function SettingsScreen() {
               <TextInput style={styles.input} value={empForm.email} onChangeText={(v) => setEmpForm({ ...empForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" />
               <Pressable style={styles.saveBtn} onPress={() => {
                 if (!empForm.name || !empForm.pin) return Alert.alert(t("error"), t("namePinRequired"));
-                createEmpMutation.mutate({ name: empForm.name, pin: empForm.pin, role: empForm.role, email: empForm.email || undefined, branchId: 1, permissions: empForm.role === "admin" ? ["all"] : ["pos"] });
+                createEmpMutation.mutate({ name: empForm.name, pin: empForm.pin, role: empForm.role, email: empForm.email || undefined, tenantId: tenant?.id, branchId: branches[0]?.id ?? null, permissions: empForm.role === "admin" ? ["all"] : ["pos"] });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
                   <Text style={styles.saveBtnText}>{t("createEmployee")}</Text>

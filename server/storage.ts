@@ -58,15 +58,21 @@ export const storage = {
     return db.select().from(employees).orderBy(desc(employees.createdAt));
   },
   async getEmployeesByTenant(tenantId: number) {
-    // Ideally we would do a join with branches, but for simplicity:
     const tenantBranches = await this.getBranchesByTenant(tenantId);
     const branchIds = tenantBranches.map((b) => b.id);
-    if (branchIds.length === 0) return [];
 
-    // Fallback if 'inArray' or complex query is tricky - we fetch all and filter or query directly if supported.
-    // Drizzle 'inArray' should be used.
     const { inArray } = await import('drizzle-orm');
-    return db.select().from(employees).where(inArray(employees.branchId, branchIds)).orderBy(desc(employees.createdAt));
+
+    if (branchIds.length > 0) {
+      // Match by tenantId OR by branchId belonging to this tenant
+      return db.select().from(employees)
+        .where(or(eq(employees.tenantId, tenantId), inArray(employees.branchId, branchIds)))
+        .orderBy(desc(employees.createdAt));
+    }
+    // No branches — fall back to tenantId column only
+    return db.select().from(employees)
+      .where(eq(employees.tenantId, tenantId))
+      .orderBy(desc(employees.createdAt));
   },
   async getEmployee(id: number) {
     const [emp] = await db.select().from(employees).where(eq(employees.id, id));

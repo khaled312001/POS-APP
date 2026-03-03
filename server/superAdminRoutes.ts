@@ -590,7 +590,7 @@ export function registerSuperAdminRoutes(app: Express) {
       const tenantId = parseInt(req.params.id);
       const branches = await storage.getBranchesByTenant(tenantId);
       const branchId = req.body.branchId || (branches[0]?.id ?? null);
-      const employee = await storage.createEmployee({ ...req.body, branchId, isActive: true });
+      const employee = await storage.createEmployee({ ...req.body, branchId, tenantId, isActive: true });
       res.json(employee);
     } catch (e: any) {
       res.status(500).json({ error: e.message });

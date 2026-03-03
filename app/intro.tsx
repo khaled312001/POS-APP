@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TouchableOpacity, Animated, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
@@ -68,7 +68,7 @@ export default function IntroScreen() {
         <View style={styles.container}>
             <LinearGradient
                 colors={['#0A0E27', '#1a1060', '#0f2a60']}
-                style={[styles.gradient, { paddingBottom: insets.bottom }]}
+                style={styles.gradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
@@ -77,23 +77,27 @@ export default function IntroScreen() {
                 <View style={styles.circle2} />
                 <View style={styles.circle3} />
 
-                {/* Header area */}
-                <View style={[styles.header, { paddingTop: Math.max(insets.top + 16, 40) }]}>
-                    <View style={styles.logoRow}>
-                        <LinearGradient
-                            colors={[Colors.primary, Colors.secondary]}
-                            style={styles.logoBadge}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                        >
-                            <Ionicons name="storefront" size={28} color={Colors.white} />
-                        </LinearGradient>
-                        <Text style={styles.logoName}>Barmagly</Text>
+                <ScrollView
+                    contentContainerStyle={[styles.scrollContent, { paddingTop: Math.max(insets.top + 16, 32), paddingBottom: Math.max(insets.bottom + 24, 32) }]}
+                    showsVerticalScrollIndicator={false}
+                    bounces={false}
+                >
+                    {/* Header area */}
+                    <View style={styles.header}>
+                        <View style={styles.logoRow}>
+                            <LinearGradient
+                                colors={[Colors.primary, Colors.secondary]}
+                                style={styles.logoBadge}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <Ionicons name="storefront" size={24} color={Colors.white} />
+                            </LinearGradient>
+                            <Text style={styles.logoName}>Barmagly</Text>
+                        </View>
                     </View>
-                </View>
 
-                {/* Hero content */}
-                <View style={styles.content}>
+                    {/* Hero icon */}
                     <View style={styles.heroIconContainer}>
                         <LinearGradient
                             colors={[Colors.primary, Colors.secondary, Colors.accent]}
@@ -101,11 +105,12 @@ export default function IntroScreen() {
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                         >
-                            <Ionicons name="storefront" size={64} color={Colors.white} />
+                            <Ionicons name="storefront" size={56} color={Colors.white} />
                         </LinearGradient>
                         <View style={styles.heroIconGlow} />
                     </View>
 
+                    {/* Hero text */}
                     <Text style={[styles.welcomeText, rtlText]}>{content.welcome}</Text>
                     <Text style={[styles.brandText, rtlText]}>{content.brand}</Text>
                     <Text style={[styles.subtitle, rtlText]}>{content.subtitle}</Text>
@@ -114,54 +119,55 @@ export default function IntroScreen() {
                     <View style={[styles.featuresRow, isRTL && { flexDirection: 'row-reverse' }]}>
                         {content.features.map((f, i) => (
                             <View key={i} style={styles.featurePill}>
-                                <Ionicons name={f.icon as any} size={16} color={Colors.accent} />
+                                <Ionicons name={f.icon as any} size={14} color={Colors.accent} />
                                 <Text style={styles.featurePillText}>{f.text}</Text>
                             </View>
                         ))}
                     </View>
-                </View>
 
-                {/* Language switcher */}
-                <View style={styles.languageSection}>
-                    <Text style={styles.languageSectionLabel}>
-                        {language === 'ar' ? 'اختر اللغة' : language === 'de' ? 'Sprache wählen' : 'Select Language'}
-                    </Text>
-                    <View style={styles.languageList}>
-                        {LANGUAGES.map((lang) => {
-                            const selected = language === lang.code;
-                            return (
-                                <TouchableOpacity
-                                    key={lang.code}
-                                    onPress={() => setLanguage(lang.code)}
-                                    style={[styles.languageOption, selected && styles.languageOptionSelected]}
-                                    activeOpacity={0.7}
-                                >
-                                    {selected && (
-                                        <LinearGradient
-                                            colors={[Colors.primary, Colors.secondary]}
-                                            style={StyleSheet.absoluteFillObject}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 1 }}
-                                            borderRadius={14}
-                                        />
-                                    )}
-                                    <Text style={styles.languageFlag}>{lang.flag}</Text>
-                                    <Text style={[styles.languageNativeLabel, selected && styles.languageNativeLabelSelected]}>
-                                        {lang.nativeLabel}
-                                    </Text>
-                                    {selected && (
-                                        <View style={styles.languageCheck}>
-                                            <Ionicons name="checkmark-circle" size={16} color={Colors.white} />
-                                        </View>
-                                    )}
-                                </TouchableOpacity>
-                            );
-                        })}
+                    {/* Divider */}
+                    <View style={styles.divider} />
+
+                    {/* Language switcher */}
+                    <View style={styles.languageSection}>
+                        <Text style={styles.languageSectionLabel}>
+                            {language === 'ar' ? 'اختر اللغة' : language === 'de' ? 'Sprache wählen' : 'Select Language'}
+                        </Text>
+                        <View style={styles.languageList}>
+                            {LANGUAGES.map((lang) => {
+                                const selected = language === lang.code;
+                                return (
+                                    <TouchableOpacity
+                                        key={lang.code}
+                                        onPress={() => setLanguage(lang.code)}
+                                        style={[styles.languageOption, selected && styles.languageOptionSelected]}
+                                        activeOpacity={0.7}
+                                    >
+                                        {selected && (
+                                            <LinearGradient
+                                                colors={[Colors.primary, Colors.secondary]}
+                                                style={StyleSheet.absoluteFillObject}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 1 }}
+                                                borderRadius={14}
+                                            />
+                                        )}
+                                        <Text style={styles.languageFlag}>{lang.flag}</Text>
+                                        <Text style={[styles.languageNativeLabel, selected && styles.languageNativeLabelSelected]}>
+                                            {lang.nativeLabel}
+                                        </Text>
+                                        {selected && (
+                                            <View style={styles.languageCheck}>
+                                                <Ionicons name="checkmark-circle" size={16} color={Colors.white} />
+                                            </View>
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
                     </View>
-                </View>
 
-                {/* Footer */}
-                <View style={styles.footer}>
+                    {/* Get Started button */}
                     <Pressable
                         style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
                         onPress={handleStart}
@@ -186,10 +192,8 @@ export default function IntroScreen() {
                         </LinearGradient>
                     </Pressable>
 
-                    <Text style={styles.footerNote}>
-                        © 2025 Barmagly · v1.0
-                    </Text>
-                </View>
+                    <Text style={styles.footerNote}>© 2025 Barmagly · v1.0</Text>
+                </ScrollView>
             </LinearGradient>
         </View>
     );
@@ -202,8 +206,11 @@ const styles = StyleSheet.create({
     },
     gradient: {
         flex: 1,
-        justifyContent: 'space-between',
         overflow: 'hidden',
+    },
+    scrollContent: {
+        alignItems: 'center',
+        paddingHorizontal: 24,
     },
 
     /* Decorative background circles */
@@ -237,8 +244,8 @@ const styles = StyleSheet.create({
 
     /* Header */
     header: {
-        paddingHorizontal: 24,
-        zIndex: 10,
+        width: '100%',
+        marginBottom: 28,
     },
     logoRow: {
         flexDirection: 'row',
@@ -246,44 +253,36 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     logoBadge: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
+        width: 42,
+        height: 42,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
     },
     logoName: {
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: '800',
         color: Colors.white,
         letterSpacing: 0.5,
     },
 
     /* Hero */
-    content: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 32,
-        paddingTop: 16,
-        zIndex: 10,
-    },
     heroIconContainer: {
         position: 'relative',
-        marginBottom: 32,
+        marginBottom: 24,
     },
     heroIconGradient: {
-        width: 130,
-        height: 130,
-        borderRadius: 40,
+        width: 110,
+        height: 110,
+        borderRadius: 34,
         justifyContent: 'center',
         alignItems: 'center',
     },
     heroIconGlow: {
         position: 'absolute',
-        width: 130,
-        height: 130,
-        borderRadius: 40,
+        width: 110,
+        height: 110,
+        borderRadius: 34,
         backgroundColor: Colors.primary,
         opacity: 0.25,
         top: 8,
@@ -291,43 +290,44 @@ const styles = StyleSheet.create({
         zIndex: -1,
     },
     welcomeText: {
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: '400',
         color: 'rgba(255,255,255,0.65)',
         textAlign: 'center',
         marginBottom: 4,
     },
     brandText: {
-        fontSize: 36,
+        fontSize: 34,
         fontWeight: '900',
         color: Colors.white,
         textAlign: 'center',
-        marginBottom: 12,
+        marginBottom: 10,
         letterSpacing: 0.5,
     },
     subtitle: {
-        fontSize: 15,
-        lineHeight: 22,
+        fontSize: 14,
+        lineHeight: 21,
         color: 'rgba(255,255,255,0.6)',
         textAlign: 'center',
-        marginBottom: 28,
+        marginBottom: 20,
         maxWidth: 300,
     },
     featuresRow: {
         flexDirection: 'row',
-        gap: 10,
+        gap: 8,
         flexWrap: 'wrap',
         justifyContent: 'center',
+        marginBottom: 8,
     },
     featurePill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 5,
         backgroundColor: 'rgba(47, 211, 198, 0.1)',
         borderWidth: 1,
         borderColor: 'rgba(47, 211, 198, 0.25)',
-        paddingHorizontal: 14,
-        paddingVertical: 7,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
         borderRadius: 20,
     },
     featurePillText: {
@@ -336,20 +336,27 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
+    /* Divider */
+    divider: {
+        width: '80%',
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        marginVertical: 24,
+    },
+
     /* Language switcher */
     languageSection: {
-        paddingHorizontal: 24,
-        marginBottom: 12,
-        zIndex: 10,
+        width: '100%',
+        marginBottom: 24,
     },
     languageSectionLabel: {
         color: 'rgba(255,255,255,0.45)',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '600',
         textAlign: 'center',
-        letterSpacing: 1,
+        letterSpacing: 1.2,
         textTransform: 'uppercase',
-        marginBottom: 12,
+        marginBottom: 14,
     },
     languageList: {
         flexDirection: 'row',
@@ -358,7 +365,7 @@ const styles = StyleSheet.create({
     },
     languageOption: {
         flex: 1,
-        maxWidth: 130,
+        maxWidth: 120,
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
@@ -393,14 +400,7 @@ const styles = StyleSheet.create({
         right: 8,
     },
 
-    /* Footer */
-    footer: {
-        paddingHorizontal: 24,
-        paddingBottom: 24,
-        alignItems: 'center',
-        gap: 14,
-        zIndex: 10,
-    },
+    /* Button */
     button: {
         width: '100%',
         maxWidth: 420,
@@ -411,12 +411,13 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.5,
         shadowRadius: 16,
+        marginBottom: 16,
     },
     buttonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 18,
+        paddingVertical: 17,
         paddingHorizontal: 32,
     },
     buttonPressed: {
