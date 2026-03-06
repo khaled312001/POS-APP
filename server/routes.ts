@@ -1681,19 +1681,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Public Restaurant Store page ───────────────────────────────────────────
   app.get("/store/:slug", async (req, res) => {
     try {
+      const path = require("path");
+      const fs = require("fs");
       const { slug } = req.params;
       const config = await storage.getLandingPageConfigBySlug(slug);
       if (!config || !config.isPublished) {
         return res.status(404).send("<h1>Store not found</h1>");
       }
-      const templatePath = require("path").join(__dirname, "templates", "restaurant-store.html");
-      const fs = require("fs");
+      const templatePath = path.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
       let html = fs.readFileSync(templatePath, "utf8");
       html = html.replace(/\{\{SLUG\}\}/g, slug);
       html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
       html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.send(html);
-    } catch (e: any) { res.status(500).send("<h1>Server error</h1>"); }
+    } catch (e: any) {
+      console.error("[store/:slug] Error:", e);
+      res.status(500).send("<h1>Server error</h1>");
+    }
   });
 
   const httpServer = createServer(app);

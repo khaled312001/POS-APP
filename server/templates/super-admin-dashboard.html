@@ -429,7 +429,10 @@
     <div class="view" id="view-landingpages">
       <div class="sh">
         <div style="color:var(--mu);font-size:13px">Manage restaurant landing pages &amp; online ordering stores</div>
-        <button class="btn btn-p" onclick="openM('mLanding')">+ Create Landing Page</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-o" onclick="reseedPizzaLemon()" title="Update Pizza Lemon images & landing page config">🍕 Sync Pizza Lemon</button>
+          <button class="btn btn-p" onclick="openM('mLanding')">+ Create Landing Page</button>
+        </div>
       </div>
       <div id="landingList"><div class="ls"><div class="spin"></div></div></div>
     </div>
@@ -1436,6 +1439,16 @@ window.openM = function(id){
 /* ══════════════════════════════════════════════════════
    LANDING PAGES
 ══════════════════════════════════════════════════════ */
+async function reseedPizzaLemon(){
+  try {
+    toast('Syncing Pizza Lemon data…');
+    const res = await fetch('/api/admin/seed-pizza-lemon', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`} });
+    const data = await res.json();
+    if(res.ok) { toast('✅ Pizza Lemon synced! Images & landing page updated.','ok'); loadLandingPages(); }
+    else toast(data.error||'Sync failed','err');
+  } catch(e) { toast('Sync failed','err'); }
+}
+
 async function loadLandingPages(){
   if(!allTenants.length) allTenants = await api('GET','/tenants') || [];
   const el = document.getElementById('landingList');

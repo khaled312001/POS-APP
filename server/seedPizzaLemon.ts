@@ -3,7 +3,7 @@ import { eq, sql, inArray } from "drizzle-orm";
 import {
     branches, employees, categories, products, inventory,
     tenants, tenantSubscriptions, licenseKeys, tenantNotifications,
-    warehouses, tables,
+    warehouses, tables, landingPageConfig,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { addYears } from "date-fns";
@@ -48,50 +48,51 @@ function sizeModifier() {
     ];
 }
 
-interface MenuItem { name: string; description: string; price: number; }
+const IMG_BASE = "https://pizzalemon.ch/lemon/image/cache/catalog/";
+interface MenuItem { name: string; description: string; price: number; image?: string; }
 
 const PIZZAS: MenuItem[] = [
-    { name: "Margherita",          description: "Tomatensauce, Mozzarella, Oregano",                                                           price: 14.00 },
-    { name: "Profumata",           description: "Tomaten, Mozzarella, Zwiebeln, Knoblauch, Oregano",                                           price: 14.00 },
-    { name: "Funghi",              description: "Tomatensauce, Mozzarella, Pilze",                                                             price: 15.00 },
-    { name: "Spinat",              description: "Tomatensauce, Mozzarella, Spinat",                                                            price: 15.00 },
-    { name: "Gorgonzola",          description: "Tomatensauce, Mozzarella, Gorgonzola",                                                        price: 16.00 },
-    { name: "Prosciutto",          description: "Tomatensauce, Mozzarella, Schinken",                                                          price: 16.00 },
-    { name: "Salami",              description: "Tomatensauce, Mozzarella, scharfe Salami",                                                    price: 16.00 },
-    { name: "Arrabiata",           description: "Tomatensauce, Mozzarella, Oliven, Pilze, scharf",                                             price: 17.00 },
-    { name: "Diavola",             description: "Tomatensauce, Mozzarella, scharfe Salami, Oliven, Zwiebeln",                                  price: 17.00 },
-    { name: "Hawaii",              description: "Tomatensauce, Mozzarella, Schinken, Ananas",                                                  price: 17.00 },
-    { name: "Prosciutto e Funghi", description: "Tomatensauce, Mozzarella, Pilze, Schinken",                                                   price: 17.00 },
-    { name: "Siciliana",           description: "Tomatensauce, Mozzarella, Schinken, Sardellen, Kapern",                                       price: 17.00 },
-    { name: "Tonno",               description: "Tomatensauce, Mozzarella, Thon, Zwiebeln",                                                    price: 17.00 },
-    { name: "Fiorentina",          description: "Tomaten, Mozzarella, Spinat, Parmesan, Ei, Oregano",                                          price: 18.00 },
-    { name: "Napoli",              description: "Tomatensauce, Mozzarella, Sardellen, Oliven, Kapern",                                         price: 18.00 },
-    { name: "Piccante",            description: "Tomatensauce, Mozzarella, Peperoni, Peperoncini, Zwiebeln, Knoblauch, Oregano",               price: 18.00 },
-    { name: "Pizzaiolo",           description: "Tomatensauce, Mozzarella, Speck, Knoblauch, Pilze",                                          price: 18.00 },
-    { name: "Raclette",            description: "Tomatensauce, Mozzarella, Raclettekäse",                                                      price: 18.00 },
-    { name: "A'Casa",              description: "Tomatensauce, Mozzarella, Geflügelgeschnetzeltes, Peperoni, Ei, Oregano",                     price: 19.00 },
-    { name: "Carbonara",           description: "Tomatensauce, Mozzarella, Speck, Ei, Zwiebeln",                                              price: 19.00 },
-    { name: "Frutti di Mare",      description: "Tomatensauce, Mozzarella, Meeresfrüchte, Oregano",                                           price: 19.00 },
-    { name: "Gamberetti",          description: "Tomatensauce, Mozzarella, Crevetten, Knoblauch",                                             price: 19.00 },
-    { name: "Kebab Pizza",         description: "Tomatensauce, Mozzarella, Kebabfleisch",                                                      price: 19.00 },
-    { name: "Porcini",             description: "Tomaten, Mozzarella, Steinpilze, Zwiebeln, Oregano",                                          price: 19.00 },
-    { name: "Poulet",              description: "Tomatensauce, Mozzarella, Poulet",                                                            price: 19.00 },
-    { name: "Quattro Formaggi",    description: "Tomatensauce, Mozzarella, 4 Käsesorten, Mascarpone",                                         price: 19.00 },
-    { name: "Quattro Stagioni",    description: "Tomatensauce, Mozzarella, Schinken, Pilze, Artischocken, Peperoni",                           price: 19.00 },
-    { name: "Verdura",             description: "Tomatensauce, Mozzarella, Gemüse",                                                            price: 19.00 },
-    { name: "Spezial",             description: "Tomatensauce, Mozzarella, Kalbfleisch, Knoblauch, Scharf, Kräuterbutter, Oregano",           price: 19.00 },
-    { name: "Italiano",            description: "Tomatensauce, Mozzarella, Rohschinken, Mascarpone, Rucola",                                  price: 20.00 },
-    { name: "Lemon Pizza",         description: "Tomatensauce, Mozzarella, Lammfleisch, Knoblauch, Zwiebeln, Peperoncini, Scharf",            price: 20.00 },
-    { name: "Padrone",             description: "Tomatensauce, Mozzarella, Gorgonzola, Pilze",                                                price: 20.00 },
-    { name: "Schloss Pizza",       description: "Tomatensauce, Mozzarella, Schinken, Speck, scharfe Salami",                                  price: 20.00 },
-    { name: "Americano",           description: "Tomatensauce, Mozzarella, Speck, Mais, Zwiebeln",                                            price: 21.00 },
-    { name: "Wunschpizza",         description: "Ihre Wunschpizza – wählen Sie Ihre Zutaten selbst",                                          price: 19.00 },
+    { name: "Margherita",          description: "Tomatensauce, Mozzarella, Oregano",                                                          price: 14.00 },
+    { name: "Profumata",           description: "Tomaten, Mozzarella, Zwiebeln, Knoblauch, Oregano",                                          price: 14.00 },
+    { name: "Funghi",              description: "Tomatensauce, Mozzarella, Pilze",                                                            price: 15.00, image: "Funghi-220x220.jpg" },
+    { name: "Spinat",              description: "Tomatensauce, Mozzarella, Spinat",                                                           price: 15.00, image: "Spinat-220x220.jpg" },
+    { name: "Gorgonzola",          description: "Tomatensauce, Mozzarella, Gorgonzola",                                                       price: 16.00, image: "Gorgonzola-220x220.jpg" },
+    { name: "Prosciutto",          description: "Tomatensauce, Mozzarella, Schinken",                                                         price: 16.00, image: "Prosciutto-220x220.jpg" },
+    { name: "Salami",              description: "Tomatensauce, Mozzarella, scharfe Salami",                                                   price: 16.00, image: "Salami-220x220.jpg" },
+    { name: "Arrabiata",           description: "Tomatensauce, Mozzarella, Oliven, Pilze, scharf",                                            price: 17.00, image: "Arrabiata-220x220.jpg" },
+    { name: "Diavola",             description: "Tomatensauce, Mozzarella, scharfe Salami, Oliven, Zwiebeln",                                 price: 17.00, image: "Diavola-220x220.jpg" },
+    { name: "Hawaii",              description: "Tomatensauce, Mozzarella, Schinken, Ananas",                                                 price: 17.00, image: "Hawaii-220x220.jpg" },
+    { name: "Prosciutto e Funghi", description: "Tomatensauce, Mozzarella, Pilze, Schinken",                                                  price: 17.00, image: "Prosciutto e Funghi-220x220.jpg" },
+    { name: "Siciliana",           description: "Tomatensauce, Mozzarella, Schinken, Sardellen, Kapern",                                      price: 17.00, image: "Siciliana-220x220.jpg" },
+    { name: "Tonno",               description: "Tomatensauce, Mozzarella, Thon, Zwiebeln",                                                   price: 17.00, image: "Tonno-220x220.jpg" },
+    { name: "Fiorentina",          description: "Tomaten, Mozzarella, Spinat, Parmesan, Ei, Oregano",                                         price: 18.00 },
+    { name: "Napoli",              description: "Tomatensauce, Mozzarella, Sardellen, Oliven, Kapern",                                        price: 18.00, image: "Pizza Napoli-220x220.jpg" },
+    { name: "Piccante",            description: "Tomatensauce, Mozzarella, Peperoni, Peperoncini, Zwiebeln, Knoblauch, Oregano",              price: 18.00 },
+    { name: "Pizzaiolo",           description: "Tomatensauce, Mozzarella, Speck, Knoblauch, Pilze",                                         price: 18.00, image: "Pizzaiolo-220x220.jpg" },
+    { name: "Raclette",            description: "Tomatensauce, Mozzarella, Raclettekäse",                                                     price: 18.00 },
+    { name: "A'Casa",              description: "Tomatensauce, Mozzarella, Geflügelgeschnetzeltes, Peperoni, Ei, Oregano",                    price: 19.00 },
+    { name: "Carbonara",           description: "Tomatensauce, Mozzarella, Speck, Ei, Zwiebeln",                                             price: 19.00, image: "Carbonara-220x220.jpg" },
+    { name: "Frutti di Mare",      description: "Tomatensauce, Mozzarella, Meeresfrüchte, Oregano",                                          price: 19.00, image: "Frutti di Mare-220x220.jpg" },
+    { name: "Gamberetti",          description: "Tomatensauce, Mozzarella, Crevetten, Knoblauch",                                            price: 19.00, image: "Gamberetti-220x220.jpg" },
+    { name: "Kebab Pizza",         description: "Tomatensauce, Mozzarella, Kebabfleisch",                                                     price: 19.00, image: "Kebab Pizza-220x220.jpg" },
+    { name: "Porcini",             description: "Tomaten, Mozzarella, Steinpilze, Zwiebeln, Oregano",                                         price: 19.00 },
+    { name: "Poulet",              description: "Tomatensauce, Mozzarella, Poulet",                                                           price: 19.00, image: "Poulet-220x220.jpg" },
+    { name: "Quattro Formaggi",    description: "Tomatensauce, Mozzarella, 4 Käsesorten, Mascarpone",                                        price: 19.00, image: "Quatro Formaggi-220x220.jpg" },
+    { name: "Quattro Stagioni",    description: "Tomatensauce, Mozzarella, Schinken, Pilze, Artischocken, Peperoni",                          price: 19.00, image: "Quatro Stagione-220x220.jpg" },
+    { name: "Verdura",             description: "Tomatensauce, Mozzarella, Gemüse",                                                           price: 19.00, image: "Verdura-220x220.jpg" },
+    { name: "Spezial",             description: "Tomatensauce, Mozzarella, Kalbfleisch, Knoblauch, Scharf, Kräuterbutter, Oregano",          price: 19.00 },
+    { name: "Italiano",            description: "Tomatensauce, Mozzarella, Rohschinken, Mascarpone, Rucola",                                 price: 20.00, image: "Italiano_1-220x220.jpg" },
+    { name: "Lemon Pizza",         description: "Tomatensauce, Mozzarella, Lammfleisch, Knoblauch, Zwiebeln, Peperoncini, Scharf",           price: 20.00, image: "Lemon Pizza-220x220.jpg" },
+    { name: "Padrone",             description: "Tomatensauce, Mozzarella, Gorgonzola, Pilze",                                               price: 20.00, image: "Padrone-220x220.jpg" },
+    { name: "Schloss Pizza",       description: "Tomatensauce, Mozzarella, Schinken, Speck, scharfe Salami",                                 price: 20.00, image: "Schloss Pizza-220x220.jpg" },
+    { name: "Americano",           description: "Tomatensauce, Mozzarella, Speck, Mais, Zwiebeln",                                           price: 21.00, image: "Pizza Americano-220x220.jpg" },
+    { name: "Wunschpizza",         description: "Ihre Wunschpizza – wählen Sie Ihre Zutaten selbst",                                         price: 19.00 },
 ];
 
 const CALZONES: MenuItem[] = [
-    { name: "Calzone",         description: "Tomatensauce, Mozzarella, Schinken, Pilze, Ei",  price: 20.00 },
-    { name: "Calzone Kebab",   description: "Tomatensauce, Mozzarella, Kebabfleisch, Ei",      price: 20.00 },
-    { name: "Calzone Verdura", description: "Tomatensauce, Mozzarella, Saisongemüse",          price: 20.00 },
+    { name: "Calzone",         description: "Tomatensauce, Mozzarella, Schinken, Pilze, Ei (nur 45cm)",  price: 20.00, image: "Calzone-220x220.jpg" },
+    { name: "Calzone Kebab",   description: "Tomatensauce, Mozzarella, Kebabfleisch, Ei (nur 45cm)",      price: 20.00, image: "Calzone-220x220.jpg" },
+    { name: "Calzone Verdura", description: "Tomatensauce, Mozzarella, Saisongemüse (nur 45cm)",          price: 20.00, image: "Calzone-220x220.jpg" },
 ];
 
 const DONER: MenuItem[] = [
@@ -161,9 +162,10 @@ export async function seedPizzaLemon() {
     const [existingKey] = await db.select().from(licenseKeys)
         .where(eq(licenseKeys.licenseKey, LICENSE_KEY));
 
-    if (existingKey) {
-        console.log("[PIZZA LEMON] License key already present – store is configured. ✅");
-        return;
+    const isAlreadySeeded = !!existingKey;
+    if (isAlreadySeeded) {
+        console.log("[PIZZA LEMON] License key already present – running incremental updates...");
+        // Still run image + landing page updates below (don't return early)
     }
 
     // ── Phase 2: Find or create the Pizza Lemon tenant ────────────────────────
@@ -232,19 +234,21 @@ export async function seedPizzaLemon() {
         console.log("[PIZZA LEMON] Created new subscription.");
     }
 
-    // ── Phase 4: Add the fixed license key ───────────────────────────────────
-    const endDate = addYears(new Date(), 2);
-    await db.insert(licenseKeys).values({
-        licenseKey:          LICENSE_KEY,
-        tenantId:            tenant.id,
-        subscriptionId:      subId,
-        status:              "active",
-        activatedAt:         new Date(),
-        expiresAt:           endDate,
-        maxActivations:      5,
-        currentActivations:  0,
-    });
-    console.log(`[PIZZA LEMON] License key added: ${LICENSE_KEY}`);
+    // ── Phase 4: Add the fixed license key (only if new) ─────────────────────
+    if (!isAlreadySeeded) {
+        const endDate = addYears(new Date(), 2);
+        await db.insert(licenseKeys).values({
+            licenseKey:          LICENSE_KEY,
+            tenantId:            tenant.id,
+            subscriptionId:      subId,
+            status:              "active",
+            activatedAt:         new Date(),
+            expiresAt:           endDate,
+            maxActivations:      5,
+            currentActivations:  0,
+        });
+        console.log(`[PIZZA LEMON] License key added: ${LICENSE_KEY}`);
+    }
 
     // ── Phase 5: Ensure branch exists ─────────────────────────────────────────
     let tenantBranches = await db.select().from(branches)
@@ -308,6 +312,7 @@ export async function seedPizzaLemon() {
         let idx = 0;
         async function insertItem(catKey: string, item: MenuItem, mods: any[] = []) {
             const sku = `PL-${slugify(item.name).toUpperCase().slice(0, 10)}-${++idx}`;
+            const image = item.image ? `${IMG_BASE}${encodeURIComponent(item.image)}` : null;
             const [prod] = await db.insert(products).values({
                 tenantId: tenant!.id,
                 name: item.name,
@@ -321,6 +326,7 @@ export async function seedPizzaLemon() {
                 trackInventory: false,
                 isActive: true,
                 modifiers: mods,
+                ...(image ? { image } : {}),
             }).returning();
             await db.insert(inventory).values({ productId: prod.id, branchId, quantity: 999, lowStockThreshold: 0, reorderPoint: 0 });
         }
@@ -339,6 +345,68 @@ export async function seedPizzaLemon() {
         console.log(`[PIZZA LEMON] Products seeded.`);
     } else {
         console.log(`[PIZZA LEMON] Products already present (${existingProds.length}). Skipping.`);
+    }
+
+    // ── Update product images for existing stores ─────────────────────────────
+    const allItems: { name: string; image?: string }[] = [
+        ...PIZZAS, ...CALZONES, ...DONER, ...PIDE,
+        ...TELLER, ...LAHMACUN, ...SALATE, ...DESSERTS, ...SOFT, ...ALKOHOL,
+    ];
+    const tenantProds = await db.select({ id: products.id, name: products.name, image: products.image })
+        .from(products).where(eq(products.tenantId, tenant.id));
+
+    for (const prod of tenantProds) {
+        const item = allItems.find(i => i.name === prod.name);
+        if (item?.image && !prod.image) {
+            const image = `${IMG_BASE}${encodeURIComponent(item.image)}`;
+            await db.update(products).set({ image }).where(eq(products.id, prod.id));
+        }
+    }
+    console.log("[PIZZA LEMON] Product images updated.");
+
+    // ── Landing page config ────────────────────────────────────────────────────
+    const [existingConfig] = await db.select().from(landingPageConfig)
+        .where(eq(landingPageConfig.tenantId, tenant.id));
+
+    if (!existingConfig) {
+        await db.insert(landingPageConfig).values({
+            tenantId: tenant.id,
+            slug: "pizza-lemon",
+            heroTitle: "Pizza Lemon",
+            heroSubtitle: "Frische Pizza, Döner & mehr – direkt zu Ihnen geliefert",
+            heroImage: `${IMG_BASE}Lemon Pizza-220x220.jpg`,
+            aboutText: "Pizza Lemon – Ihr Lieblingsrestaurant für authentische italienische Pizza und türkische Spezialitäten. Wir verwenden frische Zutaten und backen unsere Pizzen täglich frisch. Bestellen Sie online oder besuchen Sie uns direkt.",
+            primaryColor: "#E53E3E",
+            accentColor: "#D69E2E",
+            enableOnlineOrdering: true,
+            enableDelivery: true,
+            enablePickup: true,
+            acceptCard: true,
+            acceptMobile: true,
+            acceptCash: true,
+            minOrderAmount: "15.00",
+            estimatedDeliveryTime: 35,
+            footerText: "© 2025 Pizza Lemon · Alle Rechte vorbehalten",
+            socialWhatsapp: "+41000000000",
+            isPublished: true,
+        });
+        console.log("[PIZZA LEMON] Landing page config created. URL: /store/pizza-lemon");
+    } else {
+        // Update existing config with hero content if missing
+        if (!existingConfig.heroTitle) {
+            await db.update(landingPageConfig).set({
+                heroTitle: "Pizza Lemon",
+                heroSubtitle: "Frische Pizza, Döner & mehr – direkt zu Ihnen geliefert",
+                heroImage: `${IMG_BASE}Lemon Pizza-220x220.jpg`,
+                aboutText: "Pizza Lemon – Ihr Lieblingsrestaurant für authentische italienische Pizza und türkische Spezialitäten.",
+                primaryColor: "#E53E3E",
+                accentColor: "#D69E2E",
+                minOrderAmount: "15.00",
+                estimatedDeliveryTime: 35,
+                footerText: "© 2025 Pizza Lemon · Alle Rechte vorbehalten",
+            }).where(eq(landingPageConfig.tenantId, tenant.id));
+            console.log("[PIZZA LEMON] Landing page config updated with store data.");
+        }
     }
 
     // ── Notification ──────────────────────────────────────────────────────────

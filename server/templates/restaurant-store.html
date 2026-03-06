@@ -563,7 +563,7 @@ function renderProducts(products) {
   }
   grid.innerHTML = filtered.map(p => `
     <div class="product-card" onclick="addToCart(${p.id})">
-      ${p.imageUrl ? `<img src="${p.imageUrl}" alt="${p.name}" loading="lazy" />` : `<div class="no-img">🍽️</div>`}
+      ${(p.image||p.imageUrl) ? `<img src="${p.image||p.imageUrl}" alt="${p.name}" loading="lazy" />` : `<div class="no-img">🍽️</div>`}
       <div class="info">
         <h3>${p.name}</h3>
         ${p.description ? `<p class="desc">${p.description}</p>` : ""}
