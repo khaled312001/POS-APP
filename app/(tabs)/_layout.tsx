@@ -1,18 +1,46 @@
 import { Tabs, Redirect } from "expo-router";
 import { Platform, StyleSheet } from "react-native";
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/colors";
 import { BlurView } from "expo-blur";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { useLicense } from "@/lib/license-context";
-import { Text, View } from "react-native";
+import { Text, View, Animated } from "react-native";
+import { useQuery } from "@tanstack/react-query";
+import { getQueryFn, getApiUrl } from "@/lib/query-client";
 
 export default function TabLayout() {
   const { isLoggedIn, isCashier } = useAuth();
   const { t, isRTL } = useLanguage();
-  const { subscription } = useLicense();
+  const { subscription, tenant } = useLicense();
+  const tenantId = tenant?.id;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const { data: onlineOrders = [] } = useQuery<any[]>({
+    queryKey: ["/api/online-orders", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
+    refetchInterval: 20000,
+  });
+
+  useEffect(() => {
+    const count = (onlineOrders as any[]).filter((o: any) => o.status === "pending").length;
+    setPendingCount(count);
+    if (count > 0) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.3, duration: 600, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.stopAnimation();
+      pulseAnim.setValue(1);
+    }
+  }, [onlineOrders]);
 
   if (!isLoggedIn) {
     return <Redirect href="/login" />;
@@ -91,6 +119,32 @@ export default function TabLayout() {
               <Ionicons name="stats-chart" size={size} color={color} />
             ),
             href: isCashier ? null : undefined,
+          }}
+        />
+        <Tabs.Screen
+          name="online-orders"
+          options={{
+            title: t("onlineOrdersTitle" as any) || "Orders",
+            tabBarIcon: ({ color, size, focused }) => (
+              <View style={{ position: "relative" }}>
+                <Ionicons name="globe" size={size} color={color} />
+                {pendingCount > 0 && (
+                  <Animated.View style={{
+                    position: "absolute", top: -4, right: -6,
+                    minWidth: 16, height: 16, borderRadius: 8,
+                    backgroundColor: Colors.danger,
+                    justifyContent: "center", alignItems: "center",
+                    paddingHorizontal: 3,
+                    transform: [{ scale: pulseAnim }],
+                    borderWidth: 1.5, borderColor: Colors.tabBar,
+                  }}>
+                    <Text style={{ color: "#fff", fontSize: 9, fontWeight: "900", lineHeight: 12 }}>
+                      {pendingCount > 9 ? "9+" : pendingCount}
+                    </Text>
+                  </Animated.View>
+                )}
+              </View>
+            ),
           }}
         />
         <Tabs.Screen
