@@ -216,3 +216,5 @@
 [2026-03-06T00:36:40.014Z] Creating default admin for tenant 25
 [2026-03-06T00:39:28.238Z] seedSuperAdminData started
 [2026-03-06T00:39:28.544Z] Existing tenants count: 5
+[2026-03-06T00:57:35.350Z] seedSuperAdminData started
+[2026-03-06T00:57:35.626Z] Existing tenants count: 5
