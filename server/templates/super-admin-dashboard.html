@@ -159,6 +159,7 @@
     <div class="ni" onclick="show('licenses')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>License Keys</div>
     <div class="nav-sec">Analytics</div>
     <div class="ni" onclick="show('analytics')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>Analytics</div>
+    <div class="ni" onclick="show('commission')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Commissions</div>
     <div class="ni" onclick="show('system')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>System Health</div>
     <div class="ni" onclick="show('notifications')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>Notifications</div>
     <div class="ni" onclick="show('reports')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Reports</div>
@@ -322,6 +323,40 @@
         <div class="card"><div class="ct">Plan Breakdown</div><div id="aPlan"><div class="spin"></div></div></div>
       </div>
       <div class="card" style="margin-bottom:20px"><div class="ct">Sales by Tenant</div><div id="aSales"><div class="spin"></div></div></div>
+    </div>
+
+    <!-- ══════════ COMMISSIONS ══════════ -->
+    <div class="view" id="view-commission">
+      <div class="card" style="margin-bottom:18px">
+        <div class="ct">Commission Rate Settings</div>
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 0">
+          <label style="font-size:13px;color:var(--mu)">Platform Commission Rate (%)</label>
+          <input id="commRateInput" type="number" min="0" max="100" step="0.1" style="width:100px;padding:8px 10px;background:rgba(0,0,0,.3);border:1px solid var(--bd);border-radius:8px;font-size:13px;color:var(--tx);outline:none" placeholder="6.0" />
+          <button class="btn btn-p" onclick="saveCommissionRate()">Save Rate</button>
+          <span id="commRateStatus" style="font-size:12px;color:var(--ok)"></span>
+        </div>
+        <div style="font-size:12px;color:var(--mu);margin-top:4px">This rate is embedded in customer-facing prices. A 6% rate means prices are shown as price × 1.06, and the commission is extracted from each online order.</div>
+      </div>
+      <div class="card" style="margin-bottom:18px">
+        <div class="ct">Commission Summary</div>
+        <div id="commSummaryStats" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px"><div class="spin"></div></div>
+        <div class="tw"><table>
+          <thead><tr><th>Store</th><th style="text-align:right">Orders</th><th style="text-align:right">Commission Earned</th></tr></thead>
+          <tbody id="commSummaryTbl"><tr><td colspan="3" class="ls"><div class="spin"></div></td></tr></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <div class="ct">Recent Commission Transactions</div>
+        <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">
+          <input id="commTenantFilter" type="number" placeholder="Filter by Tenant ID…" style="padding:8px 10px;background:rgba(0,0,0,.3);border:1px solid var(--bd);border-radius:8px;font-size:13px;color:var(--tx);outline:none;width:180px" />
+          <button class="btn btn-o" onclick="loadCommissionTx()">Filter</button>
+          <button class="btn btn-p" onclick="document.getElementById('commTenantFilter').value='';loadCommissionTx()">All</button>
+        </div>
+        <div class="tw"><table>
+          <thead><tr><th>ID</th><th>Tenant</th><th>Order ID</th><th style="text-align:right">Sale Total</th><th style="text-align:right">Rate %</th><th style="text-align:right">Commission</th><th>Status</th><th>Date</th></tr></thead>
+          <tbody id="commTxTbl"><tr><td colspan="8" class="ls"><div class="spin"></div></td></tr></tbody>
+        </table></div>
+      </div>
     </div>
 
     <!-- ══════════ SYSTEM ══════════ -->
@@ -675,6 +710,7 @@ const META = {
   backup:        ['Backup & Restore','Automated and manual backups'],
   settings:      ['Settings','Account & preferences'],
   landingpages:  ['Landing Pages','Manage restaurant online stores'],
+  commission:    ['Commissions','Platform commission tracking & settings'],
 };
 let curView = 'dashboard';
 function show(v) {
@@ -701,6 +737,7 @@ function show(v) {
   if(v==='shifts')        loadShifts();
   if(v==='backup')        { loadBackups(); fillBkTenants(); }
   if(v==='landingpages')  loadLandingPages();
+  if(v==='commission')    loadCommission();
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1745,6 +1782,71 @@ async function restoreBackup(filename){
     const r = res.restored||{};
     toast(`Restored: ${r.products||0} products, ${r.customers||0} customers`,'ok');
   } else toast(res?.error||'Restore failed','err');
+}
+
+/* ══════════════════════════════════════════════════════
+   COMMISSIONS
+══════════════════════════════════════════════════════ */
+async function loadCommission(){
+  // Load current rate
+  const settings = await api('GET','/commission/settings');
+  if(settings){ document.getElementById('commRateInput').value = settings.commissionRate; }
+  // Load summary
+  await loadCommissionSummary();
+  // Load transactions
+  await loadCommissionTx();
+}
+
+async function loadCommissionSummary(){
+  const summary = await api('GET','/commission/summary');
+  const statsEl = document.getElementById('commSummaryStats');
+  const tblEl = document.getElementById('commSummaryTbl');
+  if(!summary){ statsEl.innerHTML='<div class="ls">Failed to load</div>'; return; }
+  statsEl.innerHTML = `
+    <div class="hi" style="min-width:160px">
+      <div class="hv">${fmtM(summary.grandTotal)}</div>
+      <div class="hl">Total Commission Earned</div>
+    </div>
+    <div class="hi" style="min-width:160px">
+      <div class="hv">${summary.tenants?.length||0}</div>
+      <div class="hl">Stores Tracked</div>
+    </div>
+  `;
+  tblEl.innerHTML = (summary.tenants||[]).map(t=>`<tr>
+    <td style="font-weight:600">${t.businessName}</td>
+    <td style="text-align:right;color:var(--mu)">${t.count}</td>
+    <td style="text-align:right;font-weight:700;color:var(--pr)">${fmtM(t.commissionTotal)}</td>
+  </tr>`).join('') || '<tr><td colspan="3" class="empty">No commission data yet.</td></tr>';
+}
+
+async function loadCommissionTx(){
+  const tenantId = document.getElementById('commTenantFilter').value;
+  const url = tenantId ? `/commission/transactions?tenantId=${tenantId}` : '/commission/transactions';
+  const txs = await api('GET', url);
+  const tbl = document.getElementById('commTxTbl');
+  if(!txs){ tbl.innerHTML='<tr><td colspan="8" class="empty">Failed to load</td></tr>'; return; }
+  tbl.innerHTML = txs.map(tx=>`<tr>
+    <td style="color:var(--mu);font-size:11px">${tx.id}</td>
+    <td>${tx.tenantId}</td>
+    <td style="color:var(--mu)">${tx.orderId||'—'}</td>
+    <td style="text-align:right">${fmtM(tx.saleTotal)}</td>
+    <td style="text-align:right;color:var(--mu)">${parseFloat(tx.commissionRate||0).toFixed(1)}%</td>
+    <td style="text-align:right;font-weight:700;color:var(--pr)">${fmtM(tx.commissionAmount)}</td>
+    <td>${badge(tx.status||'pending')}</td>
+    <td style="color:var(--mu);font-size:12px">${fmtDT(tx.createdAt)}</td>
+  </tr>`).join('') || '<tr><td colspan="8" class="empty">No transactions found.</td></tr>';
+}
+
+async function saveCommissionRate(){
+  const val = document.getElementById('commRateInput').value;
+  const statusEl = document.getElementById('commRateStatus');
+  if(!val || isNaN(parseFloat(val))){ toast('Enter a valid rate','err'); return; }
+  const res = await api('PUT','/commission/settings',{ commissionRate: parseFloat(val) });
+  if(res?.commissionRate !== undefined){
+    statusEl.textContent = 'Saved!';
+    setTimeout(()=>{ statusEl.textContent=''; }, 3000);
+    toast('Commission rate updated to '+res.commissionRate+'%','ok');
+  } else toast('Failed to save rate','err');
 }
 
 /* ══════════════════════════════════════════════════════

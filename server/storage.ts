@@ -20,8 +20,9 @@ import {
   type InsertStockCountItem, type InsertSupplierContract, type InsertEmployeeCommission,
   type InsertNotification, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications,
   type InsertSuperAdmin, type InsertTenant, type InsertTenantSubscription, type InsertLicenseKey, type InsertTenantNotification,
-  onlineOrders, landingPageConfig,
-  type InsertOnlineOrder, type InsertLandingPageConfig
+  onlineOrders, landingPageConfig, platformSettings, platformCommissions,
+  type InsertOnlineOrder, type InsertLandingPageConfig,
+  type InsertPlatformSetting, type InsertPlatformCommission
 } from "@shared/schema";
 
 export const storage = {
@@ -1613,5 +1614,51 @@ export const storage = {
         permissions: ["all"],
       });
     }
-  }
+  },
+
+  // ── Platform Settings ──────────────────────────────────────────────────────
+  async getPlatformSetting(key: string): Promise<string | null> {
+    const [row] = await db.select().from(platformSettings).where(eq(platformSettings.key, key));
+    return row?.value ?? null;
+  },
+  async setPlatformSetting(key: string, value: string) {
+    const existing = await db.select().from(platformSettings).where(eq(platformSettings.key, key));
+    if (existing.length > 0) {
+      await db.update(platformSettings).set({ value, updatedAt: new Date() }).where(eq(platformSettings.key, key));
+    } else {
+      await db.insert(platformSettings).values({ key, value });
+    }
+  },
+  async getCommissionRate(): Promise<number> {
+    const val = await this.getPlatformSetting("commission_rate");
+    return val ? parseFloat(val) : 6.0;
+  },
+
+  // ── Platform Commissions ───────────────────────────────────────────────────
+  async createPlatformCommission(data: InsertPlatformCommission) {
+    const [row] = await db.insert(platformCommissions).values(data).returning();
+    return row;
+  },
+  async getPlatformCommissions(tenantId?: number) {
+    if (tenantId) {
+      return db.select().from(platformCommissions).where(eq(platformCommissions.tenantId, tenantId)).orderBy(desc(platformCommissions.createdAt));
+    }
+    return db.select().from(platformCommissions).orderBy(desc(platformCommissions.createdAt));
+  },
+  async getCommissionSummary() {
+    const { sql: sqlFn } = await import("drizzle-orm");
+    const allTenants = await this.getTenants();
+    const result = [];
+    let grandTotal = 0;
+    for (const t of allTenants) {
+      const [row] = await db.select({
+        total: sqlFn<string>`coalesce(sum(cast(commission_amount as decimal)), 0)::text`,
+        count: sqlFn<number>`count(*)`
+      }).from(platformCommissions).where(eq(platformCommissions.tenantId, t.id));
+      const total = parseFloat(row?.total || "0");
+      grandTotal += total;
+      result.push({ tenantId: t.id, businessName: t.businessName, commissionTotal: total, count: Number(row?.count || 0) });
+    }
+    return { tenants: result, grandTotal };
+  },
 };

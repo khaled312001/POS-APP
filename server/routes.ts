@@ -7,6 +7,7 @@ import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { callerIdService } from "./callerIdService";
 import { requireSuperAdmin } from "./superAdminAuth";
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 const TIMESTAMP_FIELDS = [
   "createdAt", "updatedAt", "expiryDate", "expectedDate", "receivedDate",
@@ -1690,6 +1691,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "pending",
       });
 
+      // Track platform commission
+      try {
+        const commissionRate = await storage.getCommissionRate();
+        const saleTotal = parseFloat(orderData.totalAmount || "0");
+        const commissionAmount = saleTotal * commissionRate / (100 + commissionRate);
+        if (commissionAmount > 0) {
+          await storage.createPlatformCommission({
+            tenantId: resolvedTenantId,
+            orderId: order.id,
+            saleTotal: String(saleTotal.toFixed(2)),
+            commissionRate: String(commissionRate),
+            commissionAmount: String(commissionAmount.toFixed(2)),
+            status: "pending",
+          });
+        }
+      } catch (commErr) {
+        console.error("[Commission] Failed to track commission:", commErr);
+      }
+
       // Broadcast to all connected POS clients
       callerIdService.broadcast({
         type: "new_online_order",
@@ -1718,6 +1738,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Broadcast status update to all clients
       callerIdService.broadcast({ type: "online_order_updated", order });
+      // Notify SSE clients tracking this order
+      if ((app as any)._broadcastOrderStatus) {
+        (app as any)._broadcastOrderStatus(id, { type: "status_update", order });
+      }
       res.json(order);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -1748,6 +1772,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(config);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
+
+  // ── Public commission rate ─────────────────────────────────────────────────
+  app.get("/api/store-public/commission-rate", async (_req, res) => {
+    try {
+      const rate = await storage.getCommissionRate();
+      res.json({ rate });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Stripe Payment Intent ──────────────────────────────────────────────────
+  app.post("/api/create-payment-intent", async (req, res) => {
+    try {
+      const { amount, currency, tenantId } = req.body;
+      const stripe = await getUncachableStripeClient();
+      const amountInCents = Math.round(parseFloat(amount) * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountInCents,
+        currency: (currency || "chf").toLowerCase(),
+        metadata: { tenantId: String(tenantId || ""), source: "online_order" },
+      });
+      res.json({ clientSecret: paymentIntent.client_secret, publishableKey: await getStripePublishableKey() });
+    } catch (e: any) {
+      console.error("[Stripe] PaymentIntent error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ── SSE: Customer order status tracking ───────────────────────────────────
+  const orderSseClients: Map<number, Set<any>> = new Map();
+
+  app.get("/api/online-orders/:id/status-stream", (req, res) => {
+    const orderId = Number(req.params.id);
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    if (!orderSseClients.has(orderId)) orderSseClients.set(orderId, new Set());
+    orderSseClients.get(orderId)!.add(res);
+
+    res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
+
+    const keepAlive = setInterval(() => res.write(`: ping\n\n`), 25000);
+    req.on("close", () => {
+      clearInterval(keepAlive);
+      orderSseClients.get(orderId)?.delete(res);
+    });
+  });
+
+  (app as any)._broadcastOrderStatus = (orderId: number, data: object) => {
+    const clients = orderSseClients.get(orderId);
+    if (clients) {
+      const msg = `data: ${JSON.stringify(data)}\n\n`;
+      clients.forEach((c: any) => { try { c.write(msg); } catch {} });
+    }
+  };
 
   // ── Public Restaurant Store page ───────────────────────────────────────────
   app.get("/store/:slug", async (req, res) => {

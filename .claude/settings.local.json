@@ -14,7 +14,8 @@
       "Bash(python3:*)",
       "Bash(dir F:\\\\POS-APP\\\\static-build:*)",
       "Bash(grep:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

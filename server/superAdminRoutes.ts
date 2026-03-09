@@ -962,6 +962,41 @@ export function registerSuperAdminRoutes(app: Express) {
     }
   });
 
+  // ── COMMISSION SETTINGS ───────────────────────────────────────────────────
+  app.get("/api/super-admin/commission/settings", requireSuperAdmin, async (_req: Request, res: Response) => {
+    try {
+      const rate = await storage.getCommissionRate();
+      res.json({ commissionRate: rate });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/super-admin/commission/settings", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { commissionRate } = req.body;
+      if (commissionRate === undefined || isNaN(Number(commissionRate))) {
+        return res.status(400).json({ error: "Valid commissionRate required" });
+      }
+      const rate = Math.max(0, Math.min(100, Number(commissionRate)));
+      await storage.setPlatformSetting("commission_rate", String(rate));
+      res.json({ commissionRate: rate });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/super-admin/commission/summary", requireSuperAdmin, async (_req: Request, res: Response) => {
+    try {
+      const summary = await storage.getCommissionSummary();
+      res.json(summary);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/super-admin/commission/transactions", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      const commissions = await storage.getPlatformCommissions(tenantId);
+      res.json(commissions);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // ── CHANGE SUPER ADMIN PASSWORD ───────────────────────────────────────
   app.post("/api/super-admin/change-password", requireSuperAdmin, async (req: SuperAdminRequest, res: Response) => {
     try {

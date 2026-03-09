@@ -515,6 +515,26 @@ export const tenantNotifications = pgTable("tenant_notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ========== Platform Settings & Commissions ==========
+
+export const platformSettings = pgTable("platform_settings", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const platformCommissions = pgTable("platform_commissions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  orderId: integer("order_id"),
+  saleTotal: decimal("sale_total", { precision: 12, scale: 2 }).notNull(),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull(),
+  commissionAmount: decimal("commission_amount", { precision: 12, scale: 2 }).notNull(),
+  status: text("status").default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // ========== Online Ordering ==========
 
 export const onlineOrders = pgTable("online_orders", {
@@ -610,6 +630,10 @@ export const insertLicenseKeySchema = createInsertSchema(licenseKeys).omit({ id:
 export const insertTenantNotificationSchema = createInsertSchema(tenantNotifications).omit({ id: true, createdAt: true });
 export const insertOnlineOrderSchema = createInsertSchema(onlineOrders).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLandingPageConfigSchema = createInsertSchema(landingPageConfig).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPlatformSettingSchema = createInsertSchema(platformSettings).omit({ id: true, updatedAt: true });
+export const insertPlatformCommissionSchema = createInsertSchema(platformCommissions).omit({ id: true, createdAt: true });
+export type InsertPlatformSetting = z.infer<typeof insertPlatformSettingSchema>;
+export type InsertPlatformCommission = z.infer<typeof insertPlatformCommissionSchema>;
 
 // ========== Type Exports ==========
 
