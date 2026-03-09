@@ -189,7 +189,7 @@ function configureExpoAndLanding(app: express.Application) {
 
   log("Serving static Expo files with dynamic manifest routing");
 
-  app.use((req: Request, res: Response, next: NextFunction) => {
+  app.use(async (req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith("/api")) {
       return next();
     }
@@ -283,6 +283,31 @@ self.addEventListener('fetch', (e) => {
       const dbTemplate = fs.readFileSync(dashboardPath, "utf-8");
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(dbTemplate);
+    }
+
+    const storeByIdMatch = req.path.match(/^\/store\/(\d+)$/);
+    if (storeByIdMatch) {
+      try {
+        const tenantId = parseInt(storeByIdMatch[1], 10);
+        const { storage } = await import("./storage");
+        const tenant = await storage.getTenant(tenantId);
+        if (!tenant) {
+          return res.status(404).send("<h1>Store not found</h1>");
+        }
+        const config = await storage.getLandingPageConfig(tenantId);
+        const storePath = path.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
+        let html = fs.readFileSync(storePath, "utf-8");
+        const slug = config?.slug || `tenant-${tenantId}`;
+        html = html.replace(/\{\{SLUG\}\}/g, slug);
+        html = html.replace(/\{\{TENANT_ID\}\}/g, String(tenantId));
+        html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config?.primaryColor || "#2FD3C6");
+        html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config?.accentColor || "#6366F1");
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.status(200).send(html);
+      } catch (err) {
+        console.error("[store/:tenantId] Error:", err);
+        return res.status(500).send("<h1>Server error</h1>");
+      }
     }
 
     if (req.path !== "/landing" && req.path !== "/manifest") {

@@ -157,7 +157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         priority: "normal"
       });
 
-      console.log(`[SUBSCRIBE] New tenant created: ${businessName} (ID: ${tenant.id}), temp password: ${tempPassword}`);
+      console.log(`[SUBSCRIBE] New tenant created: ${businessName} (ID: ${tenant.id})`);
 
       res.json({
         success: true,
@@ -1609,6 +1609,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   });
 
+  app.get("/api/store/:tenantId/menu", async (req, res) => {
+    try {
+      const tenantId = Number(req.params.tenantId);
+      if (!tenantId || isNaN(tenantId)) {
+        return res.status(400).json({ error: "Valid tenantId is required" });
+      }
+      const tenant = await storage.getTenant(tenantId);
+      if (!tenant) {
+        return res.status(404).json({ error: "Store not found" });
+      }
+      const products = await storage.getProductsByTenant(tenantId);
+      const categories = await storage.getCategories(tenantId);
+      const config = await storage.getLandingPageConfig(tenantId);
+      res.json({
+        store: {
+          id: tenant.id,
+          name: tenant.businessName,
+          logo: tenant.logo,
+          storeType: tenant.storeType,
+        },
+        config: config || null,
+        products,
+        categories,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ── Online Orders ──────────────────────────────────────────────────────────
   // Public: get store info + menu by slug (for landing page)
   app.get("/api/store-public/:slug", async (req, res) => {
@@ -1626,14 +1655,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Public: create online order
   app.post("/api/online-orders/public", async (req, res) => {
     try {
-      const { slug, ...orderData } = req.body;
-      const config = await storage.getLandingPageConfigBySlug(slug);
-      if (!config) return res.status(404).json({ error: "Store not found" });
+      const { slug, tenantId: bodyTenantId, ...orderData } = req.body;
+      let resolvedTenantId: number | undefined;
+      if (slug) {
+        const config = await storage.getLandingPageConfigBySlug(slug);
+        if (config) resolvedTenantId = config.tenantId;
+      }
+      if (!resolvedTenantId && bodyTenantId) {
+        resolvedTenantId = Number(bodyTenantId);
+      }
+      if (!resolvedTenantId) return res.status(404).json({ error: "Store not found" });
 
       const orderNumber = `ONL-${Date.now().toString().slice(-6)}`;
       const order = await storage.createOnlineOrder({
         ...orderData,
-        tenantId: config.tenantId,
+        tenantId: resolvedTenantId,
         orderNumber,
         paymentStatus: orderData.paymentMethod === "cash" ? "pending" : "pending",
         status: "pending",
@@ -1711,6 +1747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const templatePath = path.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
       let html = fs.readFileSync(templatePath, "utf8");
       html = html.replace(/\{\{SLUG\}\}/g, slug);
+      html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
       html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
       html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
       res.setHeader("Content-Type", "text/html; charset=utf-8");

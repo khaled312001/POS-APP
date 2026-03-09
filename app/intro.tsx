@@ -407,7 +407,10 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         overflow: 'hidden',
         elevation: 12,
-        ...(Platform.OS === "web" ? { boxShadow: `0px 6px 16px rgba(30,64,175,0.5)` } as any : { shadowColor: Colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.5, shadowRadius: 16 }),
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.5,
+        shadowRadius: 16,
         marginBottom: 16,
     },
     buttonGradient: {

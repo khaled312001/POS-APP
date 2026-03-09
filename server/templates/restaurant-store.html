@@ -795,6 +795,7 @@
 <script>
 // ── Config ─────────────────────────────────────────────────────
 const SLUG = "{{SLUG}}";
+const TENANT_ID = "{{TENANT_ID}}";
 let storeData = null, cart = [], selType_ = "delivery", selPay = "cash";
 let lang = localStorage.getItem("store-lang") || "en";
 
@@ -932,8 +933,14 @@ window.addEventListener("scroll", () => {
 // ── Load store data ─────────────────────────────────────────────
 async function loadStore() {
   try {
-    const res = await fetch("/api/store-public/" + SLUG);
-    if (!res.ok) {
+    let res;
+    if (SLUG && !SLUG.startsWith("tenant-")) {
+      res = await fetch("/api/store-public/" + SLUG);
+    }
+    if ((!res || !res.ok) && TENANT_ID && TENANT_ID !== "{{TENANT_ID}}") {
+      res = await fetch("/api/store/" + TENANT_ID + "/menu");
+    }
+    if (!res || !res.ok) {
       document.getElementById("product-grid").innerHTML =
         `<div style="grid-column:1/-1;text-align:center;padding:80px;color:var(--mu)">Store not found</div>`;
       return;
@@ -946,7 +953,11 @@ async function loadStore() {
   }
 }
 
-function applyStore({ config, tenant, products, categories }) {
+function applyStore(data) {
+  const config = data.config || {};
+  const tenant = data.tenant || data.store || {};
+  const products = data.products || [];
+  const categories = data.categories || [];
   // Hero
   if (config.heroImage) {
     const bg = document.getElementById("hero-bg");
@@ -957,11 +968,12 @@ function applyStore({ config, tenant, products, categories }) {
     const frame = document.getElementById("about-img-frame");
     frame.innerHTML = `<img src="${config.heroImage}" alt="About" />`;
   }
-  if (config.heroTitle) {
-    document.getElementById("hero-title").textContent = config.heroTitle;
-    document.getElementById("nav-logo").textContent = config.heroTitle;
-    document.getElementById("footer-logo").textContent = config.heroTitle;
-    document.title = config.heroTitle + " — Order Online";
+  const storeName = config.heroTitle || tenant.businessName || tenant.name || "";
+  if (storeName) {
+    document.getElementById("hero-title").textContent = storeName;
+    document.getElementById("nav-logo").textContent = storeName;
+    document.getElementById("footer-logo").textContent = storeName;
+    document.title = storeName + " — Order Online";
   }
   if (config.heroSubtitle) document.getElementById("hero-subtitle").textContent = config.heroSubtitle;
 
@@ -1179,7 +1191,8 @@ async function placeOrder() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        slug: SLUG, customerName: name, customerPhone: phone,
+        slug: SLUG, tenantId: (TENANT_ID && TENANT_ID !== "{{TENANT_ID}}") ? TENANT_ID : undefined,
+        customerName: name, customerPhone: phone,
         customerEmail: email || null, customerAddress: addr || null,
         items: cart.map(i => ({ productId: i.productId, name: i.name, quantity: i.qty, unitPrice: i.unitPrice, total: i.total })),
         subtotal: sub.toFixed(2), taxAmount: "0",
