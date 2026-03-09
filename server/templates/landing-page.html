@@ -437,7 +437,7 @@
   <div class="nav-right">
     <button class="lang-btn" id="langBtn">عربي</button>
     <a href="BASE_URL_PLACEHOLDER/super_admin/login" class="btn-nav btn-nav-ghost" data-en="Admin Login" data-ar="تسجيل الدخول" data-de="Admin Login">Admin Login</a>
-    <button class="btn-nav btn-nav-primary" onclick="openModal('monthly')" data-en="Get Started" data-ar="ابدأ الآن" data-de="Jetzt starten">Get Started</button>
+    <button class="btn-nav btn-nav-primary" onclick="openModal('basic')" data-en="Get Started" data-ar="ابدأ الآن" data-de="Jetzt starten">Get Started</button>
   </div>
   <div class="hamburger" id="hamburger">
     <span></span><span></span><span></span>
@@ -461,7 +461,7 @@
         Barmagly POS is a cloud-powered, multi-tenant point-of-sale platform for restaurants, cafés, and retail stores. Manage sales, inventory, employees, and customers — all in one place, in English, Arabic, and German.
       </p>
       <div class="hero-cta">
-        <button class="btn-hero-primary" onclick="openModal('annual')" data-en="Start Free Trial" data-ar="ابدأ تجربة مجانية" data-de="Kostenlos testen">Start Free Trial</button>
+        <button class="btn-hero-primary" onclick="openModal('advanced')" data-en="Start Free Trial" data-ar="ابدأ تجربة مجانية" data-de="Kostenlos testen">Start Free Trial</button>
         <a class="btn-hero-ghost" href="#features" data-en="See Features ↓" data-ar="شاهد المميزات ↓" data-de="Funktionen ansehen ↓">See Features ↓</a>
       </div>
  
@@ -542,85 +542,89 @@
         <div class="toggle-knob"></div>
       </div>
       <span class="toggle-label" id="lbl-annual" data-en="Annual" data-ar="سنوي" data-de="Jährlich">Annual</span>
-      <span class="save-badge" data-en="Save 33%" data-ar="وفر 33%" data-de="33% sparen">Save 33%</span>
+      <span class="save-badge" data-en="Save up to 16%" data-ar="وفر حتى 16%" data-de="Bis zu 16% sparen">Save up to 16%</span>
     </div>
 
     <div class="pricing-grid">
-      <!-- Monthly Plan -->
-      <div class="pricing-card reveal" id="card-monthly">
-        <div class="pricing-plan-name" data-en="Professional" data-ar="احترافي" data-de="Professional">Professional</div>
-        <div class="pricing-price">
-          <div class="pricing-amount" id="monthly-price">CHF 149</div>
-          <div class="pricing-period" data-en="/ month" data-ar="/ شهر" data-de="/ Monat">/ month</div>
+      <!-- Basic Package / POS Starter -->
+      <div class="pricing-card reveal" id="card-basic">
+        <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.25);padding:4px 14px;border-radius:100px;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;">
+          🟢 <span data-en="Basic Package" data-ar="الباقة الأساسية" data-de="Basis-Paket">Basic Package</span>
         </div>
-        <div class="pricing-tagline" data-en="Everything you need to run a modern store. Add premium services à la carte." data-ar="كل ما تحتاجه لإدارة متجر حديث. أضف الخدمات المميزة بشكل منفصل." data-de="Alles, was Sie für einen modernen Store brauchen. Premium-Dienste à la carte hinzufügen.">Everything you need to run a modern store. Add premium services à la carte.</div>
+        <div class="pricing-plan-name" data-en="POS Starter" data-ar="نقطة بيع المبتدئين" data-de="POS Starter">POS Starter</div>
+        <div class="pricing-price">
+          <div class="pricing-amount" id="basic-price">CHF 199</div>
+          <div class="pricing-period" id="basic-period" data-en="/ month" data-ar="/ شهر" data-de="/ Monat">/ month</div>
+        </div>
+        <div class="pricing-tagline" id="basic-tagline" data-en="A professional POS system for small shops — manage sales & inventory with ease." data-ar="نظام نقطة بيع احترافي للمتاجر الصغيرة — أدر مبيعاتك ومخزونك بسهولة." data-de="Ein professionelles Kassensystem für kleine Geschäfte — verwalten Sie Verkäufe & Inventar einfach.">A professional POS system for small shops — manage sales &amp; inventory with ease.</div>
         <ul class="pricing-features">
-          <li><span class="check check-yes">✓</span><span data-en="Full POS Terminal (unlimited products)" data-ar="نقطة بيع كاملة (منتجات غير محدودة)" data-de="Vollständiges Kassensystem (unbegrenzte Produkte)">Full POS Terminal (unlimited products)</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="Multi-branch (up to 3 locations)" data-ar="متعدد الفروع (حتى 3 مواقع)" data-de="Mehrere Filialen (bis zu 3 Standorte)">Multi-branch (up to 3 locations)</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="Inventory & purchase orders" data-ar="المخزون وأوامر الشراء" data-de="Inventar & Bestellungen">Inventory & purchase orders</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="Employee & shift management" data-ar="إدارة الموظفين والورديات" data-de="Mitarbeiter- & Schichtverwaltung">Employee & shift management</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="Customer CRM & loyalty points" data-ar="إدارة العملاء ونقاط الولاء" data-de="Kunden-CRM & Treuepunkte">Customer CRM & loyalty points</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="Stripe, card, cash & NFC payments" data-ar="مدفوعات Stripe والبطاقة والنقد" data-de="Stripe, Karte, Bargeld & NFC-Zahlungen">Stripe, card, cash & NFC payments</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="3-language app (EN/AR/DE)" data-ar="تطبيق 3 لغات" data-de="3-sprachige App (EN/AR/DE)">3-language app (EN/AR/DE)</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="Daily automated backups" data-ar="نسخ احتياطية يومية تلقائية" data-de="Tägliche automatische Backups">Daily automated backups</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="Analytics & Excel reports" data-ar="التحليلات وتقارير Excel" data-de="Analysen & Excel-Berichte">Analytics & Excel reports</span></li>
-          <li><span class="check check-addon">+</span><span style="color:#818cf8" data-en="Website & App: +CHF 49/mo" data-ar="موقع وتطبيق: +49 فرنك/شهر" data-de="Website & App: +CHF 49/Mo">Website & App: +CHF 49/mo</span></li>
-          <li><span class="check check-addon">+</span><span style="color:#818cf8" data-en="Social Media Marketing: +CHF 99/mo" data-ar="التسويق عبر وسائل التواصل: +99 فرنك/شهر" data-de="Social-Media-Marketing: +CHF 99/Mo">Social Media Marketing: +CHF 99/mo</span></li>
-          <li><span class="check check-addon">+</span><span style="color:#818cf8" data-en="Sales Automation: +CHF 79/mo" data-ar="أتمتة المبيعات: +79 فرنك/شهر" data-de="Verkaufsautomatisierung: +CHF 79/Mo">Sales Automation: +CHF 79/mo</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Fast & easy-to-use POS cashier system" data-ar="نظام صراف سريع وسهل الاستخدام" data-de="Schnelles & einfaches Kassensystem">Fast &amp; easy-to-use POS cashier system</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Product & category management" data-ar="إدارة المنتجات والفئات" data-de="Produkt- & Kategorieverwaltung">Product &amp; category management</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Inventory management & low-stock alerts" data-ar="إدارة المخزون وتنبيهات نفاد المخزون" data-de="Bestandsverwaltung & Niedrigbestandswarnungen">Inventory management &amp; low-stock alerts</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Invoice creation & printing" data-ar="إنشاء الفواتير وطباعتها" data-de="Rechnungserstellung & -druck">Invoice creation &amp; printing</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Daily sales & profit reports" data-ar="تقارير المبيعات والأرباح اليومية" data-de="Tägliche Verkaufs- & Gewinnberichte">Daily sales &amp; profit reports</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Bestselling product reports" data-ar="تقارير المنتجات الأكثر مبيعاً" data-de="Berichte über Bestseller">Bestselling product reports</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Management control panel" data-ar="لوحة تحكم الإدارة" data-de="Management-Kontrollfeld">Management control panel</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Admin account + 1 Cashier account" data-ar="حساب مدير + حساب صراف" data-de="Admin-Konto + 1 Kassierer-Konto">Admin account + 1 Cashier account</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Barcode scanner support" data-ar="دعم ماسح الباركود" data-de="Barcode-Scanner-Unterstützung">Barcode scanner support</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Complete sales history" data-ar="سجل مبيعات كامل" data-de="Vollständige Verkaufshistorie">Complete sales history</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Works via computer or web browser" data-ar="يعمل عبر الكمبيوتر أو متصفح الإنترنت" data-de="Funktioniert über Computer oder Webbrowser">Works via computer or web browser</span></li>
+          <li style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)"><span class="check check-yes" style="background:rgba(47,211,198,.15);color:var(--primary)">✓</span><span data-en="System hosting & data backup" data-ar="استضافة النظام ونسخ البيانات الاحتياطية" data-de="System-Hosting & Datensicherung">System hosting &amp; data backup</span></li>
+          <li><span class="check check-yes" style="background:rgba(47,211,198,.15);color:var(--primary)">✓</span><span data-en="System updates & technical support" data-ar="تحديثات النظام والدعم الفني" data-de="System-Updates & technischer Support">System updates &amp; technical support</span></li>
         </ul>
-        <button class="pricing-cta pricing-cta-ghost" onclick="openModal('monthly')" data-en="Start with Professional" data-ar="ابدأ بالخطة الاحترافية" data-de="Mit Professional starten">Start with Professional</button>
+        <button class="pricing-cta pricing-cta-ghost" onclick="openModal('basic')" data-en="Start with POS Starter" data-ar="ابدأ بباقة نقطة البيع" data-de="Mit POS Starter beginnen">Start with POS Starter</button>
       </div>
 
-      <!-- Annual / Growth Plan -->
-      <div class="pricing-card featured reveal" id="card-annual">
-        <div class="pricing-badge" data-en="BEST VALUE" data-ar="أفضل قيمة" data-de="BESTES ANGEBOT">BEST VALUE</div>
-        <div class="pricing-plan-name" data-en="Growth" data-ar="النمو" data-de="Wachstum">Growth</div>
-        <div class="pricing-price">
-          <div class="pricing-amount" id="annual-price">CHF 100</div>
-          <div class="pricing-period" data-en="/ month" data-ar="/ شهر" data-de="/ Monat">/ month</div>
+      <!-- Advanced Package / Smart Business Growth -->
+      <div class="pricing-card featured reveal" id="card-advanced">
+        <div class="pricing-badge" data-en="MOST POPULAR" data-ar="الأكثر شعبية" data-de="AM BELIEBTESTEN">MOST POPULAR</div>
+        <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(99,102,241,.15);color:#818cf8;border:1px solid rgba(99,102,241,.3);padding:4px 14px;border-radius:100px;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;">
+          🔵 <span data-en="Advanced Package" data-ar="الباقة المتقدمة" data-de="Erweitertes Paket">Advanced Package</span>
         </div>
-        <div class="pricing-tagline" id="annual-tagline" data-en="Billed CHF 1,200/year — Save CHF 588 vs monthly plan" data-ar="يُفوتر بـ 1200 فرنك/سنة — وفر 588 فرنك مقارنة بالخطة الشهرية" data-de="Jährlich CHF 1.200 — Sparen Sie CHF 588 im Vergleich zum Monatsplan">Billed CHF 1,200/year — Save CHF 588 vs monthly plan</div>
-        <ul class="pricing-features">
-          <li><span class="check check-yes">✓</span><span data-en="Everything in Professional" data-ar="كل شيء في الخطة الاحترافية" data-de="Alles in Professional">Everything in Professional</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="Unlimited branches" data-ar="فروع غير محدودة" data-de="Unbegrenzte Filialen">Unlimited branches</span></li>
-          <li><span class="check check-yes">✓</span><span style="font-weight:700;color:var(--primary)" data-en="Custom Website + Web App — INCLUDED" data-ar="موقع مخصص + تطبيق ويب — مشمول" data-de="Individuelle Website + Web-App — INKLUSIVE">Custom Website + Web App — INCLUDED</span></li>
-          <li><span class="check check-yes">✓</span><span style="font-weight:700;color:var(--primary)" data-en="Social Media Marketing — INCLUDED" data-ar="التسويق عبر وسائل التواصل — مشمول" data-de="Social-Media-Marketing — INKLUSIVE">Social Media Marketing — INCLUDED</span></li>
-          <li><span class="check check-yes">✓</span><span style="font-weight:700;color:var(--primary)" data-en="Sales Automation — INCLUDED" data-ar="أتمتة المبيعات — مشمول" data-de="Verkaufsautomatisierung — INKLUSIVE">Sales Automation — INCLUDED</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="Dedicated account manager" data-ar="مدير حساب مخصص" data-de="Persönlicher Ansprechpartner">Dedicated account manager</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="Priority 24/7 support" data-ar="دعم أولوية 24/7" data-de="Prioritäts-24/7-Support">Priority 24/7 support</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="Advanced analytics & custom reports" data-ar="تحليلات متقدمة وتقارير مخصصة" data-de="Erweiterte Analysen & individuelle Berichte">Advanced analytics & custom reports</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="API access for integrations" data-ar="وصول API للتكاملات" data-de="API-Zugang für Integrationen">API access for integrations</span></li>
-          <li><span class="check check-yes">✓</span><span data-en="White-label branding options" data-ar="خيارات علامة تجارية بيضاء" data-de="White-Label-Branding-Optionen">White-label branding options</span></li>
+        <div class="pricing-plan-name" data-en="Smart Business Growth" data-ar="نمو الأعمال الذكي" data-de="Intelligentes Geschäftswachstum">Smart Business Growth</div>
+        <div class="pricing-price">
+          <div class="pricing-amount" id="advanced-price">CHF 499</div>
+          <div class="pricing-period" id="advanced-period" data-en="/ month" data-ar="/ شهر" data-de="/ Monat">/ month</div>
+        </div>
+        <div class="pricing-tagline" id="advanced-tagline" data-en="Everything in Basic plus online store, CRM, multi-device POS, advanced reports & marketing services." data-ar="كل شيء في الأساسي بالإضافة إلى المتجر الإلكتروني وإدارة العملاء ونقطة البيع متعددة الأجهزة والتسويق." data-de="Alles im Basic-Paket plus Online-Shop, CRM, Multi-Gerät-POS, erweiterte Berichte & Marketing.">Everything in Basic plus online store, CRM, multi-device POS, advanced reports &amp; marketing services.</div>
+
+        <div style="font-size:.7rem;font-weight:800;color:var(--primary);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;" data-en="✦ All Basic Features PLUS:" data-ar="✦ كل مميزات الأساسي بالإضافة إلى:" data-de="✦ Alle Basic-Funktionen PLUS:">✦ All Basic Features PLUS:</div>
+
+        <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;" data-en="🛒 Online Store" data-ar="🛒 المتجر الإلكتروني" data-de="🛒 Online-Shop">🛒 Online Store</div>
+        <ul class="pricing-features" style="margin-bottom:14px">
+          <li><span class="check check-yes">✓</span><span data-en="Fully integrated online store" data-ar="متجر إلكتروني متكامل بالكامل" data-de="Vollständig integrierter Online-Shop">Fully integrated online store</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Product display, shopping cart & order management" data-ar="عرض المنتجات، سلة التسوق وإدارة الطلبات" data-de="Produktanzeige, Warenkorb & Auftragsverwaltung">Product display, shopping cart &amp; order management</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Customer accounts & discount coupons" data-ar="حسابات العملاء وقسائم الخصم" data-de="Kundenkonten & Rabattgutscheine">Customer accounts &amp; discount coupons</span></li>
         </ul>
-        <button class="pricing-cta pricing-cta-primary" onclick="openModal('annual')" data-en="Start Growth Plan" data-ar="ابدأ خطة النمو" data-de="Wachstumsplan starten">Start Growth Plan</button>
+
+        <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;" data-en="👥 CRM System" data-ar="👥 نظام إدارة العملاء" data-de="👥 CRM-System">👥 CRM System</div>
+        <ul class="pricing-features" style="margin-bottom:14px">
+          <li><span class="check check-yes">✓</span><span data-en="Customer database, order history & segmentation" data-ar="قاعدة بيانات العملاء، سجل الطلبات والتقسيم" data-de="Kundendatenbank, Bestellhistorie & Segmentierung">Customer database, order history &amp; segmentation</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Purchase tracking & loyalty system" data-ar="تتبع المشتريات ونظام الولاء" data-de="Kaufverfolgung & Treueprogramm">Purchase tracking &amp; loyalty system</span></li>
+        </ul>
+
+        <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;" data-en="📱 Multi-Device POS" data-ar="📱 نقطة بيع متعددة الأجهزة" data-de="📱 Multi-Gerät-POS">📱 Multi-Device POS</div>
+        <ul class="pricing-features" style="margin-bottom:14px">
+          <li><span class="check check-yes">✓</span><span data-en="Works on mobile, tablet & computer" data-ar="يعمل على الجوال، الجهاز اللوحي والكمبيوتر" data-de="Funktioniert auf Mobilgerät, Tablet & Computer">Works on mobile, tablet &amp; computer</span></li>
+          <li><span class="check check-yes">✓</span><span data-en="Sales, customer & product performance reports" data-ar="تقارير المبيعات والعملاء وأداء المنتجات" data-de="Verkaufs-, Kunden- & Produktleistungsberichte">Sales, customer &amp; product performance reports</span></li>
+        </ul>
+
+        <div style="font-size:.72rem;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;" data-en="🚀 Marketing & Sales Services (by our team)" data-ar="🚀 خدمات التسويق والمبيعات (من فريقنا)" data-de="🚀 Marketing- & Vertriebsdienste (von unserem Team)">🚀 Marketing &amp; Sales Services (by our team)</div>
+        <ul class="pricing-features" style="margin-bottom:14px">
+          <li><span class="check check-yes" style="background:rgba(129,140,248,.15);color:#818cf8">✓</span><span data-en="Professional sales landing page design" data-ar="تصميم صفحة مبيعات احترافية" data-de="Professionelles Verkaufs-Landingpage-Design">Professional sales landing page design</span></li>
+          <li><span class="check check-yes" style="background:rgba(129,140,248,.15);color:#818cf8">✓</span><span data-en="Advertising campaign management & analysis" data-ar="إدارة الحملات الإعلانية وتحليلها" data-de="Werbekampagnenverwaltung & -analyse">Advertising campaign management &amp; analysis</span></li>
+          <li><span class="check check-yes" style="background:rgba(129,140,248,.15);color:#818cf8">✓</span><span data-en="Monthly content plan & social media posting" data-ar="خطة محتوى شهرية ونشر على وسائل التواصل" data-de="Monatlicher Content-Plan & Social-Media-Posts">Monthly content plan &amp; social media posting</span></li>
+          <li><span class="check check-yes" style="background:rgba(129,140,248,.15);color:#818cf8">✓</span><span data-en="Marketing offer design & campaign optimization" data-ar="تصميم عروض التسويق وتحسين الحملات" data-de="Design von Marketingangeboten & Kampagnenoptimierung">Marketing offer design &amp; campaign optimization</span></li>
+        </ul>
+        <button class="pricing-cta pricing-cta-primary" onclick="openModal('advanced')" data-en="Start Smart Business Growth" data-ar="ابدأ خطة نمو الأعمال الذكي" data-de="Intelligentes Wachstum starten">Start Smart Business Growth</button>
       </div>
     </div>
 
-    <!-- Add-ons for Monthly -->
-    <div class="addon-section reveal" id="addon-section">
-      <div class="addon-title">
-        <span data-en="Supercharge your Professional plan with" data-ar="عزز خطتك الاحترافية مع" data-de="Erweitern Sie Ihren Professional-Plan mit">Supercharge your Professional plan with</span>
-        <span data-en="optional add-ons" data-ar="الإضافات الاختيارية" data-de="optionalen Erweiterungen"> optional add-ons</span>
-      </div>
-      <div class="addons-grid">
-        <div class="addon-card" id="addon-website">
-          <div class="addon-card-icon">🌐</div>
-          <div class="addon-card-name" data-en="Website & Web App" data-ar="موقع وتطبيق ويب" data-de="Website & Web-App">Website & Web App</div>
-          <div class="addon-card-desc" data-en="Professional branded website + PWA for your business. Built and maintained by us." data-ar="موقع مخصص + تطبيق PWA لعملك. يُبنى ويُصان من قبلنا." data-de="Professionelle Website + PWA für Ihr Unternehmen. Von uns erstellt und gepflegt.">Professional branded website + PWA for your business.</div>
-          <div class="addon-card-price">+CHF 49/mo</div>
-        </div>
-        <div class="addon-card" id="addon-social">
-          <div class="addon-card-icon">📱</div>
-          <div class="addon-card-name" data-en="Social Media Marketing" data-ar="التسويق عبر وسائل التواصل" data-de="Social-Media-Marketing">Social Media Marketing</div>
-          <div class="addon-card-desc" data-en="Monthly content calendar, posts, stories, and ad campaign management for IG, FB & TikTok." data-ar="تقويم محتوى شهري ومنشورات وإدارة حملات إعلانية." data-de="Monatlicher Content-Kalender, Posts, Stories und Anzeigenkampagnen-Management.">Monthly content calendar, posts, and ad campaign management.</div>
-          <div class="addon-card-price">+CHF 99/mo</div>
-        </div>
-        <div class="addon-card" id="addon-sales">
-          <div class="addon-card-icon">🚀</div>
-          <div class="addon-card-name" data-en="Sales Automation" data-ar="أتمتة المبيعات" data-de="Verkaufsautomatisierung">Sales Automation</div>
-          <div class="addon-card-desc" data-en="Automated email campaigns, loyalty rewards, upsell triggers, and abandoned order recovery." data-ar="حملات بريد إلكتروني تلقائية ومكافآت الولاء وعرض المنتجات." data-de="Automatisierte E-Mail-Kampagnen, Treueprogramme und Wiederherstellung aufgegebener Bestellungen.">Automated email campaigns, loyalty rewards, and order recovery.</div>
-          <div class="addon-card-price">+CHF 79/mo</div>
-        </div>
+    <!-- Comparison note -->
+    <div style="text-align:center;margin-top:40px;padding:28px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);max-width:780px;margin-left:auto;margin-right:auto;" class="reveal">
+      <div style="font-size:.8rem;color:var(--muted);line-height:1.9">
+        <span style="color:var(--primary);font-weight:700" data-en="Annual billing:" data-ar="الفوترة السنوية:" data-de="Jährliche Abrechnung:">Annual billing:</span>
+        <span data-en="POS Starter — CHF 1,999/year (save CHF 389) · Smart Business Growth — CHF 4,999/year (save CHF 989)" data-ar="نقطة بيع المبتدئين — 1,999 فرنك/سنة (وفر 389 فرنك) · نمو الأعمال الذكي — 4,999 فرنك/سنة (وفر 989 فرنك)" data-de="POS Starter — CHF 1.999/Jahr (sparen Sie CHF 389) · Intelligentes Wachstum — CHF 4.999/Jahr (sparen Sie CHF 989)">POS Starter — CHF 1,999/year (save CHF 389) · Smart Business Growth — CHF 4,999/year (save CHF 989)</span>
       </div>
     </div>
   </div>
@@ -634,8 +638,8 @@
     <h2 data-en="Ready to transform your business?" data-ar="هل أنت مستعد لتحويل عملك؟" data-de="Bereit, Ihr Unternehmen zu transformieren?">Ready to <span class="text-primary">transform</span> your business?</h2>
     <p data-en="Join hundreds of stores already using Barmagly POS. Get your license key and start selling in minutes." data-ar="انضم إلى مئات المتاجر التي تستخدم برمجلي POS. احصل على مفتاح الترخيص الخاص بك وابدأ البيع في دقائق." data-de="Schließen Sie sich Hunderten von Filialen an, die bereits Barmagly POS verwenden. Holen Sie sich Ihren Lizenzschlüssel und beginnen Sie in Minuten.">Join hundreds of stores already using Barmagly POS. Get your license key and start selling in minutes.</p>
     <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
-      <button class="btn-hero-primary" onclick="openModal('annual')" data-en="Get Growth Plan — CHF 1,200/yr" data-ar="احصل على خطة النمو — 1200 فرنك/سنة" data-de="Wachstumsplan — CHF 1.200/Jahr">Get Growth Plan — CHF 1,200/yr</button>
-      <button class="btn-hero-ghost" onclick="openModal('monthly')" data-en="Start Monthly — CHF 149/mo" data-ar="ابدأ شهرياً — 149 فرنك/شهر" data-de="Monatlich starten — CHF 149/Mo">Start Monthly — CHF 149/mo</button>
+      <button class="btn-hero-primary" onclick="openModal('advanced')" data-en="Smart Business Growth — CHF 499/mo" data-ar="نمو الأعمال الذكي — 499 فرنك/شهر" data-de="Intelligentes Wachstum — CHF 499/Mo">Smart Business Growth — CHF 499/mo</button>
+      <button class="btn-hero-ghost" onclick="openModal('basic')" data-en="POS Starter — CHF 199/mo" data-ar="نقطة بيع المبتدئين — 199 فرنك/شهر" data-de="POS Starter — CHF 199/Mo">POS Starter — CHF 199/mo</button>
     </div>
   </div>
 </section>
@@ -663,7 +667,7 @@
       <div class="footer-col">
         <div class="footer-col-title" data-en="Access" data-ar="الوصول" data-de="Zugang">Access</div>
         <a href="BASE_URL_PLACEHOLDER/super_admin/login" data-en="Admin Login" data-ar="تسجيل الدخول للمشرف" data-de="Admin-Login">Admin Login</a>
-        <a href="#" onclick="openModal('monthly');return false" data-en="Get License" data-ar="احصل على ترخيص" data-de="Lizenz erhalten">Get License</a>
+        <a href="#" onclick="openModal('basic');return false" data-en="Get License" data-ar="احصل على ترخيص" data-de="Lizenz erhalten">Get License</a>
       </div>
     </div>
     <div class="footer-bottom">
@@ -713,24 +717,8 @@
           <label class="form-label" data-en="Business Email *" data-ar="البريد الإلكتروني للأعمال *" data-de="Geschäfts-E-Mail *">Business Email *</label>
           <input class="form-input" id="f-email" type="email" placeholder="you@yourbusiness.com" required>
         </div>
-        <!-- Add-ons for monthly plan -->
-        <div id="addon-picker" style="display:none">
-          <div class="form-label" style="margin-bottom:12px" data-en="Optional Add-ons" data-ar="إضافات اختيارية" data-de="Optionale Erweiterungen">Optional Add-ons</div>
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <label style="display:flex;align-items:center;gap:12px;cursor:pointer;font-size:.88rem">
-              <input type="checkbox" id="ao-website" onchange="updateAddons()" style="width:16px;height:16px;accent-color:var(--primary)">
-              <span>🌐 <span data-en="Website & App" data-ar="موقع وتطبيق" data-de="Website & App">Website & App</span> <span style="color:#818cf8;font-weight:700">+CHF 49/mo</span></span>
-            </label>
-            <label style="display:flex;align-items:center;gap:12px;cursor:pointer;font-size:.88rem">
-              <input type="checkbox" id="ao-social" onchange="updateAddons()" style="width:16px;height:16px;accent-color:var(--primary)">
-              <span>📱 <span data-en="Social Media Marketing" data-ar="التسويق عبر وسائل التواصل" data-de="Social-Media-Marketing">Social Media Marketing</span> <span style="color:#818cf8;font-weight:700">+CHF 99/mo</span></span>
-            </label>
-            <label style="display:flex;align-items:center;gap:12px;cursor:pointer;font-size:.88rem">
-              <input type="checkbox" id="ao-sales" onchange="updateAddons()" style="width:16px;height:16px;accent-color:var(--primary)">
-              <span>🚀 <span data-en="Sales Automation" data-ar="أتمتة المبيعات" data-de="Verkaufsautomatisierung">Sales Automation</span> <span style="color:#818cf8;font-weight:700">+CHF 79/mo</span></span>
-            </label>
-          </div>
-        </div>
+        <!-- Plan includes info -->
+        <div id="plan-includes" style="margin-top:16px;padding:14px 16px;border-radius:12px;background:var(--surface);border:1px solid var(--border);font-size:.82rem;line-height:1.8;color:var(--muted)"></div>
       </div>
 
       <!-- Step 2: Payment -->
@@ -840,27 +828,56 @@ document.querySelectorAll('.reveal').forEach(el => ro.observe(el));
 
 /* ═══════ BILLING TOGGLE ═══════ */
 let isAnnual = false;
+const PLANS = {
+  basic: {
+    name: { en: 'POS Starter', ar: 'نقطة بيع المبتدئين', de: 'POS Starter' },
+    monthly: 199, annual: 1999,
+    includes: {
+      en: '✓ POS system · ✓ Inventory · ✓ Invoicing · ✓ Reports · ✓ Hosting & backups · ✓ Technical support',
+      ar: '✓ نقطة البيع · ✓ المخزون · ✓ الفواتير · ✓ التقارير · ✓ الاستضافة والنسخ الاحتياطية · ✓ الدعم الفني',
+      de: '✓ POS-System · ✓ Inventar · ✓ Rechnungen · ✓ Berichte · ✓ Hosting & Backups · ✓ Technischer Support'
+    }
+  },
+  advanced: {
+    name: { en: 'Smart Business Growth', ar: 'نمو الأعمال الذكي', de: 'Intelligentes Geschäftswachstum' },
+    monthly: 499, annual: 4999,
+    includes: {
+      en: '✓ Everything in Basic · ✓ Online store · ✓ CRM · ✓ Multi-device POS · ✓ Advanced reports · ✓ Landing page design · ✓ Ad campaigns · ✓ Social media management',
+      ar: '✓ كل شيء في الأساسي · ✓ متجر إلكتروني · ✓ إدارة العملاء · ✓ نقطة بيع متعددة الأجهزة · ✓ تقارير متقدمة · ✓ تصميم صفحة مبيعات · ✓ حملات إعلانية · ✓ إدارة وسائل التواصل',
+      de: '✓ Alles im Basic · ✓ Online-Shop · ✓ CRM · ✓ Multi-Gerät-POS · ✓ Erweiterte Berichte · ✓ Landingpage-Design · ✓ Werbekampagnen · ✓ Social-Media-Management'
+    }
+  }
+};
+
 function toggleBilling() {
   isAnnual = !isAnnual;
   document.getElementById('billingToggle').classList.toggle('on', isAnnual);
   document.getElementById('lbl-monthly').classList.toggle('active', !isAnnual);
   document.getElementById('lbl-annual').classList.toggle('active', isAnnual);
-  document.getElementById('addon-section').style.opacity = isAnnual ? '.3' : '1';
-  document.getElementById('addon-section').style.pointerEvents = isAnnual ? 'none' : 'auto';
   updatePricingUI();
 }
 
 function updatePricingUI() {
-  const monthly = document.getElementById('monthly-price');
-  const annualP = document.getElementById('annual-price');
-  const annualT = document.getElementById('annual-tagline');
-  if(isAnnual) {
-    monthly.textContent = 'CHF 100';
-    annualP.textContent = 'CHF 100';
-    annualT.textContent = annualT.getAttribute(`data-${lang}`) || 'Billed CHF 1,200/year — Save CHF 588 vs monthly plan';
+  const bp = document.getElementById('basic-price');
+  const bperiod = document.getElementById('basic-period');
+  const btagline = document.getElementById('basic-tagline');
+  const ap = document.getElementById('advanced-price');
+  const aperiod = document.getElementById('advanced-period');
+  const atagline = document.getElementById('advanced-tagline');
+  if (isAnnual) {
+    bp.textContent = 'CHF 1,999';
+    bperiod.textContent = { en:'/ year', ar:'/ سنة', de:'/ Jahr' }[lang] || '/ year';
+    btagline.textContent = { en:'Billed CHF 1,999/year — save CHF 389 vs monthly', ar:'يُفوتر بـ 1,999 فرنك/سنة — وفر 389 فرنك', de:'Jährlich CHF 1.999 — sparen Sie CHF 389' }[lang];
+    ap.textContent = 'CHF 4,999';
+    aperiod.textContent = { en:'/ year', ar:'/ سنة', de:'/ Jahr' }[lang] || '/ year';
+    atagline.textContent = { en:'Billed CHF 4,999/year — save CHF 989 vs monthly', ar:'يُفوتر بـ 4,999 فرنك/سنة — وفر 989 فرنك', de:'Jährlich CHF 4.999 — sparen Sie CHF 989' }[lang];
   } else {
-    monthly.textContent = 'CHF 149';
-    annualP.textContent = 'CHF 100';
+    bp.textContent = 'CHF 199';
+    bperiod.textContent = { en:'/ month', ar:'/ شهر', de:'/ Monat' }[lang] || '/ month';
+    btagline.textContent = btagline.getAttribute(`data-${lang}`) || btagline.getAttribute('data-en');
+    ap.textContent = 'CHF 499';
+    aperiod.textContent = { en:'/ month', ar:'/ شهر', de:'/ Monat' }[lang] || '/ month';
+    atagline.textContent = atagline.getAttribute(`data-${lang}`) || atagline.getAttribute('data-en');
   }
 }
 
@@ -925,40 +942,25 @@ function closeModal() {
 document.getElementById('modal').addEventListener('click', e => { if(e.target === document.getElementById('modal')) closeModal(); });
 
 function updateModalSummary() {
-  const isAnnualPlan = currentPlan === 'annual';
-  const planNames = { en: isAnnualPlan ? 'Growth Plan (Annual)' : 'Professional Plan (Monthly)', ar: isAnnualPlan ? 'خطة النمو (سنوية)' : 'الخطة الاحترافية (شهرية)', de: isAnnualPlan ? 'Wachstumsplan (Jährlich)' : 'Professional-Plan (Monatlich)' };
-  const planName = planNames[lang] || planNames.en;
+  const planKey = currentPlan; // 'basic' or 'advanced'
+  const plan = PLANS[planKey] || PLANS.basic;
+  const planName = (plan.name[lang] || plan.name.en) + (isAnnual ? ` (${ lang==='ar'?'سنوي': lang==='de'?'Jährlich':'Annual'})` : ` (${ lang==='ar'?'شهري': lang==='de'?'Monatlich':'Monthly'})`);
   document.getElementById('summary-plan-name').textContent = planName;
   document.getElementById('pay-plan-name').textContent = planName;
-  const price = isAnnualPlan ? 'CHF 1,200' : 'CHF 149';
-  const period = isAnnualPlan ? (lang==='ar'?'في السنة': lang==='de'?'pro Jahr':'per year') : (lang==='ar'?'في الشهر': lang==='de'?'pro Monat':'per month');
+  const price = isAnnual ? 'CHF ' + (planKey === 'advanced' ? '4,999' : '1,999') : 'CHF ' + plan.monthly;
+  const period = isAnnual ? (lang==='ar'?'في السنة': lang==='de'?'pro Jahr':'per year') : (lang==='ar'?'في الشهر': lang==='de'?'pro Monat':'per month');
   document.getElementById('summary-price').textContent = price;
   document.getElementById('pay-price').textContent = price;
   document.getElementById('summary-period').textContent = period;
   document.getElementById('pay-period').textContent = lang==='ar'?'مستحق اليوم': lang==='de'?'fällig heute':'due today';
   document.getElementById('modal-title').textContent = lang==='ar'?'ابدأ خطتك': lang==='de'?'Starten Sie Ihren Plan':'Start Your Plan';
-  const addonPicker = document.getElementById('addon-picker');
-  addonPicker.style.display = isAnnualPlan ? 'none' : 'block';
-  updateAddons();
+  document.getElementById('summary-addons').style.display = 'none';
+  // Show plan includes
+  const pi = document.getElementById('plan-includes');
+  if (pi) pi.textContent = plan.includes[lang] || plan.includes.en;
 }
 
-function updateAddons() {
-  if(currentPlan === 'annual') {
-    document.getElementById('summary-addons').style.display = 'none';
-    return;
-  }
-  const addons = [];
-  if(document.getElementById('ao-website').checked) addons.push('🌐 Website & App (+CHF 49/mo)');
-  if(document.getElementById('ao-social').checked) addons.push('📱 Social Media (+CHF 99/mo)');
-  if(document.getElementById('ao-sales').checked) addons.push('🚀 Sales Auto (+CHF 79/mo)');
-  const box = document.getElementById('summary-addons');
-  if(addons.length) {
-    box.style.display = 'block';
-    box.textContent = addons.join(' · ');
-  } else {
-    box.style.display = 'none';
-  }
-}
+function updateAddons() { /* preserved for compatibility */ }
 
 function setError(msg) {
   const el = document.getElementById('modal-error');
@@ -1011,13 +1013,8 @@ async function submitPayment() {
     const name = document.getElementById('f-name').value.trim();
     const email = document.getElementById('f-email').value.trim();
     const phone = document.getElementById('f-phone').value.trim();
-    const isAnnualPlan = currentPlan === 'annual';
+    const plan = PLANS[currentPlan] || PLANS.basic;
     const addons = [];
-    if(!isAnnualPlan) {
-      if(document.getElementById('ao-website').checked) addons.push('website');
-      if(document.getElementById('ao-social').checked) addons.push('social');
-      if(document.getElementById('ao-sales').checked) addons.push('sales');
-    }
 
     // Try Stripe tokenization
     let stripeToken = null;
@@ -1041,8 +1038,8 @@ async function submitPayment() {
         ownerName: name,
         ownerEmail: email,
         ownerPhone: phone || null,
-        planType: isAnnualPlan ? 'yearly' : 'monthly',
-        planName: isAnnualPlan ? 'pro' : 'starter',
+        planType: isAnnual ? 'yearly' : 'monthly',
+        planName: currentPlan === 'advanced' ? 'advanced' : 'basic',
         addons,
         paymentMethod: stripeToken ? 'stripe' : 'bank',
         stripeToken,

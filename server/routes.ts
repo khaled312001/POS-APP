@@ -101,8 +101,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ownerPhone: ownerPhone || null,
         passwordHash,
         status: planType === "trial" ? "active" : "active", // In a real app, "pending" for bank
-        maxBranches: planName === "pro" ? 5 : 1,
-        maxEmployees: planName === "pro" ? 999 : 5,
+        maxBranches: planName === "advanced" ? 10 : 1,
+        maxEmployees: planName === "advanced" ? 999 : 5,
         metadata: {
           signupDate: new Date().toISOString(),
           paymentMethod,
@@ -128,7 +128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tenantId: tenant.id,
         planType,
         planName: planName || "Starter",
-        price: planType === "trial" ? "0" : (planName === "pro" ? "79.00" : "29.00"),
+        price: planType === "trial" ? "0" : (planType === "yearly" ? (planName === "advanced" ? "4999.00" : "1999.00") : (planName === "advanced" ? "499.00" : "199.00")),
         status,
         startDate,
         endDate,
@@ -147,7 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tenantId: tenant.id,
         subscriptionId: subscription.id,
         status: "active",
-        maxActivations: planName === "pro" ? 10 : 3,
+        maxActivations: planName === "advanced" ? 10 : 3,
         expiresAt: endDate,
         notes: `Subscription from landing page: ${planName}`
       });
