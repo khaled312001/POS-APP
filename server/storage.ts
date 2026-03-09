@@ -235,16 +235,53 @@ export const storage = {
     }
 
     if (search) {
-      conditions.push(
-        or(
-          ilike(customers.name, `%${search}%`),
-          ilike(customers.phone || "", `%${search}%`),
-          ilike(customers.email || "", `%${search}%`)
-        )
-      );
+      const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(search.trim());
+      if (looksLikePhone) {
+        const { getPhoneSearchVariants } = await import("./phoneUtils");
+        const variants = getPhoneSearchVariants(search.trim());
+        const phoneConditions = variants.map(v => ilike(customers.phone || "", `%${v}%`));
+        const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
+        for (const v of variants) {
+          phoneConditions.push(sql`${strippedCol} ILIKE ${'%' + v + '%'}`);
+        }
+        conditions.push(or(...phoneConditions));
+      } else {
+        conditions.push(
+          or(
+            ilike(customers.name, `%${search}%`),
+            ilike(customers.phone || "", `%${search}%`),
+            ilike(customers.email || "", `%${search}%`)
+          )
+        );
+      }
     }
 
     return db.select().from(customers).where(and(...conditions)).orderBy(desc(customers.createdAt));
+  },
+
+  async findCustomerByPhone(phone: string, tenantId: number) {
+    const { getPhoneSearchVariants, normalizePhone } = await import("./phoneUtils");
+    const variants = getPhoneSearchVariants(phone);
+    const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
+    const phoneConditions = variants.map(v => ilike(customers.phone || "", `%${v}%`));
+    for (const v of variants) {
+      phoneConditions.push(sql`${strippedCol} ILIKE ${'%' + v + '%'}`);
+    }
+    const conditions: any[] = [
+      eq(customers.isActive, true),
+      eq(customers.tenantId, tenantId),
+      or(...phoneConditions),
+    ];
+    const normalized = normalizePhone(phone);
+    const results = await db.select().from(customers).where(and(...conditions)).limit(5);
+    results.sort((a, b) => {
+      const aNorm = a.phone ? normalizePhone(a.phone) : '';
+      const bNorm = b.phone ? normalizePhone(b.phone) : '';
+      const aExact = aNorm === normalized ? 0 : 1;
+      const bExact = bNorm === normalized ? 0 : 1;
+      return aExact - bExact;
+    });
+    return results;
   },
   async getCustomer(id: number) {
     const [cust] = await db.select().from(customers).where(eq(customers.id, id));

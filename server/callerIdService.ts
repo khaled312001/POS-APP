@@ -1,11 +1,23 @@
 import { EventEmitter } from "events";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
+import { normalizePhone } from "./phoneUtils";
 
 interface ActiveCall {
   phoneNumber: string;
-  slot: number; // 1-4 for the 4 ISDN B-channels
+  normalizedPhone: string;
+  slot: number;
   timestamp: string;
+  customer?: {
+    id: number;
+    name: string;
+    phone: string | null;
+    email: string | null;
+    loyaltyPoints: number | null;
+    visitCount: number | null;
+    totalSpent: string | null;
+    notes: string | null;
+  } | null;
 }
 
 /**
@@ -100,11 +112,12 @@ export class CallerIDService extends EventEmitter {
 
   /**
    * Handles an incoming call notification, assigning to the next free slot (1-4)
+   * Automatically looks up the customer by phone number across all tenants (or specific tenant)
    */
-  public handleIncomingCall(phoneNumber: string, preferredSlot?: number) {
-    console.log(`[CallerID] Incoming call from: ${phoneNumber}`);
+  public async handleIncomingCall(phoneNumber: string, preferredSlot?: number, tenantId?: number) {
+    const normalized = normalizePhone(phoneNumber);
+    console.log(`[CallerID] Incoming call from: ${phoneNumber} (normalized: ${normalized})`);
 
-    // Find next free slot (1-4)
     let slot = preferredSlot;
     if (!slot || this.activeCallSlots.has(slot)) {
       for (let s = 1; s <= 4; s++) {
@@ -116,14 +129,44 @@ export class CallerIDService extends EventEmitter {
       return;
     }
 
-    const callInfo: ActiveCall = { phoneNumber, slot, timestamp: new Date().toISOString() };
+    let customer: ActiveCall["customer"] = null;
+    try {
+      if (!tenantId) {
+        console.log("[CallerID] No tenantId provided, skipping customer lookup");
+      } else {
+        const { storage } = await import("./storage");
+        const matches = await storage.findCustomerByPhone(phoneNumber, tenantId);
+        if (matches.length > 0) {
+          const c = matches[0];
+          customer = {
+            id: c.id,
+            name: c.name,
+            phone: c.phone,
+            email: c.email,
+            loyaltyPoints: c.loyaltyPoints,
+            visitCount: c.visitCount,
+            totalSpent: c.totalSpent,
+            notes: c.notes,
+          };
+          console.log(`[CallerID] Customer matched: ${customer.name} (ID: ${customer.id})`);
+        } else {
+          console.log(`[CallerID] No customer found for phone: ${phoneNumber}`);
+        }
+      }
+    } catch (e) {
+      console.error("[CallerID] Customer lookup error:", e);
+    }
+
+    const callInfo: ActiveCall = { phoneNumber, normalizedPhone: normalized, slot, timestamp: new Date().toISOString(), customer };
     this.activeCallSlots.set(slot, callInfo);
 
     const payload = JSON.stringify({
       type: "incoming_call",
       phoneNumber,
+      normalizedPhone: normalized,
       slot,
       timestamp: callInfo.timestamp,
+      customer,
       totalActiveCalls: this.activeCallSlots.size,
       allActiveCalls: Array.from(this.activeCallSlots.values()),
     });
@@ -136,7 +179,7 @@ export class CallerIDService extends EventEmitter {
       });
     }
 
-    this.emit("call", phoneNumber, slot);
+    this.emit("call", phoneNumber, slot, customer);
   }
 
   /**

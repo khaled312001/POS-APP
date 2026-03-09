@@ -683,6 +683,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // Phone number customer lookup (must be before :id route)
+  app.get("/api/customers/phone-lookup", async (req, res) => {
+    try {
+      const phone = req.query.phone as string;
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      if (!phone) return res.status(400).json({ error: "phone is required" });
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const results = await storage.findCustomerByPhone(phone, tenantId);
+      res.json(results);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Bulk Import Customers (must be before :id route)
   app.post("/api/customers/import", async (req: any, res) => {
     try {
@@ -1604,8 +1616,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Simulate Caller ID
   app.post("/api/caller-id/simulate", async (req, res) => {
-    const { phoneNumber } = req.body;
-    callerIdService.handleIncomingCall(phoneNumber || "0551234567");
+    const { phoneNumber, tenantId } = req.body;
+    await callerIdService.handleIncomingCall(phoneNumber || "0551234567", undefined, tenantId ? Number(tenantId) : undefined);
     res.json({ success: true });
   });
 
