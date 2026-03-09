@@ -3,6 +3,7 @@ import React from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { getApiUrl } from "./api-config";
+import { setCachedLicenseKey, clearCachedLicenseKey } from "./query-client";
 import * as Application from "expo-application";
 
 interface SubscriptionStatus {
@@ -99,7 +100,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
 
             if (data.isValid) {
                 await AsyncStorage.setItem("barmagly_license_key", key);
-                // We might also want to store email for future reference if needed
+                setCachedLicenseKey(key);
                 if (email) await AsyncStorage.setItem("barmagly_store_email", email);
 
                 setIsValid(true);
@@ -108,6 +109,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                 return true;
             } else {
                 await AsyncStorage.removeItem("barmagly_license_key");
+                clearCachedLicenseKey();
                 setIsValid(false);
                 setErrorReason(data.reason || "Invalid license key");
                 setTenant(null);
@@ -127,6 +129,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
 
     const logoutLicense = async () => {
         await AsyncStorage.removeItem("barmagly_license_key");
+        clearCachedLicenseKey();
         setIsValid(false);
         setTenant(null);
         setSubscription(null);

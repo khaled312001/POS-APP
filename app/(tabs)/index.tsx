@@ -2287,7 +2287,7 @@ export default function POSScreen() {
             flexDirection: isRTL ? "row-reverse" : "row",
             alignItems: "center", gap: 12,
             elevation: 10,
-            shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8,
+            ...(Platform.OS === "web" ? { boxShadow: "0px 4px 8px rgba(0,0,0,0.4)" } : { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 }),
             zIndex: 9999,
           }}
         >

@@ -373,11 +373,8 @@ const styles = StyleSheet.create({
   },
   orderCardNew: {
     borderColor: "#F59E0B",
-    shadowColor: "#F59E0B",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
     elevation: 6,
+    ...(Platform.OS === "web" ? { boxShadow: "0px 0px 8px rgba(245,158,11,0.25)" } as any : { shadowColor: "#F59E0B", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 8 }),
   },
   newDot: {
     width: 8, height: 8, borderRadius: 4,

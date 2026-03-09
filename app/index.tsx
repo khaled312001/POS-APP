@@ -46,8 +46,8 @@ export default function IndexScreen() {
                     router.replace("/(tabs)" as any);
                     return;
                 }
-            } catch {
-                // ignore AsyncStorage errors
+            } catch (e) {
+                console.warn("AsyncStorage read failed for barmagly_employee:", e);
             }
 
             router.replace("/login" as any);

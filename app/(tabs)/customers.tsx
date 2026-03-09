@@ -16,7 +16,7 @@ import { useLicense } from "@/lib/license-context";
 export default function CustomersScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
-  const { canManage } = useAuth();
+  const { canManage, canDeleteCustomers, isCashier } = useAuth();
   const { t, isRTL, rtlTextAlign, rtlText } = useLanguage();
   const { tenant } = useLicense();
   const [search, setSearch] = useState("");
@@ -84,11 +84,9 @@ export default function CustomersScreen() {
     <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
       <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid]} style={[styles.header, isRTL && { flexDirection: "row-reverse" }]}>
         <Text style={[styles.headerTitle, rtlTextAlign]}>{t("customers")}</Text>
-        {canManage && (
-          <Pressable style={styles.addBtn} onPress={() => { setEditCustomer(null); setForm({ name: "", email: "", phone: "", address: "", notes: "" }); setShowForm(true); }}>
-            <Ionicons name="add" size={24} color={Colors.white} />
-          </Pressable>
-        )}
+        <Pressable style={styles.addBtn} onPress={() => { setEditCustomer(null); setForm({ name: "", email: "", phone: "", address: "", notes: "" }); setShowForm(true); }}>
+          <Ionicons name="add" size={24} color={Colors.white} />
+        </Pressable>
       </LinearGradient>
 
       <View style={styles.searchRow}>
@@ -217,17 +215,19 @@ export default function CustomersScreen() {
                         <Text style={{ color: Colors.white, fontSize: 14, fontWeight: "600" }}>{t("edit")}</Text>
                       </LinearGradient>
                     </Pressable>
-                    <Pressable style={{ flex: 1, borderRadius: 12, overflow: "hidden" }} onPress={() => {
-                      Alert.alert(t("deleteCustomer") || "Delete Customer", `${t("delete")} "${selectedCustomer.name}"?`, [
-                        { text: t("cancel"), style: "cancel" },
-                        { text: t("delete"), style: "destructive", onPress: () => deleteMutation.mutate(selectedCustomer.id) },
-                      ]);
-                    }}>
-                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", backgroundColor: Colors.danger, alignItems: "center", justifyContent: "center", paddingVertical: 12, gap: 6 }}>
-                        <Ionicons name="trash-outline" size={18} color={Colors.white} />
-                        <Text style={{ color: Colors.white, fontSize: 14, fontWeight: "600" }}>{t("delete")}</Text>
-                      </View>
-                    </Pressable>
+                    {canDeleteCustomers && (
+                      <Pressable style={{ flex: 1, borderRadius: 12, overflow: "hidden" }} onPress={() => {
+                        Alert.alert(t("deleteCustomer") || "Delete Customer", `${t("delete")} "${selectedCustomer.name}"?`, [
+                          { text: t("cancel"), style: "cancel" },
+                          { text: t("delete"), style: "destructive", onPress: () => deleteMutation.mutate(selectedCustomer.id) },
+                        ]);
+                      }}>
+                        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", backgroundColor: Colors.danger, alignItems: "center", justifyContent: "center", paddingVertical: 12, gap: 6 }}>
+                          <Ionicons name="trash-outline" size={18} color={Colors.white} />
+                          <Text style={{ color: Colors.white, fontSize: 14, fontWeight: "600" }}>{t("delete")}</Text>
+                        </View>
+                      </Pressable>
+                    )}
                   </View>
                 )}
 

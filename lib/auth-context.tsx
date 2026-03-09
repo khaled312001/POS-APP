@@ -16,6 +16,11 @@ interface AuthContextValue {
   isManager: boolean;
   isCashier: boolean;
   canManage: boolean;
+  canAccessReports: boolean;
+  canManageProducts: boolean;
+  canManageEmployees: boolean;
+  canManageSettings: boolean;
+  canDeleteCustomers: boolean;
   login: (employee: Employee) => void;
   logout: () => void;
 }
@@ -46,9 +51,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isManager = role === "manager";
   const isCashier = role === "cashier";
   const canManage = isAdmin || isManager;
+  const canAccessReports = isAdmin || isManager;
+  const canManageProducts = isAdmin || isManager;
+  const canManageEmployees = isAdmin;
+  const canManageSettings = isAdmin;
+  const canDeleteCustomers = isAdmin || isManager;
 
   const value = useMemo(
-    () => ({ employee, isLoggedIn: !!employee, isAdmin, isManager, isCashier, canManage, login, logout }),
+    () => ({ employee, isLoggedIn: !!employee, isAdmin, isManager, isCashier, canManage, canAccessReports, canManageProducts, canManageEmployees, canManageSettings, canDeleteCustomers, login, logout }),
     [employee]
   );
 

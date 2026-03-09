@@ -88,7 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 2. Create Tenant
       // Generate a temporary password (e.g., ownerName lower + 123)
       const tempPassword = "admin" + Math.floor(1000 + Math.random() * 9000);
-      const passwordHash = await bcrypt.hash("admin123", 10); // Default for now, or use generated
+      const passwordHash = await bcrypt.hash(tempPassword, 10);
 
       const tenant = await storage.createTenant({
         businessName,
@@ -157,11 +157,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         priority: "normal"
       });
 
+      console.log(`[SUBSCRIBE] New tenant created: ${businessName} (ID: ${tenant.id}), temp password: ${tempPassword}`);
+
       res.json({
         success: true,
         tenantId: tenant.id,
         licenseKey,
-        tempPassword: "admin123" // In a real app, we'd email this
+        message: "Your account has been created. Check your email for login credentials, or contact support."
       });
     } catch (e: any) {
       console.error("Subscription error:", e);
@@ -284,7 +286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const allBranches = await storage.getBranchesByTenant(tenantId);
       const allEmployees = await storage.getEmployeesByTenant(tenantId);
-      const allInventory = await storage.getInventoryByTenant(tenantId);
+      const allInventory = await storage.getInventory(undefined, tenantId);
       const allSales = await storage.getSales({ tenantId });
       const allShifts = await storage.getShifts(tenantId);
       const allProducts = await storage.getProductsByTenant(tenantId);
@@ -599,7 +601,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Inventory
   app.get("/api/inventory", async (req, res) => {
-    try { res.json(await storage.getInventory(req.query.branchId ? Number(req.query.branchId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+      const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      res.json(await storage.getInventory(branchId, tenantId));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/inventory", async (req, res) => {
     try { res.json(await storage.upsertInventory(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -613,8 +619,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/inventory/low-stock", async (req, res) => {
     try {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
-      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      res.json(await storage.getLowStockItems(tenantId));
+      const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+      if (!tenantId && !branchId) return res.status(400).json({ error: "tenantId or branchId is required" });
+      if (branchId) {
+        res.json(await storage.getLowStockItems(branchId));
+      } else if (tenantId) {
+        const tenantBranches = await storage.getBranchesByTenant(tenantId);
+        const allLowStock = [];
+        for (const branch of tenantBranches) {
+          const items = await storage.getLowStockItems(branch.id);
+          allLowStock.push(...items);
+        }
+        res.json(allLowStock);
+      }
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -646,7 +663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/customers/export", async (req, res) => {
     try {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
-      const customers = await storage.getCustomers(tenantId);
+      const customers = await storage.getCustomers(undefined, tenantId);
       const exportData = customers.map((c: any) => ({
         Name: c.name || "",
         Phone: c.phone || "",
@@ -1394,12 +1411,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const topProducts = stats.topProducts || [];
       const slowMoving = await storage.getSlowMovingProducts(30); // Need to update slowMoving to tenantId if needed
       const allProds = tenantId ? await storage.getProductsByTenant(tenantId) : await storage.getProducts();
-      // Low stock data needs branch filtering
-      let lowStockData = await storage.getLowStockItems();
+      let lowStockData: any[] = [];
       if (tenantId) {
-        const branches = await storage.getBranchesByTenant(tenantId);
-        const branchIds = branches.map(b => b.id);
-        lowStockData = lowStockData.filter(item => branchIds.includes(item.branchId));
+        const tenantBranches = await storage.getBranchesByTenant(tenantId);
+        for (const branch of tenantBranches) {
+          const items = await storage.getLowStockItems(branch.id);
+          lowStockData.push(...items);
+        }
+      } else {
+        lowStockData = await storage.getLowStockItems();
       }
 
       // Simple predictions based on trends

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TouchableOpacity, Animated, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TouchableOpacity, Animated, ScrollView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
@@ -407,10 +407,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         overflow: 'hidden',
         elevation: 12,
-        shadowColor: Colors.primary,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.5,
-        shadowRadius: 16,
+        ...(Platform.OS === "web" ? { boxShadow: `0px 6px 16px rgba(30,64,175,0.5)` } as any : { shadowColor: Colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.5, shadowRadius: 16 }),
         marginBottom: 16,
     },
     buttonGradient: {

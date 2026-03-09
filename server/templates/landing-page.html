@@ -812,18 +812,31 @@
             </div>
           </div>
         </div>
-        <div class="form-group">
-          <label class="form-label" data-en="Card Number" data-ar="رقم البطاقة" data-de="Kartennummer">Card Number</label>
-          <div class="stripe-field" id="card-number-el"></div>
-        </div>
-        <div class="form-row">
+        <div id="stripe-payment-section">
           <div class="form-group">
-            <label class="form-label" data-en="Expiry" data-ar="انتهاء الصلاحية" data-de="Ablaufdatum">Expiry</label>
-            <div class="stripe-field" id="card-expiry-el"></div>
+            <label class="form-label" data-en="Card Number" data-ar="رقم البطاقة" data-de="Kartennummer">Card Number</label>
+            <div class="stripe-field" id="card-number-el"></div>
           </div>
-          <div class="form-group">
-            <label class="form-label">CVC</label>
-            <div class="stripe-field" id="card-cvc-el"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" data-en="Expiry" data-ar="انتهاء الصلاحية" data-de="Ablaufdatum">Expiry</label>
+              <div class="stripe-field" id="card-expiry-el"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">CVC</label>
+              <div class="stripe-field" id="card-cvc-el"></div>
+            </div>
+          </div>
+        </div>
+        <div id="manual-payment-section" style="display:none;">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;text-align:center;">
+            <div style="font-size:36px;margin-bottom:12px;">🏦</div>
+            <h4 style="font-size:1rem;font-weight:700;margin-bottom:8px;" data-en="Bank Transfer Payment" data-ar="الدفع عبر التحويل المصرفي" data-de="Zahlung per Banküberweisung">Bank Transfer Payment</h4>
+            <p style="font-size:.85rem;color:var(--muted);line-height:1.7;margin-bottom:16px;" data-en="Online card payment is currently unavailable. Your account will be created and activated after we confirm your bank transfer. You will receive payment details by email." data-ar="الدفع بالبطاقة عبر الإنترنت غير متاح حالياً. سيتم إنشاء حسابك وتفعيله بعد تأكيد التحويل المصرفي. ستتلقى تفاصيل الدفع عبر البريد الإلكتروني." data-de="Online-Kartenzahlung ist derzeit nicht verfügbar. Ihr Konto wird erstellt und nach Bestätigung Ihrer Banküberweisung aktiviert. Sie erhalten die Zahlungsdetails per E-Mail.">Online card payment is currently unavailable. Your account will be created and activated after we confirm your bank transfer. You will receive payment details by email.</p>
+            <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:100px;background:rgba(16,185,129,.1);color:#10b981;font-size:.8rem;font-weight:600;">
+              <span>✓</span>
+              <span data-en="30-day free trial included" data-ar="تجربة مجانية لمدة 30 يوماً" data-de="30-Tage-Testversion inklusive">30-day free trial included</span>
+            </div>
           </div>
         </div>
       </div>
@@ -851,7 +864,7 @@
       </button>
       <div class="ssl-note">
         <span>🔒</span>
-        <span data-en="Secured by Stripe · 256-bit SSL encryption" data-ar="مؤمن بواسطة Stripe · تشفير SSL 256 بت" data-de="Gesichert durch Stripe · 256-Bit-SSL-Verschlüsselung">Secured by Stripe · 256-bit SSL encryption</span>
+        <span data-en="Secured connection · 256-bit SSL encryption" data-ar="اتصال آمن · تشفير SSL 256 بت" data-de="Gesicherte Verbindung · 256-Bit-SSL-Verschlüsselung">Secured connection · 256-bit SSL encryption</span>
       </div>
     </div>
   </div>
@@ -924,10 +937,14 @@ let stripe, cardNumber, cardExpiry, cardCvc, stripeReady = false;
 let currentPlan = 'annual';
 let modalStep = 1;
 
-function initStripe() {
+async function initStripe() {
   if(stripeReady) return;
   try {
-    stripe = Stripe('pk_test_51placeholder');
+    const res = await fetch('/api/stripe/publishable-key');
+    const data = await res.json();
+    const pk = data.publishableKey;
+    if(!pk || pk.includes('dummy') || pk.includes('placeholder')) throw new Error('Stripe not configured');
+    stripe = Stripe(pk);
     const elements = stripe.elements({ appearance: { theme:'night', variables: { colorPrimary:'#2FD3C6', borderRadius:'10px' } } });
     const style = { style: { base: { color:'#f0f4f8', fontSize:'15px', fontFamily:'Inter,sans-serif', '::placeholder':{color:'#506070'} } } };
     cardNumber = elements.create('cardNumber', style);
@@ -943,7 +960,14 @@ function initStripe() {
       el.on('blur', () => container.classList.remove('focused'));
     });
     stripeReady = true;
-  } catch(e) { console.warn('Stripe init failed:', e); }
+    document.getElementById('stripe-payment-section').style.display = '';
+    document.getElementById('manual-payment-section').style.display = 'none';
+  } catch(e) {
+    console.warn('Stripe init failed:', e);
+    stripeReady = false;
+    document.getElementById('stripe-payment-section').style.display = 'none';
+    document.getElementById('manual-payment-section').style.display = '';
+  }
 }
 
 function openModal(plan) {

@@ -155,9 +155,18 @@ export const storage = {
   },
 
   // Inventory
-  async getInventory(branchId?: number) {
+  async getInventory(branchId?: number, tenantId?: number) {
     if (branchId) {
       return db.select().from(inventory).where(eq(inventory.branchId, branchId));
+    }
+    if (tenantId) {
+      const tenantBranches = await this.getBranchesByTenant(tenantId);
+      const branchIds = tenantBranches.map(b => b.id);
+      if (branchIds.length > 0) {
+        const { inArray } = await import('drizzle-orm');
+        return db.select().from(inventory).where(inArray(inventory.branchId, branchIds));
+      }
+      return [];
     }
     return db.select().from(inventory);
   },
@@ -191,61 +200,51 @@ export const storage = {
     return inv;
   },
   async getLowStockItems(branchId?: number) {
-    let result = await db.select().from(inventory);
-    if (branchId) {
-      result = result.filter(item => item.branchId === branchId);
-    }
+    const { inArray, notInArray, lte: ltEq } = await import('drizzle-orm');
 
-    // Filter out items for restaurant tenants as they have unlimited stock
-    const { inArray } = await import('drizzle-orm');
     const restaurantTenants = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.storeType, "restaurant"));
     const restaurantTenantIds = restaurantTenants.map(t => t.id);
 
+    let excludedBranchIds: number[] = [];
     if (restaurantTenantIds.length > 0) {
-      // Find branches of these restaurants
       const restaurantBranches = await db.select({ id: branches.id }).from(branches).where(inArray(branches.tenantId, restaurantTenantIds));
-      const restaurantBranchIds = restaurantBranches.map(b => b.id);
-      result = result.filter(item => !restaurantBranchIds.includes(item.branchId));
+      excludedBranchIds = restaurantBranches.map(b => b.id);
     }
 
-    return result.filter(item => (item.quantity || 0) <= (item.lowStockThreshold || 10));
+    const conditions: any[] = [
+      sql`${inventory.quantity} <= ${inventory.lowStockThreshold}`,
+    ];
+
+    if (branchId) {
+      conditions.push(eq(inventory.branchId, branchId));
+    }
+
+    if (excludedBranchIds.length > 0) {
+      conditions.push(notInArray(inventory.branchId, excludedBranchIds));
+    }
+
+    return db.select().from(inventory).where(and(...conditions));
   },
 
   // Customers
   async getCustomers(search?: string, tenantId?: number) {
-    let baseQuery = db.select().from(customers).where(eq(customers.isActive, true));
+    const conditions: any[] = [eq(customers.isActive, true)];
 
     if (tenantId) {
-      baseQuery = db.select().from(customers).where(and(eq(customers.tenantId, tenantId), eq(customers.isActive, true)));
+      conditions.push(eq(customers.tenantId, tenantId));
     }
 
     if (search) {
-      if (tenantId) {
-        return db.select().from(customers).where(
-          and(
-            eq(customers.tenantId, tenantId),
-            eq(customers.isActive, true),
-            or(
-              ilike(customers.name, `%${search}%`),
-              ilike(customers.phone || "", `%${search}%`),
-              ilike(customers.email || "", `%${search}%`)
-            )
-          )
-        ).orderBy(desc(customers.createdAt));
-      } else {
-        return db.select().from(customers).where(
-          and(
-            eq(customers.isActive, true),
-            or(
-              ilike(customers.name, `%${search}%`),
-              ilike(customers.phone || "", `%${search}%`),
-              ilike(customers.email || "", `%${search}%`)
-            )
-          )
-        ).orderBy(desc(customers.createdAt));
-      }
+      conditions.push(
+        or(
+          ilike(customers.name, `%${search}%`),
+          ilike(customers.phone || "", `%${search}%`),
+          ilike(customers.email || "", `%${search}%`)
+        )
+      );
     }
-    return baseQuery.orderBy(desc(customers.createdAt));
+
+    return db.select().from(customers).where(and(...conditions)).orderBy(desc(customers.createdAt));
   },
   async getCustomer(id: number) {
     const [cust] = await db.select().from(customers).where(eq(customers.id, id));
@@ -1100,8 +1099,20 @@ export const storage = {
     const [emp] = await db.select().from(employees).where(eq(employees.id, shift.employeeId));
     return { ...shift, employee: emp };
   },
-  async getAllActiveShifts() {
-    const activeShifts = await db.select().from(shifts).where(eq(shifts.status, "open")).orderBy(desc(shifts.startTime));
+  async getAllActiveShifts(tenantId?: number) {
+    let activeShifts: any[];
+    if (tenantId) {
+      const tenantBranches = await this.getBranchesByTenant(tenantId);
+      const branchIds = tenantBranches.map(b => b.id);
+      if (branchIds.length > 0) {
+        const { inArray } = await import('drizzle-orm');
+        activeShifts = await db.select().from(shifts).where(and(eq(shifts.status, "open"), inArray(shifts.branchId, branchIds))).orderBy(desc(shifts.startTime));
+      } else {
+        activeShifts = [];
+      }
+    } else {
+      activeShifts = await db.select().from(shifts).where(eq(shifts.status, "open")).orderBy(desc(shifts.startTime));
+    }
     const empList = await db.select().from(employees);
     const empMap = new Map(empList.map(e => [e.id, e]));
     return activeShifts.map(s => ({
@@ -1110,8 +1121,20 @@ export const storage = {
       employeeRole: empMap.get(s.employeeId)?.role || "unknown",
     }));
   },
-  async getShiftStats() {
-    const allShifts = await db.select().from(shifts).orderBy(desc(shifts.startTime)).limit(100);
+  async getShiftStats(tenantId?: number) {
+    let allShifts: any[];
+    if (tenantId) {
+      const tenantBranches = await this.getBranchesByTenant(tenantId);
+      const branchIds = tenantBranches.map(b => b.id);
+      if (branchIds.length > 0) {
+        const { inArray } = await import('drizzle-orm');
+        allShifts = await db.select().from(shifts).where(inArray(shifts.branchId, branchIds)).orderBy(desc(shifts.startTime)).limit(100);
+      } else {
+        allShifts = [];
+      }
+    } else {
+      allShifts = await db.select().from(shifts).orderBy(desc(shifts.startTime)).limit(100);
+    }
     const empList = await db.select().from(employees);
     const empMap = new Map(empList.map(e => [e.id, e]));
     const activeShifts = allShifts.filter(s => s.status === "open");
@@ -1166,17 +1189,28 @@ export const storage = {
   async getTenantsWithStats() {
     const allTenants = await this.getTenants();
 
-    // In a real app, you'd join with branches, employees, and sales.
-    // For now, we'll return demo stats or look them up.
     const results = [];
     for (const tenant of allTenants) {
-      // Mocking branch/employee counts for demo
-      // In production, these would be real queries filtered by tenantId
+      const tenantBranches = await this.getBranchesByTenant(tenant.id);
+      const branchIds = tenantBranches.map(b => b.id);
+      const tenantEmployees = await this.getEmployeesByTenant(tenant.id);
+
+      let salesToday = "0.00";
+      if (branchIds.length > 0) {
+        const { inArray } = await import('drizzle-orm');
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const [todaySales] = await db.select({
+          total: sql<string>`coalesce(sum(total_amount::numeric), 0)`,
+        }).from(sales).where(and(gte(sales.createdAt, todayStart), inArray(sales.branchId, branchIds)));
+        salesToday = Number(todaySales?.total || 0).toFixed(2);
+      }
+
       results.push({
         ...tenant,
-        branchCount: Math.floor(Math.random() * 3) + 1,
-        employeeCount: Math.floor(Math.random() * 10) + 2,
-        salesToday: (Math.random() * 1000).toFixed(2)
+        branchCount: tenantBranches.length,
+        employeeCount: tenantEmployees.length,
+        salesToday,
       });
     }
     return results;

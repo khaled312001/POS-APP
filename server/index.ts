@@ -2,6 +2,7 @@ import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { registerSuperAdminRoutes } from "./superAdminRoutes";
+import { tenantAuthMiddleware } from "./tenantAuth";
 import { callerIdService } from "./callerIdService";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync, getStripePublishableKey, getUncachableStripeClient, getStripeSecretKey } from "./stripeClient";
@@ -45,7 +46,7 @@ function setupCors(app: express.Application) {
         "Access-Control-Allow-Methods",
         "GET, POST, PUT, DELETE, OPTIONS",
       );
-      res.header("Access-Control-Allow-Headers", "Content-Type");
+      res.header("Access-Control-Allow-Headers", "Content-Type, x-license-key");
       res.header("Access-Control-Allow-Credentials", "true");
     }
 
@@ -576,6 +577,8 @@ function setupPaymentGatewayRoutes(app: express.Application) {
 
   setupBodyParsing(app);
   setupRequestLogging(app);
+
+  app.use(tenantAuthMiddleware());
 
   setupStripeRoutes(app);
   setupPaymentGatewayRoutes(app);

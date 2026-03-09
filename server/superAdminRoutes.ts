@@ -716,6 +716,18 @@ export function registerSuperAdminRoutes(app: Express) {
     }
   });
 
+  // ── CUSTOMER SOFT-DELETE ─────────────────────────────────────────────
+  app.patch("/api/super-admin/customers/:id/deactivate", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const customer = await storage.updateCustomer(id, { isActive: false } as any);
+      res.json(customer);
+    } catch (e: any) {
+      console.error("[SUPER-ADMIN] Customer deactivate error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ── SYSTEM HEALTH ─────────────────────────────────────────────────────
   app.get("/api/super-admin/system/health", requireSuperAdmin, async (_req: Request, res: Response) => {
     try {
@@ -764,7 +776,7 @@ export function registerSuperAdminRoutes(app: Express) {
         const tenants = await storage.getTenants();
         const results: string[] = [];
         for (const t of tenants) {
-          try { results.push(await createTenantBackup(t.id)); } catch (e) { /* skip failed */ }
+          try { results.push(await createTenantBackup(t.id)); } catch (e) { console.error(`[BACKUP] Failed to backup tenant ${t.id}:`, e); }
         }
         res.json({ success: true, count: results.length, files: results });
       }
@@ -780,6 +792,55 @@ export function registerSuperAdminRoutes(app: Express) {
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.send(fs.readFileSync(filepath));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/super-admin/backup/restore/:filename", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const filename = path.basename(req.params.filename);
+      const filepath = path.join(BACKUP_DIR, filename);
+      if (!fs.existsSync(filepath)) return res.status(404).json({ error: "Backup file not found" });
+      const raw = fs.readFileSync(filepath, "utf-8");
+      const snapshot = JSON.parse(raw);
+      if (!snapshot.tenant) return res.status(400).json({ error: "Invalid backup format: missing tenant data" });
+
+      const tenantId = snapshot.tenant.id;
+      const existingTenant = await storage.getTenant(tenantId);
+      if (!existingTenant) {
+        return res.status(404).json({ error: `Tenant #${tenantId} not found. The tenant must exist before restoring data.` });
+      }
+
+      let restored = { products: 0, customers: 0, branches: 0, employees: 0 };
+
+      if (snapshot.products && Array.isArray(snapshot.products)) {
+        for (const p of snapshot.products) {
+          try {
+            const existing = await storage.getProductsByTenant(tenantId);
+            const match = existing.find((ep: any) => ep.barcode && ep.barcode === p.barcode);
+            if (match) {
+              await storage.updateProduct(match.id, { name: p.name, price: p.price, costPrice: p.costPrice, description: p.description, isActive: p.isActive });
+            } else {
+              await storage.createProduct({ ...p, id: undefined, tenantId });
+            }
+            restored.products++;
+          } catch (err) { console.error(`[RESTORE] Failed to restore product "${p.name}":`, err); }
+        }
+      }
+
+      if (snapshot.customers && Array.isArray(snapshot.customers)) {
+        for (const c of snapshot.customers) {
+          try {
+            await storage.createCustomer({ ...c, id: undefined, tenantId });
+            restored.customers++;
+          } catch (err) { console.error(`[RESTORE] Failed to restore customer "${c.name}":`, err); }
+        }
+      }
+
+      console.log(`[RESTORE] Restored from ${filename} for tenant ${tenantId}:`, restored);
+      res.json({ success: true, tenantId, restored });
+    } catch (e: any) {
+      console.error("[RESTORE] Error:", e);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.delete("/api/super-admin/backup/:filename", requireSuperAdmin, async (req: Request, res: Response) => {
@@ -893,7 +954,7 @@ export function registerSuperAdminRoutes(app: Express) {
             trackInventory: true,
           });
           imported++;
-        } catch (err) { /* skip invalid rows */ }
+        } catch (err) { console.error(`[BULK-IMPORT] Failed to import product "${p.name}":`, err); }
       }
       res.json({ success: true, imported });
     } catch (e: any) {

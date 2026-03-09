@@ -23,7 +23,7 @@ export const branches = pgTable("branches", {
 
 export const employees = pgTable("employees", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id"),
+  tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }),
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),

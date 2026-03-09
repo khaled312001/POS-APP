@@ -517,12 +517,12 @@ export default function SettingsScreen() {
           </View>
         )}
 
-        {canManage && (
+        {isAdmin && (
           <>
-            <Text style={styles.sectionTitle}>{t("management")}</Text>
-            {isAdmin && <SettingRow icon="people" label={t("employees")} value={`${employees.length} ${t("members")}`} onPress={() => setShowEmployees(true)} color={Colors.info} rtl={isRTL} />}
-            {isAdmin && <SettingRow icon="business" label={t("branches")} value={`${branches.length} ${t("locations")}`} onPress={() => setShowBranches(true)} color={Colors.secondary} rtl={isRTL} />}
-            {isAdmin && <SettingRow icon="storefront-outline" label={t("storeSettings")} value={t("configureStore")} onPress={() => {
+            <Text style={styles.sectionTitle}>{t("storeSettings")}</Text>
+            <SettingRow icon="people" label={t("employees")} value={`${employees.length} ${t("members")}`} onPress={() => setShowEmployees(true)} color={Colors.info} rtl={isRTL} />
+            <SettingRow icon="business" label={t("branches")} value={`${branches.length} ${t("locations")}`} onPress={() => setShowBranches(true)} color={Colors.secondary} rtl={isRTL} />
+            <SettingRow icon="storefront-outline" label={t("storeSettings")} value={t("configureStore")} onPress={() => {
               setStoreForm({
                 name: storeSettings?.name || "",
                 address: storeSettings?.address || "",
@@ -534,8 +534,15 @@ export default function SettingsScreen() {
               });
               setStoreLogo(storeSettings?.logo || null);
               setShowStoreSettings(true);
-            }} color={Colors.accent} rtl={isRTL} />}
-            {isAdmin && <SettingRow icon="card" label={t("paymentGateways")} value={pgConfig?.stripe?.status === "connected" ? t("stripeConnected") : t("notConfigured")} onPress={() => { setPgTestResult(null); setShowPaymentGateway(true); }} color="#7C3AED" rtl={isRTL} />}
+            }} color={Colors.accent} rtl={isRTL} />
+            <SettingRow icon="card" label={t("paymentGateways")} value={pgConfig?.stripe?.status === "connected" ? t("stripeConnected") : t("notConfigured")} onPress={() => { setPgTestResult(null); setShowPaymentGateway(true); }} color="#7C3AED" rtl={isRTL} />
+            <SettingRow icon="cloud-upload" label={t("bulkImport")} value={t("importData")} onPress={() => { setImportResult(null); setShowBulkImport(true); }} color="#F59E0B" rtl={isRTL} />
+          </>
+        )}
+
+        {canManage && (
+          <>
+            <Text style={styles.sectionTitle}>{t("management")}</Text>
             <SettingRow icon="cube" label={t("suppliers")} value={`${suppliers.length} ${t("suppliers")}`} onPress={() => setShowSuppliers(true)} color={Colors.success} rtl={isRTL} />
             <SettingRow icon="wallet" label={t("expenses")} value={`${expenses.length} ${t("expenses")}`} onPress={() => setShowExpenses(true)} color={Colors.warning} rtl={isRTL} />
             <SettingRow icon="time" label={t("attendance")} value={`${shifts.length} ${t("attendance")}`} onPress={() => setShowAttendance(true)} color={Colors.warning} rtl={isRTL} />
@@ -543,21 +550,22 @@ export default function SettingsScreen() {
             <SettingRow icon="document-text" label={t("purchaseOrders")} value={`${purchaseOrders.length} ${t("orders")}`} onPress={() => setShowPurchaseOrders(true)} color={Colors.info} rtl={isRTL} />
             <SettingRow icon="list" label={t("activityLog")} value={`${activityLog.length} ${t("entries")}`} onPress={() => setShowActivityLog(true)} color={Colors.secondary} rtl={isRTL} />
             <SettingRow icon="swap-horizontal" label={t("returnsRefunds")} value={`${returns.length} ${t("returns")}`} onPress={() => setShowReturnsManager(true)} color={Colors.danger} rtl={isRTL} />
-            {isAdmin && <SettingRow icon="cloud-upload" label={t("bulkImport") || "Bulk Import"} value={t("importData") || "Import Products & Customers"} onPress={() => { setImportResult(null); setShowBulkImport(true); }} color="#F59E0B" rtl={isRTL} />}
-            {isAdmin && <SettingRow icon="call" label={t("callerID") || "Caller ID"} value={t("testCallerID") || "Test & Simulate Calls"} onPress={() => { setCallerIdStatus("idle"); setShowCallerIdTest(true); }} color="#EC4899" rtl={isRTL} />}
-          </>
-        )}
-        <SettingRow icon="cash" label={t("cashDrawer")} value={activeShift ? t("activeShift") : t("noActiveShift")} onPress={() => setShowCashDrawer(true)} color={Colors.success} rtl={isRTL} />
-        {canManage && (
-          <>
+            <SettingRow icon="cash" label={t("cashDrawer")} value={activeShift ? t("activeShift") : t("noActiveShift")} onPress={() => setShowCashDrawer(true)} color={Colors.success} rtl={isRTL} />
             <SettingRow icon="home" label={t("warehouses")} value={`${warehousesList.length} ${t("warehouses")}`} onPress={() => setShowWarehouseManager(true)} color={Colors.accent} rtl={isRTL} />
             <SettingRow icon="layers" label={t("productBatches")} value={`${batchesList.length} ${t("batches")}`} onPress={() => { setBatchView("list"); setShowBatchManager(true); }} color={Colors.secondary} rtl={isRTL} />
           </>
         )}
 
+        {!canManage && (
+          <>
+            <Text style={styles.sectionTitle}>{t("management")}</Text>
+            <SettingRow icon="time" label={t("attendance")} value={`${shifts.length} ${t("attendance")}`} onPress={() => setShowAttendance(true)} color={Colors.warning} rtl={isRTL} />
+            <SettingRow icon="cash" label={t("cashDrawer")} value={activeShift ? t("activeShift") : t("noActiveShift")} onPress={() => setShowCashDrawer(true)} color={Colors.success} rtl={isRTL} />
+          </>
+        )}
+
         <Text style={styles.sectionTitle}>{t("system")}</Text>
         <SettingRow icon="language" label={t("language")} value={language === "ar" ? "العربية" : language === "de" ? "Deutsch" : "English"} onPress={() => setShowLanguagePicker(true)} color={Colors.info} rtl={isRTL} />
-        {/* Left-hand mode toggle */}
         <Pressable
           style={[rowStyles.row, isRTL && { flexDirection: "row-reverse" }]}
           onPress={() => toggleLeftHandMode(!leftHandMode)}
@@ -576,7 +584,7 @@ export default function SettingsScreen() {
             thumbColor={leftHandMode ? Colors.secondary : Colors.textMuted}
           />
         </Pressable>
-        <SettingRow icon="print" label={t("receiptPrinter")} value={t("notConfigured")} onPress={() => setShowPrinterSettings(true)} color={Colors.textMuted} rtl={isRTL} />
+        {canManage && <SettingRow icon="print" label={t("receiptPrinter")} value={t("notConfigured")} onPress={() => setShowPrinterSettings(true)} color={Colors.textMuted} rtl={isRTL} />}
         <SettingRow icon="cloud-upload" label={t("syncStatus")} value={t("connected")} color={Colors.success} rtl={isRTL} />
         <SettingRow icon="information-circle" label={t("appVersion")} value="1.0.0" color={Colors.info} rtl={isRTL} />
 
@@ -1860,13 +1868,13 @@ export default function SettingsScreen() {
               <Text style={[styles.label, rtlTextAlign]}>{t("storeEmail")}</Text>
               <TextInput style={[styles.input, rtlTextAlign]} value={storeForm.email} onChangeText={(v) => setStoreForm({ ...storeForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storeEmail")} keyboardType="email-address" />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("storeType") || "Store Type"}</Text>
+              <Text style={[styles.label, rtlTextAlign]}>{t("storeType")}</Text>
               <View style={styles.roleRow}>
                 {[
-                  { id: "supermarket", label: t("supermarket") || "Supermarket" },
-                  { id: "restaurant", label: t("restaurant") || "Restaurant" },
-                  { id: "pharmacy", label: t("pharmacy") || "Pharmacy" },
-                  { id: "others", label: t("others") || "Others" },
+                  { id: "supermarket", label: t("supermarket") },
+                  { id: "restaurant", label: t("restaurant") },
+                  { id: "pharmacy", label: t("pharmacy") },
+                  { id: "others", label: t("others") },
                 ].map((st) => (
                   <Pressable
                     key={st.id}
@@ -2089,7 +2097,7 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Text style={[styles.modalTitle, rtlTextAlign]}>{t("bulkImport" as any) || "Bulk Import"}</Text>
+              <Text style={[styles.modalTitle, rtlTextAlign]}>{t("bulkImport")}</Text>
               <Pressable onPress={() => setShowBulkImport(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -2115,15 +2123,15 @@ export default function SettingsScreen() {
               <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginBottom: 16 }}>
                 <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
                   <Ionicons name="information-circle" size={18} color={Colors.info} />
-                  <Text style={{ color: Colors.text, fontSize: 14, fontWeight: "600" }}>{t("excelFormat" as any) || "Excel Format"}</Text>
+                  <Text style={{ color: Colors.text, fontSize: 14, fontWeight: "600" }}>{t("excelFormat")}</Text>
                 </View>
                 {importType === "products" ? (
                   <Text style={{ color: Colors.textMuted, fontSize: 12, lineHeight: 18 }}>
-                    {t("productImportHelp" as any) || "Excel columns: Name, Price, CostPrice, SKU, Barcode, Unit, NameArabic"}
+                    {t("productImportHelp")}
                   </Text>
                 ) : (
                   <Text style={{ color: Colors.textMuted, fontSize: 12, lineHeight: 18 }}>
-                    {t("customerImportHelp" as any) || "Excel columns: Name, Phone, Email, Address"}
+                    {t("customerImportHelp")}
                   </Text>
                 )}
               </View>
@@ -2136,12 +2144,12 @@ export default function SettingsScreen() {
                   if (Platform.OS === "web") {
                     window.open(templateUrl, "_blank");
                   } else {
-                    Alert.alert(t("downloadTemplate" as any) || "Download Template", templateUrl);
+                    Alert.alert(t("downloadTemplate"), templateUrl);
                   }
                 }}
               >
                 <Ionicons name="download-outline" size={20} color={Colors.accent} />
-                <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: "600" }}>{t("downloadTemplate" as any) || "Download Template"}</Text>
+                <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: "600" }}>{t("downloadTemplate")}</Text>
               </Pressable>
 
               {/* Export existing data (customers only) */}
@@ -2153,7 +2161,7 @@ export default function SettingsScreen() {
                     if (Platform.OS === "web") {
                       window.open(exportUrl, "_blank");
                     } else {
-                      Alert.alert(t("exportCustomersExcel" as any) || "Export", exportUrl);
+                      Alert.alert(t("exportCustomersExcel"), exportUrl);
                     }
                   }}
                 >
@@ -2243,7 +2251,7 @@ export default function SettingsScreen() {
               >
                 <Ionicons name={importLoading ? "hourglass" : "cloud-upload"} size={40} color={importLoading ? Colors.textMuted : Colors.accent} />
                 <Text style={{ color: importLoading ? Colors.textMuted : Colors.accent, fontSize: 16, fontWeight: "700", marginTop: 8 }}>
-                  {importLoading ? (t("uploading" as any) || "Uploading...") : (t("selectExcelFile" as any) || "Select Excel File")}
+                  {importLoading ? t("uploading") : t("selectExcelFile")}
                 </Text>
                 <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 4 }}>.xlsx, .xls, .csv</Text>
               </Pressable>
@@ -2263,7 +2271,7 @@ export default function SettingsScreen() {
                     />
                     <Text style={{ color: importResult.success ? Colors.success : Colors.danger, fontSize: 15, fontWeight: "700" }}>
                       {importResult.success
-                        ? `${t("imported" as any) || "Imported"} ${importResult.count} ${importType === "products" ? t("products") : t("customers")}`
+                        ? `${t("imported")} ${importResult.count} ${importType === "products" ? t("products") : t("customers")}`
                         : importResult.error || t("error")}
                     </Text>
                   </View>
@@ -2279,7 +2287,7 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Text style={[styles.modalTitle, rtlTextAlign]}>{t("callerID" as any) || "Caller ID"}</Text>
+              <Text style={[styles.modalTitle, rtlTextAlign]}>{t("callerID")}</Text>
               <Pressable onPress={() => setShowCallerIdTest(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -2297,15 +2305,15 @@ export default function SettingsScreen() {
                   />
                 </View>
                 <Text style={{ color: Colors.text, fontSize: 18, fontWeight: "700" }}>
-                  {callerIdStatus === "done" ? (t("callSimulated" as any) || "Call Simulated!") : (t("simulateCall" as any) || "Simulate Call")}
+                  {callerIdStatus === "done" ? t("callSimulated") : t("simulateCall")}
                 </Text>
                 <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 4, textAlign: "center" }}>
-                  {t("callerIdDescription" as any) || "Test the Caller ID notification on the POS screen"}
+                  {t("callerIdDescription")}
                 </Text>
               </View>
 
               {/* Phone Number Input */}
-              <Text style={[styles.label, rtlTextAlign]}>{t("phoneNumber" as any) || "Phone Number"}</Text>
+              <Text style={[styles.label, rtlTextAlign]}>{t("phoneNumber")}</Text>
               <TextInput
                 style={[styles.input, { fontSize: 18, textAlign: "center", fontWeight: "700" }]}
                 value={testPhoneNumber}
@@ -2316,7 +2324,7 @@ export default function SettingsScreen() {
               />
 
               {/* Quick Numbers */}
-              <Text style={[styles.label, rtlTextAlign, { marginTop: 16 }]}>{t("quickTest" as any) || "Quick Test Numbers"}</Text>
+              <Text style={[styles.label, rtlTextAlign, { marginTop: 16 }]}>{t("quickTest")}</Text>
               <View style={{ flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap", gap: 8 }}>
                 {["0551234567", "0509876543", "0521112233", "+41791234567"].map((num) => (
                   <Pressable
@@ -2351,7 +2359,7 @@ export default function SettingsScreen() {
                 <LinearGradient colors={["#EC4899", "#9333EA"]} style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", paddingVertical: 16, gap: 10 }}>
                   <Ionicons name={callerIdStatus === "testing" ? "hourglass" : "call"} size={22} color={Colors.white} />
                   <Text style={{ color: Colors.white, fontSize: 16, fontWeight: "700" }}>
-                    {callerIdStatus === "testing" ? (t("simulating" as any) || "Simulating...") : (t("simulateIncomingCall" as any) || "Simulate Incoming Call")}
+                    {callerIdStatus === "testing" ? t("simulating") : t("simulateIncomingCall")}
                   </Text>
                 </LinearGradient>
               </Pressable>
@@ -2383,7 +2391,7 @@ export default function SettingsScreen() {
               <View style={{ flexDirection: isRTL ? "row-reverse" : "row", backgroundColor: Colors.info + "10", borderRadius: 12, padding: 12, gap: 8, alignItems: "flex-start" }}>
                 <Ionicons name="information-circle" size={18} color={Colors.info} />
                 <Text style={{ color: Colors.textSecondary, fontSize: 12, flex: 1 }}>
-                  {t("callerIdNote" as any) || "When you simulate a call, a notification banner will appear on the POS screen showing the caller info. If the phone number matches a customer, their name will be displayed."}
+                  {t("callerIdNote")}
                 </Text>
               </View>
             </ScrollView>

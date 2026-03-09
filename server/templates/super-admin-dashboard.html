@@ -1131,8 +1131,10 @@ async function saveCust(){
   else toast('Failed to save customer','err');
 }
 async function delCust(id,name){
-  if(!confirm(`Delete customer "${name}"?`)) return;
-  toast('Customer delete not supported via API – mark inactive instead','err');
+  if(!confirm(`Deactivate customer "${name}"? They will be marked as inactive.`)) return;
+  const res = await api('PATCH',`/customers/${id}/deactivate`);
+  if(res&&res.id){ toast('Customer deactivated','ok'); loadStoreCustomers(); }
+  else toast('Failed to deactivate customer','err');
 }
 
 /* ── Store Sales ── */
@@ -1708,6 +1710,7 @@ async function loadBackups(){
     <td style="color:var(--mu)">${fmtDT(f.createdAt)}</td>
     <td>
       <button class="btn btn-sm btn-p" onclick="dlBackup('${f.filename}')">⬇ Download</button>
+      <button class="btn btn-sm btn-o" onclick="restoreBackup('${f.filename}')">♻ Restore</button>
       ${iBtn('🗑️','btn-d',`deleteBackup('${f.filename}')`)}
     </td>
   </tr>`).join('') || '<tr><td colspan="4" class="empty">No backups yet. Create one above.</td></tr>';
@@ -1733,6 +1736,15 @@ async function deleteBackup(filename){
   if(!confirm(`Delete backup ${filename}?`)) return;
   const res = await api('DELETE',`/backup/${filename}`);
   if(res?.success){ toast('Deleted','ok'); loadBackups(); } else toast('Failed','err');
+}
+async function restoreBackup(filename){
+  if(!confirm(`Restore data from backup "${filename}"?\n\nThis will re-import products and customers into the original tenant. Existing data with matching barcodes will be updated.`)) return;
+  toast('Restoring…');
+  const res = await api('POST',`/backup/restore/${filename}`);
+  if(res?.success){
+    const r = res.restored||{};
+    toast(`Restored: ${r.products||0} products, ${r.customers||0} customers`,'ok');
+  } else toast(res?.error||'Restore failed','err');
 }
 
 /* ══════════════════════════════════════════════════════
