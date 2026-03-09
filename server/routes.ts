@@ -6,6 +6,7 @@ import fs from "node:fs";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { callerIdService } from "./callerIdService";
+import { requireSuperAdmin } from "./superAdminAuth";
 
 const TIMESTAMP_FIELDS = [
   "createdAt", "updatedAt", "expiryDate", "expectedDate", "receivedDate",
@@ -1739,7 +1740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.put("/api/landing-page-config", async (req, res) => {
+  app.put("/api/landing-page-config", requireSuperAdmin as any, async (req: any, res: any) => {
     try {
       const { tenantId, ...data } = req.body;
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });

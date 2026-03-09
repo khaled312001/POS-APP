@@ -9,6 +9,7 @@ export interface TenantAuthRequest extends Request {
 const PUBLIC_ROUTES = [
   "/api/license/validate",
   "/api/landing/subscribe",
+  "/api/landing-page-config",
   "/api/store-public/",
   "/api/online-orders/public",
   "/api/stripe/webhook",
