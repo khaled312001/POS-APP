@@ -220,23 +220,29 @@ export default function SettingsScreen() {
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
+  const shiftsQueryKey = tenant?.id ? `/api/shifts?tenantId=${tenant.id}` : "/api/shifts";
+  const activeShiftsQueryKey = tenant?.id ? `/api/shifts/active?tenantId=${tenant.id}` : "/api/shifts/active";
+
   const clockInMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/shifts", data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/shifts"] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [shiftsQueryKey] }); },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const clockOutMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/shifts/${id}/close`, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/shifts"] }); qc.invalidateQueries({ queryKey: ["/api/shifts/active"] }); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [shiftsQueryKey] });
+      qc.invalidateQueries({ queryKey: [activeShiftsQueryKey] });
+    },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
   const forceCloseShiftMutation = useMutation({
     mutationFn: (id: number) => apiRequest("PUT", `/api/shifts/${id}/close`, {}),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/shifts"] });
-      qc.invalidateQueries({ queryKey: ["/api/shifts/active"] });
+      qc.invalidateQueries({ queryKey: [shiftsQueryKey] });
+      qc.invalidateQueries({ queryKey: [activeShiftsQueryKey] });
       Alert.alert(t("success"), t("shiftForceClosed"));
     },
     onError: (e: any) => Alert.alert(t("error"), e.message),
@@ -486,6 +492,43 @@ export default function SettingsScreen() {
     return `${hours}h ${mins}m`;
   };
 
+  const handleLogout = () => {
+    if (activeShift) {
+      Alert.alert(
+        t("endShift"),
+        t("shiftRequiredMsg") || "You must end your shift before logging out.",
+        [
+          { text: t("cancel"), style: "cancel" },
+          {
+            text: t("endShift") + " & " + t("logout"),
+            style: "destructive",
+            onPress: () => clockOutMutation.mutate({ id: activeShift.id, data: {} }, {
+              onSuccess: () => {
+                if (Platform.OS === "web") {
+                  if (window.confirm(t("logoutConfirm"))) logout();
+                } else {
+                  Alert.alert(t("logoutConfirm"), "", [
+                    { text: t("cancel"), style: "cancel" },
+                    { text: t("logout"), style: "destructive", onPress: () => logout() },
+                  ]);
+                }
+              },
+            }),
+          },
+        ]
+      );
+      return;
+    }
+    if (Platform.OS === "web") {
+      if (window.confirm(t("logoutConfirm"))) logout();
+    } else {
+      Alert.alert(t("logoutConfirm"), "", [
+        { text: t("cancel"), style: "cancel" },
+        { text: t("logout"), style: "destructive", onPress: () => logout() },
+      ]);
+    }
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
       <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid]} style={styles.header}>
@@ -588,7 +631,7 @@ export default function SettingsScreen() {
         <SettingRow icon="cloud-upload" label={t("syncStatus")} value={t("connected")} color={Colors.success} rtl={isRTL} />
         <SettingRow icon="information-circle" label={t("appVersion")} value="1.0.0" color={Colors.info} rtl={isRTL} />
 
-        <Pressable style={styles.logoutBtn} onPress={() => { if (Platform.OS === "web") { if (window.confirm(t("logoutConfirm"))) logout(); } else { Alert.alert(t("logoutConfirm"), "", [{ text: t("cancel"), style: "cancel" }, { text: t("logout"), style: "destructive", onPress: () => logout() }]); } }}>
+        <Pressable style={styles.logoutBtn} onPress={handleLogout}>
           <Ionicons name="log-out" size={20} color={Colors.danger} />
           <Text style={styles.logoutText}>{t("logout")}</Text>
         </Pressable>
@@ -955,11 +998,19 @@ export default function SettingsScreen() {
                         {item.endTime ? ` - ${new Date(item.endTime).toLocaleString()}` : ` ${t("shiftActiveLabel")}`}
                       </Text>
                     </View>
-                    {item.endTime && (
+                    {item.endTime ? (
                       <View style={[styles.roleBadge, { backgroundColor: Colors.info + "20" }]}>
                         <Text style={[styles.roleText, { color: Colors.info }]}>{formatDuration(item.startTime, item.endTime)}</Text>
                       </View>
-                    )}
+                    ) : isAdmin && item.employeeId !== employee?.id ? (
+                      <Pressable
+                        style={[styles.clockBtn, { backgroundColor: Colors.danger + "20" }]}
+                        onPress={() => clockOutMutation.mutate({ id: item.id, data: {} })}
+                      >
+                        <Ionicons name="stop-circle" size={18} color={Colors.danger} />
+                        <Text style={[styles.clockBtnText, { color: Colors.danger }]}>{t("endShift")}</Text>
+                      </Pressable>
+                    ) : null}
                   </View>
                 );
               }}

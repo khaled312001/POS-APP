@@ -145,6 +145,13 @@ export default function POSScreen() {
     refetchInterval: showOnlineOrders ? 30000 : false,
   });
 
+  const { data: myShifts = [] } = useQuery<any[]>({
+    queryKey: [tenantId ? `/api/shifts?tenantId=${tenantId}` : "/api/shifts"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId && showAccountSwitcher,
+  });
+  const myActiveShift = (myShifts as any[]).find((s: any) => s.employeeId === employee?.id && !s.endTime && s.status === "open");
+
   const loadInvoiceDetails = async (saleId: number) => {
     try {
       const res = await apiRequest("GET", `/api/sales/${saleId}`);
@@ -553,6 +560,16 @@ export default function POSScreen() {
     }
     return null;
   };
+
+  const endShiftMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("PUT", `/api/shifts/${id}/close`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [tenantId ? `/api/shifts?tenantId=${tenantId}` : "/api/shifts"] });
+      setShowAccountSwitcher(false);
+      Alert.alert("Success", "Shift ended successfully");
+    },
+    onError: (e: any) => Alert.alert("Error", e.message),
+  });
 
   const saleMutation = useMutation({
     mutationFn: async () => {
@@ -2103,6 +2120,37 @@ export default function POSScreen() {
                       <View style={styles.switchActiveDot} />
                       <Text style={styles.switchActiveText}>{t("active" as any)}</Text>
                     </View>
+                  </View>
+                )}
+
+                {/* Shift status */}
+                {myActiveShift ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: Colors.success + "15", borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: Colors.success + "40" }}>
+                    <Ionicons name="radio-button-on" size={16} color={Colors.success} style={{ marginRight: 8 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: Colors.success, fontSize: 13, fontWeight: "700" }}>
+                        {language === "ar" ? "وردية نشطة" : language === "de" ? "Aktive Schicht" : "Active Shift"}
+                      </Text>
+                      <Text style={{ color: Colors.textMuted, fontSize: 12 }}>
+                        {new Date(myActiveShift.startTime).toLocaleTimeString()}
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => endShiftMutation.mutate(myActiveShift.id)}
+                      style={{ backgroundColor: Colors.danger + "20", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 6 }}
+                    >
+                      <Ionicons name="stop-circle" size={16} color={Colors.danger} />
+                      <Text style={{ color: Colors.danger, fontSize: 13, fontWeight: "700" }}>
+                        {language === "ar" ? "إنهاء الوردية" : language === "de" ? "Schicht beenden" : "End Shift"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: Colors.warning + "10", borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: Colors.warning + "30" }}>
+                    <Ionicons name="time-outline" size={16} color={Colors.warning} style={{ marginRight: 8 }} />
+                    <Text style={{ color: Colors.textMuted, fontSize: 13 }}>
+                      {language === "ar" ? "لا توجد وردية نشطة" : language === "de" ? "Keine aktive Schicht" : "No active shift"}
+                    </Text>
                   </View>
                 )}
 
