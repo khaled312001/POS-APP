@@ -827,7 +827,7 @@ self.addEventListener('message', (event) => {
   // SPA catch-all: serve index.html with PWA tags for any unmatched route
   // This ensures /intro, /login, /license-gate etc. all get the PWA install dialog
   const staticIndexPath = path.resolve(process.cwd(), "static-build", "index.html");
-  app.get("*", (req: Request, res: Response, next: NextFunction) => {
+  app.get("/{*splat}", (req: Request, res: Response, next: NextFunction) => {
     // Skip API routes, super_admin, store routes, and asset files
     if (
       req.path.startsWith("/api/") ||

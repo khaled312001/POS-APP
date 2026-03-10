@@ -5,15 +5,28 @@
  *   • Session management (connect / disconnect / status / QR)
  *   • Order notification to admin
  *   • Customer order confirmation & status updates
+ *
+ * The heavy @wppconnect-team/wppconnect dependency is loaded lazily
+ * so the server can start even when the package is not installed.
  */
 
-import wppconnect from "@wppconnect-team/wppconnect";
+let wppconnect: any = null;
 
-// ── Config ────────────────────────────────────────────────────────────────────
-const ADMIN_PHONE = "201204593124"; // without leading "+"
+async function loadWppConnect() {
+  if (!wppconnect) {
+    try {
+      wppconnect = (await import("@wppconnect-team/wppconnect")).default;
+    } catch {
+      console.warn("[WhatsApp] @wppconnect-team/wppconnect not installed — WhatsApp features disabled");
+      return null;
+    }
+  }
+  return wppconnect;
+}
+
+const ADMIN_PHONE = "201204593124";
 const SESSION_NAME = "barmagly-pos";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 export type WhatsAppStatus = "disconnected" | "connecting" | "qr_ready" | "connected";
 
 interface OrderItem {
@@ -38,8 +51,7 @@ interface OrderData {
     notes?: string | null;
 }
 
-// ── Singleton state ───────────────────────────────────────────────────────────
-let client: wppconnect.Whatsapp | null = null;
+let client: any = null;
 let status: WhatsAppStatus = "disconnected";
 let lastQrCode: string | null = null;
 let lastError: string | null = null;
@@ -52,31 +64,29 @@ function log(event: string) {
     console.log(`[WhatsApp] ${event}`);
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-/**
- * Normalise a phone number to the wppconnect chatId format: <digits>@c.us
- */
 function toChatId(phone: string): string {
     const digits = phone.replace(/\D/g, "");
     return `${digits}@c.us`;
 }
 
-// ── Service API ───────────────────────────────────────────────────────────────
 export const whatsappService = {
-    /** Current connection status */
     getStatus(): { status: WhatsAppStatus; lastError: string | null; log: typeof connectionLog } {
         return { status, lastError, log: connectionLog.slice(0, 20) };
     },
 
-    /** Latest QR code (base64 PNG data-uri) for the admin to scan */
     getQrCode(): string | null {
         return lastQrCode;
     },
 
-    /** Start / reconnect the WhatsApp session */
     async connect(): Promise<{ status: WhatsAppStatus; qrCode?: string }> {
         if (status === "connected" && client) {
             return { status: "connected" };
+        }
+
+        const wpp = await loadWppConnect();
+        if (!wpp) {
+            lastError = "@wppconnect-team/wppconnect package not installed";
+            return { status: "disconnected" };
         }
 
         status = "connecting";
@@ -85,22 +95,16 @@ export const whatsappService = {
         log("Connecting…");
 
         try {
-            // ── 1. Resolve Chrome executable path ──────────────────────────────
-            // Priority: env var → nix/system chromium → puppeteer bundled
-            // NOTE: puppeteer's bundled Chrome is last because on Replit it
-            //       often lacks system libs (libXext etc). Nix chromium is self-contained.
             let browserPath: string | undefined;
             const { execSync } = await import("child_process");
             const fs = await import("fs");
 
-            // 1a. Env var override
             const envChrome = process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROMIUM_PATH;
             if (envChrome && fs.existsSync(envChrome)) {
                 browserPath = envChrome;
                 log(`Using env CHROME_PATH: ${browserPath}`);
             }
 
-            // 1b. System chromium via PATH (nix, apt, etc.) — has all system libs
             if (!browserPath) {
                 try {
                     const found = execSync(
@@ -111,7 +115,6 @@ export const whatsappService = {
                 } catch { }
             }
 
-            // 1c. Nix store chromium (Replit nix packages)
             if (!browserPath) {
                 try {
                     const nixFound = execSync(
@@ -122,7 +125,6 @@ export const whatsappService = {
                 } catch { }
             }
 
-            // 1d. Common static paths
             if (!browserPath) {
                 for (const c of [
                     "/run/current-system/sw/bin/chromium",
@@ -136,7 +138,6 @@ export const whatsappService = {
                 }
             }
 
-            // 1e. Last resort: puppeteer's bundled Chrome (may be missing libs on Replit)
             if (!browserPath) {
                 try {
                     const { executablePath } = await import("puppeteer");
@@ -148,13 +149,10 @@ export const whatsappService = {
             if (browserPath) {
                 log(`Using browser: ${browserPath}`);
             } else {
-                throw new Error(
-                    "No Chrome/Chromium found. Run: npx puppeteer browsers install chrome"
-                );
+                throw new Error("No Chrome/Chromium found.");
             }
 
-            // ── 2. Start WPPConnect session ────────────────────────────────────
-            client = await wppconnect.create({
+            client = await wpp.create({
                 session: SESSION_NAME,
                 headless: true,
                 devtools: false,
@@ -188,7 +186,7 @@ export const whatsappService = {
                     if (statusSession === "inChat" || statusSession === "isLogged") {
                         status = "connected";
                         lastQrCode = null;
-                        log("✅ Connected to WhatsApp");
+                        log("Connected to WhatsApp");
                     }
                     if (
                         statusSession === "notLogged" ||
@@ -196,14 +194,14 @@ export const whatsappService = {
                         statusSession === "desconnectedMobile"
                     ) {
                         status = "disconnected";
-                        log(`⚠ Disconnected: ${statusSession}`);
+                        log(`Disconnected: ${statusSession}`);
                     }
                 },
             });
 
             status = "connected";
             lastQrCode = null;
-            log("✅ WhatsApp client ready");
+            log("WhatsApp client ready");
 
             client.onMessage(async (message: any) => {
                 log(`Msg from ${message.from}: ${(message.body || "").slice(0, 80)}`);
@@ -213,12 +211,11 @@ export const whatsappService = {
         } catch (err: any) {
             lastError = err.message || String(err);
             status = "disconnected";
-            log(`❌ Connection failed: ${lastError}`);
+            log(`Connection failed: ${lastError}`);
             return { status: "disconnected" };
         }
     },
 
-    /** Gracefully disconnect */
     async disconnect(): Promise<void> {
         if (client) {
             try {
@@ -231,9 +228,6 @@ export const whatsappService = {
         log("Disconnected");
     },
 
-    // ── Messaging ─────────────────────────────────────────────────────────────
-
-    /** Send a text message. Returns true on success. */
     async sendText(phone: string, text: string): Promise<boolean> {
         if (!client || status !== "connected") {
             log(`Cannot send — status is "${status}"`);
@@ -249,29 +243,28 @@ export const whatsappService = {
         }
     },
 
-    /** Notify admin about a new online order */
     async sendOrderNotification(order: OrderData, storeName?: string): Promise<boolean> {
         const itemLines = order.items
-            .map((i, idx) => `  ${idx + 1}. ${i.name} × ${i.quantity} — ${Number(i.unitPrice).toFixed(2)}`)
+            .map((i, idx) => `  ${idx + 1}. ${i.name} x ${i.quantity} — ${Number(i.unitPrice).toFixed(2)}`)
             .join("\n");
 
         const msg = [
-            `🛒 *New Order ${order.orderNumber}*`,
-            storeName ? `📍 Store: ${storeName}` : "",
-            `👤 ${order.customerName}`,
-            `📱 ${order.customerPhone}`,
-            order.customerAddress ? `🏠 ${order.customerAddress}` : "",
+            `New Order ${order.orderNumber}`,
+            storeName ? `Store: ${storeName}` : "",
+            `${order.customerName}`,
+            `${order.customerPhone}`,
+            order.customerAddress ? `${order.customerAddress}` : "",
             ``,
-            `📦 *Items:*`,
+            `Items:`,
             itemLines,
             ``,
-            `💰 Subtotal: ${Number(order.subtotal).toFixed(2)}`,
-            order.deliveryFee && Number(order.deliveryFee) > 0 ? `🚚 Delivery: ${Number(order.deliveryFee).toFixed(2)}` : "",
-            `💵 *Total: ${Number(order.totalAmount).toFixed(2)}*`,
+            `Subtotal: ${Number(order.subtotal).toFixed(2)}`,
+            order.deliveryFee && Number(order.deliveryFee) > 0 ? `Delivery: ${Number(order.deliveryFee).toFixed(2)}` : "",
+            `Total: ${Number(order.totalAmount).toFixed(2)}`,
             ``,
-            `📋 Type: ${order.orderType === "delivery" ? "🚚 Delivery" : "🏪 Pickup"}`,
-            `💳 Payment: ${order.paymentMethod}`,
-            order.notes ? `📝 Notes: ${order.notes}` : "",
+            `Type: ${order.orderType === "delivery" ? "Delivery" : "Pickup"}`,
+            `Payment: ${order.paymentMethod}`,
+            order.notes ? `Notes: ${order.notes}` : "",
         ]
             .filter(Boolean)
             .join("\n");
@@ -279,7 +272,6 @@ export const whatsappService = {
         return this.sendText(ADMIN_PHONE, msg);
     },
 
-    /** Send order confirmation to the customer */
     async sendCustomerConfirmation(
         customerPhone: string,
         orderNumber: string,
@@ -287,10 +279,10 @@ export const whatsappService = {
         totalAmount: string | number,
     ): Promise<boolean> {
         const msg = [
-            `✅ *Order Confirmed — ${orderNumber}*`,
+            `Order Confirmed — ${orderNumber}`,
             ``,
-            `Thank you for ordering from *${storeName}*! 🎉`,
-            `Total: *${Number(totalAmount).toFixed(2)}*`,
+            `Thank you for ordering from ${storeName}!`,
+            `Total: ${Number(totalAmount).toFixed(2)}`,
             ``,
             `We'll update you when your order is being prepared.`,
             `If you have questions, reply to this message.`,
@@ -299,33 +291,22 @@ export const whatsappService = {
         return this.sendText(customerPhone, msg);
     },
 
-    /** Notify customer about order status changes */
     async sendStatusUpdate(
         customerPhone: string,
         orderNumber: string,
         newStatus: string,
         storeName: string,
     ): Promise<boolean> {
-        const statusEmoji: Record<string, string> = {
-            accepted: "👍",
-            preparing: "👨‍🍳",
-            ready: "✅",
-            delivered: "🎉",
-            cancelled: "❌",
-        };
-
         const statusText: Record<string, string> = {
             accepted: "Your order has been accepted!",
             preparing: "Your order is being prepared…",
             ready: "Your order is ready for pickup/delivery!",
-            delivered: "Your order has been delivered. Enjoy! 🎉",
+            delivered: "Your order has been delivered. Enjoy!",
             cancelled: "Unfortunately your order has been cancelled.",
         };
 
-        const emoji = statusEmoji[newStatus] || "📋";
         const text = statusText[newStatus] || `Order status: ${newStatus}`;
-
-        const msg = `${emoji} *${storeName} — Order ${orderNumber}*\n\n${text}`;
+        const msg = `${storeName} — Order ${orderNumber}\n\n${text}`;
         return this.sendText(customerPhone, msg);
     },
 };
