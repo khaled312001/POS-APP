@@ -855,7 +855,10 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
         </svg>Backup & Restore</div>
-      <div class="ni" onclick="show('whatsapp')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>WhatsApp</div>
+      <div class="ni" onclick="show('whatsapp')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>WhatsApp</div>
       <div class="nav-sec">Account</div>
       <div class="ni" onclick="show('settings')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -3234,12 +3237,10 @@
     /* ══════════════════════════════════════════════════════
        WHATSAPP
     ══════════════════════════════════════════════════════ */
-    async function waApiGet(path) { try { const r = await fetch('/api/whatsapp' + path, { headers: { Authorization: `Bearer ${token}` } }); return await r.json(); } catch (e) { console.error(e); return null; } }
-    async function waApiPost(path) { try { const r = await fetch('/api/whatsapp' + path, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }); return await r.json(); } catch (e) { console.error(e); return null; } }
 
     async function waRefresh() {
-      const d = await waApiGet('/status');
-      if (!d) return;
+      const d = await api('GET', '/whatsapp/status');
+      if (!d || !d.status) return;
       const dot = document.getElementById('waStatusDot');
       const txt = document.getElementById('waStatusText');
       const btnC = document.getElementById('waBtnConnect');
@@ -3256,7 +3257,7 @@
         logEl.innerHTML = d.log.map(l => `<div style="margin-bottom:4px"><span style="color:var(--pr)">${new Date(l.time).toLocaleTimeString()}</span> ${l.event}</div>`).join('');
       }
       // QR
-      const qrW = await waApiGet('/qr');
+      const qrW = await api('GET', '/whatsapp/qr');
       const qrArea = document.getElementById('waQrArea');
       if (qrW?.qrCode) {
         qrArea.innerHTML = `<img src="${qrW.qrCode}" style="max-width:280px;border-radius:12px;border:2px solid var(--bd2)" alt="WhatsApp QR"><div style="margin-top:8px;font-size:12px;color:var(--mu)">Scan this with WhatsApp → Linked Devices → Link a Device</div>`;
@@ -3269,20 +3270,20 @@
 
     async function waConnect() {
       toast('Connecting to WhatsApp…', '');
-      const r = await waApiPost('/connect');
+      const r = await api('POST', '/whatsapp/connect');
       if (r) toast('Connection initiated', 'ok');
       setTimeout(waRefresh, 2000);
     }
 
     async function waDisconnect() {
-      await waApiPost('/disconnect');
+      await api('POST', '/whatsapp/disconnect');
       toast('WhatsApp disconnected', 'ok');
       waRefresh();
     }
 
     async function waTest() {
       toast('Sending test message…', '');
-      const r = await waApiPost('/test');
+      const r = await api('POST', '/whatsapp/test');
       if (r?.success) toast('✅ Test message sent to admin!', 'ok');
       else toast('Failed to send — check connection', 'err');
     }

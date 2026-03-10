@@ -642,26 +642,31 @@ function setupPaymentGatewayRoutes(app: express.Application) {
     log("Error ensuring platform tables:", err);
   }
 
-  // Seed super admin data and initial POS data
+  // Ensure super admin exists (no demo tenants)
   try {
     const { storage } = await import("./storage");
-    await storage.seedSuperAdminData();
-    await storage.seedInitialData();
-
-    // Ensure all existing tenants have at least one branch and admin
-    const tenants = await storage.getTenants();
-    for (const tenant of tenants) {
-      await storage.ensureTenantData(tenant.id);
+    const adminEmail = "admin@barmagly.com";
+    const existingAdmin = await storage.getSuperAdminByEmail(adminEmail);
+    if (!existingAdmin) {
+      await storage.createSuperAdmin({
+        name: "Super Admin",
+        email: adminEmail,
+        passwordHash: "$2b$10$OoKOgYj3UlErVOmwqm4rnOpZLdqpLDF3zBiO4VuXJQa56F0DLlesK",
+        role: "super_admin",
+        isActive: true,
+      });
+      log("Super admin created");
     }
-    // Comprehensive demo data for all tables
-    const { seedAllDemoData } = await import("./seedAllDemoData");
-    await seedAllDemoData();
+  } catch (err) {
+    log("Error creating super admin:", err);
+  }
 
-    // Pizza Lemon store (real restaurant data from pizzalemon.ch)
+  // Seed only Pizza Lemon store (no demo data auto-created)
+  try {
     const { seedPizzaLemon } = await import("./seedPizzaLemon");
     await seedPizzaLemon();
   } catch (err) {
-    log("Error seeding initial data:", err);
+    log("Error seeding Pizza Lemon data:", err);
   }
 
   configureExpoAndLanding(app);

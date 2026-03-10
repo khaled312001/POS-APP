@@ -1916,11 +1916,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ── WhatsApp Integration ───────────────────────────────────────────────────
-  app.get("/api/whatsapp/status", requireSuperAdmin as any, async (_req: any, res: any) => {
+  app.get("/api/super-admin/whatsapp/status", requireSuperAdmin as any, async (_req: any, res: any) => {
     res.json(whatsappService.getStatus());
   });
 
-  app.post("/api/whatsapp/connect", requireSuperAdmin as any, async (_req: any, res: any) => {
+  app.post("/api/super-admin/whatsapp/connect", requireSuperAdmin as any, async (_req: any, res: any) => {
     try {
       const result = await whatsappService.connect();
       const qr = whatsappService.getQrCode();
@@ -1928,17 +1928,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.post("/api/whatsapp/disconnect", requireSuperAdmin as any, async (_req: any, res: any) => {
+  app.post("/api/super-admin/whatsapp/disconnect", requireSuperAdmin as any, async (_req: any, res: any) => {
     await whatsappService.disconnect();
     res.json({ success: true });
   });
 
-  app.get("/api/whatsapp/qr", requireSuperAdmin as any, async (_req: any, res: any) => {
+  app.get("/api/super-admin/whatsapp/qr", requireSuperAdmin as any, async (_req: any, res: any) => {
     const qr = whatsappService.getQrCode();
     res.json({ qrCode: qr });
   });
 
-  app.post("/api/whatsapp/test", requireSuperAdmin as any, async (_req: any, res: any) => {
+  app.post("/api/super-admin/whatsapp/test", requireSuperAdmin as any, async (_req: any, res: any) => {
     const sent = await whatsappService.sendText(
       "201204593124",
       "🧪 *Test Message*\n\nThis is a test from Barmagly POS WhatsApp integration."
@@ -2194,9 +2194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
 
-  storage.seedInitialData().then(seeded => {
-    if (seeded) console.log("Initial seed data created");
-  }).catch(e => console.log("Seed check:", e));
+  // Auto-seeding removed – only Pizza Lemon is seeded from index.ts
 
   return httpServer;
 }
