@@ -54,6 +54,8 @@ let lastError: string | null = null;
 let connectionLog: { time: string; event: string }[] = [];
 let connecting = false;
 let connectionPhase: "idle" | "starting" | "awaiting_qr" | "qr_scanned" | "ready" = "idle";
+let autoReconnectTimer: any = null;
+let pendingMessages: { phone: string; text: string; timestamp: number }[] = [];
 
 function log(event: string) {
     const entry = { time: new Date().toISOString(), event };
@@ -99,6 +101,34 @@ async function isClientAlive(): Promise<boolean> {
     } catch {
         return false;
     }
+}
+
+function scheduleAutoReconnect() {
+    if (autoReconnectTimer) clearTimeout(autoReconnectTimer);
+    autoReconnectTimer = setTimeout(async () => {
+        autoReconnectTimer = null;
+        if (status === "disconnected" && !connecting) {
+            log("Auto-reconnecting…");
+            try {
+                await whatsappService.connect();
+                if (status === "connected" && pendingMessages.length > 0) {
+                    log(`Flushing ${pendingMessages.length} queued message(s)`);
+                    const toSend = [...pendingMessages];
+                    pendingMessages = [];
+                    for (const m of toSend) {
+                        if (Date.now() - m.timestamp < 10 * 60 * 1000) {
+                            await whatsappService.sendText(m.phone, m.text);
+                        } else {
+                            log(`Dropped stale queued message for ${m.phone} (>10min old)`);
+                        }
+                    }
+                }
+            } catch (err: any) {
+                log(`Auto-reconnect failed: ${err.message}`);
+                scheduleAutoReconnect();
+            }
+        }
+    }, 15000);
 }
 
 export const whatsappService = {
@@ -261,7 +291,8 @@ export const whatsappService = {
                             clientReady = false;
                             client = null;
                             connectionPhase = "idle";
-                            log(`Session lost: ${statusSession}`);
+                            log(`Session lost: ${statusSession} — will auto-reconnect in 15s`);
+                            scheduleAutoReconnect();
                         }
                     }
                 },
@@ -304,6 +335,7 @@ export const whatsappService = {
     },
 
     async disconnect(): Promise<void> {
+        if (autoReconnectTimer) { clearTimeout(autoReconnectTimer); autoReconnectTimer = null; }
         if (client) {
             try { await client.close(); } catch { }
             client = null;
@@ -314,23 +346,30 @@ export const whatsappService = {
         lastQrCode = null;
         connecting = false;
         connectionPhase = "idle";
-        log("Disconnected");
+        pendingMessages = [];
+        log("Disconnected (manual)");
     },
 
     async sendText(phone: string, text: string, _attempt = 1): Promise<boolean> {
         if (!client || !clientReady || status !== "connected") {
-            log(`Cannot send — not ready (status="${status}", ready=${clientReady})`);
+            log(`Cannot send — not ready (status="${status}"). Queuing message for ${phone}`);
+            pendingMessages.push({ phone, text, timestamp: Date.now() });
+            if (pendingMessages.length > 50) pendingMessages.shift();
+            scheduleAutoReconnect();
             return false;
         }
 
         if (_attempt === 1) {
             const alive = await isClientAlive();
             if (!alive) {
-                log("Client not alive when trying to send — marking disconnected");
+                log("Client not alive when trying to send — queuing and reconnecting");
                 clientReady = false;
                 status = "disconnected";
                 client = null;
                 connectionPhase = "idle";
+                pendingMessages.push({ phone, text, timestamp: Date.now() });
+                if (pendingMessages.length > 50) pendingMessages.shift();
+                scheduleAutoReconnect();
                 return false;
             }
         }
