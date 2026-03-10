@@ -85,6 +85,21 @@ export const whatsappService = {
         log("Connecting…");
 
         try {
+            // Resolve Chrome path — puppeteer's bundled browser or system Chromium
+            let browserPath: string | undefined;
+            try {
+                const puppeteer = await import("puppeteer");
+                browserPath = (puppeteer as any).executablePath?.() || undefined;
+            } catch { }
+            // Fallback: common system paths
+            if (!browserPath) {
+                const { execSync } = await import("child_process");
+                try {
+                    browserPath = execSync("which chromium-browser || which chromium || which google-chrome-stable || which google-chrome", { encoding: "utf-8" }).trim();
+                } catch { }
+            }
+            if (browserPath) log(`Using browser: ${browserPath}`);
+
             client = await wppconnect.create({
                 session: SESSION_NAME,
                 headless: true,
@@ -93,6 +108,16 @@ export const whatsappService = {
                 debug: false,
                 logQR: false,
                 autoClose: 0, // never auto-close
+                browserArgs: [
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--no-first-run",
+                    "--no-zygote",
+                    "--single-process",
+                ],
+                ...(browserPath ? { browserPathExecutable: browserPath } : {}),
                 catchQR: (base64Qr: string, _asciiQR: string, _attempts: number, _urlCode?: string) => {
                     lastQrCode = base64Qr;
                     status = "qr_ready";
