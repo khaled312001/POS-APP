@@ -71,7 +71,7 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "export CHROME_PATH=$(which chromium 2>/dev/null || which chromium-browser 2>/dev/null || echo '') && npm run server:dev"
+args = "export CHROME_PATH=$(which chromium 2>/dev/null || which chromium-browser 2>/dev/null || find /nix/store -maxdepth 4 -name 'chromium' -path '*/bin/chromium' 2>/dev/null | head -1 || echo '') && export PUPPETEER_EXECUTABLE_PATH=$CHROME_PATH && export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true && npm run server:dev"
 waitForPort = 5000
 
 [[workflows.workflow]]

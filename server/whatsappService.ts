@@ -154,6 +154,23 @@ export const whatsappService = {
             }
 
             // ── 2. Start WPPConnect session ────────────────────────────────────
+            const browserArgs = [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--no-first-run",
+                "--no-zygote",
+                "--single-process",
+                "--disable-extensions",
+                "--disable-background-networking",
+                "--disable-sync",
+                "--disable-translate",
+                "--metrics-recording-only",
+                "--safebrowsing-disable-auto-update",
+                "--disable-software-rasterizer",
+            ];
+
             client = await wppconnect.create({
                 session: SESSION_NAME,
                 headless: true,
@@ -162,22 +179,14 @@ export const whatsappService = {
                 debug: false,
                 logQR: false,
                 autoClose: 0,
-                browserPathExecutable: browserPath,
-                browserArgs: [
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-gpu",
-                    "--no-first-run",
-                    "--no-zygote",
-                    "--single-process",
-                    "--disable-extensions",
-                    "--disable-background-networking",
-                    "--disable-sync",
-                    "--disable-translate",
-                    "--metrics-recording-only",
-                    "--safebrowsing-disable-auto-update",
-                ],
+                // Pass the executable path via puppeteerOptions (the correct wppconnect API)
+                puppeteerOptions: {
+                    executablePath: browserPath,
+                    args: browserArgs,
+                    headless: true,
+                },
+                // Also set top-level browserArgs as fallback
+                browserArgs,
                 catchQR: (base64Qr: string) => {
                     lastQrCode = base64Qr;
                     status = "qr_ready";
