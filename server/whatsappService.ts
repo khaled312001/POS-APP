@@ -152,6 +152,18 @@ export const whatsappService = {
                 throw new Error("No Chrome/Chromium found.");
             }
 
+            const browserArgs = [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--no-first-run",
+                "--no-zygote",
+                "--single-process",
+                "--disable-extensions",
+                "--disable-software-rasterizer",
+            ];
+
             client = await wpp.create({
                 session: SESSION_NAME,
                 headless: true,
