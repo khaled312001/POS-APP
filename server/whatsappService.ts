@@ -86,86 +86,63 @@ export const whatsappService = {
 
         try {
             // ── 1. Resolve Chrome executable path ──────────────────────────────
+            // Priority: env var → nix/system chromium → puppeteer bundled
+            // NOTE: puppeteer's bundled Chrome is last because on Replit it
+            //       often lacks system libs (libXext etc). Nix chromium is self-contained.
             let browserPath: string | undefined;
+            const { execSync } = await import("child_process");
+            const fs = await import("fs");
 
-            // Env var override (highest priority)
-            if (process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH) {
-                const fs = await import("fs");
-                const envPath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH!;
-                if (fs.existsSync(envPath)) {
-                    browserPath = envPath;
-                    log(`Using CHROME_PATH env: ${browserPath}`);
-                }
+            // 1a. Env var override
+            const envChrome = process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROMIUM_PATH;
+            if (envChrome && fs.existsSync(envChrome)) {
+                browserPath = envChrome;
+                log(`Using env CHROME_PATH: ${browserPath}`);
             }
 
-            // Try puppeteer's bundled Chrome first
-            if (!browserPath) try {
-                const { executablePath } = await import("puppeteer");
-                const path = await import("path");
-                const fs = await import("fs");
-                const ep = executablePath();
-                if (ep && fs.existsSync(ep)) {
-                    browserPath = ep;
-                }
-            } catch { }
-
-            // If not found, install Chrome programmatically
+            // 1b. System chromium via PATH (nix, apt, etc.) — has all system libs
             if (!browserPath) {
                 try {
-                    log("Chrome not found — installing via puppeteer browsers…");
-                    const { execSync } = await import("child_process");
-                    execSync("npx puppeteer browsers install chrome", {
-                        encoding: "utf-8",
-                        timeout: 180_000,
-                        stdio: "pipe",
-                    });
-                    const { executablePath } = await import("puppeteer");
-                    const ep = executablePath();
-                    const fs = await import("fs");
-                    if (ep && fs.existsSync(ep)) {
-                        browserPath = ep;
-                        log(`Chrome installed: ${browserPath}`);
-                    }
-                } catch (installErr: any) {
-                    log(`Chrome install failed: ${installErr.message}`);
+                    const found = execSync(
+                        "which chromium 2>/dev/null || which chromium-browser 2>/dev/null || which google-chrome-stable 2>/dev/null || which google-chrome 2>/dev/null",
+                        { encoding: "utf-8", timeout: 5000 }
+                    ).trim().split("\n")[0];
+                    if (found && fs.existsSync(found)) { browserPath = found; }
+                } catch { }
+            }
+
+            // 1c. Nix store chromium (Replit nix packages)
+            if (!browserPath) {
+                try {
+                    const nixFound = execSync(
+                        "find /nix/store -maxdepth 4 -name 'chromium' -type f 2>/dev/null | grep '/bin/chromium$' | head -1",
+                        { encoding: "utf-8", timeout: 8000 }
+                    ).trim();
+                    if (nixFound && fs.existsSync(nixFound)) { browserPath = nixFound; }
+                } catch { }
+            }
+
+            // 1d. Common static paths
+            if (!browserPath) {
+                for (const c of [
+                    "/run/current-system/sw/bin/chromium",
+                    "/home/runner/.nix-profile/bin/chromium",
+                    "/usr/bin/chromium",
+                    "/usr/bin/chromium-browser",
+                    "/snap/bin/chromium",
+                    "/usr/bin/google-chrome-stable",
+                ]) {
+                    if (fs.existsSync(c)) { browserPath = c; break; }
                 }
             }
 
-            // Fallback: common system Chromium paths (nix, apt, snap, etc.)
+            // 1e. Last resort: puppeteer's bundled Chrome (may be missing libs on Replit)
             if (!browserPath) {
-                const { execSync } = await import("child_process");
-                const fs = await import("fs");
-                const candidates = [
-                    "/nix/store",  // nix package - find dynamically below
-                    "/usr/bin/chromium",
-                    "/usr/bin/chromium-browser",
-                    "/usr/bin/google-chrome",
-                    "/usr/bin/google-chrome-stable",
-                    "/snap/bin/chromium",
-                    "/run/current-system/sw/bin/chromium",
-                ];
-                for (const c of candidates) {
-                    if (c === "/nix/store") continue; // handled separately
-                    if (fs.existsSync(c)) { browserPath = c; break; }
-                }
-                // Try nix store chromium
-                if (!browserPath) {
-                    try {
-                        const nixChrome = execSync(
-                            "find /nix/store -name 'chromium' -type f -maxdepth 5 2>/dev/null | head -1",
-                            { encoding: "utf-8", timeout: 5000 }
-                        ).trim();
-                        if (nixChrome && fs.existsSync(nixChrome)) browserPath = nixChrome;
-                    } catch { }
-                }
-                if (!browserPath) {
-                    try {
-                        browserPath = execSync(
-                            "which chromium-browser || which chromium || which google-chrome-stable || which google-chrome 2>/dev/null",
-                            { encoding: "utf-8", timeout: 5000 }
-                        ).trim() || undefined;
-                    } catch { }
-                }
+                try {
+                    const { executablePath } = await import("puppeteer");
+                    const ep = executablePath();
+                    if (ep && fs.existsSync(ep)) { browserPath = ep; }
+                } catch { }
             }
 
             if (browserPath) {

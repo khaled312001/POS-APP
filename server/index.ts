@@ -824,6 +824,29 @@ self.addEventListener('message', (event) => {
   app.use("/objects", express.static(path.resolve(process.cwd(), "uploads")));
   app.use(express.static(path.resolve(process.cwd(), "static-build")));
 
+  // SPA catch-all: serve index.html with PWA tags for any unmatched route
+  // This ensures /intro, /login, /license-gate etc. all get the PWA install dialog
+  const staticIndexPath = path.resolve(process.cwd(), "static-build", "index.html");
+  app.get("*", (req: Request, res: Response, next: NextFunction) => {
+    // Skip API routes, super_admin, store routes, and asset files
+    if (
+      req.path.startsWith("/api/") ||
+      req.path.startsWith("/super_admin") ||
+      req.path.startsWith("/store/") ||
+      req.path.startsWith("/landing") ||
+      req.path.includes(".") // static files with extensions
+    ) {
+      return next();
+    }
+    if (fs.existsSync(staticIndexPath)) {
+      let html = fs.readFileSync(staticIndexPath, "utf-8");
+      html = injectPWATags(html);
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(html);
+    }
+    next();
+  });
+
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 
