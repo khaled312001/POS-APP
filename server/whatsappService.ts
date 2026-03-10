@@ -159,10 +159,21 @@ export const whatsappService = {
                 "--disable-gpu",
                 "--no-first-run",
                 "--no-zygote",
-                "--single-process",
                 "--disable-extensions",
                 "--disable-software-rasterizer",
+                "--disable-features=VizDisplayCompositor",
             ];
+
+            // Clear stale session tokens so old data doesn't conflict with new QR scan
+            try {
+                const tokenDir = fs.existsSync("./tokens/" + SESSION_NAME)
+                    ? "./tokens/" + SESSION_NAME
+                    : null;
+                if (tokenDir) {
+                    fs.rmSync(tokenDir, { recursive: true, force: true });
+                    log("Cleared old session tokens");
+                }
+            } catch { /* ignore cleanup errors */ }
 
             client = await wpp.create({
                 session: SESSION_NAME,
@@ -172,6 +183,7 @@ export const whatsappService = {
                 debug: false,
                 logQR: false,
                 autoClose: 0,
+                disableWelcome: true,
                 // Pass the executable path via puppeteerOptions (the correct wppconnect API)
                 puppeteerOptions: {
                     executablePath: browserPath,
