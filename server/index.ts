@@ -163,13 +163,82 @@ function serveLandingPage({
   );
   const template = fs.readFileSync(templatePath, "utf-8");
 
-  const html = template
+  let html = template
     .replace(/BASE_URL_PLACEHOLDER/g, baseUrl)
     .replace(/EXPS_URL_PLACEHOLDER/g, expsUrl)
     .replace(/APP_NAME_PLACEHOLDER/g, appName);
 
+  // Inject PWA tags so the POS app is installable from the landing page
+  html = injectPWATags(html);
+
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.status(200).send(html);
+}
+
+/**
+ * Injects PWA meta tags, manifest link, and service worker registration into HTML.
+ * This makes any page PWA-installable from the browser.
+ */
+function injectPWATags(html: string): string {
+  // Don't double-inject
+  if (html.includes('/manifest.json') && html.includes('/sw.js')) {
+    return html;
+  }
+
+  const pwaHead = [
+    '<link rel="manifest" href="/manifest.json">',
+    '<meta name="theme-color" content="#2FD3C6">',
+    '<meta name="mobile-web-app-capable" content="yes">',
+    '<meta name="apple-mobile-web-app-capable" content="yes">',
+    '<meta name="apple-mobile-web-app-title" content="Barmagly POS">',
+    '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">',
+    '<link rel="apple-touch-icon" href="/apple-touch-icon.png">',
+    '<meta name="msapplication-TileColor" content="#0A0E17">',
+    '<meta name="msapplication-tap-highlight" content="no">',
+  ].join('\n  ');
+
+  const pwaScript = `<script>
+  // Register PWA Service Worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then(reg => {
+          console.log('[PWA] Service Worker registered:', reg.scope);
+          // Check for updates periodically
+          setInterval(() => reg.update(), 60 * 60 * 1000);
+        })
+        .catch(err => console.warn('[PWA] SW registration failed:', err));
+    });
+  }
+
+  // Prompt user to install if available
+  let deferredPrompt;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Show install button if one exists
+    const installBtn = document.getElementById('pwa-install-btn');
+    if (installBtn) {
+      installBtn.style.display = 'inline-flex';
+      installBtn.addEventListener('click', () => {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(result => {
+          if (result.outcome === 'accepted') console.log('[PWA] App installed');
+          deferredPrompt = null;
+          installBtn.style.display = 'none';
+        });
+      });
+    }
+  });
+  </script>`;
+
+  if (!html.includes('/manifest.json')) {
+    html = html.replace('</head>', `  ${pwaHead}\n  ${pwaScript}\n</head>`);
+  } else if (!html.includes('/sw.js')) {
+    html = html.replace('</body>', `${pwaScript}\n</body>`);
+  }
+
+  return html;
 }
 
 function configureExpoAndLanding(app: express.Application) {
@@ -203,45 +272,250 @@ function configureExpoAndLanding(app: express.Application) {
 
     // PWA manifest – enables "Install App" prompt in browsers
     if (req.path === "/manifest.json") {
+      const forwardedProto = req.header("x-forwarded-proto");
+      const protocol = forwardedProto || req.protocol || "https";
+      const forwardedHost = req.header("x-forwarded-host");
+      const host = forwardedHost || req.get("host");
+      const origin = `${protocol}://${host}`;
       const manifest = {
         name: "Barmagly POS",
         short_name: "Barmagly",
-        description: "Point of Sale system for modern restaurants and stores",
+        description: "Cloud-powered Point of Sale system for modern restaurants, cafés, and retail stores. Multi-branch, multi-language, Stripe payments, inventory, CRM and more.",
         start_url: "/",
+        scope: "/",
+        id: "/",
         display: "standalone",
+        display_override: ["window-controls-overlay", "standalone", "minimal-ui"],
         background_color: "#0A0E17",
         theme_color: "#2FD3C6",
         orientation: "any",
         icons: [
-          { src: "/assets/images/icon.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
-          { src: "/assets/images/icon.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
+          { src: "/pwa-icon-192.svg", sizes: "192x192", type: "image/svg+xml", purpose: "any" },
+          { src: "/pwa-icon-512.svg", sizes: "512x512", type: "image/svg+xml", purpose: "any" },
+          { src: "/pwa-icon-maskable.svg", sizes: "512x512", type: "image/svg+xml", purpose: "maskable" },
+          { src: "/assets/images/icon.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/assets/images/icon.png", sizes: "512x512", type: "image/png", purpose: "any" }
         ],
-        categories: ["business", "productivity"],
-        lang: "en"
+        shortcuts: [
+          {
+            name: "POS Terminal",
+            short_name: "POS",
+            url: "/",
+            icons: [{ src: "/pwa-icon-192.svg", sizes: "192x192" }]
+          },
+          {
+            name: "Dashboard",
+            short_name: "Dashboard",
+            url: "/dashboard",
+            icons: [{ src: "/pwa-icon-192.svg", sizes: "192x192" }]
+          },
+          {
+            name: "Admin Panel",
+            short_name: "Admin",
+            url: "/super_admin/login",
+            icons: [{ src: "/pwa-icon-192.svg", sizes: "192x192" }]
+          }
+        ],
+        categories: ["business", "productivity", "finance"],
+        lang: "en",
+        dir: "ltr",
+        prefer_related_applications: false,
+        edge_side_panel: { preferred_width: 480 }
       };
       res.setHeader("Content-Type", "application/manifest+json");
+      res.setHeader("Cache-Control", "public, max-age=86400");
       return res.status(200).json(manifest);
     }
 
-    // Minimal service worker for PWA offline caching
+    // SVG icons for PWA
+    if (req.path === "/pwa-icon-192.svg" || req.path === "/pwa-icon-512.svg") {
+      const size = req.path.includes("192") ? 192 : 512;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0A0E17"/>
+      <stop offset="100%" style="stop-color:#111827"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2FD3C6"/>
+      <stop offset="100%" style="stop-color:#6366F1"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <rect x="24" y="24" width="464" height="464" rx="90" fill="none" stroke="url(#accent)" stroke-width="3" opacity="0.3"/>
+  <text x="256" y="340" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="280" font-weight="900" fill="url(#accent)">B</text>
+  <circle cx="390" cy="130" r="40" fill="#2FD3C6" opacity="0.15"/>
+  <circle cx="130" cy="400" r="30" fill="#6366F1" opacity="0.1"/>
+</svg>`;
+      res.setHeader("Content-Type", "image/svg+xml");
+      res.setHeader("Cache-Control", "public, max-age=604800");
+      return res.status(200).send(svg);
+    }
+
+    // Maskable icon for PWA (with safe zone padding)
+    if (req.path === "/pwa-icon-maskable.svg") {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0A0E17"/>
+      <stop offset="100%" style="stop-color:#111827"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2FD3C6"/>
+      <stop offset="100%" style="stop-color:#6366F1"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <text x="256" y="330" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="240" font-weight="900" fill="url(#accent)">B</text>
+</svg>`;
+      res.setHeader("Content-Type", "image/svg+xml");
+      res.setHeader("Cache-Control", "public, max-age=604800");
+      return res.status(200).send(svg);
+    }
+
+    // Apple touch icon
+    if (req.path === "/apple-touch-icon.png" || req.path === "/apple-touch-icon-precomposed.png") {
+      const iconPath = path.resolve(process.cwd(), "assets", "images", "icon.png");
+      if (fs.existsSync(iconPath)) {
+        const iconBuf = fs.readFileSync(iconPath);
+        res.setHeader("Content-Type", "image/png");
+        res.setHeader("Cache-Control", "public, max-age=604800");
+        return res.status(200).send(iconBuf);
+      }
+    }
+
+    // Offline fallback page
+    if (req.path === "/offline.html") {
+      const offlineHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Barmagly POS — Offline</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,sans-serif;background:#0A0E17;color:#f0f4f8;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:24px}
+    .container{max-width:480px}
+    .icon{width:80px;height:80px;margin:0 auto 24px;border-radius:20px;background:rgba(47,211,198,.1);border:1px solid rgba(47,211,198,.3);display:flex;align-items:center;justify-content:center;font-size:36px}
+    h1{font-size:1.8rem;font-weight:800;margin-bottom:12px;background:linear-gradient(135deg,#2FD3C6,#6366F1);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    p{color:#7b8fa6;font-size:1rem;line-height:1.7;margin-bottom:32px}
+    button{padding:14px 32px;border-radius:12px;border:none;background:#2FD3C6;color:#000;font-size:1rem;font-weight:700;cursor:pointer;transition:all .3s}
+    button:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(47,211,198,.3)}
+    .pulse{animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">📡</div>
+    <h1>You're Offline</h1>
+    <p>It seems you've lost your internet connection. Barmagly POS needs an internet connection to process transactions and sync data. Please check your connection and try again.</p>
+    <button onclick="window.location.reload()">🔄 Try Again</button>
+    <p style="margin-top:24px;font-size:.8rem" class="pulse">Waiting for connection...</p>
+  </div>
+  <script>window.addEventListener('online',()=>window.location.reload())</script>
+</body>
+</html>`;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(offlineHtml);
+    }
+
+    // Enhanced service worker for PWA
     if (req.path === "/sw.js") {
       const sw = `
-const CACHE_NAME = 'barmagly-pos-v1';
-const STATIC_ASSETS = ['/'];
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC_ASSETS)));
-  self.skipWaiting();
+const CACHE_VERSION = 'barmagly-pos-v3';
+const STATIC_CACHE = CACHE_VERSION + '-static';
+const DYNAMIC_CACHE = CACHE_VERSION + '-dynamic';
+
+const PRECACHE_URLS = [
+  '/',
+  '/offline.html',
+  '/manifest.json',
+  '/pwa-icon-192.svg',
+  '/pwa-icon-512.svg',
+  '/favicon.ico'
+];
+
+// Install: pre-cache essential assets
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(STATIC_CACHE)
+      .then(cache => cache.addAll(PRECACHE_URLS))
+      .then(() => self.skipWaiting())
+  );
 });
-self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))));
-  self.clients.claim();
+
+// Activate: clean old caches
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.filter(key => key !== STATIC_CACHE && key !== DYNAMIC_CACHE)
+            .map(key => caches.delete(key))
+      )
+    ).then(() => self.clients.claim())
+  );
 });
-self.addEventListener('fetch', (e) => {
-  if (e.request.url.includes('/api/')) return;
-  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-});`;
+
+// Fetch: network-first for API, cache-first for static
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Skip non-GET and cross-origin
+  if (event.request.method !== 'GET') return;
+  if (url.origin !== self.location.origin) return;
+
+  // API requests: network only (don't cache)
+  if (url.pathname.startsWith('/api/')) return;
+
+  // HTML pages: network-first with offline fallback
+  if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const clone = response.clone();
+          caches.open(DYNAMIC_CACHE).then(cache => cache.put(event.request, clone));
+          return response;
+        })
+        .catch(() =>
+          caches.match(event.request)
+            .then(cached => cached || caches.match('/offline.html'))
+        )
+    );
+    return;
+  }
+
+  // Static assets: cache-first, network fallback
+  event.respondWith(
+    caches.match(event.request)
+      .then(cached => {
+        if (cached) return cached;
+        return fetch(event.request).then(response => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(DYNAMIC_CACHE).then(cache => cache.put(event.request, clone));
+          }
+          return response;
+        });
+      })
+      .catch(() => {
+        // Return offline page for navigation requests
+        if (event.request.mode === 'navigate') {
+          return caches.match('/offline.html');
+        }
+      })
+  );
+});
+
+// Handle messages from client
+self.addEventListener('message', (event) => {
+  if (event.data === 'skipWaiting') {
+    self.skipWaiting();
+  }
+});
+`;
       res.setHeader("Content-Type", "application/javascript");
-      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Service-Worker-Allowed", "/");
       return res.status(200).send(sw);
     }
 
@@ -255,13 +529,7 @@ self.addEventListener('fetch', (e) => {
       const indexPath = path.resolve(process.cwd(), "static-build", "index.html");
       if (fs.existsSync(indexPath)) {
         let html = fs.readFileSync(indexPath, "utf-8");
-        const pwaHead = `<link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#2FD3C6"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Barmagly POS"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">`;
-        const pwaScript = `<script>if('serviceWorker'in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js'));}</script>`;
-        if (!html.includes('/manifest.json')) {
-          html = html.replace('</head>', pwaHead + pwaScript + '</head>');
-        } else if (!html.includes('/sw.js')) {
-          html = html.replace('</body>', pwaScript + '</body>');
-        }
+        html = injectPWATags(html);
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         return res.status(200).send(html);
       }
