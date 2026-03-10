@@ -52,12 +52,16 @@ interface OrderData {
 }
 
 let client: any = null;
-let clientReady = false;          // true only after wpp.create() fully resolves
+let clientReady = false;
 let status: WhatsAppStatus = "disconnected";
 let lastQrCode: string | null = null;
 let lastError: string | null = null;
 let connectionLog: { time: string; event: string }[] = [];
 let connecting = false;
+
+// Track the directories created for the active session so we can wipe them on disconnect
+let activeChromeDir: string | null = null;
+let activeTokenDir: string | null = null;
 
 function log(event: string) {
     const entry = { time: new Date().toISOString(), event };
@@ -71,10 +75,28 @@ function toChatId(phone: string): string {
     return `${digits}@c.us`;
 }
 
-function markDisconnected(reason: string) {
-    status = "disconnected";
-    clientReady = false;
-    log(`Disconnected: ${reason}`);
+/** Kill ALL wppconnect-related chrome processes and clean /tmp dirs */
+async function nukeResidualProcesses() {
+    try {
+        const { execSync } = await import("child_process");
+        // Kill any chromium process that has a wppconnect dir in its command line
+        execSync(
+            `pkill -9 -f 'wppconnect' 2>/dev/null; pkill -9 -f 'chromium.*barmagly' 2>/dev/null; true`,
+            { timeout: 4000 }
+        );
+        await new Promise(r => setTimeout(r, 1000));
+    } catch { }
+
+    // Remove ALL wppconnect temp dirs from /tmp
+    try {
+        const fs = await import("fs");
+        const entries = fs.readdirSync("/tmp").filter(d =>
+            d.startsWith("wppconnect-") || d.startsWith("barmagly-")
+        );
+        for (const e of entries) {
+            try { fs.rmSync(`/tmp/${e}`, { recursive: true, force: true }); } catch { }
+        }
+    } catch { }
 }
 
 export const whatsappService = {
@@ -91,7 +113,6 @@ export const whatsappService = {
             return { status: "connected" };
         }
 
-        // Prevent concurrent connection attempts
         if (connecting) {
             log("Connection already in progress — ignored duplicate request");
             return { status };
@@ -99,11 +120,15 @@ export const whatsappService = {
         connecting = true;
         clientReady = false;
 
-        // Tear down any lingering client before starting fresh
+        // Close any lingering client gracefully
         if (client) {
             try { await client.close(); } catch { }
             client = null;
         }
+
+        // Kill orphaned chrome processes + wipe all wppconnect /tmp dirs
+        await nukeResidualProcesses();
+        log("Cleared all previous session data");
 
         const wpp = await loadWppConnect();
         if (!wpp) {
@@ -112,15 +137,25 @@ export const whatsappService = {
             return { status: "disconnected" };
         }
 
+        // Also clear wppconnect's internal session registry
+        try {
+            if (typeof wpp.kill === "function") await wpp.kill(SESSION_NAME).catch(() => {});
+        } catch { }
+        try {
+            if (typeof wpp.deleteSession === "function") await wpp.deleteSession(SESSION_NAME).catch(() => {});
+        } catch { }
+
         status = "connecting";
         lastError = null;
         lastQrCode = null;
         log("Connecting…");
 
         try {
-            let browserPath: string | undefined;
             const { execSync } = await import("child_process");
             const fs = await import("fs");
+
+            // ----- locate chromium -----
+            let browserPath: string | undefined;
 
             const envChrome = process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROMIUM_PATH;
             if (envChrome && fs.existsSync(envChrome)) {
@@ -134,7 +169,7 @@ export const whatsappService = {
                         "which chromium 2>/dev/null || which chromium-browser 2>/dev/null || which google-chrome-stable 2>/dev/null || which google-chrome 2>/dev/null",
                         { encoding: "utf-8", timeout: 5000 }
                     ).trim().split("\n")[0];
-                    if (found && fs.existsSync(found)) { browserPath = found; }
+                    if (found && fs.existsSync(found)) browserPath = found;
                 } catch { }
             }
 
@@ -144,7 +179,7 @@ export const whatsappService = {
                         "find /nix/store -maxdepth 4 -name 'chromium' -type f 2>/dev/null | grep '/bin/chromium$' | head -1",
                         { encoding: "utf-8", timeout: 8000 }
                     ).trim();
-                    if (nixFound && fs.existsSync(nixFound)) { browserPath = nixFound; }
+                    if (nixFound && fs.existsSync(nixFound)) browserPath = nixFound;
                 } catch { }
             }
 
@@ -165,15 +200,12 @@ export const whatsappService = {
                 try {
                     const { executablePath } = await import("puppeteer");
                     const ep = executablePath();
-                    if (ep && fs.existsSync(ep)) { browserPath = ep; }
+                    if (ep && fs.existsSync(ep)) browserPath = ep;
                 } catch { }
             }
 
-            if (browserPath) {
-                log(`Using browser: ${browserPath}`);
-            } else {
-                throw new Error("No Chrome/Chromium found.");
-            }
+            if (!browserPath) throw new Error("No Chrome/Chromium found.");
+            log(`Using browser: ${browserPath}`);
 
             const browserArgs = [
                 "--no-sandbox",
@@ -185,33 +217,17 @@ export const whatsappService = {
                 "--disable-extensions",
                 "--disable-software-rasterizer",
                 "--disable-features=VizDisplayCompositor",
+                "--window-size=1280,800",
             ];
 
-            // Kill any orphaned Chrome process holding the old userDataDir lock
-            const CHROME_DATA_DIR = `/tmp/wppconnect-chrome-${SESSION_NAME}`;
-            try {
-                execSync(
-                    `pkill -9 -f 'chromium.*${SESSION_NAME}' 2>/dev/null; pkill -9 -f '${CHROME_DATA_DIR}' 2>/dev/null; true`,
-                    { timeout: 3000 }
-                );
-            } catch { }
-            // Small pause so the OS releases file locks
-            await new Promise(r => setTimeout(r, 800));
-
-            // Wipe Chrome profile dir and session tokens so both start clean
-            const TOKEN_DIR = "/tmp/wppconnect-tokens";
-            try {
-                if (fs.existsSync(CHROME_DATA_DIR)) {
-                    fs.rmSync(CHROME_DATA_DIR, { recursive: true, force: true });
-                }
-                const sessionTokenDir = TOKEN_DIR + "/" + SESSION_NAME;
-                if (fs.existsSync(sessionTokenDir)) {
-                    fs.rmSync(sessionTokenDir, { recursive: true, force: true });
-                }
-                fs.mkdirSync(TOKEN_DIR, { recursive: true });
-                fs.mkdirSync(CHROME_DATA_DIR, { recursive: true });
-                log("Cleared old session tokens and browser profile");
-            } catch { /* ignore cleanup errors */ }
+            // Use fresh unique dirs per connection attempt — eliminates "browser already running"
+            const ts = Date.now();
+            const CHROME_DATA_DIR = `/tmp/wppconnect-chrome-${ts}`;
+            const TOKEN_DIR = `/tmp/wppconnect-tokens-${ts}`;
+            fs.mkdirSync(CHROME_DATA_DIR, { recursive: true });
+            fs.mkdirSync(TOKEN_DIR, { recursive: true });
+            activeChromeDir = CHROME_DATA_DIR;
+            activeTokenDir = TOKEN_DIR;
 
             client = await wpp.create({
                 session: SESSION_NAME,
@@ -237,23 +253,26 @@ export const whatsappService = {
                 },
                 statusFind: (statusSession: string, session: string) => {
                     log(`Session "${session}": ${statusSession}`);
-                    if (
-                        statusSession === "notLogged" ||
-                        statusSession === "browserClose" ||
-                        statusSession === "desconnectedMobile" ||
-                        statusSession === "disconnectedMobile"
-                    ) {
-                        // Only act on disconnect events if we are NOT in the middle of
-                        // establishing a brand-new connection (avoids stale event bleed-over)
-                        if (clientReady) {
-                            markDisconnected(statusSession);
+                    // Only process disconnect events AFTER we are fully ready
+                    if (clientReady) {
+                        if (
+                            statusSession === "notLogged" ||
+                            statusSession === "browserClose" ||
+                            statusSession === "desconnectedMobile" ||
+                            statusSession === "disconnectedMobile"
+                        ) {
+                            status = "disconnected";
+                            clientReady = false;
                             client = null;
+                            log(`Disconnected: ${statusSession}`);
                         }
                     }
                 },
             });
 
-            // wpp.create() resolved — client is now fully initialised
+            // Wait for the WPP injection to settle before marking ready
+            await new Promise(r => setTimeout(r, 4000));
+
             status = "connected";
             clientReady = true;
             lastQrCode = null;
@@ -280,22 +299,17 @@ export const whatsappService = {
             try { await client.close(); } catch { }
             client = null;
         }
-        // Kill any still-running Chrome that belonged to this session
-        try {
-            const { execSync } = await import("child_process");
-            execSync(
-                `pkill -9 -f 'chromium.*${SESSION_NAME}' 2>/dev/null; pkill -9 -f 'wppconnect-chrome-${SESSION_NAME}' 2>/dev/null; true`,
-                { timeout: 3000 }
-            );
-        } catch { }
+        await nukeResidualProcesses();
         status = "disconnected";
         clientReady = false;
         lastQrCode = null;
         connecting = false;
+        activeChromeDir = null;
+        activeTokenDir = null;
         log("Disconnected");
     },
 
-    async sendText(phone: string, text: string): Promise<boolean> {
+    async sendText(phone: string, text: string, _attempt = 1): Promise<boolean> {
         if (!client || !clientReady || status !== "connected") {
             log(`Cannot send — not ready (status="${status}", ready=${clientReady})`);
             return false;
@@ -307,12 +321,23 @@ export const whatsappService = {
         } catch (err: any) {
             const msg = typeof err === "object" ? (err.message || JSON.stringify(err)) : String(err);
             log(`Failed to send to ${phone}: ${msg}`);
-            // If the error indicates the browser/client is broken, mark as disconnected
+
+            // Transient injection lag — retry with backoff (up to 3 retries)
+            if (
+                (msg.includes("WPP is not defined") || msg.includes("NotInitializedError")) &&
+                _attempt < 4
+            ) {
+                log(`Retrying send (attempt ${_attempt + 1})…`);
+                await new Promise(r => setTimeout(r, 2500 * _attempt));
+                return this.sendText(phone, text, _attempt + 1);
+            }
+
+            // Fatal browser errors — mark as disconnected
             if (
                 msg.includes("Execution context was destroyed") ||
-                msg.includes("NotInitializedError") ||
                 msg.includes("Protocol error") ||
-                msg.includes("Session closed")
+                msg.includes("Session closed") ||
+                msg.includes("Target closed")
             ) {
                 log("Client appears broken — marking as disconnected");
                 clientReady = false;
@@ -329,11 +354,11 @@ export const whatsappService = {
             .join("\n");
 
         const msg = [
-            `New Order ${order.orderNumber}`,
+            `🛒 New Order ${order.orderNumber}`,
             storeName ? `Store: ${storeName}` : "",
-            `${order.customerName}`,
-            `${order.customerPhone}`,
-            order.customerAddress ? `${order.customerAddress}` : "",
+            `👤 ${order.customerName}`,
+            `📞 ${order.customerPhone}`,
+            order.customerAddress ? `📍 ${order.customerAddress}` : "",
             ``,
             `Items:`,
             itemLines,
@@ -342,7 +367,7 @@ export const whatsappService = {
             order.deliveryFee && Number(order.deliveryFee) > 0 ? `Delivery: ${Number(order.deliveryFee).toFixed(2)}` : "",
             `Total: ${Number(order.totalAmount).toFixed(2)}`,
             ``,
-            `Type: ${order.orderType === "delivery" ? "Delivery" : "Pickup"}`,
+            `Type: ${order.orderType === "delivery" ? "🚚 Delivery" : "🏪 Pickup"}`,
             `Payment: ${order.paymentMethod}`,
             order.notes ? `Notes: ${order.notes}` : "",
         ]
@@ -359,7 +384,7 @@ export const whatsappService = {
         totalAmount: string | number,
     ): Promise<boolean> {
         const msg = [
-            `Order Confirmed — ${orderNumber}`,
+            `✅ Order Confirmed — ${orderNumber}`,
             ``,
             `Thank you for ordering from ${storeName}!`,
             `Total: ${Number(totalAmount).toFixed(2)}`,
@@ -378,11 +403,11 @@ export const whatsappService = {
         storeName: string,
     ): Promise<boolean> {
         const statusText: Record<string, string> = {
-            accepted: "Your order has been accepted!",
-            preparing: "Your order is being prepared…",
-            ready: "Your order is ready for pickup/delivery!",
-            delivered: "Your order has been delivered. Enjoy!",
-            cancelled: "Unfortunately your order has been cancelled.",
+            accepted: "✅ Your order has been accepted!",
+            preparing: "👨‍🍳 Your order is being prepared…",
+            ready: "🎉 Your order is ready for pickup/delivery!",
+            delivered: "🚀 Your order has been delivered. Enjoy!",
+            cancelled: "❌ Unfortunately your order has been cancelled.",
         };
 
         const text = statusText[newStatus] || `Order status: ${newStatus}`;
