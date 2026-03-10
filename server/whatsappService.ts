@@ -56,6 +56,7 @@ let status: WhatsAppStatus = "disconnected";
 let lastQrCode: string | null = null;
 let lastError: string | null = null;
 let connectionLog: { time: string; event: string }[] = [];
+let connecting = false;
 
 function log(event: string) {
     const entry = { time: new Date().toISOString(), event };
@@ -83,9 +84,23 @@ export const whatsappService = {
             return { status: "connected" };
         }
 
+        // Prevent concurrent connection attempts
+        if (connecting) {
+            log("Connection already in progress — ignored duplicate request");
+            return { status };
+        }
+        connecting = true;
+
+        // Tear down any lingering client before starting fresh
+        if (client) {
+            try { await client.close(); } catch { }
+            client = null;
+        }
+
         const wpp = await loadWppConnect();
         if (!wpp) {
             lastError = "@wppconnect-team/wppconnect package not installed";
+            connecting = false;
             return { status: "disconnected" };
         }
 
@@ -164,19 +179,20 @@ export const whatsappService = {
                 "--disable-features=VizDisplayCompositor",
             ];
 
-            // Clear stale session tokens so old data doesn't conflict with new QR scan
+            // Use an absolute token dir so cleanup is reliable
+            const TOKEN_DIR = "/tmp/wppconnect-tokens";
             try {
-                const tokenDir = fs.existsSync("./tokens/" + SESSION_NAME)
-                    ? "./tokens/" + SESSION_NAME
-                    : null;
-                if (tokenDir) {
-                    fs.rmSync(tokenDir, { recursive: true, force: true });
-                    log("Cleared old session tokens");
+                const sessionTokenDir = TOKEN_DIR + "/" + SESSION_NAME;
+                if (fs.existsSync(sessionTokenDir)) {
+                    fs.rmSync(sessionTokenDir, { recursive: true, force: true });
                 }
+                fs.mkdirSync(TOKEN_DIR, { recursive: true });
+                log("Cleared old session tokens");
             } catch { /* ignore cleanup errors */ }
 
             client = await wpp.create({
                 session: SESSION_NAME,
+                folderNameToken: TOKEN_DIR,
                 headless: true,
                 devtools: false,
                 useChrome: false,
@@ -184,13 +200,12 @@ export const whatsappService = {
                 logQR: false,
                 autoClose: 0,
                 disableWelcome: true,
-                // Pass the executable path via puppeteerOptions (the correct wppconnect API)
                 puppeteerOptions: {
                     executablePath: browserPath,
                     args: browserArgs,
                     headless: true,
+                    userDataDir: `/tmp/wppconnect-chrome-${SESSION_NAME}`,
                 },
-                // Also set top-level browserArgs as fallback
                 browserArgs,
                 catchQR: (base64Qr: string) => {
                     lastQrCode = base64Qr;
@@ -202,6 +217,7 @@ export const whatsappService = {
                     if (statusSession === "inChat" || statusSession === "isLogged") {
                         status = "connected";
                         lastQrCode = null;
+                        connecting = false;
                         log("Connected to WhatsApp");
                     }
                     if (
@@ -209,14 +225,18 @@ export const whatsappService = {
                         statusSession === "browserClose" ||
                         statusSession === "desconnectedMobile"
                     ) {
-                        status = "disconnected";
-                        log(`Disconnected: ${statusSession}`);
+                        // Ignore stale events from a previous session instance
+                        if (!connecting) {
+                            status = "disconnected";
+                            log(`Disconnected: ${statusSession}`);
+                        }
                     }
                 },
             });
 
             status = "connected";
             lastQrCode = null;
+            connecting = false;
             log("WhatsApp client ready");
 
             client.onMessage(async (message: any) => {
@@ -227,6 +247,7 @@ export const whatsappService = {
         } catch (err: any) {
             lastError = err.message || String(err);
             status = "disconnected";
+            connecting = false;
             log(`Connection failed: ${lastError}`);
             return { status: "disconnected" };
         }
@@ -241,6 +262,7 @@ export const whatsappService = {
         }
         status = "disconnected";
         lastQrCode = null;
+        connecting = false;
         log("Disconnected");
     },
 

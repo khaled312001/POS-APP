@@ -1667,7 +1667,7 @@
             <div class="ct">Test Message</div>
             <p style="font-size:13px;color:var(--mu);margin-bottom:12px">Send a test message to the admin phone to
               verify the connection is working.</p>
-            <button class="btn btn-p" onclick="waTest()">📱 Send Test Message</button>
+            <button class="btn btn-p" id="waTestBtn" onclick="waTest()" disabled style="opacity:0.5;cursor:not-allowed">📱 Send Test Message</button>
           </div>
           <div class="card">
             <div class="ct">Connection Log</div>
@@ -3249,8 +3249,14 @@
       dot.style.background = colors[d.status] || 'var(--danger)';
       dot.style.boxShadow = '0 0 6px ' + (colors[d.status] || 'var(--danger)');
       txt.textContent = d.status.replace('_', ' ').replace(/^./, c => c.toUpperCase());
-      if (d.status === 'connected') { btnC.style.display = 'none'; btnD.style.display = ''; }
-      else { btnC.style.display = ''; btnD.style.display = 'none'; }
+      const testBtn = document.getElementById('waTestBtn');
+      if (d.status === 'connected') {
+        btnC.style.display = 'none'; btnD.style.display = '';
+        if (testBtn) { testBtn.disabled = false; testBtn.style.opacity = '1'; testBtn.style.cursor = 'pointer'; }
+      } else {
+        btnC.style.display = ''; btnD.style.display = 'none';
+        if (testBtn) { testBtn.disabled = true; testBtn.style.opacity = '0.5'; testBtn.style.cursor = 'not-allowed'; }
+      }
       // Log
       const logEl = document.getElementById('waLog');
       if (d.log && d.log.length) {
@@ -3260,7 +3266,7 @@
       const qrW = await api('GET', '/whatsapp/qr');
       const qrArea = document.getElementById('waQrArea');
       if (qrW?.qrCode) {
-        qrArea.innerHTML = `<img src="${qrW.qrCode}" style="max-width:280px;border-radius:12px;border:2px solid var(--bd2)" alt="WhatsApp QR"><div style="margin-top:8px;font-size:12px;color:var(--mu)">Scan this with WhatsApp → Linked Devices → Link a Device</div>`;
+        qrArea.innerHTML = `<div style="display:inline-block;background:#ffffff;padding:20px;border-radius:16px;box-shadow:0 4px 32px rgba(0,0,0,0.25)"><img src="${qrW.qrCode}" style="display:block;width:240px;height:240px;image-rendering:pixelated;image-rendering:crisp-edges" alt="WhatsApp QR"></div><div style="margin-top:12px;font-size:12px;color:var(--mu)">Scan this with WhatsApp → Linked Devices → Link a Device</div>`;
       } else if (d.status === 'connected') {
         qrArea.innerHTML = '<div style="font-size:14px;color:var(--ok);font-weight:600">✅ Connected — no QR needed</div>';
       } else {
@@ -3282,10 +3288,12 @@
     }
 
     async function waTest() {
-      toast('Sending test message…', '');
+      const btn = document.getElementById('waTestBtn');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Sending…'; }
       const r = await api('POST', '/whatsapp/test');
-      if (r?.success) toast('✅ Test message sent to admin!', 'ok');
-      else toast('Failed to send — check connection', 'err');
+      if (btn) { btn.disabled = false; btn.textContent = '📱 Send Test Message'; }
+      if (r?.success) toast('✅ Test message sent to +201204593124!', 'ok');
+      else toast('❌ Failed — make sure WhatsApp is connected first', 'err');
     }
 
     /*
