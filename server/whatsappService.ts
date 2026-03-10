@@ -52,6 +52,7 @@ interface OrderData {
 }
 
 let client: any = null;
+let clientReady = false;          // true only after wpp.create() fully resolves
 let status: WhatsAppStatus = "disconnected";
 let lastQrCode: string | null = null;
 let lastError: string | null = null;
@@ -70,6 +71,12 @@ function toChatId(phone: string): string {
     return `${digits}@c.us`;
 }
 
+function markDisconnected(reason: string) {
+    status = "disconnected";
+    clientReady = false;
+    log(`Disconnected: ${reason}`);
+}
+
 export const whatsappService = {
     getStatus(): { status: WhatsAppStatus; lastError: string | null; log: typeof connectionLog } {
         return { status, lastError, log: connectionLog.slice(0, 20) };
@@ -80,7 +87,7 @@ export const whatsappService = {
     },
 
     async connect(): Promise<{ status: WhatsAppStatus; qrCode?: string }> {
-        if (status === "connected" && client) {
+        if (clientReady && status === "connected" && client) {
             return { status: "connected" };
         }
 
@@ -90,6 +97,7 @@ export const whatsappService = {
             return { status };
         }
         connecting = true;
+        clientReady = false;
 
         // Tear down any lingering client before starting fresh
         if (client) {
@@ -214,27 +222,25 @@ export const whatsappService = {
                 },
                 statusFind: (statusSession: string, session: string) => {
                     log(`Session "${session}": ${statusSession}`);
-                    if (statusSession === "inChat" || statusSession === "isLogged") {
-                        status = "connected";
-                        lastQrCode = null;
-                        connecting = false;
-                        log("Connected to WhatsApp");
-                    }
                     if (
                         statusSession === "notLogged" ||
                         statusSession === "browserClose" ||
-                        statusSession === "desconnectedMobile"
+                        statusSession === "desconnectedMobile" ||
+                        statusSession === "disconnectedMobile"
                     ) {
-                        // Ignore stale events from a previous session instance
-                        if (!connecting) {
-                            status = "disconnected";
-                            log(`Disconnected: ${statusSession}`);
+                        // Only act on disconnect events if we are NOT in the middle of
+                        // establishing a brand-new connection (avoids stale event bleed-over)
+                        if (clientReady) {
+                            markDisconnected(statusSession);
+                            client = null;
                         }
                     }
                 },
             });
 
+            // wpp.create() resolved — client is now fully initialised
             status = "connected";
+            clientReady = true;
             lastQrCode = null;
             connecting = false;
             log("WhatsApp client ready");
@@ -247,6 +253,7 @@ export const whatsappService = {
         } catch (err: any) {
             lastError = err.message || String(err);
             status = "disconnected";
+            clientReady = false;
             connecting = false;
             log(`Connection failed: ${lastError}`);
             return { status: "disconnected" };
@@ -261,14 +268,15 @@ export const whatsappService = {
             client = null;
         }
         status = "disconnected";
+        clientReady = false;
         lastQrCode = null;
         connecting = false;
         log("Disconnected");
     },
 
     async sendText(phone: string, text: string): Promise<boolean> {
-        if (!client || status !== "connected") {
-            log(`Cannot send — status is "${status}"`);
+        if (!client || !clientReady || status !== "connected") {
+            log(`Cannot send — not ready (status="${status}", ready=${clientReady})`);
             return false;
         }
         try {
@@ -276,7 +284,20 @@ export const whatsappService = {
             log(`Message sent to ${phone}`);
             return true;
         } catch (err: any) {
-            log(`Failed to send to ${phone}: ${err.message}`);
+            const msg = typeof err === "object" ? (err.message || JSON.stringify(err)) : String(err);
+            log(`Failed to send to ${phone}: ${msg}`);
+            // If the error indicates the browser/client is broken, mark as disconnected
+            if (
+                msg.includes("Execution context was destroyed") ||
+                msg.includes("NotInitializedError") ||
+                msg.includes("Protocol error") ||
+                msg.includes("Session closed")
+            ) {
+                log("Client appears broken — marking as disconnected");
+                clientReady = false;
+                status = "disconnected";
+                client = null;
+            }
             return false;
         }
     },
