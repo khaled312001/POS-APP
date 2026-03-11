@@ -115,7 +115,7 @@ lib/
 ## Development
 
 - **Backend**: `npm run server:dev` (port 5000)
-- **Frontend**: `npm run expo:dev` (port 8081, mapped to external port 80)
+- **Frontend**: `npm run expo:dev` (port 8080)
 - **DB Push**: `npm run db:push`
 
 ## Production Build
