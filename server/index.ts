@@ -25,6 +25,9 @@ function setupCors(app: express.Application) {
 
     if (process.env.REPLIT_DEV_DOMAIN) {
       origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
+      origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}:5000`);
+      origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}:8080`);
+      origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}:3000`);
     }
 
     if (process.env.REPLIT_DOMAINS) {
