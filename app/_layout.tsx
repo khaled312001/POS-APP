@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack, Redirect } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -13,7 +13,7 @@ import { CartProvider } from "@/lib/cart-context";
 import { LanguageProvider } from "@/lib/language-context";
 import { LicenseProvider, useLicense } from "@/lib/license-context";
 import { Ionicons, Feather } from "@expo/vector-icons";
-import * as Font from "expo-font";
+import { useFonts } from "expo-font";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -21,34 +21,19 @@ import { useRouter, useSegments } from "expo-router";
 
 function RootLayoutNav() {
   const { isValid, isValidating } = useLicense();
-  const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [fontsLoaded, fontError] = useFonts({
+    ...Ionicons.font,
+    ...Feather.font,
+  });
 
-  // Load icon fonts
   useEffect(() => {
-    async function loadFonts() {
-      try {
-        await Font.loadAsync({
-          ...Ionicons.font,
-          ...Feather.font,
-        });
-      } catch (e) {
-        console.warn("Error loading fonts:", e);
-      } finally {
-        setFontsLoaded(true);
-      }
-    }
-    loadFonts();
-  }, []);
-
-  // Keep splash screen while validating or loading fonts
-  useEffect(() => {
-    if (!isValidating && fontsLoaded) {
+    if ((fontsLoaded || fontError) && !isValidating) {
       SplashScreen.hideAsync();
     }
-  }, [isValidating, fontsLoaded]);
+  }, [fontsLoaded, fontError, isValidating]);
 
-  if (isValidating || !fontsLoaded) {
-    return null; // Return nothing while splash screen is visible
+  if (isValidating || (!fontsLoaded && !fontError)) {
+    return null;
   }
 
   return (
