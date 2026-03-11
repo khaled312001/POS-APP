@@ -2094,7 +2094,7 @@
 
     // Theme
     if (isDark) document.body.classList.add('dark');
-    function toggleTheme() { isDark = !isDark; document.body.classList.toggle('dark', isDark); document.getElementById('theme-btn').textContent = isDark ? '☀️' : '<i class="fa-solid fa-moon" id="theme-icon"></i>'; localStorage.setItem('store_dark', isDark) }
+    function toggleTheme() { isDark = !isDark; document.body.classList.toggle('dark', isDark); document.getElementById('theme-btn').innerHTML = isDark ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon" id="theme-icon"></i>'; localStorage.setItem('store_dark', isDark) }
 
     // Sidebar
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('open') }
@@ -2144,7 +2144,7 @@
     }
 
     // Toast
-    function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500) }
+    function showToast(msg) { const t = document.getElementById('toast'); t.innerHTML = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500) }
 
     // Pizza Builder
     function selectSize(size, el) { selectedSize = size; document.querySelectorAll('.pb-size').forEach(s => s.classList.remove('active')); el.classList.add('active'); updatePizzaTotal() }
@@ -2223,7 +2223,7 @@
         if (c?.phone) { document.getElementById('tb-phone').textContent = c.phone; document.getElementById('tb-phone').href = 'tel:' + c.phone; contactHtml.push(`<a href="tel:${c.phone}" style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--s2);border-radius:12px;border:1px solid var(--bd)"><span style="font-size:20px"><i class="fa-solid fa-phone" style="color:var(--P)"></i></span><span><strong>Phone</strong><br><span style="color:var(--mu);font-size:.85rem">${c.phone}</span></span></a>`); sidebarContactHtml.push(`<i class="fa-solid fa-phone" style="color:var(--P)"></i> <a href="tel:${c.phone}">${c.phone}</a>`) }
         if (c?.email) { document.getElementById('tb-email').textContent = c.email; document.getElementById('tb-email').href = 'mailto:' + c.email; contactHtml.push(`<a href="mailto:${c.email}" style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--s2);border-radius:12px;border:1px solid var(--bd)"><span style="font-size:20px"><i class="fa-solid fa-envelope" style="color:var(--P)"></i></span><span><strong>Email</strong><br><span style="color:var(--mu);font-size:.85rem">${c.email}</span></span></a>`); sidebarContactHtml.push(`<i class="fa-solid fa-envelope" style="color:var(--P)"></i> <a href="mailto:${c.email}">${c.email}</a>`) }
         if (c?.address) contactHtml.push(`<div style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--s2);border-radius:12px;border:1px solid var(--bd)"><span style="font-size:20px"><i class="fa-solid fa-location-dot" style="color:var(--P)"></i></span><span><strong>Address</strong><br><span style="color:var(--mu);font-size:.85rem">${c.address}</span></span></div>`);
-        if (c?.openingHours) { document.getElementById('tb-hours').textContent = '<i class="fa-regular fa-clock" style="color:var(--P)"></i> ' + c.openingHours; document.getElementById('footer-hours').textContent = c.openingHours; contactHtml.push(`<div style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--s2);border-radius:12px;border:1px solid var(--bd)"><span style="font-size:20px"><i class="fa-regular fa-clock" style="color:var(--P)"></i></span><span><strong>Hours</strong><br><span style="color:var(--mu);font-size:.85rem">${c.openingHours}</span></span></div>`) }
+        if (c?.openingHours) { document.getElementById('tb-hours').innerHTML = '<i class="fa-regular fa-clock" style="color:var(--P)"></i> ' + c.openingHours; document.getElementById('footer-hours').textContent = c.openingHours; contactHtml.push(`<div style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--s2);border-radius:12px;border:1px solid var(--bd)"><span style="font-size:20px"><i class="fa-regular fa-clock" style="color:var(--P)"></i></span><span><strong>Hours</strong><br><span style="color:var(--mu);font-size:.85rem">${c.openingHours}</span></span></div>`) }
         document.getElementById('contact-info').innerHTML = contactHtml.join('');
         document.getElementById('sidebar-contact').innerHTML = sidebarContactHtml.join('') + '<div class="sidebar-social" id="sb-social"></div>';
         // Social
@@ -2312,7 +2312,7 @@
       closePizzaModal();
     }
     // Theme button
-    document.getElementById('theme-btn').textContent = isDark ? '☀️' : '<i class="fa-solid fa-moon" id="theme-icon"></i>';
+    document.getElementById('theme-btn').innerHTML = isDark ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon" id="theme-icon"></i>';
     loadStore();
   </script>
 
