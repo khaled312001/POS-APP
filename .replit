@@ -15,6 +15,10 @@ localPort = 5000
 externalPort = 5000
 
 [[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
 localPort = 8081
 externalPort = 80
 
@@ -51,6 +55,10 @@ author = "agent"
 task = "workflow.run"
 args = "Start App"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start Frontend"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -79,11 +87,13 @@ name = "Start Frontend"
 author = "agent"
 mode = "sequential"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run expo:dev"
-waitForPort = 8081
-ensurePreviewReachable = "/status"
+waitForPort = 8080
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ba0158fe-b737-4e3d-9065-def7c306785e"

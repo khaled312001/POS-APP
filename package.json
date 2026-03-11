@@ -5,7 +5,7 @@
   "scripts": {
     "postinstall": "patch-package && npx puppeteer browsers install chrome || true",
     "install-chrome": "npx puppeteer browsers install chrome",
-    "expo:dev": "cross-env EXPO_PACKAGER_PROXY_URL=https://$REPLIT_DEV_DOMAIN cross-env REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_DEV_DOMAIN cross-env EXPO_PUBLIC_DOMAIN=$REPLIT_DEV_DOMAIN:5000 npx expo start --localhost",
+    "expo:dev": "cross-env EXPO_PACKAGER_PROXY_URL=https://$REPLIT_DEV_DOMAIN cross-env REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_DEV_DOMAIN cross-env EXPO_PUBLIC_DOMAIN=$REPLIT_DEV_DOMAIN:5000 npx expo start --localhost --port 8080",
     "expo:local": "npx expo start",
     "expo:clean": "npx expo start -c",
     "server:dev": "cross-env NODE_ENV=development tsx --env-file=.env server/index.ts",
