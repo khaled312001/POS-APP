@@ -584,6 +584,11 @@ export const landingPageConfig = pgTable("landing_page_config", {
   socialFacebook: text("social_facebook"),
   socialInstagram: text("social_instagram"),
   socialWhatsapp: text("social_whatsapp"),
+  phone: text("phone"),
+  email: text("email"),
+  address: text("address"),
+  openingHours: text("opening_hours"), // e.g. "Mon-Sun 11:00–22:00"
+  deliveryRadius: text("delivery_radius"), // e.g. "within 10km"
   customCss: text("custom_css"),
   isPublished: boolean("is_published").default(true),
   createdAt: timestamp("created_at").defaultNow(),
