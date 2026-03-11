@@ -321,19 +321,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ isValid: false, reason: `Store account is ${tenant.status}` });
       }
 
-      if (email || password) {
-        if (!email || !password) {
-          return res.json({ isValid: false, reason: "Both email and password are required" });
-        }
+      // Validate email if provided (no password required)
+      if (email) {
         if (tenant.ownerEmail.toLowerCase() !== email.toLowerCase()) {
           return res.json({ isValid: false, reason: "Email does not match this license" });
         }
-        if (!tenant.passwordHash) {
-          return res.json({ isValid: false, reason: "Account credentials not configured" });
-        }
-        const passwordValid = await bcrypt.compare(password, tenant.passwordHash);
-        if (!passwordValid) {
-          return res.json({ isValid: false, reason: "Invalid password" });
+        // If password is also provided, validate it (optional)
+        if (password) {
+          if (!tenant.passwordHash) {
+            return res.json({ isValid: false, reason: "Account credentials not configured" });
+          }
+          const passwordValid = await bcrypt.compare(password, tenant.passwordHash);
+          if (!passwordValid) {
+            return res.json({ isValid: false, reason: "Invalid password" });
+          }
         }
       }
 

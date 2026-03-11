@@ -12,6 +12,8 @@ import { AuthProvider } from "@/lib/auth-context";
 import { CartProvider } from "@/lib/cart-context";
 import { LanguageProvider } from "@/lib/language-context";
 import { LicenseProvider, useLicense } from "@/lib/license-context";
+import { Ionicons } from "@expo/vector-icons";
+import * as Font from "expo-font";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -19,15 +21,32 @@ import { useRouter, useSegments } from "expo-router";
 
 function RootLayoutNav() {
   const { isValid, isValidating } = useLicense();
+  const [fontsLoaded, setFontsLoaded] = useState(false);
 
-  // Keep splash screen while validating
+  // Load icon fonts
   useEffect(() => {
-    if (!isValidating) {
+    async function loadFonts() {
+      try {
+        await Font.loadAsync({
+          ...Ionicons.font,
+        });
+      } catch (e) {
+        console.warn("Error loading fonts:", e);
+      } finally {
+        setFontsLoaded(true);
+      }
+    }
+    loadFonts();
+  }, []);
+
+  // Keep splash screen while validating or loading fonts
+  useEffect(() => {
+    if (!isValidating && fontsLoaded) {
       SplashScreen.hideAsync();
     }
-  }, [isValidating]);
+  }, [isValidating, fontsLoaded]);
 
-  if (isValidating) {
+  if (isValidating || !fontsLoaded) {
     return null; // Return nothing while splash screen is visible
   }
 
