@@ -489,7 +489,7 @@ export async function seedPizzaLemon() {
     const [existingConfig] = await db.select().from(landingPageConfig)
         .where(eq(landingPageConfig.tenantId, tenant.id));
 
-    const heroImage = IMG("pizzalemon_34_lemon_pizza.jpg");
+    const heroImage = IMG("pizzalemon_hero.png");
 
     if (!existingConfig) {
         await db.insert(landingPageConfig).values({

@@ -2319,6 +2319,7 @@
         if (c?.heroImage) { const bg = document.getElementById('hero-bg'); bg.style.backgroundImage = `url(${c.heroImage})`; bg.classList.add('rs-has-image') }
         // About
         if (c?.aboutText) document.getElementById('about-text-content').textContent = c.aboutText;
+        document.getElementById('about-img-wrap').innerHTML = `<img src="/uploads/products/pizzalemon_about.png" alt="About us">`;
         document.getElementById('about-title').textContent = `About ${storeName}`;
         document.getElementById('stat-items').textContent = p.length;
         document.getElementById('stat-cats').textContent = cats.length;
