@@ -262,6 +262,7 @@
       transition: var(--t);
       position: relative;
       box-shadow: 0 4px 12px var(--P)33;
+      z-index: 110;
     }
 
     .rs-cart-btn:hover {
@@ -500,6 +501,7 @@
       background: linear-gradient(135deg, #fff, var(--P));
       -webkit-background-clip: text;
       background-clip: text;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
     }
 
     #hero-bg.has-image~#hero-content #hero-title {
@@ -507,7 +509,7 @@
       -webkit-background-clip: unset;
       background-clip: unset;
       -webkit-text-fill-color: #fff;
-      text-shadow: 0 2px 20px rgba(0, 0, 0, .6)
+      text-shadow: 0 4px 30px rgba(0, 0, 0, 0.9), 0 2px 10px rgba(0, 0, 0, 0.7);
     }
 
     #hero-subtitle {
@@ -519,8 +521,9 @@
     }
 
     #hero-bg.has-image~#hero-content #hero-subtitle {
-      color: rgba(255, 255, 255, .9);
-      text-shadow: 0 1px 6px rgba(0, 0, 0, .5)
+      color: rgba(255, 255, 255, .95);
+      text-shadow: 0 2px 15px rgba(0, 0, 0, 0.9), 0 1px 5px rgba(0, 0, 0, 0.8);
+      font-weight: 500;
     }
 
     .rs-hero-ctas {
@@ -839,12 +842,13 @@
       cursor: pointer;
       z-index: 150;
       transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-      opacity: 0;
-      visibility: hidden;
-      transform: translateY(30px) scale(0.9);
       border: 2px solid rgba(255, 255, 255, 0.15);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
+      /* Always visible, just scaled/opacity adapted based on content */
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
     }
 
     .rs-float-cart-btn.rs-visible {
@@ -2196,7 +2200,7 @@
     // Cart
     function openCart() { document.getElementById('cart-panel').classList.add('rs-open'); document.getElementById('cart-overlay').classList.add('rs-open'); renderCart() }
     function closeCart() { document.getElementById('cart-panel').classList.remove('rs-open'); document.getElementById('cart-overlay').classList.remove('rs-open') }
-    function updateCartCount() { const c = cart.reduce((s, i) => s + i.qty, 0); document.getElementById('cart-count').textContent = c; document.getElementById('float-cart-count').textContent = c; const t = getCartTotal(); document.getElementById('float-cart-total').textContent = c > 0 ? fmt(t.total) : ''; if (c > 0) document.getElementById('float-cart-btn').classList.add('rs-visible'); else document.getElementById('float-cart-btn').classList.remove('rs-visible'); }
+    function updateCartCount() { const c = cart.reduce((s, i) => s + i.qty, 0); document.getElementById('cart-count').textContent = c; document.getElementById('float-cart-count').textContent = c; const t = getCartTotal(); document.getElementById('float-cart-total').textContent = c > 0 ? fmt(t.total) : ''; }
     function addToCart(product, qty = 1, size = null, addons = []) {
       const key = `${product.id}-${size || 'default'}-${addons.sort().join(',')}`;
       const existing = cart.find(i => i.key === key);
