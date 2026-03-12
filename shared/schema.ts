@@ -113,6 +113,7 @@ export const sales = pgTable("sales", {
   customerId: integer("customer_id").references(() => customers.id, { onDelete: 'cascade' }),
   subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
   taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0"),
+  serviceFeeAmount: decimal("service_fee_amount", { precision: 10, scale: 2 }).default("0"),
   discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
   paymentMethod: text("payment_method").notNull().default("cash"),

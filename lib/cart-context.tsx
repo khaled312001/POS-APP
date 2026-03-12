@@ -33,6 +33,9 @@ interface CartContextValue {
   tax: number;
   deliveryFee: number;
   setDeliveryFee: (f: number) => void;
+  serviceFeeRate: number;
+  setServiceFeeRate: (r: number) => void;
+  serviceFee: number;
   total: number;
   customerId: number | null;
   setCustomerId: (id: number | null) => void;
@@ -49,6 +52,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [discount, setDiscount] = useState(0);
   const [taxRate, setTaxRate] = useState(7.7);
   const [deliveryFee, setDeliveryFee] = useState(0);
+  const [serviceFeeRate, setServiceFeeRate] = useState(0);
   const [customerId, setCustomerId] = useState<number | null>(null);
   const [tableNumber, setTableNumber] = useState("");
   const [orderType, setOrderType] = useState("dine_in");
@@ -104,17 +108,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price * i.quantity, 0), [items]);
   const tax = useMemo(() => ((subtotal - discount) * taxRate) / 100, [subtotal, discount, taxRate]);
-  const total = useMemo(() => subtotal - discount + tax + deliveryFee, [subtotal, discount, tax, deliveryFee]);
+  const serviceFee = useMemo(() => ((subtotal - discount) * serviceFeeRate) / 100, [subtotal, discount, serviceFeeRate]);
+  const total = useMemo(() => subtotal - discount + tax + deliveryFee + serviceFee, [subtotal, discount, tax, deliveryFee, serviceFee]);
   const itemCount = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items]);
 
   const value = useMemo(
     () => ({
       items, addItem, removeItem, updateQuantity, clearCart,
       subtotal, itemCount, discount, setDiscount, taxRate, setTaxRate,
-      tax, deliveryFee, setDeliveryFee, total, customerId, setCustomerId,
+      tax, deliveryFee, setDeliveryFee, serviceFeeRate, setServiceFeeRate, serviceFee, total, customerId, setCustomerId,
       tableNumber, setTableNumber, orderType, setOrderType,
     }),
-    [items, subtotal, itemCount, discount, taxRate, tax, deliveryFee, total, customerId, tableNumber, orderType]
+    [items, subtotal, itemCount, discount, taxRate, tax, deliveryFee, serviceFeeRate, serviceFee, total, customerId, tableNumber, orderType]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

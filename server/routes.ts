@@ -1721,9 +1721,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!mainBranch) return res.status(404).json({ error: "No branch found" });
 
       const tenant = mainBranch.tenantId ? await storage.getTenant(mainBranch.tenantId) : null;
+      const commissionRate = await storage.getCommissionRate();
       res.json({
         ...mainBranch,
-        storeType: tenant?.storeType || "supermarket"
+        storeType: tenant?.storeType || "supermarket",
+        commissionRate,
       });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });

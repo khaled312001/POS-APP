@@ -204,7 +204,8 @@ export default function POSScreen() {
         printWindow.document.write(`<div class="line"></div>`);
         printWindow.document.write(`<table><tr><td>${t("subtotal")}:</td><td class="right">CHF ${Number(inv.subtotal || inv.totalAmount).toFixed(2)}</td></tr>`);
         if (Number(inv.discount) > 0) printWindow.document.write(`<tr><td>${t("discount")}:</td><td class="right">-CHF ${Number(inv.discount).toFixed(2)}</td></tr>`);
-        printWindow.document.write(`<tr><td>${t("tax")}:</td><td class="right">CHF ${Number(inv.tax || 0).toFixed(2)}</td></tr></table>`);
+        if (Number(inv.serviceFeeAmount) > 0) printWindow.document.write(`<tr><td>${t("serviceTax" as any) || "Service Tax"}:</td><td class="right">CHF ${Number(inv.serviceFeeAmount).toFixed(2)}</td></tr>`);
+        printWindow.document.write(`<tr><td>${t("tax")}:</td><td class="right">CHF ${Number(inv.taxAmount || inv.tax || 0).toFixed(2)}</td></tr></table>`);
         printWindow.document.write(`<div class="dbl"></div>`);
         printWindow.document.write(`<table><tr><td class="bold" style="font-size:14px">TOTAL:</td><td class="right bold" style="font-size:14px">CHF ${Number(inv.totalAmount).toFixed(2)}</td></tr></table>`);
         printWindow.document.write(`<div class="dbl"></div>`);
@@ -228,7 +229,10 @@ export default function POSScreen() {
     if (storeSettings?.taxRate !== undefined) {
       cart.setTaxRate(Number(storeSettings.taxRate) || 0);
     }
-  }, [storeSettings?.taxRate]);
+    if (storeSettings?.commissionRate !== undefined) {
+      cart.setServiceFeeRate(Number(storeSettings.commissionRate) || 0);
+    }
+  }, [storeSettings?.taxRate, storeSettings?.commissionRate]);
 
   useEffect(() => {
     if (cart.orderType === "delivery" && storeSettings?.deliveryFee) {
@@ -383,7 +387,7 @@ export default function POSScreen() {
     return num.length >= 15 && mm && yy && mm.length === 2 && yy.length >= 2 && cardCvc.length >= 3;
   };
 
-  const autoPrint3Copies = (saleData: any, cartItems: typeof cart.items, cartSubtotal: number, cartTax: number, cartDiscount: number, cartTotal: number, cartDeliveryFee: number, pmMethod: string, cashAmt: number, custName: string, empName: string) => {
+  const autoPrint3Copies = (saleData: any, cartItems: typeof cart.items, cartSubtotal: number, cartTax: number, cartDiscount: number, cartServiceFee: number, cartTotal: number, cartDeliveryFee: number, pmMethod: string, cashAmt: number, custName: string, empName: string) => {
     if (Platform.OS !== "web") return;
     const printWin = window.open("", "_blank", "width=420,height=700");
     if (!printWin) return;
@@ -400,6 +404,7 @@ export default function POSScreen() {
       `<tr><td style="font-size:14px;font-weight:bold">${i.name}</td><td style="text-align:center;font-size:14px;font-weight:bold">x${i.quantity}</td></tr>`
     ).join("");
     const deliveryRow = cartDeliveryFee > 0 ? `<tr><td>Delivery:</td><td class="right">CHF ${cartDeliveryFee.toFixed(2)}</td></tr>` : "";
+    const serviceFeeRow = cartServiceFee > 0 ? `<tr><td>${t("serviceTax" as any) || "Service Tax"}:</td><td class="right">CHF ${cartServiceFee.toFixed(2)}</td></tr>` : "";
     const changeRow = pmMethod === "cash" && cashAmt > cartTotal ? `<tr><td>Change:</td><td class="right">CHF ${(cashAmt - cartTotal).toFixed(2)}</td></tr>` : "";
 
     const fullReceipt = (copyLabel: string) => `
@@ -419,6 +424,7 @@ export default function POSScreen() {
   <table width="100%">
     <tr><td>Subtotal:</td><td class="right">CHF ${cartSubtotal.toFixed(2)}</td></tr>
     ${cartDiscount > 0 ? `<tr><td>Discount:</td><td class="right">-CHF ${cartDiscount.toFixed(2)}</td></tr>` : ""}
+    ${serviceFeeRow}
     <tr><td>Tax:</td><td class="right">CHF ${cartTax.toFixed(2)}</td></tr>
     ${deliveryRow}
   </table>
@@ -472,7 +478,7 @@ export default function POSScreen() {
     const cashAmt = Number(cashReceived) || 0;
     // Auto-print 3 copies on web
     autoPrint3Copies(
-      saleData, cart.items, cart.subtotal, cart.tax, cart.discount, cart.total, cart.deliveryFee,
+      saleData, cart.items, cart.subtotal, cart.tax, cart.discount, cart.serviceFee, cart.total, cart.deliveryFee,
       paymentMethod, cashAmt, custName, empName
     );
     setLastSale({
@@ -480,6 +486,7 @@ export default function POSScreen() {
       items: saleItems,
       subtotal: cart.subtotal,
       tax: cart.tax,
+      serviceFee: cart.serviceFee,
       discount: cart.discount,
       deliveryFee: cart.deliveryFee,
       total: cart.total,
@@ -523,6 +530,7 @@ export default function POSScreen() {
       customerId: cart.customerId,
       subtotal: cart.subtotal.toFixed(2),
       taxAmount: cart.tax.toFixed(2),
+      serviceFeeAmount: cart.serviceFee.toFixed(2),
       discountAmount: cart.discount.toFixed(2),
       totalAmount: cart.total.toFixed(2),
       paymentMethod: pm,
@@ -1207,6 +1215,12 @@ export default function POSScreen() {
                 <Text style={[styles.summaryValue, { color: Colors.success }, rtlTextAlign]}>-CHF {cart.discount.toFixed(2)}</Text>
               </View>
             )}
+            {cart.serviceFee > 0 && (
+              <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("serviceTax" as any) || "Service Tax"} ({cart.serviceFeeRate}%)</Text>
+                <Text style={[styles.summaryValue, rtlTextAlign]}>CHF {cart.serviceFee.toFixed(2)}</Text>
+              </View>
+            )}
             <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("tax")} ({cart.taxRate}%)</Text>
               <Text style={[styles.summaryValue, rtlTextAlign]}>CHF {cart.tax.toFixed(2)}</Text>
@@ -1660,6 +1674,12 @@ export default function POSScreen() {
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("discount")}:</Text>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>-CHF {lastSale?.discount?.toFixed(2)}</Text>
+                    </View>
+                  )}
+                  {(lastSale?.serviceFee || lastSale?.serviceFeeAmount || 0) > 0 && (
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("serviceTax" as any) || "Service Tax"}:</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(lastSale?.serviceFee || lastSale?.serviceFeeAmount).toFixed(2)}</Text>
                     </View>
                   )}
                   <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
