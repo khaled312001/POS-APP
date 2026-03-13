@@ -91,7 +91,7 @@ export default function OnlineOrdersScreen() {
     orders.forEach(o => knownOrderIds.current.add(o.id));
   }, [orders]);
 
-  // WebSocket for instant notifications
+  // WebSocket for instant notifications (web only)
   useEffect(() => {
     if (Platform.OS !== "web") return;
     const wsUrl = `${getApiUrl().replace("http", "ws")}/api/ws/caller-id`;
@@ -116,6 +116,15 @@ export default function OnlineOrdersScreen() {
       };
     } catch {}
     return () => ws?.close();
+  }, []);
+
+  // Polling fallback for native (iOS/Android) — ensures orders refresh every 15s
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const interval = setInterval(() => {
+      qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+    }, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   const onRefresh = useCallback(async () => {

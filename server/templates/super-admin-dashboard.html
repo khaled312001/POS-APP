@@ -2373,13 +2373,13 @@
         trackInventory: true, taxable: true,
       };
       if (!body.name || !body.price) { toast('Name and price are required', 'err'); return; }
-      const res = id ? await rapi('PUT', `/api/products/${id}`, body) : await rapi('POST', '/api/products', body);
+      const res = id ? await api('PUT', `/products/${id}`, body) : await api('POST', '/products', body);
       if (res && (res.id || res.success)) { toast(id ? 'Product updated' : 'Product created', 'ok'); closeM('mProd'); document.getElementById('pId').value = ''; document.getElementById('mProdTitle').textContent = 'Add Product'; loadStoreProducts(); }
       else toast('Failed to save product', 'err');
     }
     async function delProd(id, name) {
       if (!confirm(`Delete product "${name}"?`)) return;
-      const res = await rapi('DELETE', `/api/products/${id}`);
+      const res = await api('DELETE', `/products/${id}`);
       if (res?.success) { toast('Product deleted', 'ok'); loadStoreProducts(); } else toast('Failed', 'err');
     }
 
@@ -2410,13 +2410,13 @@
       const id = document.getElementById('cId').value;
       const body = { name: document.getElementById('cName').value, nameAr: document.getElementById('cNameAr').value || null, color: document.getElementById('cColor').value, description: document.getElementById('cDesc').value || null, tenantId: SM.tenantId };
       if (!body.name) { toast('Name is required', 'err'); return; }
-      const res = id ? await rapi('PUT', `/api/categories/${id}`, body) : await rapi('POST', '/api/categories', body);
+      const res = id ? await api('PUT', `/categories/${id}`, body) : await api('POST', '/categories', body);
       if (res && (res.id || res.success)) { toast(id ? 'Category updated' : 'Category created', 'ok'); closeM('mCat'); document.getElementById('cId').value = ''; document.getElementById('mCatTitle').textContent = 'Add Category'; loadStoreCategories(); }
       else toast('Failed to save category', 'err');
     }
     async function delCat(id, name) {
       if (!confirm(`Delete category "${name}"?`)) return;
-      const res = await rapi('DELETE', `/api/categories/${id}`);
+      const res = await api('DELETE', `/categories/${id}`);
       if (res?.success) { toast('Deleted', 'ok'); loadStoreCategories(); } else toast('Failed', 'err');
     }
 
@@ -2542,7 +2542,7 @@
       const id = document.getElementById('custId').value;
       const body = { name: document.getElementById('custName').value, phone: document.getElementById('custPhone').value || null, email: document.getElementById('custEmail').value || null, address: document.getElementById('custAddr').value || null, loyaltyPoints: parseInt(document.getElementById('custPts').value) || 0, notes: document.getElementById('custNotes').value || null, tenantId: SM.tenantId, isActive: true };
       if (!body.name) { toast('Name is required', 'err'); return; }
-      const res = id ? await rapi('PUT', `/api/customers/${id}`, body) : await rapi('POST', '/api/customers', body);
+      const res = id ? await api('PUT', `/customers/${id}`, body) : await api('POST', '/customers', body);
       if (res && (res.id || res.success)) { toast(id ? 'Customer updated' : 'Customer created', 'ok'); closeM('mCust'); document.getElementById('custId').value = ''; document.getElementById('mCustTitle').textContent = 'Add Customer'; loadStoreCustomers(); }
       else toast('Failed to save customer', 'err');
     }
@@ -2631,9 +2631,9 @@
       if (!prodId || !brId) { toast('Select product and branch', 'err'); return; }
       let res;
       if (abs !== '') {
-        res = await rapi('POST', '/api/inventory', { productId: prodId, branchId: brId, quantity: parseInt(abs) });
+        res = await api('POST', '/inventory/adjust', { productId: prodId, branchId: brId, absoluteQuantity: parseInt(abs) });
       } else if (adj !== '') {
-        res = await rapi('POST', '/api/inventory/adjust', { productId: prodId, branchId: brId, adjustment: parseInt(adj) });
+        res = await api('POST', '/inventory/adjust', { productId: prodId, branchId: brId, adjustment: parseInt(adj) });
       } else { toast('Enter adjustment or absolute quantity', 'err'); return; }
       if (res) { toast('Inventory updated', 'ok'); closeM('mInvAdj'); loadInventory(); }
       else toast('Failed', 'err');

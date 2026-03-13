@@ -1017,7 +1017,7 @@ export function registerSuperAdminRoutes(app: Express) {
   });
 
   // ── BULK IMPORT ───────────────────────────────────────────────────────
-  app.get("/api/super-admin/bulk-import/template", async (_req: Request, res: Response) => {
+  app.get("/api/super-admin/bulk-import/template", requireSuperAdmin, async (_req: Request, res: Response) => {
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", "attachment; filename=products_template.csv");
     res.send("name,barcode,price,cost,category,description\nSample Product,123456,9.99,5.00,General,Sample description");
@@ -1051,6 +1051,65 @@ export function registerSuperAdminRoutes(app: Express) {
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
+  });
+
+  // ── AUTHENTICATED WRITE PROXIES (for super admin dashboard) ──────────────
+  // These endpoints allow the dashboard to perform writes using the super admin
+  // JWT token instead of relying on unauthenticated tenant routes.
+
+  app.post("/api/super-admin/products", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const product = await storage.createProduct(req.body);
+      res.json(product);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/super-admin/categories", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const category = await storage.createCategory(req.body);
+      res.json(category);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/super-admin/categories/:id", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const category = await storage.updateCategory(parseInt(req.params.id), req.body);
+      res.json(category);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete("/api/super-admin/categories/:id", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      await storage.deleteCategory(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/super-admin/customers", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const customer = await storage.createCustomer(req.body);
+      res.json(customer);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/super-admin/customers/:id", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const customer = await storage.updateCustomer(parseInt(req.params.id), req.body);
+      res.json(customer);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/super-admin/inventory/adjust", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { productId, branchId, adjustment, absoluteQuantity } = req.body;
+      if (absoluteQuantity !== undefined && absoluteQuantity !== null && absoluteQuantity !== "") {
+        const result = await storage.upsertInventory({ productId, branchId, quantity: Number(absoluteQuantity) });
+        res.json(result);
+      } else {
+        const result = await storage.adjustInventory(productId, branchId, Number(adjustment));
+        res.json(result);
+      }
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // ── COMMISSION SETTINGS ───────────────────────────────────────────────────

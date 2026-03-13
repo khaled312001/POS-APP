@@ -141,18 +141,18 @@ export default function SettingsScreen() {
     });
   };
 
-  const { data: employees = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/employees?tenantId=${tenant.id}` : "/api/employees"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
-  const { data: suppliers = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/suppliers?tenantId=${tenant.id}` : "/api/suppliers"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
-  const { data: branches = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/branches?tenantId=${tenant.id}` : "/api/branches"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
-  const { data: shifts = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/shifts?tenantId=${tenant.id}` : "/api/shifts"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
-  const { data: expenses = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/expenses?tenantId=${tenant.id}` : "/api/expenses"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
-  const { data: purchaseOrders = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/purchase-orders?tenantId=${tenant.id}` : "/api/purchase-orders"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
-  const { data: activityLog = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/activity-log?tenantId=${tenant.id}` : "/api/activity-log"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
-  const { data: returns = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/returns?tenantId=${tenant.id}` : "/api/returns"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
-  const { data: salesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/sales?limit=50&tenantId=${tenant.id}` : "/api/sales?limit=50"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
-  const { data: warehousesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/warehouses?tenantId=${tenant.id}` : "/api/warehouses"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
-  const { data: batchesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/product-batches?tenantId=${tenant.id}` : "/api/product-batches"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
-  const { data: productsList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/products?tenantId=${tenant.id}` : "/api/products"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
+  const { data: employees = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/employees?tenantId=${tenant.id}` : "/api/employees"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: suppliers = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/suppliers?tenantId=${tenant.id}` : "/api/suppliers"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: branches = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/branches?tenantId=${tenant.id}` : "/api/branches"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: shifts = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/shifts?tenantId=${tenant.id}` : "/api/shifts"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: expenses = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/expenses?tenantId=${tenant.id}` : "/api/expenses"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: purchaseOrders = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/purchase-orders?tenantId=${tenant.id}` : "/api/purchase-orders"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: activityLog = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/activity-log?tenantId=${tenant.id}` : "/api/activity-log"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: returns = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/returns?tenantId=${tenant.id}` : "/api/returns"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: salesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/sales?limit=50&tenantId=${tenant.id}` : "/api/sales?limit=50"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: warehousesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/warehouses?tenantId=${tenant.id}` : "/api/warehouses"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: batchesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/product-batches?tenantId=${tenant.id}` : "/api/product-batches"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: productsList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/products?tenantId=${tenant.id}` : "/api/products"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
   const { data: storeSettings } = useQuery<any>({ queryKey: [tenant?.id ? `/api/store-settings?tenantId=${tenant.id}` : "/api/store-settings"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
   const { data: pgConfig, refetch: refetchPgConfig } = useQuery<any>({ queryKey: ["/api/payment-gateway/config"], queryFn: getQueryFn({ on401: "throw" }), enabled: isAdmin });
 

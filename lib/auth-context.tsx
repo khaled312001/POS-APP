@@ -47,15 +47,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const role = employee?.role || "";
+  const perms = employee?.permissions || [];
   const isAdmin = role === "admin" || role === "owner";
   const isManager = role === "manager";
   const isCashier = role === "cashier";
-  const canManage = isAdmin || isManager;
-  const canAccessReports = isAdmin || isManager;
-  const canManageProducts = isAdmin || isManager;
-  const canManageEmployees = isAdmin;
-  const canManageSettings = isAdmin;
-  const canDeleteCustomers = isAdmin || isManager;
+  const canManage = isAdmin || isManager || perms.includes("manage");
+  const canAccessReports = isAdmin || isManager || perms.includes("reports");
+  const canManageProducts = isAdmin || isManager || perms.includes("products");
+  const canManageEmployees = isAdmin || perms.includes("employees");
+  const canManageSettings = isAdmin || perms.includes("settings");
+  const canDeleteCustomers = isAdmin || isManager || perms.includes("deleteCustomers");
 
   const value = useMemo(
     () => ({ employee, isLoggedIn: !!employee, isAdmin, isManager, isCashier, canManage, canAccessReports, canManageProducts, canManageEmployees, canManageSettings, canDeleteCustomers, login, logout }),

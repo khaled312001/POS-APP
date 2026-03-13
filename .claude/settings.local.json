@@ -24,7 +24,8 @@
       "Bash(cd \"/f/POS-APP\" && npx tsx --env-file=.env -e \"\nimport { seedPizzaLemon } from './server/seedPizzaLemon';\nseedPizzaLemon\\(\\).then\\(\\(\\) => { console.log\\('DONE'\\); process.exit\\(0\\); }\\).catch\\(e => { console.error\\('FAILED:', e.message\\); process.exit\\(1\\); }\\);\n\" 2>&1)",
       "Bash(cd \"/f/POS-APP\" && npx tsx --env-file=.env server/seedPizzaLemon.ts 2>&1 | tail -20)",
       "Bash(cd \"/f/POS-APP\" && node -e \"\nprocess.env.NODE_ENV='development';\n\" && npx tsx --tsconfig tsconfig.json -e \"\nimport { seedPizzaLemon } from './server/seedPizzaLemon';\nseedPizzaLemon\\(\\).then\\(\\(\\) => process.exit\\(0\\)\\).catch\\(e => { console.error\\(e.message\\); process.exit\\(1\\); }\\);\n\" 2>&1 | tail -20)",
-      "Bash(cd \"/f/POS-APP\" && DATABASE_URL=\"postgresql://neondb_owner:npg_eMqwIhUg8p2G@ep-long-sound-ajwt8qyz.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require\" npx tsx --tsconfig tsconfig.json -e \"\nimport { seedPizzaLemon } from './server/seedPizzaLemon';\nseedPizzaLemon\\(\\).then\\(\\(\\) => { console.log\\('SUCCESS'\\); process.exit\\(0\\); }\\).catch\\(e => { console.error\\('ERROR:', e.message\\); process.exit\\(1\\); }\\);\n\" 2>&1)"
+      "Bash(cd \"/f/POS-APP\" && DATABASE_URL=\"postgresql://neondb_owner:npg_eMqwIhUg8p2G@ep-long-sound-ajwt8qyz.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require\" npx tsx --tsconfig tsconfig.json -e \"\nimport { seedPizzaLemon } from './server/seedPizzaLemon';\nseedPizzaLemon\\(\\).then\\(\\(\\) => { console.log\\('SUCCESS'\\); process.exit\\(0\\); }\\).catch\\(e => { console.error\\('ERROR:', e.message\\); process.exit\\(1\\); }\\);\n\" 2>&1)",
+      "Bash(find /f/POS-APP/app -type f \\\\\\(-name *.ts -o -name *.tsx \\\\\\))"
     ]
   }
 }

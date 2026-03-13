@@ -154,6 +154,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="menu" size={size} color={color} />
             ),
+            href: isCashier ? null : undefined,
           }}
         />
       </Tabs>
