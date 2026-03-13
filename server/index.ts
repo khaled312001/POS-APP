@@ -1206,4 +1206,31 @@ function setupPaymentGatewayRoutes(app: express.Application) {
       throw err;
     }
   });
+
+  if (process.env.NODE_ENV !== 'production' && port !== 8081) {
+    const http = await import('http');
+    const expoPort = 8080;
+    const proxy = http.createServer((req, res) => {
+      const targetPort = (req.url || '').startsWith('/api') ? port : expoPort;
+      const options = {
+        hostname: '127.0.0.1',
+        port: targetPort,
+        path: req.url,
+        method: req.method,
+        headers: req.headers,
+      };
+      const proxyReq = http.request(options, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode || 500, proxyRes.headers);
+        proxyRes.pipe(res, { end: true });
+      });
+      proxyReq.on('error', () => {
+        res.writeHead(502);
+        res.end('Backend not ready');
+      });
+      req.pipe(proxyReq, { end: true });
+    });
+    proxy.listen(8081, '0.0.0.0', () => {
+      log(`proxy on port 8081 → Expo:${expoPort} (API→${port}) (default preview)`);
+    });
+  }
 })();
