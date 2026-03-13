@@ -6,7 +6,7 @@ import { Colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-const WEBSITE_URL = 'https://barmagly.com/';
+const WEBSITE_URL = 'https://www.barmagly.tech/';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function LicenseGate() {

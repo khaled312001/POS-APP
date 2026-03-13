@@ -46,7 +46,7 @@ export default function TabLayout() {
     return <Redirect href="/login" />;
   }
 
-  const showWarningUrl = "https://barmagly.com/upgrade"; // Or a modal
+  const showWarningUrl = "https://www.barmagly.tech/upgrade"; // Or a modal
 
   const banner = subscription?.requiresUpgrade ? (
     <View style={{ backgroundColor: Colors.warning, padding: 12, paddingTop: Platform.OS === 'ios' ? 44 : 24, paddingBottom: 12 }}>
