@@ -180,20 +180,35 @@
     }
 
     .nav-info {
-      display: flex;
+      display: none;
       align-items: center;
       gap: 6px;
       font-size: .78rem;
       color: var(--mu);
       background: var(--s2);
-      padding: 6px 12px;
+      padding: 6px 14px;
       border-radius: 20px;
-      border: 1px solid var(--bd)
+      border: 1px solid var(--bd);
+      max-width: 220px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .nav-info.visible {
+      display: flex;
+    }
+
+    @media(max-width: 1024px) {
+      .nav-info {
+        max-width: 160px;
+      }
     }
 
     .nav-info i {
       color: var(--P);
-      font-size: .8rem
+      font-size: .8rem;
+      flex-shrink: 0;
     }
 
     .nav-actions {
@@ -270,8 +285,10 @@
     }
 
     @media(max-width:768px) {
-      .nav-info {
-        display: none
+
+      .nav-info,
+      .nav-info.visible {
+        display: none !important
       }
 
       .nav-hamburger {
@@ -2319,10 +2336,7 @@
       <span id="nav-logo" class="nav-brand-text">Loading...</span>
     </div>
     <div class="nav-spacer"></div>
-    <div id="nav-info" class="nav-info" style="display:none">
-      <i class="fa-regular fa-clock"></i>
-      <span id="tb-hours">Open Now</span>
-    </div>
+      
     <div class="nav-actions">
       <div id="tb-social-links" style="display:flex;gap:6px"></div>
       <button class="nav-btn" onclick="toggleTheme()" id="theme-btn" aria-label="Toggle theme">
@@ -3190,7 +3204,7 @@
         if (c?.openingHours) {
           contactHtml.push(`<div class="contact-item"><div class="contact-icon"><i class="fa-regular fa-clock"></i></div><div><div class="contact-label">Hours</div><div class="contact-value">${c.openingHours}</div></div></div>`);
           document.getElementById('tb-hours').textContent = c.openingHours;
-          document.getElementById('nav-info').style.display = 'flex';
+          document.getElementById('nav-info').classList.add('visible');
           document.getElementById('footer-hours').textContent = c.openingHours;
         }
         document.getElementById('contact-info').innerHTML = contactHtml.join('') || '<div style="color:var(--mu);font-size:.9rem;padding:12px">Contact information not available</div>';

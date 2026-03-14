@@ -15,7 +15,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 
-WebBrowser.maybeCompleteAuthSession();
 
 function getApiUrl() {
   if (__DEV__) {
@@ -76,6 +75,11 @@ export default function LoginScreen() {
       const { id_token } = googleResponse.params;
       if (id_token) {
         handleGoogleLogin(id_token);
+      }
+    } else if (googleResponse?.type === "error" || googleResponse?.type === "cancel") {
+      const details = (googleResponse as any).error?.message || googleResponse?.type;
+      if (googleResponse?.type === "error") {
+        Alert.alert(t("error"), `Google Sign-In failed: ${details}`);
       }
     }
   }, [googleResponse]);

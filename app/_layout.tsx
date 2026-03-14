@@ -19,6 +19,9 @@ import { useFonts } from "expo-font";
 SplashScreen.preventAutoHideAsync();
 
 import { useRouter, useSegments } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+
+WebBrowser.maybeCompleteAuthSession();
 
 function RootLayoutNav() {
   const { isValid, isValidating } = useLicense();

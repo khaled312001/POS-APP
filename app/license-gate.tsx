@@ -11,7 +11,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useLanguage } from '@/lib/language-context';
 import { makeRedirectUri } from 'expo-auth-session';
 
-WebBrowser.maybeCompleteAuthSession();
+
 
 const WEBSITE_URL = 'https://pos.barmagly.tech/';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -39,6 +39,11 @@ export default function LicenseGate() {
             if (id_token) {
                 setLoading(true);
                 validateGoogleLogin(id_token).finally(() => setLoading(false));
+            }
+        } else if (response?.type === 'error' || response?.type === 'cancel') {
+            const details = (response as any).error?.message || response?.type;
+            if (response?.type === 'error') {
+                Alert.alert(t('error'), `Google Sign-In failed: ${details}`);
             }
         }
     }, [response]);
