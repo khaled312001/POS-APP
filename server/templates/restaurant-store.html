@@ -283,6 +283,39 @@
       }
     }
 
+    @media(max-width:480px) {
+      #nav {
+        padding: 0 10px;
+        gap: 8px;
+      }
+
+      .nav-brand-text {
+        font-size: 0.95rem;
+      }
+
+      .nav-actions {
+        gap: 4px;
+      }
+
+      .nav-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 0.8rem;
+      }
+
+      .nav-cart-btn {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+      }
+
+      .nav-brand-text {
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
     /* ===== SIDEBAR ===== */
     #sidebar-overlay {
       position: fixed;
@@ -2441,7 +2474,8 @@
         <div class="about-img" id="about-img-wrap">
           <div
             style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--s2);font-size:3rem;color:var(--s4)">
-            <i class="fa-solid fa-utensils"></i></div>
+            <i class="fa-solid fa-utensils"></i>
+          </div>
         </div>
         <div class="about-text">
           <div>
@@ -2623,7 +2657,8 @@
         <div class="pizza-header-img" id="pb-pizza-img">
           <div
             style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:var(--mu)">
-            <i class="fa-solid fa-pizza-slice"></i></div>
+            <i class="fa-solid fa-pizza-slice"></i>
+          </div>
         </div>
         <div class="pizza-header-text">
           <div class="pizza-name" id="pb-pizza-name">Build Your Pizza</div>
@@ -2636,15 +2671,11 @@
           <div class="pb-section-title">Choose Size</div>
           <div class="pb-sizes">
             <div class="pb-size active" data-size="small" onclick="selectSize('small',this)">
-              <div class="pb-size-name">Small</div>
+              <div class="pb-size-name">33 cm</div>
               <div class="pb-size-price" id="price-small">—</div>
             </div>
-            <div class="pb-size" data-size="medium" onclick="selectSize('medium',this)">
-              <div class="pb-size-name">Medium</div>
-              <div class="pb-size-price" id="price-medium">—</div>
-            </div>
             <div class="pb-size" data-size="large" onclick="selectSize('large',this)">
-              <div class="pb-size-name">Large</div>
+              <div class="pb-size-name">45 cm</div>
               <div class="pb-size-price" id="price-large">—</div>
             </div>
           </div>
@@ -2674,7 +2705,10 @@
     const SLUG = '{{SLUG}}';
     const TENANT_ID = '{{TENANT_ID}}';
     const CURRENCY = '{{CURRENCY}}' || 'CHF';
-    const PIZZA_SIZES = { small: { label: 'Small', multiplier: 1 }, medium: { label: 'Medium', multiplier: 1.35 }, large: { label: 'Large', multiplier: 1.7 } };
+    const PIZZA_SIZES = {
+      small: { label: '33 cm', multiplier: 1 },
+      large: { label: '45 cm', multiplier: 1.7 }
+    };
     const PIZZA_ADDONS = [
       { id: 'extra-cheese', name: 'Extra Cheese', price: 1.5, icon: '🧀' },
       { id: 'mushrooms', name: 'Mushrooms', price: 1.0, icon: '🍄' },

@@ -18,6 +18,7 @@ interface TenantInfo {
     name: string;
     logo: string | null;
     storeType: string | null;
+    setupCompleted: boolean;
 }
 
 interface LicenseContextType {
@@ -27,6 +28,7 @@ interface LicenseContextType {
     subscription: SubscriptionStatus | null;
     errorReason: string | null;
     validateLicense: (key: string, email?: string, password?: string) => Promise<boolean>;
+    validateGoogleLogin: (idToken: string) => Promise<boolean>;
     logoutLicense: () => Promise<void>;
     deviceId: string;
 }
@@ -127,6 +129,37 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const validateGoogleLogin = async (idToken: string): Promise<boolean> => {
+        setErrorReason(null);
+        try {
+            let apiUrl = getApiUrl();
+            const response = await fetch(`${apiUrl}/api/auth/google`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ idToken, deviceId })
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.licenseKey) {
+                await AsyncStorage.setItem("barmagly_license_key", data.licenseKey);
+                setCachedLicenseKey(data.licenseKey);
+
+                setIsValid(true);
+                setTenant(data.tenant);
+                // After successful Google login, we should also fetch the full validation info
+                return await validateLicense(data.licenseKey);
+            } else {
+                setErrorReason(data.error || "Google authentication failed");
+                return false;
+            }
+        } catch (err: any) {
+            console.error("Google login validation failed:", err);
+            setErrorReason(`Connection error: ${err.message}`);
+            return false;
+        }
+    };
+
     const logoutLicense = async () => {
         await AsyncStorage.removeItem("barmagly_license_key");
         clearCachedLicenseKey();
@@ -144,6 +177,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                 subscription,
                 errorReason,
                 validateLicense,
+                validateGoogleLogin,
                 logoutLicense,
                 deviceId
             }}

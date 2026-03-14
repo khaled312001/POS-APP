@@ -366,7 +366,41 @@ export function registerSuperAdminRoutes(app: Express) {
         maxEmployees: maxEmployees || 5,
         storeType: storeType || "supermarket",
       });
-      res.json(tenant);
+
+      // Automatically create a 14-day trial subscription and license key
+      const startDate = new Date();
+      const endDate = addDays(startDate, 14);
+
+      const sub = await storage.createTenantSubscription({
+        tenantId: tenant.id,
+        planType: "trial",
+        planName: "14-Day Free Trial",
+        price: "0",
+        status: "active",
+        startDate,
+        endDate,
+        autoRenew: false,
+      });
+
+      const randomSegments = Array.from({ length: 4 }, () =>
+        crypto.randomBytes(2).toString("hex").toUpperCase()
+      );
+      const licenseKey = `TRIAL-${randomSegments.join("-")}`;
+
+      await storage.createLicenseKey({
+        licenseKey,
+        tenantId: tenant.id,
+        subscriptionId: sub.id,
+        status: "active",
+        maxActivations: 3,
+        expiresAt: endDate,
+        notes: "Auto-generated Trial for Dashboard creation",
+      });
+
+      // Ensure default data (branch/admin)
+      await storage.ensureTenantData(tenant.id);
+
+      res.json({ ...tenant, licenseKey });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }

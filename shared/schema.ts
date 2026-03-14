@@ -458,6 +458,7 @@ export const tenants = pgTable("tenants", {
   maxEmployees: integer("max_employees").default(5),
   storeType: text("store_type").default("supermarket"), // supermarket, restaurant, pharmacy, others
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  setupCompleted: boolean("setup_completed").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

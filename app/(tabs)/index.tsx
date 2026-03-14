@@ -105,7 +105,7 @@ export default function POSScreen() {
   });
 
   const { data: products = [] } = useQuery<any[]>({
-    queryKey: ["/api/products", tenantId ? `?tenantId=${tenantId}` : (search ? `?search=${search}` : "")],
+    queryKey: ["/api/products", `?tenantId=${tenantId || ""}${search ? `&search=${search}` : ""}`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: true,
   });
@@ -237,7 +237,12 @@ export default function POSScreen() {
 
   useEffect(() => {
     apiRequest("POST", "/api/seed").catch(() => { });
-  }, []);
+
+    // Redirect to onboarding if not completed
+    if (tenant && tenant.setupCompleted === false) {
+      router.replace("/onboarding");
+    }
+  }, [tenant]);
 
   /* Removed local WebSocket logic in favor of global NotificationProvider */
 

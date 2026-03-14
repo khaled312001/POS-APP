@@ -1,21 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Animated, Platform, Linking, ScrollView, Dimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Animated, Platform, Linking, ScrollView, Dimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLicense } from '@/lib/license-context';
 import { Colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+
+WebBrowser.maybeCompleteAuthSession();
 
 const WEBSITE_URL = 'https://www.barmagly.tech/';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function LicenseGate() {
-    const { isValidating, isValid, validateLicense, errorReason, deviceId } = useLicense();
+    const { isValidating, isValid, validateLicense, validateGoogleLogin, errorReason, deviceId } = useLicense();
     const [email, setEmail] = useState('');
     const [key, setKey] = useState('');
     const [loading, setLoading] = useState(false);
     const [focusedField, setFocusedField] = useState<string | null>(null);
     const router = useRouter();
+
+    // Google Sign-In
+    const [request, response, promptAsync] = Google.useAuthRequest({
+        androidClientId: "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com",
+        webClientId: "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com",
+    });
+
+    useEffect(() => {
+        if (response?.type === 'success') {
+            const { id_token } = response.params;
+            if (id_token) {
+                setLoading(true);
+                validateGoogleLogin(id_token).finally(() => setLoading(false));
+            }
+        }
+    }, [response]);
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -132,8 +152,36 @@ export default function LicenseGate() {
                     {/* Header */}
                     <Text style={styles.title}>Activate Your Store</Text>
                     <Text style={styles.subtitle}>
-                        Enter your store email and license key to get started with Barmagly POS.
+                        Enter your store email and license key to get started, or sign in with Google to start your <Text style={styles.trialHighlight}>14-day free trial</Text> instantly.
                     </Text>
+
+                    {/* Google Login Button */}
+                    <TouchableOpacity
+                        style={styles.googleButton}
+                        onPress={() => promptAsync()}
+                        disabled={!request || loading}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="logo-google" size={20} color="#fff" />
+                        <Text style={styles.googleButtonText}>Sign in with Google</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.subscribeButton}
+                        onPress={() => {
+                            Alert.alert("الإشتراك", "سيتم توجيهك لخطط الأسعار أو التواصل مع المبيعات.");
+                        }}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="star" size={20} color="#fff" />
+                        <Text style={styles.subscribeButtonText}>اشترك الآن (Subscribe Now)</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.orDivider}>
+                        <View style={styles.orLine} />
+                        <Text style={styles.orText}>OR USE LICENSE KEY</Text>
+                        <View style={styles.orLine} />
+                    </View>
 
                     {/* Error */}
                     {errorReason && (
@@ -433,6 +481,54 @@ const styles = StyleSheet.create({
         flex: 1,
         fontWeight: '500',
         lineHeight: 18,
+    },
+    trialHighlight: {
+        color: Colors.accent,
+        fontWeight: '700',
+    },
+    googleButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        backgroundColor: '#4285F4',
+        width: '100%',
+        paddingVertical: 14,
+        borderRadius: 14,
+        marginBottom: 20,
+        ...(Platform.OS === 'web' ? {
+            boxShadow: '0 4px 12px rgba(66, 133, 244, 0.3)',
+        } : {
+            shadowColor: '#4285F4',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 4,
+        }),
+    },
+    googleButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    orDivider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        width: '100%',
+        marginBottom: 20,
+    },
+    orLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: Colors.cardBorder,
+        opacity: 0.5,
+    },
+    orText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: Colors.textMuted,
+        letterSpacing: 1,
     },
 
     // ── Form Card ──

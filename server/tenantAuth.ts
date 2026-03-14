@@ -11,6 +11,7 @@ export interface TenantAuthRequest extends Request {
 
 const PUBLIC_ROUTES = [
   "/api/license/validate",
+  "/api/auth/google",
   "/api/landing/subscribe",
   "/api/landing-page-config",
   "/api/store-public/",
@@ -76,7 +77,7 @@ export function tenantAuthMiddleware() {
           if (tenantId) req.tenantId = tenantId;
           return next();
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     const tenantId = req.query.tenantId ? Number(req.query.tenantId) : (req.body?.tenantId ? Number(req.body.tenantId) : undefined);
@@ -105,7 +106,12 @@ export function tenantAuthMiddleware() {
       }
 
       if (license.expiresAt && new Date(license.expiresAt) < new Date()) {
-        return res.status(401).json({ error: "License has expired" });
+        const isTrial = license.licenseKey.startsWith("TRIAL-");
+        return res.status(401).json({
+          error: isTrial ? "Your 14-day trial period has expired. Please subscribe to continue." : "License has expired",
+          code: "LICENSE_EXPIRED",
+          isTrial
+        });
       }
 
       req.tenantId = license.tenantId;

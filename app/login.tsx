@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, Text, View, Pressable, Platform, Alert, Dimensions, FlatList, ActivityIndicator, TextInput, Modal } from "react-native";
+import { StyleSheet, Text, View, Pressable, Platform, Alert, Dimensions, FlatList, ActivityIndicator, TextInput, Modal, ScrollView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,6 +12,18 @@ import * as Haptics from "expo-haptics";
 import { useLanguage } from "@/lib/language-context";
 import { useLicense } from "@/lib/license-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+
+WebBrowser.maybeCompleteAuthSession();
+
+function getApiUrl() {
+  if (__DEV__) {
+    const domain = process.env.EXPO_PUBLIC_DOMAIN || 'localhost';
+    return `https://${domain}`;
+  }
+  return 'https://pos.barmagly.tech';
+}
 
 interface Employee {
   id: number;
@@ -51,6 +63,45 @@ export default function LoginScreen() {
   const [showOpeningCashInput, setShowOpeningCashInput] = useState(false);
   const [openingCash, setOpeningCash] = useState("");
   const [loggedInEmployee, setLoggedInEmployee] = useState<Employee | null>(null);
+
+  // Google Sign-In
+  const [request, googleResponse, promptAsync] = Google.useAuthRequest({
+    androidClientId: "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com",
+    webClientId: "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com",
+  });
+
+  useEffect(() => {
+    if (googleResponse?.type === "success") {
+      const { id_token } = googleResponse.params;
+      if (id_token) {
+        handleGoogleLogin(id_token);
+      }
+    }
+  }, [googleResponse]);
+
+  const handleGoogleLogin = async (idToken: string) => {
+    setLoading(true);
+    try {
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/api/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken })
+      });
+      const data = await res.json();
+      if (data.success && data.employee) {
+        login(data.employee);
+        router.replace("/(tabs)/products");
+      } else {
+        Alert.alert("Login Failed", data.error || "No associated employee found.");
+      }
+    } catch (err) {
+      console.error("Google login error:", err);
+      Alert.alert("Error", "Failed to sign in with Google");
+    } finally {
+      setLoading(false);
+    }
+  };
   useEffect(() => {
     const sub = Dimensions.addEventListener("change", ({ window }) => setScreenDims(window));
     return () => sub?.remove();
@@ -194,12 +245,16 @@ export default function LoginScreen() {
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        <View style={styles.content}>
-          <View style={styles.logoWrap}>
-            <View style={styles.logoCircle}>
-              <Ionicons name="storefront" size={36} color={Colors.accent} />
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + bottomPad + 20 }]}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <View style={[styles.logoWrap, screenDims.height < 700 && { marginBottom: 12 }]}>
+            <View style={[styles.logoCircle, screenDims.height < 700 && { width: 56, height: 56, borderRadius: 28 }]}>
+              <Ionicons name="storefront" size={screenDims.height < 700 ? 28 : 36} color={Colors.accent} />
             </View>
-            <Text style={styles.appName}>{tenant?.name || "POS System"}</Text>
+            <Text style={[styles.appName, screenDims.height < 700 && { fontSize: 24 }]}>{tenant?.name || "POS System"}</Text>
           </View>
 
           {mode === "select" ? (
@@ -221,6 +276,23 @@ export default function LoginScreen() {
                   ListEmptyComponent={
                     <Text style={[styles.emptyText, rtlText]}>{t("noEmployees")}</Text>
                   }
+                  ListFooterComponent={() => (
+                    <View style={styles.footerOptions}>
+                      <Pressable
+                        style={styles.googleLoginBtn}
+                        onPress={() => promptAsync()}
+                        disabled={!request || loading}
+                      >
+                        <Ionicons name="logo-google" size={18} color="#fff" />
+                        <Text style={styles.googleLoginText}>Sign in with Google (Admin)</Text>
+                      </Pressable>
+
+                      <Pressable style={styles.logoutLicenseBtn} onPress={logoutLicense}>
+                        <Ionicons name="log-out-outline" size={16} color={Colors.textMuted} />
+                        <Text style={styles.logoutLicenseText}>Switch Store License</Text>
+                      </Pressable>
+                    </View>
+                  )}
                 />
               )}
 
@@ -288,7 +360,7 @@ export default function LoginScreen() {
               )}
             </View>
           )}
-        </View>
+        </ScrollView>
       </LinearGradient>
       <Modal visible={showShiftPrompt} animationType="fade" transparent>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 24 }}>
@@ -355,10 +427,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
     alignItems: "center",
     paddingHorizontal: 24,
     paddingTop: 16,
+    width: "100%",
   },
   logoWrap: {
     alignItems: "center",
@@ -526,5 +598,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 32,
     textAlign: "center" as const,
+  },
+  footerOptions: {
+    paddingVertical: 24,
+    gap: 16,
+    alignItems: 'center',
+    width: '100%',
+  },
+  googleLoginBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#4285F4',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginTop: 10,
+  },
+  googleLoginText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  logoutLicenseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  logoutLicenseText: {
+    color: Colors.textMuted,
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

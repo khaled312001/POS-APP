@@ -34,6 +34,9 @@ function sanitizeDates(data: any) {
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import { addDays, addMonths, addYears } from "date-fns";
+import { OAuth2Client } from "google-auth-library";
+
+const googleClient = new OAuth2Client("852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com");
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
@@ -283,6 +286,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       sendLicenseKeyEmail({ to: ownerEmail, ownerName, businessName, licenseKey, planName, planType, tempPassword, expiresAt: endDate }).catch(() => { });
       res.json({ success: true, tenantId: tenant.id, licenseKey, requiresAction: false });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Google Authentication & Auto-Trial
+  app.post("/api/auth/google", async (req, res) => {
+    try {
+      const { idToken, deviceId } = req.body;
+      if (!idToken) return res.status(400).json({ error: "idToken is required" });
+
+      const ticket = await googleClient.verifyIdToken({
+        idToken,
+      });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        return res.status(400).json({ error: "Invalid Google token" });
+      }
+
+      const email = payload.email.toLowerCase();
+      const name = payload.name || "Store Owner";
+
+      // 1. Check if tenant exists
+      let tenant = await storage.getTenantByEmail(email);
+      let isNew = false;
+
+      if (!tenant) {
+        isNew = true;
+        // Create Tenant with Trial status
+        const tempPassword = "GAuth-" + crypto.randomBytes(4).toString("hex");
+        const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+        tenant = await storage.createTenant({
+          businessName: payload.name ? `${payload.name}'s Store` : "My New Store",
+          ownerName: name,
+          ownerEmail: email,
+          passwordHash,
+          status: "active",
+          maxBranches: 1,
+          maxEmployees: 5,
+          metadata: { signupMethod: "google", signupDate: new Date().toISOString() }
+        });
+
+        // 2. Create 14-Day Trial Subscription
+        const startDate = new Date();
+        const endDate = addDays(startDate, 14);
+
+        const sub = await storage.createTenantSubscription({
+          tenantId: tenant.id,
+          planType: "trial",
+          planName: "14-Day Free Trial",
+          price: "0",
+          status: "active",
+          startDate,
+          endDate,
+          autoRenew: false,
+        });
+
+        // 3. Generate Trial License Key
+        const randomSegments = Array.from({ length: 4 }, () =>
+          crypto.randomBytes(2).toString("hex").toUpperCase()
+        );
+        const licenseKey = `TRIAL-${randomSegments.join("-")}`;
+
+        await storage.createLicenseKey({
+          licenseKey,
+          tenantId: tenant.id,
+          subscriptionId: sub.id,
+          status: "active",
+          maxActivations: 3,
+          expiresAt: endDate,
+          notes: "Auto-generated Google Trial",
+        });
+
+        // 4. Ensure branch & admin employee
+        await storage.ensureTenantData(tenant.id);
+      }
+
+      // 5. Find the active license
+      const licenses = await storage.getLicenseKeys(tenant.id);
+      const activeLicense = licenses.find(l => l.status === "active" && (!l.expiresAt || new Date(l.expiresAt) > new Date()));
+
+      if (!activeLicense) {
+        return res.status(403).json({ error: "No active license found for this account. Your trial may have expired." });
+      }
+
+      // 6. Find the admin employee
+      const employees = await storage.getEmployeesByTenant(tenant.id);
+      const adminEmployee = employees.find(e => e.role === "admin" || e.email === email);
+
+      res.json({
+        success: true,
+        licenseKey: activeLicense.licenseKey,
+        isNew,
+        tenant: {
+          id: tenant.id,
+          name: tenant.businessName,
+          email: tenant.ownerEmail,
+          setupCompleted: tenant.setupCompleted
+        },
+        employee: adminEmployee ? {
+          id: adminEmployee.id,
+          name: adminEmployee.name,
+          role: adminEmployee.role,
+          permissions: adminEmployee.permissions,
+        } : null
+      });
+    } catch (e: any) {
+      console.error("[GOOGLE AUTH] Error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/tenant/onboarding-status", async (req, res) => {
+    try {
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const status = await storage.getOnboardingStatus(tenantId);
+      res.json(status);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/tenant/onboarding-complete", async (req, res) => {
+    try {
+      const { tenantId, businessName, ownerPhone, storeType, logo } = req.body;
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+
+      // 1. Update Tenant Info
+      await storage.updateTenant(tenantId, {
+        businessName,
+        ownerPhone,
+        storeType,
+        logo,
+        setupCompleted: true
+      });
+
+      // 2. Sync with Landing Page Config
+      const config = await storage.getLandingPageConfig(tenantId);
+      if (!config) {
+        const { db } = await import("./db");
+        const { landingPageConfig: landingConfig } = await import("@shared/schema");
+        await db.insert(landingConfig).values({
+          tenantId,
+          slug: businessName.toLowerCase().replace(/\s+/g, '-'),
+          heroTitle: businessName,
+          phone: ownerPhone,
+          socialWhatsapp: ownerPhone,
+        });
+      } else {
+        const { db } = await import("./db");
+        const { landingPageConfig: landingConfig } = await import("@shared/schema");
+        const { eq } = await import("drizzle-orm");
+        await db.update(landingConfig).set({
+          heroTitle: businessName,
+          phone: ownerPhone,
+          socialWhatsapp: ownerPhone,
+        }).where(eq(landingConfig.tenantId, tenantId));
+      }
+
+      res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }

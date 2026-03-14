@@ -126,8 +126,8 @@ export const storage = {
           eq(products.isActive, true),
           or(
             ilike(products.name, `%${search}%`),
-            ilike(products.sku || "", `%${search}%`),
-            ilike(products.barcode || "", `%${search}%`)
+            ilike(products.sku, `%${search}%`),
+            ilike(products.barcode, `%${search}%`)
           )
         )
       ).orderBy(desc(products.createdAt));
@@ -142,8 +142,8 @@ export const storage = {
           eq(products.isActive, true),
           or(
             ilike(products.name, `%${search}%`),
-            ilike(products.sku || "", `%${search}%`),
-            ilike(products.barcode || "", `%${search}%`)
+            ilike(products.sku, `%${search}%`),
+            ilike(products.barcode, `%${search}%`)
           )
         )
       ).orderBy(desc(products.createdAt));
@@ -1438,9 +1438,26 @@ export const storage = {
   },
 
   // ── Landing Page Config ────────────────────────────────────────────────────
-  async getLandingPageConfig(tenantId: number) {
-    const [config] = await db.select().from(landingPageConfig).where(eq(landingPageConfig.tenantId, tenantId));
-    return config;
+  async getTenant(id: number) {
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id));
+    return tenant;
+  },
+
+  async updateTenant(id: number, data: Partial<InsertTenant>) {
+    const [tenant] = await db.update(tenants).set({ ...data, updatedAt: new Date() }).where(eq(tenants.id, id)).returning();
+    return tenant;
+  },
+
+  async getOnboardingStatus(tenantId: number) {
+    const categoriesList = await this.getCategories(tenantId);
+    const productsList = await this.getProductsByTenant(tenantId);
+    const tenant = await this.getTenant(tenantId);
+
+    return {
+      hasCategory: categoriesList.length > 0,
+      hasProduct: productsList.length > 0,
+      isCompleted: tenant?.setupCompleted || false
+    };
   },
 
   async getLandingPageConfigBySlug(slug: string) {
