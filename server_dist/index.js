@@ -525,6 +525,7 @@ var init_schema = __esm({
       storeType: text("store_type").default("supermarket"),
       // supermarket, restaurant, pharmacy, others
       metadata: jsonb("metadata").$type(),
+      setupCompleted: boolean("setup_completed").default(false),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
@@ -869,6 +870,10 @@ var init_storage = __esm({
         const [cat] = await db.insert(categories).values(data).returning();
         return cat;
       },
+      async getCategory(id) {
+        const [category] = await db.select().from(categories).where(eq(categories.id, id));
+        return category;
+      },
       async updateCategory(id, data) {
         const [cat] = await db.update(categories).set(data).where(eq(categories.id, id)).returning();
         return cat;
@@ -884,15 +889,28 @@ var init_storage = __esm({
               eq(products.isActive, true),
               or(
                 ilike(products.name, `%${search}%`),
-                ilike(products.sku || "", `%${search}%`),
-                ilike(products.barcode || "", `%${search}%`)
+                ilike(products.sku, `%${search}%`),
+                ilike(products.barcode, `%${search}%`)
               )
             )
           ).orderBy(desc(products.createdAt));
         }
         return db.select().from(products).where(eq(products.isActive, true)).orderBy(desc(products.createdAt));
       },
-      async getProductsByTenant(tenantId) {
+      async getProductsByTenant(tenantId, search) {
+        if (search) {
+          return db.select().from(products).where(
+            and(
+              eq(products.tenantId, tenantId),
+              eq(products.isActive, true),
+              or(
+                ilike(products.name, `%${search}%`),
+                ilike(products.sku, `%${search}%`),
+                ilike(products.barcode, `%${search}%`)
+              )
+            )
+          ).orderBy(desc(products.createdAt));
+        }
         return db.select().from(products).where(and(eq(products.tenantId, tenantId), eq(products.isActive, true))).orderBy(desc(products.createdAt));
       },
       async getProduct(id) {
@@ -2063,9 +2081,23 @@ var init_storage = __esm({
         await db.delete(onlineOrders).where(eq(onlineOrders.id, id));
       },
       // ── Landing Page Config ────────────────────────────────────────────────────
-      async getLandingPageConfig(tenantId) {
-        const [config] = await db.select().from(landingPageConfig).where(eq(landingPageConfig.tenantId, tenantId));
-        return config;
+      async getTenant(id) {
+        const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id));
+        return tenant;
+      },
+      async updateTenant(id, data) {
+        const [tenant] = await db.update(tenants).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(tenants.id, id)).returning();
+        return tenant;
+      },
+      async getOnboardingStatus(tenantId) {
+        const categoriesList = await this.getCategories(tenantId);
+        const productsList = await this.getProductsByTenant(tenantId);
+        const tenant = await this.getTenant(tenantId);
+        return {
+          hasCategory: categoriesList.length > 0,
+          hasProduct: productsList.length > 0,
+          isCompleted: tenant?.setupCompleted || false
+        };
       },
       async getLandingPageConfigBySlug(slug) {
         const [config] = await db.select().from(landingPageConfig).where(eq(landingPageConfig.slug, slug));
@@ -2297,15 +2329,17 @@ function pizzaModifier(price33, price45) {
       required: false,
       multiple: true,
       options: [
-        { label: "Extra K\xE4se", price: "2.00" },
-        { label: "Extra Pilze", price: "2.00" },
-        { label: "Extra Schinken", price: "2.50" },
-        { label: "Extra Salami", price: "2.50" },
-        { label: "Extra Kebabfleisch", price: "3.00" },
-        { label: "Extra Oliven", price: "1.50" },
-        { label: "Extra Peperoni", price: "1.50" },
-        { label: "Knoblauchsauce", price: "1.00" },
-        { label: "Scharfe Sauce", price: "1.00" }
+        { label: "Extra K\xE4se", price: "0.00" },
+        { label: "Extra Pilze", price: "0.00" },
+        { label: "Extra Schinken", price: "0.00" },
+        { label: "Extra Salami", price: "0.00" },
+        { label: "Extra Kebabfleisch", price: "0.00" },
+        { label: "Extra Oliven", price: "0.00" },
+        { label: "Extra Peperoni", price: "0.00" },
+        { label: "Knoblauchsauce", price: "0.00" },
+        { label: "Scharfe Sauce", price: "0.00" },
+        { label: "K\xE4serand (33cm)", price: "3.00" },
+        { label: "K\xE4serand (45cm)", price: "6.00" }
       ]
     }
   ];
@@ -2436,7 +2470,7 @@ async function seedPizzaLemon() {
   } else {
     console.log("[PIZZA LEMON] Creating fresh product catalog...");
   }
-  const allCats = await db.select({ id: categories.id, name: categories.name }).from(categories);
+  const allCats = await db.select({ id: categories.id, name: categories.name }).from(categories).where(eq2(categories.tenantId, tenant.id));
   const catMap = {};
   for (const c of allCats) catMap[c.name] = c.id;
   if (catMap["Softgetr\xE4nke"] && !catMap["Getr\xE4nke"]) {
@@ -2589,13 +2623,13 @@ var init_seedPizzaLemon = __esm({
       { name: "Tabakwaren", color: "#4A5568", icon: "warning", sortOrder: 12 }
     ];
     PIZZAS = [
-      { name: "Margherita", description: "Tomaten, Mozzarella, Oregano", price: 14, price45: 24, image: IMG("pizzalemon_01_margherita.jpg") },
-      { name: "Profumata", description: "Tomaten, Mozzarella, Knoblauch, Petersilie, Oregano", price: 16, price45: 27, image: IMG("pizzalemon_02_profumata.jpg") },
-      { name: "Funghi", description: "Tomaten, Mozzarella, Pilze", price: 16, price45: 28, image: IMG("pizzalemon_03_funghi.jpg") },
-      { name: "Spinat", description: "Tomaten, Mozzarella, Spinat", price: 16, price45: 28, image: IMG("pizzalemon_04_spinat.jpg") },
-      { name: "Gorgonzola", description: "Tomaten, Mozzarella, Gorgonzola", price: 16, price45: 28, image: IMG("pizzalemon_05_gorgonzola.jpg") },
-      { name: "Prosciutto", description: "Tomaten, Mozzarella, Schinken", price: 16, price45: 28, image: IMG("pizzalemon_06_prosciutto.jpg") },
-      { name: "Salami", description: "Tomaten, Mozzarella, Salami", price: 16, price45: 28, image: IMG("pizzalemon_07_salami.jpg") },
+      { name: "Margherita", description: "Tomaten, Mozzarella, Oregano", price: 14, price45: 25, image: IMG("pizzalemon_01_margherita.jpg") },
+      { name: "Profumata", description: "Tomaten, Mozzarella, Knoblauch, Petersilie, Oregano", price: 14, price45: 27, image: IMG("pizzalemon_02_profumata.jpg") },
+      { name: "Funghi", description: "Tomaten, Mozzarella, Pilze", price: 15, price45: 28, image: IMG("pizzalemon_03_funghi.jpg") },
+      { name: "Spinat", description: "Tomaten, Mozzarella, Spinat", price: 15, price45: 28, image: IMG("pizzalemon_04_spinat.jpg") },
+      { name: "Gorgonzola", description: "Tomaten, Mozzarella, Gorgonzola", price: 16, price45: 29, image: IMG("pizzalemon_05_gorgonzola.jpg") },
+      { name: "Prosciutto", description: "Tomaten, Mozzarella, Schinken", price: 16, price45: 30, image: IMG("pizzalemon_06_prosciutto.jpg") },
+      { name: "Salami", description: "Tomaten, Mozzarella, Salami", price: 16, price45: 30, image: IMG("pizzalemon_07_salami.jpg") },
       { name: "Diavola", description: "Tomaten, Mozzarella, scharfe Salami, Oliven, Peperoncini", price: 17, price45: 31, image: IMG("pizzalemon_08_diavola.jpg") },
       { name: "Arrabbiata", description: "Tomaten, Mozzarella, Speck, Peperoncini, Knoblauch, Zwiebeln", price: 17, price45: 31, image: IMG("pizzalemon_09_arrabbiata.jpg") },
       { name: "Siciliana", description: "Tomaten, Mozzarella, Schinken, Sardellen, Kapern", price: 17, price45: 31, image: IMG("pizzalemon_10_siciliana.jpg") },
@@ -2605,25 +2639,24 @@ var init_seedPizzaLemon = __esm({
       { name: "Piccante", description: "Tomaten, Mozzarella, Peperoni, Peperoncini, Zwiebeln, Knoblauch, Oregano", price: 18, price45: 32, image: IMG("pizzalemon_14_piccante.jpg") },
       { name: "Raclette", description: "Tomaten, Mozzarella, Rohschinken", price: 18, price45: 32, image: IMG("pizzalemon_15_raclette.jpg") },
       { name: "Fiorentina", description: "Tomaten, Mozzarella, Spinat, Gorgonzola, Knoblauch", price: 18, price45: 32, image: IMG("pizzalemon_16_fiorentina.jpg") },
-      { name: "Kebab Pizza", description: "Tomaten, Mozzarella, Kebabfleisch", price: 18, price45: 32, image: IMG("pizzalemon_17_kebab_pizza.jpg") },
-      { name: "Poulet", description: "Tomaten, Mozzarella, Poulet", price: 18, price45: 32, image: IMG("pizzalemon_18_poulet.jpg") },
-      { name: "Carbonara", description: "Tomaten, Mozzarella, Speck, Ei, Rahm", price: 18, price45: 33, image: IMG("pizzalemon_19_carbonara.jpg") },
-      { name: "Gamberetti", description: "Tomaten, Mozzarella, Crevetten, Knoblauch", price: 18, price45: 33, image: IMG("pizzalemon_20_gamberetti.jpg") },
-      { name: "Quattro Formaggi", description: "Tomaten, Mozzarella, 4 verschiedene K\xE4sesorten", price: 19, price45: 35, image: IMG("pizzalemon_21_quattro_formaggi.jpg") },
-      { name: "Quattro Stagioni", description: "Tomaten, Mozzarella, Schinken, Pilze, Peperoni, Artischocken", price: 19, price45: 35, image: IMG("pizzalemon_22_quattro_stagioni.jpg") },
-      { name: "Frutti di Mare", description: "Tomaten, Mozzarella, Meeresfr\xFCchte", price: 19, price45: 35, image: IMG("pizzalemon_23_frutti_di_mare.jpg") },
-      { name: "Verdura", description: "Tomaten, Mozzarella, verschiedenes Gem\xFCse", price: 18, price45: 33, image: IMG("pizzalemon_24_verdura.jpg") },
+      { name: "Kebab Pizza", description: "Tomaten, Mozzarella, Kebabfleisch", price: 19, price45: 33, image: IMG("pizzalemon_17_kebab_pizza.jpg") },
+      { name: "Poulet", description: "Tomaten, Mozzarella, Poulet", price: 19, price45: 33, image: IMG("pizzalemon_18_poulet.jpg") },
+      { name: "Carbonara", description: "Tomaten, Mozzarella, Speck, Ei, Rahm", price: 19, price45: 33, image: IMG("pizzalemon_19_carbonara.jpg") },
+      { name: "Gamberetti", description: "Tomaten, Mozzarella, Crevetten, Knoblauch", price: 19, price45: 33, image: IMG("pizzalemon_20_gamberetti.jpg") },
+      { name: "Quattro Formaggi", description: "Tomaten, Mozzarella, 4 verschiedene K\xE4sesorten", price: 19, price45: 33, image: IMG("pizzalemon_21_quattro_formaggi.jpg") },
+      { name: "Quattro Stagioni", description: "Tomaten, Mozzarella, Schinken, Pilze, Peperoni, Artischocken", price: 19, price45: 33, image: IMG("pizzalemon_22_quattro_stagioni.jpg") },
+      { name: "Frutti di Mare", description: "Tomaten, Mozzarella, Meeresfr\xFCchte", price: 19, price45: 33, image: IMG("pizzalemon_23_frutti_di_mare.jpg") },
+      { name: "Verdura", description: "Tomaten, Mozzarella, verschiedenes Gem\xFCse", price: 19, price45: 33, image: IMG("pizzalemon_24_verdura.jpg") },
       { name: "Napoli", description: "Tomaten, Mozzarella, Sardellen, Kapern, Oliven", price: 18, price45: 32, image: IMG("pizzalemon_25_napoli.jpg") },
       { name: "Pizzaiolo", description: "Tomaten, Mozzarella, Speck, Knoblauch, Pilze", price: 18, price45: 32, image: IMG("pizzalemon_26_pizzaiolo.jpg") },
       { name: "A'Casa", description: "Tomaten, Mozzarella, Gorgonzola, Peperoni, Pilze, Knoblauch, Zwiebeln", price: 19, price45: 34, image: IMG("pizzalemon_27_a_casa.jpg") },
       { name: "Porcini", description: "Tomaten, Mozzarella, Steinpilze, Zwiebeln, Oregano", price: 19, price45: 34, image: IMG("pizzalemon_28_porcini.jpg") },
       { name: "Spezial", description: "Tomaten, Mozzarella, Kalbfleisch, Knoblauch, Kr\xE4uterbutter, Zwiebeln, Oregano", price: 19, price45: 34, image: IMG("pizzalemon_29_spezial.jpg") },
-      { name: "Padrone", description: "Tomaten, Mozzarella, Gorgonzola, Pilze", price: 20, price45: 35, image: IMG("pizzalemon_30_padrone.jpg") },
-      { name: "Schloss Pizza", description: "Tomaten, Mozzarella, Kalbfleisch, Speck, scharfe Salami", price: 20, price45: 35, image: IMG("pizzalemon_31_schloss_pizza.jpg") },
-      { name: "Italiano", description: "Tomaten, Mozzarella, Rohschinken, Mascarpone, Rucola", price: 20, price45: 35, image: IMG("pizzalemon_32_italiano.jpg") },
-      { name: "Americano", description: "Tomaten, Mozzarella, Speck, Mais, Zwiebeln", price: 20, price45: 35, image: IMG("pizzalemon_33_americano.jpg") },
-      { name: "Lemon Pizza", description: "Tomaten, Mozzarella, Lammfleisch, Knoblauch, Peperoncini, Scharf", price: 21, price45: 36, image: IMG("pizzalemon_34_lemon_pizza.jpg") },
-      { name: "Extra K\xE4serand", description: "Knuspriger K\xE4serand f\xFCr Ihre Pizza (33cm: +3.- / 45cm: +6.-)", price: 3, price45: 6, image: IMG("pizzalemon_35_extra_kaeserand.jpg") }
+      { name: "Padrone", description: "Tomaten, Mozzarella, Gorgonzola, Pilze", price: 20, price45: 33, image: IMG("pizzalemon_30_padrone.jpg") },
+      { name: "Schloss Pizza", description: "Tomaten, Mozzarella, Kalbfleisch, Speck, scharfe Salami", price: 20, price45: 34, image: IMG("pizzalemon_31_schloss_pizza.jpg") },
+      { name: "Italiano", description: "Tomaten, Mozzarella, Rohschinken, Mascarpone, Rucola", price: 20, price45: 34, image: IMG("pizzalemon_32_italiano.jpg") },
+      { name: "Americano", description: "Tomaten, Mozzarella, Speck, Mais, Zwiebeln", price: 20, price45: 34, image: IMG("pizzalemon_33_americano.jpg") },
+      { name: "Lemon Pizza", description: "Tomaten, Mozzarella, Lammfleisch, Knoblauch, Peperoncini, Scharf", price: 20, price45: 34, image: IMG("pizzalemon_34_lemon_pizza.jpg") }
     ];
     CALZONES = [
       { name: "Calzone", description: "Tomaten, Mozzarella, Schinken, Pilze, Ei", price: 20, image: IMG("pizzalemon_c1_calzone.jpg") },
@@ -3842,7 +3875,7 @@ function scheduleAutoReconnect() {
       log("Auto-reconnecting\u2026");
       try {
         await whatsappService.connect();
-        if (status === "connected" && pendingMessages.length > 0) {
+        if (whatsappService.getStatus().status === "connected" && pendingMessages.length > 0) {
           log(`Flushing ${pendingMessages.length} queued message(s)`);
           const toSend = [...pendingMessages];
           pendingMessages = [];
@@ -4162,7 +4195,8 @@ ${text2}`;
 // server/routes.ts
 import * as bcrypt3 from "bcrypt";
 import * as crypto2 from "crypto";
-import { addMonths as addMonths2, addYears as addYears2 } from "date-fns";
+import { addDays as addDays2, addMonths as addMonths2, addYears as addYears2 } from "date-fns";
+import { OAuth2Client } from "google-auth-library";
 var TIMESTAMP_FIELDS = [
   "createdAt",
   "updatedAt",
@@ -4192,6 +4226,7 @@ function sanitizeDates(data) {
   }
   return result;
 }
+var googleClient = new OAuth2Client("852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com");
 async function registerRoutes(app2) {
   app2.post("/api/admin/seed-pizza-lemon", async (_req, res) => {
     try {
@@ -4259,7 +4294,7 @@ async function registerRoutes(app2) {
               description: `Barmagly ${planName} ${planType} \u2014 ${businessName}`,
               metadata: { businessName, ownerEmail, planName, planType }
             });
-            if (pi.status === "requires_action" || pi.status === "requires_source_action") {
+            if (pi.status === "requires_action") {
               return res.json({ requiresAction: true, clientSecret: pi.client_secret, paymentIntentId: pi.id });
             }
             if (pi.status !== "succeeded") {
@@ -4424,6 +4459,139 @@ async function registerRoutes(app2) {
       sendLicenseKeyEmail({ to: ownerEmail, ownerName, businessName, licenseKey, planName, planType, tempPassword, expiresAt: endDate }).catch(() => {
       });
       res.json({ success: true, tenantId: tenant.id, licenseKey, requiresAction: false });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/auth/google", async (req, res) => {
+    try {
+      const { idToken, deviceId } = req.body;
+      if (!idToken) return res.status(400).json({ error: "idToken is required" });
+      const ticket = await googleClient.verifyIdToken({
+        idToken
+      });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        return res.status(400).json({ error: "Invalid Google token" });
+      }
+      const email = payload.email.toLowerCase();
+      const name = payload.name || "Store Owner";
+      let tenant = await storage.getTenantByEmail(email);
+      let isNew = false;
+      if (!tenant) {
+        isNew = true;
+        const tempPassword = "GAuth-" + crypto2.randomBytes(4).toString("hex");
+        const passwordHash = await bcrypt3.hash(tempPassword, 10);
+        tenant = await storage.createTenant({
+          businessName: payload.name ? `${payload.name}'s Store` : "My New Store",
+          ownerName: name,
+          ownerEmail: email,
+          passwordHash,
+          status: "active",
+          maxBranches: 1,
+          maxEmployees: 5,
+          metadata: { signupMethod: "google", signupDate: (/* @__PURE__ */ new Date()).toISOString() }
+        });
+        const startDate = /* @__PURE__ */ new Date();
+        const endDate = addDays2(startDate, 14);
+        const sub = await storage.createTenantSubscription({
+          tenantId: tenant.id,
+          planType: "trial",
+          planName: "14-Day Free Trial",
+          price: "0",
+          status: "active",
+          startDate,
+          endDate,
+          autoRenew: false
+        });
+        const randomSegments = Array.from(
+          { length: 4 },
+          () => crypto2.randomBytes(2).toString("hex").toUpperCase()
+        );
+        const licenseKey = `TRIAL-${randomSegments.join("-")}`;
+        await storage.createLicenseKey({
+          licenseKey,
+          tenantId: tenant.id,
+          subscriptionId: sub.id,
+          status: "active",
+          maxActivations: 3,
+          expiresAt: endDate,
+          notes: "Auto-generated Google Trial"
+        });
+        await storage.ensureTenantData(tenant.id);
+      }
+      const licenses = await storage.getLicenseKeys(tenant.id);
+      const activeLicense = licenses.find((l) => l.status === "active" && (!l.expiresAt || new Date(l.expiresAt) > /* @__PURE__ */ new Date()));
+      if (!activeLicense) {
+        return res.status(403).json({ error: "No active license found for this account. Your trial may have expired." });
+      }
+      const employees2 = await storage.getEmployeesByTenant(tenant.id);
+      const adminEmployee = employees2.find((e) => e.role === "admin" || e.email === email);
+      res.json({
+        success: true,
+        licenseKey: activeLicense.licenseKey,
+        isNew,
+        tenant: {
+          id: tenant.id,
+          name: tenant.businessName,
+          email: tenant.ownerEmail,
+          setupCompleted: tenant.setupCompleted
+        },
+        employee: adminEmployee ? {
+          id: adminEmployee.id,
+          name: adminEmployee.name,
+          role: adminEmployee.role,
+          permissions: adminEmployee.permissions
+        } : null
+      });
+    } catch (e) {
+      console.error("[GOOGLE AUTH] Error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/tenant/onboarding-status", async (req, res) => {
+    try {
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const status2 = await storage.getOnboardingStatus(tenantId);
+      res.json(status2);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/tenant/onboarding-complete", async (req, res) => {
+    try {
+      const { tenantId, businessName, ownerPhone, storeType, logo } = req.body;
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      await storage.updateTenant(tenantId, {
+        businessName,
+        ownerPhone,
+        storeType,
+        logo,
+        setupCompleted: true
+      });
+      const config = await storage.getLandingPageConfig(tenantId);
+      if (!config) {
+        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+        const { landingPageConfig: landingConfig } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+        await db2.insert(landingConfig).values({
+          tenantId,
+          slug: businessName.toLowerCase().replace(/\s+/g, "-"),
+          heroTitle: businessName,
+          phone: ownerPhone,
+          socialWhatsapp: ownerPhone
+        });
+      } else {
+        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+        const { landingPageConfig: landingConfig } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+        const { eq: eq5 } = await import("drizzle-orm");
+        await db2.update(landingConfig).set({
+          heroTitle: businessName,
+          phone: ownerPhone,
+          socialWhatsapp: ownerPhone
+        }).where(eq5(landingConfig.tenantId, tenantId));
+      }
+      res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -4744,7 +4912,8 @@ async function registerRoutes(app2) {
     try {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
       if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      res.json(await storage.getCategories(tenantId));
+      const categories2 = await storage.getCategories(tenantId);
+      res.json(sortCategoriesByPriority(categories2));
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -4780,8 +4949,9 @@ async function registerRoutes(app2) {
   app2.get("/api/products", async (req, res) => {
     try {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      const search = req.query.search;
       if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      res.json(await storage.getProductsByTenant(tenantId));
+      res.json(await storage.getProductsByTenant(tenantId, search));
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -5978,10 +6148,15 @@ async function registerRoutes(app2) {
     }
   });
   app2.put("/api/images/save", async (req, res) => {
-    if (!req.body.imageURL) return res.status(400).json({ error: "imageURL is required" });
+    const { imageURL } = req.body;
+    console.log("Saving image path for URL:", imageURL);
+    if (!imageURL) {
+      return res.status(400).json({ error: "imageURL is required" });
+    }
     try {
       const objectStorageService = new ObjectStorageService();
-      const objectPath = objectStorageService.normalizeObjectEntityPath(req.body.imageURL);
+      const objectPath = objectStorageService.normalizeObjectEntityPath(imageURL);
+      console.log("Normalized object path:", objectPath);
       res.status(200).json({ objectPath });
     } catch (error) {
       console.error("Error saving image:", error);
@@ -6069,13 +6244,13 @@ async function registerRoutes(app2) {
   function sortCategoriesByPriority(cats) {
     const getPriority = (name) => {
       const n = name.toLowerCase();
-      if (/pizza|بيتزا/.test(n)) return 1;
-      if (/burger|burg|sandwich|wrap|grill|shawarma|شاورما/.test(n)) return 2;
-      if (/pasta|meal|main|plate|chicken|meat|fish|دجاج|لحم|سمك/.test(n)) return 3;
-      if (/appetizer|starter|مقبلات|فاتح/.test(n)) return 6;
-      if (/salad|سلطة/.test(n)) return 7;
-      if (/drink|beverage|juice|عصير|مشروب/.test(n)) return 8;
-      if (/dessert|sweet|حلوى|حلويات/.test(n)) return 9;
+      if (/pizza|بيتزا|calzone|pide|lahmacun|burger|burg|sandwich|wrap|grill|shawarma|شاورما/.test(n)) return 1;
+      if (/pasta|meal|main|plate|chicken|meat|fish|teller|nuggets|schnitzel|kebab|دجاج|لحم|سمك/.test(n)) return 2;
+      if (/appetizer|starter|finger|snack|مقبلات|فاتح/.test(n)) return 3;
+      if (/salad|سلطة/.test(n)) return 6;
+      if (/dessert|sweet|حلوى|حلويات|baklava|tiramisu/.test(n)) return 7;
+      if (/drink|beverage|juice|water|coke|cola|bier|beer|wine|alcohol|عصير|مشروب/.test(n)) return 8;
+      if (/tabak|tobacco|cigarette/.test(n)) return 9;
       return 5;
     };
     return [...cats].sort((a, b) => {
@@ -6424,7 +6599,7 @@ async function registerRoutes(app2) {
         }
       }
       try {
-        expenses2 = await storage.getExpenses(void 0, tenantId);
+        expenses2 = await storage.getExpenses(tenantId);
       } catch {
       }
       const sales2 = await storage.getSales({ tenantId, limit: 1e4 });
@@ -6569,7 +6744,7 @@ async function createTenantBackup(tenantId) {
     }
   }
   try {
-    expenses2 = await storage.getExpenses(void 0, tenantId);
+    expenses2 = await storage.getExpenses(tenantId);
   } catch {
   }
   const sales2 = await storage.getSales({ tenantId, limit: 5e4 });
@@ -6876,7 +7051,34 @@ function registerSuperAdminRoutes(app2) {
         maxEmployees: maxEmployees || 5,
         storeType: storeType || "supermarket"
       });
-      res.json(tenant);
+      const startDate = /* @__PURE__ */ new Date();
+      const endDate = addDays3(startDate, 14);
+      const sub = await storage.createTenantSubscription({
+        tenantId: tenant.id,
+        planType: "trial",
+        planName: "14-Day Free Trial",
+        price: "0",
+        status: "active",
+        startDate,
+        endDate,
+        autoRenew: false
+      });
+      const randomSegments = Array.from(
+        { length: 4 },
+        () => crypto3.randomBytes(2).toString("hex").toUpperCase()
+      );
+      const licenseKey = `TRIAL-${randomSegments.join("-")}`;
+      await storage.createLicenseKey({
+        licenseKey,
+        tenantId: tenant.id,
+        subscriptionId: sub.id,
+        status: "active",
+        maxActivations: 3,
+        expiresAt: endDate,
+        notes: "Auto-generated Trial for Dashboard creation"
+      });
+      await storage.ensureTenantData(tenant.id);
+      res.json({ ...tenant, licenseKey });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -7657,6 +7859,7 @@ import jwt2 from "jsonwebtoken";
 var JWT_SECRET2 = process.env.JWT_SECRET || "barmagly-super-admin-secret-key-2024";
 var PUBLIC_ROUTES = [
   "/api/license/validate",
+  "/api/auth/google",
   "/api/landing/subscribe",
   "/api/landing-page-config",
   "/api/store-public/",
@@ -7735,7 +7938,12 @@ function tenantAuthMiddleware() {
         return res.status(403).json({ error: "License key does not match the requested tenant" });
       }
       if (license.expiresAt && new Date(license.expiresAt) < /* @__PURE__ */ new Date()) {
-        return res.status(401).json({ error: "License has expired" });
+        const isTrial = license.licenseKey.startsWith("TRIAL-");
+        return res.status(401).json({
+          error: isTrial ? "Your 14-day trial period has expired. Please subscribe to continue." : "License has expired",
+          code: "LICENSE_EXPIRED",
+          isTrial
+        });
       }
       req.tenantId = license.tenantId;
       req.licenseKey = licenseKey;
@@ -7768,6 +7976,10 @@ import * as fs4 from "fs";
 import * as path3 from "path";
 var app = express();
 var log2 = console.log;
+app.use((req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
+  next();
+});
 function setupCors(app2) {
   app2.use((req, res, next) => {
     const origins = /* @__PURE__ */ new Set();
@@ -8193,8 +8405,8 @@ function configureExpoAndLanding(app2) {
         short_name: "Barmagly",
         description: "Cloud-powered Point of Sale system for modern restaurants, caf\xE9s, and retail stores. Multi-branch, multi-language, Stripe payments, inventory, CRM and more.",
         start_url: "/app",
-        scope: "/app",
-        id: "/app",
+        scope: "/",
+        id: "/",
         display: "standalone",
         display_override: ["window-controls-overlay", "standalone", "minimal-ui"],
         background_color: "#0A0E17",
@@ -8537,7 +8749,7 @@ async function initStripe() {
   }
   try {
     log2("Initializing Stripe schema...");
-    await runMigrations({ databaseUrl, schema: "stripe" });
+    await runMigrations({ databaseUrl });
     log2("Stripe schema ready");
     let stripeSync2, secretKey;
     try {
