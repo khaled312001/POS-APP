@@ -755,6 +755,10 @@ self.addEventListener('message', (event) => {
       }
     }
 
+    if (req.path.startsWith("/super_admin")) {
+      return res.redirect(301, req.url.replace("/super_admin", "/super-admin"));
+    }
+
     if (req.path.startsWith("/super-admin")) {
       const superAdminTemplatePath = path.resolve(
         process.cwd(),
