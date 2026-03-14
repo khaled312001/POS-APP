@@ -746,7 +746,7 @@ self.addEventListener('message', (event) => {
     }
 
     if (req.path === "/app" || req.path === "/app/" || req.path === "/app/index.html") {
-      const indexPath = path.resolve(process.cwd(), "static-build", "index.html");
+      const indexPath = path.resolve(process.cwd(), "dist", "index.html");
       if (fs.existsSync(indexPath)) {
         let html = fs.readFileSync(indexPath, "utf-8");
         html = injectPWATags(html);
@@ -826,12 +826,12 @@ self.addEventListener('message', (event) => {
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
   app.use("/objects", express.static(path.resolve(process.cwd(), "uploads")));
-  app.use("/app", express.static(path.resolve(process.cwd(), "static-build")));
+  app.use("/app", express.static(path.resolve(process.cwd(), "dist")));
   app.use(express.static(path.resolve(process.cwd(), "static-build")));
 
   // SPA catch-all: serve index.html with PWA tags for any unmatched route under /app
   // This ensures /app/intro, /app/login, /app/license-gate etc. all get the PWA install dialog
-  const staticIndexPath = path.resolve(process.cwd(), "static-build", "index.html");
+  const staticIndexPath = path.resolve(process.cwd(), "dist", "index.html");
   app.get("/app/{*splat}", (req: Request, res: Response, next: NextFunction) => {
     if (
       req.path.includes(".") // static files with extensions

@@ -8417,7 +8417,7 @@ self.addEventListener('message', (event) => {
       return serveLandingPage({ req, res, appName });
     }
     if (req.path === "/app" || req.path === "/app/" || req.path === "/app/index.html") {
-      const indexPath = path3.resolve(process.cwd(), "static-build", "index.html");
+      const indexPath = path3.resolve(process.cwd(), "dist", "index.html");
       if (fs4.existsSync(indexPath)) {
         let html = fs4.readFileSync(indexPath, "utf-8");
         html = injectPWATags(html);
@@ -8488,9 +8488,9 @@ self.addEventListener('message', (event) => {
   app2.use("/assets", express.static(path3.resolve(process.cwd(), "assets")));
   app2.use("/uploads", express.static(path3.resolve(process.cwd(), "uploads")));
   app2.use("/objects", express.static(path3.resolve(process.cwd(), "uploads")));
-  app2.use("/app", express.static(path3.resolve(process.cwd(), "static-build")));
+  app2.use("/app", express.static(path3.resolve(process.cwd(), "dist")));
   app2.use(express.static(path3.resolve(process.cwd(), "static-build")));
-  const staticIndexPath = path3.resolve(process.cwd(), "static-build", "index.html");
+  const staticIndexPath = path3.resolve(process.cwd(), "dist", "index.html");
   app2.get("/app/{*splat}", (req, res, next) => {
     if (req.path.includes(".")) {
       return next();
@@ -8747,7 +8747,27 @@ function setupPaymentGatewayRoutes(app2) {
   app.use(tenantAuthMiddleware());
   setupStripeRoutes(app);
   setupPaymentGatewayRoutes(app);
-  await initStripe();
+  configureExpoAndLanding(app);
+  registerSuperAdminRoutes(app);
+  const server = await registerRoutes(app);
+  setupErrorHandler(app);
+  const isProduction = process.env.NODE_ENV === "production";
+  const port = parseInt(process.env.PORT || (isProduction ? "8081" : "5000"), 10);
+  await new Promise((resolve3, reject) => {
+    server.listen({ port, host: "0.0.0.0" }, () => {
+      log2(`express server serving on port ${port}`);
+      resolve3();
+    }).on("error", (err) => {
+      if (err.code === "EADDRINUSE") {
+        log2(`[ERROR] Port ${port} is already in use.`);
+        process.exit(1);
+      } else {
+        reject(err);
+      }
+    });
+  });
+  await callerIdService.init(server);
+  initStripe().catch((err) => log2("Stripe init error (non-fatal):", err));
   try {
     const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     await pool2.query(`
@@ -8795,30 +8815,7 @@ function setupPaymentGatewayRoutes(app2) {
   } catch (err) {
     log2("Error seeding Pizza Lemon data:", err);
   }
-  configureExpoAndLanding(app);
-  registerSuperAdminRoutes(app);
-  const server = await registerRoutes(app);
-  await callerIdService.init(server);
-  setupErrorHandler(app);
-  const port = parseInt(process.env.PORT || "5000", 10);
-  server.listen(
-    {
-      port,
-      host: "0.0.0.0"
-    },
-    () => {
-      log2(`express server serving on port ${port}`);
-    }
-  ).on("error", (err) => {
-    if (err.code === "EADDRINUSE") {
-      log2(`[ERROR] Port ${port} is already in use.`);
-      log2(`Try running: npx kill-port ${port}`);
-      process.exit(1);
-    } else {
-      throw err;
-    }
-  });
-  if (process.env.NODE_ENV !== "production" && port !== 8081) {
+  if (!isProduction) {
     const http = await import("http");
     const expoPort = 8080;
     const proxy = http.createServer((req, res) => {
