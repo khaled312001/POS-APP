@@ -1,9 +1,6 @@
-/**
- * WhatsApp Service — uses wppconnect to send WhatsApp messages.
- *
- * The heavy @wppconnect-team/wppconnect dependency is loaded lazily
- * so the server can start even when the package is not installed.
- */
+import os from 'os';
+import path from 'path';
+import fs from 'fs';
 
 let wppconnect: any = null;
 
@@ -24,6 +21,9 @@ async function loadWppConnect() {
 
 const ADMIN_PHONE = "201204593124";
 const SESSION_NAME = "barmagly-pos";
+const STORAGE_DIR = path.resolve(process.cwd(), ".wppconnect");
+const CHROME_DATA_DIR = path.join(STORAGE_DIR, "chrome-data");
+const TOKEN_DIR = path.join(STORAGE_DIR, "tokens");
 
 export type WhatsAppStatus = "disconnected" | "connecting" | "qr_ready" | "connected";
 
@@ -73,24 +73,25 @@ function toChatId(phone: string): string {
 }
 
 async function cleanupProcesses() {
-    try {
-        const { execSync } = await import("child_process");
-        execSync(
-            `pkill -9 -f 'wppconnect' 2>/dev/null; pkill -9 -f 'chromium.*barmagly' 2>/dev/null; true`,
-            { timeout: 4000 }
-        );
-        await new Promise(r => setTimeout(r, 500));
-    } catch { }
+    // Only cleanup if we are not on Windows or if we really need to force a reset.
+    // On Windows, taskkill is noisy and often unnecessary if we use a stable userDataDir.
+    const isWindows = os.platform() === 'win32';
+    if (!isWindows) {
+        try {
+            const { execSync } = await import("child_process");
+            execSync(
+                `pkill -9 -f 'wppconnect' 2>/dev/null; pkill -9 -f 'chromium.*barmagly' 2>/dev/null; true`,
+                { timeout: 4000 }
+            );
+            await new Promise(r => setTimeout(r, 500));
+        } catch { }
+    }
 
-    try {
-        const fs = await import("fs");
-        const entries = fs.readdirSync("/tmp").filter((d: string) =>
-            d.startsWith("wppconnect-") || d.startsWith("barmagly-")
-        );
-        for (const e of entries) {
-            try { fs.rmSync(`/tmp/${e}`, { recursive: true, force: true }); } catch { }
-        }
-    } catch { }
+    // We don't wipe the whole /tmp anymore to preserve session data.
+    // Instead, we just ensure the STORAGE_DIR exists.
+    if (!fs.existsSync(STORAGE_DIR)) {
+        fs.mkdirSync(STORAGE_DIR, { recursive: true });
+    }
 }
 
 async function isClientAlive(): Promise<boolean> {
@@ -225,9 +226,6 @@ export const whatsappService = {
             if (!browserPath) throw new Error("No Chrome/Chromium found.");
             log(`Using browser: ${browserPath}`);
 
-            const ts = Date.now();
-            const CHROME_DATA_DIR = `/tmp/wppconnect-chrome-${ts}`;
-            const TOKEN_DIR = `/tmp/wppconnect-tokens-${ts}`;
             fs.mkdirSync(CHROME_DATA_DIR, { recursive: true });
             fs.mkdirSync(TOKEN_DIR, { recursive: true });
 
