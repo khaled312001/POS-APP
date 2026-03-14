@@ -13,6 +13,12 @@ import * as path from "path";
 const app = express();
 const log = console.log;
 
+// Security and Cross-Origin Headers
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;

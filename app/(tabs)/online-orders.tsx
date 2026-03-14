@@ -17,12 +17,12 @@ import * as Haptics from "expo-haptics";
 const STATUS_FLOW = ["pending", "accepted", "preparing", "ready", "delivered"];
 
 const STATUS_META: Record<string, { label: string; labelAr: string; labelDe: string; color: string; icon: string; next?: string }> = {
-  pending:   { label: "Pending",   labelAr: "انتظار",      labelDe: "Ausstehend",     color: "#F59E0B", icon: "time-outline",         next: "accepted" },
-  accepted:  { label: "Accepted",  labelAr: "مقبول",       labelDe: "Angenommen",     color: "#3B82F6", icon: "checkmark-circle-outline", next: "preparing" },
-  preparing: { label: "Preparing", labelAr: "قيد التحضير", labelDe: "In Zubereitung", color: "#8B5CF6", icon: "flame-outline",         next: "ready" },
-  ready:     { label: "Ready",     labelAr: "جاهز",        labelDe: "Fertig",          color: "#2FD3C6", icon: "bag-check-outline",    next: "delivered" },
-  delivered: { label: "Delivered", labelAr: "تم التوصيل",  labelDe: "Geliefert",       color: "#10B981", icon: "checkmark-done-outline" },
-  cancelled: { label: "Cancelled", labelAr: "ملغي",        labelDe: "Storniert",       color: "#EF4444", icon: "close-circle-outline" },
+  pending: { label: "Pending", labelAr: "انتظار", labelDe: "Ausstehend", color: "#F59E0B", icon: "time-outline", next: "accepted" },
+  accepted: { label: "Accepted", labelAr: "مقبول", labelDe: "Angenommen", color: "#3B82F6", icon: "checkmark-circle-outline", next: "preparing" },
+  preparing: { label: "Preparing", labelAr: "قيد التحضير", labelDe: "In Zubereitung", color: "#8B5CF6", icon: "flame-outline", next: "ready" },
+  ready: { label: "Ready", labelAr: "جاهز", labelDe: "Fertig", color: "#2FD3C6", icon: "bag-check-outline", next: "delivered" },
+  delivered: { label: "Delivered", labelAr: "تم التوصيل", labelDe: "Geliefert", color: "#10B981", icon: "checkmark-done-outline" },
+  cancelled: { label: "Cancelled", labelAr: "ملغي", labelDe: "Storniert", color: "#EF4444", icon: "close-circle-outline" },
 };
 
 const PAY_ICON: Record<string, string> = { cash: "💵", card: "💳", mobile: "📱" };
@@ -42,7 +42,7 @@ function playNotificationSound() {
       osc.start(ctx.currentTime + t);
       osc.stop(ctx.currentTime + t + 0.3);
     });
-  } catch {}
+  } catch { }
 }
 
 export default function OnlineOrdersScreen() {
@@ -82,10 +82,10 @@ export default function OnlineOrdersScreen() {
       });
       // Pulse animation
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.08, duration: 200, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1.05, duration: 150, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.08, duration: 200, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 200, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(pulseAnim, { toValue: 1.05, duration: 150, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 150, useNativeDriver: Platform.OS !== 'web' }),
       ]).start();
     }
     orders.forEach(o => knownOrderIds.current.add(o.id));
@@ -112,9 +112,9 @@ export default function OnlineOrdersScreen() {
           } else if (data.type === "online_order_updated") {
             qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
           }
-        } catch {}
+        } catch { }
       };
-    } catch {}
+    } catch { }
     return () => ws?.close();
   }, []);
 
@@ -168,9 +168,9 @@ export default function OnlineOrdersScreen() {
     const nextLabel = next ? s(next) : null;
 
     const nextBtnColor: Record<string, string[]> = {
-      accepted:  ["#3B82F6", "#1D4ED8"],
+      accepted: ["#3B82F6", "#1D4ED8"],
       preparing: ["#8B5CF6", "#6D28D9"],
-      ready:     ["#2FD3C6", "#0D9488"],
+      ready: ["#2FD3C6", "#0D9488"],
       delivered: ["#10B981", "#059669"],
     };
 
@@ -307,8 +307,8 @@ export default function OnlineOrdersScreen() {
           <View style={[styles.filterRow, isRTL && { flexDirection: "row-reverse" }]}>
             {[
               { key: "active", labelEn: "Active", labelAr: "النشطة", labelDe: "Aktiv" },
-              { key: "done",   labelEn: "Done",   labelAr: "المكتملة", labelDe: "Erledigt" },
-              { key: "all",    labelEn: "All",    labelAr: "الكل",    labelDe: "Alle" },
+              { key: "done", labelEn: "Done", labelAr: "المكتملة", labelDe: "Erledigt" },
+              { key: "all", labelEn: "All", labelAr: "الكل", labelDe: "Alle" },
             ].map(f => (
               <Pressable
                 key={f.key}
@@ -341,7 +341,7 @@ export default function OnlineOrdersScreen() {
             <Text style={styles.emptyText}>
               {language === "ar" ? "ستظهر الطلبات الإلكترونية هنا فور وصولها"
                 : language === "de" ? "Online-Bestellungen erscheinen hier sofort"
-                : "Online orders will appear here in real time"}
+                  : "Online orders will appear here in real time"}
             </Text>
           </View>
         }

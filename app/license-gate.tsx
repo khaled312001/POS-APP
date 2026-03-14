@@ -60,19 +60,19 @@ export default function LicenseGate() {
             Animated.timing(fadeAnim, {
                 toValue: 1,
                 duration: 800,
-                useNativeDriver: true,
+                useNativeDriver: Platform.OS !== 'web',
             }),
             Animated.spring(slideAnim, {
                 toValue: 0,
                 tension: 60,
                 friction: 12,
-                useNativeDriver: true,
+                useNativeDriver: Platform.OS !== 'web',
             }),
             Animated.spring(iconScale, {
                 toValue: 1,
                 tension: 80,
                 friction: 8,
-                useNativeDriver: true,
+                useNativeDriver: Platform.OS !== 'web',
             }),
         ]).start();
 
@@ -82,12 +82,12 @@ export default function LicenseGate() {
                 Animated.timing(pulseAnim, {
                     toValue: 1.05,
                     duration: 2000,
-                    useNativeDriver: true,
+                    useNativeDriver: Platform.OS !== 'web',
                 }),
                 Animated.timing(pulseAnim, {
                     toValue: 1,
                     duration: 2000,
-                    useNativeDriver: true,
+                    useNativeDriver: Platform.OS !== 'web',
                 }),
             ])
         ).start();
