@@ -9,10 +9,13 @@ let wppconnect: any = null;
 
 async function loadWppConnect() {
     if (!wppconnect) {
+        console.log("[WhatsApp] Attempting to load @wppconnect-team/wppconnect...");
         try {
-            wppconnect = (await import("@wppconnect-team/wppconnect")).default;
-        } catch {
-            console.warn("[WhatsApp] @wppconnect-team/wppconnect not installed — WhatsApp features disabled");
+            wppconnect = require("@wppconnect-team/wppconnect");
+            if (wppconnect.default) wppconnect = wppconnect.default;
+            console.log("[WhatsApp] Successfully loaded @wppconnect-team/wppconnect");
+        } catch (err: any) {
+            console.error("[WhatsApp] FAIL to load wppconnect:", err);
             return null;
         }
     }
@@ -375,8 +378,12 @@ export const whatsappService = {
         }
 
         try {
-            await client.sendText(toChatId(phone), text);
-            log(`Message sent to ${phone}`);
+            const resolvedChatId = toChatId(phone);
+            log(`Attempting to send message to resolved chatId: ${resolvedChatId}`);
+
+            const result = await client.sendText(resolvedChatId, text);
+            log(`Message successfully sent to ${phone}`);
+            console.log(`[WhatsApp Detailed Log] sendText result for ${phone}:`, JSON.stringify(result));
             return true;
         } catch (err: any) {
             const msg = typeof err === "object" ? (err.message || JSON.stringify(err)) : String(err);

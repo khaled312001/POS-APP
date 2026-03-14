@@ -1438,15 +1438,7 @@ export const storage = {
   },
 
   // ── Landing Page Config ────────────────────────────────────────────────────
-  async getTenant(id: number) {
-    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id));
-    return tenant;
-  },
 
-  async updateTenant(id: number, data: Partial<InsertTenant>) {
-    const [tenant] = await db.update(tenants).set({ ...data, updatedAt: new Date() }).where(eq(tenants.id, id)).returning();
-    return tenant;
-  },
 
   async getOnboardingStatus(tenantId: number) {
     const categoriesList = await this.getCategories(tenantId);
@@ -1458,6 +1450,11 @@ export const storage = {
       hasProduct: productsList.length > 0,
       isCompleted: tenant?.setupCompleted || false
     };
+  },
+
+  async getLandingPageConfig(tenantId: number) {
+    const [config] = await db.select().from(landingPageConfig).where(eq(landingPageConfig.tenantId, tenantId));
+    return config;
   },
 
   async getLandingPageConfigBySlug(slug: string) {
