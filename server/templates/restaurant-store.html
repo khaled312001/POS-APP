@@ -2336,7 +2336,7 @@
       <span id="nav-logo" class="nav-brand-text">Loading...</span>
     </div>
     <div class="nav-spacer"></div>
-      
+
     <div class="nav-actions">
       <div id="tb-social-links" style="display:flex;gap:6px"></div>
       <button class="nav-btn" onclick="toggleTheme()" id="theme-btn" aria-label="Toggle theme">
@@ -2759,6 +2759,16 @@
       ? '<i class="fa-solid fa-sun" id="theme-icon"></i>'
       : '<i class="fa-solid fa-moon" id="theme-icon"></i>';
 
+    // ===== HELPERS =====
+    const setTxt = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    const setHtml = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+    const addCls = (id, cls) => { const el = document.getElementById(id); if (el) el.classList.add(cls); };
+    const remCls = (id, cls) => { const el = document.getElementById(id); if (el) el.classList.remove(cls); };
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+    const getVal = (id) => document.getElementById(id)?.value?.trim() || '';
+    const setDisp = (id, disp) => { const el = document.getElementById(id); if (el) el.style.display = disp; };
+    const toggleCls = (id, cls, force) => { const el = document.getElementById(id); if (el) el.classList.toggle(cls, force); };
+
     // ===== FORMAT =====
     function fmt(n) {
       const num = Number(n) || 0;
@@ -2813,13 +2823,13 @@
 
     // ===== CART =====
     function openCart() {
-      document.getElementById('cart-panel').classList.add('open');
-      document.getElementById('cart-overlay').classList.add('open');
+      addCls('cart-panel', 'open');
+      addCls('cart-overlay', 'open');
       renderCart();
     }
     function closeCart() {
-      document.getElementById('cart-panel').classList.remove('open');
-      document.getElementById('cart-overlay').classList.remove('open');
+      remCls('cart-panel', 'open');
+      remCls('cart-overlay', 'open');
     }
 
     function getCartTotal() {
@@ -2832,22 +2842,23 @@
       const count = cart.reduce((s, i) => s + i.qty, 0);
       const total = getCartTotal().total;
       // Navbar
-      const navCount = document.getElementById('cart-count');
-      navCount.textContent = count;
-      navCount.style.display = count > 0 ? 'flex' : 'none';
+      setTxt('cart-count', count);
+      setDisp('cart-count', count > 0 ? 'flex' : 'none');
       // Sidebar count
-      document.getElementById('sb-cart-count').textContent = count;
+      setTxt('sb-cart-count', count);
       // Float btn
       const floatBtn = document.getElementById('float-cart-btn');
       if (count > 0) {
-        floatBtn.style.display = 'flex';
-        document.getElementById('float-count').textContent = count;
-        document.getElementById('float-total').textContent = fmt(total);
-        floatBtn.classList.remove('pulse');
-        void floatBtn.offsetWidth;
-        floatBtn.classList.add('pulse');
+        setDisp('float-cart-btn', 'flex');
+        setTxt('float-count', count);
+        setTxt('float-total', fmt(total));
+        if (floatBtn) {
+          floatBtn.classList.remove('pulse');
+          void floatBtn.offsetWidth;
+          floatBtn.classList.add('pulse');
+        }
       } else {
-        floatBtn.style.display = 'none';
+        setDisp('float-cart-btn', 'none');
       }
     }
 
@@ -2882,13 +2893,8 @@
     }
 
     function renderCart() {
-      const items = document.getElementById('cart-items');
-      const footer = document.getElementById('cart-footer');
-      if (!cart.length) {
-        items.innerHTML = `<div class="cart-empty"><div class="cart-empty-icon"><i class="fa-solid fa-cart-shopping"></i></div><p>Your cart is empty</p><span style="font-size:.82rem;color:var(--mu)">Add items from the menu</span></div>`;
-        footer.innerHTML = ''; return;
-      }
-      items.innerHTML = cart.map(i => `
+      const itemsHtml = !cart.length ? `<div class="cart-empty"><div class="cart-empty-icon"><i class="fa-solid fa-cart-shopping"></i></div><p>Your cart is empty</p><span style="font-size:.82rem;color:var(--mu)">Add items from the menu</span></div>`
+        : cart.map(i => `
       <div class="cart-item">
         <div class="cart-item-img">${i.image ? `<img src="${i.image}" alt="" loading="lazy">` : `<div class="cart-item-img-placeholder"><i class="fa-solid fa-utensils"></i></div>`}</div>
         <div class="cart-item-info">
@@ -2902,46 +2908,53 @@
           <button class="qty-btn" onclick="changeQty('${i.key}',1)">+</button>
         </div>
       </div>`).join('');
+      setHtml('cart-items', itemsHtml);
+
+      if (!cart.length) {
+        setHtml('cart-footer', ''); return;
+      }
       const t = getCartTotal();
-      footer.innerHTML = `
+      setHtml('cart-footer', `
       <div class="cart-totals">
         <div class="cart-total-row"><span>Subtotal</span><span>${fmt(t.subtotal)}</span></div>
         <div class="cart-total-row"><span>Delivery</span><span>${fmt(t.delivery)}</span></div>
         <div class="cart-total-row grand"><span>Total</span><span>${fmt(t.total)}</span></div>
       </div>
-      <button class="btn-checkout" onclick="openCheckout()"><i class="fa-solid fa-lock" style="margin-right:8px"></i>Checkout — ${fmt(t.total)}</button>`;
+      <button class="btn-checkout" onclick="openCheckout()"><i class="fa-solid fa-lock" style="margin-right:8px"></i>Checkout — ${fmt(t.total)}</button>`);
     }
 
     // ===== CHECKOUT =====
     function openCheckout() {
       if (!cart.length) { showToast('<i class="fa-solid fa-circle-exclamation" style="margin-right:6px;color:#f59e0b"></i>Cart is empty'); return; }
       closeCart();
-      document.getElementById('checkout-modal').classList.add('open');
-      document.getElementById('checkout-form').style.display = '';
-      document.getElementById('checkout-success').style.display = 'none';
-      document.getElementById('checkout-footer').style.display = '';
-      document.getElementById('checkout-error').style.display = 'none';
+      addCls('checkout-modal', 'open');
+      setDisp('checkout-form', '');
+      setDisp('checkout-success', 'none');
+      setDisp('checkout-footer', '');
+      setDisp('checkout-error', 'none');
     }
-    function closeCheckout() { document.getElementById('checkout-modal').classList.remove('open'); }
+    function closeCheckout() { remCls('checkout-modal', 'open'); }
 
     document.getElementById('co-type')?.addEventListener('change', function () {
-      document.getElementById('co-address-group').style.display = this.value === 'pickup' ? 'none' : '';
+      setDisp('co-address-group', this.value === 'pickup' ? 'none' : '');
     });
 
     async function submitOrder() {
-      const name = document.getElementById('co-name').value.trim();
-      const phone = document.getElementById('co-phone').value.trim();
-      const email = document.getElementById('co-email').value.trim();
-      const type = document.getElementById('co-type').value;
-      const address = document.getElementById('co-address').value.trim();
-      const payment = document.getElementById('co-payment').value;
-      const notes = document.getElementById('co-notes').value.trim();
-      const errEl = document.getElementById('checkout-error');
-      if (!name || !phone) { errEl.textContent = 'Please fill in your name and phone number.'; errEl.style.display = 'block'; return; }
-      if (type === 'delivery' && !address) { errEl.textContent = 'Please enter your delivery address.'; errEl.style.display = 'block'; return; }
-      errEl.style.display = 'none';
+      const name = getVal('co-name');
+      const phone = getVal('co-phone');
+      const email = getVal('co-email');
+      const type = getVal('co-type');
+      const address = getVal('co-address');
+      const payment = getVal('co-payment');
+      const notes = getVal('co-notes');
+
+      if (!name || !phone) { setTxt('checkout-error', 'Please fill in your name and phone number.'); setDisp('checkout-error', 'block'); return; }
+      if (type === 'delivery' && !address) { setTxt('checkout-error', 'Please enter your delivery address.'); setDisp('checkout-error', 'block'); return; }
+      setDisp('checkout-error', 'none');
+
       const btn = document.getElementById('checkout-submit');
-      btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:8px"></i>Placing order...';
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:8px"></i>Placing order...'; }
+
       const t = getCartTotal();
       try {
         const r = await fetch('/api/online-orders/public', {
@@ -2964,33 +2977,33 @@
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || 'Order failed');
-        document.getElementById('checkout-form').style.display = 'none';
-        document.getElementById('checkout-success').style.display = 'block';
-        document.getElementById('checkout-footer').style.display = 'none';
-        document.getElementById('success-msg').textContent =
-          `Order #${data.orderNumber} confirmed! ${type === 'delivery' ? 'Delivering to ' + address : 'Ready for pickup soon'}. Total: ${fmt(t.total)}`;
+        setDisp('checkout-form', 'none');
+        setDisp('checkout-success', 'block');
+        setDisp('checkout-footer', 'none');
+        setTxt('success-msg', `Order #${data.orderNumber} confirmed! ${type === 'delivery' ? 'Delivering to ' + address : 'Ready for pickup soon'}. Total: ${fmt(t.total)}`);
         cart = []; updateCartUI();
-      } catch (e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
-      btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-lock" style="margin-right:8px"></i>Place Order';
+      } catch (e) { setTxt('checkout-error', e.message); setDisp('checkout-error', 'block'); }
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-lock" style="margin-right:8px"></i>Place Order'; }
     }
 
     // ===== PIZZA BUILDER =====
     function openPizzaModal(product) {
       selectedPizza = product;
-      document.getElementById('pb-pizza-name').textContent = product.name;
-      document.getElementById('pb-pizza-desc').textContent = product.description || 'Choose your size and add toppings';
-      const imgEl = document.getElementById('pb-pizza-img');
-      imgEl.innerHTML = product.image
+      setTxt('pb-pizza-name', product.name);
+      setTxt('pb-pizza-desc', product.description || 'Choose your size and add toppings');
+      const imgHtml = product.image
         ? `<img src="${product.image}" style="width:100%;height:100%;object-fit:cover">`
         : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:var(--mu)"><i class="fa-solid fa-pizza-slice"></i></div>`;
+      setHtml('pb-pizza-img', imgHtml);
       Object.keys(PIZZA_SIZES).forEach(s => {
-        document.getElementById('price-' + s).textContent = fmt(Number(product.price) * PIZZA_SIZES[s].multiplier);
+        setTxt('price-' + s, fmt(Number(product.price) * PIZZA_SIZES[s].multiplier));
       });
       selectedSize = 'small';
       document.querySelectorAll('.pb-size').forEach(el => el.classList.remove('active'));
-      document.querySelector('[data-size="small"]')?.classList.add('active');
+      const smallSize = document.querySelector('[data-size="small"]');
+      if (smallSize) smallSize.classList.add('active');
       selectedAddons.clear();
-      document.getElementById('pb-addons').innerHTML = PIZZA_ADDONS.map(a =>
+      setHtml('pb-addons', PIZZA_ADDONS.map(a =>
         `<div class="pb-addon" onclick="toggleAddon('${a.id}',this)">
         <span class="pb-addon-icon">${a.icon}</span>
         <div class="pb-addon-info">
@@ -2998,11 +3011,11 @@
           <div class="pb-addon-price">+${fmt(a.price)}</div>
         </div>
         <div class="pb-addon-check"><i class="fa-solid fa-check"></i></div>
-      </div>`).join('');
+      </div>`).join(''));
       updatePizzaTotal();
-      document.getElementById('pizza-modal').classList.add('open');
+      addCls('pizza-modal', 'open');
     }
-    function closePizzaModal() { document.getElementById('pizza-modal').classList.remove('open'); }
+    function closePizzaModal() { remCls('pizza-modal', 'open'); }
     function selectSize(size, el) {
       playClick(); selectedSize = size;
       document.querySelectorAll('.pb-size').forEach(s => s.classList.remove('active'));
@@ -3019,7 +3032,7 @@
       const addonsTotal = [...selectedAddons].reduce((s, id) => {
         const a = PIZZA_ADDONS.find(x => x.id === id); return s + (a ? a.price : 0);
       }, 0);
-      document.getElementById('pb-total').textContent = fmt(base + addonsTotal);
+      setTxt('pb-total', fmt(base + addonsTotal));
     }
     function addPizzaToCart() {
       if (!selectedPizza) { showToast('Please select a pizza first'); return; }
@@ -3052,18 +3065,18 @@
 
     function filterCat(catId, el) {
       playClick(); selectedCat = catId; searchQuery = '';
-      document.getElementById('search-input').value = '';
+      setVal('search-input', '');
       document.querySelectorAll('.cat-item').forEach(t => t.classList.remove('active'));
-      el.classList.add('active');
-      const catName = el.querySelector('.cat-item-name')?.textContent || 'All Items';
-      document.getElementById('active-cat-label').textContent = catName;
+      if (el) el.classList.add('active');
+      const catName = el?.querySelector('.cat-item-name')?.textContent || 'All Items';
+      setTxt('active-cat-label', catName);
       applyFilters();
     }
     function filterCatPill(catId, el) {
       playClick(); selectedCat = catId; searchQuery = '';
-      document.getElementById('search-input').value = '';
+      setVal('search-input', '');
       document.querySelectorAll('.cat-pill').forEach(t => t.classList.remove('active'));
-      el.classList.add('active');
+      if (el) el.classList.add('active');
       // Sync desktop sidebar
       document.querySelectorAll('.cat-item').forEach(t => t.classList.remove('active'));
       const match = [...document.querySelectorAll('.cat-item')].find(t => {
@@ -3071,7 +3084,8 @@
         return catId === 'all' ? n === 'All Items' : t.getAttribute('onclick')?.includes(`filterCat(${catId}`);
       });
       if (match) match.classList.add('active');
-      document.getElementById('active-cat-label').textContent = el.textContent.replace(/\(\d+\)/, '').trim();
+      const label = el ? el.textContent.replace(/\(\d+\)/, '').trim() : 'All Items';
+      setTxt('active-cat-label', label);
       applyFilters();
     }
     function searchProducts(q) {
@@ -3087,13 +3101,15 @@
         card.style.display = show ? '' : 'none';
         if (show) visible++;
       });
-      document.getElementById('visible-count').textContent = `${visible} item${visible !== 1 ? 's' : ''}`;
+      setTxt('visible-count', `${visible} item${visible !== 1 ? 's' : ''}`);
       const grid = document.getElementById('product-grid');
-      const empty = grid.querySelector('.product-empty');
-      if (!visible) {
-        if (!empty) grid.insertAdjacentHTML('beforeend', `<div class="product-empty"><i class="fa-solid fa-face-sad-tear"></i><p>No items found</p><span style="font-size:.85rem;color:var(--mu)">Try a different category or search</span></div>`);
-      } else {
-        empty?.remove();
+      if (grid) {
+        const empty = grid.querySelector('.product-empty');
+        if (!visible) {
+          if (!empty) grid.insertAdjacentHTML('beforeend', `<div class="product-empty"><i class="fa-solid fa-face-sad-tear"></i><p>No items found</p><span style="font-size:.85rem;color:var(--mu)">Try a different category or search</span></div>`);
+        } else {
+          empty?.remove();
+        }
       }
     }
 
@@ -3152,20 +3168,22 @@
         const logoHtml = logoUrl
           ? `<img src="${logoUrl}" alt="${storeName}" style="height:40px;width:auto;border-radius:8px;object-fit:contain">`
           : `<span class="nav-brand-text">${storeName}</span>`;
-        document.getElementById('nav-logo').innerHTML = logoHtml;
-        document.getElementById('sidebar-logo').innerHTML = logoHtml;
-        document.getElementById('footer-brand').innerHTML = logoUrl
+        setHtml('nav-logo', logoHtml);
+        setHtml('sidebar-logo', logoHtml);
+        setHtml('footer-brand', logoUrl
           ? `<img src="${logoUrl}" alt="${storeName}" style="height:36px;width:auto;border-radius:6px;margin-bottom:12px">`
-          : `<div class="nav-brand-text" style="font-size:1.2rem;margin-bottom:12px">${storeName}</div>`;
-        document.getElementById('footer-copy').innerHTML = `&copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.`;
+          : `<div class="nav-brand-text" style="font-size:1.2rem;margin-bottom:12px">${storeName}</div>`);
+        setHtml('footer-copy', `&copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.`);
 
         // Hero
-        document.getElementById('hero-title').textContent = c?.heroTitle || `Welcome to ${storeName}`;
-        if (c?.heroSubtitle) document.getElementById('hero-subtitle').textContent = c.heroSubtitle;
+        setTxt('hero-title', c?.heroTitle || `Welcome to ${storeName}`);
+        if (c?.heroSubtitle) setTxt('hero-subtitle', c.heroSubtitle);
         if (c?.heroImage) {
           const bg = document.getElementById('hero-bg');
-          bg.style.backgroundImage = `url(${c.heroImage})`;
-          bg.classList.add('has-image');
+          if (bg) {
+            bg.style.backgroundImage = `url(${c.heroImage})`;
+            bg.classList.add('has-image');
+          }
         }
         // Hero features
         const feats = [];
@@ -3173,20 +3191,20 @@
         if (c?.enablePickup) feats.push(`<div class="hero-feature"><i class="fa-solid fa-box-open"></i> Pickup</div>`);
         if (c?.acceptCard) feats.push(`<div class="hero-feature"><i class="fa-solid fa-credit-card"></i> Card</div>`);
         if (c?.estimatedDeliveryTime) feats.push(`<div class="hero-feature"><i class="fa-regular fa-clock"></i> ${c.estimatedDeliveryTime} min</div>`);
-        document.getElementById('hero-features').innerHTML = feats.join('');
+        setHtml('hero-features', feats.join(''));
 
         // Stats bar
-        document.getElementById('stat-items').textContent = allProducts.filter(x => x.isActive).length;
-        document.getElementById('stat-cats').textContent = allCategories.filter(x => x.isActive !== false).length;
-        document.getElementById('stat-items-2').textContent = allProducts.filter(x => x.isActive).length;
-        document.getElementById('stat-cats-2').textContent = allCategories.filter(x => x.isActive !== false).length;
-        if (c?.estimatedDeliveryTime) document.getElementById('info-delivery').textContent = `${c.estimatedDeliveryTime} min`;
+        setTxt('stat-items', allProducts.filter(x => x.isActive).length);
+        setTxt('stat-cats', allCategories.filter(x => x.isActive !== false).length);
+        setTxt('stat-items-2', allProducts.filter(x => x.isActive).length);
+        setTxt('stat-cats-2', allCategories.filter(x => x.isActive !== false).length);
+        if (c?.estimatedDeliveryTime) setTxt('info-delivery', `${c.estimatedDeliveryTime} min`);
 
         // About section
-        if (c?.aboutText) document.getElementById('about-text-content').textContent = c.aboutText;
-        document.getElementById('about-title').textContent = `About ${storeName}`;
+        if (c?.aboutText) setTxt('about-text-content', c.aboutText);
+        setTxt('about-title', `About ${storeName}`);
         if (c?.aboutImage) {
-          document.getElementById('about-img-wrap').innerHTML = `<img src="${c.aboutImage}" alt="About ${storeName}" style="width:100%;height:100%;object-fit:cover">`;
+          setHtml('about-img-wrap', `<img src="${c.aboutImage}" alt="About ${storeName}" style="width:100%;height:100%;object-fit:cover">`);
         }
 
         // Contact info
@@ -3199,22 +3217,22 @@
         }
         if (c?.address) {
           contactHtml.push(`<div class="contact-item"><div class="contact-icon"><i class="fa-solid fa-location-dot"></i></div><div><div class="contact-label">Address</div><div class="contact-value">${c.address}</div></div></div>`);
-          document.getElementById('contact-map').innerHTML = `<iframe width="100%" height="100%" frameborder="0" style="border:0" src="https://www.google.com/maps?q=${encodeURIComponent(c.address)}&output=embed" allowfullscreen></iframe>`;
+          setHtml('contact-map', `<iframe width="100%" height="100%" frameborder="0" style="border:0" src="https://www.google.com/maps?q=${encodeURIComponent(c.address)}&output=embed" allowfullscreen></iframe>`);
         }
         if (c?.openingHours) {
           contactHtml.push(`<div class="contact-item"><div class="contact-icon"><i class="fa-regular fa-clock"></i></div><div><div class="contact-label">Hours</div><div class="contact-value">${c.openingHours}</div></div></div>`);
-          document.getElementById('tb-hours').textContent = c.openingHours;
-          document.getElementById('nav-info').classList.add('visible');
-          document.getElementById('footer-hours').textContent = c.openingHours;
+          setTxt('tb-hours', c.openingHours);
+          addCls('nav-info', 'visible');
+          setTxt('footer-hours', c.openingHours);
         }
-        document.getElementById('contact-info').innerHTML = contactHtml.join('') || '<div style="color:var(--mu);font-size:.9rem;padding:12px">Contact information not available</div>';
+        setHtml('contact-info', contactHtml.join('') || '<div style="color:var(--mu);font-size:.9rem;padding:12px">Contact information not available</div>');
 
         // Footer contact
         const footerContact = ['<div class="footer-col-title">Contact</div>'];
-        if (c?.phone) { footerContact.push(`<a href="tel:${c.phone}"><i class="fa-solid fa-phone"></i> ${c.phone}</a>`); document.getElementById('tb-phone').textContent = c.phone; }
-        if (c?.email) { footerContact.push(`<a href="mailto:${c.email}"><i class="fa-solid fa-envelope"></i> ${c.email}</a>`); document.getElementById('tb-email').textContent = c.email; }
+        if (c?.phone) { footerContact.push(`<a href="tel:${c.phone}"><i class="fa-solid fa-phone"></i> ${c.phone}</a>`); setTxt('tb-phone', c.phone); }
+        if (c?.email) { footerContact.push(`<a href="mailto:${c.email}"><i class="fa-solid fa-envelope"></i> ${c.email}</a>`); setTxt('tb-email', c.email); }
         if (c?.address) footerContact.push(`<span><i class="fa-solid fa-location-dot"></i> ${c.address}</span>`);
-        document.getElementById('footer-contact').innerHTML = footerContact.join('');
+        setHtml('footer-contact', footerContact.join(''));
 
         // Social links
         const socialLinks = [];
@@ -3222,27 +3240,30 @@
         if (c?.socialInstagram) socialLinks.push(`<a href="${c.socialInstagram}" target="_blank" title="Instagram"><i class="fa-brands fa-instagram"></i></a>`);
         if (c?.socialWhatsapp) socialLinks.push(`<a href="https://wa.me/${c.socialWhatsapp.replace(/[^0-9]/g, '')}" target="_blank" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>`);
         const socialHtml = socialLinks.join('');
-        document.getElementById('footer-social').innerHTML = socialHtml;
-        document.getElementById('sb-social').innerHTML = socialHtml;
+        setHtml('footer-social', socialHtml);
+        setHtml('sb-social', socialHtml);
         // Navbar social (compact)
-        document.getElementById('tb-social-links').innerHTML = socialLinks.map(s =>
-          s.replace('class="', 'style="width:32px;height:32px;font-size:.8rem;border-radius:50%;background:var(--s2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--mu);transition:background .2s,color .2s" onmouseover="this.style.background=\'var(--P)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'var(--s2)\';this.style.color=\'var(--mu)\'" class="')
-        ).join('');
+        const tbSocial = document.getElementById('tb-social-links');
+        if (tbSocial) {
+          tbSocial.innerHTML = socialLinks.map(s =>
+            s.replace('class="', 'style="width:32px;height:32px;font-size:.8rem;border-radius:50%;background:var(--s2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--mu);transition:background .2s,color .2s" onmouseover="this.style.background=\'var(--P)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'var(--s2)\';this.style.color=\'var(--mu)\'" class="')
+          ).join('');
+        }
 
         // Footer description
-        if (c?.footerText) document.getElementById('footer-desc').textContent = c.footerText;
+        if (c?.footerText) setTxt('footer-desc', c.footerText);
 
         // Sidebar contact
         const sbContact = [];
         if (c?.phone) sbContact.push(`<a href="tel:${c.phone}"><i class="fa-solid fa-phone" style="color:var(--P);width:16px"></i> ${c.phone}</a>`);
         if (c?.email) sbContact.push(`<a href="mailto:${c.email}"><i class="fa-solid fa-envelope" style="color:var(--P);width:16px"></i> ${c.email}</a>`);
         if (c?.openingHours) sbContact.push(`<span><i class="fa-regular fa-clock" style="color:var(--P);width:16px"></i> ${c.openingHours}</span>`);
-        document.getElementById('sidebar-contact').innerHTML = sbContact.join('');
+        setHtml('sidebar-contact', sbContact.join(''));
 
         // Render menu
         renderCategories(cats, p);
         renderProducts(p, cats);
-        document.getElementById('visible-count').textContent = `${allProducts.filter(x => x.isActive).length} items`;
+        setTxt('visible-count', `${allProducts.filter(x => x.isActive).length} items`);
 
       } catch (e) {
         console.error('[STORE] Failed to load:', e);
