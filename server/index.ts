@@ -834,7 +834,7 @@ self.addEventListener('message', (event) => {
   // SPA catch-all: serve index.html with PWA tags for any unmatched route under /app
   // This ensures /app/intro, /app/login, /app/license-gate etc. all get the PWA install dialog
   const staticIndexPath = path.resolve(process.cwd(), "static-build", "index.html");
-  app.get("/app/*", (req: Request, res: Response, next: NextFunction) => {
+  app.get("/app/{*splat}", (req: Request, res: Response, next: NextFunction) => {
     if (
       req.path.includes(".") // static files with extensions
     ) {
@@ -885,8 +885,14 @@ async function initStripe() {
     await runMigrations({ databaseUrl, schema: 'stripe' });
     log('Stripe schema ready');
 
-    const stripeSync = await getStripeSync();
-    const secretKey = await getStripeSecretKey();
+    let stripeSync, secretKey;
+    try {
+      stripeSync = await getStripeSync();
+      secretKey = await getStripeSecretKey();
+    } catch (connErr: any) {
+      log('Stripe connection not available, skipping:', connErr?.message || connErr);
+      return;
+    }
 
     if (!secretKey || secretKey.includes('dummy')) {
       log('Stripe: Dummy or missing key detected. Skipping webhook setup and sync.');
@@ -904,8 +910,8 @@ async function initStripe() {
     stripeSync.syncBackfill()
       .then(() => log('Stripe data synced'))
       .catch((err: any) => log('Error syncing Stripe data:', err));
-  } catch (error) {
-    log('Failed to initialize Stripe:', error);
+  } catch (error: any) {
+    log('Stripe init skipped:', error?.message || error);
   }
 }
 
