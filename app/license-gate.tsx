@@ -28,7 +28,9 @@ export default function LicenseGate() {
     const [request, response, promptAsync] = Google.useAuthRequest({
         androidClientId: "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com",
         webClientId: "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com",
-        redirectUri: Platform.OS === 'web' ? "https://pos.barmagly.tech/app" : makeRedirectUri({ scheme: 'exp' }),
+        redirectUri: Platform.OS === 'web'
+            ? "https://pos.barmagly.tech/app"
+            : makeRedirectUri({ scheme: 'barmagly' }),
     });
 
     const { t } = useLanguage();

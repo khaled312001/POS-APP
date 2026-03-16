@@ -60,6 +60,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }, []);
 
     useEffect(() => {
+        if (!tenant?.id) return;
+
         const wsUrl = `${getApiUrl().replace("http", "ws")}/api/ws/caller-id`;
         let ws: WebSocket;
         let reconnectTimer: any;
@@ -116,7 +118,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             if (ws) ws.close();
             clearTimeout(reconnectTimer);
         };
-    }, [qc, setOnlineOrderNotification, playNotificationSound]);
+    }, [qc, setOnlineOrderNotification, playNotificationSound, tenant?.id]);
 
     return (
         <NotificationContext.Provider value={{

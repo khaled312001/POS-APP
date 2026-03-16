@@ -3268,24 +3268,51 @@
       const qrW = await api('GET', '/whatsapp/qr');
       const qrArea = document.getElementById('waQrArea');
       if (qrW?.qrCode) {
-        qrArea.innerHTML = `<div style="display:inline-block;background:#ffffff;padding:20px;border-radius:16px;box-shadow:0 4px 32px rgba(0,0,0,0.25)"><img src="${qrW.qrCode}" style="display:block;width:240px;height:240px;image-rendering:pixelated;image-rendering:crisp-edges" alt="WhatsApp QR"></div><div style="margin-top:12px;font-size:12px;color:var(--mu)">Scan this with WhatsApp → Linked Devices → Link a Device</div>`;
+        const qrSrc = qrW.qrCode.startsWith('data:') ? qrW.qrCode : 'data:image/png;base64,' + qrW.qrCode;
+        qrArea.innerHTML = `<div style="display:inline-block;background:#ffffff;padding:20px;border-radius:16px;box-shadow:0 4px 32px rgba(0,0,0,0.25)"><img src="${qrSrc}" style="display:block;width:240px;height:240px;image-rendering:pixelated;image-rendering:crisp-edges" alt="WhatsApp QR"></div><div style="margin-top:12px;font-size:12px;color:var(--mu)">افتح WhatsApp ← الأجهزة المرتبطة ← ربط جهاز، ثم امسح الكود</div>`;
       } else if (d.status === 'connected') {
-        qrArea.innerHTML = '<div style="font-size:14px;color:var(--ok);font-weight:600">✅ Connected — no QR needed</div>';
+        qrArea.innerHTML = '<div style="font-size:14px;color:var(--ok);font-weight:600">✅ متصل — لا حاجة لرمز QR</div>';
+      } else if (d.status === 'connecting') {
+        qrArea.innerHTML = '<div style="color:var(--mu);font-size:13px">⏳ جاري تشغيل المتصفح، انتظر ظهور رمز QR…</div>';
       } else {
-        qrArea.innerHTML = '<div style="color:var(--mu);font-size:13px">Click "Connect WhatsApp" to generate a QR code.</div>';
+        qrArea.innerHTML = '<div style="color:var(--mu);font-size:13px">اضغط "Connect WhatsApp" لتوليد رمز QR.</div>';
       }
     }
 
+    let _waPollTimer = null;
+
+    function waStopPolling() {
+      if (_waPollTimer) { clearInterval(_waPollTimer); _waPollTimer = null; }
+    }
+
+    function waStartPolling() {
+      waStopPolling();
+      let attempts = 0;
+      _waPollTimer = setInterval(async () => {
+        attempts++;
+        await waRefresh();
+        const statusTxt = (document.getElementById('waStatusText')?.textContent || '').toLowerCase().replace(' ', '_');
+        if (statusTxt === 'connected' || attempts >= 40) {
+          waStopPolling();
+          if (statusTxt === 'connected') toast('✅ WhatsApp متصل بنجاح!', 'ok');
+          else if (attempts >= 40) toast('⏱ انتهت مهلة الاتصال — حاول مرة أخرى', 'err');
+        }
+      }, 3000);
+    }
+
     async function waConnect() {
-      toast('Connecting to WhatsApp…', '');
+      toast('جاري الاتصال بـ WhatsApp…', '');
       const r = await api('POST', '/whatsapp/connect');
-      if (r) toast('Connection initiated', 'ok');
-      setTimeout(waRefresh, 2000);
+      if (r) {
+        toast('تم بدء الاتصال — انتظر ظهور رمز QR', '');
+        waStartPolling();
+      }
     }
 
     async function waDisconnect() {
+      waStopPolling();
       await api('POST', '/whatsapp/disconnect');
-      toast('WhatsApp disconnected', 'ok');
+      toast('تم قطع الاتصال بـ WhatsApp', 'ok');
       waRefresh();
     }
 

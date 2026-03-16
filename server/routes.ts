@@ -457,14 +457,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/license/validate", async (req, res) => {
     try {
       const { licenseKey, email, password, deviceId } = req.body;
-      console.log("[VALIDATE] Incoming request details:", { licenseKey, email: email ? email.substring(0, 2) + "***" : undefined, deviceId });
+      if (process.env.NODE_ENV !== 'production') console.log("[VALIDATE] Incoming request details:", { licenseKey, email: email ? email.substring(0, 2) + "***" : undefined, deviceId });
 
       if (!licenseKey) {
         return res.json({ isValid: false, reason: "License key is required" });
       }
 
       const license = await storage.getLicenseByKey(licenseKey);
-      console.log("[VALIDATE] getLicenseByKey result for", licenseKey, ":", !!license);
+      if (process.env.NODE_ENV !== 'production') console.log("[VALIDATE] getLicenseByKey result for", licenseKey, ":", !!license);
       if (!license) {
         return res.json({ isValid: false, reason: "Invalid license key" });
       }
@@ -730,7 +730,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
       if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
       const emps = await storage.getEmployeesByTenant(tenantId);
-      console.log(`[DEBUG] /api/employees: Found ${emps.length} employees (tenantId: ${tenantId})`);
       res.json(emps);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -1836,7 +1835,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Object Storage - Save uploaded image path
   app.put("/api/images/save", async (req: Request, res: Response) => {
     const { imageURL } = req.body;
-    console.log("Saving image path for URL:", imageURL);
+    if (process.env.NODE_ENV !== 'production') console.log("Saving image path for URL:", imageURL);
 
     if (!imageURL) {
       return res.status(400).json({ error: "imageURL is required" });
@@ -1845,7 +1844,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const objectStorageService = new ObjectStorageService();
       const objectPath = objectStorageService.normalizeObjectEntityPath(imageURL);
-      console.log("Normalized object path:", objectPath);
+      if (process.env.NODE_ENV !== 'production') console.log("Normalized object path:", objectPath);
       res.status(200).json({ objectPath });
     } catch (error) {
       console.error("Error saving image:", error);

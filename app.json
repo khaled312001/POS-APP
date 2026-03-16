@@ -22,6 +22,14 @@
     },
     "android": {
       "package": "com.barmagly.pos",
+      "minSdkVersion": 26,
+      "targetSdkVersion": 35,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.VIBRATE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#0A0E27",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -46,11 +54,27 @@
       [
         "expo-router",
         {
-          "origin": "https://replit.com/"
+          "origin": "https://pos.barmagly.tech/"
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Barmagly POS to access the camera to scan product barcodes.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Barmagly POS to access your photos to set product images.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -59,7 +83,7 @@
     },
     "extra": {
       "router": {
-        "origin": "https://replit.com/"
+        "origin": "https://pos.barmagly.tech/"
       },
       "eas": {
         "projectId": "70016573-6c3a-4410-bb4e-c32ba66ee6d5"

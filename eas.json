@@ -6,16 +6,34 @@
     "build": {
         "development": {
             "developmentClient": true,
-            "distribution": "internal"
+            "distribution": "internal",
+            "env": {
+                "EXPO_PUBLIC_API_URL": "https://identity-palette.replit.app"
+            }
         },
         "preview": {
-            "distribution": "internal"
+            "distribution": "internal",
+            "env": {
+                "EXPO_PUBLIC_API_URL": "https://identity-palette.replit.app"
+            }
         },
         "production": {
-            "autoIncrement": true
+            "autoIncrement": true,
+            "credentialsSource": "remote",
+            "android": {
+                "buildType": "aab"
+            },
+            "env": {
+                "EXPO_PUBLIC_API_URL": "https://identity-palette.replit.app"
+            }
         }
     },
     "submit": {
-        "production": {}
+        "production": {
+            "android": {
+                "track": "internal",
+                "releaseStatus": "draft"
+            }
+        }
     }
 }

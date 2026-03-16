@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "expo-router";
 import {
   StyleSheet, Text, View, FlatList, Pressable, TextInput,
   ScrollView, Modal, Alert, Platform, Dimensions, Image, Animated,
@@ -44,6 +45,7 @@ const AnimatedProductImage = ({ uri }: { uri: string }) => {
 
 export default function POSScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { employee, isCashier, canManage, login } = useAuth();
   const { tenant } = useLicense();
   const qc = useQueryClient();
@@ -265,7 +267,7 @@ export default function POSScreen() {
 
     // Redirect to onboarding if not completed
     if (tenant && tenant.setupCompleted === false) {
-      router.replace("/onboarding");
+      router.replace("/onboarding" as any);
     }
   }, [tenant]);
 

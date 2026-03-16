@@ -159,19 +159,19 @@ export default function ProductsScreen() {
 
   const uploadImage = async (uri: string): Promise<string | null> => {
     try {
-      console.log("Starting upload for URI:", uri);
+      if (__DEV__) console.log("Starting upload for URI:", uri);
       setImageUploading(true);
       const uploadRes = await apiRequest("POST", "/api/objects/upload");
       const { uploadURL } = await uploadRes.json();
-      console.log("Got upload URL:", uploadURL);
+      if (__DEV__) console.log("Got upload URL:", uploadURL);
       const response = await fetch(uri);
       const blob = await response.blob();
-      console.log("Blob created, size:", blob.size);
+      if (__DEV__) console.log("Blob created, size:", blob.size);
       await fetch(uploadURL, { method: "PUT", body: blob, headers: { "Content-Type": "image/jpeg" } });
-      console.log("Upload to storage successful");
+      if (__DEV__) console.log("Upload to storage successful");
       const saveRes = await apiRequest("PUT", "/api/images/save", { imageURL: uploadURL });
       const { objectPath } = await saveRes.json();
-      console.log("Saved image path:", objectPath);
+      if (__DEV__) console.log("Saved image path:", objectPath);
       return objectPath;
     } catch (e) {
       console.error("Upload failed:", e);

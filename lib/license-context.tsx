@@ -49,8 +49,11 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
             let id: string | null = await AsyncStorage.getItem("barmagly_device_id");
             if (!id) {
                 if (Platform.OS === 'android') {
-                    // Use getAndroidId() as suggests by lint, or fallback to androidId if available
-                    id = (Application as any).androidId || `android-${Date.now()}`;
+                    try {
+                        id = Application.getAndroidId() || `android-${Date.now()}`;
+                    } catch {
+                        id = `android-${Date.now()}`;
+                    }
                 } else if (Platform.OS === 'ios') {
                     id = await Application.getIosIdForVendorAsync() || `ios-${Date.now()}`;
                 } else {

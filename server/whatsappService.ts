@@ -135,6 +135,173 @@ function scheduleAutoReconnect() {
     }, 15000);
 }
 
+async function _connectBackground(wpp: any): Promise<void> {
+    try {
+        const { execSync } = await import("child_process");
+        const fsMod = await import("fs");
+
+        let browserPath: string | undefined;
+
+        const envChrome = process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH;
+        if (envChrome && fsMod.existsSync(envChrome)) {
+            browserPath = envChrome;
+            log(`Using env override: ${browserPath}`);
+        }
+
+        const isWindows = os.platform() === 'win32';
+
+        if (!browserPath && !isWindows) {
+            try {
+                const found = execSync(
+                    "which chromium 2>/dev/null || which chromium-browser 2>/dev/null || which google-chrome-stable 2>/dev/null || which google-chrome 2>/dev/null",
+                    { encoding: "utf-8", timeout: 5000 }
+                ).trim().split("\n")[0];
+                if (found && fsMod.existsSync(found)) { browserPath = found; }
+            } catch { }
+        }
+
+        if (!browserPath && !isWindows) {
+            try {
+                const nixFound = execSync(
+                    "find /nix/store -maxdepth 4 -name 'chromium' -type f 2>/dev/null | grep '/bin/chromium$' | head -1",
+                    { encoding: "utf-8", timeout: 8000 }
+                ).trim();
+                if (nixFound && fsMod.existsSync(nixFound)) { browserPath = nixFound; }
+            } catch { }
+        }
+
+        // Windows: search common Chrome/Chromium install paths
+        if (!browserPath && isWindows) {
+            const username = os.userInfo().username;
+            const windowsPaths = [
+                'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+                'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+                `C:\\Users\\${username}\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe`,
+                'C:\\Program Files\\Chromium\\Application\\chromium.exe',
+                `C:\\Users\\${username}\\AppData\\Local\\Chromium\\Application\\chrome.exe`,
+            ];
+            for (const p of windowsPaths) {
+                if (fsMod.existsSync(p)) { browserPath = p; break; }
+            }
+        }
+
+        if (!browserPath) {
+            try {
+                const { executablePath } = await import("puppeteer");
+                const ep = executablePath();
+                if (ep && fsMod.existsSync(ep)) { browserPath = ep; }
+            } catch { }
+        }
+
+        if (!browserPath) throw new Error("No Chrome/Chromium found. Set CHROME_PATH environment variable.");
+        log(`Using browser: ${browserPath}`);
+
+        fsMod.mkdirSync(CHROME_DATA_DIR, { recursive: true });
+        fsMod.mkdirSync(TOKEN_DIR, { recursive: true });
+
+        const browserArgs = [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--no-first-run",
+            "--no-zygote",
+            "--disable-extensions",
+            "--disable-software-rasterizer",
+            "--disable-features=VizDisplayCompositor",
+            "--window-size=1280,800",
+        ];
+
+        connectionPhase = "awaiting_qr";
+
+        client = await wpp.create({
+            session: SESSION_NAME,
+            folderNameToken: TOKEN_DIR,
+            headless: true,
+            devtools: false,
+            useChrome: false,
+            debug: false,
+            logQR: false,
+            autoClose: 0,
+            disableWelcome: true,
+            puppeteerOptions: {
+                executablePath: browserPath,
+                args: browserArgs,
+                headless: true,
+                userDataDir: CHROME_DATA_DIR,
+            },
+            browserArgs,
+            catchQR: (base64Qr: string) => {
+                lastQrCode = base64Qr;
+                status = "qr_ready";
+                connectionPhase = "awaiting_qr";
+                log("QR code generated — scan with WhatsApp");
+            },
+            statusFind: (statusSession: string, session: string) => {
+                log(`Session "${session}": ${statusSession}`);
+
+                if (statusSession === "qrReadSuccess") {
+                    connectionPhase = "qr_scanned";
+                    log("QR scanned successfully — waiting for session to stabilize");
+                }
+
+                if (statusSession === "inChat" || statusSession === "isLogged") {
+                    if (connectionPhase !== "ready") {
+                        connectionPhase = "qr_scanned";
+                    }
+                }
+
+                if (connectionPhase === "ready") {
+                    if (
+                        statusSession === "notLogged" ||
+                        statusSession === "browserClose" ||
+                        statusSession === "desconnectedMobile" ||
+                        statusSession === "disconnectedMobile"
+                    ) {
+                        status = "disconnected";
+                        clientReady = false;
+                        client = null;
+                        connectionPhase = "idle";
+                        log(`Session lost: ${statusSession} — will auto-reconnect in 15s`);
+                        scheduleAutoReconnect();
+                    }
+                }
+            },
+        });
+
+        log("WPP client created — waiting for session to stabilize...");
+        await new Promise(r => setTimeout(r, 6000));
+
+        const alive = await isClientAlive();
+        if (!alive) {
+            log("Client not alive after stabilization — retrying connection state check...");
+            await new Promise(r => setTimeout(r, 5000));
+            const retryAlive = await isClientAlive();
+            if (!retryAlive) {
+                throw new Error("WhatsApp session failed to stabilize after QR scan");
+            }
+        }
+
+        status = "connected";
+        clientReady = true;
+        connectionPhase = "ready";
+        lastQrCode = null;
+        connecting = false;
+        log("WhatsApp client ready and verified");
+
+        client.onMessage(async (message: any) => {
+            log(`Msg from ${message.from}: ${(message.body || "").slice(0, 80)}`);
+        });
+    } catch (err: any) {
+        lastError = err.message || String(err);
+        status = "disconnected";
+        clientReady = false;
+        connecting = false;
+        connectionPhase = "idle";
+        log(`Connection failed: ${lastError}`);
+    }
+}
+
 export const whatsappService = {
     getStatus(): { status: WhatsAppStatus; lastError: string | null; log: typeof connectionLog } {
         return { status, lastError, log: connectionLog.slice(0, 20) };
@@ -183,156 +350,10 @@ export const whatsappService = {
         lastQrCode = null;
         log("Connecting…");
 
-        try {
-            const { execSync } = await import("child_process");
-            const fs = await import("fs");
-
-            let browserPath: string | undefined;
-
-            const envChrome = process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH;
-            if (envChrome && fs.existsSync(envChrome)) {
-                browserPath = envChrome;
-                log(`Using env override: ${browserPath}`);
-            }
-
-            if (!browserPath) {
-                try {
-                    const found = execSync(
-                        "which chromium 2>/dev/null || which chromium-browser 2>/dev/null || which google-chrome-stable 2>/dev/null || which google-chrome 2>/dev/null",
-                        { encoding: "utf-8", timeout: 5000 }
-                    ).trim().split("\n")[0];
-                    if (found && fs.existsSync(found)) { browserPath = found; }
-                } catch { }
-            }
-
-            if (!browserPath) {
-                try {
-                    const nixFound = execSync(
-                        "find /nix/store -maxdepth 4 -name 'chromium' -type f 2>/dev/null | grep '/bin/chromium$' | head -1",
-                        { encoding: "utf-8", timeout: 8000 }
-                    ).trim();
-                    if (nixFound && fs.existsSync(nixFound)) { browserPath = nixFound; }
-                } catch { }
-            }
-
-            if (!browserPath) {
-                try {
-                    const { executablePath } = await import("puppeteer");
-                    const ep = executablePath();
-                    if (ep && fs.existsSync(ep)) { browserPath = ep; }
-                } catch { }
-            }
-
-            if (!browserPath) throw new Error("No Chrome/Chromium found.");
-            log(`Using browser: ${browserPath}`);
-
-            fs.mkdirSync(CHROME_DATA_DIR, { recursive: true });
-            fs.mkdirSync(TOKEN_DIR, { recursive: true });
-
-            const browserArgs = [
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-                "--no-first-run",
-                "--no-zygote",
-                "--disable-extensions",
-                "--disable-software-rasterizer",
-                "--disable-features=VizDisplayCompositor",
-                "--window-size=1280,800",
-            ];
-
-            connectionPhase = "awaiting_qr";
-
-            client = await wpp.create({
-                session: SESSION_NAME,
-                folderNameToken: TOKEN_DIR,
-                headless: true,
-                devtools: false,
-                useChrome: false,
-                debug: false,
-                logQR: false,
-                autoClose: 0,
-                disableWelcome: true,
-                puppeteerOptions: {
-                    executablePath: browserPath,
-                    args: browserArgs,
-                    headless: true,
-                    userDataDir: CHROME_DATA_DIR,
-                },
-                browserArgs,
-                catchQR: (base64Qr: string) => {
-                    lastQrCode = base64Qr;
-                    status = "qr_ready";
-                    connectionPhase = "awaiting_qr";
-                    log("QR code generated — scan with WhatsApp");
-                },
-                statusFind: (statusSession: string, session: string) => {
-                    log(`Session "${session}": ${statusSession}`);
-
-                    if (statusSession === "qrReadSuccess") {
-                        connectionPhase = "qr_scanned";
-                        log("QR scanned successfully — waiting for session to stabilize");
-                    }
-
-                    if (statusSession === "inChat" || statusSession === "isLogged") {
-                        if (connectionPhase !== "ready") {
-                            connectionPhase = "qr_scanned";
-                        }
-                    }
-
-                    if (connectionPhase === "ready") {
-                        if (
-                            statusSession === "notLogged" ||
-                            statusSession === "browserClose" ||
-                            statusSession === "desconnectedMobile" ||
-                            statusSession === "disconnectedMobile"
-                        ) {
-                            status = "disconnected";
-                            clientReady = false;
-                            client = null;
-                            connectionPhase = "idle";
-                            log(`Session lost: ${statusSession} — will auto-reconnect in 15s`);
-                            scheduleAutoReconnect();
-                        }
-                    }
-                },
-            });
-
-            log("WPP client created — waiting for session to stabilize...");
-            await new Promise(r => setTimeout(r, 6000));
-
-            const alive = await isClientAlive();
-            if (!alive) {
-                log("Client not alive after stabilization — retrying connection state check...");
-                await new Promise(r => setTimeout(r, 5000));
-                const retryAlive = await isClientAlive();
-                if (!retryAlive) {
-                    throw new Error("WhatsApp session failed to stabilize after QR scan");
-                }
-            }
-
-            status = "connected";
-            clientReady = true;
-            connectionPhase = "ready";
-            lastQrCode = null;
-            connecting = false;
-            log("WhatsApp client ready and verified");
-
-            client.onMessage(async (message: any) => {
-                log(`Msg from ${message.from}: ${(message.body || "").slice(0, 80)}`);
-            });
-
-            return { status: "connected" };
-        } catch (err: any) {
-            lastError = err.message || String(err);
-            status = "disconnected";
-            clientReady = false;
-            connecting = false;
-            connectionPhase = "idle";
-            log(`Connection failed: ${lastError}`);
-            return { status: "disconnected" };
-        }
+        // Run in background so the HTTP request returns immediately.
+        // The frontend should poll /status and /qr until QR appears or connected.
+        _connectBackground(wpp);
+        return { status: "connecting" };
     },
 
     async disconnect(): Promise<void> {
