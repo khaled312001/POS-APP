@@ -12,7 +12,7 @@ run = ["npm", "run", "server:prod"]
 
 [[ports]]
 localPort = 5000
-externalPort = 5000
+externalPort = 80
 
 [[ports]]
 localPort = 8080
@@ -59,6 +59,10 @@ args = "Start App"
 task = "workflow.run"
 args = "Start Frontend"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start Backend"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -79,8 +83,11 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true && npm run server:dev"
+args = "export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true && NODE_ENV=development npx tsx --env-file=.env server/index.ts"
 waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [[workflows.workflow]]
 name = "Start Frontend"
@@ -92,7 +99,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run expo:dev"
+args = "EXPO_PACKAGER_PROXY_URL=https://$REPLIT_DEV_DOMAIN:8080 REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_DEV_DOMAIN EXPO_PUBLIC_DOMAIN=$REPLIT_DEV_DOMAIN:5000 npx expo start --localhost --port 8080"
 waitForPort = 8080
 
 [objectStorage]
