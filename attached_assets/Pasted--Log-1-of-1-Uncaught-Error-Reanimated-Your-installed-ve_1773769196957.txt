@@ -1,0 +1,97 @@
+!
+
+Log 1 of 1
+Uncaught Error
+[Reanimated] Your installed version of Worklets (0.5.1) is not compatible with installed version of Reanimated (4.2.2). Please install Worklets 0.7.x or newer. See the documentation for the list of supported versions: https://docs.swmansion.com/react-native-reanimated/docs/guides/compatibility/#supp... See More
+Source
+ 
+  7 |
+ 
+  8 |
+   
+const
+ prefix 
+=
+ 
+'[Reanimated]'
+;
+>
+  9 |
+   
+const
+ errorInstance 
+=
+ 
+new
+ 
+Error
+(message 
+?
+ 
+`${prefix} ${message}`
+ 
+:
+ prefix)
+;
+ 
+    |
+                         
+^
+ 
+ 10 |
+   errorInstance
+.
+name 
+=
+ 
+'ReanimatedError'
+;
+ 
+ 11 |
+   
+return
+ errorInstance
+;
+ 
+ 12 |
+ }
+Call Stack
+ReanimatedErrorConstructor
+node_modules/react-native-reanimated/lib/module/common/errors.js:9:25
+assertWorkletsVersion
+node_modules/react-native-reanimated/lib/module/platform-specific/workletsVersion.js:10:11
+constructor
+node_modules/react-native-reanimated/lib/module/ReanimatedModule/js-reanimated/JSReanimated.js:22:28
+createJSReanimatedModule
+node_modules/react-native-reanimated/lib/module/ReanimatedModule/js-reanimated/JSReanimated.js:8:10
+<global>
+node_modules/react-native-reanimated/lib/module/ReanimatedModule/index.web.js:5:57
+loadModuleImplementation
+node_modules/expo/node_modules/@expo/cli/build/metro-require/require.js:248:36
+guardedLoadModule
+node_modules/expo/node_modules/@expo/cli/build/metro-require/require.js:163:16
+metroRequire
+node_modules/expo/node_modules/@expo/cli/build/metro-require/require.js:74:75
+<global>
+node_modules/react-native-reanimated/lib/module/featureFlags/index.js:4
+loadModuleImplementation
+node_modules/expo/node_modules/@expo/cli/build/metro-require/require.js:248:36
+Collapse all 10 frames
+Component Stack
+ContextNavigator
+node_modules/expo-router/build/ExpoRoot.js:95:29
+ExpoRoot
+node_modules/expo-router/build/ExpoRoot.js:68:30
+_HelmetProvider#constructor
+node_modules/expo-router/vendor/react-helmet-async/lib/index.js:483:5
+App
+<anonymous>:-1:0
+LogBoxStateSubscription#constructor
+node_modules/@expo/metro-runtime/src/error-overlay/Data/LogBoxData.tsx:365:7
+ErrorOverlay
+<anonymous>:-1:0
+withDevTools(ErrorOverlay)
+<anonymous>:-1:0
+AppContainer
+shim:react-native-web/dist/exports/AppRegistry/AppContainer.js
+Collapse all 8 frames
