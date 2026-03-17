@@ -1,641 +1,659 @@
 /**
- * Barmagly POS – Real Screenshots via Puppeteer
- * Navigates the actual live app and captures every screen
+ * Barmagly POS – Real App Screenshots (Puppeteer)
+ * Navigates the live web app and takes screenshots of every screen & flow
  *
- * Usage: node scripts/take_real_screenshots.js
+ *   node scripts/take_real_screenshots.js
  */
 
 const puppeteer = require("puppeteer");
-const path = require("path");
-const fs = require("fs");
+const path      = require("path");
+const fs        = require("fs");
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const BASE_URL   = "https://pos.barmagly.tech/app";
-const EMAIL      = "admin@pizzalemon.ch";
-const LIC_KEY    = "BARMAGLY-F49F-9932-CB31-FBA1";
-const ADMIN_PIN  = "1234";
+const BASE_URL    = "https://pos.barmagly.tech/app";
+const EMAIL       = "admin@pizzalemon.ch";
+const LIC_KEY     = "BARMAGLY-F49F-9932-CB31-FBA1";
+const ADMIN_PIN   = "1234";
 const CASHIER_PIN = "0000";
-
-const OUT_PHONE  = path.join(__dirname, "../assets/images/screenshots/phone");
-const OUT_TABLET = path.join(__dirname, "../assets/images/screenshots/tablet");
-fs.mkdirSync(OUT_PHONE,  { recursive: true });
-fs.mkdirSync(OUT_TABLET, { recursive: true });
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 // ── Screenshot helper ─────────────────────────────────────────────────────────
-async function shot(page, outDir, label) {
-  const safe = label.replace(/[^a-z0-9_]/gi, "_");
-  const file = path.join(outDir, `${safe}.png`);
+async function sc(page, outDir, label) {
+  const file = path.join(outDir, `${label}.png`);
   try {
     await page.screenshot({ path: file, fullPage: false });
-    console.log(`  📸  ${safe}.png`);
-  } catch (e) {
-    console.log(`  ⚠️  Screenshot failed: ${e.message}`);
-  }
+    console.log(`  📸  ${label}.png`);
+  } catch (e) { console.log(`  ⚠️  skip: ${e.message.slice(0, 60)}`); }
 }
 
-// ── Fill React Native TextInput (renders as <input> on web) ──────────────────
-async function fillInput(page, index, value) {
-  await page.evaluate((idx, val) => {
+// ── Fill React Native TextInput reliably ─────────────────────────────────────
+// React Native Web renders TextInput as <input>. Using keyboard.type() triggers
+// the proper synthetic events so React state updates.
+async function fillInput(page, inputIndex, value) {
+  await page.evaluate((idx) => {
     const inputs = Array.from(document.querySelectorAll("input"));
-    const el = inputs[idx];
-    if (!el) return;
-    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-    setter.call(el, val);
-    el.dispatchEvent(new Event("input",  { bubbles: true }));
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-    el.focus();
-  }, index, value);
-  await wait(500);
+    if (inputs[idx]) {
+      inputs[idx].focus();
+      inputs[idx].click();
+    }
+  }, inputIndex);
+  await wait(300);
+
+  // Select all existing text and replace
+  await page.keyboard.down("Control");
+  await page.keyboard.press("a");
+  await page.keyboard.up("Control");
+  await wait(100);
+  await page.keyboard.type(value, { delay: 40 });
+  await wait(400);
 }
 
-// ── Click element whose exact/partial text matches ────────────────────────────
-async function clickText(page, regex, timeout = 8000) {
-  try {
-    await page.waitForFunction(
-      (pattern) => {
-        const re = new RegExp(pattern, "i");
-        const all = Array.from(document.querySelectorAll("div,button,span,a"));
-        return all.some(el => {
-          if (!el.offsetParent) return false;
-          if (el.children.length > 5) return false;
-          const t = el.textContent?.trim() || "";
-          if (!re.test(t)) return false;
-          const r = el.getBoundingClientRect();
-          return r.width > 20 && r.height > 14;
-        });
-      },
-      { timeout },
-      regex
-    );
-  } catch (_) {
-    // element may not appear — fall through and try anyway
+// ── Click element by text regex ───────────────────────────────────────────────
+async function clickByText(page, regex, maxWaitMs = 10000) {
+  const re = new RegExp(regex, "i");
+  const deadline = Date.now() + maxWaitMs;
+
+  while (Date.now() < deadline) {
+    const clicked = await page.evaluate((pattern) => {
+      const re = new RegExp(pattern, "i");
+      const all = Array.from(document.querySelectorAll(
+        "div, button, span, a, [role='button']"
+      ));
+      for (const el of all) {
+        if (!el.offsetParent && el.tagName !== "BODY") continue;
+        const t = (el.textContent || "").trim();
+        if (!re.test(t)) continue;
+        if (el.children.length > 6) continue; // skip containers
+        const r = el.getBoundingClientRect();
+        if (r.width < 16 || r.height < 10) continue;
+        // find nearest clickable ancestor
+        let cur = el;
+        for (let i = 0; i < 6; i++) {
+          if (!cur) break;
+          const tag = cur.tagName;
+          const role = cur.getAttribute("role");
+          if (tag === "BUTTON" || role === "button" || role === "link") {
+            cur.click();
+            return t;
+          }
+          cur = cur.parentElement;
+        }
+        el.click();
+        return t;
+      }
+      return null;
+    }, regex);
+
+    if (clicked) {
+      await wait(300);
+      return clicked;
+    }
+    await wait(400);
   }
-  return page.evaluate((pattern) => {
-    const re = new RegExp(pattern, "i");
-    const all = Array.from(document.querySelectorAll("div,button,span,a"));
-    for (const el of all) {
-      if (!el.offsetParent) continue;
-      if (el.children.length > 5) continue;
-      const t = el.textContent?.trim() || "";
-      if (!re.test(t)) continue;
-      const r = el.getBoundingClientRect();
-      if (r.width < 20 || r.height < 14) continue;
-      // Walk up to find clickable ancestor
-      let cur = el;
-      for (let i = 0; i < 6; i++) {
-        if (!cur) break;
-        if (cur.getAttribute("role") === "button" || cur.tagName === "BUTTON") {
-          cur.click(); return t;
-        }
-        cur = cur.parentElement;
-      }
-      el.click();
-      return t;
-    }
-    return null;
-  }, regex);
+  return null;
 }
 
-// ── Click one PIN digit (exact digit text, large square element) ──────────────
-async function clickDigit(page, digit) {
-  const clicked = await page.evaluate((d) => {
-    const str = String(d);
-    const all = Array.from(document.querySelectorAll("div,button,span"));
+// ── Click a PIN digit using real mouse coordinates ────────────────────────────
+// React Native Web Pressable doesn't respond to el.click() reliably.
+// page.mouse.click(x, y) fires real pointer events that React Native Web handles.
+async function clickPinKey(page, digit) {
+  const str = String(digit);
+
+  // Get the center coordinates of the element containing exactly this digit
+  const coords = await page.evaluate((d) => {
+    const all = Array.from(document.querySelectorAll("*"));
     for (const el of all) {
       if (!el.offsetParent) continue;
-      // Must be EXACTLY the digit
-      const t = el.textContent?.trim();
-      if (t !== str) continue;
+      const t = (el.textContent || "").trim();
+      if (t !== d) continue;
       const r = el.getBoundingClientRect();
-      // Must be a reasonably large square (PIN pad keys are big)
-      if (r.width < 30 || r.height < 30) continue;
-      let cur = el;
-      for (let i = 0; i < 6; i++) {
-        if (!cur) break;
-        if (cur.getAttribute("role") === "button" || cur.tagName === "BUTTON") {
-          cur.click(); return `clicked ${d}`;
-        }
-        cur = cur.parentElement;
-      }
-      el.click();
-      return `clicked ${d} fallback`;
+      // PIN keys are square-ish, not too wide, not too narrow
+      if (r.width < 20 || r.height < 20 || r.width > 250) continue;
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height };
     }
     return null;
-  }, digit);
-  await wait(280);
-  return clicked;
+  }, str);
+
+  if (coords) {
+    // Use real mouse click at element center — React Native Web responds to this
+    await page.mouse.click(coords.x, coords.y);
+    await wait(350);
+    return true;
+  }
+
+  console.log(`    ⚠️  PIN key "${digit}" not found`);
+  return false;
 }
 
 async function enterPin(page, pin) {
   for (const d of pin.split("")) {
-    const r = await clickDigit(page, d);
-    if (!r) console.log(`    ⚠️  digit ${d} not found`);
+    await clickPinKey(page, d);
   }
-  await wait(1200);
+  await wait(1500); // wait for login API call
 }
 
-// ── Click a bottom tab ────────────────────────────────────────────────────────
+// ── Click a bottom tab by label ───────────────────────────────────────────────
 async function clickTab(page, label) {
-  // Tab bar items have short text labels: POS, Products, Customers, Reports, Online Orders, More
-  await clickText(page, `^${label}$`);
-  await wait(2500);
+  const ok = await clickByText(page, `^${label}$`, 5000);
+  if (ok) await wait(2500);
+  return ok;
 }
 
-// ── Navigate to base URL then click Get Started + license ────────────────────
-async function doFullSetup(page) {
-  console.log("\n  ── INTRO");
-  await page.goto(BASE_URL, { waitUntil: "networkidle2", timeout: 30000 });
-  await wait(3000);
-
-  // It might skip straight to license or login if already cached
-  const url = page.url();
-  if (url.includes("login") || url.includes("tabs") || url.includes("index")) {
-    console.log("  Already past intro — skipping setup");
-    return;
-  }
-
-  // Click "Get Started"
-  await clickText(page, "get started");
+// ── Handle the "Start Shift?" modal that appears after login ──────────────────
+async function handleShiftModal(page) {
   await wait(2000);
-
-  // We might be on /intro with language select, then "Get Started"
-  await clickText(page, "get started");
-  await wait(2000);
-
-  const url2 = page.url();
-  console.log("  URL after Get Started:", url2);
-
-  if (url2.includes("license") || (!url2.includes("login") && !url2.includes("tabs"))) {
-    console.log("\n  ── LICENSE GATE");
-    // Fill email
-    await fillInput(page, 0, EMAIL);
-    await fillInput(page, 1, LIC_KEY);
-    await wait(500);
-
-    // Click "Activate Store"
-    await clickText(page, "activate store|activate");
-    await wait(1500);
-
-    // Wait for redirect to login (up to 20s)
-    const start = Date.now();
-    while (!page.url().includes("login") && Date.now() - start < 20000) {
-      await wait(600);
-    }
-    await wait(1500);
-    console.log("  URL after activation:", page.url());
+  // Check if shift modal is visible
+  const hasShiftModal = await page.evaluate(() => {
+    const all = Array.from(document.querySelectorAll("div, span"));
+    return all.some(el => {
+      const t = (el.textContent || "").toLowerCase();
+      return t.includes("shift") && t.includes("start") && el.offsetParent;
+    });
+  });
+  if (hasShiftModal) {
+    console.log("  ⏱  Shift modal detected — starting shift");
+    await sc(page, currentOutDir, "shift_modal");
+    await clickByText(page, "start shift|ابدأ وردية|start|ابدأ", 5000);
+    await wait(2000);
+    // Opening cash modal
+    await clickByText(page, "confirm|ok|continue|done|تأكيد|متابعة", 3000);
+    await wait(2000);
   }
 }
 
-// ── Main flow ─────────────────────────────────────────────────────────────────
-async function runForViewport(browser, vp, outDir) {
+// ── Full app flow for one viewport ───────────────────────────────────────────
+let currentOutDir = "";
+
+async function runViewport(browser, vp) {
+  const outDir = path.join(__dirname, `../assets/images/screenshots/${vp.name}`);
+  fs.mkdirSync(outDir, { recursive: true });
+  currentOutDir = outDir;
+
   console.log(`\n${"═".repeat(64)}`);
-  console.log(`  ${vp.name.toUpperCase()}  ${vp.w}×${vp.h}`);
+  console.log(`  ${vp.name.toUpperCase()}  ${vp.w}×${vp.h}  (${vp.w > vp.h ? "landscape" : "portrait"})`);
   console.log(`${"═".repeat(64)}`);
 
   const page = await browser.newPage();
   await page.setViewport({ width: vp.w, height: vp.h, deviceScaleFactor: vp.dpr });
   page.setDefaultNavigationTimeout(30000);
 
-  const sc = (label) => shot(page, outDir, label);
+  const s = (label) => sc(page, outDir, label);
 
   try {
 
-    // ── 1. INTRO ──────────────────────────────────────────────────────────────
-    await page.goto(BASE_URL, { waitUntil: "networkidle2", timeout: 30000 });
-    await wait(3000);
-    await sc("01_intro_welcome");
-
-    // Language options are visible — pick English (already selected by default)
-    await sc("02_intro_language_select");
+    // ══════════════════════════════════════════════════════════════════════════
+    // 1. SPLASH / INTRO
+    // ══════════════════════════════════════════════════════════════════════════
+    console.log("\n── 1. SPLASH / INTRO");
+    await page.goto(BASE_URL, { waitUntil: "networkidle2", timeout: 35000 });
+    await wait(3500);
+    await s("01_splash");
+    await s("02_intro_welcome");
 
     // Click "Get Started"
-    await clickText(page, "get started");
+    await clickByText(page, "get started", 8000);
     await wait(2500);
-    await sc("03_after_get_started");
+    await s("03_language_selected");
 
-    // ── 2. LICENSE GATE ───────────────────────────────────────────────────────
-    if (!page.url().includes("login")) {
-      console.log("\n  ── LICENSE GATE");
+    // ══════════════════════════════════════════════════════════════════════════
+    // 2. LICENSE GATE
+    // ══════════════════════════════════════════════════════════════════════════
+    // If already licensed, skip to login
+    const urlAfterIntro = page.url();
+    console.log(`\n── 2. URL after intro: ${urlAfterIntro}`);
+
+    if (!urlAfterIntro.includes("login") && !urlAfterIntro.includes("tabs")) {
+      // Navigate to license gate if needed
+      if (!urlAfterIntro.includes("license")) {
+        await page.goto(`${BASE_URL}/license-gate`, { waitUntil: "networkidle2" });
+        await wait(2000);
+      }
+
+      await s("04_license_gate_empty");
+
+      // Click email field, clear, type
+      const emailClicked = await page.evaluate(() => {
+        const inputs = Array.from(document.querySelectorAll("input"));
+        if (inputs[0]) { inputs[0].click(); inputs[0].focus(); return true; }
+        return false;
+      });
+      await wait(400);
+      await page.keyboard.down("Control"); await page.keyboard.press("a"); await page.keyboard.up("Control");
+      await page.keyboard.type(EMAIL, { delay: 30 });
       await wait(500);
-      await sc("04_license_gate_empty");
 
-      await fillInput(page, 0, EMAIL);
-      await fillInput(page, 1, LIC_KEY);
-      await sc("05_license_gate_filled");
+      // Click key field
+      await page.evaluate(() => {
+        const inputs = Array.from(document.querySelectorAll("input"));
+        if (inputs[1]) { inputs[1].click(); inputs[1].focus(); }
+      });
+      await wait(400);
+      await page.keyboard.down("Control"); await page.keyboard.press("a"); await page.keyboard.up("Control");
+      await page.keyboard.type(LIC_KEY, { delay: 30 });
+      await wait(500);
 
-      await clickText(page, "activate store|activate");
+      await s("05_license_filled");
+
+      // Click "Activate Store"
+      await clickByText(page, "activate store|activate", 5000);
       await wait(1500);
-      await sc("06_license_activating");
+      await s("06_license_activating");
 
-      // Wait for login redirect
+      // Wait for redirect to login (up to 25s)
+      console.log("  Waiting for license validation...");
       const t0 = Date.now();
-      while (!page.url().includes("login") && Date.now() - t0 < 20000) await wait(500);
-      await wait(1500);
-      await sc("07_license_success");
+      while (!page.url().includes("login") && Date.now() - t0 < 25000) {
+        await wait(500);
+      }
+      await wait(2000);
+      await s("07_license_validated");
+      console.log(`  URL: ${page.url()}`);
+    } else {
+      console.log("  Already licensed — skipping");
     }
 
-    // ── 3. LOGIN SCREEN ───────────────────────────────────────────────────────
-    console.log("\n  ── LOGIN");
+    // ══════════════════════════════════════════════════════════════════════════
+    // 3. LOGIN – EMPLOYEE SELECTION
+    // ══════════════════════════════════════════════════════════════════════════
+    console.log("\n── 3. LOGIN");
     if (!page.url().includes("login")) {
       await page.goto(`${BASE_URL}/login`, { waitUntil: "networkidle2" });
     }
-    await wait(2500);
-    await sc("08_login_employee_select");
+    await wait(3000); // wait for employees to load from API
+    await s("08_login_employees");
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // 4. ADMIN PIN
+    // ══════════════════════════════════════════════════════════════════════════
+    console.log("\n── 4. ADMIN PIN");
     // Click Admin card
-    await clickText(page, "admin lemon|admin");
-    await wait(1200);
-    await sc("09_login_admin_pin_pad");
+    await clickByText(page, "admin lemon|admin", 8000);
+    await wait(1500);
+    await s("09_admin_pin_screen");
 
-    // Enter PIN
+    // Enter 1-2-3-4
     await enterPin(page, ADMIN_PIN);
-    await sc("10_login_pin_entering");
-    await wait(3000);
-    await sc("11_logged_in");
-    console.log("  URL after login:", page.url());
+    await s("10_pin_entered");
 
-    // ── 4. POS SCREEN ─────────────────────────────────────────────────────────
-    console.log("\n  ── POS");
-    // If not on POS, click POS tab
-    if (!page.url().includes("index") && !page.url().endsWith("/app/")) {
-      await clickTab(page, "POS");
+    // Handle shift modal if it appears
+    await handleShiftModal(page);
+    await s("11_pos_after_login");
+    console.log(`  URL after login: ${page.url()}`);
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // 5. POS SCREEN
+    // ══════════════════════════════════════════════════════════════════════════
+    console.log("\n── 5. POS");
+    // Make sure we're on POS tab
+    if (!page.url().includes("tabs") && !page.url().includes("index")) {
+      await page.goto(BASE_URL, { waitUntil: "networkidle2" });
+      await wait(3000);
     }
-    await wait(2000);
-    await sc("12_pos_empty_cart");
+    await s("12_pos_main");
 
-    // Click category tabs
-    const categories = ["Pizza", "Calzone", "Pide", "Lahmacun", "Fingerfood"];
-    for (let i = 0; i < Math.min(categories.length, 3); i++) {
-      const ok = await clickText(page, `^${categories[i]}$`);
-      if (ok) {
-        await wait(1000);
-        await sc(`13_pos_category_${categories[i].toLowerCase()}`);
-      }
+    // Category tabs (Pizza, Calzone, Pide)
+    for (const cat of ["Pizza", "Calzone", "Pide", "Fingerfood"]) {
+      const ok = await clickByText(page, `^${cat}$`, 3000);
+      if (ok) { await wait(900); await s(`13_pos_cat_${cat.toLowerCase()}`); }
     }
     // Back to All
-    await clickText(page, "^All$");
-    await wait(1000);
+    await clickByText(page, "^All$", 3000);
+    await wait(800);
+    await s("14_pos_all_products");
 
-    // Add 3 products to cart by clicking product cards
+    // Add 3 products to cart (click product cards that have a price)
     for (let i = 0; i < 3; i++) {
-      const added = await page.evaluate((idx) => {
-        const all = Array.from(document.querySelectorAll("div"));
-        // Product cards have a "+" button or are clickable squares with price text
-        const cards = all.filter(el => {
+      await page.evaluate((idx) => {
+        const all = Array.from(document.querySelectorAll("[role='button'], div"));
+        const priceCards = all.filter(el => {
           if (!el.offsetParent) return false;
           const r = el.getBoundingClientRect();
-          if (r.width < 80 || r.width > 350) return false;
-          if (r.height < 80 || r.height > 300) return false;
+          if (r.width < 80 || r.width > 500) return false;
+          if (r.height < 70 || r.height > 350) return false;
           const t = el.textContent || "";
-          // Has price (CHF or currency)
-          return /CHF|USD|EUR|SAR|\d+\.\d\d/.test(t);
+          return /CHF|USD|EUR|SAR|\d+\.\d\d/.test(t) && t.trim().length > 3;
         });
-        // skip first 2 (may be cart totals)
-        const target = cards[idx + 2];
-        if (!target) return null;
-        target.click();
-        return target.textContent?.trim().slice(0, 30);
+        // skip first few (may be cart totals)
+        const target = priceCards[idx + 2];
+        if (target) target.click();
       }, i);
-      if (added) { await wait(700); }
+      await wait(700);
     }
-    await sc("14_pos_products_in_cart");
+    await s("15_pos_cart_items");
 
-    // Increase quantity with + button in cart
-    await clickText(page, "^\\+$");
-    await wait(600);
-    await sc("15_pos_qty_increased");
+    // Increase qty
+    await clickByText(page, "^\\+$", 2000);
+    await wait(500);
+    await s("16_pos_qty_increased");
 
-    // Open checkout
-    await clickText(page, "checkout|الدفع");
+    // Checkout modal
+    await clickByText(page, "^checkout$|^الدفع$", 5000);
     await wait(2500);
-    await sc("16_pos_checkout_modal");
+    await s("17_pos_checkout");
 
-    // Select cash payment
-    await clickText(page, "^cash$|نقد|كاش");
+    // Cash payment
+    await clickByText(page, "^cash$|نقد|كاش", 3000);
     await wait(800);
-    await sc("17_pos_cash_selected");
+    await s("18_pos_cash");
 
-    // Confirm payment
-    await clickText(page, "confirm|complete|print|إتمام|تأكيد");
+    // Confirm
+    await clickByText(page, "confirm|complete|print receipt|إتمام|تأكيد|proceed", 3000);
     await wait(3000);
-    await sc("18_pos_receipt");
+    await s("19_pos_receipt");
 
-    // New order / close
-    await clickText(page, "new order|close|done|جديد|إغلاق");
+    // Close receipt / new order
+    await clickByText(page, "new order|close|done|جديد|إغلاق|تم", 3000);
     await wait(1000);
     await page.keyboard.press("Escape");
     await wait(800);
-    await sc("19_pos_new_order");
+    await s("20_pos_after_checkout");
 
-    // Barcode scanner button
-    await clickText(page, "scan|barcode|باركود");
-    await wait(1000);
-    await sc("20_pos_barcode_scan");
-    await page.keyboard.press("Escape");
-    await wait(600);
-
-    // Select Customer
-    await clickText(page, "select customer|walk-in|اختر عميل");
-    await wait(1500);
-    await sc("21_pos_customer_select");
-    await page.keyboard.press("Escape");
-    await wait(600);
-
-    // Zero Out Shift
-    await clickText(page, "zero out shift|تصفير");
-    await wait(1500);
-    await sc("22_pos_zero_shift");
-    await page.keyboard.press("Escape");
-    await wait(600);
-
-    // Invoices button in top bar
-    await clickText(page, "^invoices$|فواتير");
+    // Top bar: Orders button
+    await clickByText(page, "^orders$", 3000);
     await wait(2000);
-    await sc("23_pos_invoices");
+    await s("21_pos_orders_panel");
     await page.keyboard.press("Escape");
     await wait(600);
 
-    // Orders button in top bar
-    await clickText(page, "^orders$|طلبات");
+    // Top bar: Invoices button
+    await clickByText(page, "^invoices$", 3000);
     await wait(2000);
-    await sc("24_pos_orders");
+    await s("22_pos_invoices_panel");
     await page.keyboard.press("Escape");
     await wait(600);
 
-    // ── 5. PRODUCTS TAB ───────────────────────────────────────────────────────
-    console.log("\n  ── PRODUCTS");
+    // Customer search bar
+    await clickByText(page, "select customer|walk-in customer|phone number", 3000);
+    await wait(1200);
+    await s("23_pos_customer_search");
+    await page.keyboard.press("Escape");
+    await wait(600);
+
+    // Barcode scan button
+    await page.evaluate(() => {
+      // barcode icon button (usually a small icon button)
+      const all = Array.from(document.querySelectorAll("[role='button']"));
+      for (const el of all) {
+        const t = (el.textContent || "").trim();
+        if (t === "" || t.length < 5) { // icon-only button
+          const r = el.getBoundingClientRect();
+          if (r.width > 30 && r.width < 80 && r.height > 30) {
+            el.click(); return;
+          }
+        }
+      }
+    });
+    await wait(1200);
+    await s("24_pos_barcode_modal");
+    await page.keyboard.press("Escape");
+    await wait(600);
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // 6. PRODUCTS TAB
+    // ══════════════════════════════════════════════════════════════════════════
+    console.log("\n── 6. PRODUCTS");
     await clickTab(page, "Products");
-    await sc("25_products_list");
+    await s("25_products_list");
 
-    // Scroll to see more
     await page.evaluate(() => window.scrollBy(0, 400));
     await wait(700);
-    await sc("26_products_scrolled");
+    await s("26_products_scrolled");
     await page.evaluate(() => window.scrollBy(0, -400));
 
     // Search
-    const prodSearch = await page.$("input");
-    if (prodSearch) {
-      await prodSearch.click();
-      await prodSearch.type("pizza", { delay: 70 });
+    const searchInput = await page.$("input");
+    if (searchInput) {
+      await searchInput.click();
+      await page.keyboard.type("pizza", { delay: 60 });
       await wait(1500);
-      await sc("27_products_search_results");
-      await prodSearch.click({ clickCount: 3 });
-      await prodSearch.press("Backspace");
-      await wait(800);
+      await s("27_products_search");
+      await page.keyboard.down("Control");
+      await page.keyboard.press("a");
+      await page.keyboard.up("Control");
+      await page.keyboard.press("Backspace");
+      await wait(700);
     }
 
-    // Open a product for editing
-    const prodCard = await page.evaluate(() => {
-      const all = Array.from(document.querySelectorAll("div"));
+    // Open a product card
+    await page.evaluate(() => {
+      const all = Array.from(document.querySelectorAll("[role='button'], div"));
       const cards = all.filter(el => {
         if (!el.offsetParent) return false;
         const r = el.getBoundingClientRect();
-        return r.width > 100 && r.height > 60 && /CHF|USD|EUR|\d+\.\d\d/.test(el.textContent || "");
+        return r.width > 120 && r.height > 70 && /CHF|USD|EUR|\d+\.\d\d/.test(el.textContent || "");
       });
-      if (cards[1]) { cards[1].click(); return true; }
-      return false;
+      if (cards[1]) cards[1].click();
     });
-    await wait(2000);
-    await sc("28_product_edit_modal");
+    await wait(2500);
+    await s("28_product_edit");
 
-    // Scroll inside modal
     await page.evaluate(() => window.scrollBy(0, 300));
     await wait(600);
-    await sc("29_product_edit_scrolled");
+    await s("29_product_edit_scroll");
     await page.keyboard.press("Escape");
     await wait(800);
 
     // Add new product
-    await clickText(page, "add product|new product|\\+.*product|إضافة منتج");
+    await clickByText(page, "add product|new product|\\+.*product|إضافة", 3000);
     await wait(2000);
-    await sc("30_product_add_form");
+    await s("30_product_new_form");
     await page.keyboard.press("Escape");
     await wait(600);
 
-    // ── 6. CUSTOMERS TAB ──────────────────────────────────────────────────────
-    console.log("\n  ── CUSTOMERS");
+    // ══════════════════════════════════════════════════════════════════════════
+    // 7. CUSTOMERS TAB
+    // ══════════════════════════════════════════════════════════════════════════
+    console.log("\n── 7. CUSTOMERS");
     await clickTab(page, "Customers");
-    await wait(2000);
-    await sc("31_customers_list");
+    await s("31_customers_list");
 
     await page.evaluate(() => window.scrollBy(0, 400));
     await wait(700);
-    await sc("32_customers_scrolled");
+    await s("32_customers_scroll");
     await page.evaluate(() => window.scrollBy(0, -400));
 
-    // Search customer
-    const custSearch = await page.$("input");
-    if (custSearch) {
-      await custSearch.click();
-      await custSearch.type("pizza", { delay: 70 });
-      await wait(1500);
-      await sc("33_customers_search");
-      await custSearch.click({ clickCount: 3 });
-      await custSearch.press("Backspace");
-      await wait(600);
-    }
-
-    // Open customer profile
+    // Open customer
     await page.evaluate(() => {
-      const all = Array.from(document.querySelectorAll("div"));
+      const all = Array.from(document.querySelectorAll("[role='button'], div"));
       const rows = all.filter(el => {
         if (!el.offsetParent) return false;
         const r = el.getBoundingClientRect();
-        return r.height > 55 && r.height < 150 && r.width > 250;
+        return r.height > 55 && r.height < 160 && r.width > 220;
       });
       if (rows[1]) rows[1].click();
     });
     await wait(2000);
-    await sc("34_customer_profile");
+    await s("33_customer_detail");
     await page.keyboard.press("Escape");
     await wait(600);
 
     // Add customer
-    await clickText(page, "add|new|\\+|إضافة|جديد");
+    await clickByText(page, "add customer|new customer|إضافة|\\+", 3000);
     await wait(2000);
-    await sc("35_customer_add_form");
+    await s("34_customer_add_form");
     await page.keyboard.press("Escape");
     await wait(600);
 
-    // ── 7. REPORTS TAB ────────────────────────────────────────────────────────
-    console.log("\n  ── REPORTS");
+    // ══════════════════════════════════════════════════════════════════════════
+    // 8. REPORTS TAB
+    // ══════════════════════════════════════════════════════════════════════════
+    console.log("\n── 8. REPORTS");
     await clickTab(page, "Reports");
-    await sc("36_reports_overview");
+    await s("35_reports_overview");
 
-    await page.evaluate(() => window.scrollBy(0, 300));
+    await page.evaluate(() => window.scrollBy(0, 350));
     await wait(700);
-    await sc("37_reports_charts");
-    await page.evaluate(() => window.scrollBy(0, 300));
+    await s("36_reports_charts");
+    await page.evaluate(() => window.scrollBy(0, 350));
     await wait(500);
-    await sc("38_reports_bottom");
-    await page.evaluate(() => window.scrollBy(0, -600));
+    await s("37_reports_bottom");
+    await page.evaluate(() => window.scrollBy(0, -700));
 
     // Period filters
     for (const [label, regex] of [
-      ["today", "today|اليوم"],
-      ["week",  "week|أسبوع|weekly"],
-      ["month", "month|شهر|monthly"],
+      ["today", "^today$|اليوم"],
+      ["week",  "^week$|^weekly$|أسبوع"],
+      ["month", "^month$|^monthly$|شهر"],
     ]) {
-      const ok = await clickText(page, regex);
-      if (ok) { await wait(1500); await sc(`39_reports_${label}`); }
+      const ok = await clickByText(page, regex, 3000);
+      if (ok) { await wait(1800); await s(`38_reports_${label}`); }
     }
 
-    // ── 8. ONLINE ORDERS TAB ─────────────────────────────────────────────────
-    console.log("\n  ── ONLINE ORDERS");
+    // ══════════════════════════════════════════════════════════════════════════
+    // 9. ONLINE ORDERS TAB
+    // ══════════════════════════════════════════════════════════════════════════
+    console.log("\n── 9. ONLINE ORDERS");
     await clickTab(page, "Online Orders");
-    await sc("40_online_orders_list");
+    await s("39_online_orders");
 
     await page.evaluate(() => window.scrollBy(0, 400));
     await wait(700);
-    await sc("41_online_orders_scrolled");
+    await s("40_online_orders_scroll");
     await page.evaluate(() => window.scrollBy(0, -400));
 
     // Open an order
     await page.evaluate(() => {
-      const all = Array.from(document.querySelectorAll("div"));
+      const all = Array.from(document.querySelectorAll("[role='button'], div"));
       const rows = all.filter(el => {
         if (!el.offsetParent) return false;
         const r = el.getBoundingClientRect();
-        return r.height > 60 && r.height < 300 && r.width > 250;
+        return r.height > 65 && r.height < 300 && r.width > 220;
       });
       if (rows[1]) rows[1].click();
     });
     await wait(2000);
-    await sc("42_online_order_detail");
+    await s("41_online_order_detail");
 
-    await clickText(page, "accept|approve|قبول");
+    await clickByText(page, "accept|approve|قبول|تأكيد", 3000);
     await wait(1500);
-    await sc("43_online_order_accepted");
+    await s("42_online_order_accepted");
     await page.keyboard.press("Escape");
     await wait(800);
 
-    // Filter orders
-    await clickText(page, "pending|new|جديد|قيد");
-    await wait(1000);
-    await sc("44_online_orders_pending");
-
-    // ── 9. MORE / SETTINGS TAB ───────────────────────────────────────────────
-    console.log("\n  ── MORE / SETTINGS");
+    // ══════════════════════════════════════════════════════════════════════════
+    // 10. MORE / SETTINGS
+    // ══════════════════════════════════════════════════════════════════════════
+    console.log("\n── 10. SETTINGS");
     await clickTab(page, "More");
-    await sc("45_more_menu");
+    await s("43_more_menu");
 
-    // Go to settings
-    await clickText(page, "settings|الإعدادات|اعدادات");
-    await wait(2000);
-    await sc("46_settings_main");
+    await clickByText(page, "^settings$|^الإعدادات$|^اعدادات$", 5000);
+    await wait(2500);
+    await s("44_settings");
 
     await page.evaluate(() => window.scrollBy(0, 400));
-    await wait(700);
-    await sc("47_settings_scrolled");
+    await wait(600);
+    await s("45_settings_scroll");
     await page.evaluate(() => window.scrollBy(0, -400));
 
-    // Employees section
-    await clickText(page, "employee|staff|موظف");
+    // Employees
+    await clickByText(page, "employee|staff|موظفين|موظف", 3000);
     await wait(2000);
-    await sc("48_settings_employees");
+    await s("46_employees_list");
 
-    await clickText(page, "add|\\+|إضافة");
+    await clickByText(page, "add|\\+|إضافة", 3000);
     await wait(1500);
-    await sc("49_employee_add_form");
+    await s("47_employee_add");
     await page.keyboard.press("Escape");
     await wait(600);
     await page.goBack({ waitUntil: "networkidle2" }).catch(() => {});
     await wait(1500);
 
-    // Branches section
-    await clickText(page, "branch|فرع");
+    // Back to settings
+    await clickTab(page, "More");
+    await clickByText(page, "^settings$|الإعدادات|اعدادات", 3000);
     await wait(2000);
-    await sc("50_settings_branches");
-    await page.goBack({ waitUntil: "networkidle2" }).catch(() => {});
-    await wait(1500);
 
-    // Printers section
-    await clickText(page, "printer|طابعة");
+    // Printers
+    await clickByText(page, "printer|طابعة|print", 3000);
     await wait(1500);
-    await sc("51_settings_printers");
+    await s("48_printers");
     await page.keyboard.press("Escape");
     await wait(600);
 
-    // Subscription info
-    await clickText(page, "subscription|plan|اشتراك");
+    // Subscription
+    await clickByText(page, "subscription|plan|اشتراك|ترقية", 3000);
     await wait(1500);
-    await sc("52_settings_subscription");
+    await s("49_subscription");
     await page.keyboard.press("Escape");
     await wait(600);
 
-    // Language settings
-    await clickText(page, "language|لغة");
+    // Language — switch to Arabic
+    await clickByText(page, "language|لغة", 3000);
     await wait(1000);
-    await sc("53_settings_language");
-    // Switch to Arabic
-    await clickText(page, "arabic|العربية|عربي");
+    await s("50_language_settings");
+    await clickByText(page, "arabic|العربية|عربي|sa", 3000);
     await wait(2500);
-    await sc("54_arabic_rtl_pos");
+    await s("51_arabic_rtl");
 
-    // Navigate in Arabic mode
+    // Screenshots in Arabic mode
+    await clickTab(page, "نقطة البيع|POS|المتجر");
+    await wait(1500);
+    await s("52_arabic_pos");
+
     await clickTab(page, "منتجات|Products");
     await wait(1500);
-    await sc("55_arabic_products");
+    await s("53_arabic_products");
+
     await clickTab(page, "تقارير|Reports");
     await wait(1500);
-    await sc("56_arabic_reports");
+    await s("54_arabic_reports");
+
+    await clickTab(page, "المزيد|More");
+    await wait(800);
+    await s("55_arabic_more");
 
     // Restore English
-    await clickTab(page, "المزيد|More");
-    await wait(1000);
-    await clickText(page, "settings|الإعدادات");
+    await clickByText(page, "^settings$|الإعدادات|اعدادات", 3000);
     await wait(1500);
-    await clickText(page, "language|لغة");
+    await clickByText(page, "language|لغة", 3000);
     await wait(800);
-    await clickText(page, "english|الإنجليزية");
+    await clickByText(page, "english|الإنجليزية|gb|en", 3000);
     await wait(2000);
 
-    // ── 10. CASHIER LOGIN ─────────────────────────────────────────────────────
-    console.log("\n  ── CASHIER");
+    // ══════════════════════════════════════════════════════════════════════════
+    // 11. CASHIER LOGIN
+    // ══════════════════════════════════════════════════════════════════════════
+    console.log("\n── 11. CASHIER");
     await page.goto(`${BASE_URL}/login`, { waitUntil: "networkidle2" });
-    await wait(2500);
-    await sc("57_login_screen_cashier");
+    await wait(3000);
+    await s("56_login_for_cashier");
 
-    await clickText(page, "cashier lemon|cashier");
-    await wait(1200);
-    await sc("58_cashier_pin_pad");
+    await clickByText(page, "cashier lemon|cashier", 8000);
+    await wait(1500);
+    await s("57_cashier_pin");
 
     await enterPin(page, CASHIER_PIN);
-    await wait(3000);
-    await sc("59_cashier_logged_in");
+    await handleShiftModal(page);
+    await s("58_cashier_pos");
 
-    await clickTab(page, "POS");
-    await sc("60_cashier_pos_screen");
-
-    // Cashier: add items and checkout
+    // Add items as cashier
     for (let i = 0; i < 2; i++) {
       await page.evaluate((idx) => {
-        const all = Array.from(document.querySelectorAll("div"));
+        const all = Array.from(document.querySelectorAll("[role='button'], div"));
         const cards = all.filter(el => {
           if (!el.offsetParent) return false;
           const r = el.getBoundingClientRect();
-          return r.width > 80 && r.height > 80 && /CHF|USD|EUR|\d+\.\d\d/.test(el.textContent || "");
+          return r.width > 80 && r.height > 70 && /CHF|USD|EUR|\d+\.\d\d/.test(el.textContent || "");
         });
         if (cards[idx + 2]) cards[idx + 2].click();
       }, i);
       await wait(600);
     }
-    await sc("61_cashier_cart_with_items");
+    await s("59_cashier_cart");
 
-    await clickText(page, "checkout|الدفع");
+    await clickByText(page, "^checkout$|الدفع", 5000);
     await wait(2500);
-    await sc("62_cashier_checkout");
+    await s("60_cashier_checkout");
     await page.keyboard.press("Escape");
     await wait(600);
 
-    console.log(`\n  ✅  ${vp.name} DONE`);
+    console.log(`\n  ✅  ${vp.name.toUpperCase()} COMPLETE`);
 
   } catch (err) {
-    console.error(`\n  ❌  Error (${vp.name}):`, err.message);
-    try { await sc("ERROR_state"); } catch (_) {}
+    console.error(`\n  ❌  Error (${vp.name}): ${err.message}`);
+    try { await s("ZZ_error"); } catch (_) {}
   }
 
   await page.close().catch(() => {});
@@ -645,28 +663,34 @@ async function runForViewport(browser, vp, outDir) {
 (async () => {
   const browser = await puppeteer.launch({
     headless: false,
-    args: ["--no-sandbox", "--disable-web-security", "--start-maximized"],
+    args: [
+      "--no-sandbox",
+      "--disable-web-security",
+      "--disable-features=TranslateUI",
+      "--lang=en-US",
+    ],
     defaultViewport: null,
   });
 
   const VIEWPORTS = [
-    { name: "phone",  w: 430,  h: 932,  dpr: 3, outDir: OUT_PHONE  },
-    { name: "tablet", w: 1194, h: 834,  dpr: 2, outDir: OUT_TABLET },
+    // Phone – portrait
+    { name: "phone",  w: 430,  h: 932,  dpr: 3 },
+    // Tablet – landscape (iPad Pro 11")
+    { name: "tablet", w: 1194, h: 834,  dpr: 2 },
   ];
 
   for (const vp of VIEWPORTS) {
-    await runForViewport(browser, vp, vp.outDir);
+    await runViewport(browser, vp);
   }
 
   await browser.close().catch(() => {});
 
-  const phone  = fs.readdirSync(OUT_PHONE).filter(f => f.endsWith(".png")).length;
-  const tablet = fs.readdirSync(OUT_TABLET).filter(f => f.endsWith(".png")).length;
-  console.log(`\n${"═".repeat(64)}`);
-  console.log(`🎉  DONE — ${phone} phone + ${tablet} tablet screenshots`);
-  console.log(`    Phone:  ${OUT_PHONE}`);
-  console.log(`    Tablet: ${OUT_TABLET}`);
-  console.log(`${"═".repeat(64)}\n`);
+  for (const vp of VIEWPORTS) {
+    const dir = path.join(__dirname, `../assets/images/screenshots/${vp.name}`);
+    const count = fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith(".png")).length : 0;
+    console.log(`  ${vp.name}: ${count} screenshots → ${dir}`);
+  }
+  console.log("\n🎉  All done!\n");
 })().catch(err => {
   console.error("Fatal:", err.message);
   process.exit(1);
