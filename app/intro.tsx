@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TouchableOpacity, Animated, ScrollView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, TouchableOpacity, Animated, ScrollView, Platform, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
@@ -15,6 +15,12 @@ const LANGUAGES: { code: Lang; flag: string; label: string; nativeLabel: string 
     { code: 'ar', flag: '🇸🇦', label: 'Arabic', nativeLabel: 'العربية' },
     { code: 'de', flag: '🇩🇪', label: 'German', nativeLabel: 'Deutsch' },
 ];
+
+const TABLET_BANNER: Record<Lang, string> = {
+    en: '🖥️  For the best POS experience, use a Tablet or iPad',
+    ar: '🖥️  للحصول على أفضل تجربة، استخدم التطبيق على تابلت أو آيباد',
+    de: '🖥️  Für das beste Erlebnis verwenden Sie dieses App auf einem Tablet oder iPad',
+};
 
 const CONTENT: Record<Lang, { welcome: string; brand: string; subtitle: string; start: string; features: { icon: string; text: string }[] }> = {
     en: {
@@ -56,6 +62,21 @@ export default function IntroScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { language, setLanguage, isRTL, rtlText } = useLanguage();
+    const { width } = useWindowDimensions();
+    const isPhone = width < 768;
+    const [showTabletBanner, setShowTabletBanner] = useState(false);
+
+    useEffect(() => {
+        if (!isPhone) return;
+        AsyncStorage.getItem('tablet_banner_dismissed').then((val) => {
+            if (val !== 'true') setShowTabletBanner(true);
+        });
+    }, [isPhone]);
+
+    const dismissBanner = async () => {
+        await AsyncStorage.setItem('tablet_banner_dismissed', 'true');
+        setShowTabletBanner(false);
+    };
 
     const handleStart = async () => {
         await AsyncStorage.setItem('hasSeenIntro', 'true');
@@ -63,6 +84,8 @@ export default function IntroScreen() {
     };
 
     const content = CONTENT[language as Lang] ?? CONTENT.en;
+
+    const bannerText = TABLET_BANNER[language as Lang] ?? TABLET_BANNER.en;
 
     return (
         <View style={styles.container}>
@@ -72,6 +95,25 @@ export default function IntroScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
+                {/* Tablet recommendation banner */}
+                {showTabletBanner && (
+                    <View style={[styles.tabletBanner, { marginTop: insets.top + 8 }]}>
+                        <LinearGradient
+                            colors={['rgba(255,180,0,0.18)', 'rgba(255,140,0,0.12)']}
+                            style={styles.tabletBannerGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                        >
+                            <View style={[styles.tabletBannerContent, isRTL && { flexDirection: 'row-reverse' }]}>
+                                <Text style={[styles.tabletBannerText, isRTL && { textAlign: 'right', flex: 1 }]}>{bannerText}</Text>
+                                <Pressable onPress={dismissBanner} style={styles.tabletBannerClose} hitSlop={10}>
+                                    <Ionicons name="close" size={18} color="rgba(255,180,0,0.9)" />
+                                </Pressable>
+                            </View>
+                        </LinearGradient>
+                    </View>
+                )}
+
                 {/* Decorative circles */}
                 <View style={styles.circle1} />
                 <View style={styles.circle2} />
@@ -199,6 +241,42 @@ export default function IntroScreen() {
 }
 
 const styles = StyleSheet.create({
+    /* Tablet recommendation banner */
+    tabletBanner: {
+        position: 'absolute',
+        left: 16,
+        right: 16,
+        zIndex: 100,
+        borderRadius: 14,
+        overflow: 'hidden',
+        shadowColor: '#f59e0b',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        elevation: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,180,0,0.3)',
+    },
+    tabletBannerGradient: {
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+    },
+    tabletBannerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    tabletBannerText: {
+        flex: 1,
+        color: 'rgba(255,210,80,0.95)',
+        fontSize: 13,
+        fontWeight: '600',
+        lineHeight: 19,
+    },
+    tabletBannerClose: {
+        padding: 4,
+        opacity: 0.85,
+    },
     container: {
         flex: 1,
         backgroundColor: '#0A0E27',
