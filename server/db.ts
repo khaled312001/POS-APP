@@ -4,8 +4,12 @@ import * as schema from "@shared/schema";
 
 const { Pool } = pg;
 
-// Prefer NEON_DATABASE_URL to avoid Replit's auto-provisioned PostgreSQL overriding DATABASE_URL
-const connectionString = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
+// In production, Replit runtime provides the correct DATABASE_URL for the Production Database.
+// In development, prefer NEON_DATABASE_URL if set (allows pointing to a specific Neon DB).
+const connectionString =
+  process.env.NODE_ENV === "production"
+    ? process.env.DATABASE_URL
+    : (process.env.NEON_DATABASE_URL || process.env.DATABASE_URL);
 
 if (!connectionString) {
   throw new Error(

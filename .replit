@@ -108,4 +108,3 @@ defaultBucketID = "replit-objstore-ba0158fe-b737-4e3d-9065-def7c306785e"
 [userenv]
 
 [userenv.production]
-NEON_DATABASE_URL = "postgresql://neondb_owner:npg_HFhrVY7sSDp3@ep-polished-sun-amr4cmn7.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require"
