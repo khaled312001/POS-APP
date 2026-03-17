@@ -326,15 +326,6 @@ export default function LoginScreen() {
                   }
                   ListFooterComponent={() => (
                     <View style={styles.footerOptions}>
-                      <Pressable
-                        style={styles.googleLoginBtn}
-                        onPress={() => promptAsync()}
-                        disabled={!request || loading}
-                      >
-                        <Ionicons name="logo-google" size={18} color="#fff" />
-                        <Text style={styles.googleLoginText}>{t("signInWithGoogle")} (Admin)</Text>
-                      </Pressable>
-
                       <Pressable style={styles.logoutLicenseBtn} onPress={logoutLicense}>
                         <Ionicons name="log-out-outline" size={16} color={Colors.textMuted} />
                         <Text style={styles.logoutLicenseText}>{t("logout") + " Store License"}</Text>
