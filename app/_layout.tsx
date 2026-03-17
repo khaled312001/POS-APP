@@ -15,8 +15,16 @@ import { LicenseProvider, useLicense } from "@/lib/license-context";
 import { NotificationProvider } from "@/lib/notification-context";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
+import { Platform } from "react-native";
 
 SplashScreen.preventAutoHideAsync();
+
+// Suppress PWA install prompt on mobile/tablet browsers
+if (Platform.OS === "web" && typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+  });
+}
 
 import { useRouter, useSegments } from "expo-router";
 import * as WebBrowser from "expo-web-browser";

@@ -33,7 +33,12 @@
       "Bash(find /f/POS-APP/shared -type f -name *.ts)",
       "Bash(wc -l /f/POS-APP/app/\\\\\\(tabs\\\\\\)/index.tsx)",
       "Bash(xargs -I {} basename {})",
-      "Bash(find /f/POS-APP -name *.android -o -name *.ios -o -name android.json)"
+      "Bash(find /f/POS-APP -name *.android -o -name *.ios -o -name android.json)",
+      "Bash(identify assets/images/icon.png)",
+      "Bash(magick --version)",
+      "Bash(convert --version)",
+      "Bash(node -e \"require\\(''sharp''\\)\")",
+      "Bash(node -e \":*)"
     ]
   }
 }

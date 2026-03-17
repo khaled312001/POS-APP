@@ -62,6 +62,17 @@ export default function LoginScreen() {
   const [showOpeningCashInput, setShowOpeningCashInput] = useState(false);
   const [openingCash, setOpeningCash] = useState("");
   const [loggedInEmployee, setLoggedInEmployee] = useState<Employee | null>(null);
+  const [showTabletBanner, setShowTabletBanner] = useState(false);
+
+  // Show tablet recommendation once for phone users
+  useEffect(() => {
+    const isPhone = screenDims.width < 600;
+    if (isPhone && Platform.OS !== 'web') {
+      AsyncStorage.getItem('barmagly_tablet_tip_shown').then(shown => {
+        if (!shown) setShowTabletBanner(true);
+      });
+    }
+  }, []);
 
   // Google Sign-In
   const [request, googleResponse, promptAsync] = Google.useAuthRequest({
@@ -255,6 +266,38 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
+          {/* Tablet Recommendation Banner */}
+          {showTabletBanner && (
+            <Pressable
+              onPress={() => {
+                AsyncStorage.setItem('barmagly_tablet_tip_shown', 'true');
+                setShowTabletBanner(false);
+              }}
+              style={{
+                backgroundColor: `${Colors.accent}15`,
+                borderWidth: 1,
+                borderColor: `${Colors.accent}40`,
+                borderRadius: 14,
+                padding: 14,
+                marginBottom: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              <Ionicons name="tablet-landscape-outline" size={28} color={Colors.accent} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: Colors.accent, fontWeight: '700', fontSize: 13 }}>
+                  Best on Tablet or iPad
+                </Text>
+                <Text style={{ color: Colors.textSecondary, fontSize: 12, marginTop: 2, lineHeight: 17 }}>
+                  For the best POS experience, we recommend using a tablet or iPad. The interface is fully optimized for larger screens.
+                </Text>
+              </View>
+              <Ionicons name="close" size={18} color={Colors.textMuted} />
+            </Pressable>
+          )}
+
           <View style={[styles.logoWrap, screenDims.height < 700 && { marginBottom: 12 }]}>
             <View style={[styles.logoCircle, screenDims.height < 700 && { width: 56, height: 56, borderRadius: 28 }]}>
               <Ionicons name="storefront" size={screenDims.height < 700 ? 28 : 36} color={Colors.accent} />
