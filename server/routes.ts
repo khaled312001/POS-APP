@@ -1929,10 +1929,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  // Simulate Caller ID
+  // Simulate Caller ID (for testing from Settings UI)
   app.post("/api/caller-id/simulate", async (req, res) => {
     const { phoneNumber, tenantId } = req.body;
     await callerIdService.handleIncomingCall(phoneNumber || "0551234567", undefined, tenantId ? Number(tenantId) : undefined);
+    res.json({ success: true });
+  });
+
+  // Incoming call from local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
+  app.post("/api/caller-id/incoming", async (req, res) => {
+    const secret = (req.headers["x-bridge-secret"] as string) || req.body.secret;
+    if (process.env.CALLER_ID_BRIDGE_SECRET && secret !== process.env.CALLER_ID_BRIDGE_SECRET) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const { phoneNumber, tenantId, slot } = req.body;
+    await callerIdService.handleIncomingCall(
+      phoneNumber || "0123456789",
+      slot ? Number(slot) : undefined,
+      tenantId ? Number(tenantId) : undefined
+    );
     res.json({ success: true });
   });
 

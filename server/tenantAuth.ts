@@ -21,6 +21,7 @@ const PUBLIC_ROUTES = [
   "/api/payment-gateway/config",
   "/api/products/template",
   "/api/dashboard/subscriptions",
+  "/api/caller-id/incoming", // Local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
 ];
 
 const PUBLIC_ROUTE_PATTERNS = [
