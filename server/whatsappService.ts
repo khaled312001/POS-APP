@@ -8,8 +8,8 @@ async function loadWppConnect() {
     if (!wppconnect) {
         console.log("[WhatsApp] Attempting to load @wppconnect-team/wppconnect...");
         try {
-            wppconnect = require("@wppconnect-team/wppconnect");
-            if (wppconnect.default) wppconnect = wppconnect.default;
+            const mod = await import("@wppconnect-team/wppconnect");
+            wppconnect = mod.default ?? mod;
             console.log("[WhatsApp] Successfully loaded @wppconnect-team/wppconnect");
         } catch (err: any) {
             console.error("[WhatsApp] FAIL to load wppconnect:", err);
