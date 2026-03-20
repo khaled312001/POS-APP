@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { Platform } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useQueryClient } from "@tanstack/react-query";
-import { getApiUrl, apiRequest } from "./query-client";
+import { getApiUrl } from "./query-client";
 import { useLicense } from "./license-context";
 
 interface NotificationContextType {
@@ -10,6 +10,7 @@ interface NotificationContextType {
     setOnlineOrderNotification: (order: any | null) => void;
     incomingCalls: any[];
     setIncomingCalls: React.Dispatch<React.SetStateAction<any[]>>;
+    playNotificationSound: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -91,8 +92,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const { tenant } = useLicense();
     const qc = useQueryClient();
 
-    // Track the last seen order ID for polling-based fallback detection
-    const lastSeenOrderIdRef = useRef<number | null>(null);
     const audioUnlockedRef = useRef(false);
 
     // Unlock AudioContext on first user gesture (browser autoplay policy)
@@ -157,8 +156,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                             playNotificationSound();
                             setOnlineOrderNotification(data.order);
                             qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-                            // Update last seen so polling doesn't double-fire
-                            if (data.order?.id) lastSeenOrderIdRef.current = data.order.id;
                         } else if (data.type === "incoming_call") {
                             setIncomingCalls((prev) => {
                                 const filtered = prev.filter((c) => c.slot !== data.slot);
@@ -199,37 +196,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         };
     }, [qc, setOnlineOrderNotification, playNotificationSound, tenant?.id]);
 
-    // ── Polling fallback: catch new orders even when WebSocket is down ───────
-    useEffect(() => {
-        if (!tenant?.id) return;
-
-        const check = async () => {
-            try {
-                const res = await apiRequest("GET", "/api/online-orders");
-                if (!res.ok) return;
-                const orders: any[] = await res.json();
-                // Find the newest pending order
-                const pending = orders.filter((o: any) => o.status === "pending");
-                if (pending.length === 0) return;
-                const newest = pending.reduce((a: any, b: any) => (a.id > b.id ? a : b));
-                // If this order wasn't already notified via WebSocket, fire now
-                if (lastSeenOrderIdRef.current === null) {
-                    lastSeenOrderIdRef.current = newest.id;
-                    return; // First load — just record, don't notify
-                }
-                if (newest.id > (lastSeenOrderIdRef.current ?? 0)) {
-                    lastSeenOrderIdRef.current = newest.id;
-                    playNotificationSound();
-                    setOnlineOrderNotification(newest);
-                    qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-                }
-            } catch { }
-        };
-
-        check(); // Run immediately on mount
-        const interval = setInterval(check, 20000); // Then every 20s
-        return () => clearInterval(interval);
-    }, [tenant?.id, playNotificationSound, setOnlineOrderNotification, qc]);
+    // Polling is handled in _layout.tsx (which already queries /api/online-orders)
+    // WebSocket above provides the real-time path; layout polling is the reliable fallback.
 
     return (
         <NotificationContext.Provider value={{
@@ -237,6 +205,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             setOnlineOrderNotification,
             incomingCalls,
             setIncomingCalls,
+            playNotificationSound,
         }}>
             {children}
         </NotificationContext.Provider>

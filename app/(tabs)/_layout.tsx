@@ -21,32 +21,65 @@ export default function TabLayout() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const notifPulse = useRef(new Animated.Value(1)).current;
   const [pendingCount, setPendingCount] = useState(0);
+  // Track the newest order ID we've already notified about (prevents duplicates)
+  const lastNotifiedOrderIdRef = useRef<number | null>(null);
 
   const { data: onlineOrders = [] } = useQuery<any[]>({
     queryKey: ["/api/online-orders", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
-    refetchInterval: 20000,
+    refetchInterval: 8000,   // Poll every 8 seconds — fast enough to catch new orders
   });
 
+  const { onlineOrderNotification, setOnlineOrderNotification, playNotificationSound } = useNotifications();
+  const router = useRouter();
+
+  // ── Detect new online orders → play sound + show toast ────────────────────
   useEffect(() => {
-    const count = (onlineOrders as any[]).filter((o: any) => o.status === "pending").length;
+    const all = onlineOrders as any[];
+    const count = all.filter((o: any) => o.status === "pending").length;
     setPendingCount(count);
+
+    // Badge pulse animation
     if (count > 0) {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.3, duration: 600, useNativeDriver: Platform.OS !== 'web' }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: Platform.OS !== 'web' }),
+          Animated.timing(pulseAnim, { toValue: 1.3, duration: 600, useNativeDriver: Platform.OS !== "web" }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: Platform.OS !== "web" }),
         ])
       ).start();
     } else {
       pulseAnim.stopAnimation();
       pulseAnim.setValue(1);
     }
+
+    // Find the newest pending order
+    const pending = all.filter((o: any) => o.status === "pending");
+    if (pending.length === 0) return;
+    const newest = pending.reduce((a: any, b: any) => (a.id > b.id ? a : b));
+
+    if (lastNotifiedOrderIdRef.current === null) {
+      // First load — just record the current newest ID, don't notify
+      lastNotifiedOrderIdRef.current = newest.id;
+      return;
+    }
+
+    if (newest.id > lastNotifiedOrderIdRef.current) {
+      // A genuinely new order arrived!
+      lastNotifiedOrderIdRef.current = newest.id;
+      playNotificationSound();
+      setOnlineOrderNotification(newest);
+    }
   }, [onlineOrders]);
 
-  const { onlineOrderNotification, setOnlineOrderNotification } = useNotifications();
-  const router = useRouter();
+  // Sync lastNotifiedOrderIdRef when WebSocket fires a notification first
+  // (prevents the next poll from double-notifying the same order)
+  useEffect(() => {
+    if (onlineOrderNotification?.id &&
+        onlineOrderNotification.id > (lastNotifiedOrderIdRef.current ?? 0)) {
+      lastNotifiedOrderIdRef.current = onlineOrderNotification.id;
+    }
+  }, [onlineOrderNotification]);
 
   // Pulse the notification toast icon while it's visible
   useEffect(() => {
