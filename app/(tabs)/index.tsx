@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "expo-router";
 import {
   StyleSheet, Text, View, FlatList, Pressable, TextInput,
@@ -114,6 +114,33 @@ export default function POSScreen() {
   const { onlineOrderNotification, setOnlineOrderNotification, incomingCalls, setIncomingCalls } = useNotifications();
 
   const tenantId = tenant?.id;
+
+  // Track which call IDs have already been auto-processed so we don't re-run on re-renders
+  const processedCallIds = useRef<Set<string>>(new Set());
+
+  // AUTO-ASSIGN: when a call comes in, immediately add caller to the current cart
+  useEffect(() => {
+    if (incomingCalls.length === 0) return;
+    incomingCalls.forEach((call) => {
+      const callId = String(call.id);
+      if (processedCallIds.current.has(callId)) return;
+      processedCallIds.current.add(callId);
+
+      // If the number matches a known customer → assign them to the cart instantly
+      if (call.customer) {
+        cart.setCustomerId(call.customer.id);
+        setPhoneInput(call.phoneNumber);
+      } else {
+        // Unknown caller → pre-fill the phone field so the cashier can take the order
+        setPhoneInput(call.phoneNumber);
+      }
+
+      // Auto-dismiss the popup after 8 seconds
+      setTimeout(() => {
+        setIncomingCalls((prev) => prev.filter((c) => String(c.id) !== callId));
+      }, 8000);
+    });
+  }, [incomingCalls]);
 
   const PIZZA_TOPPINGS = [
     "Tomatoes", "Sliced tomatoes", "Garlic", "Onions", "Capers", "Olives",
@@ -935,38 +962,36 @@ export default function POSScreen() {
                 )}
               </View>
               <View style={[styles.callInfo, isRTL && { alignItems: "flex-end" }]}>
-                <Text style={[styles.callTitle, idx > 0 && { fontSize: 11 }]}>
-                  {language === "ar" ? "مكالمة واردة" : language === "de" ? "Eingehender Anruf" : "Incoming Call"}
-                </Text>
+                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4 }}>
+                  <Ionicons name="checkmark-circle" size={12} color="rgba(255,255,255,0.9)" />
+                  <Text style={[styles.callTitle, idx > 0 && { fontSize: 11 }]}>
+                    {language === "ar" ? "✓ تمت الإضافة تلقائياً" : language === "de" ? "✓ Auto zugewiesen" : "✓ Auto-assigned"}
+                  </Text>
+                </View>
                 <Text style={[styles.callNumber, idx > 0 && { fontSize: 13 }]}>{call.phoneNumber}</Text>
                 {call.customer ? (
                   <Text style={[styles.callCustomer, idx > 0 && { fontSize: 11 }]}>{call.customer.name}</Text>
                 ) : (
-                  <Text style={[styles.callCustomer, idx > 0 && { fontSize: 11 }]}>
-                    {language === "ar" ? "عميل جديد" : language === "de" ? "Neuer Kunde" : "New Customer"}
+                  <Text style={[styles.callCustomer, idx > 0 && { fontSize: 11 }, { opacity: 0.8 }]}>
+                    {language === "ar" ? "رقم في السلة" : language === "de" ? "Nummer im Warenkorb" : "Number added to cart"}
                   </Text>
                 )}
               </View>
               <View style={{ flexDirection: "row", gap: 6 }}>
                 <Pressable
-                  style={[styles.callActionBtn, { backgroundColor: Colors.success }]}
-                  onPress={() => {
-                    if (call.customer) {
-                      cart.setCustomerId(call.customer.id);
-                      setPhoneInput(call.phoneNumber);
-                    } else {
-                      setNewCustomerForm({ name: "", phone: call.phoneNumber, address: "", email: "" });
-                      setPhoneInput(call.phoneNumber);
-                      setShowNewCustomerForm(true);
-                    }
-                    setIncomingCalls((prev) => prev.filter((c) => c.id !== call.id));
-                  }}
+                  style={[styles.callActionBtn, { backgroundColor: "rgba(255,255,255,0.25)" }]}
+                  onPress={() => setIncomingCalls((prev) => prev.filter((c) => c.id !== call.id))}
                 >
                   <Ionicons name="checkmark" size={18} color={Colors.white} />
                 </Pressable>
                 <Pressable
                   style={[styles.callActionBtn, { backgroundColor: Colors.danger }]}
-                  onPress={() => setIncomingCalls((prev) => prev.filter((c) => c.id !== call.id))}
+                  onPress={() => {
+                    // Undo: clear the caller from the cart
+                    cart.setCustomerId(null);
+                    setPhoneInput("");
+                    setIncomingCalls((prev) => prev.filter((c) => c.id !== call.id));
+                  }}
                 >
                   <Ionicons name="close" size={18} color={Colors.white} />
                 </Pressable>
