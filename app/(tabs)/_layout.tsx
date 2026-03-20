@@ -19,6 +19,7 @@ export default function TabLayout() {
   const { subscription, tenant } = useLicense();
   const tenantId = tenant?.id;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const notifPulse = useRef(new Animated.Value(1)).current;
   const [pendingCount, setPendingCount] = useState(0);
 
   const { data: onlineOrders = [] } = useQuery<any[]>({
@@ -46,6 +47,21 @@ export default function TabLayout() {
 
   const { onlineOrderNotification, setOnlineOrderNotification } = useNotifications();
   const router = useRouter();
+
+  // Pulse the notification toast icon while it's visible
+  useEffect(() => {
+    if (onlineOrderNotification) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(notifPulse, { toValue: 1.2, duration: 500, useNativeDriver: Platform.OS !== "web" }),
+          Animated.timing(notifPulse, { toValue: 1, duration: 500, useNativeDriver: Platform.OS !== "web" }),
+        ])
+      ).start();
+    } else {
+      notifPulse.stopAnimation();
+      notifPulse.setValue(1);
+    }
+  }, [onlineOrderNotification]);
 
   if (!isLoggedIn) {
     return <Redirect href="/login" />;
@@ -164,7 +180,7 @@ export default function TabLayout() {
         />
       </Tabs>
 
-      {/* Global Online Order Notification Toast */}
+      {/* Global Online Order Notification Toast — visible on every tab */}
       {onlineOrderNotification && (
         <Pressable
           onPress={() => {
@@ -172,34 +188,54 @@ export default function TabLayout() {
             setOnlineOrderNotification(null);
           }}
           style={{
-            position: "absolute", bottom: 90, left: 16, right: 16,
-            backgroundColor: Colors.surface,
-            borderRadius: 16, padding: 16,
-            borderWidth: 2, borderColor: "#22c55e",
-            flexDirection: isRTL ? "row-reverse" : "row",
-            alignItems: "center", gap: 12,
-            elevation: 10,
-            ...(Platform.OS === "web" ? { boxShadow: "0px 4px 8px rgba(0,0,0,0.4)" } : { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 }),
-            zIndex: 9999,
+            position: "absolute", top: 16, left: 12, right: 12,
+            borderRadius: 18, overflow: "hidden",
+            zIndex: 99999,
+            ...(Platform.OS === "web"
+              ? { boxShadow: "0px 8px 32px rgba(34,197,94,0.45)" }
+              : { elevation: 20, shadowColor: "#22c55e", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.5, shadowRadius: 16 }),
           }}
         >
-          <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: "rgba(34,197,94,0.15)", justifyContent: "center", alignItems: "center" }}>
-            <Text style={{ fontSize: 24 }}>🛵</Text>
+          {/* Green gradient background */}
+          <View style={{
+            backgroundColor: "#14532d",
+            borderWidth: 2, borderColor: "#22c55e",
+            borderRadius: 18, padding: 14,
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center", gap: 12,
+          }}>
+            {/* Pulsing icon */}
+            <Animated.View style={{
+              width: 56, height: 56, borderRadius: 28,
+              backgroundColor: "rgba(34,197,94,0.25)",
+              justifyContent: "center", alignItems: "center",
+              transform: [{ scale: notifPulse }],
+            }}>
+              <Text style={{ fontSize: 28 }}>🛵</Text>
+            </Animated.View>
+
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: "#4ade80", fontWeight: "900", fontSize: 15, letterSpacing: 0.3 }}>
+                🔔 {t("newOnlineOrder" as any) || "New Online Order!"}
+              </Text>
+              <Text style={{ color: "#86efac", fontSize: 13, marginTop: 3, fontWeight: "700" }}>
+                #{onlineOrderNotification.orderNumber} · {onlineOrderNotification.customerName}
+              </Text>
+              <Text style={{ color: "#bbf7d0", fontSize: 13, fontWeight: "800", marginTop: 1 }}>
+                CHF {Number(onlineOrderNotification.totalAmount || 0).toFixed(2)}
+              </Text>
+              <Text style={{ color: "rgba(187,247,208,0.7)", fontSize: 11, marginTop: 3 }}>
+                {t("tapToViewDetails" as any) || "Tap to view details →"}
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={(e) => { e.stopPropagation(); setOnlineOrderNotification(null); }}
+              style={{ padding: 6, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.1)" }}
+            >
+              <Ionicons name="close" size={22} color="#4ade80" />
+            </Pressable>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: "#22c55e", fontWeight: "800", fontSize: 14 }}>
-              {t("newOnlineOrder" as any) || "🔔 New Online Order!"}
-            </Text>
-            <Text style={{ color: Colors.textSecondary, fontSize: 12, marginTop: 2 }}>
-              #{onlineOrderNotification.orderNumber} · {onlineOrderNotification.customerName} · CHF {Number(onlineOrderNotification.totalAmount).toFixed(2)}
-            </Text>
-            <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 1 }}>
-              {t("tapToViewDetails" as any) || "Tap to view details"}
-            </Text>
-          </View>
-          <Pressable onPress={(e) => { e.stopPropagation(); setOnlineOrderNotification(null); }}>
-            <Ionicons name="close" size={20} color={Colors.textMuted} />
-          </Pressable>
         </Pressable>
       )}
     </View>
