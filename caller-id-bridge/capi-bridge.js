@@ -94,11 +94,22 @@ function loadCAPI() {
 
     return true;
   } catch (e) {
-    if (e.message && e.message.includes("Cannot find") || e.code === "MODULE_NOT_FOUND") {
+    if (e.message && (e.message.includes("Cannot find") || e.code === "MODULE_NOT_FOUND")) {
       console.error("[Bridge] koffi not installed. Run: npm install");
-    } else if (e.message && e.message.includes("capi2032")) {
-      console.error("[Bridge] capi2032.dll not found.");
-      console.error("[Bridge] → Install AVM FRITZ!Card USB v2.1 drivers (see install-drivers.md)");
+    } else if (
+      e.message && (
+        e.message.includes("capi2032") ||
+        e.message.includes("The specified module could not be found") ||
+        e.message.includes("Failed to load shared library")
+      )
+    ) {
+      console.error("[Bridge] capi2032.dll not found in C:\\Windows\\System32\\");
+      console.error("[Bridge] → The FRITZ!Card device driver is installed, but the CAPI software");
+      console.error("[Bridge]   layer (capi2032.dll) is missing. You must install the full AVM");
+      console.error("[Bridge]   FRITZ!Card USB v2.1 driver package (not just the device driver).");
+      console.error("[Bridge] → Download from: https://avm.de/service/download/");
+      console.error("[Bridge]   Search: FRITZ!Card USB v2.1 → Windows 10/11");
+      console.error("[Bridge] → See install-drivers.md for full instructions.");
     } else {
       console.error("[Bridge] Failed to load CAPI:", e.message);
     }
