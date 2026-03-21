@@ -10,7 +10,7 @@ if errorlevel 1 (
 )
 
 echo [Service] Removing Windows Service...
-node install-service.js remove
+node "%~dp0install-service.js" remove
 
 echo [OK] Service removed.
 pause

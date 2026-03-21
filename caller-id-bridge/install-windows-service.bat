@@ -28,9 +28,9 @@ if errorlevel 1 (
 )
 
 :: Install npm dependencies (once)
-if not exist "node_modules" (
+if not exist "%~dp0node_modules" (
     echo [Setup] Installing npm packages...
-    call npm install
+    call npm install --prefix "%~dp0"
     if errorlevel 1 (
         echo [ERROR] npm install failed.
         pause
@@ -42,7 +42,7 @@ if not exist "node_modules" (
 node -e "require('node-windows')" >nul 2>&1
 if errorlevel 1 (
     echo [Setup] Installing node-windows...
-    call npm install node-windows --save
+    call npm install node-windows --save --prefix "%~dp0"
     if errorlevel 1 (
         echo [ERROR] Failed to install node-windows.
         pause
@@ -51,11 +51,11 @@ if errorlevel 1 (
 )
 
 :: Create logs directory
-if not exist "logs" mkdir logs
+if not exist "%~dp0logs" mkdir "%~dp0logs"
 
 :: Install the service
 echo [Service] Installing Windows Service...
-node install-service.js
+node "%~dp0install-service.js"
 
 if errorlevel 1 (
     echo.
