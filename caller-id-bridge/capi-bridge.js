@@ -295,7 +295,7 @@ function extractCallerID(msg) {
 }
 
 function parseMsgHeader(buf) {
-  if (buf.length < 12) return null;
+  if (buf.length < 8) return null; // CAPI header is 8 bytes minimum
   return {
     length:  buf.readUInt16LE(0),
     appId:   buf.readUInt16LE(2),
@@ -351,7 +351,7 @@ function processMessage(msgBuf) {
 
   // LISTEN_CONF (cmd=0x05, sub=0x81)
   } else if (hdr.cmd === CMD_LISTEN_CONF && hdr.sub === SUB_CONF) {
-    const info = msgBuf.length >= 14 ? msgBuf.readUInt16LE(12) : -1;
+    const info = msgBuf.length >= 10 ? msgBuf.readUInt16LE(8) : -1; // Info at offset 8
     if (info === 0) {
       console.log("[Bridge] ✓ Listening for incoming calls...");
     } else {
@@ -375,41 +375,43 @@ async function messageLoop() {
 
   while (isRunning) {
     try {
-      // Block until a message arrives (CAPI_WAIT_FOR_SIGNAL)
-      capi.CAPI_WAIT_FOR_SIGNAL(appId);
+      // Poll for messages — do NOT use CAPI_WAIT_FOR_SIGNAL as it blocks Node.js event loop
+      const msgPtrOut = [null];
+      const ret = capi.CAPI_GET_MESSAGE(appId, msgPtrOut);
 
-      // Drain all available messages
-      while (isRunning) {
-        const msgPtrOut = [null];
-        const ret = capi.CAPI_GET_MESSAGE(appId, msgPtrOut);
+      if (ret === 0x1104 || ret === 0x1101) {
+        // Queue empty — yield to event loop then poll again
+        await sleep(pollingIntervalMs);
+        continue;
+      }
 
-        if (ret === 0x1104 || ret === 0x1101) break; // No more messages
+      if (ret !== 0) {
+        console.error(`[Bridge] CAPI_GET_MESSAGE error: 0x${ret.toString(16)}`);
+        await sleep(1000);
+        continue;
+      }
 
-        if (ret === 0 && msgPtrOut[0]) {
-          // koffi returns the buffer pointed to by the out-pointer
-          const rawMsg = msgPtrOut[0];
-          // rawMsg is a Buffer or koffi-managed pointer
-          try {
-            let msgBuf;
-            if (Buffer.isBuffer(rawMsg)) {
-              msgBuf = rawMsg;
-            } else {
-              // koffi returns typed pointer — read as buffer
-              // Length is first 2 bytes; read them first
-              const lenSlice = koffi.decode(rawMsg, koffi.array("uint8", 2));
-              const msgLen = lenSlice[0] | (lenSlice[1] << 8);
-              if (msgLen >= 12 && msgLen <= 4096) {
-                const bytes = koffi.decode(rawMsg, koffi.array("uint8", msgLen));
-                msgBuf = Buffer.from(bytes);
-              }
+      if (msgPtrOut[0]) {
+        const rawMsg = msgPtrOut[0];
+        try {
+          let msgBuf;
+          if (Buffer.isBuffer(rawMsg)) {
+            msgBuf = rawMsg;
+          } else {
+            // koffi returns an opaque pointer — decode via koffi.decode
+            const lenSlice = koffi.decode(rawMsg, koffi.array("uint8", 2));
+            const msgLen = lenSlice[0] | (lenSlice[1] << 8);
+            if (msgLen >= 8 && msgLen <= 4096) {
+              const bytes = koffi.decode(rawMsg, koffi.array("uint8", msgLen));
+              msgBuf = Buffer.from(bytes);
             }
-            if (msgBuf) processMessage(msgBuf);
-          } catch (decodeErr) {
-            console.warn("[Bridge] Decode warning:", decodeErr.message);
           }
-        } else if (ret !== 0) {
-          console.error(`[Bridge] CAPI_GET_MESSAGE error: 0x${ret.toString(16)}`);
-          break;
+          if (msgBuf) {
+            console.log(`[Bridge] MSG: cmd=0x${msgBuf[4]?.toString(16)} sub=0x${msgBuf[5]?.toString(16)} len=${msgBuf.length}`);
+            processMessage(msgBuf);
+          }
+        } catch (decodeErr) {
+          console.warn("[Bridge] Decode warning:", decodeErr.message);
         }
       }
     } catch (e) {

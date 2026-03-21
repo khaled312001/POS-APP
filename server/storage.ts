@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, desc, sql, and, gte, lte, like, ilike, or } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lte, like, ilike, or, isNull } from "drizzle-orm";
 import * as fs from "fs";
 import {
   branches, employees, categories, products, inventory,
@@ -244,7 +244,7 @@ export const storage = {
 
   // Customers
   async getCustomers(search?: string, tenantId?: number) {
-    const conditions: any[] = [eq(customers.isActive, true)];
+    const conditions: any[] = [or(eq(customers.isActive, true), isNull(customers.isActive))];
 
     if (tenantId) {
       conditions.push(eq(customers.tenantId, tenantId));

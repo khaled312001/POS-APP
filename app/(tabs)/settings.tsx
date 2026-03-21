@@ -124,7 +124,7 @@ export default function SettingsScreen() {
   const [importLoading, setImportLoading] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
   const [showCallerIdTest, setShowCallerIdTest] = useState(false);
-  const [testPhoneNumber, setTestPhoneNumber] = useState("0551234567");
+  const [testPhoneNumber, setTestPhoneNumber] = useState("");
   const [callerIdStatus, setCallerIdStatus] = useState<"idle" | "testing" | "done">("idle");
   const [leftHandMode, setLeftHandMode] = useState(false);
   useEffect(() => {
@@ -2423,22 +2423,6 @@ export default function SettingsScreen() {
                 keyboardType="phone-pad"
               />
 
-              {/* Quick Numbers */}
-              <Text style={[styles.label, rtlTextAlign, { marginTop: 16 }]}>{t("quickTest")}</Text>
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap", gap: 8 }}>
-                {["0551234567", "0509876543", "0521112233", "+41791234567"].map((num) => (
-                  <Pressable
-                    key={num}
-                    style={{
-                      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-                      backgroundColor: testPhoneNumber === num ? Colors.accent : Colors.surfaceLight
-                    }}
-                    onPress={() => setTestPhoneNumber(num)}
-                  >
-                    <Text style={{ color: testPhoneNumber === num ? Colors.textDark : Colors.textSecondary, fontSize: 13, fontWeight: "600" }}>{num}</Text>
-                  </Pressable>
-                ))}
-              </View>
 
               {/* Simulate Button */}
               <Pressable
