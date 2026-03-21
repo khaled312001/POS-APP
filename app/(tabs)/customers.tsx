@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
-  StyleSheet, Text, View, FlatList, Pressable, TextInput,
+  StyleSheet, Text, View, Pressable, TextInput,
   Modal, Alert, ScrollView, Platform, ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -73,11 +73,11 @@ export default function CustomersScreen() {
     loadingMore.current = false;
   }, [pageData]);
 
-  const loadMore = useCallback(() => {
+  const loadMore = () => {
     if (isFetching || !hasMore || loadingMore.current) return;
     loadingMore.current = true;
     setOffset(prev => prev + PAGE_SIZE);
-  }, [isFetching, hasMore]);
+  };
 
   const invalidateCustomers = () => {
     qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).includes(`/api/customers?tenantId=${tenant?.id}`) });
@@ -160,48 +160,47 @@ export default function CustomersScreen() {
         )}
       </View>
 
-      <FlatList
-        data={allCustomers}
-        keyExtractor={(item: any) => String(item.id)}
-        contentContainerStyle={styles.list}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.3}
-        renderItem={({ item }: { item: any }) => (
-          <Pressable style={[styles.card, isRTL && { flexDirection: "row-reverse" }]} onPress={() => { setSelectedCustomer(item); setShowDetail(true); }}>
-            <View style={[styles.avatar, isRTL ? { marginLeft: 12, marginRight: 0 } : { marginRight: 12 }]}>
-              <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
-            </View>
-            <View style={styles.cardInfo}>
-              <Text style={[styles.cardName, rtlTextAlign]}>{item.name}</Text>
-              <Text style={[styles.cardMeta, rtlTextAlign]}>{item.phone || item.email || t("noContactInfo")}</Text>
-            </View>
-            <View style={[styles.cardRight, isRTL && { alignItems: "flex-start" }]}>
-              <View style={[styles.loyaltyBadge, isRTL && { flexDirection: "row-reverse" }]}>
-                <Ionicons name="star" size={12} color={Colors.warning} />
-                <Text style={styles.loyaltyText}>{item.loyaltyPoints || 0}</Text>
-              </View>
-              <Text style={styles.totalSpent}>CHF {Number(item.totalSpent || 0).toFixed(0)}</Text>
-            </View>
-          </Pressable>
+      <ScrollView contentContainerStyle={styles.list}>
+        {isFetching && allCustomers.length === 0 ? (
+          <View style={styles.empty}><ActivityIndicator size="large" color={Colors.textMuted} /></View>
+        ) : allCustomers.length === 0 ? (
+          <View style={styles.empty}>
+            <Ionicons name="people-outline" size={48} color={Colors.textMuted} />
+            <Text style={[styles.emptyText, rtlTextAlign]}>{t("noCustomers")}</Text>
+          </View>
+        ) : (
+          <>
+            {allCustomers.map((item: any) => (
+              <Pressable key={String(item.id)} style={[styles.card, isRTL && { flexDirection: "row-reverse" }]} onPress={() => { setSelectedCustomer(item); setShowDetail(true); }}>
+                <View style={[styles.avatar, isRTL ? { marginLeft: 12, marginRight: 0 } : { marginRight: 12 }]}>
+                  <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={styles.cardInfo}>
+                  <Text style={[styles.cardName, rtlTextAlign]}>{item.name}</Text>
+                  <Text style={[styles.cardMeta, rtlTextAlign]}>{item.phone || item.email || t("noContactInfo")}</Text>
+                </View>
+                <View style={[styles.cardRight, isRTL && { alignItems: "flex-start" }]}>
+                  <View style={[styles.loyaltyBadge, isRTL && { flexDirection: "row-reverse" }]}>
+                    <Ionicons name="star" size={12} color={Colors.warning} />
+                    <Text style={styles.loyaltyText}>{item.loyaltyPoints || 0}</Text>
+                  </View>
+                  <Text style={styles.totalSpent}>CHF {Number(item.totalSpent || 0).toFixed(0)}</Text>
+                </View>
+              </Pressable>
+            ))}
+
+            {hasMore && (
+              <Pressable style={styles.loadMoreBtn} onPress={loadMore} disabled={isFetching}>
+                {isFetching ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <Text style={styles.loadMoreText}>Load More</Text>
+                )}
+              </Pressable>
+            )}
+          </>
         )}
-        ListFooterComponent={
-          isFetching && offset > 0 ? (
-            <View style={{ paddingVertical: 20, alignItems: "center" }}>
-              <ActivityIndicator size="small" color={Colors.textMuted} />
-            </View>
-          ) : null
-        }
-        ListEmptyComponent={
-          isFetching ? (
-            <View style={styles.empty}><ActivityIndicator size="large" color={Colors.textMuted} /></View>
-          ) : (
-            <View style={styles.empty}>
-              <Ionicons name="people-outline" size={48} color={Colors.textMuted} />
-              <Text style={[styles.emptyText, rtlTextAlign]}>{t("noCustomers")}</Text>
-            </View>
-          )
-        }
-      />
+      </ScrollView>
 
       {/* Add / Edit Customer Modal */}
       <Modal visible={showForm} animationType="slide" transparent>
@@ -381,4 +380,6 @@ const styles = StyleSheet.create({
   saveBtn: { borderRadius: 14, overflow: "hidden", marginTop: 20, marginBottom: 16 },
   saveBtnGradient: { paddingVertical: 14, alignItems: "center" },
   saveBtnText: { color: Colors.white, fontSize: 16, fontWeight: "700" },
+  loadMoreBtn: { marginVertical: 16, marginHorizontal: 4, borderRadius: 12, backgroundColor: Colors.gradientMid, paddingVertical: 14, alignItems: "center" },
+  loadMoreText: { color: Colors.white, fontSize: 15, fontWeight: "600" },
 });

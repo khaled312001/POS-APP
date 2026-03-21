@@ -97,26 +97,39 @@ let capi = null;
 let appId = 0;
 let isRunning = false;
 
+// ReadProcessMemory is used to dereference the CAPI message pointer returned by
+// CAPI_GET_MESSAGE. AVM's capi2032.dll writes an 8-byte pointer (to its internal
+// message buffer) into the caller's buffer rather than returning an opaque handle
+// that koffi can decode directly. We therefore read the message bytes via RPM.
+let hProc = null;
+let ReadProcessMemory = null;
+
 function loadCAPI() {
   try {
     koffi = require("koffi");
 
     // Load capi2032.dll — use full path so it works from any location
-    const lib = koffi.load(CAPI_DLL);
+    const lib  = koffi.load(CAPI_DLL);
+    const lib2 = koffi.load(CAPI_DLL); // second handle for GET_MESSAGE (different sig)
 
-    // Register CAPI function signatures.
-    // Try two calling conventions: x64 AVM DLLs return AppID as the return value (4 params),
-    // while classic 32-bit CAPI uses an out-pointer as 5th param.
     const CAPI_REGISTER_OUT    = lib.func("uint32 CAPI_REGISTER(uint32, uint32, uint32, uint32, uint32 *out)");
     const CAPI_RELEASE         = lib.func("uint32 CAPI_RELEASE(uint32)");
     const CAPI_PUT_MESSAGE     = lib.func("uint32 CAPI_PUT_MESSAGE(uint32, uint8 *)");
-    const CAPI_GET_MESSAGE     = lib.func("uint32 CAPI_GET_MESSAGE(uint32, uint8 **out)");
-    const CAPI_WAIT_FOR_SIGNAL = lib.func("uint32 CAPI_WAIT_FOR_SIGNAL(uint32)");
+    // GET_MESSAGE: DLL writes 8-byte pointer into caller's buffer (not pointer-to-pointer)
+    const CAPI_GET_MESSAGE_BUF = lib2.func("uint32 CAPI_GET_MESSAGE(uint32, uint8 *)");
+    // Probe variant (void **out) used only to discover AppID via 0x1104 return code
+    const CAPI_GET_MESSAGE_PRB = lib.func("uint32 CAPI_GET_MESSAGE(uint32, void **out)");
     const CAPI_GET_MANUFACTURER = lib.func("uint32 CAPI_GET_MANUFACTURER(uint8 *out)");
 
-    capi = { CAPI_RELEASE, CAPI_PUT_MESSAGE, CAPI_GET_MESSAGE, CAPI_WAIT_FOR_SIGNAL, CAPI_GET_MANUFACTURER };
+    // kernel32: ReadProcessMemory to dereference the 8-byte CAPI message pointer
+    const kernel32 = koffi.load("kernel32.dll");
+    const GetCurrentProcess = kernel32.func("void *GetCurrentProcess()");
+    ReadProcessMemory = kernel32.func("bool ReadProcessMemory(void *, uintptr, uint8 *, uint32, uint32 *out)");
+    hProc = GetCurrentProcess();
 
-    // Try out-pointer variant first (classic CAPI 2.0)
+    capi = { CAPI_RELEASE, CAPI_PUT_MESSAGE, CAPI_GET_MESSAGE_BUF, CAPI_GET_MESSAGE_PRB, CAPI_GET_MANUFACTURER };
+
+    // Register with CAPI
     const idOut = [0];
     const ret = CAPI_REGISTER_OUT(4096, 2, 7, 2048, idOut);
     if (ret !== 0) {
@@ -128,18 +141,17 @@ function loadCAPI() {
 
     appId = idOut[0];
 
-    // AVM Vista-era capi2032.dll registers but doesn't write AppID to the out-pointer.
-    // Discover the real AppID via CAPI_GET_MESSAGE: 0x1104 = valid handle (empty queue) = ours.
-    // This is more reliable than probing PUT_MESSAGE (which can match orphaned registrations).
+    // AVM Vista-era capi2032.dll never writes AppID to the out-pointer.
+    // Discover the real AppID: GET_MESSAGE returns 0x1104 (queue empty) for valid handles.
     if (appId === 0) {
-      console.log("[Bridge] AppID=0 from out-pointer — probing GET_MESSAGE for actual AppID...");
+      console.log("[Bridge] AppID=0 — probing GET_MESSAGE for actual AppID...");
       let found = false;
       for (let id = 1; id <= 16; id++) {
-        const msgPtrOut = [null];
-        const gr = capi.CAPI_GET_MESSAGE(id, msgPtrOut);
-        if (gr === 0x1104) { // CAPI_QUEUE_EMPTY — valid handle, empty queue
+        const p = [null];
+        const gr = capi.CAPI_GET_MESSAGE_PRB(id, p);
+        if (gr === 0x1104) {
           appId = id;
-          console.log(`[Bridge] AppID discovered via GET_MESSAGE probe: ${appId}`);
+          console.log(`[Bridge] AppID discovered: ${appId}`);
           found = true;
           break;
         }
@@ -152,7 +164,6 @@ function loadCAPI() {
 
     console.log(`[Bridge] CAPI registered. AppID = ${appId}`);
 
-    // Print manufacturer info
     try {
       const mfgBuf = Buffer.alloc(64).fill(0);
       capi.CAPI_GET_MANUFACTURER(mfgBuf);
@@ -172,12 +183,7 @@ function loadCAPI() {
       )
     ) {
       console.error("[Bridge] capi2032.dll not found in C:\\Windows\\System32\\");
-      console.error("[Bridge] → The FRITZ!Card device driver is installed, but the CAPI software");
-      console.error("[Bridge]   layer (capi2032.dll) is missing. You must install the full AVM");
-      console.error("[Bridge]   FRITZ!Card USB v2.1 driver package (not just the device driver).");
-      console.error("[Bridge] → Download from: https://avm.de/service/download/");
-      console.error("[Bridge]   Search: FRITZ!Card USB v2.1 → Windows 10/11");
-      console.error("[Bridge] → See install-drivers.md for full instructions.");
+      console.error("[Bridge] → Install the full AVM FRITZ!Card USB v2.1 driver package.");
     } else {
       console.error("[Bridge] Failed to load CAPI:", e.message);
     }
@@ -257,15 +263,15 @@ function buildDisconnectResp(ncci) {
  *   [4]     Command (0x02)
  *   [5]     SubCmd  (0x82)
  *   [6..7]  MsgNumber
- *   [8..11] PLCI
- *   [12..15] CIPValue
- *   [16]    CalledPartyNumber struct  → [len][data...]
- *   [16+1+calledLen] CallingPartyNumber struct → [len][typeInfo][digits...]
+ *   [8..11]  PLCI
+ *   [12..13] CIPValue (WORD = 2 bytes)
+ *   [14]     CalledPartyNumber struct  → [len][data...]
+ *   [14+1+calledLen] CallingPartyNumber struct → [len][type][presentation][digits...]
  */
 function extractCallerID(msg) {
   try {
     if (msg.length < 20) return null;
-    let o = 16;
+    let o = 14;  // CIPValue is WORD (2 bytes) → CalledPartyNumber starts at offset 14
 
     // Skip CalledPartyNumber struct
     const calledLen = msg.readUInt8(o);
@@ -343,7 +349,8 @@ function processMessage(msgBuf) {
 
   // LISTEN_CONF (cmd=0x05, sub=0x81)
   } else if (hdr.cmd === CMD_LISTEN_CONF && hdr.sub === SUB_CONF) {
-    const info = msgBuf.length >= 10 ? msgBuf.readUInt16LE(8) : -1; // Info at offset 8
+    // LISTEN_CONF: header(8) + Controller(4) + Info(2) → Info at offset 12
+    const info = msgBuf.length >= 14 ? msgBuf.readUInt16LE(12) : -1;
     if (info === 0) {
       console.log("[Bridge] ✓ Listening for incoming calls...");
     } else {
@@ -365,14 +372,19 @@ async function sleep(ms) {
 async function messageLoop() {
   console.log("[Bridge] Message loop started.");
 
+  // ptrHolder: 8-byte buffer that receives the CAPI message pointer from GET_MESSAGE.
+  // AVM's capi2032.dll writes the pointer as raw bytes (not via koffi's out-param mechanism),
+  // so we pass a plain buffer and use ReadProcessMemory to dereference it.
+  const ptrHolder = Buffer.alloc(8, 0);
+  const msgBuf    = Buffer.alloc(512, 0);
+  const nReadOut  = [0];
+
   while (isRunning) {
     try {
-      // Poll for messages — do NOT use CAPI_WAIT_FOR_SIGNAL as it blocks Node.js event loop
-      const msgPtrOut = [null];
-      const ret = capi.CAPI_GET_MESSAGE(appId, msgPtrOut);
+      ptrHolder.fill(0);
+      const ret = capi.CAPI_GET_MESSAGE_BUF(appId, ptrHolder);
 
       if (ret === 0x1104 || ret === 0x1101) {
-        // Queue empty — yield to event loop then poll again
         await sleep(pollingIntervalMs);
         continue;
       }
@@ -383,29 +395,25 @@ async function messageLoop() {
         continue;
       }
 
-      if (msgPtrOut[0]) {
-        const rawMsg = msgPtrOut[0];
-        try {
-          let msgBuf;
-          if (Buffer.isBuffer(rawMsg)) {
-            msgBuf = rawMsg;
-          } else {
-            // koffi returns an opaque pointer — decode via koffi.decode
-            const lenSlice = koffi.decode(rawMsg, koffi.array("uint8", 2));
-            const msgLen = lenSlice[0] | (lenSlice[1] << 8);
-            if (msgLen >= 8 && msgLen <= 4096) {
-              const bytes = koffi.decode(rawMsg, koffi.array("uint8", msgLen));
-              msgBuf = Buffer.from(bytes);
-            }
-          }
-          if (msgBuf) {
-            console.log(`[Bridge] MSG: cmd=0x${msgBuf[4]?.toString(16)} sub=0x${msgBuf[5]?.toString(16)} len=${msgBuf.length}`);
-            processMessage(msgBuf);
-          }
-        } catch (decodeErr) {
-          console.warn("[Bridge] Decode warning:", decodeErr.message);
-        }
-      }
+      // Read the 8-byte pointer written by the DLL
+      const ptrLo  = ptrHolder.readUInt32LE(0);
+      const ptrHi  = ptrHolder.readUInt32LE(4);
+      const ptrNum = ptrHi * 0x100000000 + ptrLo;
+      if (ptrNum === 0) continue;
+
+      // Dereference via ReadProcessMemory
+      msgBuf.fill(0);
+      nReadOut[0] = 0;
+      const ok = ReadProcessMemory(hProc, ptrNum, msgBuf, 512, nReadOut);
+      if (!ok) continue;
+
+      const msgLen = msgBuf.readUInt16LE(0);
+      if (msgLen < 8 || msgLen > 512) continue;
+
+      const msg = msgBuf.subarray(0, msgLen);
+      console.log(`[Bridge] MSG: cmd=0x${msg[4]?.toString(16)} sub=0x${msg[5]?.toString(16)} len=${msgLen}`);
+      processMessage(msg);
+
     } catch (e) {
       if (isRunning) {
         console.error("[Bridge] Loop error:", e.message);
