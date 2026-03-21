@@ -336,12 +336,10 @@ export default function OnlineOrdersScreen() {
               <Ionicons name="close" size={18} color={Colors.danger} />
             </Pressable>
           )}
-          {/* Delete button (completed/cancelled orders) */}
-          {(item.status === "delivered" || item.status === "cancelled") && (
-            <Pressable style={styles.deleteBtn} onPress={() => deleteOrder(item.id)}>
-              <Ionicons name="trash-outline" size={16} color={Colors.danger} />
-            </Pressable>
-          )}
+          {/* Delete button — always visible for all orders */}
+          <Pressable style={styles.deleteBtn} onPress={() => deleteOrder(item.id)}>
+            <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+          </Pressable>
         </View>
       </Animated.View>
     );

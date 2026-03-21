@@ -114,7 +114,7 @@ export class CallerIDService extends EventEmitter {
    * Handles an incoming call notification, assigning to the next free slot (1-4)
    * Automatically looks up the customer by phone number across all tenants (or specific tenant)
    */
-  public async handleIncomingCall(phoneNumber: string, preferredSlot?: number, tenantId?: number) {
+  public async handleIncomingCall(phoneNumber: string, preferredSlot?: number, tenantId?: number): Promise<ActiveCall | null> {
     const normalized = normalizePhone(phoneNumber);
     console.log(`[CallerID] Incoming call from: ${phoneNumber} (normalized: ${normalized})`);
 
@@ -126,7 +126,7 @@ export class CallerIDService extends EventEmitter {
     }
     if (!slot) {
       console.warn("[CallerID] All 4 call slots occupied, dropping call from:", phoneNumber);
-      return;
+      return null;
     }
 
     let customer: ActiveCall["customer"] = null;
@@ -180,6 +180,7 @@ export class CallerIDService extends EventEmitter {
     }
 
     this.emit("call", phoneNumber, slot, customer);
+    return callInfo;
   }
 
   /**

@@ -181,7 +181,14 @@ export default function POSScreen() {
     enabled: true,
   });
 
-  const tenantCategories = categories;
+  // Sort categories: pizza first, then rest by sortOrder
+  const tenantCategories = [...(categories as any[])].sort((a, b) => {
+    const aIsPizza = (a.name || "").toLowerCase().includes("pizza");
+    const bIsPizza = (b.name || "").toLowerCase().includes("pizza");
+    if (aIsPizza && !bIsPizza) return -1;
+    if (!aIsPizza && bIsPizza) return 1;
+    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+  });
 
   const { data: allEmployees = [] } = useQuery<any[]>({
     queryKey: ["/api/employees", tenantId ? `?tenantId=${tenantId}` : ""],

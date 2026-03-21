@@ -17,27 +17,12 @@ import { useLicense } from "@/lib/license-context";
 import { useLanguage } from "@/lib/language-context";
 
 const AnimatedProductImage = ({ uri }: { uri: string }) => {
-  const anim = React.useRef(new Animated.Value(0)).current;
-  React.useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration: 2000, useNativeDriver: true }),
-        Animated.timing(anim, { toValue: 0, duration: 2000, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
-  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.95] });
-  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 0.5] });
-
   return (
-    <Animated.View style={{ transform: [{ scale }], opacity }}>
-      <Image
-        source={{ uri }}
-        style={{ width: 34, height: 34, borderRadius: 8 }}
-        resizeMode="cover"
-        blurRadius={3}
-      />
-    </Animated.View>
+    <Image
+      source={{ uri }}
+      style={{ width: 44, height: 44, borderRadius: 10 }}
+      resizeMode="cover"
+    />
   );
 };
 

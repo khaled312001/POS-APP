@@ -19,6 +19,55 @@ import { Platform } from "react-native";
 
 SplashScreen.preventAutoHideAsync();
 
+// ── Service Worker + Web Push Registration ──────────────────────────────────
+if (Platform.OS === "web" && typeof window !== "undefined" && "serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    try {
+      // Register service worker
+      const reg = await navigator.serviceWorker.register("/app/sw.js", { scope: "/app/" });
+      console.log("[SW] Registered:", reg.scope);
+
+      // Request push permission and subscribe
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        try {
+          // Get VAPID public key
+          const keyRes = await fetch("/api/push/vapid-public-key");
+          const { publicKey } = await keyRes.json();
+
+          // Subscribe to push
+          const existing = await reg.pushManager.getSubscription();
+          const sub = existing || await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey),
+          });
+
+          // Send subscription to server
+          await fetch("/api/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(sub.toJSON()),
+          });
+          console.log("[Push] Subscribed successfully");
+        } catch (pushErr) {
+          console.warn("[Push] Subscription failed:", pushErr);
+        }
+      }
+    } catch (err) {
+      console.warn("[SW] Registration failed:", err);
+    }
+  });
+}
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
 // Suppress PWA install prompt on mobile/tablet browsers
 if (Platform.OS === "web" && typeof window !== "undefined") {
   window.addEventListener("beforeinstallprompt", (e) => {

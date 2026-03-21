@@ -44,7 +44,8 @@
       "Bash(ls -la /f/POS-APP/app/\\\\\\(tabs\\\\\\)/)",
       "Bash(find F:/POS-APP/components -type f \\\\\\( -name \"*.js\" -o -name \"*.jsx\" -o -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) 2>/dev/null | head -40)",
       "Bash(wc -l F:/POS-APP/app/\\\\\\(tabs\\\\\\)/index.tsx)",
-      "Bash(find \"F:/POS-APP\" -name \"*capi*\" -o -name \"*bridge*\" -o -name \"*caller*\" 2>/dev/null | grep -v node_modules | grep -v \".git\")"
+      "Bash(find \"F:/POS-APP\" -name \"*capi*\" -o -name \"*bridge*\" -o -name \"*caller*\" 2>/dev/null | grep -v node_modules | grep -v \".git\")",
+      "Bash(ls \"F:/POS-APP/dist/\" 2>/dev/null | head -20; find \"F:/POS-APP/dist\" -name \"manifest.json\" -o -name \"sw.js\" -o -name \"service-worker*\" 2>/dev/null | head -5)"
     ]
   }
 }

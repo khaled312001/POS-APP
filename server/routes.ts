@@ -6,6 +6,7 @@ import fs from "node:fs";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { callerIdService } from "./callerIdService";
+import { pushService } from "./pushService";
 import { requireSuperAdmin } from "./superAdminAuth";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { sendLicenseKeyEmail } from "./emailService";
@@ -1974,11 +1975,32 @@ async function test(){
       return res.status(401).json({ error: "Unauthorized" });
     }
     const { phoneNumber, tenantId, slot } = req.body;
-    await callerIdService.handleIncomingCall(
+    const callInfo = await callerIdService.handleIncomingCall(
       phoneNumber || "0123456789",
       slot ? Number(slot) : undefined,
       tenantId ? Number(tenantId) : undefined
     );
+    // Web Push: notify all subscribed browsers (even closed tabs)
+    const customerName = (callInfo as any)?.customer?.name;
+    pushService.notifyIncomingCall(phoneNumber || "0123456789", customerName).catch(() => {});
+    res.json({ success: true });
+  });
+
+  // ── Web Push Subscription ─────────────────────────────────────────────────
+  app.get("/api/push/vapid-public-key", (_req, res) => {
+    res.json({ publicKey: pushService.publicKey });
+  });
+
+  app.post("/api/push/subscribe", (req, res) => {
+    const sub = req.body;
+    if (!sub || !sub.endpoint) return res.status(400).json({ error: "Invalid subscription" });
+    pushService.subscribe(sub);
+    res.json({ success: true });
+  });
+
+  app.post("/api/push/unsubscribe", (req, res) => {
+    const { endpoint } = req.body;
+    if (endpoint) pushService.unsubscribe(endpoint);
     res.json({ success: true });
   });
 
@@ -2121,11 +2143,13 @@ async function test(){
         console.error("[Commission] Failed to track commission:", commErr);
       }
 
-      // Broadcast to all connected POS clients
+      // Broadcast to all connected POS clients (WebSocket)
       callerIdService.broadcast({
         type: "new_online_order",
         order,
       });
+      // Web Push: notify even closed browser tabs
+      pushService.notifyNewOrder(orderNumber, orderData.totalAmount || "0").catch(() => {});
 
       // ── WhatsApp notifications ────────────────────────────────
       try {
