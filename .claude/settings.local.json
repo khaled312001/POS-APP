@@ -45,7 +45,13 @@
       "Bash(find F:/POS-APP/components -type f \\\\\\( -name \"*.js\" -o -name \"*.jsx\" -o -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) 2>/dev/null | head -40)",
       "Bash(wc -l F:/POS-APP/app/\\\\\\(tabs\\\\\\)/index.tsx)",
       "Bash(find \"F:/POS-APP\" -name \"*capi*\" -o -name \"*bridge*\" -o -name \"*caller*\" 2>/dev/null | grep -v node_modules | grep -v \".git\")",
-      "Bash(ls \"F:/POS-APP/dist/\" 2>/dev/null | head -20; find \"F:/POS-APP/dist\" -name \"manifest.json\" -o -name \"sw.js\" -o -name \"service-worker*\" 2>/dev/null | head -5)"
+      "Bash(ls \"F:/POS-APP/dist/\" 2>/dev/null | head -20; find \"F:/POS-APP/dist\" -name \"manifest.json\" -o -name \"sw.js\" -o -name \"service-worker*\" 2>/dev/null | head -5)",
+      "Bash(npx cross-env:*)",
+      "Bash(git -C F:/POS-APP show HEAD:dist/sw.js)",
+      "Bash(git -C F:/POS-APP show HEAD:dist/manifest.webmanifest)",
+      "Bash(git -C F:/POS-APP log --oneline -3 dist/sw.js)",
+      "Bash(git -C F:/POS-APP show 71b37ca:dist/sw.js)",
+      "Bash(git -C F:/POS-APP show 71b37ca -- dist/sw.js)"
     ]
   }
 }

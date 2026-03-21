@@ -1,15 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Animated, Platform, Linking, ScrollView, Dimensions, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Animated, Platform, Linking, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLicense } from '@/lib/license-context';
 import { Colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
 
 import { useLanguage } from '@/lib/language-context';
-import { makeRedirectUri } from 'expo-auth-session';
 
 
 
@@ -17,38 +14,14 @@ const WEBSITE_URL = 'https://pos.barmagly.tech/';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function LicenseGate() {
-    const { isValidating, isValid, validateLicense, validateGoogleLogin, errorReason, deviceId } = useLicense();
+    const { isValidating, isValid, validateLicense, errorReason, deviceId } = useLicense();
     const [email, setEmail] = useState('');
     const [key, setKey] = useState('');
     const [loading, setLoading] = useState(false);
     const [focusedField, setFocusedField] = useState<string | null>(null);
     const router = useRouter();
 
-    // Google Sign-In
-    const [request, response, promptAsync] = Google.useAuthRequest({
-        androidClientId: "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com",
-        webClientId: "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com",
-        redirectUri: Platform.OS === 'web'
-            ? "https://pos.barmagly.tech/app"
-            : makeRedirectUri({ scheme: 'barmagly' }),
-    });
-
     const { t } = useLanguage();
-
-    useEffect(() => {
-        if (response?.type === 'success') {
-            const { id_token } = response.params;
-            if (id_token) {
-                setLoading(true);
-                validateGoogleLogin(id_token).finally(() => setLoading(false));
-            }
-        } else if (response?.type === 'error' || response?.type === 'cancel') {
-            const details = (response as any).error?.message || response?.type;
-            if (response?.type === 'error') {
-                Alert.alert(t('error'), `Google Sign-In failed: ${details}`);
-            }
-        }
-    }, [response]);
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -165,21 +138,10 @@ export default function LicenseGate() {
                     {/* Header */}
                     <Text style={styles.title}>{t('activateStore')}</Text>
                     <Text style={styles.subtitle}>
-                        {t('activateStoreSubtitle').split(t('fourteenDayTrial'))[0]}
-                        <Text style={styles.trialHighlight}>{t('fourteenDayTrial')}</Text>
-                        {t('activateStoreSubtitle').split(t('fourteenDayTrial'))[1]}
+                        Enter your store email and license key to activate, or subscribe to start your{' '}
+                        <Text style={styles.trialHighlight}>14-day free trial</Text>
+                        {' '}instantly.
                     </Text>
-
-                    {/* Google Login Button */}
-                    <TouchableOpacity
-                        style={styles.googleButton}
-                        onPress={() => promptAsync()}
-                        disabled={!request || loading}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="logo-google" size={20} color="#fff" />
-                        <Text style={styles.googleButtonText}>{t('signInWithGoogle')}</Text>
-                    </TouchableOpacity>
 
                     <TouchableOpacity
                         style={styles.subscribeButton}

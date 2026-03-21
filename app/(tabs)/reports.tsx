@@ -22,6 +22,7 @@ import { Colors } from "@/constants/colors";
 import { getQueryFn, getApiUrl } from "@/lib/query-client";
 import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
+import { useLicense } from "@/lib/license-context";
 
 type TabType = "overview" | "sales" | "inventory" | "returns" | "finance" | "activity";
 
@@ -384,6 +385,8 @@ export default function ReportsScreen() {
   const insets = useSafeAreaInsets();
   const { t, isRTL, rtlRow, rtlTextAlign, rtlText } = useLanguage();
   const { isCashier } = useAuth();
+  const { tenant } = useLicense();
+  const tenantId = tenant?.id;
   const [screenDims, setScreenDims] = useState(Dimensions.get("window"));
   useEffect(() => {
     const sub = Dimensions.addEventListener("change", ({ window }) => setScreenDims(window));
@@ -398,23 +401,27 @@ export default function ReportsScreen() {
   const [showDatePicker, setShowDatePicker] = useState<"specific" | "from" | "to" | null>(null);
 
   const { data: stats } = useQuery<any>({
-    queryKey: ["/api/dashboard"],
+    queryKey: ["/api/dashboard", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
   });
 
   const { data: salesData = [] } = useQuery<any[]>({
-    queryKey: ["/api/sales?limit=20"],
+    queryKey: ["/api/sales", tenantId ? `?tenantId=${tenantId}&limit=20` : "?limit=20"],
     queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
   });
 
   const { data: lowStock = [] } = useQuery<any[]>({
-    queryKey: ["/api/inventory/low-stock"],
+    queryKey: ["/api/inventory/low-stock", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
   });
 
   const { data: allProducts = [] } = useQuery<any[]>({
-    queryKey: ["/api/products"],
+    queryKey: ["/api/products", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
   });
 
   const { data: activityLog = [] } = useQuery<any[]>({

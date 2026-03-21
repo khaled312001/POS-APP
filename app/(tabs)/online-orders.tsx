@@ -146,24 +146,25 @@ export default function OnlineOrdersScreen() {
   };
 
   const deleteOrder = async (id: number) => {
-    Alert.alert(
-      language === "ar" ? "حذف الطلب" : language === "de" ? "Bestellung löschen?" : "Delete Order?",
-      language === "ar" ? "سيتم حذف هذا الطلب نهائياً" : language === "de" ? "Diese Bestellung wird dauerhaft gelöscht." : "This will permanently delete the order.",
-      [
-        { text: language === "ar" ? "إلغاء" : language === "de" ? "Abbrechen" : "Cancel", style: "cancel" },
-        {
-          text: language === "ar" ? "حذف" : language === "de" ? "Löschen" : "Delete", style: "destructive",
-          onPress: async () => {
-            try {
-              await apiRequest("DELETE", `/api/online-orders/${id}`);
-              qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-            } catch {
-              Alert.alert("Error", "Failed to delete order");
-            }
-          },
-        },
-      ]
-    );
+    const confirmed = Platform.OS === "web"
+      ? window.confirm(language === "ar" ? "سيتم حذف هذا الطلب نهائياً" : language === "de" ? "Bestellung dauerhaft löschen?" : "Permanently delete this order?")
+      : await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            language === "ar" ? "حذف الطلب" : language === "de" ? "Bestellung löschen?" : "Delete Order?",
+            language === "ar" ? "سيتم حذف هذا الطلب نهائياً" : language === "de" ? "Diese Bestellung wird dauerhaft gelöscht." : "This will permanently delete the order.",
+            [
+              { text: language === "ar" ? "إلغاء" : language === "de" ? "Abbrechen" : "Cancel", style: "cancel", onPress: () => resolve(false) },
+              { text: language === "ar" ? "حذف" : language === "de" ? "Löschen" : "Delete", style: "destructive", onPress: () => resolve(true) },
+            ]
+          );
+        });
+    if (!confirmed) return;
+    try {
+      await apiRequest("DELETE", `/api/online-orders/${id}`);
+      qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+    } catch {
+      Alert.alert("Error", "Failed to delete order");
+    }
   };
 
   const openEditOrder = (order: any) => {

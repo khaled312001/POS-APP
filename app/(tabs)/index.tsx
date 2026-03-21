@@ -328,6 +328,13 @@ export default function POSScreen() {
     const matchesCategory = selectedCategory ? p.categoryId === selectedCategory : true;
     const matchesSearch = search ? p.name.toLowerCase().includes(search.toLowerCase()) : true;
     return matchesCategory && matchesSearch;
+  }).sort((a: any, b: any) => {
+    const aCatIdx = tenantCategories.findIndex((c: any) => c.id === a.categoryId);
+    const bCatIdx = tenantCategories.findIndex((c: any) => c.id === b.categoryId);
+    if (aCatIdx === -1 && bCatIdx === -1) return 0;
+    if (aCatIdx === -1) return 1;
+    if (bCatIdx === -1) return -1;
+    return aCatIdx - bCatIdx;
   });
 
   const selectedCustomer = customers.find((c: any) => c.id === cart.customerId);

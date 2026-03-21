@@ -787,7 +787,7 @@ var storage_exports = {};
 __export(storage_exports, {
   storage: () => storage
 });
-import { eq, desc, sql, and, gte, lte, ilike, or } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lte, ilike, or, isNull } from "drizzle-orm";
 import * as fs from "fs";
 var storage;
 var init_storage = __esm({
@@ -994,8 +994,8 @@ var init_storage = __esm({
         return db.select().from(inventory).where(and(...conditions));
       },
       // Customers
-      async getCustomers(search, tenantId) {
-        const conditions = [eq(customers.isActive, true)];
+      async getCustomers(search, tenantId, limit = 50, offset = 0) {
+        const conditions = [or(eq(customers.isActive, true), isNull(customers.isActive))];
         if (tenantId) {
           conditions.push(eq(customers.tenantId, tenantId));
         }
@@ -1020,7 +1020,7 @@ var init_storage = __esm({
             );
           }
         }
-        return db.select().from(customers).where(and(...conditions)).orderBy(desc(customers.createdAt));
+        return db.select().from(customers).where(and(...conditions)).orderBy(desc(customers.createdAt)).limit(limit).offset(offset);
       },
       async findCustomerByPhone(phone, tenantId) {
         const { getPhoneSearchVariants: getPhoneSearchVariants2, normalizePhone: normalizePhone2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
@@ -2651,12 +2651,12 @@ var init_seedPizzaLemon = __esm({
       { name: "Padrone", description: "Tomaten, Mozzarella, Gorgonzola, Pilze", price: 20, price45: 33, image: IMG("pizzalemon_30_padrone.jpg") },
       { name: "Schloss Pizza", description: "Tomaten, Mozzarella, Kalbfleisch, Speck, scharfe Salami", price: 20, price45: 34, image: IMG("pizzalemon_31_schloss_pizza.jpg") },
       { name: "Italiano", description: "Tomaten, Mozzarella, Rohschinken, Mascarpone, Rucola", price: 20, price45: 34, image: IMG("pizzalemon_32_italiano.jpg") },
-      { name: "Americano", description: "Tomaten, Mozzarella, Speck, Mais, Zwiebeln", price: 20, price45: 34, image: IMG("pizzalemon_33_americano.jpg") },
+      { name: "Americano", description: "Tomaten, Mozzarella, Speck, Mais, Zwiebeln", price: 21, price45: 34, image: IMG("pizzalemon_33_americano.jpg") },
       { name: "Lemon Pizza", description: "Tomaten, Mozzarella, Lammfleisch, Knoblauch, Peperoncini, Scharf", price: 20, price45: 34, image: IMG("pizzalemon_34_lemon_pizza.jpg") }
     ];
     CALZONES = [
       { name: "Calzone", description: "Tomaten, Mozzarella, Schinken, Pilze, Ei", price: 20, image: IMG("pizzalemon_c1_calzone.jpg") },
-      { name: "Calzone Kebab", description: "Tomaten, Mozzarella, Kebabfleisch", price: 23, image: IMG("pizzalemon_c2_calzone_kebab.jpg") },
+      { name: "Calzone Kebab", description: "Tomaten, Mozzarella, Kebabfleisch", price: 20, image: IMG("pizzalemon_c2_calzone_kebab.jpg") },
       { name: "Calzone Verdura", description: "Tomaten, Mozzarella, Saisongem\xFCse", price: 20, image: IMG("pizzalemon_c3_calzone_verdura.jpg") }
     ];
     PIDE = [
@@ -3461,7 +3461,7 @@ var CallerIDService = class extends EventEmitter {
     }
     if (!slot) {
       console.warn("[CallerID] All 4 call slots occupied, dropping call from:", phoneNumber);
-      return;
+      return null;
     }
     let customer = null;
     try {
@@ -3510,6 +3510,7 @@ var CallerIDService = class extends EventEmitter {
       });
     }
     this.emit("call", phoneNumber, slot, customer);
+    return callInfo;
   }
   /**
    * Broadcasts updated slot information to all connected clients
@@ -3543,6 +3544,65 @@ var CallerIDService = class extends EventEmitter {
   }
 };
 var callerIdService = new CallerIDService();
+
+// server/pushService.ts
+import webpush from "web-push";
+var VAPID_PUBLIC = "BN_VRMNof7tvLBE3u4-dJdq7ZBSOHUqrexcuD2Tf81rQe4t1GSkbUNzRGU9DyoXObqFwUa2ef1w4AWhteWalk08";
+var VAPID_PRIVATE = "SYAn5KRDjhIDKcIb7WJr3kgr_LDsLKQYWEIHmcgfnjY";
+var VAPID_EMAIL = "mailto:admin@barmagly.tech";
+webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
+var subscriptions2 = /* @__PURE__ */ new Map();
+var pushService = {
+  /** Public VAPID key for the browser to use when subscribing */
+  publicKey: VAPID_PUBLIC,
+  /** Save a push subscription received from the browser */
+  subscribe(sub) {
+    subscriptions2.set(sub.endpoint, sub);
+    console.log(`[Push] Subscription saved. Total: ${subscriptions2.size}`);
+  },
+  /** Remove a subscription (when browser unsubscribes) */
+  unsubscribe(endpoint) {
+    subscriptions2.delete(endpoint);
+  },
+  /** Send a push payload to all subscribed browsers */
+  async broadcast(payload) {
+    if (subscriptions2.size === 0) return;
+    const msg = JSON.stringify(payload);
+    const failed = [];
+    await Promise.allSettled(
+      Array.from(subscriptions2.values()).map(async (sub) => {
+        try {
+          await webpush.sendNotification(sub, msg);
+        } catch (err) {
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            failed.push(sub.endpoint);
+          } else {
+            console.error("[Push] Send failed:", err.message);
+          }
+        }
+      })
+    );
+    failed.forEach((ep) => subscriptions2.delete(ep));
+  },
+  /** Push: incoming call notification */
+  async notifyIncomingCall(phoneNumber, customerName) {
+    await this.broadcast({
+      type: "incoming_call",
+      title: `\u{1F4DE} Incoming Call`,
+      body: customerName ? `${phoneNumber} \u2014 ${customerName}` : phoneNumber,
+      data: { type: "incoming_call", phoneNumber }
+    });
+  },
+  /** Push: new online order notification */
+  async notifyNewOrder(orderNumber, total) {
+    await this.broadcast({
+      type: "new_online_order",
+      title: "\u{1F6D2} New Online Order",
+      body: `Order #${orderNumber} \u2014 CHF ${Number(total).toFixed(2)}`,
+      data: { type: "new_online_order", orderNumber }
+    });
+  }
+};
 
 // server/superAdminAuth.ts
 init_storage();
@@ -5112,7 +5172,9 @@ async function registerRoutes(app2) {
     try {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
       if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      res.json(await storage.getCustomers(req.query.search, tenantId));
+      const limit = req.query.limit ? Math.min(Number(req.query.limit), 200) : 50;
+      const offset = req.query.offset ? Number(req.query.offset) : 0;
+      res.json(await storage.getCustomers(req.query.search, tenantId, limit, offset));
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -6257,17 +6319,61 @@ async function registerRoutes(app2) {
     await callerIdService.handleIncomingCall(phoneNumber || "0551234567", void 0, tenantId ? Number(tenantId) : void 0);
     res.json({ success: true });
   });
+  app2.get("/api/caller-id/incoming", (_req, res) => {
+    res.send(`<!DOCTYPE html><html><head><title>Caller ID Test</title>
+<style>body{font-family:sans-serif;max-width:400px;margin:40px auto;padding:20px}
+input,button{display:block;width:100%;margin:8px 0;padding:10px;font-size:16px;box-sizing:border-box}
+button{background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer}
+#result{margin-top:16px;padding:12px;border-radius:6px;display:none}
+.ok{background:#d1fae5;color:#065f46}.err{background:#fee2e2;color:#991b1b}</style></head>
+<body><h2>Caller ID Test</h2>
+<input id="phone" placeholder="Phone number" value="01012345678"/>
+<input id="secret" placeholder="Bridge secret" value="fritzbridge-secret-change-me"/>
+<button onclick="test()">Simulate Incoming Call</button>
+<div id="result"></div>
+<script>
+async function test(){
+  const r=document.getElementById('result');
+  r.style.display='block';r.className='';r.textContent='Sending...';
+  try{
+    const res=await fetch('/api/caller-id/incoming',{method:'POST',
+      headers:{'Content-Type':'application/json','x-bridge-secret':document.getElementById('secret').value},
+      body:JSON.stringify({phoneNumber:document.getElementById('phone').value,tenantId:1,slot:1})});
+    const d=await res.json();
+    r.className=res.ok?'ok':'err';
+    r.textContent=res.ok?'\u2713 Success! Check POS for popup.':'\u2717 '+JSON.stringify(d);
+  }catch(e){r.className='err';r.textContent='\u2717 '+e.message;}
+}
+</script></body></html>`);
+  });
   app2.post("/api/caller-id/incoming", async (req, res) => {
     const secret = req.headers["x-bridge-secret"] || req.body.secret;
     if (process.env.CALLER_ID_BRIDGE_SECRET && secret !== process.env.CALLER_ID_BRIDGE_SECRET) {
       return res.status(401).json({ error: "Unauthorized" });
     }
     const { phoneNumber, tenantId, slot } = req.body;
-    await callerIdService.handleIncomingCall(
+    const callInfo = await callerIdService.handleIncomingCall(
       phoneNumber || "0123456789",
       slot ? Number(slot) : void 0,
       tenantId ? Number(tenantId) : void 0
     );
+    const customerName = callInfo?.customer?.name;
+    pushService.notifyIncomingCall(phoneNumber || "0123456789", customerName).catch(() => {
+    });
+    res.json({ success: true });
+  });
+  app2.get("/api/push/vapid-public-key", (_req, res) => {
+    res.json({ publicKey: pushService.publicKey });
+  });
+  app2.post("/api/push/subscribe", (req, res) => {
+    const sub = req.body;
+    if (!sub || !sub.endpoint) return res.status(400).json({ error: "Invalid subscription" });
+    pushService.subscribe(sub);
+    res.json({ success: true });
+  });
+  app2.post("/api/push/unsubscribe", (req, res) => {
+    const { endpoint } = req.body;
+    if (endpoint) pushService.unsubscribe(endpoint);
     res.json({ success: true });
   });
   function sortCategoriesByPriority(cats) {
@@ -6384,6 +6490,8 @@ async function registerRoutes(app2) {
       callerIdService.broadcast({
         type: "new_online_order",
         order
+      });
+      pushService.notifyNewOrder(orderNumber, orderData.totalAmount || "0").catch(() => {
       });
       try {
         const tenant = await storage.getTenant(resolvedTenantId);

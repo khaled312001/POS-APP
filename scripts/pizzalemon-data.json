@@ -1,302 +1,141 @@
 {
   "Pizza": [
-    {
-      "name": "Unknown",
-      "category": "Pizza"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1025"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1024"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1026"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=56"
-    }
+    { "name": "Margherita", "price": 14.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Profumata", "price": 14.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Funghi", "price": 15.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Spinat", "price": 15.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Gorgonzola", "price": 16.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Prosciutto", "price": 16.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Salami", "price": 16.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Diavola", "price": 17.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Arrabbiata", "price": 17.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Siciliana", "price": 17.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Prosciutto e Funghi", "price": 17.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Hawaii", "price": 17.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Tonno", "price": 17.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Piccante", "price": 18.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Raclette", "price": 18.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Fiorentina", "price": 18.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Napoli", "price": 18.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Pizzaiolo", "price": 18.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Kebab Pizza", "price": 19.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Poulet", "price": 19.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Carbonara", "price": 19.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Gamberetti", "price": 19.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Quattro Formaggi", "price": 19.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Quattro Stagioni", "price": 19.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Frutti di Mare", "price": 19.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Verdura", "price": 19.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "A'Casa", "price": 19.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Porcini", "price": 19.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Spezial", "price": 19.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Padrone", "price": 20.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Schloss Pizza", "price": 20.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Italiano", "price": 20.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Lemon Pizza", "price": 20.00, "sizes": ["33cm Normal", "45cm Gross"] },
+    { "name": "Americano", "price": 21.00, "sizes": ["33cm Normal", "45cm Gross"] }
   ],
-  "Döner / Fingerfood": [
-    {
-      "name": "Unknown",
-      "category": "Döner / Fingerfood"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1025"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1024"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1026"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=56"
-    }
+  "Calzone": [
+    { "name": "Calzone", "price": 20.00, "sizes": ["45cm Gross"] },
+    { "name": "Calzone Kebab", "price": 20.00, "sizes": ["45cm Gross"] },
+    { "name": "Calzone Verdura", "price": 20.00, "sizes": ["45cm Gross"] }
   ],
   "Pide": [
-    {
-      "name": "Unknown",
-      "category": "Pide"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1025"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1024"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1026"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=56"
-    }
-  ],
-  "Tellergerichte": [
-    {
-      "name": "Unknown",
-      "category": "Tellergerichte"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1025"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1024"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1026"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=56"
-    }
+    { "name": "Pide mit Käse", "price": 15.00 },
+    { "name": "Pide mit Hackfleisch", "price": 17.00 },
+    { "name": "Pide mit Käse und Hackfleisch", "price": 18.00 },
+    { "name": "Pide mit Käse und Spinat", "price": 18.00 },
+    { "name": "Pide mit Käse und Ei", "price": 18.00 },
+    { "name": "Lemon Pide", "price": 18.00 },
+    { "name": "Lemon Pide Spezial", "price": 20.00 },
+    { "name": "Pide mit Sucuk", "price": 18.00 },
+    { "name": "Pide mit Kebabfleisch", "price": 20.00 }
   ],
   "Lahmacun": [
-    {
-      "name": "Unknown",
-      "category": "Lahmacun"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1025"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1024"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1026"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=56"
-    }
+    { "name": "Lahmacun mit Salat", "price": 15.00 },
+    { "name": "Lahmacun mit Salat und Kebab", "price": 18.00 }
+  ],
+  "Tellergerichte": [
+    { "name": "Döner Teller+Pommes", "price": 18.00 },
+    { "name": "Döner Teller+Salat", "price": 18.00 },
+    { "name": "Döner Teller Komplett", "price": 20.00 },
+    { "name": "Chicken Nuggets 8Stk", "price": 17.00 },
+    { "name": "Pouletschnitzel", "price": 17.00 },
+    { "name": "Pouletflügeli 12Stk", "price": 18.00 },
+    { "name": "Poulet Kebab Teller", "price": 18.00 },
+    { "name": "Lamm Kebab Teller", "price": 22.00 },
+    { "name": "Köfte Teller", "price": 18.00 },
+    { "name": "Cevapcici Teller", "price": 18.00 },
+    { "name": "Falafel Teller", "price": 16.00 },
+    { "name": "Pommes", "price": 10.00 },
+    { "name": "Original Schweins Cordon Bleu", "price": 23.00 }
+  ],
+  "Fingerfood": [
+    { "name": "Döner Kebab Tasche", "price": 13.00 },
+    { "name": "Dürüm Kebab", "price": 13.00 },
+    { "name": "Döner Box", "price": 13.00 },
+    { "name": "Falafel Taschenbrot", "price": 12.00 },
+    { "name": "Falafel Dürüm", "price": 12.00 },
+    { "name": "Poulet Pepito", "price": 12.00 },
+    { "name": "Lamm Pepito", "price": 14.00 },
+    { "name": "Hamburger", "price": 11.00 },
+    { "name": "Lemon Burger", "price": 17.00 },
+    { "name": "Cheeseburger", "price": 13.00 },
+    { "name": "Hamburger Rindfleisch", "price": 12.00 },
+    { "name": "Poulet Kebab Tasche", "price": 13.00 },
+    { "name": "Poulet Kebab Fladen", "price": 13.00 },
+    { "name": "Lamm Kebab Tasche", "price": 14.00 },
+    { "name": "Lamm Kebab Fladen", "price": 14.00 },
+    { "name": "Köfte Taschenbrot", "price": 13.00 },
+    { "name": "Cevapcici Taschenbrot", "price": 13.00 },
+    { "name": "Falafel Box", "price": 12.00 },
+    { "name": "Chicken Nuggets Box", "price": 12.00 },
+    { "name": "Kebab Fladen+Raclette", "price": 15.00 },
+    { "name": "Kebab Tasche+Raclette", "price": 15.00 },
+    { "name": "Kebab Fladen+Speck", "price": 15.00 },
+    { "name": "Kebab Tasche+Speck", "price": 15.00 }
   ],
   "Salat": [
-    {
-      "name": "Unknown",
-      "category": "Salat"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1025"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1024"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1026"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=56"
-    }
+    { "name": "Grüner Salat", "price": 8.00 },
+    { "name": "Gemischter Salat", "price": 9.00 },
+    { "name": "Griechischer Salat", "price": 12.00 },
+    { "name": "Lemon Salat", "price": 13.00 },
+    { "name": "Thon Salat", "price": 10.00 },
+    { "name": "Tomaten Salat", "price": 9.00 },
+    { "name": "Tomaten Mozzarella", "price": 12.00 },
+    { "name": "Knoblibrot", "price": 5.00 },
+    { "name": "Crevettencocktail", "price": 15.00 }
   ],
   "Dessert": [
-    {
-      "name": "Unknown",
-      "category": "Dessert"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1025"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1024"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1026"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=56"
-    }
+    { "name": "Tiramisu", "price": 6.00 },
+    { "name": "Baklava", "price": 8.00 },
+    { "name": "Marlenke", "price": 6.00 },
+    { "name": "Choco-Mousse", "price": 7.00 },
+    { "name": "Mövenpick Glace", "price": 6.00 }
   ],
-  "Softgetränke": [
-    {
-      "name": "Unknown",
-      "category": "Softgetränke"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1025"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1024"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1026"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=56"
-    }
-  ],
-  "Alkoholische Getränke": [
-    {
-      "name": "Unknown",
-      "category": "Alkoholische Getränke"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1025"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1024"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1026"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=56"
-    }
+  "Getränke": [
+    { "name": "Coca-Cola", "price": 4.00, "sizes": ["0.5l Klein", "1.0l Gross"] },
+    { "name": "Fanta", "price": 4.00, "sizes": ["0.5l Klein", "1.0l Gross"] },
+    { "name": "Eistee", "price": 4.00, "sizes": ["0.5l Klein", "1.0l Gross"] },
+    { "name": "Mineralwasser", "price": 4.00, "sizes": ["0.5l Klein", "1.0l Gross"] },
+    { "name": "Uludag Gazoz", "price": 4.00 },
+    { "name": "Rivella", "price": 4.00 },
+    { "name": "Ayran", "price": 4.00 },
+    { "name": "Red Bull", "price": 6.00 }
   ],
   "Bier": [
-    {
-      "name": "Unknown",
-      "category": "Bier"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1025"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1024"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1026"
-    },
-    {
-      "name": "",
-      "price": "N/A",
-      "sizes": [],
-      "link": "https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=56"
-    }
+    { "name": "Müllerbräu", "price": 5.00 },
+    { "name": "Feldschlösschen", "price": 5.00 }
+  ],
+  "Alkoholische Getränke": [
+    { "name": "Rotwein Merlot", "price": 13.00 },
+    { "name": "Weisswein", "price": 15.00 },
+    { "name": "Whisky", "price": 50.00 },
+    { "name": "Vodka", "price": 50.00 },
+    { "name": "Champagner", "price": 30.00 },
+    { "name": "Smirnoff Ice", "price": 6.00 }
+  ],
+  "Tabakwaren": [
+    { "name": "Zigaretten", "price": 0.00, "note": "Aktueller Preis – zählen nicht zum Mindestbestellwert" }
   ]
 }
