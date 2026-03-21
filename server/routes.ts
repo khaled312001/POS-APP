@@ -1984,7 +1984,8 @@ async function test(){
     );
     // Web Push: notify all subscribed browsers (even closed tabs)
     const customerName = (callInfo as any)?.customer?.name;
-    pushService.notifyIncomingCall(phoneNumber || "0123456789", customerName).catch(() => {});
+    const customerAddress = (callInfo as any)?.customer?.address;
+    pushService.notifyIncomingCall(phoneNumber || "0123456789", customerName, customerAddress).catch(() => { });
     res.json({ success: true });
   });
 
@@ -2151,7 +2152,7 @@ async function test(){
         order,
       });
       // Web Push: notify even closed browser tabs
-      pushService.notifyNewOrder(orderNumber, orderData.totalAmount || "0").catch(() => {});
+      pushService.notifyNewOrder(orderNumber, orderData.totalAmount || "0").catch(() => { });
 
       // ── WhatsApp notifications ────────────────────────────────
       try {

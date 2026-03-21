@@ -13,6 +13,7 @@ interface ActiveCall {
     name: string;
     phone: string | null;
     email: string | null;
+    address?: string | null;
     loyaltyPoints: number | null;
     visitCount: number | null;
     totalSpent: string | null;
@@ -39,14 +40,14 @@ export class CallerIDService extends EventEmitter {
    */
   public async init(server: Server) {
     console.log("[CallerID] Initializing Service...");
-    
+
     // Initialize WebSocket Server
     this.wss = new WebSocketServer({ server, path: "/api/ws/caller-id" });
-    
+
     this.wss.on("connection", (ws) => {
       console.log("[CallerID] Client connected to WebSocket");
       ws.send(JSON.stringify({ type: "connected", status: "ready", mode: this.isSimulation ? "simulation" : "hardware" }));
-      
+
       // Send current active calls to newly connected client
       if (this.activeCallSlots.size > 0) {
         const activeCalls = Array.from(this.activeCallSlots.values());
@@ -143,6 +144,7 @@ export class CallerIDService extends EventEmitter {
             name: c.name,
             phone: c.phone,
             email: c.email,
+            address: c.address,
             loyaltyPoints: c.loyaltyPoints,
             visitCount: c.visitCount,
             totalSpent: c.totalSpent,

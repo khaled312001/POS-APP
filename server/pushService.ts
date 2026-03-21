@@ -7,9 +7,9 @@
 
 import webpush from "web-push";
 
-const VAPID_PUBLIC  = "BN_VRMNof7tvLBE3u4-dJdq7ZBSOHUqrexcuD2Tf81rQe4t1GSkbUNzRGU9DyoXObqFwUa2ef1w4AWhteWalk08";
+const VAPID_PUBLIC = "BN_VRMNof7tvLBE3u4-dJdq7ZBSOHUqrexcuD2Tf81rQe4t1GSkbUNzRGU9DyoXObqFwUa2ef1w4AWhteWalk08";
 const VAPID_PRIVATE = "SYAn5KRDjhIDKcIb7WJr3kgr_LDsLKQYWEIHmcgfnjY";
-const VAPID_EMAIL   = "mailto:admin@barmagly.tech";
+const VAPID_EMAIL = "mailto:admin@barmagly.tech";
 
 webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
 
@@ -57,13 +57,15 @@ export const pushService = {
   },
 
   /** Push: incoming call notification */
-  async notifyIncomingCall(phoneNumber: string, customerName?: string) {
+  async notifyIncomingCall(phoneNumber: string, customerName?: string, address?: string) {
+    let body = phoneNumber;
+    if (customerName) body += ` — ${customerName}`;
+    if (address) body += `\n📍 ${address}`;
+
     await this.broadcast({
       type: "incoming_call",
       title: `📞 Incoming Call`,
-      body: customerName
-        ? `${phoneNumber} — ${customerName}`
-        : phoneNumber,
+      body: body,
       data: { type: "incoming_call", phoneNumber },
     });
   },
