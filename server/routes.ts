@@ -1936,6 +1936,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   });
 
+  // Test page for caller-id (browser GET)
+  app.get("/api/caller-id/incoming", (_req, res) => {
+    res.send(`<!DOCTYPE html><html><head><title>Caller ID Test</title>
+<style>body{font-family:sans-serif;max-width:400px;margin:40px auto;padding:20px}
+input,button{display:block;width:100%;margin:8px 0;padding:10px;font-size:16px;box-sizing:border-box}
+button{background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer}
+#result{margin-top:16px;padding:12px;border-radius:6px;display:none}
+.ok{background:#d1fae5;color:#065f46}.err{background:#fee2e2;color:#991b1b}</style></head>
+<body><h2>Caller ID Test</h2>
+<input id="phone" placeholder="Phone number" value="01012345678"/>
+<input id="secret" placeholder="Bridge secret" value="fritzbridge-secret-change-me"/>
+<button onclick="test()">Simulate Incoming Call</button>
+<div id="result"></div>
+<script>
+async function test(){
+  const r=document.getElementById('result');
+  r.style.display='block';r.className='';r.textContent='Sending...';
+  try{
+    const res=await fetch('/api/caller-id/incoming',{method:'POST',
+      headers:{'Content-Type':'application/json','x-bridge-secret':document.getElementById('secret').value},
+      body:JSON.stringify({phoneNumber:document.getElementById('phone').value,tenantId:1,slot:1})});
+    const d=await res.json();
+    r.className=res.ok?'ok':'err';
+    r.textContent=res.ok?'✓ Success! Check POS for popup.':'✗ '+JSON.stringify(d);
+  }catch(e){r.className='err';r.textContent='✗ '+e.message;}
+}
+</script></body></html>`);
+  });
+
   // Incoming call from local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
   app.post("/api/caller-id/incoming", async (req, res) => {
     const secret = (req.headers["x-bridge-secret"] as string) || req.body.secret;

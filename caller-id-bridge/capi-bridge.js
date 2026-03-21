@@ -21,6 +21,42 @@ const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
 
+// ─── Pre-flight: locate capi2032.dll ─────────────────────────────────────────
+const CAPI_DLL_SEARCH = [
+  "C:\\Windows\\System32\\capi2032.dll",
+  "C:\\Windows\\SysWOW64\\capi2032.dll",
+  "C:\\Program Files\\AVM\\FRITZ!Card USB\\capi2032.dll",
+  "C:\\Program Files (x86)\\AVM\\FRITZ!Card USB\\capi2032.dll",
+  "C:\\Program Files\\AVM\\capi2032.dll",
+  "C:\\Program Files (x86)\\AVM\\capi2032.dll",
+  "C:\\AVM\\capi2032.dll",
+];
+let CAPI_DLL = CAPI_DLL_SEARCH.find(p => fs.existsSync(p));
+if (!CAPI_DLL) {
+  console.error("=================================================");
+  console.error("  [ERROR] capi2032.dll NOT FOUND");
+  console.error("=================================================");
+  console.error("");
+  console.error("  Searched in:");
+  CAPI_DLL_SEARCH.forEach(p => console.error("    " + p));
+  console.error("");
+  console.error("  Your FRITZ!Card shows in Device Manager but is");
+  console.error("  using a generic Microsoft driver (from 2005).");
+  console.error("  The AVM CAPI software layer is NOT installed.");
+  console.error("");
+  console.error("  FIX:");
+  console.error("   1. Download full AVM driver:");
+  console.error("      https://avm.de/service/download/");
+  console.error("      Search: FRITZ!Card USB v2.1");
+  console.error("   2. Run installer as Administrator");
+  console.error("   3. Reboot, then start bridge again");
+  console.error("");
+  console.error("  See install-drivers.md for details.");
+  console.error("=================================================");
+  process.exit(1);
+}
+console.log(`[Bridge] Found capi2032.dll at: ${CAPI_DLL}`);
+
 // ─── Config ──────────────────────────────────────────────────────────────────
 const configPath = path.join(__dirname, "config.json");
 if (!fs.existsSync(configPath)) {
@@ -58,8 +94,8 @@ function loadCAPI() {
   try {
     koffi = require("koffi");
 
-    // Load capi2032.dll from system directory
-    const lib = koffi.load("capi2032");
+    // Load capi2032.dll — use full path so it works from any location
+    const lib = koffi.load(CAPI_DLL);
 
     // Register CAPI function signatures
     const CAPI_REGISTER        = lib.func("uint32 CAPI_REGISTER(uint32, uint32, uint32, uint32, uint32 *out)");
@@ -348,11 +384,12 @@ async function messageLoop() {
 // ─── Startup ──────────────────────────────────────────────────────────────────
 async function main() {
   console.log("=================================================");
-  console.log("  FRITZ!Card USB — POS Caller ID Bridge v1.0");
+  console.log("  FRITZ!Card USB - POS Caller ID Bridge v1.0");
   console.log("=================================================");
   console.log(`  Server  : ${serverUrl}`);
   console.log(`  Tenant  : ${tenantId}`);
   console.log(`  Poll ms : ${pollingIntervalMs}`);
+  console.log(`  CAPI DLL: ${CAPI_DLL.replace(/\\/g, "/")}`);
   console.log("=================================================\n");
 
   if (!loadCAPI()) {
