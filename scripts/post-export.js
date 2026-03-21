@@ -103,4 +103,20 @@ const manifestContent = JSON.stringify({
 fs.writeFileSync(path.join(distDir, "sw.js"), swContent);
 fs.writeFileSync(path.join(distDir, "manifest.webmanifest"), manifestContent);
 
+// ── Patch index.html to add manifest link ────────────────────────────────────
+const indexPath = path.join(distDir, "index.html");
+if (fs.existsSync(indexPath)) {
+  let html = fs.readFileSync(indexPath, "utf8");
+  if (!html.includes('rel="manifest"')) {
+    html = html.replace(
+      "</head>",
+      '  <link rel="manifest" href="/app/manifest.webmanifest" />\n  <link rel="apple-touch-icon" href="/app/assets/images/icon.png" />\n  <meta name="mobile-web-app-capable" content="yes" />\n  <meta name="apple-mobile-web-app-capable" content="yes" />\n  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />\n</head>'
+    );
+    fs.writeFileSync(indexPath, html, "utf8");
+    console.log("[post-export] Patched index.html with manifest link.");
+  } else {
+    console.log("[post-export] index.html already has manifest link.");
+  }
+}
+
 console.log("[post-export] Restored sw.js and manifest.webmanifest to dist/");

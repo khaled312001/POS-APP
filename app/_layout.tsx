@@ -33,7 +33,10 @@ if (Platform.OS === "web" && typeof window !== "undefined" && "serviceWorker" in
         try {
           // Get VAPID public key
           const keyRes = await fetch("/api/push/vapid-public-key");
-          const { publicKey } = await keyRes.json();
+          if (!keyRes.ok) throw new Error("VAPID key unavailable");
+          const keyData = await keyRes.json();
+          const publicKey = keyData?.publicKey;
+          if (!publicKey) throw new Error("VAPID public key missing");
 
           // Subscribe to push
           const existing = await reg.pushManager.getSubscription();
@@ -68,10 +71,10 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-// Suppress PWA install prompt on mobile/tablet browsers
+// Store the PWA install prompt for later use (do NOT suppress it)
 if (Platform.OS === "web" && typeof window !== "undefined") {
   window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault();
+    (window as any).__pwaInstallPrompt = e;
   });
 }
 

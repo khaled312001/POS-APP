@@ -401,7 +401,7 @@ export default function ReportsScreen() {
   const [showDatePicker, setShowDatePicker] = useState<"specific" | "from" | "to" | null>(null);
 
   const { data: stats } = useQuery<any>({
-    queryKey: ["/api/dashboard", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryKey: [`/api/dashboard?tenantId=${tenantId}`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });
@@ -413,13 +413,13 @@ export default function ReportsScreen() {
   });
 
   const { data: lowStock = [] } = useQuery<any[]>({
-    queryKey: ["/api/inventory/low-stock", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryKey: [`/api/inventory/low-stock?tenantId=${tenantId}`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });
 
   const { data: allProducts = [] } = useQuery<any[]>({
-    queryKey: ["/api/products", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryKey: [`/api/products?tenantId=${tenantId}`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });

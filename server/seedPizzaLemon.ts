@@ -80,7 +80,51 @@ function drinkSizeModifier(largeExtra: number) {
             required: false,
             options: [
                 { label: "0.5l Klein", price: "0.00" },
-                { label: `1.0l Gross (+${largeExtra.toFixed(2)})`, price: largeExtra.toFixed(2) },
+                { label: `1.5l Gross (+${largeExtra.toFixed(2)})`, price: largeExtra.toFixed(2) },
+            ],
+        },
+    ];
+}
+
+// Sauce modifier for Döner/Kebab sandwiches
+function sauceModifier() {
+    return [
+        {
+            name: "Sauce",
+            required: false,
+            options: [
+                { label: "Cocktailsauce", price: "0.00" },
+                { label: "Joghurtsauce", price: "0.00" },
+                { label: "Joghurt + Cocktail", price: "0.00" },
+            ],
+        },
+    ];
+}
+
+// Side choice for Teller items (Pommes or Salat)
+function sideModifier() {
+    return [
+        {
+            name: "Beilage",
+            required: true,
+            options: [
+                { label: "Pommes Frites", price: "0.00" },
+                { label: "Salat", price: "0.00" },
+            ],
+        },
+    ];
+}
+
+// Dressing choice for salad items
+function dressingModifier() {
+    return [
+        {
+            name: "Salatsauce",
+            required: false,
+            options: [
+                { label: "Italienisch", price: "0.00" },
+                { label: "Französisch", price: "0.00" },
+                { label: "ohne Salatsauce", price: "0.00" },
             ],
         },
     ];
@@ -172,8 +216,9 @@ const TELLERGERICHTE: MenuItem[] = [
 // ─── FINGERFOOD ───────────────────────────────────────────────────────────────
 const FINGERFOOD: MenuItem[] = [
     { name: "Döner Kebab Tasche", description: "Döner Kebab im Taschenbrot", price: 13.00, image: IMG("pizzalemon_60_doener_kebab_tasche.jpg") },
-    { name: "Dürüm Kebab", description: "Döner Kebab im Fladenbrot", price: 13.00, image: IMG("pizzalemon_61_dueruem_kebab.jpg") },
+    { name: "Dürüm Kebab", description: "Döner Kebab im Fladenbrot", price: 14.00, image: IMG("pizzalemon_61_dueruem_kebab.jpg") },
     { name: "Döner Box", description: "Döner Kebab in der Box mit Salat und Pommes", price: 13.00, image: IMG("pizzalemon_62_doener_box.jpg") },
+    { name: "Falafel", description: "Knusprige Falafel im Taschenbrot oder Dürüm", price: 12.00, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
     { name: "Falafel Taschenbrot", description: "Knusprige Falafel im Taschenbrot", price: 12.00, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
     { name: "Falafel Dürüm", description: "Falafel im Fladenbrot", price: 12.00, image: IMG("pizzalemon_64_falafel_dueruem.jpg") },
     { name: "Poulet Pepito", description: "Gegrilltes Poulet im Fladenbrot", price: 12.00, image: IMG("pizzalemon_65_poulet_pepito.jpg") },
@@ -213,27 +258,29 @@ const SALATE: MenuItem[] = [
 const DESSERTS: MenuItem[] = [
     { name: "Tiramisu", description: "Klassisches italienisches Tiramisu", price: 6.00, image: IMG("pizzalemon_92_tiramisu.jpg") },
     { name: "Baklava", description: "Türkisches Baklava mit Honig und Nüssen – Portion 4 Stk.", price: 8.00, image: IMG("pizzalemon_93_baklava.jpg") },
-    { name: "Marlenke", description: "Tschechischer Honigkuchen (Marlenka) mit Honig oder Schokolade", price: 6.00, image: IMG("pizzalemon_94_marlenke.jpg") },
+    { name: "Marlenke mit Honig", description: "Tschechischer Honigkuchen (Marlenka) mit Honig", price: 6.00, image: IMG("pizzalemon_94_marlenke.jpg") },
+    { name: "Marlenke mit Schokolade", description: "Tschechischer Honigkuchen (Marlenka) mit Schokolade", price: 6.00, image: IMG("pizzalemon_94_marlenke.jpg") },
     { name: "Choco-Mousse", description: "Cremige Schokoladenmousse", price: 7.00, image: IMG("pizzalemon_95_choco_mousse.jpg") },
     { name: "Mövenpick Glace", description: "Mövenpick Premium-Glacé – Erdbeer, Schokolade, Vanille, Caramel (175ml)", price: 6.00, image: IMG("pizzalemon_96_moevenpick_glace.jpg") },
 ];
 
 // ─── GETRÄNKE ─────────────────────────────────────────────────────────────────
 const GETRAENKE: MenuItem[] = [
-    { name: "Coca-Cola", description: "Soft Drinks (Cola, Fanta, etc. 50cl)", price: 4.00, image: IMG("pizzalemon_97_coca_cola.jpg") },
-    { name: "Fanta", description: "Soft Drinks (Cola, Fanta, etc. 50cl)", price: 4.00, image: IMG("pizzalemon_98_fanta.jpg") },
-    { name: "Eistee", description: "Soft Drinks (Cola, Fanta, etc. 50cl)", price: 4.00, image: IMG("pizzalemon_99_eistee.jpg") },
-    { name: "Mineralwasser", description: "Mineralwasser", price: 4.00, image: IMG("pizzalemon_100_mineralwasser.jpg") },
-    { name: "Uludag Gazoz", description: "Türkische Limonade Uludag", price: 4.00, image: IMG("pizzalemon_101_uludag_gazoz.jpg") },
-    { name: "Rivella", description: "Rivella", price: 4.00, image: IMG("pizzalemon_102_rivella.jpg") },
-    { name: "Ayran", description: "Türkisches Joghurtgetränk", price: 4.00, image: IMG("pizzalemon_103_ayran.jpg") },
-    { name: "Red Bull", description: "Red Bull Energy Drink", price: 6.00, image: IMG("pizzalemon_104_red_bull.jpg") },
+    { name: "Coca-Cola", description: "Coca-Cola, 0.5l / 1.5l", price: 4.00, image: IMG("pizzalemon_97_coca_cola.jpg") },
+    { name: "Coca-Cola Zero", description: "Coca-Cola Zero, 0.5l / 1.5l", price: 4.00, image: IMG("pizzalemon_97_coca_cola.jpg") },
+    { name: "Fanta", description: "Fanta Orange, 0.5l / 1.5l", price: 6.00, image: IMG("pizzalemon_98_fanta.jpg") },
+    { name: "Eistee Pfirsich", description: "Eistee Pfirsich, 0.5l / 1.5l", price: 4.00, image: IMG("pizzalemon_99_eistee.jpg") },
+    { name: "Uludag Gazoz", description: "Türkische Limonade Uludag, 0.5l", price: 4.00, image: IMG("pizzalemon_101_uludag_gazoz.jpg") },
+    { name: "Rivella Blau", description: "Rivella Blau, 0.5l", price: 4.00, image: IMG("pizzalemon_102_rivella.jpg") },
+    { name: "Rivella Rot", description: "Rivella Rot, 0.5l", price: 4.00, image: IMG("pizzalemon_102_rivella.jpg") },
+    { name: "Ayran", description: "Türkisches Joghurtgetränk, 0.5l", price: 4.00, image: IMG("pizzalemon_103_ayran.jpg") },
+    { name: "Red Bull", description: "Red Bull Energy Drink, 250ml", price: 5.00, image: IMG("pizzalemon_104_red_bull.jpg") },
 ];
 
 // ─── BIER ─────────────────────────────────────────────────────────────────────
 const BIER: MenuItem[] = [
     { name: "Müllerbräu", description: "Schweizer Bier Müllerbräu, 0.5l", price: 5.00, image: IMG("pizzalemon_105_muellerbraeu.jpg") },
-    { name: "Feldschlösschen", description: "Feldschlösschen Bier, 0.5l", price: 5.00, image: IMG("pizzalemon_106_feldschlosschen.jpg") },
+    { name: "Feldschlösschen", description: "Feldschlösschen Bier, 0.5l", price: 5.00, image: IMG("pizzalemon_106_feldschloesschen.jpg") },
 ];
 
 // ─── ALKOHOLISCHE GETRÄNKE ────────────────────────────────────────────────────
@@ -467,14 +514,44 @@ export async function seedPizzaLemon() {
     for (const p of CALZONES) await insertItem("Calzone", p);
     for (const p of PIDE) await insertItem("Pide", p);
     for (const p of LAHMACUN) await insertItem("Lahmacun", p);
-    for (const p of TELLERGERICHTE) await insertItem("Tellergerichte", p);
-    for (const p of FINGERFOOD) await insertItem("Fingerfood", p);
-    for (const p of SALATE) await insertItem("Salat", p);
+
+    // Tellergerichte: items with Pommes/Salat choice get sideModifier
+    const TELLER_WITH_SIDE = new Set([
+        "Chicken Nuggets 8Stk", "Pouletschnitzel", "Pouletflügeli 12Stk",
+        "Poulet Kebab Teller", "Lamm Kebab Teller", "Köfte Teller",
+        "Cevapcici Teller", "Falafel Teller",
+    ]);
+    for (const p of TELLERGERICHTE) {
+        await insertItem("Tellergerichte", p, TELLER_WITH_SIDE.has(p.name) ? sideModifier() : []);
+    }
+
+    // Fingerfood: Döner/Kebab items get sauce modifier
+    const FINGER_WITH_SAUCE = new Set([
+        "Döner Kebab Tasche", "Dürüm Kebab", "Döner Box",
+        "Poulet Kebab Tasche", "Poulet Kebab Fladen",
+        "Lamm Kebab Tasche", "Lamm Kebab Fladen",
+        "Köfte Taschenbrot", "Cevapcici Taschenbrot",
+        "Kebab Fladen+Raclette", "Kebab Tasche+Raclette",
+        "Kebab Fladen+Speck", "Kebab Tasche+Speck",
+    ]);
+    for (const p of FINGERFOOD) {
+        await insertItem("Fingerfood", p, FINGER_WITH_SAUCE.has(p.name) ? sauceModifier() : []);
+    }
+
+    // Salat: green/mixed salads get dressing modifier
+    const SALAT_WITH_DRESSING = new Set([
+        "Grüner Salat", "Gemischter Salat", "Thon Salat", "Lemon Salat",
+    ]);
+    for (const p of SALATE) {
+        await insertItem("Salat", p, SALAT_WITH_DRESSING.has(p.name) ? dressingModifier() : []);
+    }
+
     for (const p of DESSERTS) await insertItem("Dessert", p);
 
-    // Drinks with size modifier for Cola/Fanta/Eistee (4/6 CHF)
+    // Drinks with size modifier for Cola/Zero/Fanta/Eistee (0.5l/1.5l +2.00)
+    const DRINKS_WITH_SIZE = new Set(["Coca-Cola", "Coca-Cola Zero", "Fanta", "Eistee Pfirsich"]);
     for (const p of GETRAENKE) {
-        const sizeMod = ["Coca-Cola", "Fanta", "Eistee"].includes(p.name) ? drinkSizeModifier(2.00) : [];
+        const sizeMod = DRINKS_WITH_SIZE.has(p.name) ? drinkSizeModifier(2.00) : [];
         await insertItem("Getränke", p, sizeMod);
     }
 
@@ -485,7 +562,7 @@ export async function seedPizzaLemon() {
     const total = PIZZAS.length + CALZONES.length + PIDE.length + LAHMACUN.length +
         TELLERGERICHTE.length + FINGERFOOD.length + SALATE.length + DESSERTS.length +
         GETRAENKE.length + BIER.length + ALKOHOL.length + TABAK.length;
-    console.log(`[PIZZA LEMON] ✓ ${total} products inserted with updated images (v3) and prices.`);
+    console.log(`[PIZZA LEMON] ✓ ${total} products inserted with updated images (v4) and prices.`);
 
     // ── Landing page config ────────────────────────────────────────────────────
     const [existingConfig] = await db.select().from(landingPageConfig)
@@ -540,8 +617,8 @@ export async function seedPizzaLemon() {
     await db.insert(tenantNotifications).values({
         tenantId: tenant.id,
         type: "info",
-        title: "Pizza Lemon Katalog aktualisiert (v3)!",
-        message: `Neue Bilder + Preise geladen. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
+        title: "Pizza Lemon Katalog aktualisiert (v4)!",
+        message: `Sauce/Beilage/Dressing Modifiers + neue Getränke. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
         priority: "high",
     }).onConflictDoNothing();
 
@@ -550,5 +627,5 @@ export async function seedPizzaLemon() {
     console.log(`[PIZZA LEMON]    Pass:    ${STORE_PASSWORD}`);
     console.log(`[PIZZA LEMON]    License: ${LICENSE_KEY}`);
     console.log(`[PIZZA LEMON]    Admin PIN: 1234  |  Cashier PIN: 5678`);
-    console.log(`[PIZZA LEMON]    Menu: 35 Pizza, 3 Calzone, 9 Pide, 2 Lahmacun, 13 Tellergerichte, 23 Fingerfood, 9 Salat, 5 Dessert, 8 Getränke, 2 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
+    console.log(`[PIZZA LEMON]    Menu: 34 Pizza, 3 Calzone, 9 Pide, 2 Lahmacun, 13 Tellergerichte, 24 Fingerfood, 9 Salat, 6 Dessert, 9 Getränke, 2 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
 }
