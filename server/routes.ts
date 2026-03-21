@@ -1974,7 +1974,9 @@ async function test(){
     if (process.env.CALLER_ID_BRIDGE_SECRET && secret !== process.env.CALLER_ID_BRIDGE_SECRET) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const { phoneNumber, tenantId, slot } = req.body;
+    const { phoneNumber, slot } = req.body;
+    // tenantId can come from the body (hardware bridge) or from the license-key auth middleware
+    const tenantId = req.body.tenantId || (req as any).tenantId;
     const callInfo = await callerIdService.handleIncomingCall(
       phoneNumber || "0123456789",
       slot ? Number(slot) : undefined,

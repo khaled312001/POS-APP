@@ -102,6 +102,8 @@ export default function POSScreen() {
 
   // Track which call IDs have already been auto-processed so we don't re-run on re-renders
   const processedCallIds = useRef<Set<string>>(new Set());
+  // Store caller's full customer object directly (faster than waiting for customers list)
+  const [callerCustomer, setCallerCustomer] = useState<any>(null);
 
   // AUTO-ASSIGN: when a call comes in, immediately add caller to the current cart
   useEffect(() => {
@@ -111,19 +113,21 @@ export default function POSScreen() {
       if (processedCallIds.current.has(callId)) return;
       processedCallIds.current.add(callId);
 
-      // If the number matches a known customer → assign them to the cart instantly
       if (call.customer) {
+        // Known customer → assign to cart and store full customer object for immediate display
         cart.setCustomerId(call.customer.id);
-        setPhoneInput(call.phoneNumber);
+        setCallerCustomer(call.customer);
+        setPhoneInput(call.customer.phone || call.phoneNumber);
       } else {
-        // Unknown caller → pre-fill the phone field so the cashier can take the order
+        // Unknown caller → pre-fill phone so cashier can look up or create customer
         setPhoneInput(call.phoneNumber);
+        setCallerCustomer(null);
       }
 
-      // Auto-dismiss the popup after 8 seconds and mark as seen
+      // Auto-dismiss the popup after 10 seconds
       setTimeout(() => {
         dismissCall(callId, call.slot);
-      }, 8000);
+      }, 10000);
     });
   }, [incomingCalls]);
 
@@ -197,7 +201,7 @@ export default function POSScreen() {
   });
 
   const { data: customers = [] } = useQuery<any[]>({
-    queryKey: ["/api/customers", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryKey: [`/api/customers?tenantId=${tenantId}`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });
@@ -337,7 +341,9 @@ export default function POSScreen() {
     return aCatIdx - bCatIdx;
   });
 
-  const selectedCustomer = customers.find((c: any) => c.id === cart.customerId);
+  // Use caller's customer directly for immediate display; fall back to loaded customers list
+  const selectedCustomer = customers.find((c: any) => c.id === cart.customerId)
+    || (callerCustomer && callerCustomer.id === cart.customerId ? callerCustomer : null);
 
   const handlePhoneSearch = useCallback((phone: string) => {
     const trimmed = phone.trim();
@@ -345,9 +351,15 @@ export default function POSScreen() {
       cart.setCustomerId(null);
       return;
     }
-    const found = (customers as any[]).find((c: any) => c.phone === trimmed);
+    // Normalize for fuzzy matching: strip spaces, dashes, parens
+    const normalize = (p: string) => p.replace(/[\s\-().+]/g, "");
+    const normTrimmed = normalize(trimmed);
+    const found = (customers as any[]).find((c: any) =>
+      c.phone && normalize(c.phone).includes(normTrimmed.slice(-8))
+    );
     if (found) {
       cart.setCustomerId(found.id);
+      setCallerCustomer(found);
     } else {
       setNewCustomerForm({ name: "", phone: trimmed, address: "", email: "" });
       setShowNewCustomerForm(true);
@@ -518,6 +530,7 @@ export default function POSScreen() {
     generateQR(`barmagly:receipt:${saleData.receiptNumber || saleData.id}`);
     cart.clearCart();
     setPhoneInput("");
+    setCallerCustomer(null);
     setShowCheckout(false);
     setCashReceived("");
     setCardNumber("");
@@ -699,9 +712,28 @@ export default function POSScreen() {
   });
 
   const handleAddToCart = useCallback((product: any) => {
+    // Convert modifiers to variants if no explicit variants exist
+    let enrichedProduct = product;
+    if (
+      (!product.variants || product.variants.length === 0) &&
+      product.modifiers && Array.isArray(product.modifiers) && product.modifiers.length > 0
+    ) {
+      const sizeGroup = product.modifiers.find((m: any) => m.required === true);
+      if (sizeGroup?.options?.length > 0) {
+        const basePrice = Number(product.price);
+        enrichedProduct = {
+          ...product,
+          variants: sizeGroup.options.map((opt: any) => ({
+            name: opt.label,
+            price: basePrice + Number(opt.price),
+          })),
+        };
+      }
+    }
+
     // If product has variants, show options modal (size selection + pizza toppings)
-    if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
-      setSelectedProductForOptions(product);
+    if (enrichedProduct.variants && Array.isArray(enrichedProduct.variants) && enrichedProduct.variants.length > 0) {
+      setSelectedProductForOptions(enrichedProduct);
       setShowToppingsStep(false);
       return;
     }
@@ -931,7 +963,7 @@ export default function POSScreen() {
             <Ionicons name="sync" size={14} color={Colors.textMuted} />
           )}
           {phoneInput ? (
-            <Pressable onPress={() => { setPhoneInput(""); cart.setCustomerId(null); }}>
+            <Pressable onPress={() => { setPhoneInput(""); cart.setCustomerId(null); setCallerCustomer(null); }}>
               <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
             </Pressable>
           ) : null}
@@ -954,7 +986,7 @@ export default function POSScreen() {
               </View>
               {selectedCustomer.email && <Text style={[styles.phoneBarMetaText, { color: Colors.info }]} numberOfLines={1}>{selectedCustomer.email}</Text>}
             </View>
-            <Pressable onPress={() => { cart.setCustomerId(null); setPhoneInput(""); }} style={styles.phoneBarClear}>
+            <Pressable onPress={() => { cart.setCustomerId(null); setPhoneInput(""); setCallerCustomer(null); }} style={styles.phoneBarClear}>
               <Ionicons name="close" size={14} color={Colors.textMuted} />
             </Pressable>
           </Pressable>
@@ -995,20 +1027,41 @@ export default function POSScreen() {
                   </Text>
                 )}
               </View>
-              <View style={[styles.callInfo, isRTL && { alignItems: "flex-end" }]}>
-                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4 }}>
-                  <Ionicons name="checkmark-circle" size={12} color="rgba(255,255,255,0.9)" />
-                  <Text style={[styles.callTitle, idx > 0 && { fontSize: 11 }]}>
-                    {language === "ar" ? "✓ تمت الإضافة تلقائياً" : language === "de" ? "✓ Auto zugewiesen" : "✓ Auto-assigned"}
-                  </Text>
-                </View>
-                <Text style={[styles.callNumber, idx > 0 && { fontSize: 13 }]}>{call.phoneNumber}</Text>
+              <View style={[styles.callInfo, isRTL && { alignItems: "flex-end" }, { flex: 1 }]}>
                 {call.customer ? (
-                  <Text style={[styles.callCustomer, idx > 0 && { fontSize: 11 }]}>{call.customer.name}</Text>
+                  <>
+                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4 }}>
+                      <Ionicons name="person-circle" size={13} color="rgba(255,255,255,0.95)" />
+                      <Text style={[styles.callCustomer, { fontSize: idx === 0 ? 15 : 12, fontWeight: "800" }]}>
+                        {call.customer.name}
+                      </Text>
+                    </View>
+                    <Text style={[styles.callNumber, idx > 0 && { fontSize: 12 }]}>{call.phoneNumber}</Text>
+                    {call.customer.address ? (
+                      <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 10, marginTop: 1 }} numberOfLines={1}>
+                        {call.customer.address}
+                      </Text>
+                    ) : null}
+                    {call.customer.visitCount ? (
+                      <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, marginTop: 1 }}>
+                        {language === "ar" ? `${call.customer.visitCount} زيارة` : language === "de" ? `${call.customer.visitCount} Besuche` : `${call.customer.visitCount} visits`}
+                        {call.customer.totalSpent ? ` · CHF ${Number(call.customer.totalSpent).toFixed(0)}` : ""}
+                      </Text>
+                    ) : null}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
+                      <Ionicons name="checkmark-circle" size={11} color="rgba(255,255,255,0.85)" />
+                      <Text style={{ color: "rgba(255,255,255,0.85)", fontSize: 10, fontWeight: "600" }}>
+                        {language === "ar" ? "أُضيف للفاتورة" : language === "de" ? "Zur Rechnung hinzugefügt" : "Added to invoice"}
+                      </Text>
+                    </View>
+                  </>
                 ) : (
-                  <Text style={[styles.callCustomer, idx > 0 && { fontSize: 11 }, { opacity: 0.8 }]}>
-                    {language === "ar" ? "رقم في السلة" : language === "de" ? "Nummer im Warenkorb" : "Number added to cart"}
-                  </Text>
+                  <>
+                    <Text style={[styles.callNumber, idx > 0 && { fontSize: 13 }]}>{call.phoneNumber}</Text>
+                    <Text style={[styles.callCustomer, idx > 0 && { fontSize: 11 }, { opacity: 0.8 }]}>
+                      {language === "ar" ? "عميل غير معروف · الرقم في السلة" : language === "de" ? "Unbekannt · Nummer im Warenkorb" : "Unknown · Number added to cart"}
+                    </Text>
+                  </>
                 )}
               </View>
               <View style={{ flexDirection: "row", gap: 6 }}>
@@ -1024,6 +1077,7 @@ export default function POSScreen() {
                     // Undo: clear the caller from the cart
                     cart.setCustomerId(null);
                     setPhoneInput("");
+                    setCallerCustomer(null);
                     dismissCall(call.id, call.slot);
                   }}
                 >
@@ -1337,31 +1391,43 @@ export default function POSScreen() {
                   {language === "ar" ? "إضافات اختيارية" : language === "de" ? "EXTRA BELÄGE (OPTIONAL)" : "EXTRA TOPPINGS (OPTIONAL)"}
                 </Text>
                 <View style={{ gap: 2 }}>
-                  {PIZZA_TOPPINGS.map((topping) => {
-                    const isSelected = selectedToppings.includes(topping.name);
-                    return (
-                      <Pressable
-                        key={topping.name}
-                        onPress={() => {
-                          setSelectedToppings((prev) =>
-                            isSelected ? prev.filter((t) => t !== topping.name) : [...prev, topping.name]
-                          );
-                        }}
-                        style={[styles.toppingRow, isSelected && styles.toppingRowSelected]}
-                      >
-                        <View style={styles.toppingIconWrap}>
-                          <Text style={{ fontSize: 22 }}>{topping.icon}</Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.toppingName, isSelected && { color: Colors.accent }]}>{topping.name}</Text>
-                          <Text style={styles.toppingPrice}>+CHF 0.00</Text>
-                        </View>
-                        <View style={[styles.toppingCheckbox, isSelected && styles.toppingCheckboxSelected]}>
-                          {isSelected && <Ionicons name="checkmark" size={13} color="#000" />}
-                        </View>
-                      </Pressable>
+                  {(() => {
+                    // Use product modifier extras if available, otherwise fallback to hardcoded list
+                    const extrasGroup = selectedProductForOptions?.modifiers?.find(
+                      (m: any) => !m.required && m.options?.length > 0
                     );
-                  })}
+                    const toppingOptions = extrasGroup
+                      ? extrasGroup.options.map((o: any) => ({ name: o.label, price: Number(o.price || 0), icon: "" }))
+                      : PIZZA_TOPPINGS.map((t) => ({ name: t.name, price: 0, icon: t.icon }));
+
+                    return toppingOptions.map((topping: { name: string; price: number; icon: string }) => {
+                      const isSelected = selectedToppings.includes(topping.name);
+                      return (
+                        <Pressable
+                          key={topping.name}
+                          onPress={() => {
+                            setSelectedToppings((prev) =>
+                              isSelected ? prev.filter((t) => t !== topping.name) : [...prev, topping.name]
+                            );
+                          }}
+                          style={[styles.toppingRow, isSelected && styles.toppingRowSelected]}
+                        >
+                          {topping.icon ? (
+                            <View style={styles.toppingIconWrap}>
+                              <Text style={{ fontSize: 22 }}>{topping.icon}</Text>
+                            </View>
+                          ) : null}
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.toppingName, isSelected && { color: Colors.accent }]}>{topping.name}</Text>
+                            <Text style={styles.toppingPrice}>+CHF {topping.price.toFixed(2)}</Text>
+                          </View>
+                          <View style={[styles.toppingCheckbox, isSelected && styles.toppingCheckboxSelected]}>
+                            {isSelected && <Ionicons name="checkmark" size={13} color="#000" />}
+                          </View>
+                        </Pressable>
+                      );
+                    });
+                  })()}
                 </View>
                 {/* Add to Cart */}
                 <Pressable

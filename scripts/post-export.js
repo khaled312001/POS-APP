@@ -55,7 +55,21 @@ self.addEventListener("push", (event) => {
       : [],
   };
 
-  event.waitUntil(self.registration.showNotification(title || "Barmagly POS", options));
+  // For incoming calls: skip the push notification if the POS app tab is already open and focused
+  // (the in-app WebSocket notification handles it — no need to show a duplicate browser notification)
+  if (type === "incoming_call") {
+    event.waitUntil(
+      clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+        const hasFocusedAppTab = windowClients.some(
+          (c) => c.url.includes("/app") && c.focused
+        );
+        if (hasFocusedAppTab) return; // App is open & focused → in-app notification handles it
+        return self.registration.showNotification(title || "Barmagly POS", options);
+      })
+    );
+  } else {
+    event.waitUntil(self.registration.showNotification(title || "Barmagly POS", options));
+  }
 });
 
 self.addEventListener("notificationclick", (event) => {
