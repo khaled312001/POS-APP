@@ -23,6 +23,7 @@ const axios = require("axios");
 
 // ─── Pre-flight: locate capi2032.dll ─────────────────────────────────────────
 const CAPI_DLL_SEARCH = [
+  // Standard CAPI DLL locations
   "C:\\Windows\\System32\\capi2032.dll",
   "C:\\Windows\\SysWOW64\\capi2032.dll",
   "C:\\Program Files\\AVM\\FRITZ!Card USB\\capi2032.dll",
@@ -30,6 +31,12 @@ const CAPI_DLL_SEARCH = [
   "C:\\Program Files\\AVM\\capi2032.dll",
   "C:\\Program Files (x86)\\AVM\\capi2032.dll",
   "C:\\AVM\\capi2032.dll",
+  // AVM newer packages — DLL renamed to avmc2032.dll
+  "C:\\Windows\\System32\\avmc2032.dll",
+  "C:\\Windows\\SysWOW64\\avmc2032.dll",
+  "C:\\Program Files\\AVM\\avmc2032.dll",
+  "C:\\Program Files (x86)\\AVM\\avmc2032.dll",
+  "C:\\AVM\\avmc2032.dll",
 ];
 let CAPI_DLL = CAPI_DLL_SEARCH.find(p => fs.existsSync(p));
 if (!CAPI_DLL) {
@@ -97,19 +104,21 @@ function loadCAPI() {
     // Load capi2032.dll — use full path so it works from any location
     const lib = koffi.load(CAPI_DLL);
 
-    // Register CAPI function signatures
-    const CAPI_REGISTER        = lib.func("uint32 CAPI_REGISTER(uint32, uint32, uint32, uint32, uint32 *out)");
+    // Register CAPI function signatures.
+    // Try two calling conventions: x64 AVM DLLs return AppID as the return value (4 params),
+    // while classic 32-bit CAPI uses an out-pointer as 5th param.
+    const CAPI_REGISTER_OUT    = lib.func("uint32 CAPI_REGISTER(uint32, uint32, uint32, uint32, uint32 *out)");
     const CAPI_RELEASE         = lib.func("uint32 CAPI_RELEASE(uint32)");
     const CAPI_PUT_MESSAGE     = lib.func("uint32 CAPI_PUT_MESSAGE(uint32, uint8 *)");
     const CAPI_GET_MESSAGE     = lib.func("uint32 CAPI_GET_MESSAGE(uint32, uint8 **out)");
     const CAPI_WAIT_FOR_SIGNAL = lib.func("uint32 CAPI_WAIT_FOR_SIGNAL(uint32)");
     const CAPI_GET_MANUFACTURER = lib.func("uint32 CAPI_GET_MANUFACTURER(uint8 *out)");
 
-    capi = { CAPI_REGISTER, CAPI_RELEASE, CAPI_PUT_MESSAGE, CAPI_GET_MESSAGE, CAPI_WAIT_FOR_SIGNAL, CAPI_GET_MANUFACTURER };
+    capi = { CAPI_RELEASE, CAPI_PUT_MESSAGE, CAPI_GET_MESSAGE, CAPI_WAIT_FOR_SIGNAL, CAPI_GET_MANUFACTURER };
 
-    // Register our application
+    // Try out-pointer variant first (classic CAPI 2.0)
     const idOut = [0];
-    const ret = capi.CAPI_REGISTER(4096, 2, 7, 2048, idOut);
+    const ret = CAPI_REGISTER_OUT(4096, 2, 7, 2048, idOut);
     if (ret !== 0) {
       console.error(`[Bridge] CAPI_REGISTER failed: 0x${ret.toString(16)}`);
       if (ret === 0x1001) console.error("[Bridge] → FRITZ!Card not connected or drivers not installed");
@@ -118,6 +127,37 @@ function loadCAPI() {
     }
 
     appId = idOut[0];
+
+    // AVM Vista-era capi2032.dll registers successfully but doesn't write the AppID
+    // to the out-pointer (returns 0 there). Discover the real AppID by probing
+    // CAPI_PUT_MESSAGE with IDs 1–10 — the one that returns 0x0 is ours.
+    if (appId === 0) {
+      console.log("[Bridge] AppID=0 from out-pointer — probing for actual AppID...");
+      let found = false;
+      for (let id = 1; id <= 10; id++) {
+        const probeBuf = Buffer.alloc(32).fill(0);
+        probeBuf.writeUInt16LE(32, 0);
+        probeBuf.writeUInt16LE(id, 2);
+        probeBuf.writeUInt8(CMD_LISTEN_REQ, 4);
+        probeBuf.writeUInt8(SUB_REQ, 5);
+        probeBuf.writeUInt16LE(1, 6);
+        probeBuf.writeUInt32LE(capiController, 8);
+        probeBuf.writeUInt32LE(0x0000FFFF, 12);
+        probeBuf.writeUInt32LE(0x1FFF03FF, 16);
+        const pr = capi.CAPI_PUT_MESSAGE(id, probeBuf);
+        if (pr === 0) {
+          appId = id;
+          console.log(`[Bridge] AppID discovered: ${appId}`);
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        console.error("[Bridge] Could not discover AppID — CAPI stack not responding");
+        return false;
+      }
+    }
+
     console.log(`[Bridge] CAPI registered. AppID = ${appId}`);
 
     // Print manufacturer info
