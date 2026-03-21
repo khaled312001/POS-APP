@@ -299,10 +299,21 @@ export default function CustomersScreen() {
                     </Pressable>
                     {canDeleteCustomers && (
                       <Pressable style={{ flex: 1, borderRadius: 12, overflow: "hidden" }} onPress={() => {
-                        Alert.alert(t("deleteCustomer" as any) || "Delete Customer", `${t("delete")} "${selectedCustomer.name}"?`, [
-                          { text: t("cancel"), style: "cancel" },
-                          { text: t("delete"), style: "destructive", onPress: () => deleteMutation.mutate(selectedCustomer.id) },
-                        ]);
+                        const msg = `${t("delete")} "${selectedCustomer.name}"?`;
+                        if (Platform.OS === "web") {
+                          if (window.confirm(msg)) {
+                            deleteMutation.mutate(selectedCustomer.id);
+                          }
+                        } else {
+                          Alert.alert(
+                            t("deleteCustomer" as any) || "Delete Customer",
+                            msg,
+                            [
+                              { text: t("cancel"), style: "cancel" },
+                              { text: t("delete"), style: "destructive", onPress: () => deleteMutation.mutate(selectedCustomer.id) },
+                            ]
+                          );
+                        }
                       }}>
                         <View style={{ flexDirection: isRTL ? "row-reverse" : "row", backgroundColor: Colors.danger, alignItems: "center", justifyContent: "center", paddingVertical: 12, gap: 6 }}>
                           <Ionicons name="trash-outline" size={18} color={Colors.white} />
