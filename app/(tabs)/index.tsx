@@ -15,6 +15,7 @@ import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import * as Haptics from "expo-haptics";
 import BarcodeScanner from "@/components/BarcodeScanner";
+import RealTimeClock from "@/components/RealTimeClock";
 import { useLanguage } from "@/lib/language-context";
 import { useNotifications } from "@/lib/notification-context";
 
@@ -931,7 +932,8 @@ export default function POSScreen() {
         <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.headerGradient}>
           <View style={[styles.headerContent, isRTL && { flexDirection: "row-reverse" }]}>
             <Text style={[styles.headerTitle, rtlTextAlign]}>Barmagly POS</Text>
-            <View style={[styles.headerRight, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.headerRight, isRTL && { flexDirection: "row-reverse", alignItems: "center" }, { alignItems: "center" }]}>
+              <RealTimeClock />
               <Pressable onPress={() => setShowOnlineOrders(true)} style={[styles.headerInvoiceBtn, { position: "relative" }]}>
                 <Ionicons name="globe-outline" size={28} color={Colors.white} />
                 <Text style={styles.headerInvoiceLabel}>{language === "ar" ? "طلبات" : language === "de" ? "Online" : "Orders"}</Text>
