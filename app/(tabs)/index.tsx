@@ -106,7 +106,7 @@ export default function POSScreen() {
   // Store caller's full customer object directly (faster than waiting for customers list)
   const [callerCustomer, setCallerCustomer] = useState<any>(null);
 
-  // Only handle auto-dismisses now, we don't auto-assign until checkmark is clicked
+  // AUTO-ASSIGN: when a call comes in, immediately add caller to the current cart
   useEffect(() => {
     if (incomingCalls.length === 0) return;
     incomingCalls.forEach((call) => {
@@ -114,10 +114,21 @@ export default function POSScreen() {
       if (processedCallIds.current.has(callId)) return;
       processedCallIds.current.add(callId);
 
-      // Auto-dismiss the popup after 15 seconds
+      if (call.customer) {
+        // Known customer → assign to cart and store full customer object for immediate display
+        cart.setCustomerId(call.customer.id);
+        setCallerCustomer(call.customer);
+        setPhoneInput(call.customer.phone || call.phoneNumber);
+      } else {
+        // Unknown caller → pre-fill phone so cashier can look up or create customer
+        setPhoneInput(call.phoneNumber);
+        setCallerCustomer(null);
+      }
+
+      // Auto-dismiss the popup after 10 seconds
       setTimeout(() => {
         dismissCall(callId, call.slot);
-      }, 15000);
+      }, 10000);
     });
   }, [incomingCalls]);
 
@@ -1039,15 +1050,15 @@ export default function POSScreen() {
               <View style={[styles.callInfo, isRTL && { alignItems: "flex-end" }, { flex: 1 }]}>
                 {call.customer ? (
                   <>
-                    <Text style={[styles.callNumber, { fontSize: idx === 0 ? 18 : 14, fontWeight: "700" }]}>{call.phoneNumber}</Text>
+                    <Text style={[styles.callNumber, idx > 0 && { fontSize: 12 }]}>{call.phoneNumber}</Text>
                     <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4, marginTop: 2 }}>
-                      <Ionicons name="person-circle" size={14} color="rgba(255,255,255,0.95)" />
-                      <Text style={[styles.callCustomer, { fontSize: idx === 0 ? 15 : 12, fontWeight: "800" }]}>
+                      <Ionicons name="person-circle" size={13} color="rgba(255,255,255,0.95)" />
+                      <Text style={[styles.callCustomer, { fontSize: idx === 0 ? 14 : 11, fontWeight: "700" }]}>
                         {call.customer.name}
                       </Text>
                     </View>
                     {call.customer.address ? (
-                      <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 10, marginTop: 2 }} numberOfLines={1}>
+                      <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 10, marginTop: 1 }} numberOfLines={1}>
                         {call.customer.address}
                       </Text>
                     ) : null}
@@ -1057,12 +1068,18 @@ export default function POSScreen() {
                         {call.customer.totalSpent ? ` · CHF ${Number(call.customer.totalSpent).toFixed(0)}` : ""}
                       </Text>
                     ) : null}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
+                      <Ionicons name="checkmark-circle" size={11} color="rgba(255,255,255,0.85)" />
+                      <Text style={{ color: "rgba(255,255,255,0.85)", fontSize: 10, fontWeight: "600" }}>
+                        {language === "ar" ? "أُضيف للفاتورة" : language === "de" ? "Zur Rechnung hinzugefügt" : "Added to invoice"}
+                      </Text>
+                    </View>
                   </>
                 ) : (
                   <>
-                    <Text style={[styles.callNumber, { fontSize: idx === 0 ? 18 : 14, fontWeight: "700" }]}>{call.phoneNumber}</Text>
-                    <Text style={[styles.callCustomer, { fontSize: idx === 0 ? 13 : 11, opacity: 0.8, marginTop: 2 }]}>
-                      {language === "ar" ? "عميل غير معروف" : language === "de" ? "Unbekannt" : "Unknown"}
+                    <Text style={[styles.callNumber, idx > 0 && { fontSize: 13 }]}>{call.phoneNumber}</Text>
+                    <Text style={[styles.callCustomer, idx > 0 && { fontSize: 11 }, { opacity: 0.8 }]}>
+                      {language === "ar" ? "عميل غير معروف · الرقم في السلة" : language === "de" ? "Unbekannt · Nummer im Warenkorb" : "Unknown · Number added to cart"}
                     </Text>
                   </>
                 )}
@@ -1072,14 +1089,13 @@ export default function POSScreen() {
                   style={[styles.callActionBtn, { backgroundColor: "rgba(255,255,255,0.25)" }]}
                   onPress={() => {
                     if (call.customer) {
+                      // Known customer: ensure assigned to cart immediately
                       cart.setCustomerId(call.customer.id);
                       setCallerCustomer(call.customer);
                       setPhoneInput(call.customer.phone || call.phoneNumber);
                     } else {
-                      setPhoneInput(call.phoneNumber);
-                      if (call.phoneNumber.trim()) {
-                        handlePhoneSearch(call.phoneNumber);
-                      }
+                      // Unknown caller: trigger phone lookup to find/create customer
+                      handlePhoneSearch(call.phoneNumber);
                     }
                     dismissCall(call.id, call.slot);
                   }}
@@ -1089,6 +1105,10 @@ export default function POSScreen() {
                 <Pressable
                   style={[styles.callActionBtn, { backgroundColor: Colors.danger }]}
                   onPress={() => {
+                    // Undo: clear the caller from the cart
+                    cart.setCustomerId(null);
+                    setPhoneInput("");
+                    setCallerCustomer(null);
                     dismissCall(call.id, call.slot);
                   }}
                 >
