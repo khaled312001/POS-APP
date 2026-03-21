@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   StyleSheet, Text, View, FlatList, Pressable, ScrollView,
-  Alert, Platform, Animated, RefreshControl,
+  Alert, Platform, Animated, RefreshControl, Modal, TextInput, KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -54,6 +54,8 @@ export default function OnlineOrdersScreen() {
   const [filter, setFilter] = useState<string>("active");
   const [refreshing, setRefreshing] = useState(false);
   const [newOrderIds, setNewOrderIds] = useState<Set<number>>(new Set());
+  const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ customerName: "", customerPhone: "", customerAddress: "", notes: "", estimatedTime: "" });
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const knownOrderIds = useRef<Set<number>>(new Set());
 
@@ -143,6 +145,55 @@ export default function OnlineOrdersScreen() {
     }
   };
 
+  const deleteOrder = async (id: number) => {
+    Alert.alert(
+      language === "ar" ? "حذف الطلب" : language === "de" ? "Bestellung löschen?" : "Delete Order?",
+      language === "ar" ? "سيتم حذف هذا الطلب نهائياً" : language === "de" ? "Diese Bestellung wird dauerhaft gelöscht." : "This will permanently delete the order.",
+      [
+        { text: language === "ar" ? "إلغاء" : language === "de" ? "Abbrechen" : "Cancel", style: "cancel" },
+        {
+          text: language === "ar" ? "حذف" : language === "de" ? "Löschen" : "Delete", style: "destructive",
+          onPress: async () => {
+            try {
+              await apiRequest("DELETE", `/api/online-orders/${id}`);
+              qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+            } catch {
+              Alert.alert("Error", "Failed to delete order");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const openEditOrder = (order: any) => {
+    setEditForm({
+      customerName: order.customerName || "",
+      customerPhone: order.customerPhone || "",
+      customerAddress: order.customerAddress || "",
+      notes: order.notes || "",
+      estimatedTime: order.estimatedTime ? String(order.estimatedTime) : "",
+    });
+    setEditingOrder(order);
+  };
+
+  const saveEditOrder = async () => {
+    if (!editingOrder) return;
+    try {
+      await apiRequest("PUT", `/api/online-orders/${editingOrder.id}`, {
+        customerName: editForm.customerName,
+        customerPhone: editForm.customerPhone,
+        customerAddress: editForm.customerAddress || null,
+        notes: editForm.notes || null,
+        estimatedTime: editForm.estimatedTime ? Number(editForm.estimatedTime) : null,
+      });
+      qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+      setEditingOrder(null);
+    } catch {
+      Alert.alert("Error", "Failed to update order");
+    }
+  };
+
   const filteredOrders = orders.filter((o: any) => {
     if (filter === "active") return ["pending", "accepted", "preparing", "ready"].includes(o.status);
     if (filter === "done") return ["delivered", "cancelled"].includes(o.status);
@@ -218,10 +269,15 @@ export default function OnlineOrdersScreen() {
         {/* Items */}
         <View style={styles.itemsList}>
           {(item.items || []).map((it: any, idx: number) => (
-            <View key={idx} style={[styles.itemRow, isRTL && { flexDirection: "row-reverse" }]}>
-              <Text style={styles.itemQty}>{it.quantity}×</Text>
-              <Text style={[styles.itemName, { flex: 1 }, isRTL && { textAlign: "right" }]} numberOfLines={1}>{it.name}</Text>
-              <Text style={styles.itemPrice}>CHF {Number(it.total).toFixed(2)}</Text>
+            <View key={idx} style={{ marginBottom: 6 }}>
+              <View style={[styles.itemRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <Text style={styles.itemQty}>{it.quantity}×</Text>
+                <Text style={[styles.itemName, { flex: 1 }, isRTL && { textAlign: "right" }]}>{it.name}</Text>
+                <Text style={styles.itemPrice}>CHF {Number(it.total).toFixed(2)}</Text>
+              </View>
+              {it.notes ? (
+                <Text style={[styles.itemAddons, isRTL && { textAlign: "right" }]}>↳ {it.notes}</Text>
+              ) : null}
             </View>
           ))}
           {item.notes ? (
@@ -242,25 +298,30 @@ export default function OnlineOrdersScreen() {
         </View>
 
         {/* Actions */}
-        {item.status !== "delivered" && item.status !== "cancelled" && (
-          <View style={[styles.actions, isRTL && { flexDirection: "row-reverse" }]}>
-            {next && nextBtnColor[next] && (
-              <Pressable
-                style={{ flex: 1, borderRadius: 10, overflow: "hidden" }}
-                onPress={() => updateStatus(item.id, next)}
+        <View style={[styles.actions, isRTL && { flexDirection: "row-reverse" }]}>
+          {item.status !== "delivered" && item.status !== "cancelled" && next && nextBtnColor[next] && (
+            <Pressable
+              style={{ flex: 1, borderRadius: 10, overflow: "hidden" }}
+              onPress={() => updateStatus(item.id, next)}
+            >
+              <LinearGradient
+                colors={nextBtnColor[next] as [string, string]}
+                style={styles.actionBtnPrimary}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               >
-                <LinearGradient
-                  colors={nextBtnColor[next] as [string, string]}
-                  style={styles.actionBtnPrimary}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                >
-                  <Ionicons name={STATUS_META[next]?.icon as any || "arrow-forward"} size={16} color="#fff" />
-                  <Text style={styles.actionBtnText}>
-                    {language === "ar" ? STATUS_META[next]?.labelAr : language === "de" ? STATUS_META[next]?.labelDe : STATUS_META[next]?.label}
-                  </Text>
-                </LinearGradient>
-              </Pressable>
-            )}
+                <Ionicons name={STATUS_META[next]?.icon as any || "arrow-forward"} size={16} color="#fff" />
+                <Text style={styles.actionBtnText}>
+                  {language === "ar" ? STATUS_META[next]?.labelAr : language === "de" ? STATUS_META[next]?.labelDe : STATUS_META[next]?.label}
+                </Text>
+              </LinearGradient>
+            </Pressable>
+          )}
+          {/* Edit button */}
+          <Pressable style={styles.editBtn} onPress={() => openEditOrder(item)}>
+            <Ionicons name="pencil" size={16} color={Colors.accent} />
+          </Pressable>
+          {/* Cancel button (active orders only) */}
+          {item.status !== "delivered" && item.status !== "cancelled" && (
             <Pressable
               style={styles.cancelBtn}
               onPress={() => Alert.alert(
@@ -274,14 +335,67 @@ export default function OnlineOrdersScreen() {
             >
               <Ionicons name="close" size={18} color={Colors.danger} />
             </Pressable>
-          </View>
-        )}
+          )}
+          {/* Delete button (completed/cancelled orders) */}
+          {(item.status === "delivered" || item.status === "cancelled") && (
+            <Pressable style={styles.deleteBtn} onPress={() => deleteOrder(item.id)}>
+              <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+            </Pressable>
+          )}
+        </View>
       </Animated.View>
     );
   };
 
+  const editLabel = (en: string, ar: string, de: string) =>
+    language === "ar" ? ar : language === "de" ? de : en;
+
   return (
     <View style={styles.container}>
+      {/* Edit Order Modal */}
+      <Modal visible={!!editingOrder} animationType="slide" transparent onRequestClose={() => setEditingOrder(null)}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <View style={styles.modalSheet}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={styles.modalTitle}>{editLabel("Edit Order", "تعديل الطلب", "Bestellung bearbeiten")} #{editingOrder?.orderNumber}</Text>
+              <Pressable onPress={() => setEditingOrder(null)}>
+                <Ionicons name="close" size={22} color={Colors.textMuted} />
+              </Pressable>
+            </View>
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+              {[
+                { label: editLabel("Customer Name", "اسم العميل", "Kundenname"), key: "customerName", placeholder: "Name" },
+                { label: editLabel("Phone", "الهاتف", "Telefon"), key: "customerPhone", placeholder: "+1 234 567" },
+                { label: editLabel("Address", "العنوان", "Adresse"), key: "customerAddress", placeholder: "Street, City" },
+                { label: editLabel("Estimated Time (min)", "وقت التوصيل (دقيقة)", "Geschätzte Zeit (Min)"), key: "estimatedTime", placeholder: "30" },
+                { label: editLabel("Notes", "ملاحظات", "Notizen"), key: "notes", placeholder: "..." },
+              ].map(f => (
+                <View key={f.key} style={styles.editField}>
+                  <Text style={[styles.editLabel, isRTL && { textAlign: "right" }]}>{f.label}</Text>
+                  <TextInput
+                    style={[styles.editInput, isRTL && { textAlign: "right" }]}
+                    value={(editForm as any)[f.key]}
+                    onChangeText={v => setEditForm(prev => ({ ...prev, [f.key]: v }))}
+                    placeholder={f.placeholder}
+                    placeholderTextColor={Colors.textMuted}
+                    keyboardType={f.key === "estimatedTime" ? "number-pad" : "default"}
+                    multiline={f.key === "notes"}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+            <View style={[styles.modalFooter, isRTL && { flexDirection: "row-reverse" }]}>
+              <Pressable style={styles.modalCancelBtn} onPress={() => setEditingOrder(null)}>
+                <Text style={styles.modalCancelText}>{editLabel("Cancel", "إلغاء", "Abbrechen")}</Text>
+              </Pressable>
+              <Pressable style={styles.modalSaveBtn} onPress={saveEditOrder}>
+                <Text style={styles.modalSaveText}>{editLabel("Save Changes", "حفظ", "Speichern")}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <LinearGradient colors={["#1E1B4B", "#312E81", "#0A0E27"]} style={styles.headerGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
@@ -422,6 +536,7 @@ const styles = StyleSheet.create({
   itemRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   itemQty: { color: Colors.accent, fontWeight: "700", fontSize: 12, minWidth: 24 },
   itemName: { color: Colors.textSecondary, fontSize: 12 },
+  itemAddons: { color: Colors.textMuted, fontSize: 11, marginLeft: 32, marginTop: 2, fontStyle: "italic" },
   itemPrice: { color: Colors.text, fontWeight: "600", fontSize: 12 },
   orderNotes: { color: Colors.warning, fontSize: 11, marginTop: 6 },
 
@@ -435,12 +550,53 @@ const styles = StyleSheet.create({
     gap: 6, paddingVertical: 11, paddingHorizontal: 16, borderRadius: 10,
   },
   actionBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  editBtn: {
+    width: 42, height: 42, borderRadius: 10,
+    backgroundColor: "rgba(47,211,198,0.1)",
+    borderWidth: 1, borderColor: "rgba(47,211,198,0.3)",
+    justifyContent: "center", alignItems: "center",
+  },
   cancelBtn: {
     width: 42, height: 42, borderRadius: 10,
     backgroundColor: "rgba(239,68,68,0.1)",
     borderWidth: 1, borderColor: "rgba(239,68,68,0.3)",
     justifyContent: "center", alignItems: "center",
   },
+  deleteBtn: {
+    width: 42, height: 42, borderRadius: 10,
+    backgroundColor: "rgba(239,68,68,0.1)",
+    borderWidth: 1, borderColor: "rgba(239,68,68,0.3)",
+    justifyContent: "center", alignItems: "center",
+  },
+  // Edit Modal
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
+  modalSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: 20, maxHeight: "85%",
+  },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  modalTitle: { color: Colors.text, fontWeight: "800", fontSize: 16 },
+  editField: { marginBottom: 14 },
+  editLabel: { color: Colors.textMuted, fontSize: 11, fontWeight: "600", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
+  editInput: {
+    backgroundColor: Colors.background,
+    borderWidth: 1, borderColor: Colors.cardBorder,
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+    color: Colors.text, fontSize: 14,
+  },
+  modalFooter: { flexDirection: "row", gap: 10, marginTop: 16 },
+  modalCancelBtn: {
+    flex: 1, paddingVertical: 13, borderRadius: 10,
+    borderWidth: 1, borderColor: Colors.cardBorder,
+    alignItems: "center",
+  },
+  modalCancelText: { color: Colors.textMuted, fontWeight: "600", fontSize: 14 },
+  modalSaveBtn: {
+    flex: 2, paddingVertical: 13, borderRadius: 10,
+    backgroundColor: Colors.accent, alignItems: "center",
+  },
+  modalSaveText: { color: "#000", fontWeight: "800", fontSize: 14 },
   emptyState: { alignItems: "center", paddingTop: 80, paddingHorizontal: 32 },
   emptyIcon: { fontSize: 56, marginBottom: 16 },
   emptyTitle: { color: Colors.text, fontSize: 18, fontWeight: "800", marginBottom: 8 },

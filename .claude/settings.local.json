@@ -40,7 +40,11 @@
       "Bash(node -e \"require\\(''sharp''\\)\")",
       "Bash(node -e \":*)",
       "Bash(find f:/POS-APP -type f \\\\\\(-name *pwa* -o -name *icon* -o -name *manifest* \\\\\\) ! -path */node_modules/* ! -path */.wppconnect/* ! -path */dist/*)",
-      "Bash(npx esbuild:*)"
+      "Bash(npx esbuild:*)",
+      "Bash(ls -la /f/POS-APP/app/\\\\\\(tabs\\\\\\)/)",
+      "Bash(find F:/POS-APP/components -type f \\\\\\( -name \"*.js\" -o -name \"*.jsx\" -o -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) 2>/dev/null | head -40)",
+      "Bash(wc -l F:/POS-APP/app/\\\\\\(tabs\\\\\\)/index.tsx)",
+      "Bash(find \"F:/POS-APP\" -name \"*capi*\" -o -name \"*bridge*\" -o -name \"*caller*\" 2>/dev/null | grep -v node_modules | grep -v \".git\")"
     ]
   }
 }

@@ -96,7 +96,7 @@ export default function POSScreen() {
   const [showOnlineOrders, setShowOnlineOrders] = useState(false);
   const [endOfDayLoading, setEndOfDayLoading] = useState(false);
 
-  const { onlineOrderNotification, setOnlineOrderNotification, incomingCalls, setIncomingCalls } = useNotifications();
+  const { onlineOrderNotification, setOnlineOrderNotification, incomingCalls, setIncomingCalls, dismissCall } = useNotifications();
 
   const tenantId = tenant?.id;
 
@@ -120,21 +120,53 @@ export default function POSScreen() {
         setPhoneInput(call.phoneNumber);
       }
 
-      // Auto-dismiss the popup after 8 seconds
+      // Auto-dismiss the popup after 8 seconds and mark as seen
       setTimeout(() => {
-        setIncomingCalls((prev) => prev.filter((c) => String(c.id) !== callId));
+        dismissCall(callId, call.slot);
       }, 8000);
     });
   }, [incomingCalls]);
 
-  const PIZZA_TOPPINGS = [
-    "Tomatoes", "Sliced tomatoes", "Garlic", "Onions", "Capers", "Olives",
-    "Oregano", "Vegetables", "Spinach", "Pepperoni", "Corn", "Broccoli",
-    "Artichokes", "Arugula", "Pineapple", "Mushrooms", "Ham", "Spicy salami",
-    "Salami", "Bacon", "Prosciutto", "Lamb", "Chicken", "Kebab", "Minced Meat",
-    "Mayonnaise", "Anchovies", "Shrimp", "Tuna", "Ketchup", "Mozzarella",
-    "Gorgonzola", "Parmesan", "Mascarpone", "Kaeserand", "Cocktail Sauce",
-    "Spicy Sauce", "Yogurt Sauce",
+  const PIZZA_TOPPINGS: { name: string; icon: string }[] = [
+    { name: "Tomatoes",       icon: "🍅" },
+    { name: "Sliced tomatoes",icon: "🍅" },
+    { name: "Garlic",         icon: "🧄" },
+    { name: "Onions",         icon: "🧅" },
+    { name: "Capers",         icon: "🌿" },
+    { name: "Olives",         icon: "🫒" },
+    { name: "Oregano",        icon: "🌿" },
+    { name: "Vegetables",     icon: "🥦" },
+    { name: "Spinach",        icon: "🥬" },
+    { name: "Pepperoni",      icon: "🍕" },
+    { name: "Corn",           icon: "🌽" },
+    { name: "Broccoli",       icon: "🥦" },
+    { name: "Artichokes",     icon: "🌿" },
+    { name: "Arugula",        icon: "🥬" },
+    { name: "Pineapple",      icon: "🍍" },
+    { name: "Mushrooms",      icon: "🍄" },
+    { name: "Ham",            icon: "🥩" },
+    { name: "Spicy salami",   icon: "🌶️" },
+    { name: "Salami",         icon: "🥩" },
+    { name: "Bacon",          icon: "🥓" },
+    { name: "Prosciutto",     icon: "🥩" },
+    { name: "Lamb",           icon: "🥩" },
+    { name: "Chicken",        icon: "🍗" },
+    { name: "Kebab",          icon: "🥙" },
+    { name: "Minced Meat",    icon: "🥩" },
+    { name: "Mayonnaise",     icon: "🫙" },
+    { name: "Anchovies",      icon: "🐟" },
+    { name: "Shrimp",         icon: "🍤" },
+    { name: "Tuna",           icon: "🐟" },
+    { name: "Ketchup",        icon: "🫙" },
+    { name: "Mozzarella",     icon: "🧀" },
+    { name: "Gorgonzola",     icon: "🧀" },
+    { name: "Parmesan",       icon: "🧀" },
+    { name: "Mascarpone",     icon: "🧀" },
+    { name: "Kaeserand",      icon: "🧀" },
+    { name: "Cocktail Sauce", icon: "🫙" },
+    { name: "Spicy Sauce",    icon: "🌶️" },
+    { name: "Yogurt Sauce",   icon: "🫙" },
+    { name: "Bell Peppers",   icon: "🫑" },
   ];
 
   const { data: categories = [] } = useQuery<any[]>({
@@ -927,7 +959,10 @@ export default function POSScreen() {
               <Text style={{ color: Colors.white, fontSize: 11, fontWeight: "700", opacity: 0.9 }}>
                 {t("callQueue" as any)} — {incomingCalls.length} {t("callsWaiting" as any)}
               </Text>
-              <Pressable onPress={() => setIncomingCalls([])} style={{ paddingHorizontal: 10, paddingVertical: 3, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 8 }}>
+              <Pressable
+                onPress={() => { incomingCalls.forEach(c => dismissCall(c.id, c.slot)); }}
+                style={{ paddingHorizontal: 10, paddingVertical: 3, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 8 }}
+              >
                 <Text style={{ color: Colors.white, fontSize: 11, fontWeight: "600" }}>{t("dismissAll" as any)}</Text>
               </Pressable>
             </View>
@@ -965,7 +1000,7 @@ export default function POSScreen() {
               <View style={{ flexDirection: "row", gap: 6 }}>
                 <Pressable
                   style={[styles.callActionBtn, { backgroundColor: "rgba(255,255,255,0.25)" }]}
-                  onPress={() => setIncomingCalls((prev) => prev.filter((c) => c.id !== call.id))}
+                  onPress={() => dismissCall(call.id, call.slot)}
                 >
                   <Ionicons name="checkmark" size={18} color={Colors.white} />
                 </Pressable>
@@ -975,7 +1010,7 @@ export default function POSScreen() {
                     // Undo: clear the caller from the cart
                     cart.setCustomerId(null);
                     setPhoneInput("");
-                    setIncomingCalls((prev) => prev.filter((c) => c.id !== call.id));
+                    dismissCall(call.id, call.slot);
                   }}
                 >
                   <Ionicons name="close" size={18} color={Colors.white} />
@@ -1241,76 +1276,82 @@ export default function POSScreen() {
             </View>
 
             {!showToppingsStep ? (
-              <View style={{ gap: 12, marginTop: 20 }}>
-                {selectedProductForOptions?.variants?.map((v: any, idx: number) => (
-                  <Pressable
-                    key={idx}
-                    style={({ pressed }) => [
-                      styles.variantBtn,
-                      pressed && { opacity: 0.8, backgroundColor: Colors.accent + "20" }
-                    ]}
-                    onPress={() => {
-                      if (isPizzaProduct(selectedProductForOptions)) {
-                        setSelectedVariant(v);
-                        setSelectedToppings([]);
-                        setShowToppingsStep(true);
-                      } else {
-                        cart.addItem({
-                          id: selectedProductForOptions.id,
-                          name: selectedProductForOptions.name,
-                          price: Number(selectedProductForOptions.price),
-                          variant: v
-                        });
-                        if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setSelectedProductForOptions(null);
-                      }
-                    }}
-                  >
-                    <View style={[styles.variantBtnInner, isRTL && { flexDirection: "row-reverse" }]}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-                        <View style={styles.variantIconCircle}>
-                          <Ionicons name="options-outline" size={20} color={Colors.accent} />
-                        </View>
-                        <Text style={styles.variantBtnName}>{v.name}</Text>
-                      </View>
-                      <View style={styles.variantPriceTag}>
-                        <Text style={styles.variantBtnPrice}>CHF {Number(v.price).toFixed(2)}</Text>
-                      </View>
-                    </View>
-                  </Pressable>
-                ))}
+              /* ── SIZE SELECTION: 2-column grid ── */
+              <View style={{ marginTop: 16, gap: 10 }}>
+                <Text style={[styles.sectionLabel, { marginBottom: 4 }]}>
+                  {language === "ar" ? "اختر الحجم" : language === "de" ? "Größe wählen" : "CHOOSE SIZE"}
+                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                  {selectedProductForOptions?.variants?.map((v: any, idx: number) => (
+                    <Pressable
+                      key={idx}
+                      style={[styles.sizeCard, idx === 0 && styles.sizeCardSelected]}
+                      onPress={() => {
+                        if (isPizzaProduct(selectedProductForOptions)) {
+                          setSelectedVariant(v);
+                          setSelectedToppings([]);
+                          setShowToppingsStep(true);
+                        } else {
+                          cart.addItem({
+                            id: selectedProductForOptions.id,
+                            name: selectedProductForOptions.name,
+                            price: Number(selectedProductForOptions.price),
+                            variant: v,
+                          });
+                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          setSelectedProductForOptions(null);
+                        }
+                      }}
+                    >
+                      <Text style={styles.sizeCardName}>{v.name}</Text>
+                      <Text style={styles.sizeCardPrice}>CHF {Number(v.price).toFixed(2)}</Text>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
             ) : (
-              <ScrollView style={{ marginTop: 16 }} showsVerticalScrollIndicator={false}>
-                <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: 12 }}>
-                  Size: {selectedVariant?.name} — CHF {Number(selectedVariant?.price).toFixed(2)}
+              /* ── TOPPINGS: icon list with checkbox ── */
+              <ScrollView style={{ marginTop: 4 }} showsVerticalScrollIndicator={false}>
+                {/* Selected size badge */}
+                <View style={styles.selectedSizeBadge}>
+                  <Ionicons name="pizza-outline" size={14} color={Colors.accent} />
+                  <Text style={styles.selectedSizeBadgeText}>
+                    {selectedVariant?.name} — CHF {Number(selectedVariant?.price).toFixed(2)}
+                  </Text>
+                </View>
+                <Text style={[styles.sectionLabel, { marginBottom: 8, marginTop: 10 }]}>
+                  {language === "ar" ? "إضافات اختيارية" : language === "de" ? "EXTRA BELÄGE (OPTIONAL)" : "EXTRA TOPPINGS (OPTIONAL)"}
                 </Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                <View style={{ gap: 2 }}>
                   {PIZZA_TOPPINGS.map((topping) => {
-                    const isSelected = selectedToppings.includes(topping);
+                    const isSelected = selectedToppings.includes(topping.name);
                     return (
                       <Pressable
-                        key={topping}
+                        key={topping.name}
                         onPress={() => {
                           setSelectedToppings((prev) =>
-                            isSelected ? prev.filter((t) => t !== topping) : [...prev, topping]
+                            isSelected ? prev.filter((t) => t !== topping.name) : [...prev, topping.name]
                           );
                         }}
-                        style={{
-                          paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
-                          backgroundColor: isSelected ? Colors.accent : Colors.surfaceLight,
-                          borderWidth: 1.5, borderColor: isSelected ? Colors.accent : Colors.cardBorder,
-                        }}
+                        style={[styles.toppingRow, isSelected && styles.toppingRowSelected]}
                       >
-                        <Text style={{ color: isSelected ? Colors.textDark : Colors.text, fontSize: 13, fontWeight: "600" }}>
-                          {topping}
-                        </Text>
+                        <View style={styles.toppingIconWrap}>
+                          <Text style={{ fontSize: 22 }}>{topping.icon}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.toppingName, isSelected && { color: Colors.accent }]}>{topping.name}</Text>
+                          <Text style={styles.toppingPrice}>+CHF 0.00</Text>
+                        </View>
+                        <View style={[styles.toppingCheckbox, isSelected && styles.toppingCheckboxSelected]}>
+                          {isSelected && <Ionicons name="checkmark" size={13} color="#000" />}
+                        </View>
                       </Pressable>
                     );
                   })}
                 </View>
+                {/* Add to Cart */}
                 <Pressable
-                  style={{ marginTop: 20, borderRadius: 14, overflow: "hidden" }}
+                  style={{ marginTop: 16, borderRadius: 14, overflow: "hidden" }}
                   onPress={() => {
                     const toppingsSuffix = selectedToppings.length > 0 ? ` [${selectedToppings.join(", ")}]` : "";
                     cart.addItem({
@@ -1328,12 +1369,16 @@ export default function POSScreen() {
                 >
                   <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ paddingVertical: 14, alignItems: "center", borderRadius: 14 }}>
                     <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "800" }}>
-                      Add to Cart{selectedToppings.length > 0 ? ` (${selectedToppings.length} toppings)` : ""}
+                      {language === "ar" ? `أضف للسلة${selectedToppings.length > 0 ? ` (${selectedToppings.length})` : ""}` :
+                       language === "de" ? `In den Warenkorb${selectedToppings.length > 0 ? ` (${selectedToppings.length})` : ""}` :
+                       `Add to Cart${selectedToppings.length > 0 ? ` (${selectedToppings.length} toppings)` : ""}`}
                     </Text>
                   </LinearGradient>
                 </Pressable>
-                <Pressable style={{ marginTop: 8 }} onPress={() => setShowToppingsStep(false)}>
-                  <Text style={{ color: Colors.textMuted, textAlign: "center", padding: 8 }}>← Back to sizes</Text>
+                <Pressable style={{ marginTop: 8, marginBottom: 8 }} onPress={() => setShowToppingsStep(false)}>
+                  <Text style={{ color: Colors.textMuted, textAlign: "center", padding: 8, fontSize: 13 }}>
+                    {language === "ar" ? "← العودة للأحجام" : language === "de" ? "← Zurück zu Größen" : "← Back to sizes"}
+                  </Text>
                 </Pressable>
               </ScrollView>
             )}
@@ -2852,6 +2897,51 @@ const styles = StyleSheet.create({
   variantBtnName: { color: Colors.white, fontSize: 16, fontWeight: "700" as const },
   variantPriceTag: { backgroundColor: "rgba(47, 211, 198, 0.15)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
   variantBtnPrice: { color: Colors.accent, fontSize: 16, fontWeight: "800" as const },
+  // Size grid cards
+  sizeCard: {
+    flex: 1, minWidth: 120,
+    paddingVertical: 14, paddingHorizontal: 12,
+    borderRadius: 12, borderWidth: 2,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.surfaceLight,
+    alignItems: "center" as const,
+  },
+  sizeCardSelected: {
+    borderColor: Colors.accent,
+    backgroundColor: "rgba(47,211,198,0.08)",
+  },
+  sizeCardName: { color: Colors.white, fontSize: 15, fontWeight: "700" as const, marginBottom: 4 },
+  sizeCardPrice: { color: Colors.accent, fontSize: 13, fontWeight: "600" as const },
+  // Toppings list
+  selectedSizeBadge: {
+    flexDirection: "row" as const, alignItems: "center", gap: 6,
+    backgroundColor: "rgba(47,211,198,0.1)",
+    borderWidth: 1, borderColor: "rgba(47,211,198,0.3)",
+    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, alignSelf: "flex-start" as const,
+  },
+  selectedSizeBadgeText: { color: Colors.accent, fontSize: 12, fontWeight: "600" as const },
+  toppingRow: {
+    flexDirection: "row" as const, alignItems: "center", gap: 12,
+    paddingVertical: 10, paddingHorizontal: 4,
+    borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)",
+  },
+  toppingRowSelected: { backgroundColor: "rgba(47,211,198,0.06)", borderRadius: 10, borderBottomColor: "transparent" },
+  toppingIconWrap: {
+    width: 40, height: 40, borderRadius: 10,
+    backgroundColor: Colors.surfaceLight,
+    justifyContent: "center" as const, alignItems: "center" as const,
+  },
+  toppingName: { color: Colors.text, fontSize: 14, fontWeight: "500" as const },
+  toppingPrice: { color: Colors.textMuted, fontSize: 11, marginTop: 1 },
+  toppingCheckbox: {
+    width: 24, height: 24, borderRadius: 12,
+    borderWidth: 2, borderColor: Colors.cardBorder,
+    justifyContent: "center" as const, alignItems: "center" as const,
+  },
+  toppingCheckboxSelected: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
   modalCancelBtn: { marginTop: 24, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: Colors.cardBorder, alignItems: "center" as const },
   modalCancelBtnText: { color: Colors.textMuted, fontSize: 15, fontWeight: "600" as const },
 });

@@ -10,6 +10,7 @@ interface NotificationContextType {
     setOnlineOrderNotification: (order: any | null) => void;
     incomingCalls: any[];
     setIncomingCalls: React.Dispatch<React.SetStateAction<any[]>>;
+    dismissCall: (callId: string, slot: number) => void;
     playNotificationSound: () => void;
 }
 
@@ -86,11 +87,27 @@ function playRestaurantBell() {
     }
 }
 
+// Session-scoped dismissed call IDs (cleared on tab/window close, not on navigation)
+function getSeenCallIds(): Set<string> {
+    try {
+        const raw = sessionStorage.getItem("pos_seen_calls");
+        return new Set(raw ? JSON.parse(raw) : []);
+    } catch { return new Set(); }
+}
+function markCallSeen(id: string) {
+    try {
+        const ids = getSeenCallIds();
+        ids.add(id);
+        sessionStorage.setItem("pos_seen_calls", JSON.stringify([...ids]));
+    } catch { }
+}
+
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
     const [onlineOrderNotification, setOnlineOrderNotificationState] = useState<any | null>(null);
     const [incomingCalls, setIncomingCalls] = useState<any[]>([]);
     const { tenant } = useLicense();
     const qc = useQueryClient();
+    const wsRef = useRef<WebSocket | null>(null);
 
     const audioUnlockedRef = useRef(false);
 
@@ -147,6 +164,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         function connect() {
             try {
                 ws = new WebSocket(wsUrl);
+                wsRef.current = ws;
 
                 ws.onmessage = (event) => {
                     try {
@@ -157,16 +175,20 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                             setOnlineOrderNotification(data.order);
                             qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
                         } else if (data.type === "incoming_call") {
+                            const callId = `${data.slot}-${data.timestamp}`;
+                            // Don't re-show calls already dismissed this session
+                            if (getSeenCallIds().has(callId)) return;
                             setIncomingCalls((prev) => {
                                 const filtered = prev.filter((c) => c.slot !== data.slot);
-                                return [...filtered, { ...data, id: `${data.slot}-${data.timestamp}` }].slice(0, 4);
+                                return [...filtered, { ...data, id: callId }].slice(0, 4);
                             });
                             if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
                         } else if (data.type === "active_calls" || data.type === "calls_update") {
-                            const calls = (data.calls || data.allActiveCalls || []).map((c: any) => ({
-                                ...c,
-                                id: `${c.slot}-${c.timestamp}`,
-                            }));
+                            const seen = getSeenCallIds();
+                            const calls = (data.calls || data.allActiveCalls || [])
+                                .map((c: any) => ({ ...c, id: `${c.slot}-${c.timestamp}` }))
+                                // Filter out calls already dismissed this browser session
+                                .filter((c: any) => !seen.has(c.id));
                             setIncomingCalls(calls);
                         } else if (data.type === "menu_updated") {
                             qc.invalidateQueries({ queryKey: ["/api/products"] });
@@ -199,12 +221,26 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     // Polling is handled in _layout.tsx (which already queries /api/online-orders)
     // WebSocket above provides the real-time path; layout polling is the reliable fallback.
 
+    const dismissCall = useCallback((callId: string, slot: number) => {
+        // Mark as seen so it won't re-appear after page refresh
+        markCallSeen(callId);
+        // Remove from local state
+        setIncomingCalls((prev) => prev.filter((c) => c.id !== callId));
+        // Tell server to free the slot
+        try {
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({ type: "call_answered", slot }));
+            }
+        } catch { }
+    }, []);
+
     return (
         <NotificationContext.Provider value={{
             onlineOrderNotification,
             setOnlineOrderNotification,
             incomingCalls,
             setIncomingCalls,
+            dismissCall,
             playNotificationSound,
         }}>
             {children}
