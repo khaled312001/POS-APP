@@ -132,45 +132,45 @@ export default function POSScreen() {
   }, [incomingCalls]);
 
   const PIZZA_TOPPINGS: { name: string; icon: string }[] = [
-    { name: "Tomatoes",       icon: "🍅" },
-    { name: "Sliced tomatoes",icon: "🍅" },
-    { name: "Garlic",         icon: "🧄" },
-    { name: "Onions",         icon: "🧅" },
-    { name: "Capers",         icon: "🌿" },
-    { name: "Olives",         icon: "🫒" },
-    { name: "Oregano",        icon: "🌿" },
-    { name: "Vegetables",     icon: "🥦" },
-    { name: "Spinach",        icon: "🥬" },
-    { name: "Pepperoni",      icon: "🍕" },
-    { name: "Corn",           icon: "🌽" },
-    { name: "Broccoli",       icon: "🥦" },
-    { name: "Artichokes",     icon: "🌿" },
-    { name: "Arugula",        icon: "🥬" },
-    { name: "Pineapple",      icon: "🍍" },
-    { name: "Mushrooms",      icon: "🍄" },
-    { name: "Ham",            icon: "🥩" },
-    { name: "Spicy salami",   icon: "🌶️" },
-    { name: "Salami",         icon: "🥩" },
-    { name: "Bacon",          icon: "🥓" },
-    { name: "Prosciutto",     icon: "🥩" },
-    { name: "Lamb",           icon: "🥩" },
-    { name: "Chicken",        icon: "🍗" },
-    { name: "Kebab",          icon: "🥙" },
-    { name: "Minced Meat",    icon: "🥩" },
-    { name: "Mayonnaise",     icon: "🫙" },
-    { name: "Anchovies",      icon: "🐟" },
-    { name: "Shrimp",         icon: "🍤" },
-    { name: "Tuna",           icon: "🐟" },
-    { name: "Ketchup",        icon: "🫙" },
-    { name: "Mozzarella",     icon: "🧀" },
-    { name: "Gorgonzola",     icon: "🧀" },
-    { name: "Parmesan",       icon: "🧀" },
-    { name: "Mascarpone",     icon: "🧀" },
-    { name: "Kaeserand",      icon: "🧀" },
+    { name: "Tomatoes", icon: "🍅" },
+    { name: "Sliced tomatoes", icon: "🍅" },
+    { name: "Garlic", icon: "🧄" },
+    { name: "Onions", icon: "🧅" },
+    { name: "Capers", icon: "🌿" },
+    { name: "Olives", icon: "🫒" },
+    { name: "Oregano", icon: "🌿" },
+    { name: "Vegetables", icon: "🥦" },
+    { name: "Spinach", icon: "🥬" },
+    { name: "Pepperoni", icon: "🍕" },
+    { name: "Corn", icon: "🌽" },
+    { name: "Broccoli", icon: "🥦" },
+    { name: "Artichokes", icon: "🌿" },
+    { name: "Arugula", icon: "🥬" },
+    { name: "Pineapple", icon: "🍍" },
+    { name: "Mushrooms", icon: "🍄" },
+    { name: "Ham", icon: "🥩" },
+    { name: "Spicy salami", icon: "🌶️" },
+    { name: "Salami", icon: "🥩" },
+    { name: "Bacon", icon: "🥓" },
+    { name: "Prosciutto", icon: "🥩" },
+    { name: "Lamb", icon: "🥩" },
+    { name: "Chicken", icon: "🍗" },
+    { name: "Kebab", icon: "🥙" },
+    { name: "Minced Meat", icon: "🥩" },
+    { name: "Mayonnaise", icon: "🫙" },
+    { name: "Anchovies", icon: "🐟" },
+    { name: "Shrimp", icon: "🍤" },
+    { name: "Tuna", icon: "🐟" },
+    { name: "Ketchup", icon: "🫙" },
+    { name: "Mozzarella", icon: "🧀" },
+    { name: "Gorgonzola", icon: "🧀" },
+    { name: "Parmesan", icon: "🧀" },
+    { name: "Mascarpone", icon: "🧀" },
+    { name: "Kaeserand", icon: "🧀" },
     { name: "Cocktail Sauce", icon: "🫙" },
-    { name: "Spicy Sauce",    icon: "🌶️" },
-    { name: "Yogurt Sauce",   icon: "🫙" },
-    { name: "Bell Peppers",   icon: "🫑" },
+    { name: "Spicy Sauce", icon: "🌶️" },
+    { name: "Yogurt Sauce", icon: "🫙" },
+    { name: "Bell Peppers", icon: "🫑" },
   ];
 
   const { data: categories = [] } = useQuery<any[]>({
@@ -345,13 +345,31 @@ export default function POSScreen() {
   const selectedCustomer = customers.find((c: any) => c.id === cart.customerId)
     || (callerCustomer && callerCustomer.id === cart.customerId ? callerCustomer : null);
 
-  const handlePhoneSearch = useCallback((phone: string) => {
+  const handlePhoneSearch = useCallback(async (phone: string) => {
     const trimmed = phone.trim();
     if (!trimmed) {
       cart.setCustomerId(null);
       return;
     }
-    // Normalize for fuzzy matching: strip spaces, dashes, parens
+
+    setCustomerPhoneLoading(true);
+    try {
+      const res = await apiRequest("GET", `/api/customers/phone-lookup?phone=${encodeURIComponent(trimmed)}&tenantId=${tenantId}`);
+      if (res.ok) {
+        const matches = await res.json();
+        if (matches && matches.length > 0) {
+          cart.setCustomerId(matches[0].id);
+          setCallerCustomer(matches[0]);
+          setCustomerPhoneLoading(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("[phoneSearch] error looking up customer:", err);
+    }
+    setCustomerPhoneLoading(false);
+
+    // Normalize for fuzzy matching: strip spaces, dashes, parens (fallback)
     const normalize = (p: string) => p.replace(/[\s\-().+]/g, "");
     const normTrimmed = normalize(trimmed);
     const found = (customers as any[]).find((c: any) =>
@@ -364,7 +382,7 @@ export default function POSScreen() {
       setNewCustomerForm({ name: "", phone: trimmed, address: "", email: "" });
       setShowNewCustomerForm(true);
     }
-  }, [customers, cart]);
+  }, [customers, cart, tenantId]);
 
   const handleCreateCustomer = async () => {
     if (!newCustomerForm.name.trim()) return;
@@ -1450,8 +1468,8 @@ export default function POSScreen() {
                   <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ paddingVertical: 14, alignItems: "center", borderRadius: 14 }}>
                     <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "800" }}>
                       {language === "ar" ? `أضف للسلة${selectedToppings.length > 0 ? ` (${selectedToppings.length})` : ""}` :
-                       language === "de" ? `In den Warenkorb${selectedToppings.length > 0 ? ` (${selectedToppings.length})` : ""}` :
-                       `Add to Cart${selectedToppings.length > 0 ? ` (${selectedToppings.length} toppings)` : ""}`}
+                        language === "de" ? `In den Warenkorb${selectedToppings.length > 0 ? ` (${selectedToppings.length})` : ""}` :
+                          `Add to Cart${selectedToppings.length > 0 ? ` (${selectedToppings.length} toppings)` : ""}`}
                     </Text>
                   </LinearGradient>
                 </Pressable>

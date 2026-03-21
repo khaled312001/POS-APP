@@ -44,7 +44,7 @@ export class CallerIDService extends EventEmitter {
     // Initialize WebSocket Server
     this.wss = new WebSocketServer({ server, path: "/api/ws/caller-id" });
 
-    this.wss.on("connection", (ws) => {
+    this.wss.on("connection", (ws: WebSocket) => {
       console.log("[CallerID] Client connected to WebSocket");
       ws.send(JSON.stringify({ type: "connected", status: "ready", mode: this.isSimulation ? "simulation" : "hardware" }));
 
@@ -54,7 +54,7 @@ export class CallerIDService extends EventEmitter {
         ws.send(JSON.stringify({ type: "active_calls", calls: activeCalls }));
       }
 
-      ws.on("message", (message) => {
+      ws.on("message", (message: any) => {
         try {
           const data = JSON.parse(message.toString());
           if (data.type === "simulate_call") {
@@ -148,7 +148,7 @@ export class CallerIDService extends EventEmitter {
 
     try {
       const { storage } = await import("./storage");
-      const matches = await storage.findCustomerByPhone(phoneNumber, tenantId);
+      const matches = await storage.findCustomerByPhone(phoneNumber, tenantId as number);
       if (matches.length > 0) {
         const c = matches[0];
         callInfo.customer = {
@@ -182,7 +182,7 @@ export class CallerIDService extends EventEmitter {
     });
 
     if (this.wss) {
-      this.wss.clients.forEach((client) => {
+      this.wss.clients.forEach((client: WebSocket) => {
         if (client.readyState === WebSocket.OPEN) {
           client.send(payload);
         }
@@ -203,7 +203,7 @@ export class CallerIDService extends EventEmitter {
       allActiveCalls: Array.from(this.activeCallSlots.values()),
       totalActiveCalls: this.activeCallSlots.size,
     });
-    this.wss.clients.forEach((client) => {
+    this.wss.clients.forEach((client: WebSocket) => {
       if (client.readyState === WebSocket.OPEN) client.send(payload);
     });
   }
@@ -214,7 +214,7 @@ export class CallerIDService extends EventEmitter {
   public broadcast(payload: object) {
     if (!this.wss) return;
     const msg = JSON.stringify(payload);
-    this.wss.clients.forEach((client) => {
+    this.wss.clients.forEach((client: WebSocket) => {
       if (client.readyState === WebSocket.OPEN) client.send(msg);
     });
   }
