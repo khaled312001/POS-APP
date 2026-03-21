@@ -946,7 +946,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
       if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      res.json(await storage.getCustomers(req.query.search as string, tenantId));
+      const limit = req.query.limit ? Math.min(Number(req.query.limit), 200) : 50;
+      const offset = req.query.offset ? Number(req.query.offset) : 0;
+      res.json(await storage.getCustomers(req.query.search as string, tenantId, limit, offset));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 

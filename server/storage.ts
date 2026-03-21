@@ -243,7 +243,7 @@ export const storage = {
   },
 
   // Customers
-  async getCustomers(search?: string, tenantId?: number) {
+  async getCustomers(search?: string, tenantId?: number, limit = 50, offset = 0) {
     const conditions: any[] = [or(eq(customers.isActive, true), isNull(customers.isActive))];
 
     if (tenantId) {
@@ -272,7 +272,7 @@ export const storage = {
       }
     }
 
-    return db.select().from(customers).where(and(...conditions)).orderBy(desc(customers.createdAt));
+    return db.select().from(customers).where(and(...conditions)).orderBy(desc(customers.createdAt)).limit(limit).offset(offset);
   },
 
   async findCustomerByPhone(phone: string, tenantId: number) {

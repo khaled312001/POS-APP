@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   StyleSheet, Text, View, FlatList, Pressable, TextInput,
-  Modal, Alert, ScrollView, Platform,
+  Modal, Alert, ScrollView, Platform, ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -13,25 +13,79 @@ import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { useLicense } from "@/lib/license-context";
 
+const PAGE_SIZE = 50;
+
 export default function CustomersScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
-  const { canManage, canDeleteCustomers, isCashier } = useAuth();
+  const { canManage, canDeleteCustomers } = useAuth();
   const { t, isRTL, rtlTextAlign, rtlText } = useLanguage();
   const { tenant } = useLicense();
+
+  // Search state — raw (shown in input) + debounced (sent to API)
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Pagination
+  const [offset, setOffset] = useState(0);
+  const [allCustomers, setAllCustomers] = useState<any[]>([]);
+  const [hasMore, setHasMore] = useState(true);
+  const loadingMore = useRef(false);
+
+  // Modals
   const [showForm, setShowForm] = useState(false);
   const [editCustomer, setEditCustomer] = useState<any>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", notes: "" });
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [showDetail, setShowDetail] = useState(false);
 
-  const { data: customers = [] } = useQuery<any[]>({
-    queryKey: [
-      tenant?.id ? `/api/customers?tenantId=${tenant.id}${search ? `&search=${search}` : ""}` : "/api/customers"
-    ],
+  const handleSearchChange = useCallback((text: string) => {
+    setSearch(text);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(text);
+      setOffset(0);
+      setAllCustomers([]);
+      setHasMore(true);
+      loadingMore.current = false;
+    }, 400);
+  }, []);
+
+  const queryUrl = tenant?.id
+    ? `/api/customers?tenantId=${tenant.id}&limit=${PAGE_SIZE}&offset=${offset}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`
+    : null;
+
+  const { data: pageData, isFetching } = useQuery<any[]>({
+    queryKey: [queryUrl],
     queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!queryUrl,
   });
+
+  useEffect(() => {
+    if (!pageData) return;
+    if (offset === 0) {
+      setAllCustomers(pageData);
+    } else {
+      setAllCustomers(prev => [...prev, ...pageData]);
+    }
+    setHasMore(pageData.length === PAGE_SIZE);
+    loadingMore.current = false;
+  }, [pageData]);
+
+  const loadMore = useCallback(() => {
+    if (isFetching || !hasMore || loadingMore.current) return;
+    loadingMore.current = true;
+    setOffset(prev => prev + PAGE_SIZE);
+  }, [isFetching, hasMore]);
+
+  const invalidateCustomers = () => {
+    qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).includes(`/api/customers?tenantId=${tenant?.id}`) });
+    setOffset(0);
+    setAllCustomers([]);
+    setHasMore(true);
+    loadingMore.current = false;
+  };
 
   const { data: customerSales = [] } = useQuery<any[]>({
     queryKey: [`/api/customers/${selectedCustomer?.id}/sales`],
@@ -42,7 +96,7 @@ export default function CustomersScreen() {
   const saveMutation = useMutation({
     mutationFn: (data: any) => apiRequest(editCustomer ? "PUT" : "POST", editCustomer ? `/api/customers/${editCustomer.id}` : "/api/customers", data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/customers?tenantId=${tenant.id}${search ? `&search=${search}` : ""}` : "/api/customers"] });
+      invalidateCustomers();
       setShowForm(false);
       setEditCustomer(null);
       setForm({ name: "", email: "", phone: "", address: "", notes: "" });
@@ -53,7 +107,7 @@ export default function CustomersScreen() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/customers/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/customers?tenantId=${tenant.id}${search ? `&search=${search}` : ""}` : "/api/customers"] });
+      invalidateCustomers();
       setShowDetail(false);
       setSelectedCustomer(null);
     },
@@ -74,7 +128,7 @@ export default function CustomersScreen() {
       phone: form.phone || undefined,
       address: form.address || undefined,
       notes: form.notes || undefined,
-      tenantId: tenant?.id
+      tenantId: tenant?.id,
     });
   };
 
@@ -92,15 +146,26 @@ export default function CustomersScreen() {
       <View style={styles.searchRow}>
         <View style={[styles.searchBox, isRTL && { flexDirection: "row-reverse" }]}>
           <Ionicons name="search" size={18} color={Colors.textMuted} />
-          <TextInput style={[styles.searchInput, isRTL ? { marginRight: 8, marginLeft: 0 } : { marginLeft: 8 }, rtlTextAlign, rtlText]} placeholder={t("search") + "..."} placeholderTextColor={Colors.textMuted} value={search} onChangeText={setSearch} />
+          <TextInput
+            style={[styles.searchInput, isRTL ? { marginRight: 8, marginLeft: 0 } : { marginLeft: 8 }, rtlTextAlign, rtlText]}
+            placeholder={t("search") + "..."}
+            placeholderTextColor={Colors.textMuted}
+            value={search}
+            onChangeText={handleSearchChange}
+          />
+          {isFetching && <ActivityIndicator size="small" color={Colors.textMuted} style={{ marginLeft: 6 }} />}
         </View>
+        {allCustomers.length > 0 && (
+          <Text style={styles.countText}>{allCustomers.length}{hasMore ? "+" : ""}</Text>
+        )}
       </View>
 
       <FlatList
-        data={customers}
+        data={allCustomers}
         keyExtractor={(item: any) => String(item.id)}
         contentContainerStyle={styles.list}
-        scrollEnabled={!!customers.length}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.3}
         renderItem={({ item }: { item: any }) => (
           <Pressable style={[styles.card, isRTL && { flexDirection: "row-reverse" }]} onPress={() => { setSelectedCustomer(item); setShowDetail(true); }}>
             <View style={[styles.avatar, isRTL ? { marginLeft: 12, marginRight: 0 } : { marginRight: 12 }]}>
@@ -119,9 +184,26 @@ export default function CustomersScreen() {
             </View>
           </Pressable>
         )}
-        ListEmptyComponent={<View style={styles.empty}><Ionicons name="people-outline" size={48} color={Colors.textMuted} /><Text style={[styles.emptyText, rtlTextAlign]}>{t("noCustomers")}</Text></View>}
+        ListFooterComponent={
+          isFetching && offset > 0 ? (
+            <View style={{ paddingVertical: 20, alignItems: "center" }}>
+              <ActivityIndicator size="small" color={Colors.textMuted} />
+            </View>
+          ) : null
+        }
+        ListEmptyComponent={
+          isFetching ? (
+            <View style={styles.empty}><ActivityIndicator size="large" color={Colors.textMuted} /></View>
+          ) : (
+            <View style={styles.empty}>
+              <Ionicons name="people-outline" size={48} color={Colors.textMuted} />
+              <Text style={[styles.emptyText, rtlTextAlign]}>{t("noCustomers")}</Text>
+            </View>
+          )
+        }
       />
 
+      {/* Add / Edit Customer Modal */}
       <Modal visible={showForm} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -150,6 +232,7 @@ export default function CustomersScreen() {
         </View>
       </Modal>
 
+      {/* Customer Detail Modal */}
       <Modal visible={showDetail} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: "90%" }]}>
@@ -272,9 +355,10 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14 },
   headerTitle: { fontSize: 22, fontWeight: "800", color: Colors.white },
   addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
-  searchRow: { paddingHorizontal: 12, paddingVertical: 10 },
-  searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 42, borderWidth: 1, borderColor: Colors.inputBorder },
+  searchRow: { paddingHorizontal: 12, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 8 },
+  searchBox: { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 42, borderWidth: 1, borderColor: Colors.inputBorder },
   searchInput: { flex: 1, color: Colors.text, fontSize: 15 },
+  countText: { color: Colors.textMuted, fontSize: 12, fontWeight: "600", minWidth: 36, textAlign: "right" },
   list: { paddingHorizontal: 12 },
   card: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface, borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.gradientMid, justifyContent: "center", alignItems: "center" },

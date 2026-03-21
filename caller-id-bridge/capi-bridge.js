@@ -128,26 +128,18 @@ function loadCAPI() {
 
     appId = idOut[0];
 
-    // AVM Vista-era capi2032.dll registers successfully but doesn't write the AppID
-    // to the out-pointer (returns 0 there). Discover the real AppID by probing
-    // CAPI_PUT_MESSAGE with IDs 1–10 — the one that returns 0x0 is ours.
+    // AVM Vista-era capi2032.dll registers but doesn't write AppID to the out-pointer.
+    // Discover the real AppID via CAPI_GET_MESSAGE: 0x1104 = valid handle (empty queue) = ours.
+    // This is more reliable than probing PUT_MESSAGE (which can match orphaned registrations).
     if (appId === 0) {
-      console.log("[Bridge] AppID=0 from out-pointer — probing for actual AppID...");
+      console.log("[Bridge] AppID=0 from out-pointer — probing GET_MESSAGE for actual AppID...");
       let found = false;
-      for (let id = 1; id <= 10; id++) {
-        const probeBuf = Buffer.alloc(32).fill(0);
-        probeBuf.writeUInt16LE(32, 0);
-        probeBuf.writeUInt16LE(id, 2);
-        probeBuf.writeUInt8(CMD_LISTEN_REQ, 4);
-        probeBuf.writeUInt8(SUB_REQ, 5);
-        probeBuf.writeUInt16LE(1, 6);
-        probeBuf.writeUInt32LE(capiController, 8);
-        probeBuf.writeUInt32LE(0x0000FFFF, 12);
-        probeBuf.writeUInt32LE(0x1FFF03FF, 16);
-        const pr = capi.CAPI_PUT_MESSAGE(id, probeBuf);
-        if (pr === 0) {
+      for (let id = 1; id <= 16; id++) {
+        const msgPtrOut = [null];
+        const gr = capi.CAPI_GET_MESSAGE(id, msgPtrOut);
+        if (gr === 0x1104) { // CAPI_QUEUE_EMPTY — valid handle, empty queue
           appId = id;
-          console.log(`[Bridge] AppID discovered: ${appId}`);
+          console.log(`[Bridge] AppID discovered via GET_MESSAGE probe: ${appId}`);
           found = true;
           break;
         }
