@@ -119,6 +119,18 @@ export class CallerIDService extends EventEmitter {
     const normalized = normalizePhone(phoneNumber);
     console.log(`[CallerID] Incoming call from: ${phoneNumber} (normalized: ${normalized})`);
 
+    // Check if a call from this number is already active to prevent duplicates
+    for (const [existingSlot, existingCall] of this.activeCallSlots.entries()) {
+      if (existingCall.normalizedPhone === normalized || existingCall.phoneNumber === phoneNumber) {
+        console.log(`[CallerID] Call from ${phoneNumber} already active in slot ${existingSlot}, ignoring duplicate.`);
+
+        // Update the timestamp to keep it fresh, but don't create a new notification
+        existingCall.timestamp = new Date().toISOString();
+        this.broadcastCallSlotUpdate();
+        return existingCall;
+      }
+    }
+
     let slot = preferredSlot;
     if (!slot || this.activeCallSlots.has(slot)) {
       for (let s = 1; s <= 4; s++) {
@@ -130,37 +142,33 @@ export class CallerIDService extends EventEmitter {
       return null;
     }
 
-    let customer: ActiveCall["customer"] = null;
+    // Immediately reserve the slot to prevent race conditions during DB lookup
+    const callInfo: ActiveCall = { phoneNumber, normalizedPhone: normalized, slot, timestamp: new Date().toISOString(), customer: null };
+    this.activeCallSlots.set(slot, callInfo);
+
     try {
-      if (!tenantId) {
-        console.log("[CallerID] No tenantId provided, skipping customer lookup");
+      const { storage } = await import("./storage");
+      const matches = await storage.findCustomerByPhone(phoneNumber, tenantId);
+      if (matches.length > 0) {
+        const c = matches[0];
+        callInfo.customer = {
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+          email: c.email,
+          address: c.address,
+          loyaltyPoints: c.loyaltyPoints,
+          visitCount: c.visitCount,
+          totalSpent: c.totalSpent,
+          notes: c.notes,
+        };
+        console.log(`[CallerID] Customer matched: ${callInfo.customer.name} (ID: ${callInfo.customer.id})`);
       } else {
-        const { storage } = await import("./storage");
-        const matches = await storage.findCustomerByPhone(phoneNumber, tenantId);
-        if (matches.length > 0) {
-          const c = matches[0];
-          customer = {
-            id: c.id,
-            name: c.name,
-            phone: c.phone,
-            email: c.email,
-            address: c.address,
-            loyaltyPoints: c.loyaltyPoints,
-            visitCount: c.visitCount,
-            totalSpent: c.totalSpent,
-            notes: c.notes,
-          };
-          console.log(`[CallerID] Customer matched: ${customer.name} (ID: ${customer.id})`);
-        } else {
-          console.log(`[CallerID] No customer found for phone: ${phoneNumber}`);
-        }
+        console.log(`[CallerID] No customer found for phone: ${phoneNumber}`);
       }
     } catch (e) {
       console.error("[CallerID] Customer lookup error:", e);
     }
-
-    const callInfo: ActiveCall = { phoneNumber, normalizedPhone: normalized, slot, timestamp: new Date().toISOString(), customer };
-    this.activeCallSlots.set(slot, callInfo);
 
     const payload = JSON.stringify({
       type: "incoming_call",
@@ -168,7 +176,7 @@ export class CallerIDService extends EventEmitter {
       normalizedPhone: normalized,
       slot,
       timestamp: callInfo.timestamp,
-      customer,
+      customer: callInfo.customer,
       totalActiveCalls: this.activeCallSlots.size,
       allActiveCalls: Array.from(this.activeCallSlots.values()),
     });
@@ -181,7 +189,7 @@ export class CallerIDService extends EventEmitter {
       });
     }
 
-    this.emit("call", phoneNumber, slot, customer);
+    this.emit("call", phoneNumber, slot, callInfo.customer);
     return callInfo;
   }
 

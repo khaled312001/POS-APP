@@ -279,15 +279,17 @@ export const storage = {
     const { getPhoneSearchVariants, normalizePhone } = await import("./phoneUtils");
     const variants = getPhoneSearchVariants(phone);
     const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
-    const phoneConditions = variants.map(v => ilike(customers.phone || "", `%${v}%`));
+    const phoneConditions = variants.map(v => ilike(customers.phone, `%${v}%`));
     for (const v of variants) {
       phoneConditions.push(sql`${strippedCol} ILIKE ${'%' + v + '%'}`);
     }
     const conditions: any[] = [
       eq(customers.isActive, true),
-      eq(customers.tenantId, tenantId),
       or(...phoneConditions),
     ];
+    if (tenantId) {
+      conditions.push(eq(customers.tenantId, tenantId));
+    }
     const normalized = normalizePhone(phone);
     const results = await db.select().from(customers).where(and(...conditions)).limit(5);
     results.sort((a, b) => {
