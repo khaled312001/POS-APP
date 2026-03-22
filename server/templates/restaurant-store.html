@@ -3251,6 +3251,9 @@
     let audioCtx = null;
     let isDark = localStorage.getItem('store_dark') === 'true';
 
+    // ===== APPLY INITIAL LANGUAGE =====
+    applyLang(currentLang);
+
     // ===== THEME =====
     if (isDark) document.body.classList.add('dark');
     function toggleTheme() {
@@ -3567,7 +3570,7 @@
         setDisp('checkout-form', 'none');
         setDisp('checkout-success', 'flex');
         setDisp('checkout-footer', 'none');
-        setTxt('success-msg', `Order #${data.orderNumber} confirmed! ${type === 'delivery' ? '🚚 Delivering to ' + address : '🏪 Ready for pickup soon'}. Total: ${fmt(t.total)}`);
+        setTxt('success-msg', `Order #${data.orderNumber} confirmed! ${type === 'delivery' ? '🚚 ' + tr('deliveryFeat') + ': ' + address : '🏪 ' + tr('pickupFeat')}. ${tr('totalLbl')}: ${fmt(t.total)}`);
         cart = []; updateCartUI();
         // Trigger success animations
         const icon = document.querySelector('.checkout-success-icon');
@@ -3575,14 +3578,14 @@
         playOrderSuccess();
         setTimeout(launchConfetti, 200);
       } catch (e) { setTxt('checkout-error', e.message); setDisp('checkout-error', 'block'); }
-      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-lock" style="margin-right:8px"></i>Place Order'; }
+      if (btn) { btn.disabled = false; btn.innerHTML = `<i class="fa-solid fa-lock" style="margin-right:8px"></i>${tr('placeOrder')}`; }
     }
 
     // ===== PIZZA BUILDER =====
     function openPizzaModal(product) {
       selectedPizza = product;
       setTxt('pb-pizza-name', product.name);
-      setTxt('pb-pizza-desc', product.description || 'Choose your size and add toppings');
+      setTxt('pb-pizza-desc', product.description || tr('chooseSizeToppings'));
       const imgHtml = product.image
         ? `<img src="${product.image}" style="width:100%;height:100%;object-fit:cover">`
         : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:var(--mu)"><i class="fa-solid fa-pizza-slice"></i></div>`;
@@ -3627,7 +3630,7 @@
       setTxt('pb-total', fmt(base + addonsTotal));
     }
     function addPizzaToCart() {
-      if (!selectedPizza) { showToast('Please select a pizza first'); return; }
+      if (!selectedPizza) { showToast(tr('selectPizzaFirst')); return; }
       addToCart(selectedPizza, 1, selectedSize, [...selectedAddons]);
       closePizzaModal();
     }
@@ -3638,11 +3641,11 @@
       // Sidebar list
       const listEl = document.getElementById('cat-list');
       let listHtml = `<div class="cat-item active" onclick="filterCat('all',this)">
-      <div class="cat-item-left"><div class="cat-item-icon"><i class="fa-solid fa-layer-group"></i></div><span class="cat-item-name">All Items</span></div>
+      <div class="cat-item-left"><div class="cat-item-icon"><i class="fa-solid fa-layer-group"></i></div><span class="cat-item-name">${tr('allItems')}</span></div>
       <span class="cat-item-count">${allCount}</span></div>`;
       // Mobile pills
       const pillsEl = document.getElementById('cat-pills');
-      let pillsHtml = `<div class="cat-pill active" onclick="filterCatPill('all',this)"><i class="fa-solid fa-layer-group"></i> All (${allCount})</div>`;
+      let pillsHtml = `<div class="cat-pill active" onclick="filterCatPill('all',this)"><i class="fa-solid fa-layer-group"></i> ${tr('allItems')} (${allCount})</div>`;
 
       cats.filter(c => c.isActive !== false).forEach(c => {
         const count = products.filter(p => p.categoryId === c.id && p.isActive).length;
@@ -3660,7 +3663,7 @@
       setVal('search-input', '');
       document.querySelectorAll('.cat-item').forEach(t => t.classList.remove('active'));
       if (el) el.classList.add('active');
-      const catName = el?.querySelector('.cat-item-name')?.textContent || 'All Items';
+      const catName = el?.querySelector('.cat-item-name')?.textContent || tr('allItems');
       setTxt('active-cat-label', catName);
       applyFilters();
     }
@@ -3673,10 +3676,10 @@
       document.querySelectorAll('.cat-item').forEach(t => t.classList.remove('active'));
       const match = [...document.querySelectorAll('.cat-item')].find(t => {
         const n = t.querySelector('.cat-item-name')?.textContent;
-        return catId === 'all' ? n === 'All Items' : t.getAttribute('onclick')?.includes(`filterCat(${catId}`);
+        return catId === 'all' ? n === tr('allItems') : t.getAttribute('onclick')?.includes(`filterCat(${catId}`);
       });
       if (match) match.classList.add('active');
-      const label = el ? el.textContent.replace(/\(\d+\)/, '').trim() : 'All Items';
+      const label = el ? el.textContent.replace(/\(\d+\)/, '').trim() : tr('allItems');
       setTxt('active-cat-label', label);
       applyFilters();
     }
@@ -3693,12 +3696,12 @@
         card.style.display = show ? '' : 'none';
         if (show) visible++;
       });
-      setTxt('visible-count', `${visible} item${visible !== 1 ? 's' : ''}`);
+      setTxt('visible-count', `${visible} ${tr('items')}`);
       const grid = document.getElementById('product-grid');
       if (grid) {
         const empty = grid.querySelector('.product-empty');
         if (!visible) {
-          if (!empty) grid.insertAdjacentHTML('beforeend', `<div class="product-empty"><i class="fa-solid fa-face-sad-tear"></i><p>No items found</p><span style="font-size:.85rem;color:var(--mu)">Try a different category or search</span></div>`);
+          if (!empty) grid.insertAdjacentHTML('beforeend', `<div class="product-empty"><i class="fa-solid fa-face-sad-tear"></i><p>${tr('noItemsFound')}</p><span style="font-size:.85rem;color:var(--mu)">${tr('tryDifferent')}</span></div>`);
         } else {
           empty?.remove();
         }
@@ -3709,7 +3712,7 @@
       const grid = document.getElementById('product-grid');
       const active = products.filter(p => p.isActive);
       if (!active.length) {
-        grid.innerHTML = `<div class="product-empty"><i class="fa-solid fa-utensils"></i><p>Menu coming soon</p></div>`;
+        grid.innerHTML = `<div class="product-empty"><i class="fa-solid fa-utensils"></i><p>${tr('menuComingSoon')}</p></div>`;
         return;
       }
       grid.innerHTML = active.map(p => {
@@ -3768,7 +3771,7 @@
         setHtml('footer-brand', logoUrl
           ? `<img src="${logoUrl}" alt="${storeName}" style="height:36px;width:auto;border-radius:6px;margin-bottom:12px">`
           : `<div class="nav-brand-text" style="font-size:1.2rem;margin-bottom:12px">${storeName}</div>`);
-        setHtml('footer-copy', `&copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.`);
+        setHtml('footer-copy', `&copy; ${new Date().getFullYear()} ${storeName}. ${tr('allRights')}`);
 
         // Hero
         setTxt('hero-title', c?.heroTitle || `Welcome to ${storeName}`);
@@ -3782,9 +3785,9 @@
         }
         // Hero features
         const feats = [];
-        if (c?.enableDelivery) feats.push(`<div class="hero-feature"><i class="fa-solid fa-truck"></i> Delivery</div>`);
-        if (c?.enablePickup) feats.push(`<div class="hero-feature"><i class="fa-solid fa-box-open"></i> Pickup</div>`);
-        if (c?.acceptCard) feats.push(`<div class="hero-feature"><i class="fa-solid fa-credit-card"></i> Card</div>`);
+        if (c?.enableDelivery) feats.push(`<div class="hero-feature"><i class="fa-solid fa-truck"></i> ${tr('deliveryFeat')}</div>`);
+        if (c?.enablePickup) feats.push(`<div class="hero-feature"><i class="fa-solid fa-box-open"></i> ${tr('pickupFeat')}</div>`);
+        if (c?.acceptCard) feats.push(`<div class="hero-feature"><i class="fa-solid fa-credit-card"></i> ${tr('cardFeat')}</div>`);
         if (c?.estimatedDeliveryTime) feats.push(`<div class="hero-feature"><i class="fa-regular fa-clock"></i> ${c.estimatedDeliveryTime} min</div>`);
         setHtml('hero-features', feats.join(''));
 
@@ -3797,7 +3800,7 @@
 
         // About section
         if (c?.aboutText) setTxt('about-text-content', c.aboutText);
-        setTxt('about-title', `About ${storeName}`);
+        setTxt('about-title', `${tr('aboutLabel')} ${storeName}`);
         if (c?.aboutImage) {
           setHtml('about-img-wrap', `<img src="${c.aboutImage}" alt="About ${storeName}" style="width:100%;height:100%;object-fit:cover">`);
         }
@@ -3805,25 +3808,25 @@
         // Contact info
         const contactHtml = [];
         if (c?.phone) {
-          contactHtml.push(`<div class="contact-item"><div class="contact-icon"><i class="fa-solid fa-phone"></i></div><div><div class="contact-label">Phone</div><div class="contact-value"><a href="tel:${c.phone}">${c.phone}</a></div></div></div>`);
+          contactHtml.push(`<div class="contact-item"><div class="contact-icon"><i class="fa-solid fa-phone"></i></div><div><div class="contact-label">${tr('phoneLbl')}</div><div class="contact-value"><a href="tel:${c.phone}">${c.phone}</a></div></div></div>`);
         }
         if (c?.email) {
-          contactHtml.push(`<div class="contact-item"><div class="contact-icon"><i class="fa-solid fa-envelope"></i></div><div><div class="contact-label">Email</div><div class="contact-value"><a href="mailto:${c.email}">${c.email}</a></div></div></div>`);
+          contactHtml.push(`<div class="contact-item"><div class="contact-icon"><i class="fa-solid fa-envelope"></i></div><div><div class="contact-label">${tr('emailLbl')}</div><div class="contact-value"><a href="mailto:${c.email}">${c.email}</a></div></div></div>`);
         }
         if (c?.address) {
-          contactHtml.push(`<div class="contact-item"><div class="contact-icon"><i class="fa-solid fa-location-dot"></i></div><div><div class="contact-label">Address</div><div class="contact-value">${c.address}</div></div></div>`);
+          contactHtml.push(`<div class="contact-item"><div class="contact-icon"><i class="fa-solid fa-location-dot"></i></div><div><div class="contact-label">${tr('addressLbl')}</div><div class="contact-value">${c.address}</div></div></div>`);
           setHtml('contact-map', `<iframe width="100%" height="100%" frameborder="0" style="border:0" src="https://www.google.com/maps?q=${encodeURIComponent(c.address)}&output=embed" allowfullscreen></iframe>`);
         }
         if (c?.openingHours) {
-          contactHtml.push(`<div class="contact-item"><div class="contact-icon"><i class="fa-regular fa-clock"></i></div><div><div class="contact-label">Hours</div><div class="contact-value">${c.openingHours}</div></div></div>`);
+          contactHtml.push(`<div class="contact-item"><div class="contact-icon"><i class="fa-regular fa-clock"></i></div><div><div class="contact-label">${tr('hoursLbl')}</div><div class="contact-value">${c.openingHours}</div></div></div>`);
           setTxt('tb-hours', c.openingHours);
           addCls('nav-info', 'visible');
           setTxt('footer-hours', c.openingHours);
         }
-        setHtml('contact-info', contactHtml.join('') || '<div style="color:var(--mu);font-size:.9rem;padding:12px">Contact information not available</div>');
+        setHtml('contact-info', contactHtml.join('') || `<div style="color:var(--mu);font-size:.9rem;padding:12px">${tr('contactNotAvailable')}</div>`);
 
         // Footer contact
-        const footerContact = ['<div class="footer-col-title">Contact</div>'];
+        const footerContact = [`<div class="footer-col-title">${tr('contact')}</div>`];
         if (c?.phone) { footerContact.push(`<a href="tel:${c.phone}"><i class="fa-solid fa-phone"></i> ${c.phone}</a>`); setTxt('tb-phone', c.phone); }
         if (c?.email) { footerContact.push(`<a href="mailto:${c.email}"><i class="fa-solid fa-envelope"></i> ${c.email}</a>`); setTxt('tb-email', c.email); }
         if (c?.address) footerContact.push(`<span><i class="fa-solid fa-location-dot"></i> ${c.address}</span>`);
@@ -3858,11 +3861,11 @@
         // Render menu
         renderCategories(cats, p);
         renderProducts(p, cats);
-        setTxt('visible-count', `${allProducts.filter(x => x.isActive).length} items`);
+        setTxt('visible-count', `${allProducts.filter(x => x.isActive).length} ${tr('items')}`);
 
       } catch (e) {
         console.error('[STORE] Failed to load:', e);
-        document.getElementById('product-grid').innerHTML = `<div class="product-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>Failed to load menu</p><span style="font-size:.85rem;color:var(--mu)">${e.message}</span></div>`;
+        document.getElementById('product-grid').innerHTML = `<div class="product-empty"><i class="fa-solid fa-triangle-exclamation"></i><p>${tr('failedToLoad')}</p><span style="font-size:.85rem;color:var(--mu)">${e.message}</span></div>`;
       }
     }
 

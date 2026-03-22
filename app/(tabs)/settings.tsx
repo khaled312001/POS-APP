@@ -1734,7 +1734,7 @@ export default function SettingsScreen() {
             <Pressable
               testID="lang-en"
               style={[styles.empCard, language === "en" && { borderWidth: 2, borderColor: Colors.accent }]}
-              onPress={() => { setLanguage("en"); setShowLanguagePicker(false); }}
+              onPress={() => { setLanguage("en"); setShowLanguagePicker(false); apiRequest("PUT", "/api/system-language", { language: "en" }).catch(() => {}); }}
             >
               <View style={[styles.empAvatar, { backgroundColor: Colors.info + "30" }]}>
                 <Text style={{ fontSize: 20 }}>🇺🇸</Text>
@@ -1748,7 +1748,7 @@ export default function SettingsScreen() {
             <Pressable
               testID="lang-ar"
               style={[styles.empCard, language === "ar" && { borderWidth: 2, borderColor: Colors.accent }]}
-              onPress={() => { setLanguage("ar"); setShowLanguagePicker(false); }}
+              onPress={() => { setLanguage("ar"); setShowLanguagePicker(false); apiRequest("PUT", "/api/system-language", { language: "ar" }).catch(() => {}); }}
             >
               <View style={[styles.empAvatar, { backgroundColor: Colors.success + "30" }]}>
                 <Text style={{ fontSize: 20 }}>🇸🇦</Text>
@@ -1762,7 +1762,7 @@ export default function SettingsScreen() {
             <Pressable
               testID="lang-de"
               style={[styles.empCard, language === "de" && { borderWidth: 2, borderColor: Colors.accent }]}
-              onPress={() => { setLanguage("de"); setShowLanguagePicker(false); }}
+              onPress={() => { setLanguage("de"); setShowLanguagePicker(false); apiRequest("PUT", "/api/system-language", { language: "de" }).catch(() => {}); }}
             >
               <View style={[styles.empAvatar, { backgroundColor: Colors.warning + "30" }]}>
                 <Text style={{ fontSize: 20 }}>🇩🇪</Text>
