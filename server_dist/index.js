@@ -3854,7 +3854,11 @@ var CallerIDService = class extends EventEmitter {
     this.wss.clients.forEach((client2) => {
       if (client2.readyState === WebSocket.OPEN) {
         total++;
+<<<<<<< HEAD
         if (!tenantId || !client2.tenantId || client2.tenantId === tenantId) {
+=======
+        if (!tenantId || client2.tenantId === tenantId) {
+>>>>>>> b7fb8dbb7febbd1d823c591b0c0a4d017fbee513
           matched++;
           client2.send(payload);
         }
@@ -5491,9 +5495,13 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/products", async (req, res) => {
     try {
+<<<<<<< HEAD
       const body = sanitizeDates(req.body);
       if (body.isAddon) body.price = "0";
       const p = await storage.createProduct(body);
+=======
+      const p = await storage.createProduct(sanitizeDates(req.body));
+>>>>>>> b7fb8dbb7febbd1d823c591b0c0a4d017fbee513
       callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
       res.json(p);
     } catch (e) {
@@ -5502,9 +5510,13 @@ async function registerRoutes(app2) {
   });
   app2.put("/api/products/:id", async (req, res) => {
     try {
+<<<<<<< HEAD
       const body = sanitizeDates(req.body);
       if (body.isAddon) body.price = "0";
       const p = await storage.updateProduct(Number(req.params.id), body);
+=======
+      const p = await storage.updateProduct(Number(req.params.id), sanitizeDates(req.body));
+>>>>>>> b7fb8dbb7febbd1d823c591b0c0a4d017fbee513
       callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
       res.json(p);
     } catch (e) {
@@ -8596,8 +8608,11 @@ var PUBLIC_ROUTES = [
   "/api/dashboard/subscriptions",
   "/api/caller-id/incoming",
   // Local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
+<<<<<<< HEAD
   "/api/caller-id/active-calls",
   // HTTP polling fallback — tenantId required in query string
+=======
+>>>>>>> b7fb8dbb7febbd1d823c591b0c0a4d017fbee513
   "/api/push/vapid-public-key",
   // Public — needed for SW push subscription before auth
   "/api/push/subscribe"

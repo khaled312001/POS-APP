@@ -3511,7 +3511,7 @@
 
     // ===== CHECKOUT =====
     function openCheckout() {
-      if (!cart.length) { showToast('<i class="fa-solid fa-circle-exclamation" style="margin-right:6px;color:#f59e0b"></i>Cart is empty'); return; }
+      if (!cart.length) { showToast(`<i class="fa-solid fa-circle-exclamation" style="margin-right:6px;color:#f59e0b"></i>${tr('cartIsEmpty')}`); return; }
       closeCart();
       addCls('checkout-modal', 'open');
       setDisp('checkout-form', '');
@@ -3540,7 +3540,7 @@
       setDisp('checkout-error', 'none');
 
       const btn = document.getElementById('checkout-submit');
-      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:8px"></i>Placing order...'; }
+      if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-right:8px"></i>${tr('placingOrder')}`; }
 
       const t = getCartTotal();
       try {
