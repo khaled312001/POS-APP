@@ -553,83 +553,253 @@ export default function POSScreen() {
     return num.length >= 15 && mm && yy && mm.length === 2 && yy.length >= 2 && cardCvc.length >= 3;
   };
 
-  const autoPrint3Copies = (saleData: any, cartItems: typeof cart.items, cartSubtotal: number, cartTax: number, cartDiscount: number, cartServiceFee: number, cartTotal: number, cartDeliveryFee: number, pmMethod: string, cashAmt: number, custName: string, empName: string) => {
+  const autoPrint3Copies = (saleData: any, cartItems: typeof cart.items, cartSubtotal: number, cartTax: number, cartDiscount: number, cartServiceFee: number, cartTotal: number, cartDeliveryFee: number, pmMethod: string, cashAmt: number, custName: string, empName: string, custObj?: any) => {
     if (Platform.OS !== "web") return;
-    const printWin = window.open("", "_blank", "width=420,height=700");
+    const printWin = window.open("", "_blank", "width=900,height=700");
     if (!printWin) return;
+
     const storeName = storeSettings?.name || tenant?.name || "POS System";
     const storeAddr = storeSettings?.address || "";
     const storePhone = storeSettings?.phone || "";
-    const receiptNum = saleData?.receiptNumber || `#${saleData?.id}`;
-    const dateStr = new Date().toLocaleDateString();
-    const timeStr = new Date().toLocaleTimeString();
-    const itemsHtml = cartItems.map((i) =>
-      `<tr><td>${i.name}</td><td style="text-align:center">x${i.quantity}</td><td style="text-align:right">CHF ${(i.price * i.quantity).toFixed(2)}</td></tr>`
-    ).join("");
-    const kitchenItemsHtml = cartItems.map((i) =>
-      `<tr><td style="font-size:14px;font-weight:bold">${i.name}</td><td style="text-align:center;font-size:14px;font-weight:bold">x${i.quantity}</td></tr>`
-    ).join("");
-    const deliveryRow = cartDeliveryFee > 0 ? `<tr><td>Delivery:</td><td class="right">CHF ${cartDeliveryFee.toFixed(2)}</td></tr>` : "";
-    const serviceFeeRow = cartServiceFee > 0 ? `<tr><td>${t("serviceTax" as any) || "Service Tax"}:</td><td class="right">CHF ${cartServiceFee.toFixed(2)}</td></tr>` : "";
-    const changeRow = pmMethod === "cash" && cashAmt > cartTotal ? `<tr><td>Change:</td><td class="right">CHF ${(cashAmt - cartTotal).toFixed(2)}</td></tr>` : "";
+    const storeEmail = storeSettings?.email || "";
+    const logoPath = storeSettings?.logo || "";
+    const logoUrl = logoPath ? `${window.location.origin}${logoPath}` : "";
+    const orderId = saleData?.id || "";
+    const receiptNum = saleData?.receiptNumber || `#${orderId}`;
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+    const timeStr = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+    const orderTimeStr = saleData?.createdAt ? new Date(saleData.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : timeStr;
 
-    const fullReceipt = (copyLabel: string) => `
+    const custAddress = custObj?.address || "";
+    const custPhone = custObj?.phone || "";
+    const isDelivery = pmMethod === "delivery" || (cartDeliveryFee > 0);
+    const pmLabel = pmMethod === "cash" ? "Bar" : pmMethod === "card" ? "Karte" : pmMethod === "delivery" ? "Lieferung" : pmMethod.toUpperCase();
+
+    const itemsHtml = cartItems.map((i) =>
+      `<tr><td class="item-name">${i.name}</td><td class="item-qty">x${i.quantity}</td><td class="item-price">Fr&nbsp;${(i.price).toFixed(2)}</td><td class="item-total">Fr&nbsp;${(i.price * i.quantity).toFixed(2)}</td></tr>`
+    ).join("");
+
+    const kitchenItemsHtml = cartItems.map((i) =>
+      `<tr><td class="k-name">${i.name}</td><td class="k-qty">x${i.quantity}</td></tr>`
+    ).join("");
+
+    const logoHtml = logoUrl
+      ? `<img src="${logoUrl}" alt="${storeName}" class="logo-img" />`
+      : `<div class="store-name-big">${storeName}</div>`;
+
+    const mwstCount = cartItems.reduce((s, i) => s + i.quantity, 0);
+    const mwstRate = Number(storeSettings?.taxRate || 2.5);
+
+    // ── RECEIPT 1: Kundenrechnung ─────────────────────────────────────────────
+    const customerReceipt = `
 <div class="receipt">
-  <p class="center label">${copyLabel}</p>
-  <p class="center bold big">${storeName}</p>
-  ${storeAddr ? `<p class="center small">${storeAddr}</p>` : ""}
-  ${storePhone ? `<p class="center small">${storePhone}</p>` : ""}
-  <div class="dline"></div>
-  <p class="small">Date: ${dateStr} ${timeStr}</p>
-  <p class="small">Receipt: ${receiptNum}</p>
-  <p class="small">Cashier: ${empName}</p>
-  <p class="small">Customer: ${custName}</p>
-  <div class="line"></div>
-  <table width="100%"><thead><tr><th style="text-align:left">Item</th><th>Qty</th><th style="text-align:right">Total</th></tr></thead><tbody>${itemsHtml}</tbody></table>
-  <div class="line"></div>
-  <table width="100%">
-    <tr><td>Subtotal:</td><td class="right">CHF ${cartSubtotal.toFixed(2)}</td></tr>
-    ${cartDiscount > 0 ? `<tr><td>Discount:</td><td class="right">-CHF ${cartDiscount.toFixed(2)}</td></tr>` : ""}
-    ${serviceFeeRow}
-    <tr><td>Tax:</td><td class="right">CHF ${cartTax.toFixed(2)}</td></tr>
-    ${deliveryRow}
+  <div class="receipt-header">
+    <div class="logo-wrap">${logoHtml}</div>
+    <div class="receipt-title">Rechnung</div>
+  </div>
+
+  <div class="info-block">
+    <div class="info-row">
+      <div class="info-left">
+        <div class="info-label">${receiptNum}&nbsp;MwSt</div>
+        <div class="info-label">Kassierer</div>
+        <div class="time-big">${timeStr}</div>
+        <div class="info-label">${now.toLocaleDateString("de-DE")}</div>
+        <div class="info-label">${orderTimeStr}</div>
+      </div>
+      <div class="info-right">
+        <div class="cust-name">${custName}</div>
+        ${custAddress ? `<div class="cust-addr">${custAddress}</div>` : ""}
+        ${isDelivery ? `<div class="delivery-note">Hauslieferung ohne Service und Zubereitung</div>` : ""}
+        ${custPhone ? `<div class="cust-tel"><strong>Tel</strong>&nbsp;&nbsp;${custPhone}</div>` : ""}
+      </div>
+    </div>
+  </div>
+
+  <table class="items-table">
+    <tbody>
+      ${itemsHtml}
+      ${cartDiscount > 0 ? `<tr><td class="item-name" colspan="2">- Fr. ${cartDiscount.toFixed(2).replace(".00", ".--")}</td><td class="item-qty"></td><td class="item-price">-${cartDiscount.toFixed(2)}</td><td class="item-total">-${cartDiscount.toFixed(2)}</td></tr><tr><td class="item-name" colspan="4" style="font-size:10px;padding-left:10px">Reduktion</td></tr>` : ""}
+    </tbody>
   </table>
-  <div class="dline"></div>
-  <table width="100%"><tr><td class="bold big">TOTAL:</td><td class="right bold big">CHF ${cartTotal.toFixed(2)}</td></tr></table>
-  <div class="dline"></div>
-  <p class="small">Payment: ${pmMethod.toUpperCase()}</p>
-  ${changeRow ? `<table width="100%">${changeRow}</table>` : ""}
-  <p class="center bold" style="margin-top:12px">Thank you!</p>
+
+  <div class="totals-box">
+    <table class="totals-table">
+      <tr>
+        <td class="tot-count">${mwstCount}</td>
+        <td class="tot-label">MwS<br>t</td>
+        <td class="tot-val">Fr&nbsp;${cartTotal.toFixed(2)}</td>
+        <td class="tot-val">Fr&nbsp;${cartTax.toFixed(2)}</td>
+        <td class="tot-final"><strong>Fr</strong></td>
+        <td class="tot-final-amt"><strong>${cartTotal.toFixed(2)}</strong></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="receipt-footer">
+    ${storeEmail ? `<div>Grazie mille e buon appetito! ${storeEmail}</div>` : "<div>Grazie mille e buon appetito!</div>"}
+  </div>
+  <div class="store-bottom">${storeName}${storeAddr ? " - " + storeAddr : ""}${storePhone ? " Tel: " + storePhone : ""}</div>
 </div>`;
 
+    // ── RECEIPT 2: Fahrerauftrag ──────────────────────────────────────────────
+    const driverReceipt = `
+<div class="receipt">
+  <div class="fahrerauftrag-header">Fahrerauftrag ${orderId}</div>
+
+  <div class="info-block">
+    <div class="info-row">
+      <div class="info-left">
+        <div class="info-label">${receiptNum}&nbsp;MwSt</div>
+        <div class="info-label">Kassierer</div>
+        <div class="time-big">${timeStr}</div>
+        <div class="info-label">${now.toLocaleDateString("de-DE")}</div>
+        <div class="info-label">${orderTimeStr}</div>
+      </div>
+      <div class="info-right">
+        <div class="cust-name">${custName}</div>
+        ${custAddress ? `<div class="cust-addr">${custAddress}</div>` : ""}
+        ${isDelivery ? `<div class="delivery-note">Hauslieferung ohne Service und Zubereitung</div>` : ""}
+        ${custPhone ? `<div class="cust-tel"><strong>Tel</strong>&nbsp;&nbsp;${custPhone}</div>` : ""}
+      </div>
+    </div>
+  </div>
+
+  <table class="items-table">
+    <tbody>
+      ${itemsHtml}
+      ${cartDiscount > 0 ? `<tr><td class="item-name" colspan="2">- Fr. ${cartDiscount.toFixed(2).replace(".00", ".--")}</td><td class="item-qty"></td><td class="item-price">-${cartDiscount.toFixed(2)}</td><td class="item-total">-${cartDiscount.toFixed(2)}</td></tr><tr><td class="item-name" colspan="4" style="font-size:10px;padding-left:10px">Reduktion</td></tr>` : ""}
+    </tbody>
+  </table>
+
+  <div class="totals-box">
+    <table class="totals-table">
+      <tr>
+        <td class="tot-count">${mwstCount}</td>
+        <td class="tot-label">MwS<br>t</td>
+        <td class="tot-val">Fr&nbsp;${cartTotal.toFixed(2)}</td>
+        <td class="tot-val">Fr&nbsp;${cartTax.toFixed(2)}</td>
+        <td class="tot-final"><strong>Fr</strong></td>
+        <td class="tot-final-amt"><strong>${cartTotal.toFixed(2)}</strong></td>
+      </tr>
+    </table>
+  </div>
+
+  <table class="driver-footer-table">
+    <tr><td class="df-label">FAHRER</td><td class="df-val"></td></tr>
+    <tr><td class="df-label">LIEFERZEIT</td><td class="df-val"></td></tr>
+    <tr><td class="df-label">NOTIZ</td><td class="df-val"><em>${pmLabel}</em></td></tr>
+  </table>
+</div>`;
+
+    // ── RECEIPT 3: AENDERUNG / Küchenbon ─────────────────────────────────────
     const kitchenReceipt = `
 <div class="receipt">
-  <p class="center label">*** KITCHEN ORDER ***</p>
-  <p class="center bold big">${storeName}</p>
-  <div class="dline"></div>
-  <p class="small">Date: ${dateStr} ${timeStr}</p>
-  <p class="small">Receipt: ${receiptNum}</p>
-  ${pmMethod === "delivery" ? `<p class="bold" style="font-size:14px;text-align:center">⚡ DELIVERY ORDER ⚡</p>` : ""}
-  <div class="line"></div>
-  <table width="100%"><tbody>${kitchenItemsHtml}</tbody></table>
-  <div class="dline"></div>
-  <p class="center bold" style="font-size:14px">-- Prepare Now --</p>
+  <div class="aenderung-header">AENDERUNG</div>
+
+  <div class="info-block">
+    <div class="info-row">
+      <div class="info-left">
+        <div class="kitchen-store">${storeName} ${orderId}</div>
+        <div class="info-label">Kassierer</div>
+        <div class="time-big">${timeStr}</div>
+        <div class="info-label">${dateStr}</div>
+        <div class="info-label">${orderTimeStr}</div>
+      </div>
+      <div class="info-right">
+        <div class="cust-name">${custName}</div>
+        ${custAddress ? `<div class="cust-addr">${custAddress}</div>` : ""}
+        ${custPhone ? `<div class="cust-tel"><strong>Tel</strong>&nbsp;&nbsp;${custPhone}</div>` : ""}
+      </div>
+    </div>
+  </div>
+
+  <div class="kitchen-section-label">FOOD</div>
+  <table class="kitchen-table">
+    <tbody>${kitchenItemsHtml}</tbody>
+  </table>
+  <div class="k-line"></div>
+  <div class="k-line"></div>
+  <div class="k-line"></div>
 </div>`;
 
-    printWin.document.write(`<html><head><title>Receipt</title><style>
-      *{margin:0;padding:0;box-sizing:border-box}
-      body{font-family:'Courier New',monospace;font-size:11px;width:300px;margin:0 auto}
-      .receipt{padding:12px;margin-bottom:4px}
-      .center{text-align:center}.right{text-align:right}.bold{font-weight:bold}.big{font-size:14px}.small{font-size:10px}
-      .label{font-size:12px;font-weight:bold;border:1px solid #000;padding:2px 8px;display:inline-block;margin:0 auto 6px auto}
-      .line{border-top:1px dashed #000;margin:6px 0}.dline{border-top:2px solid #000;margin:6px 0}
-      table{width:100%;border-collapse:collapse}td,th{padding:2px 0}
-      @media print{.pagebreak{page-break-after:always}}
-    </style></head><body>`);
-    printWin.document.write(fullReceipt("★ CUSTOMER COPY ★"));
-    printWin.document.write(`<div class="pagebreak"></div>`);
-    printWin.document.write(fullReceipt("★ RESTAURANT / DELIVERY COPY ★"));
-    printWin.document.write(`<div class="pagebreak"></div>`);
+    const css = `
+      @page { size: A4; margin: 8mm 12mm; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #000; background: #fff; }
+
+      .receipt { width: 100%; min-height: 277mm; padding: 6mm 0; page-break-after: always; display: flex; flex-direction: column; }
+      .receipt:last-child { page-break-after: avoid; }
+
+      /* Header */
+      .receipt-header { text-align: center; border-bottom: 3px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
+      .logo-img { max-height: 70px; max-width: 220px; object-fit: contain; }
+      .store-name-big { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+      .receipt-title { font-size: 18px; font-weight: normal; margin-top: 4px; }
+
+      /* Fahrerauftrag */
+      .fahrerauftrag-header { font-size: 32px; font-weight: 900; margin-bottom: 10px; }
+
+      /* AENDERUNG */
+      .aenderung-header { font-size: 28px; font-weight: 900; text-align: center; margin-bottom: 4px; }
+      .kitchen-store { font-size: 14px; font-weight: normal; margin-bottom: 4px; }
+
+      /* Info block */
+      .info-block { margin: 8px 0; }
+      .info-row { display: flex; gap: 16px; }
+      .info-left { min-width: 120px; }
+      .info-right { flex: 1; }
+      .info-label { font-size: 11px; color: #333; line-height: 1.5; }
+      .time-big { font-size: 22px; font-weight: 900; line-height: 1.2; margin: 2px 0; }
+      .cust-name { font-size: 15px; font-weight: 700; }
+      .cust-addr { font-size: 13px; line-height: 1.6; }
+      .delivery-note { font-size: 9px; color: #555; margin: 2px 0; }
+      .cust-tel { font-size: 15px; font-weight: bold; margin-top: 4px; letter-spacing: 1px; }
+
+      /* Items table */
+      .items-table { width: 100%; border-collapse: collapse; margin: 10px 0; border-top: 1px solid #000; border-bottom: 1px solid #000; }
+      .items-table td { padding: 3px 4px; font-size: 12px; }
+      .item-name { text-align: left; width: 45%; }
+      .item-qty { text-align: center; width: 15%; font-size: 10px; color: #555; }
+      .item-price { text-align: right; width: 15%; font-size: 10px; color: #555; }
+      .item-total { text-align: right; width: 25%; font-weight: 600; }
+
+      /* Totals box */
+      .totals-box { border: 1px solid #000; padding: 6px 8px; margin: 4px 0 10px; }
+      .totals-table { width: 100%; border-collapse: collapse; }
+      .totals-table td { padding: 2px 6px; font-size: 12px; }
+      .tot-count { font-size: 14px; font-weight: bold; width: 24px; }
+      .tot-label { font-size: 10px; line-height: 1.1; width: 30px; }
+      .tot-val { text-align: right; }
+      .tot-final { text-align: right; font-size: 14px; }
+      .tot-final-amt { text-align: right; font-size: 22px; font-weight: 900; }
+
+      /* Driver footer */
+      .driver-footer-table { width: 100%; border-collapse: collapse; border: 1px solid #000; margin-top: 12px; }
+      .driver-footer-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #000; }
+      .driver-footer-table tr:last-child td { border-bottom: none; }
+      .df-label { font-weight: 700; width: 120px; }
+      .df-val { }
+
+      /* Kitchen section */
+      .kitchen-section-label { background: #000; color: #fff; font-weight: bold; font-size: 13px; padding: 4px 8px; margin: 8px 0 4px; }
+      .kitchen-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+      .kitchen-table td { padding: 4px 4px; font-size: 13px; }
+      .k-name { font-weight: bold; width: 75%; border-bottom: 1px solid #ccc; }
+      .k-qty { text-align: center; width: 25%; border-bottom: 1px solid #ccc; }
+      .k-line { border-top: 1px solid #000; margin: 14px 0; }
+
+      /* Footer */
+      .receipt-footer { text-align: center; font-size: 11px; margin-top: auto; padding-top: 10px; }
+      .store-bottom { text-align: center; font-size: 10px; font-weight: bold; margin-top: 6px; border-top: 1px solid #000; padding-top: 6px; }
+
+      @media print { .pagebreak { page-break-after: always; } }
+    `;
+
+    printWin.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Rechnung ${receiptNum}</title><style>${css}</style></head><body>`);
+    printWin.document.write(customerReceipt);
+    printWin.document.write(driverReceipt);
     printWin.document.write(kitchenReceipt);
     printWin.document.write("</body></html>");
     printWin.document.close();
@@ -645,7 +815,7 @@ export default function POSScreen() {
     // Auto-print 3 copies on web
     autoPrint3Copies(
       saleData, cart.items, cart.subtotal, cart.tax, cart.discount, cart.serviceFee, cart.total, cart.deliveryFee,
-      paymentMethod, cashAmt, custName, empName
+      paymentMethod, cashAmt, custName, empName, selectedCustomer
     );
     setLastSale({
       ...saleData,
