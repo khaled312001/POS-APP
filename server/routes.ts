@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import * as xlsx from "xlsx";
 import path from "node:path";
 import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { callerIdService } from "./callerIdService";
@@ -1847,36 +1848,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Object Storage - Get upload URL
-  app.post("/api/objects/upload", async (_req, res) => {
+  // Object Storage - Upload image (local filesystem)
+  app.post("/api/objects/upload", async (req: Request, res: Response) => {
     try {
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      res.json({ uploadURL });
+      const { imageData, contentType = "image/jpeg" } = req.body;
+      if (!imageData) {
+        return res.status(400).json({ error: "imageData is required" });
+      }
+      const uploadsDir = path.resolve(process.cwd(), "uploads");
+      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+      const ext = (contentType.split("/")[1] || "jpg").split(";")[0];
+      const filename = `${randomUUID()}.${ext}`;
+      const filePath = path.join(uploadsDir, filename);
+      const buffer = Buffer.from(imageData, "base64");
+      fs.writeFileSync(filePath, buffer);
+      const objectPath = `/objects/${filename}`;
+      res.json({ objectPath });
     } catch (error: any) {
-      console.error("Error getting upload URL:", error);
+      console.error("Error uploading file:", error);
       res.status(500).json({ error: error.message });
     }
   });
 
-  // Object Storage - Save uploaded image path
+  // Object Storage - Save uploaded image path (kept for compatibility)
   app.put("/api/images/save", async (req: Request, res: Response) => {
     const { imageURL } = req.body;
-    if (process.env.NODE_ENV !== 'production') console.log("Saving image path for URL:", imageURL);
-
     if (!imageURL) {
       return res.status(400).json({ error: "imageURL is required" });
     }
-
-    try {
-      const objectStorageService = new ObjectStorageService();
-      const objectPath = objectStorageService.normalizeObjectEntityPath(imageURL);
-      if (process.env.NODE_ENV !== 'production') console.log("Normalized object path:", objectPath);
-      res.status(200).json({ objectPath });
-    } catch (error) {
-      console.error("Error saving image:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
+    res.status(200).json({ objectPath: imageURL });
   });
 
   // Create product with initial stock
@@ -2561,6 +2561,111 @@ async function test(){
       const filepath = path.join(TENANT_BACKUP_DIR, filename);
       if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
       res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Vehicles / Fleet Management ────────────────────────────────────────────
+  app.get("/api/vehicles", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+      res.json(await storage.getVehicles(tenantId, branchId));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/vehicles", async (req, res) => {
+    try { res.json(await storage.createVehicle(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.put("/api/vehicles/:id", async (req, res) => {
+    try { res.json(await storage.updateVehicle(Number(req.params.id), req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.delete("/api/vehicles/:id", async (req, res) => {
+    try { await storage.deleteVehicle(Number(req.params.id)); res.json({ success: true }); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Printer Configurations ─────────────────────────────────────────────────
+  app.get("/api/printer-configs", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : 1;
+      const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+      res.json(await storage.getPrinterConfigs(tenantId, branchId));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/printer-configs", async (req, res) => {
+    try { res.json(await storage.upsertPrinterConfig(req.body)); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Daily Closings (TAGESABSCHLUSS) ───────────────────────────────────────
+  app.get("/api/daily-closings", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : 1;
+      const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+      res.json(await storage.getDailyClosings(tenantId, branchId));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/daily-closings", async (req, res) => {
+    try {
+      const { tenantId, branchId, closingDate } = req.body;
+      // Auto-compute from today's sales
+      const today = closingDate || new Date().toISOString().split("T")[0];
+      const startOfDay = new Date(today + "T00:00:00.000Z");
+      const endOfDay = new Date(today + "T23:59:59.999Z");
+      const daySales = await storage.getSalesByDateRange(startOfDay, endOfDay);
+      const totalSales = daySales.reduce((s: number, sale: any) => s + Number(sale.totalAmount || 0), 0);
+      const totalCash = daySales.filter((s: any) => s.paymentMethod === "cash").reduce((a: number, s: any) => a + Number(s.totalAmount || 0), 0);
+      const totalCard = daySales.filter((s: any) => s.paymentMethod === "card").reduce((a: number, s: any) => a + Number(s.totalAmount || 0), 0);
+      const totalMobile = daySales.filter((s: any) => s.paymentMethod === "mobile").reduce((a: number, s: any) => a + Number(s.totalAmount || 0), 0);
+      const totalDiscounts = daySales.reduce((s: number, sale: any) => s + Number(sale.discountAmount || 0), 0);
+      const dc = await storage.createDailyClosing({
+        tenantId, branchId: branchId || null, employeeId: req.body.employeeId || null,
+        closingDate: today,
+        totalSales: String(totalSales), totalCash: String(totalCash),
+        totalCard: String(totalCard), totalMobile: String(totalMobile),
+        totalTransactions: daySales.length,
+        totalReturns: "0", totalDiscounts: String(totalDiscounts),
+        openingCash: String(req.body.openingCash || 0),
+        closingCash: String(req.body.closingCash || 0),
+        notes: req.body.notes || null,
+        status: "closed",
+      });
+      res.json(dc);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Monthly Closings (MONATSABSCHLUSS) ────────────────────────────────────
+  app.get("/api/monthly-closings", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : 1;
+      const branchId = req.query.branchId ? Number(req.query.branchId) : undefined;
+      res.json(await storage.getMonthlyClosings(tenantId, branchId));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/monthly-closings", async (req, res) => {
+    try {
+      const { tenantId, branchId, closingMonth } = req.body;
+      const month = closingMonth || new Date().toISOString().slice(0, 7);
+      const startOfMonth = new Date(month + "-01T00:00:00.000Z");
+      const endOfMonth = new Date(new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() + 1, 0).toISOString().split("T")[0] + "T23:59:59.999Z");
+      const monthSales = await storage.getSalesByDateRange(startOfMonth, endOfMonth);
+      const totalSales = monthSales.reduce((s: number, sale: any) => s + Number(sale.totalAmount || 0), 0);
+      const totalCash = monthSales.filter((s: any) => s.paymentMethod === "cash").reduce((a: number, s: any) => a + Number(s.totalAmount || 0), 0);
+      const totalCard = monthSales.filter((s: any) => s.paymentMethod === "card").reduce((a: number, s: any) => a + Number(s.totalAmount || 0), 0);
+      const totalMobile = monthSales.filter((s: any) => s.paymentMethod === "mobile").reduce((a: number, s: any) => a + Number(s.totalAmount || 0), 0);
+      const totalDiscounts = monthSales.reduce((s: number, sale: any) => s + Number(sale.discountAmount || 0), 0);
+      const expenses = await storage.getExpensesByDateRange(startOfMonth, endOfMonth);
+      const totalExpenses = expenses.reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
+      const mc = await storage.createMonthlyClosing({
+        tenantId, branchId: branchId || null, employeeId: req.body.employeeId || null,
+        closingMonth: month,
+        totalSales: String(totalSales), totalCash: String(totalCash),
+        totalCard: String(totalCard), totalMobile: String(totalMobile),
+        totalTransactions: monthSales.length,
+        totalReturns: "0", totalDiscounts: String(totalDiscounts),
+        totalExpenses: String(totalExpenses),
+        netRevenue: String(totalSales - totalExpenses),
+        notes: req.body.notes || null,
+        status: "closed",
+      });
+      res.json(mc);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 

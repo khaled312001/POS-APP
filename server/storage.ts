@@ -21,8 +21,10 @@ import {
   type InsertNotification, type InsertCall, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications,
   type InsertSuperAdmin, type InsertTenant, type InsertTenantSubscription, type InsertLicenseKey, type InsertTenantNotification,
   onlineOrders, landingPageConfig, platformSettings, platformCommissions,
+  vehicles, printerConfigs, dailyClosings, monthlyClosings,
   type InsertOnlineOrder, type InsertLandingPageConfig,
-  type InsertPlatformSetting, type InsertPlatformCommission
+  type InsertPlatformSetting, type InsertPlatformCommission,
+  type InsertVehicle, type InsertPrinterConfig, type InsertDailyClosing, type InsertMonthlyClosing
 } from "@shared/schema";
 
 export const storage = {
@@ -1266,6 +1268,75 @@ export const storage = {
   },
 
   // ========== Super Admin System ==========
+
+  // Vehicles / Fleet Management
+  async getVehicles(tenantId?: number, branchId?: number) {
+    if (tenantId && branchId) return db.select().from(vehicles).where(and(eq(vehicles.tenantId, tenantId), eq(vehicles.branchId, branchId), eq(vehicles.isActive, true))).orderBy(desc(vehicles.createdAt));
+    if (tenantId) return db.select().from(vehicles).where(and(eq(vehicles.tenantId, tenantId), eq(vehicles.isActive, true))).orderBy(desc(vehicles.createdAt));
+    return db.select().from(vehicles).where(eq(vehicles.isActive, true)).orderBy(desc(vehicles.createdAt));
+  },
+  async createVehicle(data: InsertVehicle) {
+    const [v] = await db.insert(vehicles).values(data).returning();
+    return v;
+  },
+  async updateVehicle(id: number, data: Partial<InsertVehicle>) {
+    const [v] = await db.update(vehicles).set(data).where(eq(vehicles.id, id)).returning();
+    return v;
+  },
+  async deleteVehicle(id: number) {
+    await db.update(vehicles).set({ isActive: false }).where(eq(vehicles.id, id));
+  },
+
+  // Printer Configurations
+  async getPrinterConfigs(tenantId: number, branchId?: number) {
+    if (branchId) return db.select().from(printerConfigs).where(and(eq(printerConfigs.tenantId, tenantId), eq(printerConfigs.branchId, branchId)));
+    return db.select().from(printerConfigs).where(eq(printerConfigs.tenantId, tenantId));
+  },
+  async upsertPrinterConfig(data: InsertPrinterConfig) {
+    const existing = await db.select().from(printerConfigs).where(and(eq(printerConfigs.tenantId, data.tenantId), eq(printerConfigs.receiptType, data.receiptType)));
+    if (existing.length > 0) {
+      const [c] = await db.update(printerConfigs).set({ ...data, updatedAt: new Date() }).where(eq(printerConfigs.id, existing[0].id)).returning();
+      return c;
+    }
+    const [c] = await db.insert(printerConfigs).values(data).returning();
+    return c;
+  },
+
+  // Daily Closings
+  async getDailyClosings(tenantId: number, branchId?: number) {
+    if (branchId) return db.select().from(dailyClosings).where(and(eq(dailyClosings.tenantId, tenantId), eq(dailyClosings.branchId, branchId))).orderBy(desc(dailyClosings.createdAt));
+    return db.select().from(dailyClosings).where(eq(dailyClosings.tenantId, tenantId)).orderBy(desc(dailyClosings.createdAt));
+  },
+  async createDailyClosing(data: InsertDailyClosing) {
+    const [dc] = await db.insert(dailyClosings).values(data).returning();
+    return dc;
+  },
+  async getDailyClosingByDate(tenantId: number, closingDate: string, branchId?: number) {
+    if (branchId) {
+      const [dc] = await db.select().from(dailyClosings).where(and(eq(dailyClosings.tenantId, tenantId), eq(dailyClosings.closingDate, closingDate), eq(dailyClosings.branchId, branchId)));
+      return dc;
+    }
+    const [dc] = await db.select().from(dailyClosings).where(and(eq(dailyClosings.tenantId, tenantId), eq(dailyClosings.closingDate, closingDate)));
+    return dc;
+  },
+
+  // Monthly Closings
+  async getMonthlyClosings(tenantId: number, branchId?: number) {
+    if (branchId) return db.select().from(monthlyClosings).where(and(eq(monthlyClosings.tenantId, tenantId), eq(monthlyClosings.branchId, branchId))).orderBy(desc(monthlyClosings.createdAt));
+    return db.select().from(monthlyClosings).where(eq(monthlyClosings.tenantId, tenantId)).orderBy(desc(monthlyClosings.createdAt));
+  },
+  async createMonthlyClosing(data: InsertMonthlyClosing) {
+    const [mc] = await db.insert(monthlyClosings).values(data).returning();
+    return mc;
+  },
+  async getMonthlyClosingByMonth(tenantId: number, closingMonth: string, branchId?: number) {
+    if (branchId) {
+      const [mc] = await db.select().from(monthlyClosings).where(and(eq(monthlyClosings.tenantId, tenantId), eq(monthlyClosings.closingMonth, closingMonth), eq(monthlyClosings.branchId, branchId)));
+      return mc;
+    }
+    const [mc] = await db.select().from(monthlyClosings).where(and(eq(monthlyClosings.tenantId, tenantId), eq(monthlyClosings.closingMonth, closingMonth)));
+    return mc;
+  },
 
   // Super Admins
   async getSuperAdmins() {

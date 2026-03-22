@@ -126,6 +126,29 @@ export default function SettingsScreen() {
   const [showCallerIdTest, setShowCallerIdTest] = useState(false);
   const [testPhoneNumber, setTestPhoneNumber] = useState("");
   const [callerIdStatus, setCallerIdStatus] = useState<"idle" | "testing" | "done">("idle");
+
+  // Vehicles
+  const [showVehicles, setShowVehicles] = useState(false);
+  const [showVehicleForm, setShowVehicleForm] = useState(false);
+  const [editVehicle, setEditVehicle] = useState<any>(null);
+  const [vehicleForm, setVehicleForm] = useState({ licensePlate: "", make: "", model: "", color: "", driverName: "", driverPhone: "", notes: "" });
+
+  // Advanced Printer Config
+  const [showPrinterConfig, setShowPrinterConfig] = useState(false);
+  const [printerConfigData, setPrinterConfigData] = useState<Record<string, { printer1: string; printer2: string }>>({});
+
+  // Daily Closing
+  const [showDailyClosing, setShowDailyClosing] = useState(false);
+  const [dailyClosingForm, setDailyClosingForm] = useState({ openingCash: "", closingCash: "", notes: "" });
+  const [dailyClosingLoading, setDailyClosingLoading] = useState(false);
+
+  // Monthly Closing
+  const [showMonthlyClosing, setShowMonthlyClosing] = useState(false);
+  const [monthlyClosingForm, setMonthlyClosingForm] = useState({ notes: "" });
+  const [monthlyClosingLoading, setMonthlyClosingLoading] = useState(false);
+
+  // Accounts Receivable
+  const [showAccountsReceivable, setShowAccountsReceivable] = useState(false);
   const [leftHandMode, setLeftHandMode] = useState(false);
   useEffect(() => {
     import("@react-native-async-storage/async-storage").then(({ default: AsyncStorage }) => {
@@ -155,6 +178,11 @@ export default function SettingsScreen() {
   const { data: productsList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/products?tenantId=${tenant.id}` : "/api/products"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
   const { data: storeSettings } = useQuery<any>({ queryKey: [tenant?.id ? `/api/store-settings?tenantId=${tenant.id}` : "/api/store-settings"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
   const { data: pgConfig, refetch: refetchPgConfig } = useQuery<any>({ queryKey: ["/api/payment-gateway/config"], queryFn: getQueryFn({ on401: "throw" }), enabled: isAdmin });
+  const { data: vehiclesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/vehicles?tenantId=${tenant.id}` : "/api/vehicles"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: printerConfigsList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/printer-configs?tenantId=${tenant.id}` : "/api/printer-configs"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: dailyClosingsList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/daily-closings?tenantId=${tenant.id}` : "/api/daily-closings"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: monthlyClosingsList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/monthly-closings?tenantId=${tenant.id}` : "/api/monthly-closings"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
+  const { data: customersList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/customers?tenantId=${tenant.id}` : "/api/customers"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && showAccountsReceivable });
 
   const { data: allActiveShiftsRaw } = useQuery<any[]>({
     queryKey: [tenant?.id ? `/api/shifts/active?tenantId=${tenant.id}` : "/api/shifts/active"],
@@ -414,16 +442,25 @@ export default function SettingsScreen() {
     }
   };
 
+  const blobToBase64 = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
   const uploadStoreLogo = async (uri: string): Promise<string | null> => {
     try {
       setStoreLogoUploading(true);
-      const uploadRes = await apiRequest("POST", "/api/objects/upload");
-      const { uploadURL } = await uploadRes.json();
       const response = await fetch(uri);
       const blob = await response.blob();
-      await fetch(uploadURL, { method: "PUT", body: blob, headers: { "Content-Type": "image/jpeg" } });
-      const saveRes = await apiRequest("PUT", "/api/images/save", { imageURL: uploadURL });
-      const { objectPath } = await saveRes.json();
+      const imageData = await blobToBase64(blob);
+      const uploadRes = await apiRequest("POST", "/api/objects/upload", {
+        imageData,
+        contentType: blob.type || "image/jpeg",
+      });
+      const { objectPath } = await uploadRes.json();
       return objectPath;
     } catch (e) {
       console.error("Logo upload failed:", e);
@@ -449,6 +486,30 @@ export default function SettingsScreen() {
       deliveryFee: storeForm.deliveryFee !== "" ? storeForm.deliveryFee : undefined,
     });
   };
+
+  // Vehicle mutations
+  const createVehicleMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/vehicles", { ...data, tenantId: tenant?.id, branchId: employee?.branchId || null }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/vehicles?tenantId=${tenant.id}` : "/api/vehicles"] }); setShowVehicleForm(false); setEditVehicle(null); },
+    onError: (e: any) => Alert.alert(t("error"), e.message),
+  });
+  const updateVehicleMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/vehicles/${id}`, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/vehicles?tenantId=${tenant.id}` : "/api/vehicles"] }); setShowVehicleForm(false); setEditVehicle(null); },
+    onError: (e: any) => Alert.alert(t("error"), e.message),
+  });
+  const deleteVehicleMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/vehicles/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/vehicles?tenantId=${tenant.id}` : "/api/vehicles"] }); },
+    onError: (e: any) => Alert.alert(t("error"), e.message),
+  });
+
+  // Printer config save
+  const savePrinterConfigMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/printer-configs", { ...data, tenantId: tenant?.id }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/printer-configs?tenantId=${tenant.id}` : "/api/printer-configs"] }); Alert.alert(t("success"), t("printerConfigSaved")); },
+    onError: (e: any) => Alert.alert(t("error"), e.message),
+  });
 
   const rtlTextAlign = isRTL ? { textAlign: "right" as const } : {};
 
@@ -620,6 +681,10 @@ export default function SettingsScreen() {
             <SettingRow icon="cash" label={t("cashDrawer")} value={activeShift ? t("activeShift") : t("noActiveShift")} onPress={() => setShowCashDrawer(true)} color={Colors.success} rtl={isRTL} />
             <SettingRow icon="home" label={t("warehouses")} value={`${warehousesList.length} ${t("warehouses")}`} onPress={() => setShowWarehouseManager(true)} color={Colors.accent} rtl={isRTL} />
             <SettingRow icon="layers" label={t("productBatches")} value={`${batchesList.length} ${t("batches")}`} onPress={() => { setBatchView("list"); setShowBatchManager(true); }} color={Colors.secondary} rtl={isRTL} />
+            <SettingRow icon="car" label={t("vehicles")} value={`${vehiclesList.length} ${t("vehicles")}`} onPress={() => setShowVehicles(true)} color="#F97316" rtl={isRTL} />
+            <SettingRow icon="calendar" label={t("dailyClosing")} value={`${dailyClosingsList.length} ${t("entries")}`} onPress={() => setShowDailyClosing(true)} color="#06B6D4" rtl={isRTL} />
+            <SettingRow icon="calendar-number" label={t("monthlyClosing")} value={`${monthlyClosingsList.length} ${t("entries")}`} onPress={() => setShowMonthlyClosing(true)} color="#8B5CF6" rtl={isRTL} />
+            <SettingRow icon="receipt" label={t("accountsReceivable")} value={t("debitoren")} onPress={() => setShowAccountsReceivable(true)} color="#EF4444" rtl={isRTL} />
           </>
         )}
 
@@ -652,6 +717,7 @@ export default function SettingsScreen() {
           />
         </Pressable>
         {canManage && <SettingRow icon="print" label={t("receiptPrinter")} value={t("notConfigured")} onPress={() => setShowPrinterSettings(true)} color={Colors.textMuted} rtl={isRTL} />}
+        {canManage && <SettingRow icon="print-outline" label={t("printerConfig")} value={t("printerConfigDesc")} onPress={() => setShowPrinterConfig(true)} color="#7C3AED" rtl={isRTL} />}
         <SettingRow icon="cloud-upload" label={t("syncStatus")} value={t("connected")} color={Colors.success} rtl={isRTL} />
         <SettingRow icon="information-circle" label={t("appVersion")} value="1.0.0" color={Colors.info} rtl={isRTL} />
 
@@ -2490,6 +2556,326 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ── Vehicle Management Modal ──────────────────────────────────── */}
+      <Modal visible={showVehicles} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={styles.modalTitle}>{t("vehicleManagement")}</Text>
+              <Pressable onPress={() => setShowVehicles(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
+            </View>
+            <ScrollView>
+              <Pressable style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: Colors.accent, borderRadius: 12, padding: 12, marginBottom: 12, justifyContent: "center" }} onPress={() => { setEditVehicle(null); setVehicleForm({ licensePlate: "", make: "", model: "", color: "", driverName: "", driverPhone: "", notes: "" }); setShowVehicleForm(true); }}>
+                <Ionicons name="add" size={20} color={Colors.white} />
+                <Text style={{ color: Colors.white, fontWeight: "700", fontSize: 14 }}>{t("addVehicle")}</Text>
+              </Pressable>
+              {vehiclesList.length === 0 ? (
+                <Text style={{ color: Colors.textMuted, textAlign: "center", padding: 24 }}>{t("noVehicles")}</Text>
+              ) : (
+                vehiclesList.map((v: any) => (
+                  <View key={v.id} style={[styles.empCard, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[styles.empAvatar, { backgroundColor: "#F97316" + "20" }]}>
+                      <Ionicons name="car" size={22} color="#F97316" />
+                    </View>
+                    <View style={[styles.empInfo, isRTL && { alignItems: "flex-end" }]}>
+                      <Text style={styles.empName}>{v.licensePlate}</Text>
+                      <Text style={styles.empMeta}>{[v.make, v.model, v.color].filter(Boolean).join(" • ")}</Text>
+                      {v.driverName && <Text style={styles.empMeta}>{v.driverName} {v.driverPhone ? `· ${v.driverPhone}` : ""}</Text>}
+                    </View>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <Pressable onPress={() => { setEditVehicle(v); setVehicleForm({ licensePlate: v.licensePlate || "", make: v.make || "", model: v.model || "", color: v.color || "", driverName: v.driverName || "", driverPhone: v.driverPhone || "", notes: v.notes || "" }); setShowVehicleForm(true); }}>
+                        <Ionicons name="pencil" size={18} color={Colors.info} />
+                      </Pressable>
+                      <Pressable onPress={() => Alert.alert(t("deleteVehicle"), t("areYouSure"), [{ text: t("cancel") }, { text: t("delete"), style: "destructive", onPress: () => deleteVehicleMutation.mutate(v.id) }])}>
+                        <Ionicons name="trash" size={18} color={Colors.danger} />
+                      </Pressable>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Vehicle Form Modal */}
+      <Modal visible={showVehicleForm} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={styles.modalTitle}>{editVehicle ? t("editVehicle") : t("addVehicle")}</Text>
+              <Pressable onPress={() => setShowVehicleForm(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
+            </View>
+            <ScrollView>
+              {[
+                { key: "licensePlate", label: t("licensePlate") },
+                { key: "make", label: t("vehicleMake") },
+                { key: "model", label: t("vehicleModel") },
+                { key: "color", label: t("vehicleColor") },
+                { key: "driverName", label: t("driverName") },
+                { key: "driverPhone", label: t("driverPhone") },
+                { key: "notes", label: t("vehicleNotes") },
+              ].map(({ key, label }) => (
+                <View key={key} style={{ marginBottom: 12 }}>
+                  <Text style={styles.label}>{label}</Text>
+                  <TextInput
+                    style={[styles.input, isRTL && { textAlign: "right" }]}
+                    value={(vehicleForm as any)[key]}
+                    onChangeText={(v) => setVehicleForm((f) => ({ ...f, [key]: v }))}
+                    placeholder={label}
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                </View>
+              ))}
+              <Pressable style={styles.saveBtn} onPress={() => {
+                if (!vehicleForm.licensePlate.trim()) { Alert.alert(t("error"), t("licensePlate") + " required"); return; }
+                if (editVehicle) updateVehicleMutation.mutate({ id: editVehicle.id, data: vehicleForm });
+                else createVehicleMutation.mutate(vehicleForm);
+              }}>
+                <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
+                  <Text style={styles.saveBtnText}>{editVehicle ? t("save") : t("addVehicle")}</Text>
+                </LinearGradient>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Advanced Printer Config Modal ─────────────────────────────── */}
+      <Modal visible={showPrinterConfig} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={styles.modalTitle}>{t("printerConfig")}</Text>
+              <Pressable onPress={() => setShowPrinterConfig(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
+            </View>
+            <ScrollView>
+              <Text style={{ color: Colors.textMuted, fontSize: 13, marginBottom: 16 }}>{t("printerConfigDesc")}</Text>
+              {[
+                { key: "kitchen", label: t("receiptTypeKitchen"), icon: "restaurant" },
+                { key: "home_delivery", label: t("receiptTypeHomeDelivery"), icon: "bicycle" },
+                { key: "take_away", label: t("receiptTypeTakeAway"), icon: "bag-handle" },
+                { key: "restaurant", label: t("receiptTypeRestaurant"), icon: "cafe" },
+                { key: "driver_order", label: t("receiptTypeDriverOrder"), icon: "car" },
+                { key: "check_out", label: t("receiptTypeCheckOut"), icon: "person-remove" },
+                { key: "lists", label: t("receiptTypeLists"), icon: "list" },
+                { key: "daily_close", label: t("receiptTypeDailyClose"), icon: "calendar" },
+                { key: "monthly_close", label: t("receiptTypeMonthlyClose"), icon: "calendar-number" },
+                { key: "accounts_receivable", label: t("receiptTypeDebitoren"), icon: "receipt" },
+              ].map(({ key, label, icon }) => {
+                const cfg = printerConfigsList.find((p: any) => p.receiptType === key) || {};
+                const localCfg = printerConfigData[key] || { printer1: (cfg as any).printer1 || "", printer2: (cfg as any).printer2 || "" };
+                return (
+                  <View key={key} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: Colors.cardBorder }}>
+                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <Ionicons name={icon as any} size={18} color={Colors.accent} />
+                      <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 14 }}>{label}</Text>
+                    </View>
+                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 4 }}>{t("printer1")}</Text>
+                        <TextInput
+                          style={[styles.input, { fontSize: 12, paddingVertical: 8 }]}
+                          value={localCfg.printer1}
+                          onChangeText={(v) => setPrinterConfigData((d) => ({ ...d, [key]: { ...localCfg, printer1: v } }))}
+                          placeholder={t("noPrinterAssigned")}
+                          placeholderTextColor={Colors.textMuted}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 4 }}>{t("printer2")}</Text>
+                        <TextInput
+                          style={[styles.input, { fontSize: 12, paddingVertical: 8 }]}
+                          value={localCfg.printer2}
+                          onChangeText={(v) => setPrinterConfigData((d) => ({ ...d, [key]: { ...localCfg, printer2: v } }))}
+                          placeholder={t("noPrinterAssigned")}
+                          placeholderTextColor={Colors.textMuted}
+                        />
+                      </View>
+                    </View>
+                    <Pressable style={{ backgroundColor: Colors.accent + "20", borderRadius: 8, padding: 8, marginTop: 6, alignItems: "center" }} onPress={() => {
+                      savePrinterConfigMutation.mutate({ receiptType: key, printer1: localCfg.printer1, printer2: localCfg.printer2 });
+                    }}>
+                      <Text style={{ color: Colors.accent, fontWeight: "700", fontSize: 12 }}>{t("save")}</Text>
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Daily Closing Modal (TAGESABSCHLUSS) ─────────────────────── */}
+      <Modal visible={showDailyClosing} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={styles.modalTitle}>{t("dailyClosingTitle")}</Text>
+              <Pressable onPress={() => setShowDailyClosing(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
+            </View>
+            <ScrollView>
+              <Text style={{ color: Colors.textMuted, fontSize: 13, marginBottom: 16 }}>{t("dailyClosingDesc")}</Text>
+
+              {/* Perform closing button */}
+              <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: "#06B6D4" + "40" }}>
+                <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 15, marginBottom: 12 }}>{t("performDailyClosing")}</Text>
+                <View style={{ marginBottom: 10 }}>
+                  <Text style={styles.label}>{t("openingCash")}</Text>
+                  <TextInput style={styles.input} value={dailyClosingForm.openingCash} onChangeText={(v) => setDailyClosingForm((f) => ({ ...f, openingCash: v }))} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={Colors.textMuted} />
+                </View>
+                <View style={{ marginBottom: 10 }}>
+                  <Text style={styles.label}>{t("closingCash")}</Text>
+                  <TextInput style={styles.input} value={dailyClosingForm.closingCash} onChangeText={(v) => setDailyClosingForm((f) => ({ ...f, closingCash: v }))} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={Colors.textMuted} />
+                </View>
+                <View style={{ marginBottom: 10 }}>
+                  <Text style={styles.label}>{t("notes")}</Text>
+                  <TextInput style={styles.input} value={dailyClosingForm.notes} onChangeText={(v) => setDailyClosingForm((f) => ({ ...f, notes: v }))} placeholder={t("optionalNotes")} placeholderTextColor={Colors.textMuted} />
+                </View>
+                <Pressable style={styles.saveBtn} onPress={async () => {
+                  setDailyClosingLoading(true);
+                  try {
+                    await apiRequest("POST", "/api/daily-closings", {
+                      tenantId: tenant?.id, branchId: employee?.branchId || null,
+                      employeeId: employee?.id, openingCash: dailyClosingForm.openingCash, closingCash: dailyClosingForm.closingCash, notes: dailyClosingForm.notes,
+                    });
+                    qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/daily-closings?tenantId=${tenant.id}` : "/api/daily-closings"] });
+                    Alert.alert(t("success"), t("dailyClosingDone"));
+                    setDailyClosingForm({ openingCash: "", closingCash: "", notes: "" });
+                  } catch (e: any) { Alert.alert(t("error"), e.message); }
+                  setDailyClosingLoading(false);
+                }} disabled={dailyClosingLoading}>
+                  <LinearGradient colors={["#06B6D4", "#0891B2"]} style={styles.saveBtnGradient}>
+                    <Text style={styles.saveBtnText}>{dailyClosingLoading ? t("loading") : t("performDailyClosing")}</Text>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+
+              {/* Past closings */}
+              <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 15, marginBottom: 10 }}>{t("dailyClosing")} {t("entries")}</Text>
+              {dailyClosingsList.length === 0 ? (
+                <Text style={{ color: Colors.textMuted, textAlign: "center", padding: 16 }}>{t("noDailyClosings")}</Text>
+              ) : (
+                dailyClosingsList.slice(0, 30).map((dc: any) => (
+                  <View key={dc.id} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder }}>
+                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
+                      <Text style={{ color: Colors.text, fontWeight: "700" }}>{dc.closingDate}</Text>
+                      <Text style={{ color: Colors.success, fontWeight: "700" }}>CHF {Number(dc.totalSales || 0).toFixed(2)}</Text>
+                    </View>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{dc.totalTransactions} {t("transactions")} · {t("cashDrawer")}: {Number(dc.closingCash || 0).toFixed(2)}</Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Monthly Closing Modal (MONATSABSCHLUSS) ───────────────────── */}
+      <Modal visible={showMonthlyClosing} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={styles.modalTitle}>{t("monthlyClosingTitle")}</Text>
+              <Pressable onPress={() => setShowMonthlyClosing(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
+            </View>
+            <ScrollView>
+              <Text style={{ color: Colors.textMuted, fontSize: 13, marginBottom: 16 }}>{t("monthlyClosingDesc")}</Text>
+
+              <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: "#8B5CF6" + "40" }}>
+                <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 15, marginBottom: 12 }}>{t("performMonthlyClosing")}</Text>
+                <View style={{ marginBottom: 10 }}>
+                  <Text style={styles.label}>{t("notes")}</Text>
+                  <TextInput style={styles.input} value={monthlyClosingForm.notes} onChangeText={(v) => setMonthlyClosingForm({ notes: v })} placeholder={t("optionalNotes")} placeholderTextColor={Colors.textMuted} />
+                </View>
+                <Pressable style={styles.saveBtn} onPress={async () => {
+                  setMonthlyClosingLoading(true);
+                  try {
+                    const now = new Date();
+                    await apiRequest("POST", "/api/monthly-closings", {
+                      tenantId: tenant?.id, branchId: employee?.branchId || null,
+                      employeeId: employee?.id,
+                      closingMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
+                      notes: monthlyClosingForm.notes,
+                    });
+                    qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/monthly-closings?tenantId=${tenant.id}` : "/api/monthly-closings"] });
+                    Alert.alert(t("success"), t("monthlyClosingDone"));
+                    setMonthlyClosingForm({ notes: "" });
+                  } catch (e: any) { Alert.alert(t("error"), e.message); }
+                  setMonthlyClosingLoading(false);
+                }} disabled={monthlyClosingLoading}>
+                  <LinearGradient colors={["#8B5CF6", "#7C3AED"]} style={styles.saveBtnGradient}>
+                    <Text style={styles.saveBtnText}>{monthlyClosingLoading ? t("loading") : t("performMonthlyClosing")}</Text>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+
+              <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 15, marginBottom: 10 }}>{t("monthlyClosing")} {t("entries")}</Text>
+              {monthlyClosingsList.length === 0 ? (
+                <Text style={{ color: Colors.textMuted, textAlign: "center", padding: 16 }}>{t("noMonthlyClosings")}</Text>
+              ) : (
+                monthlyClosingsList.map((mc: any) => (
+                  <View key={mc.id} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder }}>
+                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
+                      <Text style={{ color: Colors.text, fontWeight: "700" }}>{mc.closingMonth}</Text>
+                      <Text style={{ color: Colors.success, fontWeight: "700" }}>CHF {Number(mc.totalSales || 0).toFixed(2)}</Text>
+                    </View>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{mc.totalTransactions} {t("transactions")} · {t("netRevenue")}: CHF {Number(mc.netRevenue || 0).toFixed(2)}</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{t("totalExpenses")}: CHF {Number(mc.totalExpenses || 0).toFixed(2)}</Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Accounts Receivable Modal (DEBITOREN) ─────────────────────── */}
+      <Modal visible={showAccountsReceivable} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={styles.modalTitle}>{t("debitoren")}</Text>
+              <Pressable onPress={() => setShowAccountsReceivable(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
+            </View>
+            <ScrollView>
+              {(() => {
+                const debtors = customersList.filter((c: any) => Number(c.creditBalance) > 0);
+                const total = debtors.reduce((s: number, c: any) => s + Number(c.creditBalance || 0), 0);
+                return (
+                  <>
+                    <View style={{ backgroundColor: "#EF4444" + "15", borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: "#EF4444" + "40" }}>
+                      <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{t("totalOutstanding")}</Text>
+                      <Text style={{ color: "#EF4444", fontSize: 28, fontWeight: "800" }}>CHF {total.toFixed(2)}</Text>
+                      <Text style={{ color: Colors.textMuted, fontSize: 13 }}>{debtors.length} {t("customersWithCredit")}</Text>
+                    </View>
+                    {debtors.length === 0 ? (
+                      <Text style={{ color: Colors.textMuted, textAlign: "center", padding: 24 }}>{t("noOutstandingBalances")}</Text>
+                    ) : (
+                      debtors.map((c: any) => (
+                        <View key={c.id} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder }}>
+                          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center" }}>
+                            <View>
+                              <Text style={{ color: Colors.text, fontWeight: "700" }}>{c.name}</Text>
+                              <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{c.phone || t("noPhone")}</Text>
+                            </View>
+                            <View style={{ alignItems: "flex-end" }}>
+                              <Text style={{ color: "#EF4444", fontWeight: "800", fontSize: 16 }}>CHF {Number(c.creditBalance).toFixed(2)}</Text>
+                              <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{t("creditBalance")}</Text>
+                            </View>
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </>
+                );
+              })()}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }

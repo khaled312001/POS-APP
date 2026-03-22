@@ -142,20 +142,27 @@ export default function ProductsScreen() {
     }
   };
 
+  const blobToBase64 = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
   const uploadImage = async (uri: string): Promise<string | null> => {
     try {
       if (__DEV__) console.log("Starting upload for URI:", uri);
       setImageUploading(true);
-      const uploadRes = await apiRequest("POST", "/api/objects/upload");
-      const { uploadURL } = await uploadRes.json();
-      if (__DEV__) console.log("Got upload URL:", uploadURL);
       const response = await fetch(uri);
       const blob = await response.blob();
       if (__DEV__) console.log("Blob created, size:", blob.size);
-      await fetch(uploadURL, { method: "PUT", body: blob, headers: { "Content-Type": "image/jpeg" } });
-      if (__DEV__) console.log("Upload to storage successful");
-      const saveRes = await apiRequest("PUT", "/api/images/save", { imageURL: uploadURL });
-      const { objectPath } = await saveRes.json();
+      const imageData = await blobToBase64(blob);
+      const uploadRes = await apiRequest("POST", "/api/objects/upload", {
+        imageData,
+        contentType: blob.type || "image/jpeg",
+      });
+      const { objectPath } = await uploadRes.json();
       if (__DEV__) console.log("Saved image path:", objectPath);
       return objectPath;
     } catch (e) {

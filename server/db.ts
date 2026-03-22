@@ -18,4 +18,10 @@ if (!connectionString) {
 }
 
 export const pool = new Pool({ connectionString });
+
+// Ensure UTF-8 encoding for all connections to properly handle special characters (German, Arabic, etc.)
+pool.on("connect", (client) => {
+  client.query("SET client_encoding = 'UTF8'");
+});
+
 export const db = drizzle(pool, { schema });

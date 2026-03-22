@@ -23,7 +23,7 @@ const AnimatedProductImage = ({ uri }: { uri: string }) => {
   return (
     <Image
       source={{ uri }}
-      style={{ width: 34, height: 34, borderRadius: 8 }}
+      style={{ width: 50, height: 50, borderRadius: 12 }}
       resizeMode="cover"
     />
   );
@@ -198,36 +198,53 @@ export default function POSScreen() {
   }, [incomingCalls]);
 
   const PIZZA_TOPPINGS = [
+    // Sauces / Base
+    { name: "Tomato Sauce", names: ["Tomato Sauce", "Tomatensauce", "Extra Tomatensauce"], icon: "🍅", category: "Sauces" },
     { name: "Tomatoes", names: ["Tomatoes", "Tomaten", "Extra Tomaten"], icon: "🍅", category: "Vegetables" },
-    { name: "Mushrooms", names: ["Mushrooms", "Pilze", "Champignons", "Extra Pilze"], icon: "🍄", category: "Vegetables" },
-    { name: "Ham", names: ["Ham", "Schinken", "Extra Schinken", "Prosciutto"], icon: "🥩", category: "Meat" },
+    { name: "Sliced Tomatoes", names: ["Sliced Tomatoes", "Tomatenscheiben", "Extra Tomatenscheiben"], icon: "🍅", category: "Vegetables" },
+    // Vegetables
+    { name: "Garlic", names: ["Garlic", "Knoblauch", "Extra Knoblauch"], icon: "🧄", category: "Vegetables" },
+    { name: "Onions", names: ["Onions", "Zwiebeln", "Extra Zwiebeln"], icon: "🧅", category: "Vegetables" },
+    { name: "Capers", names: ["Capers", "Kapern", "Extra Kapern"], icon: "🫛", category: "Vegetables" },
+    { name: "Olives", names: ["Olives", "Oliven", "Extra Oliven"], icon: "🫒", category: "Vegetables" },
+    { name: "Oregano", names: ["Oregano", "Extra Oregano"], icon: "🌿", category: "Others" },
+    { name: "Vegetables", names: ["Vegetables", "Gemüse", "Extra Gemüse"], icon: "🥦", category: "Vegetables" },
+    { name: "Spinach", names: ["Spinach", "Spinat", "Extra Spinat"], icon: "🥬", category: "Vegetables" },
+    { name: "Bell Peppers", names: ["Bell Peppers", "Peperoni", "Paprika", "Extra Peperoni"], icon: "🫑", category: "Vegetables" },
+    { name: "Corn", names: ["Corn", "Mais", "Extra Mais"], icon: "🌽", category: "Vegetables" },
+    { name: "Broccoli", names: ["Broccoli", "Extra Broccoli"], icon: "🥦", category: "Vegetables" },
+    { name: "Artichokes", names: ["Artichokes", "Artischocken", "Artischoken", "Extra Artischocken"], icon: "🌿", category: "Vegetables" },
+    { name: "Arugula", names: ["Arugula", "Rucola", "Rukola", "Extra Rucola"], icon: "🥬", category: "Vegetables" },
+    { name: "Egg", names: ["Egg", "Ei", "Extra Ei"], icon: "🥚", category: "Others" },
+    { name: "Pineapple", names: ["Pineapple", "Ananas", "Extra Ananas"], icon: "🍍", category: "Others" },
+    { name: "Mushrooms", names: ["Mushrooms", "Pilze", "Champignons", "Extra Pilze", "Extra Champignons"], icon: "🍄", category: "Vegetables" },
+    // Meat
+    { name: "Ham", names: ["Ham", "Schinken", "Extra Schinken"], icon: "🥩", category: "Meat" },
+    { name: "Spicy Salami", names: ["Spicy Salami", "Scharfe Salami", "Salami scharf", "Extra Scharfe Salami", "Diavola"], icon: "🌶️", category: "Meat" },
     { name: "Salami", names: ["Salami", "Extra Salami"], icon: "🥩", category: "Meat" },
-    { name: "Spicy Salami", names: ["Spicy Salami", "Scharfe Salami", "Extra Scharfe Salami", "Diavola"], icon: "🌶️", category: "Meat" },
     { name: "Bacon", names: ["Bacon", "Speck", "Extra Speck"], icon: "🥓", category: "Meat" },
+    { name: "Prosciutto", names: ["Prosciutto", "Rohschinken", "Raw Ham", "Extra Rohschinken"], icon: "🥩", category: "Meat" },
+    { name: "Lamb", names: ["Lamb", "Lammfleisch", "Extra Lammfleisch"], icon: "🥩", category: "Meat" },
     { name: "Chicken", names: ["Chicken", "Poulet", "Hähnchen", "Extra Poulet"], icon: "🍗", category: "Meat" },
     { name: "Kebab", names: ["Kebab", "Kebabfleisch", "Extra Kebabfleisch"], icon: "🥙", category: "Meat" },
     { name: "Minced Meat", names: ["Minced Meat", "Hackfleisch", "Extra Hackfleisch"], icon: "🥩", category: "Meat" },
+    // Seafood
+    { name: "Anchovies", names: ["Anchovies", "Sardellen", "Extra Sardellen"], icon: "🐟", category: "Seafood" },
+    { name: "Shrimp", names: ["Shrimp", "Crevetten", "Garnelen", "Extra Crevetten"], icon: "🍤", category: "Seafood" },
+    { name: "Tuna", names: ["Tuna", "Thunfisch", "Thon", "Extra Thunfisch"], icon: "🐟", category: "Seafood" },
+    // Sauces
+    { name: "Mayonnaise", names: ["Mayonnaise", "Mayo", "Mayonaise"], icon: "🫙", category: "Sauces" },
+    { name: "Ketchup", names: ["Ketchup"], icon: "🫙", category: "Sauces" },
+    { name: "Cocktail Sauce", names: ["Cocktail Sauce", "Cocktailsauce", "Cocktail"], icon: "🫙", category: "Sauces" },
+    { name: "Spicy Sauce", names: ["Spicy Sauce", "Scharfe Sauce", "SCHARF", "Extra Scharf"], icon: "🌶️", category: "Sauces" },
+    { name: "Garlic Sauce", names: ["Garlic Sauce", "Knoblauchsauce"], icon: "🫙", category: "Sauces" },
+    { name: "Yogurt Sauce", names: ["Yogurt Sauce", "Joghurtsauce", "Joghurt"], icon: "🫙", category: "Sauces" },
+    // Cheese
     { name: "Mozzarella", names: ["Mozzarella", "Extra Mozzarella", "Käse", "Extra Käse"], icon: "🧀", category: "Cheese" },
     { name: "Gorgonzola", names: ["Gorgonzola", "Extra Gorgonzola"], icon: "🧀", category: "Cheese" },
     { name: "Parmesan", names: ["Parmesan", "Extra Parmesan"], icon: "🧀", category: "Cheese" },
-    { name: "Olives", names: ["Olives", "Oliven", "Extra Oliven"], icon: "🫒", category: "Vegetables" },
-    { name: "Onions", names: ["Onions", "Zwiebeln", "Extra Zwiebeln"], icon: "🧅", category: "Vegetables" },
-    { name: "Garlic", names: ["Garlic", "Knoblauch", "Extra Knoblauch"], icon: "🧄", category: "Vegetables" },
-    { name: "Bell Peppers", names: ["Bell Peppers", "Peperoni", "Paprika", "Extra Peperoni"], icon: "🫑", category: "Vegetables" },
-    { name: "Corn", names: ["Corn", "Mais", "Extra Mais"], icon: "🌽", category: "Vegetables" },
-    { name: "Pineapple", names: ["Pineapple", "Ananas", "Extra Ananas"], icon: "🍍", category: "Others" },
-    { name: "Artichokes", names: ["Artichokes", "Artischocken", "Extra Artischocken"], icon: "🌿", category: "Vegetables" },
-    { name: "Spinach", icon: "🥬", category: "Vegetables" },
-    { name: "Arugula", names: ["Arugula", "Rucola", "Extra Rucola"], icon: "🥬", category: "Vegetables" },
-    { name: "Anchovies", names: ["Anchovies", "Sardellen", "Extra Sardellen"], icon: "🐟", category: "Seafood" },
-    { name: "Tuna", names: ["Tuna", "Thunfisch", "Extra Thunfisch"], icon: "🐟", category: "Seafood" },
-    { name: "Shrimp", names: ["Shrimp", "Crevetten", "Garnelen", "Extra Crevetten"], icon: "🍤", category: "Seafood" },
-    { name: "Mayonnaise", names: ["Mayonnaise", "Mayo"], icon: "🫙", category: "Sauces" },
-    { name: "Ketchup", icon: "🫙", category: "Sauces" },
-    { name: "Garlic Sauce", names: ["Garlic Sauce", "Knoblauchsauce"], icon: "🫙", category: "Sauces" },
-    { name: "Spicy Sauce", names: ["Spicy Sauce", "Scharfe Sauce"], icon: "🌶️", category: "Sauces" },
-    { name: "Yogurt Sauce", names: ["Yogurt Sauce", "Joghurtsauce"], icon: "🫙", category: "Sauces" },
-    { name: "Cocktail Sauce", icon: "🫙", category: "Sauces" },
+    { name: "Mascarpone", names: ["Mascarpone", "Extra Mascarpone"], icon: "🧀", category: "Cheese" },
+    { name: "Kaeserand", names: ["Kaeserand", "Käserand", "Käserand (33cm)", "Käserand (45cm)", "Cheese Crust"], icon: "🧀", category: "Cheese" },
   ];
 
   const getToppingInfo = (label: string) => {
@@ -266,6 +283,17 @@ export default function POSScreen() {
     if (!aIsPizza && bIsPizza) return 1;
     return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
   });
+
+  // Merge Bier + Alkoholische Getränke into one chip
+  const MERGED_ALCOHOL_ID = -99;
+  const bierCat = (categories as any[]).find((c: any) => (c.name || "").toLowerCase() === "bier");
+  const alkoCat = (categories as any[]).find((c: any) => (c.name || "").toLowerCase().includes("alkohol"));
+  const mergedAlcoholIds: number[] = [bierCat?.id, alkoCat?.id].filter(Boolean) as number[];
+  const displayCategories = mergedAlcoholIds.length >= 2
+    ? tenantCategories
+        .filter((c: any) => !mergedAlcoholIds.includes(c.id))
+        .concat([{ id: MERGED_ALCOHOL_ID, name: "Bier & Alkohol", icon: "beer", color: "#f59e0b" }])
+    : tenantCategories;
 
   const { data: allEmployees = [] } = useQuery<any[]>({
     queryKey: ["/api/employees", tenantId ? `?tenantId=${tenantId}` : ""],
@@ -417,7 +445,9 @@ export default function POSScreen() {
   /* Removed local WebSocket logic in favor of global NotificationProvider */
 
   const filteredProducts = products.filter((p: any) => {
-    const matchesCategory = selectedCategory ? p.categoryId === selectedCategory : true;
+    const matchesCategory = selectedCategory
+      ? (selectedCategory === MERGED_ALCOHOL_ID ? mergedAlcoholIds.includes(p.categoryId) : p.categoryId === selectedCategory)
+      : true;
     const matchesSearch = search ? p.name.toLowerCase().includes(search.toLowerCase()) : true;
     return matchesCategory && matchesSearch;
   }).sort((a: any, b: any) => {
@@ -689,12 +719,6 @@ export default function POSScreen() {
   };
 
   const validateBeforeComplete = (): string | null => {
-    // Cash payment: must have received enough
-    if (paymentMethod === "cash") {
-      if (!cashReceived || Number(cashReceived) < cart.total) {
-        return t("insufficientCash" as any) || "Cash received must be at least the total amount";
-      }
-    }
     // Delivery order: customer must have phone and address
     if (cart.orderType === "delivery") {
       if (!cart.customerId) {
@@ -708,8 +732,8 @@ export default function POSScreen() {
         return t("customerAddressRequired" as any) || "Delivery requires customer address";
       }
     }
-    // Non-cash: confirm payment received
-    if (paymentMethod !== "cash" && paymentMethod !== "card" && paymentMethod !== "nfc" && !paymentConfirmed) {
+    // Non-cash: confirm payment received via external device
+    if (paymentMethod !== "cash" && !paymentConfirmed) {
       return t("paymentNotConfirmed" as any) || "Please confirm payment has been received";
     }
     return null;
@@ -739,76 +763,6 @@ export default function POSScreen() {
 
   const saleMutation = useMutation({
     mutationFn: async () => {
-      if (paymentMethod === "nfc") {
-        setNfcStatus("reading");
-        try {
-          const amountInCents = Math.round(cart.total * 100);
-          const chargeRes = await apiRequest("POST", "/api/stripe/pos-charge", {
-            amount: amountInCents,
-            currency: "chf",
-            token: "tok_visa",
-            metadata: {
-              employeeId: String(employee?.id || 1),
-              branchId: String(employee?.branchId || 1),
-              source: "barmagly-pos-nfc",
-              paymentType: "contactless",
-            },
-          });
-          const chargeData = await chargeRes.json();
-          if (!chargeRes.ok || !chargeData.success) {
-            setNfcStatus("error");
-            throw new Error(chargeData.error || t("cardDeclined"));
-          }
-          setNfcStatus("success");
-          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          const saleData = await createSale("card", chargeData.paymentIntentId);
-          return saleData;
-        } catch (err: any) {
-          setNfcStatus("error");
-          throw err;
-        }
-      }
-
-      if (paymentMethod === "card") {
-        setCardProcessing(true);
-        setCardError("");
-        try {
-          const num = cardNumber.replace(/\s/g, "");
-          const testCardTokens: Record<string, string> = {
-            "4242424242424242": "tok_visa",
-            "5555555555554444": "tok_mastercard",
-            "378282246310005": "tok_amex",
-            "4000056655665556": "tok_visa_debit",
-            "4000000000009995": "tok_chargeDeclined",
-            "4000000000000002": "tok_chargeDeclined",
-          };
-          const token = testCardTokens[num] || "tok_visa";
-          const amountInCents = Math.round(cart.total * 100);
-          const chargeRes = await apiRequest("POST", "/api/stripe/pos-charge", {
-            amount: amountInCents,
-            currency: "chf",
-            token,
-            metadata: {
-              employeeId: String(employee?.id || 1),
-              branchId: String(employee?.branchId || 1),
-              source: "barmagly-pos",
-              cardLast4: num.slice(-4),
-            },
-          });
-          const chargeData = await chargeRes.json();
-          if (!chargeRes.ok || !chargeData.success) {
-            throw new Error(chargeData.error || t("cardDeclined"));
-          }
-          setCardProcessing(false);
-          const saleData = await createSale("card", chargeData.paymentIntentId);
-          return saleData;
-        } catch (err: any) {
-          setCardProcessing(false);
-          setCardError(err.message || t("cardDeclined"));
-          throw err;
-        }
-      }
-
       return await createSale(paymentMethod, null);
     },
     onSuccess: (saleData: any) => {
@@ -1275,7 +1229,7 @@ export default function POSScreen() {
                 </View>
               )}
             </Pressable>
-            {tenantCategories.map((cat: any) => {
+            {displayCategories.map((cat: any) => {
               const isActive = selectedCategory === cat.id;
               const iconName = (cat.icon || "cube") as keyof typeof Ionicons.glyphMap;
               const color = cat.color || Colors.accent;
@@ -1297,8 +1251,8 @@ export default function POSScreen() {
 
           <FlatList
             data={filteredProducts}
-            numColumns={isTablet ? 4 : 3}
-            key={isTablet ? "tablet" : "phone"}
+            numColumns={isTablet ? 3 : 2}
+            key={isTablet ? "tablet3" : "phone2"}
             keyExtractor={(item: any) => String(item.id)}
             contentContainerStyle={styles.productGrid}
             scrollEnabled={!!filteredProducts.length}
@@ -1484,7 +1438,7 @@ export default function POSScreen() {
           <Animated.View style={{ transform: [{ scale: checkoutPulse }] }}>
             <Pressable
               style={[styles.checkoutBtn, !cart.items.length && styles.checkoutBtnDisabled]}
-              onPress={() => cart.items.length > 0 && setShowCheckout(true)}
+              onPress={() => { if (cart.items.length > 0) { setPaymentConfirmed(false); setShowCheckout(true); } }}
               disabled={!cart.items.length}
             >
               <LinearGradient
@@ -1733,13 +1687,12 @@ export default function POSScreen() {
                   { key: "cash", icon: "cash" as const, label: t("cash") },
                   { key: "card", icon: "card" as const, label: t("card") },
                   { key: "twint", icon: "phone-portrait" as const, label: "TWINT" },
-                  { key: "mobile", icon: "phone-portrait" as const, label: t("mobile") },
                   { key: "nfc", icon: "wifi" as const, label: t("nfcPay") },
                 ].map((m) => (
                   <Pressable
                     key={m.key}
                     style={[styles.paymentBtn, paymentMethod === m.key && styles.paymentBtnActive]}
-                    onPress={() => { setPaymentMethod(m.key); if (m.key === "nfc") setNfcStatus("waiting"); }}
+                    onPress={() => { setPaymentMethod(m.key); setPaymentConfirmed(false); }}
                   >
                     <Ionicons name={m.icon} size={22} color={paymentMethod === m.key ? Colors.accent : Colors.textSecondary} />
                     <Text style={[styles.paymentBtnText, paymentMethod === m.key && { color: Colors.accent }]}>{m.label}</Text>
@@ -1749,7 +1702,7 @@ export default function POSScreen() {
 
               {paymentMethod === "cash" && (
                 <View style={styles.cashSection}>
-                  <Text style={[styles.sectionLabel, rtlTextAlign]}>{t("cashReceived")}</Text>
+                  <Text style={[styles.sectionLabel, rtlTextAlign]}>{t("cashReceived")} <Text style={{ color: Colors.textMuted, fontSize: 11, textTransform: "none", letterSpacing: 0 }}>({t("optional" as any) || "optional"})</Text></Text>
                   <TextInput
                     style={styles.cashInput}
                     placeholder={t("enterAmount")}
@@ -1765,105 +1718,33 @@ export default function POSScreen() {
               )}
 
               {paymentMethod === "nfc" && (
-                <View style={styles.nfcPaySection}>
-                  <View style={styles.nfcIconContainer}>
-                    <View style={[styles.nfcRing, styles.nfcRingOuter]} />
-                    <View style={[styles.nfcRing, styles.nfcRingMiddle]} />
-                    <View style={[styles.nfcRing, styles.nfcRingInner]} />
-                    <View style={styles.nfcCenterIcon}>
-                      <Ionicons name="wifi" size={32} color={Colors.white} />
-                    </View>
+                <Pressable
+                  style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10, backgroundColor: paymentConfirmed ? Colors.success + "15" : Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1.5, borderColor: paymentConfirmed ? Colors.success : Colors.cardBorder }]}
+                  onPress={() => setPaymentConfirmed(!paymentConfirmed)}
+                >
+                  <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: paymentConfirmed ? Colors.success : Colors.textMuted, backgroundColor: paymentConfirmed ? Colors.success : "transparent", justifyContent: "center", alignItems: "center" }}>
+                    {paymentConfirmed && <Ionicons name="checkmark" size={14} color={Colors.white} />}
                   </View>
-                  <Text style={[styles.nfcPayTitle, rtlTextAlign]}>{t("tapToPay")}</Text>
-                  <Text style={[styles.nfcPaySubtitle, rtlTextAlign]}>{t("holdCardNear")}</Text>
-                  <Text style={styles.nfcPayAmount}>CHF {cart.total.toFixed(2)}</Text>
-                  <View style={[styles.nfcStatusBadge,
-                  nfcStatus === "success" && { backgroundColor: "rgba(16,185,129,0.15)" },
-                  nfcStatus === "error" && { backgroundColor: "rgba(239,68,68,0.15)" },
-                  nfcStatus === "reading" && { backgroundColor: "rgba(59,130,246,0.15)" },
-                  ]}>
-                    <Ionicons
-                      name={nfcStatus === "success" ? "checkmark-circle" : nfcStatus === "error" ? "close-circle" : nfcStatus === "reading" ? "sync" : "radio-outline"}
-                      size={16}
-                      color={nfcStatus === "success" ? Colors.success : nfcStatus === "error" ? Colors.danger : nfcStatus === "reading" ? "#3B82F6" : Colors.accent}
-                    />
-                    <Text style={[styles.nfcStatusText,
-                    nfcStatus === "success" && { color: Colors.success },
-                    nfcStatus === "error" && { color: Colors.danger },
-                    nfcStatus === "reading" && { color: "#3B82F6" },
-                    ]}>
-                      {nfcStatus === "success" ? t("paymentSuccess") : nfcStatus === "error" ? t("paymentFailed") : nfcStatus === "reading" ? t("processingPayment") : t("nfcReady")}
-                    </Text>
-                  </View>
-                </View>
+                  <Ionicons name="wifi" size={18} color={paymentConfirmed ? Colors.success : Colors.textSecondary} />
+                  <Text style={[{ color: paymentConfirmed ? Colors.success : Colors.text, fontSize: 13, fontWeight: "600", flex: 1 }, rtlTextAlign]}>
+                    {t("confirmPayment" as any) || "Confirm NFC payment"} — CHF {cart.total.toFixed(2)}
+                  </Text>
+                </Pressable>
               )}
 
               {paymentMethod === "card" && (
-                <View style={styles.cardInputSection}>
-                  <View style={[styles.cardInputHeader, isRTL && { flexDirection: "row-reverse" }]}>
-                    <Ionicons name="card" size={24} color={Colors.accent} />
-                    <Text style={[styles.cardInputTitle, rtlTextAlign]}>{t("cardDetails")}</Text>
-                    <View style={[styles.cardBrands, isRTL && { flexDirection: "row-reverse" }]}>
-                      <Text style={styles.cardBrand}>VISA</Text>
-                      <Text style={styles.cardBrand}>MC</Text>
-                    </View>
+                <Pressable
+                  style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10, backgroundColor: paymentConfirmed ? Colors.success + "15" : Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1.5, borderColor: paymentConfirmed ? Colors.success : Colors.cardBorder }]}
+                  onPress={() => setPaymentConfirmed(!paymentConfirmed)}
+                >
+                  <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: paymentConfirmed ? Colors.success : Colors.textMuted, backgroundColor: paymentConfirmed ? Colors.success : "transparent", justifyContent: "center", alignItems: "center" }}>
+                    {paymentConfirmed && <Ionicons name="checkmark" size={14} color={Colors.white} />}
                   </View>
-                  <View style={styles.cardField}>
-                    <Ionicons name="card-outline" size={18} color={Colors.textMuted} style={{ marginRight: 8 }} />
-                    <TextInput
-                      style={styles.cardInput}
-                      placeholder="4242 4242 4242 4242"
-                      placeholderTextColor={Colors.textMuted}
-                      value={cardNumber}
-                      onChangeText={(t) => setCardNumber(formatCardNumber(t))}
-                      keyboardType="number-pad"
-                      maxLength={19}
-                    />
-                  </View>
-                  <View style={[styles.cardRow, isRTL && { flexDirection: "row-reverse" }]}>
-                    <View style={[styles.cardField, { flex: 1, marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }]}>
-                      <Ionicons name="calendar-outline" size={18} color={Colors.textMuted} style={{ marginRight: 8 }} />
-                      <TextInput
-                        style={styles.cardInput}
-                        placeholder="MM/YY"
-                        placeholderTextColor={Colors.textMuted}
-                        value={cardExpiry}
-                        onChangeText={(t) => setCardExpiry(formatExpiry(t))}
-                        keyboardType="number-pad"
-                        maxLength={5}
-                      />
-                    </View>
-                    <View style={[styles.cardField, { flex: 1 }]}>
-                      <Ionicons name="lock-closed-outline" size={18} color={Colors.textMuted} style={{ marginRight: 8 }} />
-                      <TextInput
-                        style={styles.cardInput}
-                        placeholder="CVC"
-                        placeholderTextColor={Colors.textMuted}
-                        value={cardCvc}
-                        onChangeText={(t) => setCardCvc(t.replace(/\D/g, "").slice(0, 4))}
-                        keyboardType="number-pad"
-                        maxLength={4}
-                        secureTextEntry
-                      />
-                    </View>
-                  </View>
-                  {cardError ? (
-                    <View style={[styles.cardErrorRow, isRTL && { flexDirection: "row-reverse" }]}>
-                      <Ionicons name="alert-circle" size={16} color={Colors.danger} />
-                      <Text style={[styles.cardErrorText, rtlTextAlign]}>{cardError}</Text>
-                    </View>
-                  ) : null}
-                  {cardProcessing && (
-                    <View style={[styles.cardProcessingRow, isRTL && { flexDirection: "row-reverse" }]}>
-                      <Ionicons name="sync" size={16} color={Colors.accent} />
-                      <Text style={[styles.cardProcessingText, rtlTextAlign]}>{t("processingPayment")}</Text>
-                    </View>
-                  )}
-                  <View style={[styles.cardSecureRow, isRTL && { flexDirection: "row-reverse" }]}>
-                    <Ionicons name="shield-checkmark" size={14} color={Colors.success} />
-                    <Text style={styles.cardSecureText}>{t("securePayment")}</Text>
-                  </View>
-                </View>
+                  <Ionicons name="card" size={18} color={paymentConfirmed ? Colors.success : Colors.textSecondary} />
+                  <Text style={[{ color: paymentConfirmed ? Colors.success : Colors.text, fontSize: 13, fontWeight: "600", flex: 1 }, rtlTextAlign]}>
+                    {t("confirmPayment" as any) || "Confirm card payment via terminal"} — CHF {cart.total.toFixed(2)}
+                  </Text>
+                </Pressable>
               )}
 
               <Text style={[styles.sectionLabel, rtlTextAlign]}>{t("orderSummary")}</Text>
@@ -1900,8 +1781,8 @@ export default function POSScreen() {
                 </View>
               </View>
 
-              {/* Payment confirmation checkbox for non-card/cash/nfc payments */}
-              {(paymentMethod === "twint" || paymentMethod === "mobile" || paymentMethod === "qr") && (
+              {/* Payment confirmation checkbox for TWINT/QR payments */}
+              {(paymentMethod === "twint" || paymentMethod === "qr") && (
                 <Pressable
                   style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10, backgroundColor: paymentConfirmed ? Colors.success + "15" : Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1.5, borderColor: paymentConfirmed ? Colors.success : Colors.cardBorder }]}
                   onPress={() => setPaymentConfirmed(!paymentConfirmed)}
@@ -1916,23 +1797,23 @@ export default function POSScreen() {
               )}
 
               <Pressable
-                style={[styles.completeBtn, (saleMutation.isPending || cardProcessing || nfcStatus === "reading" || (paymentMethod === "card" && !isCardValid())) && { opacity: 0.5 }]}
+                style={[styles.completeBtn, saleMutation.isPending && { opacity: 0.5 }]}
                 onPress={() => {
                   const validationError = validateBeforeComplete();
                   if (validationError) {
                     Alert.alert(t("error"), validationError);
                     return;
                   }
-                  if (!saleMutation.isPending && !cardProcessing && nfcStatus !== "reading" && !(paymentMethod === "card" && !isCardValid())) {
+                  if (!saleMutation.isPending) {
                     saleMutation.mutate();
                   }
                 }}
-                disabled={saleMutation.isPending || cardProcessing || nfcStatus === "reading" || (paymentMethod === "card" && !isCardValid())}
+                disabled={saleMutation.isPending}
               >
                 <LinearGradient colors={[Colors.success, "#059669"]} style={[styles.completeBtnGradient, isRTL && { flexDirection: "row-reverse" }]}>
                   <Ionicons name="checkmark-circle" size={22} color={Colors.white} />
                   <Text style={styles.completeBtnText}>
-                    {cardProcessing || nfcStatus === "reading" ? t("processingPayment") : saleMutation.isPending ? t("processing") : (paymentMethod === "card" || paymentMethod === "nfc") ? t("payAndComplete") : t("completeSale")}
+                    {saleMutation.isPending ? t("processing") : t("completeSale")}
                   </Text>
                 </LinearGradient>
               </Pressable>
@@ -2971,7 +2852,7 @@ const styles = StyleSheet.create({
   employeeName: { color: Colors.white, fontSize: 13, opacity: 0.9 },
   mainContent: { flex: 1 },
   productsSection: { flex: 1 },
-  productsSectionTablet: { flex: 2 },
+  productsSectionTablet: { flex: 1 },
   searchRow: { paddingHorizontal: 14, paddingTop: 12 },
   searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 14, paddingHorizontal: 14, height: 44, borderWidth: 1, borderColor: Colors.inputBorder },
   searchInput: { flex: 1, color: Colors.text, marginLeft: 8, fontSize: 15 },
@@ -2995,9 +2876,9 @@ const styles = StyleSheet.create({
   productGrid: { padding: 8 },
   productCard: { flex: 1, margin: 4, backgroundColor: Colors.surface, borderRadius: 14, padding: 12, alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder, minWidth: 80, overflow: "hidden", position: "relative" as const },
   productCardTopBorder: { position: "absolute" as const, top: 0, left: 0, right: 0, height: 3, borderTopLeftRadius: 14, borderTopRightRadius: 14 },
-  productIcon: { width: 50, height: 50, borderRadius: 14, justifyContent: "center", alignItems: "center", marginBottom: 8, marginTop: 4, overflow: "hidden" as const },
-  productName: { color: Colors.text, fontSize: 11, fontWeight: "600", textAlign: "center", marginBottom: 4, lineHeight: 15 },
-  productPrice: { color: Colors.accent, fontSize: 14, fontWeight: "800" },
+  productIcon: { width: 64, height: 64, borderRadius: 16, justifyContent: "center", alignItems: "center", marginBottom: 10, marginTop: 4, overflow: "hidden" as const },
+  productName: { color: Colors.text, fontSize: 14, fontWeight: "700", textAlign: "center", marginBottom: 4, lineHeight: 19 },
+  productPrice: { color: Colors.accent, fontSize: 16, fontWeight: "800" },
   productAddBadge: { position: "absolute" as const, top: 7, right: 7, width: 20, height: 20, borderRadius: 10, justifyContent: "center", alignItems: "center" },
   productCartBadge: { position: "absolute" as const, top: 7, right: 7, minWidth: 20, height: 20, borderRadius: 10, justifyContent: "center", alignItems: "center", paddingHorizontal: 4 },
   productCartBadgeText: { color: Colors.white, fontSize: 11, fontWeight: "800" },
@@ -3007,20 +2888,20 @@ const styles = StyleSheet.create({
 
   // ── Cart
   cartSection: { backgroundColor: Colors.surface, borderTopWidth: 1, borderColor: Colors.cardBorder, maxHeight: 420 },
-  cartSectionTablet: { flex: 1, borderTopWidth: 0, borderLeftWidth: 1, maxHeight: "100%" as any },
+  cartSectionTablet: { flex: 1.2, borderTopWidth: 0, borderLeftWidth: 1, maxHeight: "100%" as any },
   cartHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderColor: Colors.cardBorder },
-  cartTitle: { color: Colors.text, fontSize: 16, fontWeight: "700" },
+  cartTitle: { color: Colors.text, fontSize: 20, fontWeight: "700" },
   customerSelect: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
   customerSelectText: { color: Colors.textMuted, fontSize: 13, flex: 1 },
-  cartList: { maxHeight: 220 },
-  cartItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)", gap: 8 },
+  cartList: { maxHeight: 340 },
+  cartItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)", gap: 10 },
   cartItemIndexBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", flexShrink: 0 },
   cartItemIndexText: { color: Colors.textMuted, fontSize: 10, fontWeight: "700" },
   cartItemInfo: { flex: 1, minWidth: 0 },
-  cartItemName: { color: Colors.text, fontSize: 12, fontWeight: "600" },
-  cartItemUnit: { color: Colors.textMuted, fontSize: 11, marginTop: 1 },
-  cartItemPrice: { color: Colors.accent, fontSize: 12, marginTop: 2, fontWeight: "500" },
-  cartItemTotal: { color: Colors.accent, fontSize: 13, fontWeight: "700", minWidth: 60, textAlign: "right" },
+  cartItemName: { color: Colors.text, fontSize: 15, fontWeight: "600" },
+  cartItemUnit: { color: Colors.textMuted, fontSize: 13, marginTop: 1 },
+  cartItemPrice: { color: Colors.accent, fontSize: 14, marginTop: 2, fontWeight: "500" },
+  cartItemTotal: { color: Colors.accent, fontSize: 16, fontWeight: "700", minWidth: 70, textAlign: "right" },
   cartItemActions: { flexDirection: "row", alignItems: "center", gap: 6 },
   qtyBtn: { width: 26, height: 26, borderRadius: 13, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder },
   qtyBadge: { minWidth: 26, height: 26, borderRadius: 13, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder },
@@ -3033,8 +2914,8 @@ const styles = StyleSheet.create({
   summaryLabel: { color: Colors.textSecondary, fontSize: 13 },
   summaryValue: { color: Colors.text, fontSize: 13, fontWeight: "600" },
   totalRow: { borderTopWidth: 1, borderColor: Colors.cardBorder, paddingTop: 10, marginTop: 6 },
-  totalLabel: { color: Colors.text, fontSize: 17, fontWeight: "800" },
-  totalValue: { color: Colors.accent, fontSize: 20, fontWeight: "800" },
+  totalLabel: { color: Colors.text, fontSize: 22, fontWeight: "800" },
+  totalValue: { color: Colors.accent, fontSize: 26, fontWeight: "800" },
   checkoutBtn: { marginHorizontal: 16, marginVertical: 10, borderRadius: 16, overflow: "hidden", elevation: 4, boxShadow: "0px 4px 8px rgba(124, 58, 237, 0.3)" },
   checkoutBtnDisabled: { opacity: 0.5, elevation: 0, boxShadow: "none" },
   checkoutBtnGradient: { paddingVertical: 16, paddingHorizontal: 20 },
