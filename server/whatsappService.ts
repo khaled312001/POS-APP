@@ -98,28 +98,24 @@ async function cleanupProcesses() {
             execSync(`wmic process where "name='chromium.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: 'ignore' });
         } else {
             execSync(
-                `pkill -9 -f 'wppconnect' 2>/dev/null; pkill -9 -f 'chromium' 2>/dev/null; true`,
+                `pkill -9 -f 'chromium' 2>/dev/null; pkill -9 -f 'wppconnect' 2>/dev/null; true`,
                 { timeout: 4000 }
             );
         }
         await new Promise(r => setTimeout(r, 800));
     } catch { }
 
-    // Always wipe ALL Chromium lock files so a stale profile never blocks launch
-    const lockFiles = [
-        path.join(CHROME_DATA_DIR, "SingletonLock"),
-        path.join(CHROME_DATA_DIR, "SingletonCookie"),
-        path.join(CHROME_DATA_DIR, "SingletonSocket"),
-        path.join(CHROME_DATA_DIR, "Default", "Cookies-journal"),
-        path.join(CHROME_DATA_DIR, "Default", "Web Data-journal"),
-    ];
-    for (const f of lockFiles) {
-        try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch { }
-    }
+    // Wipe the entire chrome-data directory to guarantee no stale lock files.
+    // SingletonLock on Linux is a symlink — individual unlink can be unreliable.
+    // WhatsApp session tokens are in TOKEN_DIR (separate folder) and are preserved.
+    try {
+        if (fs.existsSync(CHROME_DATA_DIR)) {
+            fs.rmSync(CHROME_DATA_DIR, { recursive: true, force: true });
+        }
+    } catch { }
 
-    if (!fs.existsSync(STORAGE_DIR)) {
-        fs.mkdirSync(STORAGE_DIR, { recursive: true });
-    }
+    fs.mkdirSync(CHROME_DATA_DIR, { recursive: true });
+    if (!fs.existsSync(TOKEN_DIR)) fs.mkdirSync(TOKEN_DIR, { recursive: true });
 }
 
 async function isClientAlive(): Promise<boolean> {
