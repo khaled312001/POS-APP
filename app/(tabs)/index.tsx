@@ -318,6 +318,22 @@ export default function POSScreen() {
     return name;
   };
 
+  const toppingEmoji = (name: string): string => {
+    const map: Record<string, string> = {
+      "Tomato Sauce": "🍅", "Sliced Tomatoes": "🍅", "Garlic": "🧄", "Onions": "🧅",
+      "Capers": "🫛", "Olives": "🫒", "Oregano": "🌿", "Vegetables": "🥦",
+      "Spinach": "🥬", "Bell Peppers": "🫑", "Corn": "🌽", "Broccoli": "🥦",
+      "Artichokes": "🌿", "Arugula": "🥬", "Egg": "🥚", "Pineapple": "🍍",
+      "Mushrooms": "🍄", "Ham": "🥩", "Spicy Salami": "🌶️", "Salami": "🥩",
+      "Bacon": "🥓", "Prosciutto": "🥩", "Lamb": "🐑", "Chicken": "🍗",
+      "Kebab": "🥙", "Minced Meat": "🥩", "Mayonnaise": "🫙", "Anchovies": "🐟",
+      "Shrimp": "🍤", "Tuna": "🐟", "Ketchup": "🍅", "Cocktail Sauce": "🥂",
+      "Spicy Sauce": "🌶️", "Mozzarella": "🧀", "Gorgonzola": "🧀",
+      "Parmesan": "🧀", "Mascarpone": "🧀", "Kaeserand": "🧀", "Yogurt Sauce": "🥛",
+    };
+    return map[name] || "✨";
+  };
+
   const getToppingInfo = (label: string) => {
     const clean = label.toLowerCase()
       .replace(/^(extra|zusatz|mit)\s+/i, "")
@@ -1586,7 +1602,7 @@ export default function POSScreen() {
                 )}
               </View>
               <Pressable onPress={() => { cart.setCustomerId(null); setPhoneInput(""); }} style={styles.cartCustomerClear}>
-                <Ionicons name="close" size={16} color={Colors.textMuted} />
+                <Ionicons name="close-circle" size={26} color={Colors.danger} />
               </Pressable>
             </View>
           ) : (
@@ -1791,7 +1807,7 @@ export default function POSScreen() {
                       // Custom modifiers: show in grouped grid
                       const toppingOptions = extrasGroup.options.map((o: any) => {
                         const info = getToppingInfo(o.label);
-                        return { name: o.label, price: Number(o.price || 0), icon: info.icon, category: info.category };
+                        return { name: o.label, price: 0, icon: info.icon, category: info.category };
                       });
                       const displayCats = ["Cheese", "Meat", "Vegetables", "Seafood", "Sauces", "Others"];
                       return displayCats.map((cat: string) => {
@@ -1810,18 +1826,18 @@ export default function POSScreen() {
                                     isSelected ? prev.filter((t: string) => t !== topping.name) : [...prev, topping.name]
                                   )}
                                   style={{
-                                    height: 48, minWidth: 80, flex: 1,
+                                    height: 58, minWidth: 80, flex: 1,
                                     backgroundColor: isSelected ? Colors.accent : rowColor,
                                     justifyContent: "center", alignItems: "center",
                                     borderWidth: isSelected ? 2 : 1,
                                     borderColor: isSelected ? Colors.accent : "rgba(0,0,0,0.15)",
-                                    paddingHorizontal: 4,
+                                    paddingHorizontal: 4, paddingVertical: 4, gap: 2,
                                   }}
                                 >
-                                  <Text style={{ fontSize: 10, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : textColor }} numberOfLines={2}>
+                                  <Text style={{ fontSize: 16, lineHeight: 18 }}>{topping.icon || toppingEmoji(topping.name)}</Text>
+                                  <Text style={{ fontSize: 9, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : textColor }} numberOfLines={2}>
                                     {topping.name}
                                   </Text>
-                                  {topping.price > 0 && <Text style={{ fontSize: 8, color: isSelected ? "#000" : "rgba(255,255,255,0.8)" }}>+{topping.price.toFixed(2)}</Text>}
                                   {isSelected && <Text style={{ fontSize: 9, fontWeight: "900", color: "#000" }}>✓</Text>}
                                 </Pressable>
                               );
@@ -1840,11 +1856,7 @@ export default function POSScreen() {
                           }
                           const isSelected = selectedToppings.includes(toppingName);
                           const displayName = toppingDisplayName(toppingName);
-                          // Look up custom price if modifier exists
-                          const modPrice = selectedProductForOptions?.modifiers
-                            ?.flatMap((m: any) => m.options || [])
-                            ?.find((o: any) => getToppingInfo(o.label).category === getToppingInfo(toppingName).category && o.label.toLowerCase().includes(toppingName.toLowerCase()))
-                            ?.price;
+                          // Toppings are free — no price lookup needed
                           return (
                             <Pressable
                               key={toppingName}
@@ -1856,21 +1868,21 @@ export default function POSScreen() {
                                 else playClickSound("light");
                               }}
                               style={{
-                                flex: 1, height: 44,
+                                flex: 1, height: 54,
                                 backgroundColor: isSelected ? Colors.accent : row.color,
                                 justifyContent: "center", alignItems: "center",
                                 borderWidth: isSelected ? 2 : 0.5,
                                 borderColor: isSelected ? Colors.accent : "rgba(0,0,0,0.2)",
-                                paddingHorizontal: 2,
+                                paddingHorizontal: 2, paddingVertical: 4, gap: 2,
                               }}
                             >
+                              <Text style={{ fontSize: isTablet ? 18 : 16, lineHeight: 20 }}>{toppingEmoji(toppingName)}</Text>
                               <Text
-                                style={{ fontSize: isTablet ? 11 : 9, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 13 }}
+                                style={{ fontSize: isTablet ? 10 : 8, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 11 }}
                                 numberOfLines={2}
                               >
                                 {displayName}
                               </Text>
-                              {modPrice > 0 && <Text style={{ fontSize: 8, color: isSelected ? "#000" : "rgba(255,255,255,0.7)" }}>+{Number(modPrice).toFixed(2)}</Text>}
                               {isSelected && <Text style={{ fontSize: 8, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
                             </Pressable>
                           );
@@ -3506,7 +3518,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   cartCustomerChipText: { color: Colors.textMuted, fontSize: 10 },
-  cartCustomerClear: { padding: 4 },
+  cartCustomerClear: { padding: 8 },
 
   // New customer form
   newCustLabel: {
