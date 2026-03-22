@@ -291,8 +291,8 @@ export default function POSScreen() {
   const mergedAlcoholIds: number[] = [bierCat?.id, alkoCat?.id].filter(Boolean) as number[];
   const displayCategories = mergedAlcoholIds.length >= 2
     ? tenantCategories
-        .filter((c: any) => !mergedAlcoholIds.includes(c.id))
-        .concat([{ id: MERGED_ALCOHOL_ID, name: "Bier & Alkohol", icon: "beer", color: "#f59e0b" }])
+      .filter((c: any) => !mergedAlcoholIds.includes(c.id))
+      .concat([{ id: MERGED_ALCOHOL_ID, name: "Bier & Alkohol", icon: "beer", color: "#f59e0b" }])
     : tenantCategories;
 
   const { data: allEmployees = [] } = useQuery<any[]>({
@@ -345,6 +345,148 @@ export default function POSScreen() {
   });
   const myActiveShift = (myShifts as any[]).find((s: any) => s.employeeId === employee?.id && !s.endTime && s.status === "open");
 
+  const generateThermalReceiptHTML = (saleData: any, qrUrl: string | null = null, options: { isKitchen?: boolean, isPartial?: boolean, title?: string } = {}) => {
+    const { isKitchen = false, isPartial = false, title = isKitchen ? "KÜCHENBON" : (t("viewReceipt" as any) || "RECHNUNG") } = options;
+    const storeName = storeSettings?.name || tenant?.name || "POS System";
+    const storeAddr = storeSettings?.address || "";
+    const storePhone = storeSettings?.phone || "";
+    const storeEmail = storeSettings?.email || "";
+    const logoPath = storeSettings?.logo || "";
+    const logoUrl = logoPath ? (logoPath.startsWith("http") || logoPath.startsWith("data:") ? logoPath : `${getApiUrl().replace(/\/$/, "")}${logoPath}`) : "";
+
+    const receiptNum = saleData.receiptNumber || `#${saleData.id}`;
+    const saleDate = new Date(saleData.createdAt || saleData.date || Date.now());
+    const dateStr = saleDate.toLocaleDateString();
+    const timeStr = saleDate.toLocaleTimeString();
+    const empName = saleData.employeeName || employee?.name || "Staff";
+    const custName = saleData.customerName || "";
+
+    const itemsHtml = (saleData.items || []).map((item: any) => `
+      <div style="display:flex;justify-content:space-between;padding:3px 0;${isKitchen ? 'font-size:14px;font-weight:bold;' : ''}">
+        <span style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.productName || item.name}</span>
+        <span style="width:40px;text-align:center;">x${item.quantity}</span>
+        ${!isKitchen ? `<span style="width:75px;text-align:right;">CHF ${Number(item.total || (item.unitPrice * item.quantity)).toFixed(2)}</span>` : ""}
+      </div>
+    `).join("");
+
+    const logoHtml = logoUrl && !isKitchen ? `<div style="text-align:center;margin:8px 0;"><img src="${logoUrl}" style="max-height:55px;max-width:200px;object-fit:contain;" /></div>` : "";
+    const qrHtml = qrUrl && !isKitchen ? `<div style="text-align:center;margin-top:14px;"><img src="${qrUrl}" style="width:90px;height:90px;" /></div>` : "";
+
+    const innerContent = `
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
+  ${logoHtml}
+  <div class="center bold" style="font-size:18px;margin-bottom:4px;text-transform:uppercase;">${title}</div>
+  <div class="center bold" style="font-size:14px;">${storeName}</div>
+  ${!isKitchen ? `
+    ${storeAddr ? `<div class="center">${storeAddr}</div>` : ""}
+    ${storePhone ? `<div class="center">${storePhone}</div>` : ""}
+    ${storeEmail ? `<div class="center">${storeEmail}</div>` : ""}
+  ` : ""}
+  
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
+  
+  <div>${t("receiptDate")}: ${dateStr}, ${timeStr}</div>
+  <div>${t("receiptNumber")}: ${receiptNum}</div>
+  ${!isKitchen ? `<div>${t("servedBy")}: ${empName}</div>` : ""}
+  ${custName ? `<div>${t("customer")}: ${custName}</div>` : ""}
+  
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
+  
+  <div class="flex-between bold">
+    <span style="flex:2;">Item</span>
+    <span style="width:40px;text-align:center;">Qty</span>
+    ${!isKitchen ? `<span style="width:75px;text-align:right;">Total</span>` : ""}
+  </div>
+  
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
+  
+  ${itemsHtml}
+  
+  ${!isKitchen ? `
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
+  
+  <div class="flex-between">
+    <span>${t("subtotal")}:</span>
+    <span>CHF ${Number(saleData.subtotal || saleData.totalAmount).toFixed(2)}</span>
+  </div>
+  ${Number(saleData.discount) > 0 ? `
+    <div class="flex-between">
+      <span>${t("discount")}:</span>
+      <span>-CHF ${Number(saleData.discount).toFixed(2)}</span>
+    </div>
+  ` : ""}
+  ${Number(saleData.serviceFee || saleData.serviceFeeAmount) > 0 ? `
+    <div class="flex-between">
+      <span>${t("serviceTax") || "Service Tax"}:</span>
+      <span>CHF ${Number(saleData.serviceFee || saleData.serviceFeeAmount).toFixed(2)}</span>
+    </div>
+  ` : ""}
+  <div class="flex-between">
+    <span>${t("tax")}:</span>
+    <span>CHF ${Number(saleData.tax).toFixed(2)}</span>
+  </div>
+  ${Number(saleData.deliveryFee) > 0 ? `
+    <div class="flex-between">
+      <span>Delivery Fee:</span>
+      <span>CHF ${Number(saleData.deliveryFee).toFixed(2)}</span>
+    </div>
+  ` : ""}
+  
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
+  
+  <div class="flex-between bold" style="font-size:15px;">
+    <span>TOTAL:</span>
+    <span>CHF ${Number(saleData.total || saleData.totalAmount).toFixed(2)}</span>
+  </div>
+  
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
+  
+  <div class="flex-between">
+    <span>${t("paymentMethod")}:</span>
+    <span style="text-transform:uppercase;">${saleData.paymentMethod || "cash"}</span>
+  </div>
+  ${saleData.paymentMethod === "cash" ? `
+    <div class="flex-between">
+      <span>${t("cash")}:</span>
+      <span>CHF ${Number(saleData.cashReceived || 0).toFixed(2)}</span>
+    </div>
+    <div class="flex-between">
+      <span>${t("change")}:</span>
+      <span>CHF ${Number(saleData.change || 0).toFixed(2)}</span>
+    </div>
+  ` : ""}
+  
+  ${qrHtml}
+  ` : ""}
+  
+  <div class="center bold" style="margin-top:14px;font-size:13px;">${isKitchen ? "KÜCHENBON" : t("thankYou")}</div>
+  ${!isKitchen && storeAddr ? `<div class="center" style="font-size:10px;margin-top:2px;">${t("visitUs")}: ${storeAddr}</div>` : ""}
+  <div class="center" style="font-size:9px;color:#999;margin-top:6px;">${t("poweredBy")}</div>
+  <div class="center sep" style="margin-top:6px;overflow:hidden;white-space:nowrap;">${"=".repeat(36)}</div>
+`;
+
+    if (isPartial) return innerContent;
+
+    return `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @page { margin: 0; }
+    body { font-family: 'Courier New', monospace; font-size: 11px; width: 300px; margin: 0 auto; color: #000; background: #fff; padding: 15px; line-height: 1.2; }
+    .center { text-align: center; }
+    .bold { font-weight: 800; }
+    .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
+    .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
+    .page-break { page-break-after: always; }
+  </style>
+</head>
+<body>
+  ${innerContent}
+</body>
+</html>`;
+  };
+
   const loadInvoiceDetails = async (saleId: number) => {
     try {
       const res = await apiRequest("GET", `/api/sales/${saleId}`);
@@ -375,74 +517,16 @@ export default function POSScreen() {
       return;
     }
     if (Platform.OS === "web" && selectedInvoice) {
-      const printWindow = window.open("", "_blank", "width=900,height=700");
+      const printWindow = window.open("", "_blank", "width=400,height=600");
       if (printWindow) {
-        const inv = selectedInvoice;
-        const storeName = storeSettings?.name || tenant?.name || "POS System";
-        const storeAddr = storeSettings?.address || "";
-        const storePhone = storeSettings?.phone || "";
-        const storeEmail = storeSettings?.email || "";
-        const logoPath = storeSettings?.logo || "";
-        const logoUrl = logoPath ? `${window.location.origin}${logoPath}` : "";
-        const orderId = inv.id || "";
-        const receiptNum = inv.receiptNumber || `#${orderId}`;
-        const invDate = new Date(inv.createdAt || inv.date || Date.now());
-        const dateStr = invDate.toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
-        const timeStr = invDate.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-        const logoHtml = logoUrl
-          ? `<img src="${logoUrl}" alt="${storeName}" style="max-height:70px;max-width:220px;object-fit:contain" />`
-          : `<div style="font-size:26px;font-weight:900;letter-spacing:2px">${storeName}</div>`;
-        const itemsHtml = (inv.items || []).map((item: any) =>
-          `<tr><td style="width:45%;padding:3px 4px">${item.productName || item.name}</td><td style="text-align:center;width:15%;padding:3px 4px;font-size:10px;color:#555">x${item.quantity}</td><td style="text-align:right;width:15%;padding:3px 4px;font-size:10px;color:#555">Fr&nbsp;${Number(item.unitPrice || item.price || 0).toFixed(2)}</td><td style="text-align:right;width:25%;padding:3px 4px;font-weight:600">Fr&nbsp;${Number(item.total || (Number(item.unitPrice || item.price || 0) * item.quantity)).toFixed(2)}</td></tr>`
-        ).join("");
-        const totalAmt = Number(inv.totalAmount);
-        const taxAmt = Number(inv.taxAmount || inv.tax || 0);
-        const discAmt = Number(inv.discountAmount || inv.discount || 0);
-        const itemCount = (inv.items || []).reduce((s: number, i: any) => s + (i.quantity || 0), 0);
-        const pmLabel = (inv.paymentMethod || "cash") === "cash" ? "Bar" : (inv.paymentMethod || "cash") === "card" ? "Karte" : (inv.paymentMethod || "cash").toUpperCase();
-        const css = `@page{size:A4;margin:8mm 12mm}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#000;background:#fff}.receipt{width:100%;min-height:277mm;padding:6mm 0;page-break-after:always;display:flex;flex-direction:column}.receipt:last-child{page-break-after:avoid}.totals-box{border:1px solid #000;padding:6px 8px;margin:4px 0 10px}.store-bottom{text-align:center;font-size:10px;font-weight:bold;margin-top:6px;border-top:1px solid #000;padding-top:6px}`;
-        printWindow.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Rechnung ${receiptNum}</title><style>${css}</style></head><body>`);
-        printWindow.document.write(`<div class="receipt">
-          <div style="text-align:center;border-bottom:3px solid #000;padding-bottom:8px;margin-bottom:10px">
-            ${logoHtml}
-            <div style="font-size:18px;margin-top:4px">Rechnung</div>
-          </div>
-          <div style="display:flex;gap:16px;margin:8px 0">
-            <div style="min-width:120px">
-              <div style="font-size:11px;color:#333">${receiptNum}&nbsp;MwSt</div>
-              <div style="font-size:11px;color:#333">Kassierer</div>
-              <div style="font-size:22px;font-weight:900;line-height:1.2;margin:2px 0">${timeStr}</div>
-              <div style="font-size:11px;color:#333">${invDate.toLocaleDateString("de-DE")}</div>
-            </div>
-            <div style="flex:1">
-              <div style="font-size:15px;font-weight:700">${inv.customerName || ""}</div>
-              ${inv.customerAddress ? `<div style="font-size:13px;line-height:1.6">${inv.customerAddress}</div>` : ""}
-              ${inv.customerPhone ? `<div style="font-size:15px;font-weight:bold;margin-top:4px;letter-spacing:1px"><strong>Tel</strong>&nbsp;&nbsp;${inv.customerPhone}</div>` : ""}
-            </div>
-          </div>
-          <table style="width:100%;border-collapse:collapse;margin:10px 0;border-top:1px solid #000;border-bottom:1px solid #000">
-            <tbody>${itemsHtml}${discAmt > 0 ? `<tr><td colspan="3" style="padding:3px 4px">- Fr. ${discAmt.toFixed(2).replace(".00", ".--")} Reduktion</td><td style="text-align:right;padding:3px 4px;font-weight:600">-Fr&nbsp;${discAmt.toFixed(2)}</td></tr>` : ""}</tbody>
-          </table>
-          <div class="totals-box">
-            <table style="width:100%;border-collapse:collapse">
-              <tr>
-                <td style="font-size:14px;font-weight:bold;width:24px;padding:2px 6px">${itemCount}</td>
-                <td style="font-size:10px;line-height:1.1;width:30px;padding:2px 6px">MwS<br>t</td>
-                <td style="text-align:right;padding:2px 6px">Fr&nbsp;${totalAmt.toFixed(2)}</td>
-                <td style="text-align:right;padding:2px 6px">Fr&nbsp;${taxAmt.toFixed(2)}</td>
-                <td style="text-align:right;font-size:14px;padding:2px 6px"><strong>Fr</strong></td>
-                <td style="text-align:right;font-size:22px;font-weight:900;padding:2px 6px"><strong>${totalAmt.toFixed(2)}</strong></td>
-              </tr>
-            </table>
-          </div>
-          <div style="text-align:center;font-size:11px;margin-top:auto;padding-top:10px">
-            ${storeEmail ? `Grazie mille e buon appetito! ${storeEmail}` : "Grazie mille e buon appetito!"}
-          </div>
-          <div class="store-bottom">${storeName}${storeAddr ? " - " + storeAddr : ""}${storePhone ? " Tel: " + storePhone : ""}</div>
-        </div>`);
-        printWindow.document.write("</body></html>");
+        const html = generateThermalReceiptHTML(selectedInvoice, reprintQrDataUrl);
+        printWindow.document.write(html);
         printWindow.document.close();
-        printWindow.print();
+        // Wait for potential images to load
+        setTimeout(() => {
+          printWindow.focus();
+          printWindow.print();
+        }, 500);
       }
     }
   };
@@ -595,208 +679,78 @@ export default function POSScreen() {
 
   const autoPrint3Copies = (saleData: any, cartItems: typeof cart.items, cartSubtotal: number, cartTax: number, cartDiscount: number, cartServiceFee: number, cartTotal: number, cartDeliveryFee: number, pmMethod: string, cashAmt: number, custName: string, empName: string, custObj?: any) => {
     if (Platform.OS !== "web") return;
-    const printWin = window.open("", "_blank", "width=900,height=700");
+    const printWin = window.open("", "_blank", "width=400,height=600");
     if (!printWin) return;
 
-    const S = (style: string) => `style="${style}"`;
-    const storeName = storeSettings?.name || tenant?.name || "POS System";
-    const storeAddr = storeSettings?.address || "";
-    const storePhone = storeSettings?.phone || "";
-    const storeEmail = storeSettings?.email || "";
-    const logoPath = storeSettings?.logo || "";
-    const logoUrl = logoPath ? `${window.location.origin}${logoPath}` : "";
+    const fullSale = {
+      ...saleData,
+      items: cartItems.map(i => ({ productName: i.name, quantity: i.quantity, total: i.price * i.quantity })),
+      subtotal: cartSubtotal,
+      tax: cartTax,
+      discount: cartDiscount,
+      serviceFee: cartServiceFee,
+      total: cartTotal,
+      deliveryFee: cartDeliveryFee,
+      paymentMethod: pmMethod,
+      cashReceived: cashAmt,
+      change: pmMethod === "cash" ? cashAmt - cartTotal : 0,
+      customerName: custName,
+      employeeName: empName,
+    };
+
+    const pmLabel = pmMethod === "cash" ? "BAR" : pmMethod === "card" ? "KARTE" : pmMethod.toUpperCase();
     const orderId = saleData?.id || "";
-    const receiptNum = saleData?.receiptNumber || `#${orderId}`;
-    const now = new Date();
-    const shortDate = now.toLocaleDateString("de-DE");
-    const longDate = now.toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
-    const timeStr = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-    const orderTimeStr = saleData?.createdAt
-      ? new Date(saleData.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
-      : timeStr;
 
-    const custAddress = custObj?.address || "";
-    const custPhone = custObj?.phone || "";
-    const isDelivery = pmMethod === "delivery" || cartDeliveryFee > 0;
-    const pmLabel = pmMethod === "cash" ? "Bar" : pmMethod === "card" ? "Karte" : pmMethod === "delivery" ? "Lieferung" : pmMethod.toUpperCase();
-    const mwstCount = cartItems.reduce((s, i) => s + i.quantity, 0);
+    const customerInner = generateThermalReceiptHTML(fullSale, qrDataUrl, { title: "KUNDENBELEG", isPartial: true });
+    const driverInner = generateThermalReceiptHTML(fullSale, null, { title: `FAHRERAUFTRAG #${orderId}`, isPartial: true });
+    const kitchenInner = generateThermalReceiptHTML(fullSale, null, { isKitchen: true, isPartial: true });
 
-    // Base styles (all inline — no classes to avoid inheritance issues)
-    const PAGE = "margin:0;padding:14mm 14mm 10mm 14mm;width:100%;min-height:277mm;page-break-after:always;display:block;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#000000;background:#ffffff;box-sizing:border-box;";
-    const TD0 = "padding:0;margin:0;font-family:Arial,Helvetica,sans-serif;color:#000000;font-size:13px;background:#ffffff;";
-
-    const logoHtml = logoUrl
-      ? `<img src="${logoUrl}" alt="${storeName}" style="max-height:72px;max-width:230px;object-fit:contain;display:block;margin:0 auto 4px auto;">`
-      : `<div style="font-size:22px;font-weight:900;letter-spacing:1px;color:#000000;">${storeName}</div>`;
-
-    const itemRows = cartItems.map((i) =>
-      `<tr>
-        <td style="${TD0}padding:5px 6px;border-bottom:1px solid #dddddd;width:50%;">${i.name}</td>
-        <td style="${TD0}padding:5px 6px;border-bottom:1px solid #dddddd;width:15%;text-align:center;">${i.quantity}</td>
-        <td style="${TD0}padding:5px 6px;border-bottom:1px solid #dddddd;width:15%;text-align:right;">Fr ${i.price.toFixed(2)}</td>
-        <td style="${TD0}padding:5px 6px;border-bottom:1px solid #dddddd;width:20%;text-align:right;font-weight:700;">Fr ${(i.price * i.quantity).toFixed(2)}</td>
-      </tr>`
-    ).join("");
-
-    const discountRows = cartDiscount > 0
-      ? `<tr>
-          <td colspan="3" style="${TD0}padding:5px 6px;border-bottom:1px solid #dddddd;">- Fr. ${cartDiscount.toFixed(2).replace(".00", ".--")}</td>
-          <td style="${TD0}padding:5px 6px;border-bottom:1px solid #dddddd;text-align:right;font-weight:700;">-Fr ${cartDiscount.toFixed(2)}</td>
-        </tr>
-        <tr><td colspan="4" style="${TD0}padding:2px 6px;font-size:10px;color:#444444;">Reduktion</td></tr>`
-      : "";
-
-    const kitchenRows = cartItems.map((i) =>
-      `<tr>
-        <td style="${TD0}padding:7px 6px;border-bottom:1px solid #cccccc;font-size:15px;font-weight:700;width:75%;">${i.name}</td>
-        <td style="${TD0}padding:7px 6px;border-bottom:1px solid #cccccc;font-size:15px;font-weight:700;text-align:center;width:25%;">x${i.quantity}</td>
-      </tr>`
-    ).join("");
-
-    const infoBlock = (showDeliveryNote: boolean) => `
-      <table style="width:100%;border-collapse:collapse;margin:10px 0;">
-        <tr>
-          <td style="${TD0}vertical-align:top;width:48%;padding-right:8px;">
-            <div style="font-size:11px;color:#333333;line-height:1.8;">${receiptNum} MwSt</div>
-            <div style="font-size:11px;color:#333333;line-height:1.8;">Kassierer</div>
-            <div style="font-size:26px;font-weight:900;color:#000000;line-height:1.1;margin:3px 0;">${timeStr}</div>
-            <div style="font-size:11px;color:#333333;line-height:1.8;">${shortDate}</div>
-            <div style="font-size:11px;color:#333333;line-height:1.8;">${orderTimeStr}</div>
-          </td>
-          <td style="${TD0}vertical-align:top;width:52%;padding-left:8px;">
-            <div style="font-size:16px;font-weight:700;color:#000000;margin-bottom:3px;">${custName}</div>
-            ${custAddress ? `<div style="font-size:13px;color:#000000;line-height:1.7;">${custAddress}</div>` : ""}
-            ${showDeliveryNote && isDelivery ? `<div style="font-size:9px;color:#555555;margin:3px 0;">Hauslieferung ohne Service und Zubereitung</div>` : ""}
-            ${custPhone ? `<div style="font-size:15px;font-weight:700;color:#000000;margin-top:5px;letter-spacing:1px;"><strong>Tel</strong>&nbsp;&nbsp;${custPhone}</div>` : ""}
-          </td>
-        </tr>
-      </table>`;
-
-    const totalsBox = `
-      <div style="border:1px solid #000000;padding:7px 10px;margin:6px 0 12px;">
-        <table style="width:100%;border-collapse:collapse;">
-          <tr>
-            <td style="${TD0}font-size:16px;font-weight:700;width:28px;">${mwstCount}</td>
-            <td style="${TD0}font-size:10px;line-height:1.1;width:32px;">MwSt</td>
-            <td style="${TD0}text-align:right;">Fr ${cartTotal.toFixed(2)}</td>
-            <td style="${TD0}text-align:right;">Fr ${cartTax.toFixed(2)}</td>
-            <td style="${TD0}text-align:right;font-size:16px;padding-right:6px;"><strong>Fr</strong></td>
-            <td style="${TD0}text-align:right;font-size:26px;font-weight:900;color:#000000;"><strong>${cartTotal.toFixed(2)}</strong></td>
-          </tr>
-        </table>
+    const driverFooter = `
+      <div style="border:1px solid #000;margin-top:12px;font-family:'Courier New',monospace;font-size:12px;color:#000;">
+        <div style="display:flex;border-bottom:1px solid #000;padding:10px 10px;">
+          <span style="font-weight:700;width:110px;min-width:110px;">FAHRER</span>
+          <span style="flex:1;">&nbsp;</span>
+        </div>
+        <div style="display:flex;border-bottom:1px solid #000;padding:10px 10px;">
+          <span style="font-weight:700;width:110px;min-width:110px;">LIEFERZEIT</span>
+          <span style="flex:1;">&nbsp;</span>
+        </div>
+        <div style="display:flex;padding:10px 10px;">
+          <span style="font-weight:700;width:110px;min-width:110px;">NOTIZ</span>
+          <span style="flex:1;font-style:italic;">${pmLabel}</span>
+        </div>
       </div>`;
 
-    // ── RECEIPT 1: Kundenrechnung ─────────────────────────────────────────────
-    const customerReceipt = `
-<div style="${PAGE}">
-  <div style="text-align:center;border-bottom:3px solid #000000;padding-bottom:10px;margin-bottom:12px;">
-    ${logoHtml}
-    <div style="font-size:17px;font-weight:400;color:#000000;margin-top:4px;">Rechnung</div>
-  </div>
-  ${infoBlock(true)}
-  <table style="width:100%;border-collapse:collapse;border-top:1px solid #000000;border-bottom:1px solid #000000;margin:8px 0;">
-    <thead>
-      <tr>
-        <th style="${TD0}text-align:left;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Artikel</th>
-        <th style="${TD0}text-align:center;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Anz</th>
-        <th style="${TD0}text-align:right;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Preis</th>
-        <th style="${TD0}text-align:right;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Total</th>
-      </tr>
-    </thead>
-    <tbody>${itemRows}${discountRows}</tbody>
-  </table>
-  ${totalsBox}
-  <div style="text-align:center;font-size:11px;color:#000000;margin-top:auto;padding-top:10px;">
-    ${storeEmail ? `Grazie mille e buon appetito! ${storeEmail}` : "Grazie mille e buon appetito!"}
-  </div>
-  <div style="text-align:center;font-size:10px;font-weight:700;color:#000000;margin-top:8px;border-top:1px solid #000000;padding-top:7px;">
-    ${storeName}${storeAddr ? " &ndash; " + storeAddr : ""}${storePhone ? " Tel: " + storePhone : ""}
-  </div>
-</div>`;
-
-    // ── RECEIPT 2: Fahrerauftrag ──────────────────────────────────────────────
-    const driverReceipt = `
-<div style="${PAGE}">
-  <div style="font-size:34px;font-weight:900;color:#000000;margin-bottom:12px;">Fahrerauftrag ${orderId}</div>
-  ${infoBlock(true)}
-  <table style="width:100%;border-collapse:collapse;border-top:1px solid #000000;border-bottom:1px solid #000000;margin:8px 0;">
-    <thead>
-      <tr>
-        <th style="${TD0}text-align:left;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Artikel</th>
-        <th style="${TD0}text-align:center;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Anz</th>
-        <th style="${TD0}text-align:right;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Preis</th>
-        <th style="${TD0}text-align:right;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Total</th>
-      </tr>
-    </thead>
-    <tbody>${itemRows}${discountRows}</tbody>
-  </table>
-  ${totalsBox}
-  <table style="width:100%;border-collapse:collapse;border:1px solid #000000;margin-top:14px;">
-    <tr>
-      <td style="${TD0}padding:12px 14px;font-weight:700;width:130px;border-bottom:1px solid #000000;">FAHRER</td>
-      <td style="${TD0}padding:12px 14px;border-bottom:1px solid #000000;">&nbsp;</td>
-    </tr>
-    <tr>
-      <td style="${TD0}padding:12px 14px;font-weight:700;width:130px;border-bottom:1px solid #000000;">LIEFERZEIT</td>
-      <td style="${TD0}padding:12px 14px;border-bottom:1px solid #000000;">&nbsp;</td>
-    </tr>
-    <tr>
-      <td style="${TD0}padding:12px 14px;font-weight:700;width:130px;">NOTIZ</td>
-      <td style="${TD0}padding:12px 14px;font-style:italic;">${pmLabel}</td>
-    </tr>
-  </table>
-</div>`;
-
-    // ── RECEIPT 3: AENDERUNG / Küchenbon ─────────────────────────────────────
-    const kitchenReceipt = `
-<div style="${PAGE}page-break-after:avoid;">
-  <div style="font-size:30px;font-weight:900;color:#000000;text-align:center;margin-bottom:6px;border-bottom:3px solid #000000;padding-bottom:8px;">AENDERUNG</div>
-  <table style="width:100%;border-collapse:collapse;margin:10px 0;">
-    <tr>
-      <td style="${TD0}vertical-align:top;width:48%;padding-right:8px;">
-        <div style="font-size:13px;color:#000000;margin-bottom:4px;">${storeName} ${orderId}</div>
-        <div style="font-size:11px;color:#333333;line-height:1.8;">Kassierer</div>
-        <div style="font-size:26px;font-weight:900;color:#000000;line-height:1.1;margin:3px 0;">${timeStr}</div>
-        <div style="font-size:11px;color:#333333;line-height:1.8;">${longDate}</div>
-        <div style="font-size:11px;color:#333333;line-height:1.8;">${orderTimeStr}</div>
-      </td>
-      <td style="${TD0}vertical-align:top;width:52%;padding-left:8px;">
-        <div style="font-size:16px;font-weight:700;color:#000000;margin-bottom:3px;">${custName}</div>
-        ${custAddress ? `<div style="font-size:13px;color:#000000;line-height:1.7;">${custAddress}</div>` : ""}
-        ${custPhone ? `<div style="font-size:15px;font-weight:700;color:#000000;margin-top:5px;letter-spacing:1px;"><strong>Tel</strong>&nbsp;&nbsp;${custPhone}</div>` : ""}
-      </td>
-    </tr>
-  </table>
-  <div style="background:#000000;color:#ffffff;font-weight:700;font-size:14px;padding:5px 10px;margin:10px 0 6px;">FOOD</div>
-  <table style="width:100%;border-collapse:collapse;">
-    <tbody>${kitchenRows}</tbody>
-  </table>
-  <div style="border-top:1px solid #000000;margin:18px 0;"></div>
-  <div style="border-top:1px solid #000000;margin:18px 0;"></div>
-  <div style="border-top:1px solid #000000;margin:18px 0;"></div>
-</div>`;
-
-    const html = `<!DOCTYPE html>
+    const combinedHtml = `<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Rechnung ${receiptNum}</title>
+  <title>Rechnung ${saleData?.receiptNumber || '#' + saleData?.id}</title>
   <style>
-    @page { size: A4; margin: 0; }
+    @page { size: A4; margin: 15mm 20mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { background: #ffffff; color: #000000; font-family: Arial, Helvetica, sans-serif; }
+    body { font-family: 'Courier New', monospace; font-size: 11px; color: #000; background: #fff; line-height: 1.3; }
+    .receipt-unit { width: 300px; margin: 0 auto; padding: 12px 6px; page-break-after: always; }
+    .receipt-unit:last-child { page-break-after: avoid; }
+    .center { text-align: center; }
+    .bold { font-weight: 800; }
+    .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
+    .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
   </style>
 </head>
 <body>
-${customerReceipt}
-${driverReceipt}
-${kitchenReceipt}
+  <div class="receipt-unit">${customerInner}</div>
+  <div class="receipt-unit">${driverInner}${driverFooter}</div>
+  <div class="receipt-unit">${kitchenInner}</div>
 </body>
 </html>`;
 
-    printWin.document.write(html);
+    printWin.document.write(combinedHtml);
     printWin.document.close();
-    printWin.print();
+    setTimeout(() => {
+      printWin.focus();
+      printWin.print();
+    }, 500);
   };
 
   const completeSaleAfterPayment = (saleData: any) => {
@@ -1078,24 +1032,40 @@ ${kitchenReceipt}
         if (Platform.OS === "web") {
           const printWindow = window.open("", "_blank", "width=380,height=600");
           if (printWindow) {
-            printWindow.document.write(`<html><head><title>Daily Invoices</title><style>body{font-family:'Courier New',monospace;font-size:12px;width:300px;margin:0 auto;padding:20px}table{width:100%;border-collapse:collapse}td{padding:2px 0}.center{text-align:center}.right{text-align:right}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}.dbl{border-top:2px solid #000;margin:8px 0}.page-break{page-break-after:always;border-bottom:1px solid #ccc;margin:20px 0}</style></head><body>`);
-            fullSales.forEach((inv, index) => {
-              const itemsHtml = (inv.items || []).map((item: any) =>
-                `<tr><td style="text-align:left">${item.productName || item.name}</td><td style="text-align:center">x${item.quantity}</td><td style="text-align:right">CHF ${Number(item.total || (item.unitPrice * item.quantity)).toFixed(2)}</td></tr>`
-              ).join("");
+            const combinedHtml = fullSales.map((inv, index) => {
+              const html = generateThermalReceiptHTML(inv, null, { isPartial: true });
+              return `
+                <div class="receipt-unit">
+                  ${html}
+                </div>
+                ${index < fullSales.length - 1 ? '<div class="page-break"></div>' : ''}
+              `;
+            }).join("");
 
-              printWindow.document.write(`<div class="dbl"></div><p class="center bold" style="font-size:16px">${storeSettings?.name || tenant?.name || "POS System"}</p>`);
-              printWindow.document.write(`<p class="center">${new Date(inv.createdAt || inv.date).toLocaleString()}</p>`);
-              printWindow.document.write(`<p class="center">${t("receiptNumber")}: ${inv.receiptNumber || "#" + inv.id}</p>`);
-              printWindow.document.write(`<div class="line"></div><table>${itemsHtml}</table><div class="line"></div>`);
-              printWindow.document.write(`<table><tr><td class="bold">TOTAL:</td><td class="right bold">CHF ${Number(inv.totalAmount).toFixed(2)}</td></tr></table>`);
-              if (index < fullSales.length - 1) {
-                printWindow.document.write(`<div class="page-break"></div>`);
-              }
-            });
-            printWindow.document.write(`</body></html>`);
+            printWindow.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Daily Invoices</title>
+  <style>
+    @page { margin: 0; }
+    body { font-family: 'Courier New', monospace; font-size: 11px; width: 300px; margin: 0 auto; color: #000; background: #fff; padding: 15px; line-height: 1.2; }
+    .center { text-align: center; }
+    .bold { font-weight: 800; }
+    .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
+    .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
+    .page-break { page-break-after: always; }
+  </style>
+</head>
+<body>
+  ${combinedHtml}
+</body>
+</html>`);
             printWindow.document.close();
-            printWindow.print();
+            setTimeout(() => {
+              printWindow.focus();
+              printWindow.print();
+            }, 500);
           }
         } else {
           Alert.alert(t("success"), `Sent ${fullSales.length} invoices to printer queue.`);
@@ -1998,10 +1968,10 @@ ${kitchenReceipt}
                   </View>
                 )}
 
-                <Text style={{ textAlign: "center", color: "#000", fontSize: 16, fontWeight: "800", marginTop: 4 }}>{storeSettings?.name || tenant?.name || "POS System"}</Text>
-                {storeSettings?.address && <Text style={{ textAlign: "center", color: "#333", fontSize: 10, marginTop: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.address}</Text>}
-                {storeSettings?.phone && <Text style={{ textAlign: "center", color: "#333", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.phone}</Text>}
-                {storeSettings?.email && <Text style={{ textAlign: "center", color: "#333", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.email}</Text>}
+                <Text style={{ textAlign: "center", color: "#000", fontSize: 18, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings?.name || tenant?.name || "POS System"}</Text>
+                {storeSettings?.address && <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.address}</Text>}
+                {storeSettings?.phone && <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.phone}</Text>}
+                {storeSettings?.email && <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.email}</Text>}
 
                 <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 6, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
 
@@ -2022,30 +1992,32 @@ ${kitchenReceipt}
 
                 <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"─".repeat(36)}</Text>
 
-                {lastSale?.items?.map((item: any, idx: number) => (
-                  <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 }}>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", flex: 2 }} numberOfLines={1}>{item.name}</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 40, textAlign: "center" }}>x{item.quantity}</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 65, textAlign: "right" }}>CHF {item.total.toFixed(2)}</Text>
-                  </View>
-                ))}
+                <View style={{ marginVertical: 4 }}>
+                  {lastSale?.items?.map((item: any, idx: number) => (
+                    <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                      <Text style={{ color: "#000", fontSize: 11, flex: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }} numberOfLines={1}>{item.productName || item.name}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, width: 40, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>x{item.quantity}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, width: 75, textAlign: "right", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(item.total || (item.unitPrice * item.quantity)).toFixed(2)}</Text>
+                    </View>
+                  ))}
+                </View>
 
                 <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 4, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
 
-                <View style={{ marginTop: 6 }}>
+                <View style={{ marginVertical: 4 }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                     <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("subtotal")}:</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {lastSale?.subtotal?.toFixed(2)}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(lastSale?.subtotal || lastSale?.totalAmount).toFixed(2)}</Text>
                   </View>
                   {(lastSale?.discount || 0) > 0 && (
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("discount")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>-CHF {lastSale?.discount?.toFixed(2)}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>-CHF {Number(lastSale?.discount).toFixed(2)}</Text>
                     </View>
                   )}
                   {(lastSale?.serviceFee || lastSale?.serviceFeeAmount || 0) > 0 && (
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("serviceTax" as any) || "Service Tax"}:</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("serviceTax")}:</Text>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(lastSale?.serviceFee || lastSale?.serviceFeeAmount).toFixed(2)}</Text>
                     </View>
                   )}
@@ -2060,14 +2032,14 @@ ${kitchenReceipt}
                     </View>
                   )}
 
-                  <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
+                  <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
 
                   <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
                     <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>TOTAL:</Text>
                     <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {lastSale?.total?.toFixed(2)}</Text>
                   </View>
 
-                  <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
+                  <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
 
                   <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2, marginTop: 4 }}>
                     <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("paymentMethod")}:</Text>
@@ -2089,14 +2061,12 @@ ${kitchenReceipt}
 
                 {qrDataUrl && Platform.OS === "web" && (
                   <View style={{ alignItems: "center", marginTop: 12 }}>
-                    <Image source={{ uri: qrDataUrl }} style={{ width: 80, height: 80 }} />
+                    <Image source={{ uri: qrDataUrl }} style={{ width: 90, height: 90, resizeMode: "contain" }} />
                   </View>
                 )}
 
                 <View style={{ alignItems: "center", marginTop: 14 }}>
-                  <Text style={{ color: "#000", fontSize: 13, fontWeight: "700", textAlign: "center" }}>{t("thankYou")}</Text>
-                  {storeSettings?.address && <Text style={{ color: "#555", fontSize: 10, textAlign: "center", marginTop: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("visitUs")}: {storeSettings.address}</Text>}
-                  <Text style={{ color: "#999", fontSize: 9, textAlign: "center", marginTop: 6, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("poweredBy")}</Text>
+                  <Text style={{ color: "#000", fontSize: 13, fontWeight: "700", textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("thankYou")}</Text>
                   <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 6, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
                 </View>
               </View>
@@ -2437,47 +2407,53 @@ ${kitchenReceipt}
           <View style={{ backgroundColor: Colors.surface, borderRadius: 16, width: "94%", maxWidth: 380, maxHeight: "90%", overflow: "hidden" }}>
             <ScrollView showsVerticalScrollIndicator={false}>
               {selectedInvoice && (
-                <View style={{ backgroundColor: "#FFFFFF", padding: 20, margin: 12, borderRadius: 4 }}>
+                <View style={{ padding: 20, backgroundColor: "#fff" }}>
                   <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
-
+                  
                   {storeSettings?.logo && (
                     <View style={{ alignItems: "center", marginVertical: 8 }}>
-                      <Image source={{ uri: storeSettings.logo.startsWith("http") || storeSettings.logo.startsWith("file://") || storeSettings.logo.startsWith("data:") ? storeSettings.logo : `${getApiUrl().replace(/\/$/, "")}${storeSettings.logo}` }} style={{ width: 50, height: 50, borderRadius: 6 }} resizeMode="contain" />
+                      <Image source={{ uri: storeSettings.logo.startsWith("http") || storeSettings.logo.startsWith("file://") || storeSettings.logo.startsWith("data:") ? storeSettings.logo : `${getApiUrl().replace(/\/$/, "")}${storeSettings.logo}` }} style={{ width: 150, height: 50, resizeMode: "contain" }} />
                     </View>
                   )}
 
-                  <Text style={{ textAlign: "center", color: "#000", fontSize: 16, fontWeight: "800", marginTop: 4 }}>{storeSettings?.name || tenant?.name || "POS System"}</Text>
-                  {storeSettings?.address && <Text style={{ textAlign: "center", color: "#333", fontSize: 10, marginTop: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.address}</Text>}
-                  {storeSettings?.phone && <Text style={{ textAlign: "center", color: "#333", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.phone}</Text>}
-
-                  <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 6, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
-
-                  <View style={{ marginVertical: 6 }}>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptDate")}: {new Date(selectedInvoice.createdAt || selectedInvoice.date).toLocaleDateString()}, {new Date(selectedInvoice.createdAt || selectedInvoice.date).toLocaleTimeString()}</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptNumber")}: {selectedInvoice.receiptNumber || `#${selectedInvoice.id} `}</Text>
-                  </View>
-
-                  <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"─".repeat(36)}</Text>
-
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6, marginBottom: 4 }}>
-                    <Text style={{ color: "#000", fontSize: 11, fontWeight: "700", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", flex: 2 }}>Item</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontWeight: "700", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 40, textAlign: "center" }}>Qty</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontWeight: "700", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 65, textAlign: "right" }}>Total</Text>
-                  </View>
-
-                  <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"─".repeat(36)}</Text>
-
-                  {selectedInvoice.items?.map((item: any, idx: number) => (
-                    <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 }}>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", flex: 2 }} numberOfLines={1}>{item.productName || item.name}</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 40, textAlign: "center" }}>x{item.quantity}</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 65, textAlign: "right" }}>CHF {Number(item.total || (item.unitPrice * item.quantity)).toFixed(2)}</Text>
-                    </View>
-                  ))}
-
+                  <Text style={{ color: "#000", fontSize: 18, fontWeight: "900", textAlign: "center", textTransform: "uppercase", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("viewReceipt" as any) || "RECHNUNG"}</Text>
+                  <Text style={{ color: "#000", fontSize: 14, fontWeight: "700", textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings?.name || tenant?.name || "POS System"}</Text>
+                  
+                  {storeSettings?.address && <Text style={{ color: "#000", fontSize: 11, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.address}</Text>}
+                  {storeSettings?.phone && <Text style={{ color: "#000", fontSize: 11, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.phone}</Text>}
+                  
                   <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 4, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
 
-                  <View style={{ marginTop: 6 }}>
+                  <View style={{ marginVertical: 4 }}>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptDate")}: {new Date(selectedInvoice.createdAt || selectedInvoice.date).toLocaleDateString("de-DE")}, {new Date(selectedInvoice.createdAt || selectedInvoice.date).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptNumber")}: {selectedInvoice.receiptNumber || `#${selectedInvoice.id}`}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("servedBy")}: {selectedInvoice.employeeName || selectedInvoice.employee?.name || "Cashier"}</Text>
+                    {selectedInvoice.customerName ? <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("customer")}: {selectedInvoice.customerName}</Text> : null}
+                  </View>
+
+                  <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
+
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                    <Text style={{ color: "#000", fontSize: 11, fontWeight: "800", flex: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Item</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontWeight: "800", width: 40, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Qty</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontWeight: "800", width: 75, textAlign: "right", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Total</Text>
+                  </View>
+
+                  <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginBottom: 4, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
+
+                  <View style={{ marginVertical: 4 }}>
+                    {selectedInvoice.items?.map((item: any, idx: number) => (
+                      <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                        <Text style={{ color: "#000", fontSize: 11, flex: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }} numberOfLines={1}>{item.productName || item.name}</Text>
+                        <Text style={{ color: "#000", fontSize: 11, width: 40, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>x{item.quantity}</Text>
+                        <Text style={{ color: "#000", fontSize: 11, width: 75, textAlign: "right", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(item.total || (item.unitPrice * item.quantity)).toFixed(2)}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
+
+                  <View style={{ marginVertical: 4 }}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("subtotal")}:</Text>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(selectedInvoice.subtotal || selectedInvoice.totalAmount).toFixed(2)}</Text>
@@ -2488,19 +2464,31 @@ ${kitchenReceipt}
                         <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>-CHF {Number(selectedInvoice.discount).toFixed(2)}</Text>
                       </View>
                     )}
+                    {(selectedInvoice.serviceFee || selectedInvoice.serviceFeeAmount || 0) > 0 && (
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                        <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("serviceTax")}:</Text>
+                        <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(selectedInvoice.serviceFee || selectedInvoice.serviceFeeAmount).toFixed(2)}</Text>
+                      </View>
+                    )}
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("tax")}:</Text>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(selectedInvoice.tax || 0).toFixed(2)}</Text>
                     </View>
+                    {(selectedInvoice.deliveryFee || 0) > 0 && (
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                        <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Delivery Fee:</Text>
+                        <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(selectedInvoice.deliveryFee).toFixed(2)}</Text>
+                      </View>
+                    )}
 
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
+                    <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
 
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
                       <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>TOTAL:</Text>
                       <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(selectedInvoice.totalAmount).toFixed(2)}</Text>
                     </View>
 
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
+                    <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
 
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2, marginTop: 4 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("paymentMethod")}:</Text>
@@ -2510,13 +2498,12 @@ ${kitchenReceipt}
 
                   {reprintQrDataUrl && Platform.OS === "web" && (
                     <View style={{ alignItems: "center", marginTop: 12 }}>
-                      <Image source={{ uri: reprintQrDataUrl }} style={{ width: 80, height: 80 }} />
+                      <Image source={{ uri: reprintQrDataUrl }} style={{ width: 90, height: 90, resizeMode: "contain" }} />
                     </View>
                   )}
 
                   <View style={{ alignItems: "center", marginTop: 14 }}>
-                    <Text style={{ color: "#000", fontSize: 13, fontWeight: "700", textAlign: "center" }}>{t("thankYou")}</Text>
-                    <Text style={{ color: "#999", fontSize: 9, textAlign: "center", marginTop: 6, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("poweredBy")}</Text>
+                    <Text style={{ color: "#000", fontSize: 13, fontWeight: "700", textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("thankYou")}</Text>
                     <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 6, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
                   </View>
                 </View>
