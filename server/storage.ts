@@ -726,7 +726,7 @@ export const storage = {
         const isRestaurant = tenant?.storeType === "restaurant";
 
         lowStockQuery = isRestaurant
-          ? db.select({ count: sql<number>`0` })
+          ? db.select({ count: sql<number>`cast(0 as integer)` }).from(branches).limit(1)
           : db.select({ count: sql<number>`count(*)` }).from(inventory).where(and(sql`quantity <= low_stock_threshold`, inArray(inventory.branchId, branchIds)));
 
         todaySalesQuery = db.select({

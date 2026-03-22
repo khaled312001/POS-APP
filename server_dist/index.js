@@ -1557,7 +1557,7 @@ var init_storage = __esm({
             productCountQuery = db.select({ count: sql`count(*)` }).from(products).where(and(eq(products.tenantId, tenantId), eq(products.isActive, true)));
             const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId));
             const isRestaurant = tenant?.storeType === "restaurant";
-            lowStockQuery = isRestaurant ? db.select({ count: sql`0` }) : db.select({ count: sql`count(*)` }).from(inventory).where(and(sql`quantity <= low_stock_threshold`, inArray2(inventory.branchId, branchIds)));
+            lowStockQuery = isRestaurant ? db.select({ count: sql`cast(0 as integer)` }).from(branches).limit(1) : db.select({ count: sql`count(*)` }).from(inventory).where(and(sql`quantity <= low_stock_threshold`, inArray2(inventory.branchId, branchIds)));
             todaySalesQuery = db.select({
               count: sql`count(*)`,
               total: sql`coalesce(sum(total_amount::numeric), 0)`
@@ -6625,13 +6625,18 @@ async function registerRoutes(app2) {
     }
   });
   app2.get("/objects/*objectPath", async (req, res) => {
+    const uploadsDir = path2.resolve(process.cwd(), "uploads");
+    const filename = req.path.replace(/^\/objects\//, "");
+    const localPath = path2.join(uploadsDir, filename);
+    if (fs3.existsSync(localPath)) {
+      return res.sendFile(localPath);
+    }
     const objectStorageService = new ObjectStorageService();
     try {
       const objectFile = await objectStorageService.getObjectEntityFile(req.path);
       objectStorageService.downloadObject(objectFile, res);
     } catch (error) {
-      if (error instanceof ObjectNotFoundError) return res.sendStatus(404);
-      return res.sendStatus(500);
+      return res.sendStatus(404);
     }
   });
   app2.post("/api/objects/upload", async (req, res) => {

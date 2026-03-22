@@ -1844,13 +1844,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Object Storage - Private file serving
   app.get("/objects/*objectPath", async (req, res) => {
+    // First try local uploads directory (fast path — no env vars needed)
+    const uploadsDir = path.resolve(process.cwd(), "uploads");
+    const filename = req.path.replace(/^\/objects\//, "");
+    const localPath = path.join(uploadsDir, filename);
+    if (fs.existsSync(localPath)) {
+      return res.sendFile(localPath);
+    }
+
+    // Fall back to object storage (GCS), return 404 on any failure
     const objectStorageService = new ObjectStorageService();
     try {
       const objectFile = await objectStorageService.getObjectEntityFile(req.path);
       objectStorageService.downloadObject(objectFile, res);
     } catch (error) {
-      if (error instanceof ObjectNotFoundError) return res.sendStatus(404);
-      return res.sendStatus(500);
+      // Any error here (missing config, not found, network) → 404
+      return res.sendStatus(404);
     }
   });
 
