@@ -691,6 +691,79 @@ function setupPaymentGatewayRoutes(app: express.Application) {
     log("Error ensuring platform tables:", err);
   }
 
+  // ── Schema auto-migration: ensure all required columns and tables exist ──
+  try {
+    const { pool } = await import("./db");
+    await pool.query(`
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS is_addon boolean NOT NULL DEFAULT false;
+
+      CREATE TABLE IF NOT EXISTS calls (
+        id serial PRIMARY KEY,
+        tenant_id integer NOT NULL,
+        caller_number varchar(50),
+        caller_name varchar(255),
+        status varchar(50) DEFAULT 'ringing',
+        started_at timestamp DEFAULT now(),
+        ended_at timestamp,
+        duration integer,
+        notes text,
+        customer_id integer,
+        created_at timestamp DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS vehicles (
+        id serial PRIMARY KEY,
+        tenant_id integer NOT NULL,
+        name varchar(255) NOT NULL,
+        plate varchar(100),
+        driver_name varchar(255),
+        is_active boolean DEFAULT true,
+        created_at timestamp DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS printer_configs (
+        id serial PRIMARY KEY,
+        tenant_id integer NOT NULL,
+        name varchar(255) NOT NULL,
+        type varchar(50) DEFAULT 'thermal',
+        connection_type varchar(50) DEFAULT 'usb',
+        address varchar(255),
+        port integer DEFAULT 9100,
+        is_default boolean DEFAULT false,
+        paper_width integer DEFAULT 80,
+        created_at timestamp DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS daily_closings (
+        id serial PRIMARY KEY,
+        tenant_id integer NOT NULL,
+        closing_date date NOT NULL,
+        total_sales numeric(12,2) DEFAULT 0,
+        total_orders integer DEFAULT 0,
+        cash_amount numeric(12,2) DEFAULT 0,
+        card_amount numeric(12,2) DEFAULT 0,
+        notes text,
+        closed_by integer,
+        created_at timestamp DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS monthly_closings (
+        id serial PRIMARY KEY,
+        tenant_id integer NOT NULL,
+        closing_month integer NOT NULL,
+        closing_year integer NOT NULL,
+        total_sales numeric(12,2) DEFAULT 0,
+        total_orders integer DEFAULT 0,
+        notes text,
+        closed_by integer,
+        created_at timestamp DEFAULT now()
+      );
+    `);
+    log("Schema migration complete");
+  } catch (err) {
+    log("Schema migration error (non-fatal):", err);
+  }
+
   try {
     const { storage } = await import("./storage");
     const adminEmail = "admin@barmagly.com";

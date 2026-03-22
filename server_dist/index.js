@@ -3854,11 +3854,7 @@ var CallerIDService = class extends EventEmitter {
     this.wss.clients.forEach((client2) => {
       if (client2.readyState === WebSocket.OPEN) {
         total++;
-<<<<<<< HEAD
         if (!tenantId || !client2.tenantId || client2.tenantId === tenantId) {
-=======
-        if (!tenantId || client2.tenantId === tenantId) {
->>>>>>> b7fb8dbb7febbd1d823c591b0c0a4d017fbee513
           matched++;
           client2.send(payload);
         }
@@ -5495,13 +5491,9 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/products", async (req, res) => {
     try {
-<<<<<<< HEAD
       const body = sanitizeDates(req.body);
       if (body.isAddon) body.price = "0";
       const p = await storage.createProduct(body);
-=======
-      const p = await storage.createProduct(sanitizeDates(req.body));
->>>>>>> b7fb8dbb7febbd1d823c591b0c0a4d017fbee513
       callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
       res.json(p);
     } catch (e) {
@@ -5510,13 +5502,9 @@ async function registerRoutes(app2) {
   });
   app2.put("/api/products/:id", async (req, res) => {
     try {
-<<<<<<< HEAD
       const body = sanitizeDates(req.body);
       if (body.isAddon) body.price = "0";
       const p = await storage.updateProduct(Number(req.params.id), body);
-=======
-      const p = await storage.updateProduct(Number(req.params.id), sanitizeDates(req.body));
->>>>>>> b7fb8dbb7febbd1d823c591b0c0a4d017fbee513
       callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
       res.json(p);
     } catch (e) {
@@ -8608,11 +8596,8 @@ var PUBLIC_ROUTES = [
   "/api/dashboard/subscriptions",
   "/api/caller-id/incoming",
   // Local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
-<<<<<<< HEAD
   "/api/caller-id/active-calls",
   // HTTP polling fallback — tenantId required in query string
-=======
->>>>>>> b7fb8dbb7febbd1d823c591b0c0a4d017fbee513
   "/api/push/vapid-public-key",
   // Public — needed for SW push subscription before auth
   "/api/push/subscribe"
@@ -9277,6 +9262,77 @@ function setupPaymentGatewayRoutes(app2) {
     log2("Platform tables ready");
   } catch (err) {
     log2("Error ensuring platform tables:", err);
+  }
+  try {
+    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    await pool2.query(`
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS is_addon boolean NOT NULL DEFAULT false;
+
+      CREATE TABLE IF NOT EXISTS calls (
+        id serial PRIMARY KEY,
+        tenant_id integer NOT NULL,
+        caller_number varchar(50),
+        caller_name varchar(255),
+        status varchar(50) DEFAULT 'ringing',
+        started_at timestamp DEFAULT now(),
+        ended_at timestamp,
+        duration integer,
+        notes text,
+        customer_id integer,
+        created_at timestamp DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS vehicles (
+        id serial PRIMARY KEY,
+        tenant_id integer NOT NULL,
+        name varchar(255) NOT NULL,
+        plate varchar(100),
+        driver_name varchar(255),
+        is_active boolean DEFAULT true,
+        created_at timestamp DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS printer_configs (
+        id serial PRIMARY KEY,
+        tenant_id integer NOT NULL,
+        name varchar(255) NOT NULL,
+        type varchar(50) DEFAULT 'thermal',
+        connection_type varchar(50) DEFAULT 'usb',
+        address varchar(255),
+        port integer DEFAULT 9100,
+        is_default boolean DEFAULT false,
+        paper_width integer DEFAULT 80,
+        created_at timestamp DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS daily_closings (
+        id serial PRIMARY KEY,
+        tenant_id integer NOT NULL,
+        closing_date date NOT NULL,
+        total_sales numeric(12,2) DEFAULT 0,
+        total_orders integer DEFAULT 0,
+        cash_amount numeric(12,2) DEFAULT 0,
+        card_amount numeric(12,2) DEFAULT 0,
+        notes text,
+        closed_by integer,
+        created_at timestamp DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS monthly_closings (
+        id serial PRIMARY KEY,
+        tenant_id integer NOT NULL,
+        closing_month integer NOT NULL,
+        closing_year integer NOT NULL,
+        total_sales numeric(12,2) DEFAULT 0,
+        total_orders integer DEFAULT 0,
+        notes text,
+        closed_by integer,
+        created_at timestamp DEFAULT now()
+      );
+    `);
+    log2("Schema migration complete");
+  } catch (err) {
+    log2("Schema migration error (non-fatal):", err);
   }
   try {
     const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
