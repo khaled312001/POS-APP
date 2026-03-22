@@ -1847,16 +1847,14 @@ export default function POSScreen() {
                       });
                     }
 
-                    // Standard POS grid (image 2 layout)
+                    // Standard POS grid — full TOPPING_GRID (image 2 layout)
                     return TOPPING_GRID.map((row, rowIdx) => (
                       <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 2 }}>
                         {row.items.map((toppingName, colIdx) => {
                           if (!toppingName) {
-                            return <View key={colIdx} style={{ flex: 1, height: 44, backgroundColor: row.color, opacity: 0.3 }} />;
+                            return <View key={colIdx} style={{ flex: 1, height: 54, backgroundColor: row.color, opacity: 0.25 }} />;
                           }
                           const isSelected = selectedToppings.includes(toppingName);
-                          const displayName = toppingDisplayName(toppingName);
-                          // Toppings are free — no price lookup needed
                           return (
                             <Pressable
                               key={toppingName}
@@ -1877,11 +1875,8 @@ export default function POSScreen() {
                               }}
                             >
                               <Text style={{ fontSize: isTablet ? 18 : 16, lineHeight: 20 }}>{toppingEmoji(toppingName)}</Text>
-                              <Text
-                                style={{ fontSize: isTablet ? 10 : 8, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 11 }}
-                                numberOfLines={2}
-                              >
-                                {displayName}
+                              <Text style={{ fontSize: isTablet ? 10 : 8, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 11 }} numberOfLines={2}>
+                                {toppingDisplayName(toppingName)}
                               </Text>
                               {isSelected && <Text style={{ fontSize: 8, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
                             </Pressable>
