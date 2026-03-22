@@ -4294,12 +4294,25 @@ async function cleanupProcesses() {
       execSync(`wmic process where "name='chromium.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: "ignore" });
     } else {
       execSync(
-        `pkill -9 -f 'wppconnect' 2>/dev/null; pkill -9 -f 'chromium.*barmagly' 2>/dev/null; true`,
+        `pkill -9 -f 'wppconnect' 2>/dev/null; pkill -9 -f 'chromium' 2>/dev/null; true`,
         { timeout: 4e3 }
       );
     }
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 800));
   } catch {
+  }
+  const lockFiles = [
+    path.join(CHROME_DATA_DIR, "SingletonLock"),
+    path.join(CHROME_DATA_DIR, "SingletonCookie"),
+    path.join(CHROME_DATA_DIR, "SingletonSocket"),
+    path.join(CHROME_DATA_DIR, "Default", "Cookies-journal"),
+    path.join(CHROME_DATA_DIR, "Default", "Web Data-journal")
+  ];
+  for (const f of lockFiles) {
+    try {
+      if (fs2.existsSync(f)) fs2.unlinkSync(f);
+    } catch {
+    }
   }
   if (!fs2.existsSync(STORAGE_DIR)) {
     fs2.mkdirSync(STORAGE_DIR, { recursive: true });

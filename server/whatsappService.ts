@@ -89,7 +89,7 @@ function toChatId(phone: string): string {
 }
 
 async function cleanupProcesses() {
-    // Attempt robust cleanup on both Windows and Linux to prevent dangling browser locks
+    // Kill any lingering Chromium processes
     try {
         const { execSync } = await import("child_process");
         const isWindows = os.platform() === 'win32';
@@ -98,15 +98,25 @@ async function cleanupProcesses() {
             execSync(`wmic process where "name='chromium.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: 'ignore' });
         } else {
             execSync(
-                `pkill -9 -f 'wppconnect' 2>/dev/null; pkill -9 -f 'chromium.*barmagly' 2>/dev/null; true`,
+                `pkill -9 -f 'wppconnect' 2>/dev/null; pkill -9 -f 'chromium' 2>/dev/null; true`,
                 { timeout: 4000 }
             );
         }
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 800));
     } catch { }
 
-    // We don't wipe the whole /tmp anymore to preserve session data.
-    // Instead, we just ensure the STORAGE_DIR exists.
+    // Always wipe ALL Chromium lock files so a stale profile never blocks launch
+    const lockFiles = [
+        path.join(CHROME_DATA_DIR, "SingletonLock"),
+        path.join(CHROME_DATA_DIR, "SingletonCookie"),
+        path.join(CHROME_DATA_DIR, "SingletonSocket"),
+        path.join(CHROME_DATA_DIR, "Default", "Cookies-journal"),
+        path.join(CHROME_DATA_DIR, "Default", "Web Data-journal"),
+    ];
+    for (const f of lockFiles) {
+        try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch { }
+    }
+
     if (!fs.existsSync(STORAGE_DIR)) {
         fs.mkdirSync(STORAGE_DIR, { recursive: true });
     }
