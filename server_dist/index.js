@@ -9265,71 +9265,117 @@ function setupPaymentGatewayRoutes(app2) {
   }
   try {
     const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    await pool2.query(`
-      ALTER TABLE products ADD COLUMN IF NOT EXISTS is_addon boolean NOT NULL DEFAULT false;
-
-      CREATE TABLE IF NOT EXISTS calls (
-        id serial PRIMARY KEY,
-        tenant_id integer NOT NULL,
-        caller_number varchar(50),
-        caller_name varchar(255),
-        status varchar(50) DEFAULT 'ringing',
-        started_at timestamp DEFAULT now(),
-        ended_at timestamp,
-        duration integer,
-        notes text,
-        customer_id integer,
-        created_at timestamp DEFAULT now()
-      );
-
-      CREATE TABLE IF NOT EXISTS vehicles (
-        id serial PRIMARY KEY,
-        tenant_id integer NOT NULL,
-        name varchar(255) NOT NULL,
-        plate varchar(100),
-        driver_name varchar(255),
-        is_active boolean DEFAULT true,
-        created_at timestamp DEFAULT now()
-      );
-
-      CREATE TABLE IF NOT EXISTS printer_configs (
-        id serial PRIMARY KEY,
-        tenant_id integer NOT NULL,
-        name varchar(255) NOT NULL,
-        type varchar(50) DEFAULT 'thermal',
-        connection_type varchar(50) DEFAULT 'usb',
-        address varchar(255),
-        port integer DEFAULT 9100,
-        is_default boolean DEFAULT false,
-        paper_width integer DEFAULT 80,
-        created_at timestamp DEFAULT now()
-      );
-
-      CREATE TABLE IF NOT EXISTS daily_closings (
-        id serial PRIMARY KEY,
-        tenant_id integer NOT NULL,
-        closing_date date NOT NULL,
-        total_sales numeric(12,2) DEFAULT 0,
-        total_orders integer DEFAULT 0,
-        cash_amount numeric(12,2) DEFAULT 0,
-        card_amount numeric(12,2) DEFAULT 0,
-        notes text,
-        closed_by integer,
-        created_at timestamp DEFAULT now()
-      );
-
-      CREATE TABLE IF NOT EXISTS monthly_closings (
-        id serial PRIMARY KEY,
-        tenant_id integer NOT NULL,
-        closing_month integer NOT NULL,
-        closing_year integer NOT NULL,
-        total_sales numeric(12,2) DEFAULT 0,
-        total_orders integer DEFAULT 0,
-        notes text,
-        closed_by integer,
-        created_at timestamp DEFAULT now()
-      );
-    `);
+    await pool2.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_addon boolean NOT NULL DEFAULT false;`);
+    const callsCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='calls'`);
+    const callsHasPhone = callsCols.rows.some((r) => r.column_name === "phone_number");
+    if (!callsHasPhone) {
+      await pool2.query(`DROP TABLE IF EXISTS calls CASCADE;`);
+      await pool2.query(`
+        CREATE TABLE calls (
+          id serial PRIMARY KEY,
+          tenant_id integer REFERENCES tenants(id) ON DELETE CASCADE,
+          branch_id integer REFERENCES branches(id) ON DELETE CASCADE,
+          phone_number text NOT NULL DEFAULT '',
+          customer_id integer REFERENCES customers(id) ON DELETE SET NULL,
+          status text NOT NULL DEFAULT 'missed',
+          sale_id integer REFERENCES sales(id) ON DELETE SET NULL,
+          created_at timestamp DEFAULT now()
+        );
+      `);
+    }
+    const vehiclesCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='vehicles'`);
+    const vehiclesHasPlate = vehiclesCols.rows.some((r) => r.column_name === "license_plate");
+    if (!vehiclesHasPlate) {
+      await pool2.query(`DROP TABLE IF EXISTS vehicles CASCADE;`);
+      await pool2.query(`
+        CREATE TABLE vehicles (
+          id serial PRIMARY KEY,
+          tenant_id integer REFERENCES tenants(id) ON DELETE CASCADE,
+          branch_id integer REFERENCES branches(id) ON DELETE CASCADE,
+          license_plate text NOT NULL DEFAULT '',
+          make text,
+          model text,
+          color text,
+          driver_name text,
+          driver_phone text,
+          is_active boolean DEFAULT true,
+          notes text,
+          created_at timestamp DEFAULT now()
+        );
+      `);
+    }
+    const printerCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='printer_configs'`);
+    const printerHasReceiptType = printerCols.rows.some((r) => r.column_name === "receipt_type");
+    if (!printerHasReceiptType) {
+      await pool2.query(`DROP TABLE IF EXISTS printer_configs CASCADE;`);
+      await pool2.query(`
+        CREATE TABLE printer_configs (
+          id serial PRIMARY KEY,
+          tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+          branch_id integer REFERENCES branches(id) ON DELETE CASCADE,
+          receipt_type text NOT NULL DEFAULT 'check_out',
+          printer_1 text,
+          printer_1_copy boolean DEFAULT false,
+          printer_2 text,
+          printer_2_copy boolean DEFAULT false,
+          paper_size text DEFAULT '80mm',
+          is_active boolean DEFAULT true,
+          updated_at timestamp DEFAULT now()
+        );
+      `);
+    }
+    const dailyCols = await pool2.query(`SELECT column_name, data_type FROM information_schema.columns WHERE table_name='daily_closings'`);
+    const dailyHasBranchId = dailyCols.rows.some((r) => r.column_name === "branch_id");
+    if (!dailyHasBranchId) {
+      await pool2.query(`DROP TABLE IF EXISTS daily_closings CASCADE;`);
+      await pool2.query(`
+        CREATE TABLE daily_closings (
+          id serial PRIMARY KEY,
+          tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+          branch_id integer REFERENCES branches(id) ON DELETE CASCADE,
+          employee_id integer REFERENCES employees(id) ON DELETE CASCADE,
+          closing_date text NOT NULL DEFAULT '',
+          total_sales numeric(12,2) DEFAULT 0,
+          total_cash numeric(12,2) DEFAULT 0,
+          total_card numeric(12,2) DEFAULT 0,
+          total_mobile numeric(12,2) DEFAULT 0,
+          total_transactions integer DEFAULT 0,
+          total_returns numeric(12,2) DEFAULT 0,
+          total_discounts numeric(12,2) DEFAULT 0,
+          opening_cash numeric(12,2) DEFAULT 0,
+          closing_cash numeric(12,2) DEFAULT 0,
+          notes text,
+          status text DEFAULT 'closed',
+          created_at timestamp DEFAULT now()
+        );
+      `);
+    }
+    const monthlyCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='monthly_closings'`);
+    const monthlyHasBranchId = monthlyCols.rows.some((r) => r.column_name === "branch_id");
+    if (!monthlyHasBranchId) {
+      await pool2.query(`DROP TABLE IF EXISTS monthly_closings CASCADE;`);
+      await pool2.query(`
+        CREATE TABLE monthly_closings (
+          id serial PRIMARY KEY,
+          tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+          branch_id integer REFERENCES branches(id) ON DELETE CASCADE,
+          employee_id integer REFERENCES employees(id) ON DELETE CASCADE,
+          closing_month text NOT NULL DEFAULT '',
+          total_sales numeric(12,2) DEFAULT 0,
+          total_cash numeric(12,2) DEFAULT 0,
+          total_card numeric(12,2) DEFAULT 0,
+          total_mobile numeric(12,2) DEFAULT 0,
+          total_transactions integer DEFAULT 0,
+          total_returns numeric(12,2) DEFAULT 0,
+          total_discounts numeric(12,2) DEFAULT 0,
+          total_expenses numeric(12,2) DEFAULT 0,
+          net_revenue numeric(12,2) DEFAULT 0,
+          notes text,
+          status text DEFAULT 'closed',
+          created_at timestamp DEFAULT now()
+        );
+      `);
+    }
     log2("Schema migration complete");
   } catch (err) {
     log2("Schema migration error (non-fatal):", err);
