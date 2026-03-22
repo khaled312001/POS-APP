@@ -432,7 +432,7 @@ export default function SettingsScreen() {
 
   const pickStoreLogo = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images' as ImagePicker.MediaType,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
@@ -442,38 +442,30 @@ export default function SettingsScreen() {
     }
   };
 
-  const blobToBase64 = (blob: Blob): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-
-  const uploadStoreLogo = async (uri: string): Promise<string | null> => {
+  const uriToDataUri = async (uri: string): Promise<string | null> => {
     try {
-      setStoreLogoUploading(true);
       const response = await fetch(uri);
       const blob = await response.blob();
-      const imageData = await blobToBase64(blob);
-      const uploadRes = await apiRequest("POST", "/api/objects/upload", {
-        imageData,
-        contentType: blob.type || "image/jpeg",
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
       });
-      const { objectPath } = await uploadRes.json();
-      return objectPath;
     } catch (e) {
-      console.error("Logo upload failed:", e);
+      console.error("Image conversion failed:", e);
       return null;
-    } finally {
-      setStoreLogoUploading(false);
     }
   };
 
   const handleSaveStoreSettings = async () => {
     let logoPath = storeSettings?.logo || null;
-    if (storeLogo && !storeLogo.startsWith("/objects")) {
-      logoPath = await uploadStoreLogo(storeLogo);
+    if (storeLogo && !storeLogo.startsWith("/objects") && !storeLogo.startsWith("data:")) {
+      setStoreLogoUploading(true);
+      logoPath = await uriToDataUri(storeLogo);
+      setStoreLogoUploading(false);
+    } else if (storeLogo && storeLogo.startsWith("data:")) {
+      logoPath = storeLogo;
     }
     updateStoreSettingsMutation.mutate({
       name: storeForm.name || undefined,
