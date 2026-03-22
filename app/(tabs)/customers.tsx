@@ -13,13 +13,13 @@ import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { useLicense } from "@/lib/license-context";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 200;
 
 export default function CustomersScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const { canManage, canDeleteCustomers } = useAuth();
-  const { t, isRTL, rtlTextAlign, rtlText } = useLanguage();
+  const { t, isRTL, rtlTextAlign, rtlText, language } = useLanguage();
   const { tenant } = useLicense();
 
   // Search state — raw (shown in input) + debounced (sent to API)
@@ -33,12 +33,13 @@ export default function CustomersScreen() {
   const [hasMore, setHasMore] = useState(true);
   const loadingMore = useRef(false);
 
-  // Modals
-  const [showForm, setShowForm] = useState(false);
-  const [editCustomer, setEditCustomer] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", notes: "" });
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [showDetail, setShowDetail] = useState(false);
+  // Total count query
+  const { data: countData } = useQuery<{ count: number }>({
+    queryKey: ["/api/customers/count", `?tenantId=${tenant?.id || ""}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenant?.id,
+  });
+  const totalCount = countData?.count ?? 0;
 
   const handleSearchChange = useCallback((text: string) => {
     setSearch(text);
@@ -137,7 +138,12 @@ export default function CustomersScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
       <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid]} style={[styles.header, isRTL && { flexDirection: "row-reverse" }]}>
-        <Text style={[styles.headerTitle, rtlTextAlign]}>{t("customers")}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Text style={[styles.headerTitle, rtlTextAlign]}>{t("customers")}</Text>
+          <View style={{ backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
+            <Text style={{ color: Colors.white, fontSize: 13, fontWeight: "800" }}>{totalCount} {t("total" as any) || "Total"}</Text>
+          </View>
+        </View>
         <Pressable style={styles.addBtn} onPress={() => { setEditCustomer(null); setForm({ name: "", email: "", phone: "", address: "", notes: "" }); setShowForm(true); }}>
           <Ionicons name="add" size={24} color={Colors.white} />
         </Pressable>
@@ -155,8 +161,10 @@ export default function CustomersScreen() {
           />
           {isFetching && <ActivityIndicator size="small" color={Colors.textMuted} style={{ marginLeft: 6 }} />}
         </View>
-        {allCustomers.length > 0 && (
-          <Text style={styles.countText}>{allCustomers.length}{hasMore ? "+" : ""}</Text>
+        {totalCount > 0 && (
+          <Text style={styles.countText}>
+            {allCustomers.length}/{totalCount}
+          </Text>
         )}
       </View>
 

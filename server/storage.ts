@@ -768,7 +768,7 @@ export const storage = {
         recentSalesQuery = db.select().from(sales).where(inArray(sales.branchId, branchIds)).orderBy(desc(sales.createdAt)).limit(5);
 
         profitRowQuery = db.select({
-          totalCost: sql<string>`coalesce(sum(p.cost_price::numeric * si.quantity), 0)`,
+          totalCost: sql<string>`coalesce(sum(${products.costPrice}::numeric * ${saleItems.quantity}), 0)`,
         }).from(saleItems)
           .innerJoin(products, eq(saleItems.productId, products.id))
           .innerJoin(sales, eq(saleItems.saleId, sales.id))
@@ -818,8 +818,9 @@ export const storage = {
       recentSalesQuery = db.select().from(sales).orderBy(desc(sales.createdAt)).limit(5);
 
       profitRowQuery = db.select({
-        totalCost: sql<string>`coalesce(sum(p.cost_price::numeric * si.quantity), 0)`,
-      }).from(sql`sale_items si join products p on si.product_id = p.id`);
+        totalCost: sql<string>`coalesce(sum(${products.costPrice}::numeric * ${saleItems.quantity}), 0)`,
+      }).from(saleItems)
+        .innerJoin(products, eq(saleItems.productId, products.id));
     }
 
     const [salesCount] = await salesCountQuery;

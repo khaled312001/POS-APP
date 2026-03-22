@@ -80,7 +80,63 @@ export default function OnlineOrdersScreen() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const knownOrderIds = useRef<Set<number>>(new Set());
 
+  // Configuration States
+  const [configuringProduct, setConfiguringProduct] = useState<any>(null);
+  const [configuringItemIndex, setConfiguringItemIndex] = useState<number | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [selectedToppings, setSelectedToppings] = useState<string[]>([]);
+  const [showToppingsStep, setShowToppingsStep] = useState(false);
+
   const isRTL = language === "ar";
+
+  const PIZZA_TOPPINGS: { name: string; icon: string; category: string }[] = [
+    { name: "Tomatoes", icon: "🍅", category: "Vegetables" },
+    { name: "Sliced tomatoes", icon: "🍅", category: "Vegetables" },
+    { name: "Garlic", icon: "🧄", category: "Vegetables" },
+    { name: "Onions", icon: "🧅", category: "Vegetables" },
+    { name: "Capers", icon: "🌿", category: "Vegetables" },
+    { name: "Olives", icon: "🫒", category: "Vegetables" },
+    { name: "Oregano", icon: "🌿", category: "Vegetables" },
+    { name: "Vegetables", icon: "🥦", category: "Vegetables" },
+    { name: "Spinach", icon: "🥬", category: "Vegetables" },
+    { name: "Pepperoni", icon: "🍕", category: "Meat" },
+    { name: "Corn", icon: "🌽", category: "Vegetables" },
+    { name: "Broccoli", icon: "🥦", category: "Vegetables" },
+    { name: "Artichokes", icon: "🌿", category: "Vegetables" },
+    { name: "Arugula", icon: "🥬", category: "Vegetables" },
+    { name: "Pineapple", icon: "🍍", category: "Others" },
+    { name: "Mushrooms", icon: "🍄", category: "Vegetables" },
+    { name: "Ham", icon: "🥩", category: "Meat" },
+    { name: "Spicy salami", icon: "🌶️", category: "Meat" },
+    { name: "Salami", icon: "🥩", category: "Meat" },
+    { name: "Bacon", icon: "🥓", category: "Meat" },
+    { name: "Prosciutto", icon: "🥩", category: "Meat" },
+    { name: "Lamb", icon: "🥩", category: "Meat" },
+    { name: "Chicken", icon: "🍗", category: "Meat" },
+    { name: "Kebab", icon: "🥙", category: "Meat" },
+    { name: "Minced Meat", icon: "🥩", category: "Meat" },
+    { name: "Mayonnaise", icon: "🫙", category: "Sauces" },
+    { name: "Anchovies", icon: "🐟", category: "Seafood" },
+    { name: "Shrimp", icon: "🍤", category: "Seafood" },
+    { name: "Tuna", icon: "🐟", category: "Seafood" },
+    { name: "Ketchup", icon: "🫙", category: "Sauces" },
+    { name: "Mozzarella", icon: "🧀", category: "Cheese" },
+    { name: "Gorgonzola", icon: "🧀", category: "Cheese" },
+    { name: "Parmesan", icon: "🧀", category: "Cheese" },
+    { name: "Mascarpone", icon: "🧀", category: "Cheese" },
+    { name: "Kaeserand", icon: "🧀", category: "Cheese" },
+    { name: "Cocktail Sauce", icon: "🫙", category: "Sauces" },
+    { name: "Spicy Sauce", icon: "🌶️", category: "Sauces" },
+    { name: "Yogurt Sauce", icon: "🫙", category: "Sauces" },
+    { name: "Bell Peppers", icon: "🫑", category: "Vegetables" },
+  ];
+
+  const isPizzaProduct = useCallback((product: any) => {
+    if (!product) return false;
+    const name = (product.name || "").toLowerCase();
+    const catName = (product.categoryName || "").toLowerCase();
+    return name.includes("pizza") || catName.includes("pizza");
+  }, []);
 
   const { data: orders = [], refetch } = useQuery<any[]>({
     queryKey: ["/api/online-orders", tenantId ? `?tenantId=${tenantId}` : ""],
@@ -94,6 +150,9 @@ export default function OnlineOrdersScreen() {
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });
+
+  // Categories helper
+  const categories = allProducts ? Array.from(new Set(allProducts.map((p: any) => p.categoryName || "Other"))) : [];
 
   // Detect new orders and play sound
   useEffect(() => {
@@ -230,8 +289,19 @@ export default function OnlineOrdersScreen() {
   };
 
   const addItemToOrder = (prod: any) => {
+    // If product is pizza or has modifiers, configure it first
+    if (isPizzaProduct(prod) || (prod.modifiers && prod.modifiers.length > 0) || (prod.variants && prod.variants.length > 0)) {
+      setConfiguringProduct(prod);
+      setConfiguringItemIndex(null);
+      setSelectedVariant(null);
+      setSelectedToppings([]);
+      setShowToppingsStep(false);
+      setShowProductPicker(false);
+      return;
+    }
+
     setEditForm(prev => {
-      const existingIdx = prev.items.findIndex(i => i.productId === prod.id);
+      const existingIdx = prev.items.findIndex(i => i.productId === prod.id && (!i.notes || i.notes === ""));
       let nextItems = [...prev.items];
       if (existingIdx > -1) {
         const it = nextItems[existingIdx];
@@ -255,6 +325,26 @@ export default function OnlineOrdersScreen() {
       };
     });
     setShowProductPicker(false);
+  };
+
+  const editItemAddons = (index: number) => {
+    const item = editForm.items[index];
+    const fullProduct = allProducts.find((p: any) => p.id === item.productId);
+    if (!fullProduct) return;
+
+    setConfiguringProduct(fullProduct);
+    setConfiguringItemIndex(index);
+
+    // Parse existing addons from name "Product [Addon1, Addon2]"
+    const nameStr = item.name || "";
+    const match = nameStr.match(/\[(.*)\]/);
+    if (match && match[1]) {
+      setSelectedToppings(match[1].split(", ").map((t: string) => t.trim()));
+    } else {
+      setSelectedToppings([]);
+    }
+
+    setShowToppingsStep(true);
   };
 
   const saveEditOrder = async () => {
@@ -450,7 +540,7 @@ export default function OnlineOrdersScreen() {
                 { label: editLabel("Address", "العنوان", "Adresse"), key: "customerAddress", placeholder: "Street, City" },
                 { label: editLabel("Estimated Time (min)", "وقت التوصيل (دقيقة)", "Geschätzte Zeit (Min)"), key: "estimatedTime", placeholder: "30" },
                 { label: editLabel("Notes", "ملاحظات", "Notizen"), key: "notes", placeholder: "..." },
-              ].map(f => (
+              ].map((f: any) => (
                 <View key={f.key} style={styles.editField}>
                   <Text style={[styles.editLabel, isRTL && { textAlign: "right" }]}>{f.label}</Text>
                   <TextInput
@@ -484,7 +574,13 @@ export default function OnlineOrdersScreen() {
                   <View key={idx} style={[styles.editItemRow, isRTL && { flexDirection: "row-reverse" }]}>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.editItemName, isRTL && { textAlign: "right" }]}>{it.name}</Text>
-                      <Text style={[styles.editItemPrice, isRTL && { textAlign: "right" }]}>CHF {Number(it.unitPrice).toFixed(2)}</Text>
+                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+                        <Text style={[styles.editItemPrice, isRTL && { textAlign: "right" }]}>CHF {Number(it.unitPrice).toFixed(2)}</Text>
+                        <Pressable onPress={() => editItemAddons(idx)} style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.accent + "15", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
+                          <Ionicons name="options-outline" size={12} color={Colors.accent} />
+                          <Text style={{ fontSize: 10, color: Colors.accent, fontWeight: "700" }}>{editLabel("Edit Addons", "تعديل الإضافات", "Extras bearbeiten")}</Text>
+                        </Pressable>
+                      </View>
                     </View>
                     <View style={[styles.qtyControl, isRTL && { flexDirection: "row-reverse" }]}>
                       <Pressable onPress={() => updateItemQty(idx, -1)} style={styles.qtyBtn}>
@@ -533,6 +629,186 @@ export default function OnlineOrdersScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      <Modal visible={!!configuringProduct} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxWidth: 700, padding: 24, maxHeight: "92%" }]}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalTitle, { fontSize: 22, fontWeight: "900" }]}>{configuringProduct?.name}</Text>
+                <Text style={{ fontSize: 13, color: Colors.textMuted, marginTop: 2 }}>
+                  {showToppingsStep ? (language === "ar" ? "اختر الإضافات" : language === "de" ? "Extras wählen" : "Select Extras") : (editLabel("Select Size", "اختر الحجم", "Größe wählen"))}
+                </Text>
+              </View>
+              <Pressable onPress={() => { setConfiguringProduct(null); setConfiguringItemIndex(null); }} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color={Colors.textMuted} />
+              </Pressable>
+            </View>
+
+            {!showToppingsStep ? (
+              /* SIZE SELECTION */
+              <ScrollView style={{ marginTop: 15 }} showsVerticalScrollIndicator={false}>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                  {configuringProduct?.variants?.map((v: any, idx: number) => (
+                    <Pressable
+                      key={idx}
+                      style={[styles.statusTab, { flex: 1, minWidth: 140, paddingVertical: 15 }, selectedVariant?.name === v.name && styles.statusTabActive]}
+                      onPress={() => {
+                        if (isPizzaProduct(configuringProduct)) {
+                          setSelectedVariant(v);
+                          setSelectedToppings([]);
+                          setShowToppingsStep(true);
+                        } else {
+                          // Standard variant pick
+                          const variantName = configuringProduct.name + (v.name ? ` (${v.name})` : "");
+                          if (configuringItemIndex !== null) {
+                            setEditForm(prev => {
+                              const nextItems = [...prev.items];
+                              nextItems[configuringItemIndex] = {
+                                ...nextItems[configuringItemIndex],
+                                name: variantName,
+                                unitPrice: Number(v.price),
+                                total: Number(v.price) * nextItems[configuringItemIndex].quantity
+                              };
+                              const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
+                              return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
+                            });
+                          } else {
+                            setEditForm(prev => {
+                              const nextItems = [...prev.items, {
+                                productId: configuringProduct.id,
+                                name: variantName,
+                                quantity: 1,
+                                unitPrice: Number(v.price),
+                                total: Number(v.price),
+                              }];
+                              const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
+                              return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
+                            });
+                          }
+                          setConfiguringProduct(null);
+                        }
+                      }}
+                    >
+                      <Text style={[styles.statusTabText, selectedVariant?.name === v.name && styles.statusTabTextActive]}>{v.name}</Text>
+                      <Text style={[styles.statusTabText, { opacity: 0.8, fontSize: 13 }, selectedVariant?.name === v.name && styles.statusTabTextActive]}>CHF {Number(v.price).toFixed(2)}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            ) : (
+              /* TOPPINGS GRID */
+              <ScrollView style={{ marginTop: 10 }} showsVerticalScrollIndicator={false}>
+                <View style={{ backgroundColor: Colors.accent + "15", padding: 12, borderRadius: 10, marginBottom: 15, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="pizza" size={20} color={Colors.accent} />
+                  <Text style={{ color: Colors.accent, fontWeight: "700", fontSize: 15 }}>
+                    {selectedVariant?.name || configuringProduct?.name} — CHF {Number(selectedVariant?.price || configuringProduct?.price).toFixed(2)}
+                  </Text>
+                </View>
+
+                {(() => {
+                  const extrasGroup = configuringProduct?.modifiers?.find((m: any) => !m.required && m.options?.length > 0);
+                  const toppingOptions = extrasGroup
+                    ? extrasGroup.options.map((o: any) => ({
+                      name: o.label,
+                      price: Number(o.price || 0),
+                      icon: (PIZZA_TOPPINGS.find(pt => pt.name === o.label)?.icon || "✨"),
+                      category: (PIZZA_TOPPINGS.find(pt => pt.name === o.label)?.category || "Others")
+                    }))
+                    : PIZZA_TOPPINGS.map((t) => ({ name: t.name, price: 0, icon: t.icon, category: t.category }));
+
+                  const displayCats = ["Cheese", "Meat", "Vegetables", "Seafood", "Sauces", "Others"];
+
+                  return displayCats.map((cat: string) => {
+                    const catToppings = toppingOptions.filter((t: any) => t.category === cat);
+                    if (catToppings.length === 0) return null;
+
+                    const catLabel = cat === "Cheese" ? (language === "ar" ? "أجبان" : "Käse") :
+                      cat === "Meat" ? (language === "ar" ? "لحوم" : "Fleisch") :
+                        cat === "Vegetables" ? (language === "ar" ? "خضروات" : "Gemüse") :
+                          cat === "Seafood" ? (language === "ar" ? "مأكولات بحرية" : "Meeresfrüchte") :
+                            cat === "Sauces" ? (language === "ar" ? "صوصات" : "Saucen") :
+                              (language === "ar" ? "أخرى" : "Sonstiges");
+
+                    return (
+                      <View key={cat} style={{ marginBottom: 18 }}>
+                        <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.accent, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>{catLabel}</Text>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                          {catToppings.map((topping: any) => {
+                            const isSelected = selectedToppings.includes(topping.name);
+                            return (
+                              <Pressable
+                                key={topping.name}
+                                onPress={() => setSelectedToppings((prev: string[]) => isSelected ? prev.filter(t => t !== topping.name) : [...prev, topping.name])}
+                                style={[{ padding: 8, borderRadius: 10, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.cardBorder, width: "23%", alignItems: "center", gap: 2 }, isSelected && { borderColor: Colors.accent, backgroundColor: Colors.accent + "15" }]}
+                              >
+                                <Text style={{ fontSize: 24 }}>{topping.icon}</Text>
+                                <Text style={[{ fontSize: 10, color: Colors.text, textAlign: "center", fontWeight: "600" }, isSelected && { color: Colors.accent }]} numberOfLines={1}>{topping.name}</Text>
+                                {isSelected && (
+                                  <View style={{ position: "absolute", top: 4, right: 4, width: 14, height: 14, borderRadius: 7, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" }}>
+                                    <Ionicons name="checkmark" size={10} color="#000" />
+                                  </View>
+                                )}
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    );
+                  });
+                })()}
+
+                <View style={{ gap: 10, marginTop: 10 }}>
+                  <Pressable
+                    style={{ borderRadius: 12, overflow: "hidden" }}
+                    onPress={() => {
+                      const baseName = (selectedVariant?.name ? `${configuringProduct.name} (${selectedVariant.name})` : configuringProduct.name);
+                      const toppingsSuffix = selectedToppings.length > 0 ? ` [${selectedToppings.join(", ")}]` : "";
+                      const finalName = baseName + toppingsSuffix;
+                      const finalUnitPrice = Number(selectedVariant?.price || configuringProduct.price);
+
+                      if (configuringItemIndex !== null) {
+                        setEditForm(prev => {
+                          const nextItems = [...prev.items];
+                          nextItems[configuringItemIndex] = {
+                            ...nextItems[configuringItemIndex],
+                            name: finalName,
+                            unitPrice: finalUnitPrice,
+                            total: finalUnitPrice * nextItems[configuringItemIndex].quantity
+                          };
+                          const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
+                          return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
+                        });
+                      } else {
+                        setEditForm(prev => {
+                          const nextItems = [...prev.items, {
+                            productId: configuringProduct.id,
+                            name: finalName,
+                            quantity: 1,
+                            unitPrice: finalUnitPrice,
+                            total: finalUnitPrice,
+                          }];
+                          const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
+                          return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
+                        });
+                      }
+                      setConfiguringProduct(null);
+                      setConfiguringItemIndex(null);
+                    }}
+                  >
+                    <LinearGradient colors={[Colors.accent, "#00A3A0"]} style={{ paddingVertical: 14, alignItems: "center" }}>
+                      <Text style={{ color: "#000", fontSize: 16, fontWeight: "800" }}>{editLabel("Apply Options", "تطبيق الخيارات", "Optionen anwenden")}</Text>
+                    </LinearGradient>
+                  </Pressable>
+                  <Pressable onPress={() => setShowToppingsStep(false)} style={{ paddingVertical: 8 }}>
+                    <Text style={{ color: Colors.textMuted, textAlign: "center", fontSize: 13 }}>{editLabel("← Back", "← العودة", "← Zurück")}</Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* Product Picker Modal */}
       <Modal visible={showProductPicker} animationType="fade" transparent onRequestClose={() => setShowProductPicker(false)}>
         <View style={styles.pickerOverlay}>
@@ -552,7 +828,14 @@ export default function OnlineOrdersScreen() {
                     <Text style={[styles.customerName, isRTL && { textAlign: "right" }]}>{p.name}</Text>
                     <Text style={[styles.customerSub, isRTL && { textAlign: "right" }]}>{p.categoryName || ""}</Text>
                   </View>
-                  <Text style={styles.orderAmount}>CHF {Number(p.price).toFixed(2)}</Text>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={styles.orderAmount}>CHF {Number(p.price).toFixed(2)}</Text>
+                    {(p.modifiers?.length > 0 || p.variants?.length > 0 || isPizzaProduct(p)) && (
+                      <View style={{ backgroundColor: Colors.accent + "15", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginTop: 4 }}>
+                        <Text style={{ fontSize: 9, color: Colors.accent, fontWeight: "700" }}>{editLabel("CUSTOMIZABLE", "قابل للتعديل", "ANPASSBAR")}</Text>
+                      </View>
+                    )}
+                  </View>
                 </Pressable>
               )}
               ItemSeparatorComponent={() => <View style={styles.pickerSep} />}
@@ -791,4 +1074,39 @@ const styles = StyleSheet.create({
   pickerSheet: { backgroundColor: Colors.surface, borderRadius: 20, width: "100%", maxWidth: 500, maxHeight: "80%", padding: 20 },
   pickerItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12 },
   pickerSep: { height: 1, backgroundColor: Colors.cardBorder + "44" },
+
+  // New Styles for Topping Picker
+  modalContent: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 24,
+    width: "92%",
+    maxWidth: 600,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 24,
+  },
+  statusTab: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    alignItems: "center",
+  },
+  statusTabActive: {
+    backgroundColor: Colors.accent + "15",
+    borderColor: Colors.accent,
+  },
+  statusTabText: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  statusTabTextActive: {
+    color: Colors.accent,
+  },
 });

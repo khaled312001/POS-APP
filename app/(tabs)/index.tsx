@@ -58,6 +58,15 @@ export default function POSScreen() {
   const [showScanner, setShowScanner] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [cardNumber, setCardNumber] = useState("");
+  const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCustomerSearch(customerSearch);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [customerSearch]);
+
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvc, setCardCvc] = useState("");
   const [cardProcessing, setCardProcessing] = useState(false);
@@ -118,8 +127,8 @@ export default function POSScreen() {
   useEffect(() => {
     if (cart.items.length > 0) {
       Animated.sequence([
-        Animated.timing(checkoutPulse, { toValue: 1.03, duration: 180, useNativeDriver: true }),
-        Animated.timing(checkoutPulse, { toValue: 1, duration: 180, useNativeDriver: true }),
+        Animated.timing(checkoutPulse, { toValue: 1.03, duration: 180, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(checkoutPulse, { toValue: 1, duration: 180, useNativeDriver: Platform.OS !== 'web' }),
       ]).start();
     }
   }, [cart.items.length]);
@@ -188,46 +197,46 @@ export default function POSScreen() {
     });
   }, [incomingCalls]);
 
-  const PIZZA_TOPPINGS: { name: string; icon: string }[] = [
-    { name: "Tomatoes", icon: "🍅" },
-    { name: "Sliced tomatoes", icon: "🍅" },
-    { name: "Garlic", icon: "🧄" },
-    { name: "Onions", icon: "🧅" },
-    { name: "Capers", icon: "🌿" },
-    { name: "Olives", icon: "🫒" },
-    { name: "Oregano", icon: "🌿" },
-    { name: "Vegetables", icon: "🥦" },
-    { name: "Spinach", icon: "🥬" },
-    { name: "Pepperoni", icon: "🍕" },
-    { name: "Corn", icon: "🌽" },
-    { name: "Broccoli", icon: "🥦" },
-    { name: "Artichokes", icon: "🌿" },
-    { name: "Arugula", icon: "🥬" },
-    { name: "Pineapple", icon: "🍍" },
-    { name: "Mushrooms", icon: "🍄" },
-    { name: "Ham", icon: "🥩" },
-    { name: "Spicy salami", icon: "🌶️" },
-    { name: "Salami", icon: "🥩" },
-    { name: "Bacon", icon: "🥓" },
-    { name: "Prosciutto", icon: "🥩" },
-    { name: "Lamb", icon: "🥩" },
-    { name: "Chicken", icon: "🍗" },
-    { name: "Kebab", icon: "🥙" },
-    { name: "Minced Meat", icon: "🥩" },
-    { name: "Mayonnaise", icon: "🫙" },
-    { name: "Anchovies", icon: "🐟" },
-    { name: "Shrimp", icon: "🍤" },
-    { name: "Tuna", icon: "🐟" },
-    { name: "Ketchup", icon: "🫙" },
-    { name: "Mozzarella", icon: "🧀" },
-    { name: "Gorgonzola", icon: "🧀" },
-    { name: "Parmesan", icon: "🧀" },
-    { name: "Mascarpone", icon: "🧀" },
-    { name: "Kaeserand", icon: "🧀" },
-    { name: "Cocktail Sauce", icon: "🫙" },
-    { name: "Spicy Sauce", icon: "🌶️" },
-    { name: "Yogurt Sauce", icon: "🫙" },
-    { name: "Bell Peppers", icon: "🫑" },
+  const PIZZA_TOPPINGS: { name: string; icon: string; category: string }[] = [
+    { name: "Tomatoes", icon: "🍅", category: "Vegetables" },
+    { name: "Sliced tomatoes", icon: "🍅", category: "Vegetables" },
+    { name: "Garlic", icon: "🧄", category: "Vegetables" },
+    { name: "Onions", icon: "🧅", category: "Vegetables" },
+    { name: "Capers", icon: "🌿", category: "Vegetables" },
+    { name: "Olives", icon: "🫒", category: "Vegetables" },
+    { name: "Oregano", icon: "🌿", category: "Vegetables" },
+    { name: "Vegetables", icon: "🥦", category: "Vegetables" },
+    { name: "Spinach", icon: "🥬", category: "Vegetables" },
+    { name: "Pepperoni", icon: "🍕", category: "Meat" },
+    { name: "Corn", icon: "🌽", category: "Vegetables" },
+    { name: "Broccoli", icon: "🥦", category: "Vegetables" },
+    { name: "Artichokes", icon: "🌿", category: "Vegetables" },
+    { name: "Arugula", icon: "🥬", category: "Vegetables" },
+    { name: "Pineapple", icon: "🍍", category: "Others" },
+    { name: "Mushrooms", icon: "🍄", category: "Vegetables" },
+    { name: "Ham", icon: "🥩", category: "Meat" },
+    { name: "Spicy salami", icon: "🌶️", category: "Meat" },
+    { name: "Salami", icon: "🥩", category: "Meat" },
+    { name: "Bacon", icon: "🥓", category: "Meat" },
+    { name: "Prosciutto", icon: "🥩", category: "Meat" },
+    { name: "Lamb", icon: "🥩", category: "Meat" },
+    { name: "Chicken", icon: "🍗", category: "Meat" },
+    { name: "Kebab", icon: "🥙", category: "Meat" },
+    { name: "Minced Meat", icon: "🥩", category: "Meat" },
+    { name: "Mayonnaise", icon: "🫙", category: "Sauces" },
+    { name: "Anchovies", icon: "🐟", category: "Seafood" },
+    { name: "Shrimp", icon: "🍤", category: "Seafood" },
+    { name: "Tuna", icon: "🐟", category: "Seafood" },
+    { name: "Ketchup", icon: "🫙", category: "Sauces" },
+    { name: "Mozzarella", icon: "🧀", category: "Cheese" },
+    { name: "Gorgonzola", icon: "🧀", category: "Cheese" },
+    { name: "Parmesan", icon: "🧀", category: "Cheese" },
+    { name: "Mascarpone", icon: "🧀", category: "Cheese" },
+    { name: "Kaeserand", icon: "🧀", category: "Cheese" },
+    { name: "Cocktail Sauce", icon: "🫙", category: "Sauces" },
+    { name: "Spicy Sauce", icon: "🌶️", category: "Sauces" },
+    { name: "Yogurt Sauce", icon: "🫙", category: "Sauces" },
+    { name: "Bell Peppers", icon: "🫑", category: "Vegetables" },
   ];
 
   const { data: categories = [] } = useQuery<any[]>({
@@ -258,7 +267,7 @@ export default function POSScreen() {
   });
 
   const { data: customers = [] } = useQuery<any[]>({
-    queryKey: [`/api/customers?tenantId=${tenantId}`],
+    queryKey: [`/api/customers?tenantId=${tenantId || ""}${debouncedCustomerSearch ? `&search=${encodeURIComponent(debouncedCustomerSearch)}` : ""}`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });
@@ -288,7 +297,7 @@ export default function POSScreen() {
   });
 
   const { data: customerCountData } = useQuery<{ count: number }>({
-    queryKey: ["/api/customers/count", `?tenantId=${tenantId || ""}${customerSearch ? `&search=${customerSearch}` : ""}`],
+    queryKey: ["/api/customers/count", `?tenantId=${tenantId || ""}${debouncedCustomerSearch ? `&search=${encodeURIComponent(debouncedCustomerSearch)}` : ""}`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId && showCustomerPicker,
   });
@@ -388,7 +397,9 @@ export default function POSScreen() {
   }, [cart.orderType, storeSettings?.deliveryFee]);
 
   useEffect(() => {
-    apiRequest("POST", "/api/seed").catch(() => { });
+    if (__DEV__) {
+      apiRequest("POST", "/api/seed").catch(() => { });
+    }
 
     // Redirect to onboarding if not completed
     if (tenant && tenant.setupCompleted === false) {
@@ -1494,30 +1505,30 @@ export default function POSScreen() {
 
       <Modal visible={!!selectedProductForOptions} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxWidth: 420, padding: 28, maxHeight: "88%" }]}>
+          <View style={[styles.modalContent, { maxWidth: isTablet ? (showToppingsStep ? 750 : 420) : 420, padding: isTablet ? 32 : 24, maxHeight: "92%" }]}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.modalTitle, rtlTextAlign, { fontSize: 22, fontWeight: "900" }]}>{selectedProductForOptions?.name}</Text>
+                <Text style={[styles.modalTitle, rtlTextAlign, { fontSize: 24, fontWeight: "900" }]}>{selectedProductForOptions?.name}</Text>
                 <Text style={[styles.sectionLabel, { marginTop: 4, marginBottom: 0 }, rtlTextAlign]}>
-                  {showToppingsStep ? "Select Toppings" : (t("selectSize" as any) || "Select Size")}
+                  {showToppingsStep ? (language === "ar" ? "اختر الإضافات" : language === "de" ? "Extras wählen" : "Select Extras") : (t("selectSize" as any) || "Select Size")}
                 </Text>
               </View>
               <Pressable onPress={() => { setSelectedProductForOptions(null); setSelectedVariant(null); setSelectedToppings([]); setShowToppingsStep(false); }} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={24} color={Colors.textMuted} />
+                <Ionicons name="close" size={28} color={Colors.textMuted} />
               </Pressable>
             </View>
 
             {!showToppingsStep ? (
-              /* ── SIZE SELECTION: 2-column grid ── */
-              <View style={{ marginTop: 16, gap: 10 }}>
+              /* ── SIZE SELECTION ── */
+              <View style={{ marginTop: 20, gap: 12 }}>
                 <Text style={[styles.sectionLabel, { marginBottom: 4 }]}>
                   {language === "ar" ? "اختر الحجم" : language === "de" ? "Größe wählen" : "CHOOSE SIZE"}
                 </Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
                   {selectedProductForOptions?.variants?.map((v: any, idx: number) => (
                     <Pressable
                       key={idx}
-                      style={[styles.sizeCard, idx === 0 && styles.sizeCardSelected]}
+                      style={[styles.sizeCard, { flex: 1, minWidth: isTablet ? 140 : 120 }, selectedVariant?.name === v.name && styles.sizeCardSelected]}
                       onPress={() => {
                         if (isPizzaProduct(selectedProductForOptions)) {
                           setSelectedVariant(v);
@@ -1535,101 +1546,143 @@ export default function POSScreen() {
                         }
                       }}
                     >
-                      <Text style={styles.sizeCardName}>{v.name}</Text>
-                      <Text style={styles.sizeCardPrice}>CHF {Number(v.price).toFixed(2)}</Text>
+                      <Text style={[styles.sizeCardName, selectedVariant?.name === v.name && { color: Colors.accent }]}>{v.name}</Text>
+                      <Text style={[styles.sizeCardPrice, selectedVariant?.name === v.name && { color: Colors.accent }]}>CHF {Number(v.price).toFixed(2)}</Text>
                     </Pressable>
                   ))}
                 </View>
               </View>
             ) : (
-              /* ── TOPPINGS: icon list with checkbox ── */
-              <ScrollView style={{ marginTop: 4 }} showsVerticalScrollIndicator={false}>
+              /* ── TOPPINGS: Grouped Grid ── */
+              <ScrollView style={{ marginTop: 10 }} showsVerticalScrollIndicator={false} bounces={false}>
                 {/* Selected size badge */}
-                <View style={styles.selectedSizeBadge}>
-                  <Ionicons name="pizza-outline" size={14} color={Colors.accent} />
-                  <Text style={styles.selectedSizeBadgeText}>
+                <View style={[styles.selectedSizeBadge, { paddingVertical: 10, paddingHorizontal: 16, backgroundColor: Colors.accent + "15" }]}>
+                  <Ionicons name="pizza" size={16} color={Colors.accent} />
+                  <Text style={[styles.selectedSizeBadgeText, { fontSize: 15, fontWeight: "700" }]}>
                     {selectedVariant?.name} — CHF {Number(selectedVariant?.price).toFixed(2)}
                   </Text>
                 </View>
-                <Text style={[styles.sectionLabel, { marginBottom: 8, marginTop: 10 }]}>
-                  {language === "ar" ? "إضافات اختيارية" : language === "de" ? "EXTRA BELÄGE (OPTIONAL)" : "EXTRA TOPPINGS (OPTIONAL)"}
-                </Text>
-                <View style={{ gap: 2 }}>
-                  {(() => {
-                    // Use product modifier extras if available, otherwise fallback to hardcoded list
-                    const extrasGroup = selectedProductForOptions?.modifiers?.find(
-                      (m: any) => !m.required && m.options?.length > 0
-                    );
-                    const toppingOptions = extrasGroup
-                      ? extrasGroup.options.map((o: any) => ({ name: o.label, price: Number(o.price || 0), icon: "" }))
-                      : PIZZA_TOPPINGS.map((t) => ({ name: t.name, price: 0, icon: t.icon }));
 
-                    return toppingOptions.map((topping: { name: string; price: number; icon: string }) => {
-                      const isSelected = selectedToppings.includes(topping.name);
-                      return (
-                        <Pressable
-                          key={topping.name}
-                          onPress={() => {
-                            setSelectedToppings((prev) =>
-                              isSelected ? prev.filter((t) => t !== topping.name) : [...prev, topping.name]
+                {(() => {
+                  const extrasGroup = selectedProductForOptions?.modifiers?.find(
+                    (m: any) => !m.required && m.options?.length > 0
+                  );
+                  const toppingOptions = extrasGroup
+                    ? extrasGroup.options.map((o: any) => ({
+                      name: o.label,
+                      price: Number(o.price || 0),
+                      icon: (PIZZA_TOPPINGS.find(pt => pt.name === o.label)?.icon || "✨"),
+                      category: (PIZZA_TOPPINGS.find(pt => pt.name === o.label)?.category || "Others")
+                    }))
+                    : PIZZA_TOPPINGS.map((t: any) => ({ name: t.name, price: 0, icon: t.icon, category: t.category }));
+
+                  // Define display categories order
+                  const displayCats = ["Cheese", "Meat", "Vegetables", "Seafood", "Sauces", "Others"];
+
+                  return displayCats.map((cat: string) => {
+                    const catToppings = toppingOptions.filter((t: any) => t.category === cat);
+                    if (catToppings.length === 0) return null;
+
+                    // Translate cat names
+                    const catLabel = cat === "Cheese" ? (language === "ar" ? "أجبان" : "Käse") :
+                      cat === "Meat" ? (language === "ar" ? "لحوم" : "Fleisch") :
+                        cat === "Vegetables" ? (language === "ar" ? "خضروات" : "Gemüse") :
+                          cat === "Seafood" ? (language === "ar" ? "مأكولات بحرية" : "Meeresfrüchte") :
+                            cat === "Sauces" ? (language === "ar" ? "صوصات" : "Saucen") :
+                              (language === "ar" ? "أخرى" : "Sonstiges");
+
+                    return (
+                      <View key={cat} style={{ marginBottom: 18 }}>
+                        <Text style={[styles.sectionLabel, { marginBottom: 8, color: Colors.accent, borderLeftWidth: 3, borderLeftColor: Colors.accent, paddingLeft: 8 }]}>
+                          {catLabel.toUpperCase()}
+                        </Text>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                          {catToppings.map((topping: any) => {
+                            const isSelected = selectedToppings.includes(topping.name);
+                            return (
+                              <Pressable
+                                key={topping.name}
+                                onPress={() => {
+                                  setSelectedToppings((prev: string[]) =>
+                                    isSelected ? prev.filter((t: string) => t !== topping.name) : [...prev, topping.name]
+                                  );
+                                }}
+                                style={[
+                                  styles.toppingRow,
+                                  isSelected && styles.toppingRowSelected,
+                                  {
+                                    flexDirection: "column",
+                                    height: 70,
+                                    width: isTablet ? "23.5%" : "31.5%",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    paddingVertical: 8,
+                                    paddingHorizontal: 4,
+                                    gap: 4
+                                  }
+                                ]}
+                              >
+                                <Text style={{ fontSize: 24 }}>{topping.icon}</Text>
+                                <Text style={[styles.toppingName, { fontSize: 11, textAlign: "center" }, isSelected && { color: Colors.accent }]} numberOfLines={1}>
+                                  {topping.name}
+                                </Text>
+                                {topping.price > 0 && (
+                                  <Text style={[styles.toppingPrice, { fontSize: 9 }]}>+CHF {topping.price.toFixed(2)}</Text>
+                                )}
+                                {isSelected && (
+                                  <View style={{ position: "absolute", top: 4, right: 4, width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" }}>
+                                    <Ionicons name="checkmark" size={12} color="#000" />
+                                  </View>
+                                )}
+                              </Pressable>
                             );
-                          }}
-                          style={[styles.toppingRow, isSelected && styles.toppingRowSelected]}
-                        >
-                          {topping.icon ? (
-                            <View style={styles.toppingIconWrap}>
-                              <Text style={{ fontSize: 22 }}>{topping.icon}</Text>
-                            </View>
-                          ) : null}
-                          <View style={{ flex: 1 }}>
-                            <Text style={[styles.toppingName, isSelected && { color: Colors.accent }]}>{topping.name}</Text>
-                            <Text style={styles.toppingPrice}>+CHF {topping.price.toFixed(2)}</Text>
-                          </View>
-                          <View style={[styles.toppingCheckbox, isSelected && styles.toppingCheckboxSelected]}>
-                            {isSelected && <Ionicons name="checkmark" size={13} color="#000" />}
-                          </View>
-                        </Pressable>
-                      );
-                    });
-                  })()}
-                </View>
+                          })}
+                        </View>
+                      </View>
+                    );
+                  });
+                })()}
+
                 {/* Add to Cart */}
-                <Pressable
-                  style={{ marginTop: 16, borderRadius: 14, overflow: "hidden" }}
-                  onPress={() => {
-                    const toppingsSuffix = selectedToppings.length > 0 ? ` [${selectedToppings.join(", ")}]` : "";
-                    cart.addItem({
-                      id: selectedProductForOptions.id,
-                      name: selectedProductForOptions.name + toppingsSuffix,
-                      price: Number(selectedProductForOptions.price),
-                      variant: selectedVariant,
-                    });
-                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setSelectedProductForOptions(null);
-                    setSelectedVariant(null);
-                    setSelectedToppings([]);
-                    setShowToppingsStep(false);
-                  }}
-                >
-                  <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ paddingVertical: 14, alignItems: "center", borderRadius: 14 }}>
-                    <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "800" }}>
-                      {language === "ar" ? `أضف للسلة${selectedToppings.length > 0 ? ` (${selectedToppings.length})` : ""}` :
-                        language === "de" ? `In den Warenkorb${selectedToppings.length > 0 ? ` (${selectedToppings.length})` : ""}` :
-                          `Add to Cart${selectedToppings.length > 0 ? ` (${selectedToppings.length} toppings)` : ""}`}
+                <View style={{ gap: 10, marginTop: 10 }}>
+                  <Pressable
+                    style={{ borderRadius: 16, overflow: "hidden" }}
+                    onPress={() => {
+                      const toppingsSuffix = selectedToppings.length > 0 ? ` [${selectedToppings.join(", ")}]` : "";
+                      cart.addItem({
+                        id: selectedProductForOptions.id,
+                        name: selectedProductForOptions.name + toppingsSuffix,
+                        price: Number(selectedProductForOptions.price),
+                        variant: selectedVariant,
+                      });
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setSelectedProductForOptions(null);
+                      setSelectedVariant(null);
+                      setSelectedToppings([]);
+                      setShowToppingsStep(false);
+                    }}
+                  >
+                    <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ paddingVertical: 16, alignItems: "center", borderRadius: 16 }}>
+                      <Text style={{ color: Colors.textDark, fontSize: 18, fontWeight: "900" }}>
+                        {language === "ar" ? `إضافة للسلة${selectedToppings.length > 0 ? ` (${selectedToppings.length})` : ""}` :
+                          language === "de" ? `In den Warenkorb${selectedToppings.length > 0 ? ` (${selectedToppings.length})` : ""}` :
+                            `Add to Cart${selectedToppings.length > 0 ? ` (${selectedToppings.length} extras)` : ""}`}
+                      </Text>
+                    </LinearGradient>
+                  </Pressable>
+
+                  <Pressable style={{ paddingVertical: 12 }} onPress={() => setShowToppingsStep(false)}>
+                    <Text style={{ color: Colors.textMuted, textAlign: "center", fontSize: 14, fontWeight: "600" }}>
+                      {language === "ar" ? "← العودة للأحجام" : language === "de" ? "← Zurück zu Größen" : "← Back to sizes"}
                     </Text>
-                  </LinearGradient>
-                </Pressable>
-                <Pressable style={{ marginTop: 8, marginBottom: 8 }} onPress={() => setShowToppingsStep(false)}>
-                  <Text style={{ color: Colors.textMuted, textAlign: "center", padding: 8, fontSize: 13 }}>
-                    {language === "ar" ? "← العودة للأحجام" : language === "de" ? "← Zurück zu Größen" : "← Back to sizes"}
-                  </Text>
-                </Pressable>
+                  </Pressable>
+                </View>
               </ScrollView>
             )}
 
             {!showToppingsStep && (
               <Pressable
-                style={styles.modalCancelBtn}
+                style={[styles.modalCancelBtn, { marginTop: 16 }]}
                 onPress={() => { setSelectedProductForOptions(null); setSelectedVariant(null); setSelectedToppings([]); setShowToppingsStep(false); }}
               >
                 <Text style={styles.modalCancelBtnText}>{t("cancel")}</Text>
@@ -2048,10 +2101,7 @@ export default function POSScreen() {
               <Text style={[styles.walkInText, rtlTextAlign, { fontSize: 15, fontWeight: "600", color: Colors.textSecondary }]}>{t("walkIn")}</Text>
             </Pressable>
             <FlatList
-              data={customers.filter((c: any) =>
-                (c.name || "").toLowerCase().includes(customerSearch.toLowerCase()) ||
-                (c.phone || "").includes(customerSearch)
-              )}
+              data={customers}
               keyExtractor={(item: any) => String(item.id)}
               contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
               renderItem={({ item }: { item: any }) => (
