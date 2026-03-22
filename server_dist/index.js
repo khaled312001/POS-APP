@@ -3772,7 +3772,21 @@ var CallerIDService = class extends EventEmitter {
    */
   async handleIncomingCall(phoneNumber, preferredSlot, tenantId) {
     const normalized = normalizePhone(phoneNumber);
-    const resolvedTenantId = tenantId || null;
+    let resolvedTenantId = tenantId || null;
+    if (this.wss && resolvedTenantId) {
+      const hasClientForTenant = Array.from(this.wss.clients).some(
+        (c) => c.readyState === WebSocket.OPEN && c.tenantId === resolvedTenantId
+      );
+      if (!hasClientForTenant) {
+        const firstRegistered = Array.from(this.wss.clients).find(
+          (c) => c.readyState === WebSocket.OPEN && c.tenantId
+        );
+        if (firstRegistered?.tenantId) {
+          console.log(`[CallerID] Bridge tenantId=${resolvedTenantId} has no clients. Remapping to tenant=${firstRegistered.tenantId}`);
+          resolvedTenantId = firstRegistered.tenantId;
+        }
+      }
+    }
     console.log(`[CallerID] Incoming call for tenant ${resolvedTenantId}: ${phoneNumber} (Normalized: ${normalized})`);
     let slot = preferredSlot || 0;
     if (slot < 1 || slot > 4) {
@@ -3851,15 +3865,22 @@ var CallerIDService = class extends EventEmitter {
   broadcastToTenant(payload, tenantId) {
     if (!this.wss) return;
     let total = 0, matched = 0;
+    const allOpen = [];
     this.wss.clients.forEach((client2) => {
       if (client2.readyState === WebSocket.OPEN) {
         total++;
+        allOpen.push(client2);
         if (!tenantId || !client2.tenantId || client2.tenantId === tenantId) {
           matched++;
           client2.send(payload);
         }
       }
     });
+    if (tenantId && matched === 0 && allOpen.length > 0) {
+      console.log(`[CallerID] No clients for tenant=${tenantId}, falling back to broadcast all ${allOpen.length} clients`);
+      allOpen.forEach((c) => c.send(payload));
+      matched = allOpen.length;
+    }
     console.log(`[CallerID] Broadcast: ${matched}/${total} clients matched tenant=${tenantId}`);
   }
   /**
@@ -9278,14 +9299,21 @@ function setupPaymentGatewayRoutes(app2) {
       await pool2.query(`
         CREATE TABLE calls (
           id serial PRIMARY KEY,
-          tenant_id integer REFERENCES tenants(id) ON DELETE CASCADE,
-          branch_id integer REFERENCES branches(id) ON DELETE CASCADE,
+          tenant_id integer,
+          branch_id integer,
           phone_number text NOT NULL DEFAULT '',
-          customer_id integer REFERENCES customers(id) ON DELETE SET NULL,
+          customer_id integer,
           status text NOT NULL DEFAULT 'missed',
-          sale_id integer REFERENCES sales(id) ON DELETE SET NULL,
+          sale_id integer,
           created_at timestamp DEFAULT now()
         );
+      `);
+    } else {
+      await pool2.query(`
+        ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_tenant_id_fkey;
+        ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_branch_id_fkey;
+        ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_customer_id_fkey;
+        ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_sale_id_fkey;
       `);
     }
     const vehiclesCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='vehicles'`);

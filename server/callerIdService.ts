@@ -115,7 +115,25 @@ export class CallerIDService extends EventEmitter {
    */
   public async handleIncomingCall(phoneNumber: string, preferredSlot?: number, tenantId?: number): Promise<ActiveCall | null> {
     const normalized = normalizePhone(phoneNumber);
-    const resolvedTenantId = tenantId || null;
+
+    // Resolve actual tenantId: if no WS clients are registered for the given tenantId,
+    // fall back to the first connected client's tenantId (handles misconfigured bridge)
+    let resolvedTenantId: number | null = tenantId || null;
+    if (this.wss && resolvedTenantId) {
+      const hasClientForTenant = Array.from(this.wss.clients).some(
+        (c: any) => c.readyState === WebSocket.OPEN && c.tenantId === resolvedTenantId
+      );
+      if (!hasClientForTenant) {
+        const firstRegistered = Array.from(this.wss.clients).find(
+          (c: any) => c.readyState === WebSocket.OPEN && c.tenantId
+        ) as TenantWebSocket | undefined;
+        if (firstRegistered?.tenantId) {
+          console.log(`[CallerID] Bridge tenantId=${resolvedTenantId} has no clients. Remapping to tenant=${firstRegistered.tenantId}`);
+          resolvedTenantId = firstRegistered.tenantId;
+        }
+      }
+    }
+
     console.log(`[CallerID] Incoming call for tenant ${resolvedTenantId}: ${phoneNumber} (Normalized: ${normalized})`);
 
     // 1. Assign a slot (1-4)
@@ -217,9 +235,11 @@ export class CallerIDService extends EventEmitter {
   private broadcastToTenant(payload: string, tenantId?: number) {
     if (!this.wss) return;
     let total = 0, matched = 0;
+    const allOpen: TenantWebSocket[] = [];
     this.wss.clients.forEach((client: TenantWebSocket) => {
       if (client.readyState === WebSocket.OPEN) {
         total++;
+        allOpen.push(client);
         // Send to: unfiltered calls, unregistered clients (compat), or matching-tenant clients
         if (!tenantId || !client.tenantId || client.tenantId === tenantId) {
           matched++;
@@ -227,6 +247,13 @@ export class CallerIDService extends EventEmitter {
         }
       }
     });
+    // Fallback: if bridge sent a tenantId but no client is registered for it,
+    // broadcast to ALL connected clients (handles misconfigured bridge tenantId)
+    if (tenantId && matched === 0 && allOpen.length > 0) {
+      console.log(`[CallerID] No clients for tenant=${tenantId}, falling back to broadcast all ${allOpen.length} clients`);
+      allOpen.forEach(c => c.send(payload));
+      matched = allOpen.length;
+    }
     console.log(`[CallerID] Broadcast: ${matched}/${total} clients matched tenant=${tenantId}`);
   }
 

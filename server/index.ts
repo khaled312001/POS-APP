@@ -699,6 +699,8 @@ function setupPaymentGatewayRoutes(app: express.Application) {
     await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_addon boolean NOT NULL DEFAULT false;`);
 
     // 2. calls — drop if wrong structure (no phone_number column), recreate correctly
+    // NOTE: tenant_id is intentionally WITHOUT FK constraint so bridge misconfiguration
+    // (e.g. wrong tenantId) doesn't block call recording
     const callsCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='calls'`);
     const callsHasPhone = callsCols.rows.some((r: any) => r.column_name === 'phone_number');
     if (!callsHasPhone) {
@@ -706,14 +708,22 @@ function setupPaymentGatewayRoutes(app: express.Application) {
       await pool.query(`
         CREATE TABLE calls (
           id serial PRIMARY KEY,
-          tenant_id integer REFERENCES tenants(id) ON DELETE CASCADE,
-          branch_id integer REFERENCES branches(id) ON DELETE CASCADE,
+          tenant_id integer,
+          branch_id integer,
           phone_number text NOT NULL DEFAULT '',
-          customer_id integer REFERENCES customers(id) ON DELETE SET NULL,
+          customer_id integer,
           status text NOT NULL DEFAULT 'missed',
-          sale_id integer REFERENCES sales(id) ON DELETE SET NULL,
+          sale_id integer,
           created_at timestamp DEFAULT now()
         );
+      `);
+    } else {
+      // Remove FK constraint on calls.tenant_id if it exists (so bridge misconfiguration doesn't block)
+      await pool.query(`
+        ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_tenant_id_fkey;
+        ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_branch_id_fkey;
+        ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_customer_id_fkey;
+        ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_sale_id_fkey;
       `);
     }
 

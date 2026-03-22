@@ -1,6 +1,6 @@
 {
   "serverUrl": "https://pos.barmagly.tech",
-  "tenantId": 1,
+  "tenantId": 24,
   "secret": "fritzbridge-secret-change-me",
   "pollingIntervalMs": 100,
   "capiController": 1,
