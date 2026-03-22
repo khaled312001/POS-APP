@@ -375,32 +375,72 @@ export default function POSScreen() {
       return;
     }
     if (Platform.OS === "web" && selectedInvoice) {
-      const printWindow = window.open("", "_blank", "width=380,height=600");
+      const printWindow = window.open("", "_blank", "width=900,height=700");
       if (printWindow) {
         const inv = selectedInvoice;
+        const storeName = storeSettings?.name || tenant?.name || "POS System";
+        const storeAddr = storeSettings?.address || "";
+        const storePhone = storeSettings?.phone || "";
+        const storeEmail = storeSettings?.email || "";
+        const logoPath = storeSettings?.logo || "";
+        const logoUrl = logoPath ? `${window.location.origin}${logoPath}` : "";
+        const orderId = inv.id || "";
+        const receiptNum = inv.receiptNumber || `#${orderId}`;
+        const invDate = new Date(inv.createdAt || inv.date || Date.now());
+        const dateStr = invDate.toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+        const timeStr = invDate.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+        const logoHtml = logoUrl
+          ? `<img src="${logoUrl}" alt="${storeName}" style="max-height:70px;max-width:220px;object-fit:contain" />`
+          : `<div style="font-size:26px;font-weight:900;letter-spacing:2px">${storeName}</div>`;
         const itemsHtml = (inv.items || []).map((item: any) =>
-          `<tr><td style="text-align:left">${item.productName || item.name}</td><td style="text-align:center">x${item.quantity}</td><td style="text-align:right">CHF ${Number(item.total || (item.unitPrice * item.quantity)).toFixed(2)}</td></tr>`
+          `<tr><td style="width:45%;padding:3px 4px">${item.productName || item.name}</td><td style="text-align:center;width:15%;padding:3px 4px;font-size:10px;color:#555">x${item.quantity}</td><td style="text-align:right;width:15%;padding:3px 4px;font-size:10px;color:#555">Fr&nbsp;${Number(item.unitPrice || item.price || 0).toFixed(2)}</td><td style="text-align:right;width:25%;padding:3px 4px;font-weight:600">Fr&nbsp;${Number(item.total || (Number(item.unitPrice || item.price || 0) * item.quantity)).toFixed(2)}</td></tr>`
         ).join("");
-        printWindow.document.write(`<html><head><title>Receipt ${inv.receiptNumber || inv.id}</title><style>body{font-family:'Courier New',monospace;font-size:12px;width:300px;margin:0 auto;padding:20px}table{width:100%;border-collapse:collapse}td{padding:2px 0}.center{text-align:center}.right{text-align:right}.bold{font-weight:bold}.line{border-top:1px dashed #000;margin:8px 0}.dbl{border-top:2px solid #000;margin:8px 0}</style></head><body>`);
-        printWindow.document.write(`<div class="dbl"></div><p class="center bold" style="font-size:16px">${storeSettings?.name || tenant?.name || "POS System"}</p>`);
-        if (storeSettings?.address) printWindow.document.write(`<p class="center">${storeSettings.address}</p>`);
-        if (storeSettings?.phone) printWindow.document.write(`<p class="center">${storeSettings.phone}</p>`);
-        printWindow.document.write(`<div class="line"></div>`);
-        printWindow.document.write(`<p>${t("receiptDate")}: ${new Date(inv.createdAt || inv.date).toLocaleDateString()} ${new Date(inv.createdAt || inv.date).toLocaleTimeString()}</p>`);
-        printWindow.document.write(`<p>${t("receiptNumber")}: ${inv.receiptNumber || "#" + inv.id}</p>`);
-        printWindow.document.write(`<div class="line"></div>`);
-        printWindow.document.write(`<table>${itemsHtml}</table>`);
-        printWindow.document.write(`<div class="line"></div>`);
-        printWindow.document.write(`<table><tr><td>${t("subtotal")}:</td><td class="right">CHF ${Number(inv.subtotal || inv.totalAmount).toFixed(2)}</td></tr>`);
-        if (Number(inv.discount) > 0) printWindow.document.write(`<tr><td>${t("discount")}:</td><td class="right">-CHF ${Number(inv.discount).toFixed(2)}</td></tr>`);
-        if (Number(inv.serviceFeeAmount) > 0) printWindow.document.write(`<tr><td>${t("serviceTax" as any) || "Service Tax"}:</td><td class="right">CHF ${Number(inv.serviceFeeAmount).toFixed(2)}</td></tr>`);
-        printWindow.document.write(`<tr><td>${t("tax")}:</td><td class="right">CHF ${Number(inv.taxAmount || inv.tax || 0).toFixed(2)}</td></tr></table>`);
-        printWindow.document.write(`<div class="dbl"></div>`);
-        printWindow.document.write(`<table><tr><td class="bold" style="font-size:14px">TOTAL:</td><td class="right bold" style="font-size:14px">CHF ${Number(inv.totalAmount).toFixed(2)}</td></tr></table>`);
-        printWindow.document.write(`<div class="dbl"></div>`);
-        printWindow.document.write(`<p>${t("paymentMethod")}: ${(inv.paymentMethod || "cash").toUpperCase()}</p>`);
-        printWindow.document.write(`<p class="center bold" style="margin-top:16px">${t("thankYou")}</p>`);
-        printWindow.document.write(`<div class="dbl"></div></body></html>`);
+        const totalAmt = Number(inv.totalAmount);
+        const taxAmt = Number(inv.taxAmount || inv.tax || 0);
+        const discAmt = Number(inv.discountAmount || inv.discount || 0);
+        const itemCount = (inv.items || []).reduce((s: number, i: any) => s + (i.quantity || 0), 0);
+        const pmLabel = (inv.paymentMethod || "cash") === "cash" ? "Bar" : (inv.paymentMethod || "cash") === "card" ? "Karte" : (inv.paymentMethod || "cash").toUpperCase();
+        const css = `@page{size:A4;margin:8mm 12mm}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#000;background:#fff}.receipt{width:100%;min-height:277mm;padding:6mm 0;page-break-after:always;display:flex;flex-direction:column}.receipt:last-child{page-break-after:avoid}.totals-box{border:1px solid #000;padding:6px 8px;margin:4px 0 10px}.store-bottom{text-align:center;font-size:10px;font-weight:bold;margin-top:6px;border-top:1px solid #000;padding-top:6px}`;
+        printWindow.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Rechnung ${receiptNum}</title><style>${css}</style></head><body>`);
+        printWindow.document.write(`<div class="receipt">
+          <div style="text-align:center;border-bottom:3px solid #000;padding-bottom:8px;margin-bottom:10px">
+            ${logoHtml}
+            <div style="font-size:18px;margin-top:4px">Rechnung</div>
+          </div>
+          <div style="display:flex;gap:16px;margin:8px 0">
+            <div style="min-width:120px">
+              <div style="font-size:11px;color:#333">${receiptNum}&nbsp;MwSt</div>
+              <div style="font-size:11px;color:#333">Kassierer</div>
+              <div style="font-size:22px;font-weight:900;line-height:1.2;margin:2px 0">${timeStr}</div>
+              <div style="font-size:11px;color:#333">${invDate.toLocaleDateString("de-DE")}</div>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:15px;font-weight:700">${inv.customerName || ""}</div>
+              ${inv.customerAddress ? `<div style="font-size:13px;line-height:1.6">${inv.customerAddress}</div>` : ""}
+              ${inv.customerPhone ? `<div style="font-size:15px;font-weight:bold;margin-top:4px;letter-spacing:1px"><strong>Tel</strong>&nbsp;&nbsp;${inv.customerPhone}</div>` : ""}
+            </div>
+          </div>
+          <table style="width:100%;border-collapse:collapse;margin:10px 0;border-top:1px solid #000;border-bottom:1px solid #000">
+            <tbody>${itemsHtml}${discAmt > 0 ? `<tr><td colspan="3" style="padding:3px 4px">- Fr. ${discAmt.toFixed(2).replace(".00", ".--")} Reduktion</td><td style="text-align:right;padding:3px 4px;font-weight:600">-Fr&nbsp;${discAmt.toFixed(2)}</td></tr>` : ""}</tbody>
+          </table>
+          <div class="totals-box">
+            <table style="width:100%;border-collapse:collapse">
+              <tr>
+                <td style="font-size:14px;font-weight:bold;width:24px;padding:2px 6px">${itemCount}</td>
+                <td style="font-size:10px;line-height:1.1;width:30px;padding:2px 6px">MwS<br>t</td>
+                <td style="text-align:right;padding:2px 6px">Fr&nbsp;${totalAmt.toFixed(2)}</td>
+                <td style="text-align:right;padding:2px 6px">Fr&nbsp;${taxAmt.toFixed(2)}</td>
+                <td style="text-align:right;font-size:14px;padding:2px 6px"><strong>Fr</strong></td>
+                <td style="text-align:right;font-size:22px;font-weight:900;padding:2px 6px"><strong>${totalAmt.toFixed(2)}</strong></td>
+              </tr>
+            </table>
+          </div>
+          <div style="text-align:center;font-size:11px;margin-top:auto;padding-top:10px">
+            ${storeEmail ? `Grazie mille e buon appetito! ${storeEmail}` : "Grazie mille e buon appetito!"}
+          </div>
+          <div class="store-bottom">${storeName}${storeAddr ? " - " + storeAddr : ""}${storePhone ? " Tel: " + storePhone : ""}</div>
+        </div>`);
+        printWindow.document.write("</body></html>");
         printWindow.document.close();
         printWindow.print();
       }
