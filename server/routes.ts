@@ -1970,23 +1970,28 @@ async function test(){
 
   // Incoming call from local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
   app.post("/api/caller-id/incoming", async (req, res) => {
-    const secret = (req.headers["x-bridge-secret"] as string) || req.body.secret;
-    if (process.env.CALLER_ID_BRIDGE_SECRET && secret !== process.env.CALLER_ID_BRIDGE_SECRET) {
-      return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const secret = (req.headers["x-bridge-secret"] as string) || req.body.secret;
+      if (process.env.CALLER_ID_BRIDGE_SECRET && secret !== process.env.CALLER_ID_BRIDGE_SECRET) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const { phoneNumber, slot } = req.body;
+      // tenantId can come from the body (hardware bridge) or from the license-key auth middleware
+      const tenantId = req.body.tenantId || (req as any).tenantId;
+      const callInfo = await callerIdService.handleIncomingCall(
+        phoneNumber || "0123456789",
+        slot ? Number(slot) : undefined,
+        tenantId ? Number(tenantId) : undefined
+      );
+      // Web Push: notify all subscribed browsers (even closed tabs)
+      const customerName = (callInfo as any)?.customer?.name;
+      const customerAddress = (callInfo as any)?.customer?.address;
+      pushService.notifyIncomingCall(phoneNumber || "0123456789", customerName, customerAddress).catch(() => { });
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("[CallerID] Error handling incoming call:", e);
+      res.status(500).json({ error: "Internal server error" });
     }
-    const { phoneNumber, slot } = req.body;
-    // tenantId can come from the body (hardware bridge) or from the license-key auth middleware
-    const tenantId = req.body.tenantId || (req as any).tenantId;
-    const callInfo = await callerIdService.handleIncomingCall(
-      phoneNumber || "0123456789",
-      slot ? Number(slot) : undefined,
-      tenantId ? Number(tenantId) : undefined
-    );
-    // Web Push: notify all subscribed browsers (even closed tabs)
-    const customerName = (callInfo as any)?.customer?.name;
-    const customerAddress = (callInfo as any)?.customer?.address;
-    pushService.notifyIncomingCall(phoneNumber || "0123456789", customerName, customerAddress).catch(() => { });
-    res.json({ success: true });
   });
 
   // ── Web Push Subscription ─────────────────────────────────────────────────
@@ -2085,10 +2090,11 @@ async function test(){
       const commissionRate = await storage.getCommissionRate();
       if (commissionRate > 0) {
         const factor = 1 + (commissionRate / 100);
-        products = products.map((p: any) => ({
-          ...p,
-          price: (parseFloat(p.price) * factor).toFixed(2)
-        }));
+        products = products.map((p: any) => {
+          const rawPrice = parseFloat(p.price) * factor;
+          const rounded = Math.ceil(rawPrice * 2) / 2; // round up to nearest 0.5
+          return { ...p, price: rounded.toFixed(2) };
+        });
       }
 
       const categories = sortCategoriesByPriority(await storage.getCategories(config.tenantId));

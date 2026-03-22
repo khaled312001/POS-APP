@@ -263,11 +263,23 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const wsUrl = `${getApiUrl().replace("http", "ws")}/api/ws/caller-id`;
         let ws: WebSocket;
         let reconnectTimer: ReturnType<typeof setTimeout>;
+        let retryCount = 0;
+
+        function getReconnectDelay(): number {
+            // Exponential backoff: 1s, 2s, 4s, 8s, 16s... capped at 30s, with jitter
+            const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+            retryCount = Math.min(retryCount + 1, 10);
+            return delay + Math.random() * 500;
+        }
 
         function connect() {
             try {
                 ws = new WebSocket(wsUrl);
                 wsRef.current = ws;
+
+                ws.onopen = () => {
+                    retryCount = 0; // Reset backoff on successful connection
+                };
 
                 ws.onmessage = (event) => {
                     try {
@@ -304,14 +316,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 };
 
                 ws.onclose = () => {
-                    reconnectTimer = setTimeout(connect, 5000);
+                    clearTimeout(reconnectTimer);
+                    reconnectTimer = setTimeout(connect, getReconnectDelay());
                 };
 
                 ws.onerror = () => {
+                    // onclose will fire after this and schedule reconnect
                     ws.close();
                 };
             } catch {
-                reconnectTimer = setTimeout(connect, 5000);
+                clearTimeout(reconnectTimer);
+                reconnectTimer = setTimeout(connect, getReconnectDelay());
             }
         }
 

@@ -106,6 +106,8 @@ export default function POSScreen() {
 
   // Track which call IDs have already been auto-processed so we don't re-run on re-renders
   const processedCallIds = useRef<Set<string>>(new Set());
+  // Store auto-dismiss timer IDs so they can be cleared on manual dismiss (prevents double-dismiss)
+  const autoDismissTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // Store caller's full customer object directly (faster than waiting for customers list)
   const [callerCustomer, setCallerCustomer] = useState<any>(null);
 
@@ -118,6 +120,16 @@ export default function POSScreen() {
       ]).start();
     }
   }, [cart.items.length]);
+
+  // Wrapper around dismissCall that also clears the pending auto-dismiss timer
+  const handleDismissCall = useCallback((callId: string, slot: number) => {
+    const timer = autoDismissTimers.current.get(callId);
+    if (timer) {
+      clearTimeout(timer);
+      autoDismissTimers.current.delete(callId);
+    }
+    dismissCall(callId, slot);
+  }, [dismissCall]);
 
   // Flash animation when item added
   const triggerFlash = useCallback((productId: number) => {
@@ -142,15 +154,32 @@ export default function POSScreen() {
         setCallerCustomer(call.customer);
         setPhoneInput(call.customer.phone || call.phoneNumber);
       } else {
-        // Unknown caller → pre-fill phone so cashier can look up or create customer
+        // Unknown caller → pre-fill phone and immediately try silent lookup
         setPhoneInput(call.phoneNumber);
         setCallerCustomer(null);
+        if (tenantId) {
+          apiRequest("GET", `/api/customers/phone-lookup?phone=${encodeURIComponent(call.phoneNumber)}&tenantId=${tenantId}`)
+            .then(res => res.ok ? res.json() : [])
+            .then((matches: any[]) => {
+              if (matches && matches.length > 0) {
+                const found = matches[0];
+                cart.setCustomerId(found.id);
+                setCallerCustomer(found);
+                setPhoneInput(found.phone || call.phoneNumber);
+                // Update the call notification to show customer name
+                setIncomingCalls(prev => prev.map(c => c.id === call.id ? { ...c, customer: found } : c));
+              }
+            })
+            .catch(() => {});
+        }
       }
 
-      // Auto-dismiss the popup after 10 seconds
-      setTimeout(() => {
+      // Auto-dismiss the popup after 10 seconds (timer tracked so manual dismiss can cancel it)
+      const autoDismissTimer = setTimeout(() => {
+        autoDismissTimers.current.delete(callId);
         dismissCall(callId, call.slot);
       }, 10000);
+      autoDismissTimers.current.set(callId, autoDismissTimer);
     });
   }, [incomingCalls]);
 
@@ -1049,7 +1078,7 @@ export default function POSScreen() {
                 {t("callQueue" as any)} — {incomingCalls.length} {t("callsWaiting" as any)}
               </Text>
               <Pressable
-                onPress={() => { incomingCalls.forEach(c => dismissCall(c.id, c.slot)); }}
+                onPress={() => { incomingCalls.forEach(c => handleDismissCall(c.id, c.slot)); }}
                 style={{ paddingHorizontal: 10, paddingVertical: 3, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 8 }}
               >
                 <Text style={{ color: Colors.white, fontSize: 11, fontWeight: "600" }}>{t("dismissAll" as any)}</Text>
@@ -1116,11 +1145,28 @@ export default function POSScreen() {
                       cart.setCustomerId(call.customer.id);
                       setCallerCustomer(call.customer);
                       setPhoneInput(call.customer.phone || call.phoneNumber);
+                      handleDismissCall(call.id, call.slot);
                     } else {
-                      // Unknown caller: trigger phone lookup to find/create customer
-                      handlePhoneSearch(call.phoneNumber);
+                      // Unknown caller: silent lookup — assign if found, pre-fill if not (no new-customer form)
+                      handleDismissCall(call.id, call.slot);
+                      if (tenantId) {
+                        apiRequest("GET", `/api/customers/phone-lookup?phone=${encodeURIComponent(call.phoneNumber)}&tenantId=${tenantId}`)
+                          .then(res => res.ok ? res.json() : [])
+                          .then((matches: any[]) => {
+                            if (matches && matches.length > 0) {
+                              const found = matches[0];
+                              cart.setCustomerId(found.id);
+                              setCallerCustomer(found);
+                              setPhoneInput(found.phone || call.phoneNumber);
+                            } else {
+                              setPhoneInput(call.phoneNumber);
+                            }
+                          })
+                          .catch(() => { setPhoneInput(call.phoneNumber); });
+                      } else {
+                        setPhoneInput(call.phoneNumber);
+                      }
                     }
-                    dismissCall(call.id, call.slot);
                   }}
                 >
                   <Ionicons name="checkmark" size={18} color={Colors.white} />
@@ -1132,7 +1178,7 @@ export default function POSScreen() {
                     cart.setCustomerId(null);
                     setPhoneInput("");
                     setCallerCustomer(null);
-                    dismissCall(call.id, call.slot);
+                    handleDismissCall(call.id, call.slot);
                   }}
                 >
                   <Ionicons name="close" size={18} color={Colors.white} />

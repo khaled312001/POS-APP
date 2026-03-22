@@ -276,12 +276,19 @@ export const storage = {
   },
 
   async findCustomerByPhone(phone: string, tenantId: number) {
-    const { getPhoneSearchVariants, normalizePhone } = await import("./phoneUtils");
+    const { getPhoneSearchVariants, normalizePhone, lastNDigits } = await import("./phoneUtils");
     const variants = getPhoneSearchVariants(phone);
     const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
     const phoneConditions = variants.map(v => ilike(customers.phone, `%${v}%`));
     for (const v of variants) {
       phoneConditions.push(sql`${strippedCol} ILIKE ${'%' + v + '%'}`);
+    }
+    // Robust last-8-digits matching: strips ALL non-digit chars and compares tail (format-agnostic)
+    const last8 = lastNDigits(phone, 8);
+    if (last8.length >= 7) {
+      phoneConditions.push(
+        sql`RIGHT(REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g'), 8) = ${last8}`
+      );
     }
     const conditions: any[] = [
       eq(customers.isActive, true),

@@ -26,10 +26,13 @@ interface ActiveCall {
  * and broadcasts them to connected POS clients via WebSockets.
  * Supports up to 4 simultaneous call slots (ISDN B-channels).
  */
+const SLOT_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes — auto-free stuck slots if client never signals
+
 export class CallerIDService extends EventEmitter {
   private wss: WebSocketServer | null = null;
   private isSimulation: boolean = true;
   private activeCallSlots: Map<number, ActiveCall> = new Map(); // slot 1-4
+  private slotTimeouts: Map<number, ReturnType<typeof setTimeout>> = new Map();
 
   constructor() {
     super();
@@ -60,10 +63,12 @@ export class CallerIDService extends EventEmitter {
           if (data.type === "simulate_call") {
             this.handleIncomingCall(data.phoneNumber || "0123456789", data.slot);
           } else if (data.type === "call_answered" || data.type === "call_ended") {
-            // Client signals call was handled — free the slot
+            // Client signals call was handled — free the slot and cancel auto-expiry
             const slot = data.slot;
             if (slot) {
               this.activeCallSlots.delete(slot);
+              const t = this.slotTimeouts.get(slot);
+              if (t) { clearTimeout(t); this.slotTimeouts.delete(slot); }
               this.broadcastCallSlotUpdate();
             }
           }
@@ -145,6 +150,17 @@ export class CallerIDService extends EventEmitter {
     // Immediately reserve the slot to prevent race conditions during DB lookup
     const callInfo: ActiveCall = { phoneNumber, normalizedPhone: normalized, slot, timestamp: new Date().toISOString(), customer: null };
     this.activeCallSlots.set(slot, callInfo);
+
+    // Auto-expire the slot after 5 minutes in case the client never sends call_answered/call_ended
+    const existingTimeout = this.slotTimeouts.get(slot);
+    if (existingTimeout) clearTimeout(existingTimeout);
+    const expiryTimer = setTimeout(() => {
+      this.activeCallSlots.delete(slot);
+      this.slotTimeouts.delete(slot);
+      this.broadcastCallSlotUpdate();
+      console.log(`[CallerID] Slot ${slot} auto-expired after ${SLOT_EXPIRY_MS / 60000} min`);
+    }, SLOT_EXPIRY_MS);
+    this.slotTimeouts.set(slot, expiryTimer);
 
     try {
       const { storage } = await import("./storage");

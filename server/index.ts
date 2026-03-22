@@ -223,12 +223,7 @@ function configureExpoAndLanding(app: express.Application) {
       return serveLandingPage({ req, res, appName });
     }
 
-    // Redirect bare /app to /app/ so the service worker scope (/app/) covers the page URL
-    if (req.path === "/app") {
-      return res.redirect(302, "/app/");
-    }
-
-    if (req.path === "/app/" || req.path === "/app/index.html") {
+    if (req.path === "/app" || req.path === "/app/" || req.path === "/app/index.html") {
       const indexPath = path.resolve(process.cwd(), "dist", "index.html");
       if (fs.existsSync(indexPath)) {
         const html = fs.readFileSync(indexPath, "utf-8");
