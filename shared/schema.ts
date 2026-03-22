@@ -609,6 +609,81 @@ export const landingPageConfig = pgTable("landing_page_config", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ========== Vehicles / Fleet ==========
+
+export const vehicles = pgTable("vehicles", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }),
+  branchId: integer("branch_id").references(() => branches.id, { onDelete: 'cascade' }),
+  licensePlate: text("license_plate").notNull(),
+  make: text("make"),
+  model: text("model"),
+  color: text("color"),
+  driverName: text("driver_name"),
+  driverPhone: text("driver_phone"),
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ========== Printer Configurations ==========
+
+export const printerConfigs = pgTable("printer_configs", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  branchId: integer("branch_id").references(() => branches.id, { onDelete: 'cascade' }),
+  receiptType: text("receipt_type").notNull(), // kitchen, home_delivery, take_away, restaurant, driver_order, check_out, lists, daily_close, monthly_close, accounts_receivable
+  printer1: text("printer_1"),
+  printer1Copy: boolean("printer_1_copy").default(false),
+  printer2: text("printer_2"),
+  printer2Copy: boolean("printer_2_copy").default(false),
+  paperSize: text("paper_size").default("80mm"),
+  isActive: boolean("is_active").default(true),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ========== Daily / Monthly Closings ==========
+
+export const dailyClosings = pgTable("daily_closings", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  branchId: integer("branch_id").references(() => branches.id, { onDelete: 'cascade' }),
+  employeeId: integer("employee_id").references(() => employees.id, { onDelete: 'cascade' }),
+  closingDate: text("closing_date").notNull(), // YYYY-MM-DD
+  totalSales: decimal("total_sales", { precision: 12, scale: 2 }).default("0"),
+  totalCash: decimal("total_cash", { precision: 12, scale: 2 }).default("0"),
+  totalCard: decimal("total_card", { precision: 12, scale: 2 }).default("0"),
+  totalMobile: decimal("total_mobile", { precision: 12, scale: 2 }).default("0"),
+  totalTransactions: integer("total_transactions").default(0),
+  totalReturns: decimal("total_returns", { precision: 12, scale: 2 }).default("0"),
+  totalDiscounts: decimal("total_discounts", { precision: 12, scale: 2 }).default("0"),
+  openingCash: decimal("opening_cash", { precision: 12, scale: 2 }).default("0"),
+  closingCash: decimal("closing_cash", { precision: 12, scale: 2 }).default("0"),
+  notes: text("notes"),
+  status: text("status").default("closed"), // closed, approved
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const monthlyClosings = pgTable("monthly_closings", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  branchId: integer("branch_id").references(() => branches.id, { onDelete: 'cascade' }),
+  employeeId: integer("employee_id").references(() => employees.id, { onDelete: 'cascade' }),
+  closingMonth: text("closing_month").notNull(), // YYYY-MM
+  totalSales: decimal("total_sales", { precision: 12, scale: 2 }).default("0"),
+  totalCash: decimal("total_cash", { precision: 12, scale: 2 }).default("0"),
+  totalCard: decimal("total_card", { precision: 12, scale: 2 }).default("0"),
+  totalMobile: decimal("total_mobile", { precision: 12, scale: 2 }).default("0"),
+  totalTransactions: integer("total_transactions").default(0),
+  totalReturns: decimal("total_returns", { precision: 12, scale: 2 }).default("0"),
+  totalDiscounts: decimal("total_discounts", { precision: 12, scale: 2 }).default("0"),
+  totalExpenses: decimal("total_expenses", { precision: 12, scale: 2 }).default("0"),
+  netRevenue: decimal("net_revenue", { precision: 12, scale: 2 }).default("0"),
+  notes: text("notes"),
+  status: text("status").default("closed"), // closed, approved
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // ========== Insert Schemas ==========
 
 export const insertBranchSchema = createInsertSchema(branches).omit({ id: true, createdAt: true, updatedAt: true });
@@ -654,6 +729,20 @@ export const insertPlatformSettingSchema = createInsertSchema(platformSettings).
 export const insertPlatformCommissionSchema = createInsertSchema(platformCommissions).omit({ id: true, createdAt: true });
 export type InsertPlatformSetting = z.infer<typeof insertPlatformSettingSchema>;
 export type InsertPlatformCommission = z.infer<typeof insertPlatformCommissionSchema>;
+
+export const insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true, createdAt: true });
+export const insertPrinterConfigSchema = createInsertSchema(printerConfigs).omit({ id: true, updatedAt: true });
+export const insertDailyClosingSchema = createInsertSchema(dailyClosings).omit({ id: true, createdAt: true });
+export const insertMonthlyClosingSchema = createInsertSchema(monthlyClosings).omit({ id: true, createdAt: true });
+
+export type Vehicle = typeof vehicles.$inferSelect;
+export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
+export type PrinterConfig = typeof printerConfigs.$inferSelect;
+export type InsertPrinterConfig = z.infer<typeof insertPrinterConfigSchema>;
+export type DailyClosing = typeof dailyClosings.$inferSelect;
+export type InsertDailyClosing = z.infer<typeof insertDailyClosingSchema>;
+export type MonthlyClosing = typeof monthlyClosings.$inferSelect;
+export type InsertMonthlyClosing = z.infer<typeof insertMonthlyClosingSchema>;
 
 // ========== Type Exports ==========
 

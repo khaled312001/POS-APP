@@ -55,7 +55,12 @@
       "Bash(find /F/POS-APP -name .env* -o -name *.env)",
       "Bash(find /f/POS-APP -name manifest* -o -name *service-worker* -o -name sw.js)",
       "Bash(find f:/POS-APP/assets -name *.png)",
-      "Bash(wc -l f:/POS-APP/app/\\\\\\(tabs\\\\\\)/index.tsx)"
+      "Bash(wc -l f:/POS-APP/app/\\\\\\(tabs\\\\\\)/index.tsx)",
+      "Bash(find /f/POS-APP -type f -name *.html)",
+      "Bash(find /f/POS-APP -type f \\\\\\(-name *.json -o -name *i18n* -o -name *translation* -o -name *locale* \\\\\\))",
+      "Bash(find /f/POS-APP/app -type d -name \"\\(tabs\\)\" -o -type d -name \"pos\" -o -type d -name \"online\" -o -type d -name \"store\")",
+      "Bash(find /f/POS-APP -type f -name *.css)",
+      "Bash(find /f/POS-APP -maxdepth 2 -type f \\\\\\(-name *landing* -o -name *marketing* -o -name *brochure* -o -name *public* \\\\\\))"
     ]
   }
 }

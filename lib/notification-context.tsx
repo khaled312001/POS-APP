@@ -346,8 +346,43 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         if (incomingCalls.length === 0) stopCallRing();
     }, [incomingCalls.length, stopCallRing]);
 
-    // Polling is handled in _layout.tsx (which already queries /api/online-orders)
-    // WebSocket above provides the real-time path; layout polling is the reliable fallback.
+    // ── HTTP polling fallback — catches calls missed by WebSocket ──────────────
+    const incomingCallsRef = useRef<any[]>(incomingCalls);
+    useEffect(() => { incomingCallsRef.current = incomingCalls; }, [incomingCalls]);
+
+    useEffect(() => {
+        if (!tenant?.id) return;
+        const pollUrl = `${getApiUrl()}/api/caller-id/active-calls?tenantId=${tenant.id}`;
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(pollUrl, { credentials: "include" });
+                if (!res.ok) return;
+                const data = await res.json();
+                const remoteCalls: any[] = data.calls || [];
+                if (remoteCalls.length === 0) return;
+                const seen = getSeenCallIds();
+                const prev = incomingCallsRef.current;
+                const prevIds = new Set(prev.map((c: any) => c.id));
+                const newCalls: any[] = [];
+                for (const rc of remoteCalls) {
+                    const id = `${rc.slot}-${rc.timestamp}`;
+                    if (seen.has(id) || prevIds.has(id)) continue;
+                    newCalls.push({ ...rc, id });
+                }
+                if (newCalls.length === 0) return;
+                startCallRing();
+                setIncomingCalls((prev) => {
+                    let next = [...prev];
+                    for (const nc of newCalls) {
+                        next = next.filter((c: any) => c.slot !== nc.slot);
+                        next.push(nc);
+                    }
+                    return next.slice(0, 4);
+                });
+            } catch { /* network error — ignore */ }
+        }, 4000);
+        return () => clearInterval(interval);
+    }, [tenant?.id, startCallRing]);
 
     const dismissCall = useCallback((callId: string, slot: number) => {
         // Mark as seen so it won't re-appear after page refresh

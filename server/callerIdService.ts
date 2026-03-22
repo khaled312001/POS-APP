@@ -216,15 +216,17 @@ export class CallerIDService extends EventEmitter {
 
   private broadcastToTenant(payload: string, tenantId?: number) {
     if (!this.wss) return;
+    let total = 0, matched = 0;
     this.wss.clients.forEach((client: TenantWebSocket) => {
       if (client.readyState === WebSocket.OPEN) {
-        // If tenantId is specified, only send to matching clients.
-        // If not specified (system-wide?), send to all.
+        total++;
         if (!tenantId || client.tenantId === tenantId) {
+          matched++;
           client.send(payload);
         }
       }
     });
+    console.log(`[CallerID] Broadcast: ${matched}/${total} clients matched tenant=${tenantId}`);
   }
 
   /**
@@ -248,6 +250,13 @@ export class CallerIDService extends EventEmitter {
   public broadcast(payload: object, tenantId?: number) {
     const msg = JSON.stringify(payload);
     this.broadcastToTenant(msg, tenantId);
+  }
+
+  /**
+   * Returns all currently active calls for a given tenant (for HTTP polling fallback).
+   */
+  public getActiveCallsForTenant(tenantId: number): ActiveCall[] {
+    return Array.from(this.activeCallSlots.values()).filter(c => c.tenantId === tenantId);
   }
 
   /**

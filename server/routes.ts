@@ -1993,6 +1993,14 @@ async function test(){
 </script></body></html>`);
   });
 
+  // HTTP polling fallback — returns active calls for the requesting tenant
+  app.get("/api/caller-id/active-calls", (req, res) => {
+    const tenantId = (req as any).tenantId || Number(req.query.tenantId);
+    if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+    const calls = callerIdService.getActiveCallsForTenant(Number(tenantId));
+    res.json({ calls });
+  });
+
   // Incoming call from local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
   app.post("/api/caller-id/incoming", async (req, res) => {
     try {
