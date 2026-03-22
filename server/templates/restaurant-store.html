@@ -2503,6 +2503,87 @@
     #contact {
       scroll-margin-top: calc(var(--nav-h) + 8px)
     }
+
+    /* ===== RTL SUPPORT ===== */
+    [dir="rtl"] body { font-family: 'Inter', 'Noto Sans Arabic', system-ui, sans-serif; }
+    [dir="rtl"] .nav-brand { flex-direction: row-reverse; }
+    [dir="rtl"] .sb-nav a { flex-direction: row-reverse; }
+    [dir="rtl"] .cat-item-left { flex-direction: row-reverse; }
+    [dir="rtl"] .cart-item-info { text-align: right; }
+    [dir="rtl"] .cart-item { flex-direction: row-reverse; }
+    [dir="rtl"] .product-info { text-align: right; }
+    [dir="rtl"] .product-footer { flex-direction: row-reverse; }
+    [dir="rtl"] .form-label { text-align: right; display: block; }
+    [dir="rtl"] .form-input, [dir="rtl"] .form-select, [dir="rtl"] .form-textarea { text-align: right; direction: rtl; }
+    [dir="rtl"] .checkout-title { direction: rtl; }
+    [dir="rtl"] .about-text { text-align: right; }
+    [dir="rtl"] .section-header { text-align: right; }
+    [dir="rtl"] .footer-col { text-align: right; }
+    [dir="rtl"] .footer-col a, [dir="rtl"] .footer-col span { flex-direction: row-reverse; justify-content: flex-end; }
+    [dir="rtl"] .hero-content { text-align: right; }
+    [dir="rtl"] .hero-features { justify-content: flex-end; }
+    [dir="rtl"] .hero-cta { justify-content: flex-end; }
+    [dir="rtl"] .contact-item { flex-direction: row-reverse; }
+    [dir="rtl"] .contact-item > div:last-child { text-align: right; }
+    [dir="rtl"] .pb-section-title { text-align: right; }
+    [dir="rtl"] .pb-total-wrap { flex-direction: row-reverse; }
+    [dir="rtl"] .cart-total-row { flex-direction: row-reverse; }
+    [dir="rtl"] .cart-totals { text-align: right; }
+    [dir="rtl"] #nav { flex-direction: row-reverse; }
+    [dir="rtl"] .nav-spacer { order: 0; }
+
+    /* ===== LANGUAGE DROPDOWN ===== */
+    .lang-wrap { position: relative; }
+    .lang-btn {
+      height: 36px;
+      padding: 0 10px;
+      border-radius: 20px;
+      background: var(--s2);
+      border: 1px solid var(--bd);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--txt);
+      font-size: .78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background var(--t), color var(--t);
+      white-space: nowrap;
+    }
+    .lang-btn:hover { background: var(--P); color: #fff; border-color: var(--P); }
+    .lang-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: var(--s1);
+      border: 1px solid var(--bd);
+      border-radius: 12px;
+      padding: 6px;
+      box-shadow: var(--shadow);
+      z-index: 1100;
+      min-width: 140px;
+    }
+    [dir="rtl"] .lang-menu { right: auto; left: 0; }
+    .lang-menu.open { display: block; }
+    .lang-opt {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 10px;
+      border: none;
+      background: transparent;
+      color: var(--txt);
+      font-size: .85rem;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: left;
+      transition: background var(--t);
+    }
+    [dir="rtl"] .lang-opt { text-align: right; flex-direction: row-reverse; }
+    .lang-opt:hover { background: var(--s2); }
+    .lang-opt.active { font-weight: 700; color: var(--P); }
   </style>
 </head>
 
@@ -2520,12 +2601,24 @@
 
     <div class="nav-actions">
       <div id="tb-social-links" style="display:flex;gap:6px"></div>
+      <!-- Language switcher -->
+      <div class="lang-wrap">
+        <button class="lang-btn" onclick="toggleLangMenu()" id="lang-btn" aria-label="Language">
+          <i class="fa-solid fa-globe"></i>
+          <span id="lang-label">EN</span>
+        </button>
+        <div class="lang-menu" id="lang-menu">
+          <button class="lang-opt" id="lang-opt-en" onclick="changeLang('en')">🇺🇸 English</button>
+          <button class="lang-opt" id="lang-opt-ar" onclick="changeLang('ar')">🇸🇦 العربية</button>
+          <button class="lang-opt" id="lang-opt-de" onclick="changeLang('de')">🇩🇪 Deutsch</button>
+        </div>
+      </div>
       <button class="nav-btn" onclick="toggleTheme()" id="theme-btn" aria-label="Toggle theme">
         <i class="fa-solid fa-moon" id="theme-icon"></i>
       </button>
       <button class="nav-cart-btn" onclick="openCart()">
         <i class="fa-solid fa-basket-shopping"></i>
-        <span class="cart-label">Cart</span>
+        <span class="cart-label" data-i18n="cart">Cart</span>
         <span id="cart-count" class="nav-cart-count" style="display:none">0</span>
       </button>
     </div>
@@ -2537,16 +2630,16 @@
     <div class="sb-header">
       <button class="sb-close" onclick="toggleSidebar()"><i class="fa-solid fa-xmark"></i></button>
       <div class="sb-logo" id="sidebar-logo"></div>
-      <div style="font-size:.85rem;opacity:.85;margin-top:4px" id="sb-tagline">Great food, delivered fast</div>
+      <div style="font-size:.85rem;opacity:.85;margin-top:4px" id="sb-tagline" data-i18n="tagline">Great food, delivered fast</div>
     </div>
     <div class="sb-nav">
-      <a href="#hero" onclick="toggleSidebar()"><i class="fa-solid fa-house"></i> Home</a>
-      <a href="#menu" onclick="toggleSidebar()"><i class="fa-solid fa-utensils"></i> Menu</a>
-      <a href="#about" onclick="toggleSidebar()"><i class="fa-solid fa-circle-info"></i> About</a>
-      <a href="#contact" onclick="toggleSidebar()"><i class="fa-solid fa-phone"></i> Contact</a>
+      <a href="#hero" onclick="toggleSidebar()"><i class="fa-solid fa-house"></i> <span data-i18n="home">Home</span></a>
+      <a href="#menu" onclick="toggleSidebar()"><i class="fa-solid fa-utensils"></i> <span data-i18n="menu">Menu</span></a>
+      <a href="#about" onclick="toggleSidebar()"><i class="fa-solid fa-circle-info"></i> <span data-i18n="about">About</span></a>
+      <a href="#contact" onclick="toggleSidebar()"><i class="fa-solid fa-phone"></i> <span data-i18n="contact">Contact</span></a>
       <div class="sb-divider"></div>
       <a href="javascript:void(0)" onclick="openCart();toggleSidebar()"><i class="fa-solid fa-basket-shopping"
-          style="color:var(--P)"></i> View Cart (<span id="sb-cart-count">0</span>)</a>
+          style="color:var(--P)"></i> <span data-i18n="viewCart">View Cart</span> (<span id="sb-cart-count">0</span>)</a>
     </div>
     <div class="sb-contact" id="sidebar-contact"></div>
     <div class="sb-social" id="sb-social" style="padding:0 16px 20px"></div>
@@ -2556,17 +2649,17 @@
   <section id="hero">
     <div id="hero-bg"></div>
     <div class="hero-content">
-      <div class="hero-badge"><i class="fa-solid fa-star"></i> Premium Restaurant</div>
+      <div class="hero-badge"><i class="fa-solid fa-star"></i> <span data-i18n="heroBadge">Premium Restaurant</span></div>
       <h1 id="hero-title">Welcome to Our Restaurant</h1>
       <p id="hero-subtitle">Delicious food crafted with passion, delivered to your door</p>
       <div class="hero-features" id="hero-features"></div>
       <div class="hero-cta">
         <button class="btn-hero-primary" onclick="document.getElementById('menu').scrollIntoView({behavior:'smooth'})">
-          <i class="fa-solid fa-utensils"></i> Order Now
+          <i class="fa-solid fa-utensils"></i> <span data-i18n="orderNow">Order Now</span>
         </button>
         <button class="btn-hero-secondary"
           onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})">
-          <i class="fa-solid fa-circle-info"></i> Learn More
+          <i class="fa-solid fa-circle-info"></i> <span data-i18n="learnMore">Learn More</span>
         </button>
       </div>
     </div>
@@ -2578,19 +2671,19 @@
     <div class="stats-inner">
       <div class="stat-item">
         <div class="stat-num" id="stat-items">0</div>
-        <div class="stat-lbl">Menu Items</div>
+        <div class="stat-lbl" data-i18n="menuItems">Menu Items</div>
       </div>
       <div class="stat-item">
         <div class="stat-num" id="stat-cats">0</div>
-        <div class="stat-lbl">Categories</div>
+        <div class="stat-lbl" data-i18n="categories">Categories</div>
       </div>
       <div class="stat-item">
         <div class="stat-num" id="info-delivery">—</div>
-        <div class="stat-lbl">Delivery</div>
+        <div class="stat-lbl" data-i18n="delivery">Delivery</div>
       </div>
       <div class="stat-item">
         <div class="stat-num">★ 5.0</div>
-        <div class="stat-lbl">Rating</div>
+        <div class="stat-lbl" data-i18n="rating">Rating</div>
       </div>
     </div>
   </div>
@@ -2599,9 +2692,9 @@
   <section class="section" id="menu">
     <div class="section-inner">
       <div class="section-header">
-        <div class="section-label">Our Menu</div>
-        <h2 class="section-title">What would you like to eat?</h2>
-        <p class="section-desc">Browse our full menu and add your favorites to cart</p>
+        <div class="section-label" data-i18n="ourMenu">Our Menu</div>
+        <h2 class="section-title" data-i18n="menuSubtitle">What would you like to eat?</h2>
+        <p class="section-desc" data-i18n="menuDesc">Browse our full menu and add your favorites to cart</p>
       </div>
 
       <!-- Mobile category pills -->
@@ -2610,7 +2703,7 @@
       <div class="menu-layout">
         <!-- Category sidebar -->
         <div class="cat-sidebar">
-          <div class="cat-sidebar-title">Categories</div>
+          <div class="cat-sidebar-title" data-i18n="categoriesTitle">Categories</div>
           <div class="cat-list" id="cat-list"></div>
         </div>
 
@@ -2618,12 +2711,12 @@
         <div>
           <div class="menu-header">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              <span class="menu-title" id="active-cat-label">All Items</span>
+              <span class="menu-title" id="active-cat-label" data-i18n="allItems">All Items</span>
               <span class="menu-count" id="visible-count">0 items</span>
             </div>
             <div class="search-wrap">
               <i class="fa-solid fa-magnifying-glass"></i>
-              <input type="text" id="search-input" placeholder="Search menu..." oninput="searchProducts(this.value)">
+              <input type="text" id="search-input" data-i18n-placeholder="searchPlaceholder" placeholder="Search menu..." oninput="searchProducts(this.value)">
             </div>
           </div>
           <div id="product-grid">
@@ -2674,24 +2767,24 @@
         </div>
         <div class="about-text">
           <div>
-            <div class="section-label">Our Story</div>
+            <div class="section-label" data-i18n="ourStory">Our Story</div>
             <h2 class="section-title" id="about-title">About Us</h2>
           </div>
-          <p class="about-body" id="about-text-content">We are passionate about bringing the finest flavors to your
+          <p class="about-body" id="about-text-content" data-i18n="aboutDefault">We are passionate about bringing the finest flavors to your
             table. Every dish is crafted with care using the freshest ingredients.</p>
           <div class="about-stats">
             <div class="about-stat">
               <div class="about-stat-num" id="stat-items-2">0</div>
-              <div class="about-stat-lbl">Menu Items</div>
+              <div class="about-stat-lbl" data-i18n="menuItems">Menu Items</div>
             </div>
             <div class="about-stat">
               <div class="about-stat-num" id="stat-cats-2">0</div>
-              <div class="about-stat-lbl">Categories</div>
+              <div class="about-stat-lbl" data-i18n="categories">Categories</div>
             </div>
           </div>
           <button class="btn-hero-primary" onclick="document.getElementById('menu').scrollIntoView({behavior:'smooth'})"
             style="width:fit-content">
-            <i class="fa-solid fa-basket-shopping"></i> Order Now
+            <i class="fa-solid fa-basket-shopping"></i> <span data-i18n="orderNow">Order Now</span>
           </button>
         </div>
       </div>
@@ -2702,19 +2795,19 @@
   <section class="section" id="contact" style="background:var(--s2)">
     <div class="section-inner">
       <div class="section-header">
-        <div class="section-label">Get In Touch</div>
-        <h2 class="section-title">Contact & Location</h2>
+        <div class="section-label" data-i18n="getInTouch">Get In Touch</div>
+        <h2 class="section-title" data-i18n="contactLocation">Contact & Location</h2>
       </div>
       <div class="contact-grid">
         <div class="contact-card">
           <div class="contact-info" id="contact-info">
-            <div style="color:var(--mu);font-size:.9rem">Loading contact info...</div>
+            <div style="color:var(--mu);font-size:.9rem" data-i18n="loadingContact">Loading contact info...</div>
           </div>
         </div>
         <div class="map-wrap" id="contact-map">
           <div class="map-placeholder">
             <i class="fa-solid fa-location-dot"></i>
-            <span>Location not set</span>
+            <span data-i18n="locationNotSet">Location not set</span>
           </div>
         </div>
       </div>
@@ -2727,15 +2820,15 @@
       <div class="footer-grid">
         <div>
           <div id="footer-brand"></div>
-          <p class="footer-desc" id="footer-desc">Great food made with passion. Order online for fast delivery or easy
+          <p class="footer-desc" id="footer-desc" data-i18n="footerDefault">Great food made with passion. Order online for fast delivery or easy
             pickup.</p>
           <div class="footer-social" id="footer-social"></div>
         </div>
         <div class="footer-col">
-          <div class="footer-col-title">Menu</div>
-          <a href="#menu"><i class="fa-solid fa-utensils"></i> All Items</a>
-          <a href="#about"><i class="fa-solid fa-circle-info"></i> About Us</a>
-          <a href="#contact"><i class="fa-solid fa-phone"></i> Contact</a>
+          <div class="footer-col-title" data-i18n="menuFooter">Menu</div>
+          <a href="#menu"><i class="fa-solid fa-utensils"></i> <span data-i18n="allItems">All Items</span></a>
+          <a href="#about"><i class="fa-solid fa-circle-info"></i> <span data-i18n="aboutUs">About Us</span></a>
+          <a href="#contact"><i class="fa-solid fa-phone"></i> <span data-i18n="contact">Contact</span></a>
         </div>
         <div class="footer-col" id="footer-contact">
           <div class="footer-col-title">Contact</div>
@@ -2746,7 +2839,7 @@
       </div>
       <div class="footer-bottom">
         <span class="footer-copy" id="footer-copy">&copy; 2024 Restaurant. All rights reserved.</span>
-        <span style="font-size:.78rem;color:var(--mu)">Powered by Barmagly POS</span>
+        <span style="font-size:.78rem;color:var(--mu)" data-i18n="poweredBy">Powered by Barmagly POS</span>
       </div>
     </div>
   </footer>
@@ -2755,15 +2848,14 @@
   <div id="cart-overlay" onclick="closeCart()"></div>
   <div id="cart-panel">
     <div class="cart-header">
-      <span class="cart-title"><i class="fa-solid fa-basket-shopping" style="color:var(--P);margin-right:8px"></i>Your
-        Cart</span>
+      <span class="cart-title"><i class="fa-solid fa-basket-shopping" style="color:var(--P);margin-right:8px"></i><span data-i18n="yourCart">Your Cart</span></span>
       <button class="cart-close" onclick="closeCart()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div id="cart-items">
       <div class="cart-empty">
         <div class="cart-empty-icon"><i class="fa-solid fa-cart-shopping"></i></div>
-        <p>Your cart is empty</p>
-        <span style="font-size:.82rem;color:var(--mu)">Add items from the menu to get started</span>
+        <p data-i18n="cartEmpty">Your cart is empty</p>
+        <span style="font-size:.82rem;color:var(--mu)" data-i18n="cartEmptyHint">Add items from the menu to get started</span>
       </div>
     </div>
     <div id="cart-footer"></div>
@@ -2784,7 +2876,7 @@
     <div class="checkout-sheet">
       <div class="checkout-handle"></div>
       <div class="checkout-header">
-        <span class="checkout-title">Complete Your Order</span>
+        <span class="checkout-title" data-i18n="completeOrder">Complete Your Order</span>
         <button class="cart-close" onclick="closeCheckout()"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="checkout-body">
@@ -2792,55 +2884,55 @@
         <div id="checkout-form">
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Full Name *</label>
-              <input class="form-input" id="co-name" type="text" placeholder="Your name">
+              <label class="form-label" data-i18n="fullName">Full Name *</label>
+              <input class="form-input" id="co-name" type="text" data-i18n-placeholder="namePlaceholder" placeholder="Your name">
             </div>
             <div class="form-group">
-              <label class="form-label">Phone *</label>
+              <label class="form-label" data-i18n="phoneLbl">Phone *</label>
               <input class="form-input" id="co-phone" type="tel">
             </div>
           </div>
           <div class="form-group">
-            <label class="form-label">Email</label>
-            <input class="form-input" id="co-email" type="email" placeholder="your@email.com">
+            <label class="form-label" data-i18n="emailLbl">Email</label>
+            <input class="form-input" id="co-email" type="email" data-i18n-placeholder="emailPlaceholder" placeholder="your@email.com">
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Order Type</label>
+              <label class="form-label" data-i18n="orderType">Order Type</label>
               <select class="form-select" id="co-type">
-                <option value="delivery">Delivery</option>
-                <option value="pickup">Pickup</option>
+                <option value="delivery" data-i18n-opt="deliveryOpt">Delivery</option>
+                <option value="pickup" data-i18n-opt="pickupOpt">Pickup</option>
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label">Payment</label>
+              <label class="form-label" data-i18n="payment">Payment</label>
               <select class="form-select" id="co-payment">
-                <option value="cash">Cash on Delivery</option>
-                <option value="card">Card</option>
+                <option value="cash" data-i18n-opt="cashOnDelivery">Cash on Delivery</option>
+                <option value="card" data-i18n-opt="cardOpt">Card</option>
               </select>
             </div>
           </div>
           <div class="form-group" id="co-address-group">
-            <label class="form-label">Delivery Address *</label>
-            <input class="form-input" id="co-address" type="text" placeholder="Street, City, ZIP">
+            <label class="form-label" data-i18n="deliveryAddress">Delivery Address *</label>
+            <input class="form-input" id="co-address" type="text" data-i18n-placeholder="addressPlaceholder" placeholder="Street, City, ZIP">
           </div>
           <div class="form-group">
-            <label class="form-label">Special Instructions</label>
-            <textarea class="form-textarea" id="co-notes" placeholder="Allergies, special requests..."></textarea>
+            <label class="form-label" data-i18n="specialInstructions">Special Instructions</label>
+            <textarea class="form-textarea" id="co-notes" data-i18n-placeholder="notesPlaceholder" placeholder="Allergies, special requests..."></textarea>
           </div>
         </div>
         <div class="checkout-success" id="checkout-success" style="flex-direction:column;align-items:center">
           <div class="checkout-success-icon"><i class="fa-solid fa-check"></i></div>
-          <div class="checkout-success-title">🎉 Order Placed!</div>
-          <p class="checkout-success-msg" id="success-msg">Your order has been received.</p>
+          <div class="checkout-success-title" data-i18n="orderPlaced">🎉 Order Placed!</div>
+          <p class="checkout-success-msg" id="success-msg" data-i18n="orderReceived">Your order has been received.</p>
           <button class="btn-submit" style="margin-top:20px;max-width:220px" onclick="closeCheckout()">
-            <i class="fa-solid fa-utensils" style="margin-right:8px"></i>Continue Browsing
+            <i class="fa-solid fa-utensils" style="margin-right:8px"></i><span data-i18n="continueBrowsing">Continue Browsing</span>
           </button>
         </div>
       </div>
       <div class="checkout-footer" id="checkout-footer">
         <button class="btn-submit" id="checkout-submit" onclick="submitOrder()">
-          <i class="fa-solid fa-lock" style="margin-right:8px"></i>Place Order
+          <i class="fa-solid fa-lock" style="margin-right:8px"></i><span data-i18n="placeOrder">Place Order</span>
         </button>
       </div>
     </div>
@@ -2865,7 +2957,7 @@
       </div>
       <div class="pizza-body">
         <div class="pb-section">
-          <div class="pb-section-title">Choose Size</div>
+          <div class="pb-section-title" data-i18n="chooseSize">Choose Size</div>
           <div class="pb-sizes">
             <div class="pb-size active" data-size="small" onclick="selectSize('small',this)">
               <div class="pb-size-name">33 cm</div>
@@ -2878,17 +2970,17 @@
           </div>
         </div>
         <div class="pb-section">
-          <div class="pb-section-title">Extra Toppings (optional)</div>
+          <div class="pb-section-title" data-i18n="extraToppings">Extra Toppings (optional)</div>
           <div class="pb-addons" id="pb-addons"></div>
         </div>
       </div>
       <div class="pizza-footer">
         <div class="pb-total-wrap">
-          <div class="pb-total-label">Total</div>
+          <div class="pb-total-label" data-i18n="totalLbl">Total</div>
           <div class="pb-total" id="pb-total">—</div>
         </div>
         <button class="btn-add-pizza" onclick="addPizzaToCart()">
-          <i class="fa-solid fa-plus"></i> Add to Cart
+          <i class="fa-solid fa-plus"></i> <span data-i18n="addToCart">Add to Cart</span>
         </button>
       </div>
     </div>
@@ -2902,6 +2994,195 @@
     const SLUG = '{{SLUG}}';
     const TENANT_ID = '{{TENANT_ID}}';
     const CURRENCY = '{{CURRENCY}}' || 'CHF';
+    const STORE_LANG = '{{LANGUAGE}}' || 'en';
+
+    // ===== I18N =====
+    const I18N = {
+      en: {
+        dir:'ltr', cart:'Cart', home:'Home', menu:'Menu', about:'About', contact:'Contact',
+        viewCart:'View Cart', tagline:'Great food, delivered fast', heroBadge:'Premium Restaurant',
+        orderNow:'Order Now', learnMore:'Learn More',
+        menuItems:'Menu Items', categories:'Categories', delivery:'Delivery', rating:'Rating',
+        ourMenu:'Our Menu', menuSubtitle:'What would you like to eat?',
+        menuDesc:'Browse our full menu and add your favorites to cart',
+        categoriesTitle:'Categories', allItems:'All Items', searchPlaceholder:'Search menu...',
+        ourStory:'Our Story',
+        aboutDefault:'We are passionate about bringing the finest flavors to your table. Every dish is crafted with care using the freshest ingredients.',
+        getInTouch:'Get In Touch', contactLocation:'Contact & Location',
+        locationNotSet:'Location not set', loadingContact:'Loading contact info...',
+        phoneLbl:'Phone', emailLbl:'Email', addressLbl:'Address', hoursLbl:'Hours',
+        contactNotAvailable:'Contact information not available',
+        menuFooter:'Menu', aboutUs:'About Us', poweredBy:'Powered by Barmagly POS',
+        allRights:'All rights reserved.',
+        footerDefault:'Great food made with passion. Order online for fast delivery or easy pickup.',
+        yourCart:'Your Cart', cartEmpty:'Your cart is empty',
+        cartEmptyHint:'Add items from the menu to get started',
+        cartEmptyShort:'Add items from the menu',
+        subtotal:'Subtotal', deliveryFee:'Delivery', totalLbl:'Total',
+        checkout:'Checkout', completeOrder:'Complete Your Order',
+        fullName:'Full Name *', phoneLbl2:'Phone *', emailLblForm:'Email',
+        orderType:'Order Type', payment:'Payment',
+        deliveryOpt:'Delivery', pickupOpt:'Pickup',
+        cashOnDelivery:'Cash on Delivery', cardOpt:'Card',
+        deliveryAddress:'Delivery Address *', specialInstructions:'Special Instructions',
+        namePlaceholder:'Your name', emailPlaceholder:'your@email.com',
+        addressPlaceholder:'Street, City, ZIP', notesPlaceholder:'Allergies, special requests...',
+        orderPlaced:'🎉 Order Placed!', orderReceived:'Your order has been received.',
+        continueBrowsing:'Continue Browsing', placeOrder:'Place Order', placingOrder:'Placing order...',
+        cartIsEmpty:'Cart is empty',
+        buildPizza:'Build Your Pizza', chooseSizeToppings:'Choose your size and toppings',
+        chooseSize:'Choose Size', extraToppings:'Extra Toppings (optional)',
+        addToCart:'Add to Cart', selectPizzaFirst:'Please select a pizza first',
+        noItemsFound:'No items found', tryDifferent:'Try a different category or search',
+        menuComingSoon:'Menu coming soon', failedToLoad:'Failed to load menu',
+        items:'items', deliveryFeat:'Delivery', pickupFeat:'Pickup', cardFeat:'Card',
+        added:'added', aboutLabel:'About',
+      },
+      ar: {
+        dir:'rtl', cart:'السلة', home:'الرئيسية', menu:'القائمة', about:'عن المطعم', contact:'اتصل بنا',
+        viewCart:'عرض السلة', tagline:'طعام شهي، توصيل سريع', heroBadge:'مطعم مميز',
+        orderNow:'اطلب الآن', learnMore:'اعرف المزيد',
+        menuItems:'الأصناف', categories:'الفئات', delivery:'التوصيل', rating:'التقييم',
+        ourMenu:'قائمتنا', menuSubtitle:'ماذا تريد أن تأكل؟',
+        menuDesc:'تصفح قائمتنا الكاملة وأضف المفضلة إلى السلة',
+        categoriesTitle:'الفئات', allItems:'كل الأصناف', searchPlaceholder:'ابحث في القائمة...',
+        ourStory:'قصتنا',
+        aboutDefault:'نحن شغوفون بتقديم أفضل النكهات على طاولتك. كل طبق يُعدّ بعناية من أطيب المكونات.',
+        getInTouch:'تواصل معنا', contactLocation:'التواصل والموقع',
+        locationNotSet:'الموقع غير محدد', loadingContact:'جارٍ تحميل معلومات التواصل...',
+        phoneLbl:'الهاتف', emailLbl:'البريد الإلكتروني', addressLbl:'العنوان', hoursLbl:'أوقات العمل',
+        contactNotAvailable:'معلومات التواصل غير متاحة',
+        menuFooter:'القائمة', aboutUs:'من نحن', poweredBy:'مدعوم من Barmagly POS',
+        allRights:'جميع الحقوق محفوظة.',
+        footerDefault:'طعام شهي بشغف. اطلب عبر الإنترنت للتوصيل السريع أو الاستلام.',
+        yourCart:'سلتك', cartEmpty:'سلتك فارغة',
+        cartEmptyHint:'أضف أصنافاً من القائمة للبدء',
+        cartEmptyShort:'أضف أصنافاً من القائمة',
+        subtotal:'المجموع الجزئي', deliveryFee:'التوصيل', totalLbl:'الإجمالي',
+        checkout:'الدفع', completeOrder:'أكمل طلبك',
+        fullName:'الاسم الكامل *', phoneLbl2:'الهاتف *', emailLblForm:'البريد الإلكتروني',
+        orderType:'نوع الطلب', payment:'طريقة الدفع',
+        deliveryOpt:'توصيل', pickupOpt:'استلام',
+        cashOnDelivery:'الدفع عند الاستلام', cardOpt:'بطاقة',
+        deliveryAddress:'عنوان التوصيل *', specialInstructions:'تعليمات خاصة',
+        namePlaceholder:'اسمك', emailPlaceholder:'بريدك@الإلكتروني.com',
+        addressPlaceholder:'الشارع، المدينة، الرمز البريدي', notesPlaceholder:'حساسية، طلبات خاصة...',
+        orderPlaced:'🎉 تم تقديم الطلب!', orderReceived:'تم استلام طلبك.',
+        continueBrowsing:'متابعة التصفح', placeOrder:'قدّم الطلب', placingOrder:'جارٍ تقديم الطلب...',
+        cartIsEmpty:'السلة فارغة',
+        buildPizza:'ابنِ بيتزاك', chooseSizeToppings:'اختر الحجم والإضافات',
+        chooseSize:'اختر الحجم', extraToppings:'إضافات (اختياري)',
+        addToCart:'أضف إلى السلة', selectPizzaFirst:'الرجاء اختيار بيتزا أولاً',
+        noItemsFound:'لا توجد أصناف', tryDifferent:'جرّب فئة أو بحثاً مختلفاً',
+        menuComingSoon:'القائمة قريباً', failedToLoad:'فشل تحميل القائمة',
+        items:'صنف', deliveryFeat:'توصيل', pickupFeat:'استلام', cardFeat:'بطاقة',
+        added:'أُضيف', aboutLabel:'عن',
+      },
+      de: {
+        dir:'ltr', cart:'Warenkorb', home:'Startseite', menu:'Speisekarte', about:'Über uns', contact:'Kontakt',
+        viewCart:'Warenkorb anzeigen', tagline:'Leckeres Essen, schnell geliefert', heroBadge:'Premium Restaurant',
+        orderNow:'Jetzt bestellen', learnMore:'Mehr erfahren',
+        menuItems:'Speisen', categories:'Kategorien', delivery:'Lieferung', rating:'Bewertung',
+        ourMenu:'Unsere Speisekarte', menuSubtitle:'Was möchten Sie essen?',
+        menuDesc:'Durchsuchen Sie unsere Speisekarte und fügen Sie Favoriten hinzu',
+        categoriesTitle:'Kategorien', allItems:'Alle Speisen', searchPlaceholder:'Speisekarte durchsuchen...',
+        ourStory:'Unsere Geschichte',
+        aboutDefault:'Wir sind leidenschaftlich daran interessiert, die feinsten Aromen auf Ihren Tisch zu bringen. Jedes Gericht wird sorgfältig mit frischesten Zutaten zubereitet.',
+        getInTouch:'Kontaktieren Sie uns', contactLocation:'Kontakt & Standort',
+        locationNotSet:'Standort nicht gesetzt', loadingContact:'Kontaktinformationen werden geladen...',
+        phoneLbl:'Telefon', emailLbl:'E-Mail', addressLbl:'Adresse', hoursLbl:'Öffnungszeiten',
+        contactNotAvailable:'Kontaktinformationen nicht verfügbar',
+        menuFooter:'Speisekarte', aboutUs:'Über uns', poweredBy:'Powered by Barmagly POS',
+        allRights:'Alle Rechte vorbehalten.',
+        footerDefault:'Leckeres Essen mit Leidenschaft. Online bestellen für schnelle Lieferung oder einfache Abholung.',
+        yourCart:'Ihr Warenkorb', cartEmpty:'Ihr Warenkorb ist leer',
+        cartEmptyHint:'Fügen Sie Artikel aus der Speisekarte hinzu',
+        cartEmptyShort:'Fügen Sie Artikel aus der Speisekarte hinzu',
+        subtotal:'Zwischensumme', deliveryFee:'Lieferung', totalLbl:'Gesamt',
+        checkout:'Zur Kasse', completeOrder:'Bestellung abschließen',
+        fullName:'Vollständiger Name *', phoneLbl2:'Telefon *', emailLblForm:'E-Mail',
+        orderType:'Bestellart', payment:'Zahlung',
+        deliveryOpt:'Lieferung', pickupOpt:'Abholung',
+        cashOnDelivery:'Barzahlung bei Lieferung', cardOpt:'Karte',
+        deliveryAddress:'Lieferadresse *', specialInstructions:'Besondere Anweisungen',
+        namePlaceholder:'Ihr Name', emailPlaceholder:'ihre@email.de',
+        addressPlaceholder:'Straße, Stadt, PLZ', notesPlaceholder:'Allergien, besondere Wünsche...',
+        orderPlaced:'🎉 Bestellung aufgegeben!', orderReceived:'Ihre Bestellung wurde erhalten.',
+        continueBrowsing:'Weiter stöbern', placeOrder:'Bestellen', placingOrder:'Bestellung wird aufgegeben...',
+        cartIsEmpty:'Warenkorb ist leer',
+        buildPizza:'Deine Pizza zusammenstellen', chooseSizeToppings:'Größe und Beläge wählen',
+        chooseSize:'Größe wählen', extraToppings:'Zusätzliche Beläge (optional)',
+        addToCart:'In den Warenkorb', selectPizzaFirst:'Bitte zuerst eine Pizza auswählen',
+        noItemsFound:'Keine Artikel gefunden', tryDifferent:'Versuchen Sie eine andere Kategorie oder Suche',
+        menuComingSoon:'Speisekarte kommt bald', failedToLoad:'Fehler beim Laden der Speisekarte',
+        items:'Artikel', deliveryFeat:'Lieferung', pickupFeat:'Abholung', cardFeat:'Karte',
+        added:'hinzugefügt', aboutLabel:'Über',
+      }
+    };
+
+    function tr(key) {
+      const l = I18N[currentLang] || I18N.en;
+      return l[key] !== undefined ? l[key] : (I18N.en[key] || key);
+    }
+
+    let currentLang = localStorage.getItem('store_lang') || STORE_LANG || 'en';
+
+    function applyLang(lang) {
+      if (!I18N[lang]) lang = 'en';
+      currentLang = lang;
+      const l = I18N[lang];
+      // Direction
+      document.documentElement.dir = l.dir;
+      document.documentElement.lang = lang;
+      // Static data-i18n elements
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (l[key] !== undefined) el.textContent = l[key];
+      });
+      // Placeholder attributes
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (l[key] !== undefined) el.placeholder = l[key];
+      });
+      // Select option text via data-i18n-opt
+      document.querySelectorAll('[data-i18n-opt]').forEach(el => {
+        const key = el.getAttribute('data-i18n-opt');
+        if (l[key] !== undefined) el.textContent = l[key];
+      });
+      // Update language button label
+      const langLabel = document.getElementById('lang-label');
+      if (langLabel) langLabel.textContent = lang.toUpperCase();
+      // Update active lang option
+      ['en','ar','de'].forEach(code => {
+        const opt = document.getElementById('lang-opt-' + code);
+        if (opt) opt.classList.toggle('active', code === lang);
+      });
+      // Re-render dynamic content if store is already loaded
+      if (storeData) {
+        renderCart();
+        if (allCategories.length) renderCategories(allCategories, allProducts);
+        if (allProducts.length) {
+          renderProducts(allProducts, allCategories);
+          setTxt('visible-count', `${allProducts.filter(x => x.isActive).length} ${tr('items')}`);
+        }
+      }
+      localStorage.setItem('store_lang', lang);
+    }
+
+    function toggleLangMenu() {
+      document.getElementById('lang-menu').classList.toggle('open');
+    }
+    function changeLang(lang) {
+      applyLang(lang);
+      document.getElementById('lang-menu').classList.remove('open');
+    }
+    // Close lang menu when clicking outside
+    document.addEventListener('click', function(e) {
+      const wrap = document.querySelector('.lang-wrap');
+      if (wrap && !wrap.contains(e.target)) {
+        document.getElementById('lang-menu').classList.remove('open');
+      }
+    });
     const PIZZA_SIZES = {
       small: { label: '33 cm', multiplier: 1 },
       large: { label: '45 cm', multiplier: 1.7 }
@@ -3184,7 +3465,7 @@
       pulseBadge();
       playAdd();
       if (sourceEl) flyToCartAnimation(sourceEl);
-      showToast(`<i class="fa-solid fa-circle-check" style="color:#4ade80;margin-right:6px"></i><strong>${product.name}</strong> added!`);
+      showToast(`<i class="fa-solid fa-circle-check" style="color:#4ade80;margin-right:6px"></i><strong>${product.name}</strong> ${tr('added')}!`);
     }
 
     function removeFromCart(key) {
@@ -3198,7 +3479,7 @@
     }
 
     function renderCart() {
-      const itemsHtml = !cart.length ? `<div class="cart-empty"><div class="cart-empty-icon"><i class="fa-solid fa-cart-shopping"></i></div><p>Your cart is empty</p><span style="font-size:.82rem;color:var(--mu)">Add items from the menu</span></div>`
+      const itemsHtml = !cart.length ? `<div class="cart-empty"><div class="cart-empty-icon"><i class="fa-solid fa-cart-shopping"></i></div><p>${tr('cartEmpty')}</p><span style="font-size:.82rem;color:var(--mu)">${tr('cartEmptyShort')}</span></div>`
         : cart.map(i => `
       <div class="cart-item">
         <div class="cart-item-img">${i.image ? `<img src="${i.image}" alt="" loading="lazy">` : `<div class="cart-item-img-placeholder"><i class="fa-solid fa-utensils"></i></div>`}</div>
@@ -3221,11 +3502,11 @@
       const t = getCartTotal();
       setHtml('cart-footer', `
       <div class="cart-totals">
-        <div class="cart-total-row"><span>Subtotal</span><span>${fmt(t.subtotal)}</span></div>
-        <div class="cart-total-row"><span>Delivery</span><span>${fmt(t.delivery)}</span></div>
-        <div class="cart-total-row grand"><span>Total</span><span>${fmt(t.total)}</span></div>
+        <div class="cart-total-row"><span>${tr('subtotal')}</span><span>${fmt(t.subtotal)}</span></div>
+        <div class="cart-total-row"><span>${tr('deliveryFee')}</span><span>${fmt(t.delivery)}</span></div>
+        <div class="cart-total-row grand"><span>${tr('totalLbl')}</span><span>${fmt(t.total)}</span></div>
       </div>
-      <button class="btn-checkout" onclick="openCheckout()"><i class="fa-solid fa-lock" style="margin-right:8px"></i>Checkout — ${fmt(t.total)}</button>`);
+      <button class="btn-checkout" onclick="openCheckout()"><i class="fa-solid fa-lock" style="margin-right:8px"></i>${tr('checkout')} — ${fmt(t.total)}</button>`);
     }
 
     // ===== CHECKOUT =====

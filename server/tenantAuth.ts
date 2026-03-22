@@ -21,7 +21,8 @@ const PUBLIC_ROUTES = [
   "/api/payment-gateway/config",
   "/api/products/template",
   "/api/dashboard/subscriptions",
-  "/api/caller-id/incoming", // Local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
+  "/api/caller-id/incoming",  // Local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
+  "/api/caller-id/active-calls", // HTTP polling fallback — tenantId required in query string
   "/api/push/vapid-public-key", // Public — needed for SW push subscription before auth
   "/api/push/subscribe", // Public — SW registers subscription before full auth
 ];

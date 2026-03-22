@@ -72,6 +72,7 @@ export const products = pgTable("products", {
   expiryDate: timestamp("expiry_date"),
   modifiers: jsonb("modifiers").$type<{ name: string; options: { label: string; price: number }[] }[]>().default([]),
   variants: jsonb("variants").$type<{ name: string; sku: string; price: number; stock: number }[]>().default([]),
+  isAddon: boolean("is_addon").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -605,6 +606,7 @@ export const landingPageConfig = pgTable("landing_page_config", {
   deliveryRadius: text("delivery_radius"), // e.g. "within 10km"
   customCss: text("custom_css"),
   isPublished: boolean("is_published").default(true),
+  language: text("language").default("en"), // System language: en | ar | de
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

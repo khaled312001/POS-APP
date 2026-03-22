@@ -42,7 +42,7 @@ export default function ProductsScreen() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece", expiryDate: "" });
+  const [form, setForm] = useState({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece", expiryDate: "", isAddon: false });
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
@@ -115,14 +115,14 @@ export default function ProductsScreen() {
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
-  const resetForm = () => { setForm({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece", expiryDate: "" }); setProductImage(null); setInitialStock(""); };
+  const resetForm = () => { setForm({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece", expiryDate: "", isAddon: false }); setProductImage(null); setInitialStock(""); };
 
   const openEdit = (p: any) => {
     setEditProduct(p);
     setForm({
       name: p.name, price: String(p.price), sku: p.sku || "",
       barcode: p.barcode || "", categoryId: p.categoryId ? String(p.categoryId) : "",
-      costPrice: p.costPrice ? String(p.costPrice) : "", unit: p.unit || "piece", expiryDate: p.expiryDate || "",
+      costPrice: p.costPrice ? String(p.costPrice) : "", unit: p.unit || "piece", expiryDate: p.expiryDate || "", isAddon: !!p.isAddon,
     });
     setProductImage(p.image || null);
     setShowForm(true);
@@ -174,17 +174,17 @@ export default function ProductsScreen() {
   };
 
   const handleSave = async () => {
-    if (!form.name || !form.price) return Alert.alert(t("error"), t("productName") + " & " + t("price"));
+    if (!form.name || (!form.isAddon && !form.price)) return Alert.alert(t("error"), t("productName") + " & " + t("price"));
     let imagePath = editProduct?.image || null;
     if (productImage && !productImage.startsWith("/objects") && !productImage.startsWith("http")) {
       imagePath = await uploadImage(productImage);
     }
     const productData: any = {
       tenantId: tenantId || undefined,
-      name: form.name, price: form.price, sku: form.sku || undefined,
+      name: form.name, price: form.isAddon ? "0" : form.price, sku: form.sku || undefined,
       barcode: form.barcode || undefined, costPrice: form.costPrice || undefined,
       categoryId: form.categoryId ? Number(form.categoryId) : undefined, unit: form.unit, expiryDate: form.expiryDate || undefined,
-      image: imagePath || undefined,
+      image: imagePath || undefined, isAddon: form.isAddon,
     };
     if (!editProduct && initialStock && Number(initialStock) > 0) {
       apiRequest("POST", "/api/products-with-stock", { ...productData, initialStock: Number(initialStock), branchId: 1 })
@@ -363,7 +363,16 @@ export default function ProductsScreen() {
                 )}
               </View>
               <View style={[styles.productRight, isRTL && { alignItems: "flex-start" }]}>
-                <Text style={styles.productPrice}>CHF {Number(item.price).toFixed(2)}</Text>
+                {item.isAddon ? (
+                  <Text style={[styles.productPrice, { color: Colors.success }]}>{isRTL ? "مجاني" : "Free"}</Text>
+                ) : (
+                  <Text style={styles.productPrice}>CHF {Number(item.price).toFixed(2)}</Text>
+                )}
+                {item.isAddon && (
+                  <View style={{ backgroundColor: Colors.success + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginTop: 3 }}>
+                    <Text style={{ color: Colors.success, fontSize: 9, fontWeight: "800" }}>{isRTL ? "إضافة" : "ADDON"}</Text>
+                  </View>
+                )}
                 {canManage && (
                   <Pressable onPress={() => {
                     Alert.alert(t("delete"), `${t("delete")} ${item.name}?`, [
@@ -453,10 +462,29 @@ export default function ProductsScreen() {
               </Pressable>
               <Text style={[styles.label, rtlTextAlign]}>{t("productName")} *</Text>
               <TextInput style={[styles.input, rtlTextAlign]} value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} placeholderTextColor={Colors.textMuted} placeholder={t("productName")} />
+
+              {/* Free Addon Toggle */}
+              <Pressable
+                style={[styles.addonToggleRow, isRTL && { flexDirection: "row-reverse" }, form.isAddon && styles.addonToggleRowActive]}
+                onPress={() => setForm({ ...form, isAddon: !form.isAddon, price: !form.isAddon ? "0" : form.price })}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[{ color: form.isAddon ? Colors.success : Colors.text, fontWeight: "700", fontSize: 14 }, isRTL && { textAlign: "right" }]}>
+                    {isRTL ? "إضافة مجانية" : "Free Addon"}
+                  </Text>
+                  <Text style={[{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }, isRTL && { textAlign: "right" }]}>
+                    {isRTL ? "مثل الكاتشاب والصوصات — دائماً مجاني" : "e.g. ketchup, sauces — always free"}
+                  </Text>
+                </View>
+                <View style={[styles.addonToggle, form.isAddon && styles.addonToggleOn]}>
+                  <View style={[styles.addonToggleThumb, form.isAddon && styles.addonToggleThumbOn]} />
+                </View>
+              </Pressable>
+
               <View style={[styles.row, isRTL && { flexDirection: "row-reverse" }]}>
                 <View style={styles.half}>
-                  <Text style={[styles.label, rtlTextAlign]}>{t("price")} *</Text>
-                  <TextInput style={[styles.input, rtlTextAlign]} value={form.price} onChangeText={(v) => setForm({ ...form, price: v })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" />
+                  <Text style={[styles.label, rtlTextAlign]}>{t("price")} {!form.isAddon && "*"}</Text>
+                  <TextInput style={[styles.input, rtlTextAlign, form.isAddon && { opacity: 0.4 }]} value={form.isAddon ? "0.00" : form.price} onChangeText={(v) => setForm({ ...form, price: v })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" editable={!form.isAddon} />
                 </View>
                 <View style={styles.half}>
                   <Text style={[styles.label, rtlTextAlign]}>{t("costPrice")}</Text>
@@ -711,4 +739,10 @@ const styles = StyleSheet.create({
   saveBtn: { borderRadius: 14, overflow: "hidden", marginTop: 20, marginBottom: 16 },
   saveBtnGradient: { paddingVertical: 14, alignItems: "center" },
   saveBtnText: { color: Colors.white, fontSize: 16, fontWeight: "700" },
+  addonToggleRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: Colors.cardBorder, backgroundColor: Colors.surfaceLight, marginBottom: 14 },
+  addonToggleRowActive: { borderColor: Colors.success, backgroundColor: Colors.success + "11" },
+  addonToggle: { width: 46, height: 26, borderRadius: 13, backgroundColor: Colors.cardBorder, padding: 2, justifyContent: "center" },
+  addonToggleOn: { backgroundColor: Colors.success },
+  addonToggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff", alignSelf: "flex-start" },
+  addonToggleThumbOn: { alignSelf: "flex-end" },
 });

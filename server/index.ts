@@ -612,6 +612,15 @@ function setupPaymentGatewayRoutes(app: express.Application) {
 }
 
 (async () => {
+  // Auto-migrate: add language column to landing_page_config if missing
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS language text DEFAULT 'en'`));
+  } catch (e: any) {
+    console.log("[Migration] landing_page_config.language:", e.message);
+  }
+
   setupCors(app);
 
   setupStripeWebhook(app);

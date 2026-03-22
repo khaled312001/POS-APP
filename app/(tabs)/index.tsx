@@ -598,6 +598,7 @@ export default function POSScreen() {
     const printWin = window.open("", "_blank", "width=900,height=700");
     if (!printWin) return;
 
+    const S = (style: string) => `style="${style}"`;
     const storeName = storeSettings?.name || tenant?.name || "POS System";
     const storeAddr = storeSettings?.address || "";
     const storePhone = storeSettings?.phone || "";
@@ -607,241 +608,193 @@ export default function POSScreen() {
     const orderId = saleData?.id || "";
     const receiptNum = saleData?.receiptNumber || `#${orderId}`;
     const now = new Date();
-    const dateStr = now.toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+    const shortDate = now.toLocaleDateString("de-DE");
+    const longDate = now.toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
     const timeStr = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-    const orderTimeStr = saleData?.createdAt ? new Date(saleData.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : timeStr;
+    const orderTimeStr = saleData?.createdAt
+      ? new Date(saleData.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+      : timeStr;
 
     const custAddress = custObj?.address || "";
     const custPhone = custObj?.phone || "";
-    const isDelivery = pmMethod === "delivery" || (cartDeliveryFee > 0);
+    const isDelivery = pmMethod === "delivery" || cartDeliveryFee > 0;
     const pmLabel = pmMethod === "cash" ? "Bar" : pmMethod === "card" ? "Karte" : pmMethod === "delivery" ? "Lieferung" : pmMethod.toUpperCase();
+    const mwstCount = cartItems.reduce((s, i) => s + i.quantity, 0);
 
-    const itemsHtml = cartItems.map((i) =>
-      `<tr><td class="item-name">${i.name}</td><td class="item-qty">x${i.quantity}</td><td class="item-price">Fr&nbsp;${(i.price).toFixed(2)}</td><td class="item-total">Fr&nbsp;${(i.price * i.quantity).toFixed(2)}</td></tr>`
-    ).join("");
-
-    const kitchenItemsHtml = cartItems.map((i) =>
-      `<tr><td class="k-name">${i.name}</td><td class="k-qty">x${i.quantity}</td></tr>`
-    ).join("");
+    // Base styles (all inline — no classes to avoid inheritance issues)
+    const PAGE = "margin:0;padding:14mm 14mm 10mm 14mm;width:100%;min-height:277mm;page-break-after:always;display:block;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#000000;background:#ffffff;box-sizing:border-box;";
+    const TD0 = "padding:0;margin:0;font-family:Arial,Helvetica,sans-serif;color:#000000;font-size:13px;background:#ffffff;";
 
     const logoHtml = logoUrl
-      ? `<img src="${logoUrl}" alt="${storeName}" class="logo-img" />`
-      : `<div class="store-name-big">${storeName}</div>`;
+      ? `<img src="${logoUrl}" alt="${storeName}" style="max-height:72px;max-width:230px;object-fit:contain;display:block;margin:0 auto 4px auto;">`
+      : `<div style="font-size:22px;font-weight:900;letter-spacing:1px;color:#000000;">${storeName}</div>`;
 
-    const mwstCount = cartItems.reduce((s, i) => s + i.quantity, 0);
-    const mwstRate = Number(storeSettings?.taxRate || 2.5);
+    const itemRows = cartItems.map((i) =>
+      `<tr>
+        <td style="${TD0}padding:5px 6px;border-bottom:1px solid #dddddd;width:50%;">${i.name}</td>
+        <td style="${TD0}padding:5px 6px;border-bottom:1px solid #dddddd;width:15%;text-align:center;">${i.quantity}</td>
+        <td style="${TD0}padding:5px 6px;border-bottom:1px solid #dddddd;width:15%;text-align:right;">Fr ${i.price.toFixed(2)}</td>
+        <td style="${TD0}padding:5px 6px;border-bottom:1px solid #dddddd;width:20%;text-align:right;font-weight:700;">Fr ${(i.price * i.quantity).toFixed(2)}</td>
+      </tr>`
+    ).join("");
+
+    const discountRows = cartDiscount > 0
+      ? `<tr>
+          <td colspan="3" style="${TD0}padding:5px 6px;border-bottom:1px solid #dddddd;">- Fr. ${cartDiscount.toFixed(2).replace(".00", ".--")}</td>
+          <td style="${TD0}padding:5px 6px;border-bottom:1px solid #dddddd;text-align:right;font-weight:700;">-Fr ${cartDiscount.toFixed(2)}</td>
+        </tr>
+        <tr><td colspan="4" style="${TD0}padding:2px 6px;font-size:10px;color:#444444;">Reduktion</td></tr>`
+      : "";
+
+    const kitchenRows = cartItems.map((i) =>
+      `<tr>
+        <td style="${TD0}padding:7px 6px;border-bottom:1px solid #cccccc;font-size:15px;font-weight:700;width:75%;">${i.name}</td>
+        <td style="${TD0}padding:7px 6px;border-bottom:1px solid #cccccc;font-size:15px;font-weight:700;text-align:center;width:25%;">x${i.quantity}</td>
+      </tr>`
+    ).join("");
+
+    const infoBlock = (showDeliveryNote: boolean) => `
+      <table style="width:100%;border-collapse:collapse;margin:10px 0;">
+        <tr>
+          <td style="${TD0}vertical-align:top;width:48%;padding-right:8px;">
+            <div style="font-size:11px;color:#333333;line-height:1.8;">${receiptNum} MwSt</div>
+            <div style="font-size:11px;color:#333333;line-height:1.8;">Kassierer</div>
+            <div style="font-size:26px;font-weight:900;color:#000000;line-height:1.1;margin:3px 0;">${timeStr}</div>
+            <div style="font-size:11px;color:#333333;line-height:1.8;">${shortDate}</div>
+            <div style="font-size:11px;color:#333333;line-height:1.8;">${orderTimeStr}</div>
+          </td>
+          <td style="${TD0}vertical-align:top;width:52%;padding-left:8px;">
+            <div style="font-size:16px;font-weight:700;color:#000000;margin-bottom:3px;">${custName}</div>
+            ${custAddress ? `<div style="font-size:13px;color:#000000;line-height:1.7;">${custAddress}</div>` : ""}
+            ${showDeliveryNote && isDelivery ? `<div style="font-size:9px;color:#555555;margin:3px 0;">Hauslieferung ohne Service und Zubereitung</div>` : ""}
+            ${custPhone ? `<div style="font-size:15px;font-weight:700;color:#000000;margin-top:5px;letter-spacing:1px;"><strong>Tel</strong>&nbsp;&nbsp;${custPhone}</div>` : ""}
+          </td>
+        </tr>
+      </table>`;
+
+    const totalsBox = `
+      <div style="border:1px solid #000000;padding:7px 10px;margin:6px 0 12px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="${TD0}font-size:16px;font-weight:700;width:28px;">${mwstCount}</td>
+            <td style="${TD0}font-size:10px;line-height:1.1;width:32px;">MwSt</td>
+            <td style="${TD0}text-align:right;">Fr ${cartTotal.toFixed(2)}</td>
+            <td style="${TD0}text-align:right;">Fr ${cartTax.toFixed(2)}</td>
+            <td style="${TD0}text-align:right;font-size:16px;padding-right:6px;"><strong>Fr</strong></td>
+            <td style="${TD0}text-align:right;font-size:26px;font-weight:900;color:#000000;"><strong>${cartTotal.toFixed(2)}</strong></td>
+          </tr>
+        </table>
+      </div>`;
 
     // ── RECEIPT 1: Kundenrechnung ─────────────────────────────────────────────
     const customerReceipt = `
-<div class="receipt">
-  <div class="receipt-header">
-    <div class="logo-wrap">${logoHtml}</div>
-    <div class="receipt-title">Rechnung</div>
+<div style="${PAGE}">
+  <div style="text-align:center;border-bottom:3px solid #000000;padding-bottom:10px;margin-bottom:12px;">
+    ${logoHtml}
+    <div style="font-size:17px;font-weight:400;color:#000000;margin-top:4px;">Rechnung</div>
   </div>
-
-  <div class="info-block">
-    <div class="info-row">
-      <div class="info-left">
-        <div class="info-label">${receiptNum}&nbsp;MwSt</div>
-        <div class="info-label">Kassierer</div>
-        <div class="time-big">${timeStr}</div>
-        <div class="info-label">${now.toLocaleDateString("de-DE")}</div>
-        <div class="info-label">${orderTimeStr}</div>
-      </div>
-      <div class="info-right">
-        <div class="cust-name">${custName}</div>
-        ${custAddress ? `<div class="cust-addr">${custAddress}</div>` : ""}
-        ${isDelivery ? `<div class="delivery-note">Hauslieferung ohne Service und Zubereitung</div>` : ""}
-        ${custPhone ? `<div class="cust-tel"><strong>Tel</strong>&nbsp;&nbsp;${custPhone}</div>` : ""}
-      </div>
-    </div>
-  </div>
-
-  <table class="items-table">
-    <tbody>
-      ${itemsHtml}
-      ${cartDiscount > 0 ? `<tr><td class="item-name" colspan="2">- Fr. ${cartDiscount.toFixed(2).replace(".00", ".--")}</td><td class="item-qty"></td><td class="item-price">-${cartDiscount.toFixed(2)}</td><td class="item-total">-${cartDiscount.toFixed(2)}</td></tr><tr><td class="item-name" colspan="4" style="font-size:10px;padding-left:10px">Reduktion</td></tr>` : ""}
-    </tbody>
-  </table>
-
-  <div class="totals-box">
-    <table class="totals-table">
+  ${infoBlock(true)}
+  <table style="width:100%;border-collapse:collapse;border-top:1px solid #000000;border-bottom:1px solid #000000;margin:8px 0;">
+    <thead>
       <tr>
-        <td class="tot-count">${mwstCount}</td>
-        <td class="tot-label">MwS<br>t</td>
-        <td class="tot-val">Fr&nbsp;${cartTotal.toFixed(2)}</td>
-        <td class="tot-val">Fr&nbsp;${cartTax.toFixed(2)}</td>
-        <td class="tot-final"><strong>Fr</strong></td>
-        <td class="tot-final-amt"><strong>${cartTotal.toFixed(2)}</strong></td>
+        <th style="${TD0}text-align:left;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Artikel</th>
+        <th style="${TD0}text-align:center;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Anz</th>
+        <th style="${TD0}text-align:right;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Preis</th>
+        <th style="${TD0}text-align:right;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Total</th>
       </tr>
-    </table>
+    </thead>
+    <tbody>${itemRows}${discountRows}</tbody>
+  </table>
+  ${totalsBox}
+  <div style="text-align:center;font-size:11px;color:#000000;margin-top:auto;padding-top:10px;">
+    ${storeEmail ? `Grazie mille e buon appetito! ${storeEmail}` : "Grazie mille e buon appetito!"}
   </div>
-
-  <div class="receipt-footer">
-    ${storeEmail ? `<div>Grazie mille e buon appetito! ${storeEmail}</div>` : "<div>Grazie mille e buon appetito!</div>"}
+  <div style="text-align:center;font-size:10px;font-weight:700;color:#000000;margin-top:8px;border-top:1px solid #000000;padding-top:7px;">
+    ${storeName}${storeAddr ? " &ndash; " + storeAddr : ""}${storePhone ? " Tel: " + storePhone : ""}
   </div>
-  <div class="store-bottom">${storeName}${storeAddr ? " - " + storeAddr : ""}${storePhone ? " Tel: " + storePhone : ""}</div>
 </div>`;
 
     // ── RECEIPT 2: Fahrerauftrag ──────────────────────────────────────────────
     const driverReceipt = `
-<div class="receipt">
-  <div class="fahrerauftrag-header">Fahrerauftrag ${orderId}</div>
-
-  <div class="info-block">
-    <div class="info-row">
-      <div class="info-left">
-        <div class="info-label">${receiptNum}&nbsp;MwSt</div>
-        <div class="info-label">Kassierer</div>
-        <div class="time-big">${timeStr}</div>
-        <div class="info-label">${now.toLocaleDateString("de-DE")}</div>
-        <div class="info-label">${orderTimeStr}</div>
-      </div>
-      <div class="info-right">
-        <div class="cust-name">${custName}</div>
-        ${custAddress ? `<div class="cust-addr">${custAddress}</div>` : ""}
-        ${isDelivery ? `<div class="delivery-note">Hauslieferung ohne Service und Zubereitung</div>` : ""}
-        ${custPhone ? `<div class="cust-tel"><strong>Tel</strong>&nbsp;&nbsp;${custPhone}</div>` : ""}
-      </div>
-    </div>
-  </div>
-
-  <table class="items-table">
-    <tbody>
-      ${itemsHtml}
-      ${cartDiscount > 0 ? `<tr><td class="item-name" colspan="2">- Fr. ${cartDiscount.toFixed(2).replace(".00", ".--")}</td><td class="item-qty"></td><td class="item-price">-${cartDiscount.toFixed(2)}</td><td class="item-total">-${cartDiscount.toFixed(2)}</td></tr><tr><td class="item-name" colspan="4" style="font-size:10px;padding-left:10px">Reduktion</td></tr>` : ""}
-    </tbody>
-  </table>
-
-  <div class="totals-box">
-    <table class="totals-table">
+<div style="${PAGE}">
+  <div style="font-size:34px;font-weight:900;color:#000000;margin-bottom:12px;">Fahrerauftrag ${orderId}</div>
+  ${infoBlock(true)}
+  <table style="width:100%;border-collapse:collapse;border-top:1px solid #000000;border-bottom:1px solid #000000;margin:8px 0;">
+    <thead>
       <tr>
-        <td class="tot-count">${mwstCount}</td>
-        <td class="tot-label">MwS<br>t</td>
-        <td class="tot-val">Fr&nbsp;${cartTotal.toFixed(2)}</td>
-        <td class="tot-val">Fr&nbsp;${cartTax.toFixed(2)}</td>
-        <td class="tot-final"><strong>Fr</strong></td>
-        <td class="tot-final-amt"><strong>${cartTotal.toFixed(2)}</strong></td>
+        <th style="${TD0}text-align:left;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Artikel</th>
+        <th style="${TD0}text-align:center;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Anz</th>
+        <th style="${TD0}text-align:right;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Preis</th>
+        <th style="${TD0}text-align:right;padding:5px 6px;font-size:11px;border-bottom:1px solid #000000;font-weight:700;">Total</th>
       </tr>
-    </table>
-  </div>
-
-  <table class="driver-footer-table">
-    <tr><td class="df-label">FAHRER</td><td class="df-val"></td></tr>
-    <tr><td class="df-label">LIEFERZEIT</td><td class="df-val"></td></tr>
-    <tr><td class="df-label">NOTIZ</td><td class="df-val"><em>${pmLabel}</em></td></tr>
+    </thead>
+    <tbody>${itemRows}${discountRows}</tbody>
+  </table>
+  ${totalsBox}
+  <table style="width:100%;border-collapse:collapse;border:1px solid #000000;margin-top:14px;">
+    <tr>
+      <td style="${TD0}padding:12px 14px;font-weight:700;width:130px;border-bottom:1px solid #000000;">FAHRER</td>
+      <td style="${TD0}padding:12px 14px;border-bottom:1px solid #000000;">&nbsp;</td>
+    </tr>
+    <tr>
+      <td style="${TD0}padding:12px 14px;font-weight:700;width:130px;border-bottom:1px solid #000000;">LIEFERZEIT</td>
+      <td style="${TD0}padding:12px 14px;border-bottom:1px solid #000000;">&nbsp;</td>
+    </tr>
+    <tr>
+      <td style="${TD0}padding:12px 14px;font-weight:700;width:130px;">NOTIZ</td>
+      <td style="${TD0}padding:12px 14px;font-style:italic;">${pmLabel}</td>
+    </tr>
   </table>
 </div>`;
 
     // ── RECEIPT 3: AENDERUNG / Küchenbon ─────────────────────────────────────
     const kitchenReceipt = `
-<div class="receipt">
-  <div class="aenderung-header">AENDERUNG</div>
-
-  <div class="info-block">
-    <div class="info-row">
-      <div class="info-left">
-        <div class="kitchen-store">${storeName} ${orderId}</div>
-        <div class="info-label">Kassierer</div>
-        <div class="time-big">${timeStr}</div>
-        <div class="info-label">${dateStr}</div>
-        <div class="info-label">${orderTimeStr}</div>
-      </div>
-      <div class="info-right">
-        <div class="cust-name">${custName}</div>
-        ${custAddress ? `<div class="cust-addr">${custAddress}</div>` : ""}
-        ${custPhone ? `<div class="cust-tel"><strong>Tel</strong>&nbsp;&nbsp;${custPhone}</div>` : ""}
-      </div>
-    </div>
-  </div>
-
-  <div class="kitchen-section-label">FOOD</div>
-  <table class="kitchen-table">
-    <tbody>${kitchenItemsHtml}</tbody>
+<div style="${PAGE}page-break-after:avoid;">
+  <div style="font-size:30px;font-weight:900;color:#000000;text-align:center;margin-bottom:6px;border-bottom:3px solid #000000;padding-bottom:8px;">AENDERUNG</div>
+  <table style="width:100%;border-collapse:collapse;margin:10px 0;">
+    <tr>
+      <td style="${TD0}vertical-align:top;width:48%;padding-right:8px;">
+        <div style="font-size:13px;color:#000000;margin-bottom:4px;">${storeName} ${orderId}</div>
+        <div style="font-size:11px;color:#333333;line-height:1.8;">Kassierer</div>
+        <div style="font-size:26px;font-weight:900;color:#000000;line-height:1.1;margin:3px 0;">${timeStr}</div>
+        <div style="font-size:11px;color:#333333;line-height:1.8;">${longDate}</div>
+        <div style="font-size:11px;color:#333333;line-height:1.8;">${orderTimeStr}</div>
+      </td>
+      <td style="${TD0}vertical-align:top;width:52%;padding-left:8px;">
+        <div style="font-size:16px;font-weight:700;color:#000000;margin-bottom:3px;">${custName}</div>
+        ${custAddress ? `<div style="font-size:13px;color:#000000;line-height:1.7;">${custAddress}</div>` : ""}
+        ${custPhone ? `<div style="font-size:15px;font-weight:700;color:#000000;margin-top:5px;letter-spacing:1px;"><strong>Tel</strong>&nbsp;&nbsp;${custPhone}</div>` : ""}
+      </td>
+    </tr>
   </table>
-  <div class="k-line"></div>
-  <div class="k-line"></div>
-  <div class="k-line"></div>
+  <div style="background:#000000;color:#ffffff;font-weight:700;font-size:14px;padding:5px 10px;margin:10px 0 6px;">FOOD</div>
+  <table style="width:100%;border-collapse:collapse;">
+    <tbody>${kitchenRows}</tbody>
+  </table>
+  <div style="border-top:1px solid #000000;margin:18px 0;"></div>
+  <div style="border-top:1px solid #000000;margin:18px 0;"></div>
+  <div style="border-top:1px solid #000000;margin:18px 0;"></div>
 </div>`;
 
-    const css = `
-      @page { size: A4; margin: 8mm 12mm; }
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #000; background: #fff; }
+    const html = `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Rechnung ${receiptNum}</title>
+  <style>
+    @page { size: A4; margin: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { background: #ffffff; color: #000000; font-family: Arial, Helvetica, sans-serif; }
+  </style>
+</head>
+<body>
+${customerReceipt}
+${driverReceipt}
+${kitchenReceipt}
+</body>
+</html>`;
 
-      .receipt { width: 100%; min-height: 277mm; padding: 6mm 0; page-break-after: always; display: flex; flex-direction: column; }
-      .receipt:last-child { page-break-after: avoid; }
-
-      /* Header */
-      .receipt-header { text-align: center; border-bottom: 3px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
-      .logo-img { max-height: 70px; max-width: 220px; object-fit: contain; }
-      .store-name-big { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
-      .receipt-title { font-size: 18px; font-weight: normal; margin-top: 4px; }
-
-      /* Fahrerauftrag */
-      .fahrerauftrag-header { font-size: 32px; font-weight: 900; margin-bottom: 10px; }
-
-      /* AENDERUNG */
-      .aenderung-header { font-size: 28px; font-weight: 900; text-align: center; margin-bottom: 4px; }
-      .kitchen-store { font-size: 14px; font-weight: normal; margin-bottom: 4px; }
-
-      /* Info block */
-      .info-block { margin: 8px 0; }
-      .info-row { display: flex; gap: 16px; }
-      .info-left { min-width: 120px; }
-      .info-right { flex: 1; }
-      .info-label { font-size: 11px; color: #333; line-height: 1.5; }
-      .time-big { font-size: 22px; font-weight: 900; line-height: 1.2; margin: 2px 0; }
-      .cust-name { font-size: 15px; font-weight: 700; }
-      .cust-addr { font-size: 13px; line-height: 1.6; }
-      .delivery-note { font-size: 9px; color: #555; margin: 2px 0; }
-      .cust-tel { font-size: 15px; font-weight: bold; margin-top: 4px; letter-spacing: 1px; }
-
-      /* Items table */
-      .items-table { width: 100%; border-collapse: collapse; margin: 10px 0; border-top: 1px solid #000; border-bottom: 1px solid #000; }
-      .items-table td { padding: 3px 4px; font-size: 12px; }
-      .item-name { text-align: left; width: 45%; }
-      .item-qty { text-align: center; width: 15%; font-size: 10px; color: #555; }
-      .item-price { text-align: right; width: 15%; font-size: 10px; color: #555; }
-      .item-total { text-align: right; width: 25%; font-weight: 600; }
-
-      /* Totals box */
-      .totals-box { border: 1px solid #000; padding: 6px 8px; margin: 4px 0 10px; }
-      .totals-table { width: 100%; border-collapse: collapse; }
-      .totals-table td { padding: 2px 6px; font-size: 12px; }
-      .tot-count { font-size: 14px; font-weight: bold; width: 24px; }
-      .tot-label { font-size: 10px; line-height: 1.1; width: 30px; }
-      .tot-val { text-align: right; }
-      .tot-final { text-align: right; font-size: 14px; }
-      .tot-final-amt { text-align: right; font-size: 22px; font-weight: 900; }
-
-      /* Driver footer */
-      .driver-footer-table { width: 100%; border-collapse: collapse; border: 1px solid #000; margin-top: 12px; }
-      .driver-footer-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #000; }
-      .driver-footer-table tr:last-child td { border-bottom: none; }
-      .df-label { font-weight: 700; width: 120px; }
-      .df-val { }
-
-      /* Kitchen section */
-      .kitchen-section-label { background: #000; color: #fff; font-weight: bold; font-size: 13px; padding: 4px 8px; margin: 8px 0 4px; }
-      .kitchen-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-      .kitchen-table td { padding: 4px 4px; font-size: 13px; }
-      .k-name { font-weight: bold; width: 75%; border-bottom: 1px solid #ccc; }
-      .k-qty { text-align: center; width: 25%; border-bottom: 1px solid #ccc; }
-      .k-line { border-top: 1px solid #000; margin: 14px 0; }
-
-      /* Footer */
-      .receipt-footer { text-align: center; font-size: 11px; margin-top: auto; padding-top: 10px; }
-      .store-bottom { text-align: center; font-size: 10px; font-weight: bold; margin-top: 6px; border-top: 1px solid #000; padding-top: 6px; }
-
-      @media print { .pagebreak { page-break-after: always; } }
-    `;
-
-    printWin.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Rechnung ${receiptNum}</title><style>${css}</style></head><body>`);
-    printWin.document.write(customerReceipt);
-    printWin.document.write(driverReceipt);
-    printWin.document.write(kitchenReceipt);
-    printWin.document.write("</body></html>");
+    printWin.document.write(html);
     printWin.document.close();
     printWin.print();
   };

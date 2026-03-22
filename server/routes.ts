@@ -886,14 +886,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/products", async (req, res) => {
     try {
-      const p = await storage.createProduct(sanitizeDates(req.body));
+      const body = sanitizeDates(req.body);
+      // Addons are always free
+      if (body.isAddon) body.price = "0";
+      const p = await storage.createProduct(body);
       callerIdService.broadcast({ type: "menu_updated" }, (req as any).tenantId);
       res.json(p);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/products/:id", async (req, res) => {
     try {
-      const p = await storage.updateProduct(Number(req.params.id), sanitizeDates(req.body));
+      const body = sanitizeDates(req.body);
+      // Addons are always free
+      if (body.isAddon) body.price = "0";
+      const p = await storage.updateProduct(Number(req.params.id), body);
       callerIdService.broadcast({ type: "menu_updated" }, (req as any).tenantId);
       res.json(p);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -1956,6 +1962,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // Update system language (app + store website)
+  app.put("/api/system-language", async (req: any, res) => {
+    try {
+      const { language } = req.body;
+      if (!["en", "ar", "de"].includes(language)) {
+        return res.status(400).json({ error: "Invalid language. Must be en, ar, or de" });
+      }
+      const tenantId = req.tenantId;
+      if (!tenantId) return res.status(401).json({ error: "Not authorized" });
+      await storage.upsertLandingPageConfig(tenantId, { language } as any);
+      res.json({ success: true, language });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Simulate Caller ID (for testing from Settings UI)
   app.post("/api/caller-id/simulate", async (req, res) => {
     const { phoneNumber, tenantId: bodyTenantId } = req.body;
@@ -2407,6 +2427,7 @@ async function test(){
       html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
       html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
       html = html.replace(/\{\{CURRENCY\}\}/g, currency);
+      html = html.replace(/\{\{LANGUAGE\}\}/g, (config as any).language || "en");
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.send(html);
     } catch (e: any) {

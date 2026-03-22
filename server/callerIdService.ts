@@ -220,7 +220,8 @@ export class CallerIDService extends EventEmitter {
     this.wss.clients.forEach((client: TenantWebSocket) => {
       if (client.readyState === WebSocket.OPEN) {
         total++;
-        if (!tenantId || client.tenantId === tenantId) {
+        // Send to: unfiltered calls, unregistered clients (compat), or matching-tenant clients
+        if (!tenantId || !client.tenantId || client.tenantId === tenantId) {
           matched++;
           client.send(payload);
         }

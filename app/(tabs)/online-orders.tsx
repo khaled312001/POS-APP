@@ -854,28 +854,61 @@ export default function OnlineOrdersScreen() {
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </Pressable>
             </View>
-            <FlatList
-              data={allProducts}
-              keyExtractor={(p) => String(p.id)}
-              renderItem={({ item: p }) => (
-                <Pressable style={[styles.pickerItem, isRTL && { flexDirection: "row-reverse" }]} onPress={() => addItemToOrder(p)}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.customerName, isRTL && { textAlign: "right" }]}>{p.name}</Text>
-                    <Text style={[styles.customerSub, isRTL && { textAlign: "right" }]}>{p.categoryName || ""}</Text>
-                  </View>
-                  <View style={{ alignItems: "flex-end" }}>
-                    <Text style={styles.orderAmount}>CHF {Number(p.price).toFixed(2)}</Text>
-                    {(p.modifiers?.length > 0 || p.variants?.length > 0 || isPizzaProduct(p)) && (
-                      <View style={{ backgroundColor: Colors.accent + "15", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginTop: 4 }}>
-                        <Text style={{ fontSize: 9, color: Colors.accent, fontWeight: "700" }}>{editLabel("CUSTOMIZABLE", "قابل للتعديل", "ANPASSBAR")}</Text>
+            {/* Regular products */}
+            {allProducts.filter((p: any) => !p.isAddon).length > 0 && (
+              <>
+                <View style={styles.pickerSectionHeader}>
+                  <Text style={styles.pickerSectionTitle}>{editLabel("Items", "الأصناف", "Artikel")}</Text>
+                </View>
+                {allProducts.filter((p: any) => !p.isAddon).map((p: any) => (
+                  <View key={String(p.id)}>
+                    <Pressable style={[styles.pickerItem, isRTL && { flexDirection: "row-reverse" }]} onPress={() => addItemToOrder(p)}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.customerName, isRTL && { textAlign: "right" }]}>{p.name}</Text>
+                        <Text style={[styles.customerSub, isRTL && { textAlign: "right" }]}>{p.categoryName || ""}</Text>
                       </View>
-                    )}
+                      <View style={{ alignItems: "flex-end" }}>
+                        <Text style={styles.orderAmount}>CHF {Number(p.price).toFixed(2)}</Text>
+                        {(p.modifiers?.length > 0 || p.variants?.length > 0 || isPizzaProduct(p)) && (
+                          <View style={{ backgroundColor: Colors.accent + "15", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginTop: 4 }}>
+                            <Text style={{ fontSize: 9, color: Colors.accent, fontWeight: "700" }}>{editLabel("CUSTOMIZABLE", "قابل للتعديل", "ANPASSBAR")}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </Pressable>
+                    <View style={styles.pickerSep} />
                   </View>
-                </Pressable>
-              )}
-              ItemSeparatorComponent={() => <View style={styles.pickerSep} />}
-              ListEmptyComponent={<Text style={styles.emptyItemsText}>{editLabel("No products found", "لا يوجد منتجات", "Keine Produkte")}</Text>}
-            />
+                ))}
+              </>
+            )}
+            {/* Free addons section */}
+            {allProducts.filter((p: any) => p.isAddon).length > 0 && (
+              <>
+                <View style={styles.pickerSectionHeader}>
+                  <Text style={styles.pickerSectionTitle}>{editLabel("Free Addons", "إضافات مجانية", "Gratis Extras")}</Text>
+                  <View style={styles.freeBadge}>
+                    <Text style={styles.freeBadgeText}>{editLabel("FREE", "مجاني", "GRATIS")}</Text>
+                  </View>
+                </View>
+                {allProducts.filter((p: any) => p.isAddon).map((p: any) => (
+                  <View key={String(p.id)}>
+                    <Pressable style={[styles.pickerItem, isRTL && { flexDirection: "row-reverse" }]} onPress={() => addItemToOrder({ ...p, price: 0 })}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.customerName, isRTL && { textAlign: "right" }]}>{p.name}</Text>
+                        <Text style={[styles.customerSub, isRTL && { textAlign: "right" }]}>{p.categoryName || ""}</Text>
+                      </View>
+                      <View style={{ alignItems: "flex-end" }}>
+                        <Text style={styles.freePrice}>{editLabel("Free", "مجاني", "Gratis")}</Text>
+                      </View>
+                    </Pressable>
+                    <View style={styles.pickerSep} />
+                  </View>
+                ))}
+              </>
+            )}
+            {allProducts.length === 0 && (
+              <Text style={styles.emptyItemsText}>{editLabel("No products found", "لا يوجد منتجات", "Keine Produkte")}</Text>
+            )}
           </View>
         </View>
       </Modal>
@@ -1106,9 +1139,14 @@ const styles = StyleSheet.create({
 
   // Picker Styles
   pickerOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 20 },
-  pickerSheet: { backgroundColor: Colors.surface, borderRadius: 20, width: "100%", maxWidth: 500, maxHeight: "80%", padding: 20 },
+  pickerSheet: { backgroundColor: Colors.surface, borderRadius: 20, width: "100%", maxWidth: 500, maxHeight: "80%", padding: 20, overflow: "scroll" as any },
   pickerItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12 },
   pickerSep: { height: 1, backgroundColor: Colors.cardBorder + "44" },
+  pickerSectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, marginTop: 6, borderBottomWidth: 1, borderBottomColor: Colors.cardBorder + "55" },
+  pickerSectionTitle: { color: Colors.textMuted, fontSize: 11, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.8, flex: 1 },
+  freeBadge: { backgroundColor: Colors.success + "22", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  freeBadgeText: { color: Colors.success, fontSize: 10, fontWeight: "800" },
+  freePrice: { color: Colors.success, fontWeight: "800", fontSize: 14 },
 
   // New Styles for Topping Picker
   modalContent: {
