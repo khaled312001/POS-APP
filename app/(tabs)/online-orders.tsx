@@ -87,49 +87,57 @@ export default function OnlineOrdersScreen() {
   const [selectedToppings, setSelectedToppings] = useState<string[]>([]);
   const [showToppingsStep, setShowToppingsStep] = useState(false);
 
+  const PIZZA_TOPPINGS = [
+    { name: "Tomatoes", names: ["Tomatoes", "Tomaten", "Extra Tomaten"], icon: "🍅", category: "Vegetables" },
+    { name: "Mushrooms", names: ["Mushrooms", "Pilze", "Champignons", "Extra Pilze"], icon: "🍄", category: "Vegetables" },
+    { name: "Ham", names: ["Ham", "Schinken", "Extra Schinken", "Prosciutto"], icon: "🥩", category: "Meat" },
+    { name: "Salami", names: ["Salami", "Extra Salami"], icon: "🥩", category: "Meat" },
+    { name: "Spicy Salami", names: ["Spicy Salami", "Scharfe Salami", "Extra Scharfe Salami", "Diavola"], icon: "🌶️", category: "Meat" },
+    { name: "Bacon", names: ["Bacon", "Speck", "Extra Speck"], icon: "🥓", category: "Meat" },
+    { name: "Chicken", names: ["Chicken", "Poulet", "Hähnchen", "Extra Poulet"], icon: "🍗", category: "Meat" },
+    { name: "Kebab", names: ["Kebab", "Kebabfleisch", "Extra Kebabfleisch"], icon: "🥙", category: "Meat" },
+    { name: "Minced Meat", names: ["Minced Meat", "Hackfleisch", "Extra Hackfleisch"], icon: "🥩", category: "Meat" },
+    { name: "Mozzarella", names: ["Mozzarella", "Extra Mozzarella", "Käse", "Extra Käse"], icon: "🧀", category: "Cheese" },
+    { name: "Gorgonzola", names: ["Gorgonzola", "Extra Gorgonzola"], icon: "🧀", category: "Cheese" },
+    { name: "Parmesan", names: ["Parmesan", "Extra Parmesan"], icon: "🧀", category: "Cheese" },
+    { name: "Olives", names: ["Olives", "Oliven", "Extra Oliven"], icon: "🫒", category: "Vegetables" },
+    { name: "Onions", names: ["Onions", "Zwiebeln", "Extra Zwiebeln"], icon: "🧅", category: "Vegetables" },
+    { name: "Garlic", names: ["Garlic", "Knoblauch", "Extra Knoblauch"], icon: "🧄", category: "Vegetables" },
+    { name: "Bell Peppers", names: ["Bell Peppers", "Peperoni", "Paprika", "Extra Peperoni"], icon: "🫑", category: "Vegetables" },
+    { name: "Corn", names: ["Corn", "Mais", "Extra Mais"], icon: "🌽", category: "Vegetables" },
+    { name: "Pineapple", names: ["Pineapple", "Ananas", "Extra Ananas"], icon: "🍍", category: "Others" },
+    { name: "Artichokes", names: ["Artichokes", "Artischocken", "Extra Artischocken"], icon: "🌿", category: "Vegetables" },
+    { name: "Spinach", icon: "🥬", category: "Vegetables" },
+    { name: "Arugula", names: ["Arugula", "Rucola", "Extra Rucola"], icon: "🥬", category: "Vegetables" },
+    { name: "Anchovies", names: ["Anchovies", "Sardellen", "Extra Sardellen"], icon: "🐟", category: "Seafood" },
+    { name: "Tuna", names: ["Tuna", "Thunfisch", "Extra Thunfisch"], icon: "🐟", category: "Seafood" },
+    { name: "Shrimp", names: ["Shrimp", "Crevetten", "Garnelen", "Extra Crevetten"], icon: "🍤", category: "Seafood" },
+    { name: "Mayonnaise", names: ["Mayonnaise", "Mayo"], icon: "🫙", category: "Sauces" },
+    { name: "Ketchup", icon: "🫙", category: "Sauces" },
+    { name: "Garlic Sauce", names: ["Garlic Sauce", "Knoblauchsauce"], icon: "🫙", category: "Sauces" },
+    { name: "Spicy Sauce", names: ["Spicy Sauce", "Scharfe Sauce"], icon: "🌶️", category: "Sauces" },
+    { name: "Yogurt Sauce", names: ["Yogurt Sauce", "Joghurtsauce"], icon: "🫙", category: "Sauces" },
+    { name: "Cocktail Sauce", icon: "🫙", category: "Sauces" },
+  ];
+
+  const getToppingInfo = (label: string) => {
+    const clean = label.toLowerCase()
+      .replace(/^(extra|zusatz|mit)\s+/i, "")
+      .trim();
+
+    const found = PIZZA_TOPPINGS.find(t =>
+      t.name.toLowerCase() === clean ||
+      (t.names && t.names.some(n => n.toLowerCase() === clean)) ||
+      label.toLowerCase().includes(t.name.toLowerCase()) ||
+      (t.names && t.names.some(n => label.toLowerCase().includes(n.toLowerCase())))
+    );
+
+    return found || { icon: "✨", category: "Others" };
+  };
+
   const isRTL = language === "ar";
 
-  const PIZZA_TOPPINGS: { name: string; icon: string; category: string }[] = [
-    { name: "Tomatoes", icon: "🍅", category: "Vegetables" },
-    { name: "Sliced tomatoes", icon: "🍅", category: "Vegetables" },
-    { name: "Garlic", icon: "🧄", category: "Vegetables" },
-    { name: "Onions", icon: "🧅", category: "Vegetables" },
-    { name: "Capers", icon: "🌿", category: "Vegetables" },
-    { name: "Olives", icon: "🫒", category: "Vegetables" },
-    { name: "Oregano", icon: "🌿", category: "Vegetables" },
-    { name: "Vegetables", icon: "🥦", category: "Vegetables" },
-    { name: "Spinach", icon: "🥬", category: "Vegetables" },
-    { name: "Pepperoni", icon: "🍕", category: "Meat" },
-    { name: "Corn", icon: "🌽", category: "Vegetables" },
-    { name: "Broccoli", icon: "🥦", category: "Vegetables" },
-    { name: "Artichokes", icon: "🌿", category: "Vegetables" },
-    { name: "Arugula", icon: "🥬", category: "Vegetables" },
-    { name: "Pineapple", icon: "🍍", category: "Others" },
-    { name: "Mushrooms", icon: "🍄", category: "Vegetables" },
-    { name: "Ham", icon: "🥩", category: "Meat" },
-    { name: "Spicy salami", icon: "🌶️", category: "Meat" },
-    { name: "Salami", icon: "🥩", category: "Meat" },
-    { name: "Bacon", icon: "🥓", category: "Meat" },
-    { name: "Prosciutto", icon: "🥩", category: "Meat" },
-    { name: "Lamb", icon: "🥩", category: "Meat" },
-    { name: "Chicken", icon: "🍗", category: "Meat" },
-    { name: "Kebab", icon: "🥙", category: "Meat" },
-    { name: "Minced Meat", icon: "🥩", category: "Meat" },
-    { name: "Mayonnaise", icon: "🫙", category: "Sauces" },
-    { name: "Anchovies", icon: "🐟", category: "Seafood" },
-    { name: "Shrimp", icon: "🍤", category: "Seafood" },
-    { name: "Tuna", icon: "🐟", category: "Seafood" },
-    { name: "Ketchup", icon: "🫙", category: "Sauces" },
-    { name: "Mozzarella", icon: "🧀", category: "Cheese" },
-    { name: "Gorgonzola", icon: "🧀", category: "Cheese" },
-    { name: "Parmesan", icon: "🧀", category: "Cheese" },
-    { name: "Mascarpone", icon: "🧀", category: "Cheese" },
-    { name: "Kaeserand", icon: "🧀", category: "Cheese" },
-    { name: "Cocktail Sauce", icon: "🫙", category: "Sauces" },
-    { name: "Spicy Sauce", icon: "🌶️", category: "Sauces" },
-    { name: "Yogurt Sauce", icon: "🫙", category: "Sauces" },
-    { name: "Bell Peppers", icon: "🫑", category: "Vegetables" },
-  ];
+
 
   const isPizzaProduct = useCallback((product: any) => {
     if (!product) return false;
@@ -708,12 +716,15 @@ export default function OnlineOrdersScreen() {
                 {(() => {
                   const extrasGroup = configuringProduct?.modifiers?.find((m: any) => !m.required && m.options?.length > 0);
                   const toppingOptions = extrasGroup
-                    ? extrasGroup.options.map((o: any) => ({
-                      name: o.label,
-                      price: Number(o.price || 0),
-                      icon: (PIZZA_TOPPINGS.find(pt => pt.name === o.label)?.icon || "✨"),
-                      category: (PIZZA_TOPPINGS.find(pt => pt.name === o.label)?.category || "Others")
-                    }))
+                    ? extrasGroup.options.map((o: any) => {
+                      const info = getToppingInfo(o.label);
+                      return {
+                        name: o.label,
+                        price: Number(o.price || 0),
+                        icon: info.icon,
+                        category: info.category
+                      };
+                    })
                     : PIZZA_TOPPINGS.map((t) => ({ name: t.name, price: 0, icon: t.icon, category: t.category }));
 
                   const displayCats = ["Cheese", "Meat", "Vegetables", "Seafood", "Sauces", "Others"];
@@ -739,13 +750,19 @@ export default function OnlineOrdersScreen() {
                               <Pressable
                                 key={topping.name}
                                 onPress={() => setSelectedToppings((prev: string[]) => isSelected ? prev.filter(t => t !== topping.name) : [...prev, topping.name])}
-                                style={[{ padding: 8, borderRadius: 10, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.cardBorder, width: "23%", alignItems: "center", gap: 2 }, isSelected && { borderColor: Colors.accent, backgroundColor: Colors.accent + "15" }]}
+                                style={[{
+                                  padding: 10, borderRadius: 12, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.cardBorder,
+                                  width: "31.5%", height: 100, alignItems: "center", justifyContent: "center", gap: 4
+                                }, isSelected && { borderColor: Colors.accent, backgroundColor: Colors.accent + "15" }]}
                               >
-                                <Text style={{ fontSize: 24 }}>{topping.icon}</Text>
-                                <Text style={[{ fontSize: 10, color: Colors.text, textAlign: "center", fontWeight: "600" }, isSelected && { color: Colors.accent }]} numberOfLines={1}>{topping.name}</Text>
+                                <Text style={{ fontSize: 26 }}>{topping.icon}</Text>
+                                <Text style={[{ fontSize: 11, color: Colors.text, textAlign: "center", fontWeight: "600" }, isSelected && { color: Colors.accent }]} numberOfLines={2}>{topping.name}</Text>
+                                {topping.price > 0 && (
+                                  <Text style={{ fontSize: 10, color: Colors.textMuted, fontWeight: "700" }}>+CHF {topping.price.toFixed(2)}</Text>
+                                )}
                                 {isSelected && (
-                                  <View style={{ position: "absolute", top: 4, right: 4, width: 14, height: 14, borderRadius: 7, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" }}>
-                                    <Ionicons name="checkmark" size={10} color="#000" />
+                                  <View style={{ position: "absolute", top: 4, right: 4, width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center", elevation: 4 }}>
+                                    <Ionicons name="checkmark" size={12} color="#000" />
                                   </View>
                                 )}
                               </Pressable>
@@ -755,6 +772,7 @@ export default function OnlineOrdersScreen() {
                       </View>
                     );
                   });
+
                 })()}
 
                 <View style={{ gap: 10, marginTop: 10 }}>

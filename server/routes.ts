@@ -787,14 +787,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/categories", async (req, res) => {
     try {
       const c = await storage.createCategory(sanitizeDates(req.body));
-      callerIdService.broadcast({ type: "menu_updated" });
+      callerIdService.broadcast({ type: "menu_updated" }, (req as any).tenantId);
       res.json(c);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/categories/:id", async (req, res) => {
     try {
       const c = await storage.updateCategory(Number(req.params.id), sanitizeDates(req.body));
-      callerIdService.broadcast({ type: "menu_updated" });
+      callerIdService.broadcast({ type: "menu_updated" }, (req as any).tenantId);
       res.json(c);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -802,7 +802,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const c = await storage.getCategory(Number(req.params.id));
       await storage.deleteCategory(Number(req.params.id));
-      if (c) callerIdService.broadcast({ type: "menu_updated" });
+      if (c) callerIdService.broadcast({ type: "menu_updated" }, (req as any).tenantId);
       res.json({ success: true });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -886,14 +886,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/products", async (req, res) => {
     try {
       const p = await storage.createProduct(sanitizeDates(req.body));
-      callerIdService.broadcast({ type: "menu_updated" });
+      callerIdService.broadcast({ type: "menu_updated" }, (req as any).tenantId);
       res.json(p);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/products/:id", async (req, res) => {
     try {
       const p = await storage.updateProduct(Number(req.params.id), sanitizeDates(req.body));
-      callerIdService.broadcast({ type: "menu_updated" });
+      callerIdService.broadcast({ type: "menu_updated" }, (req as any).tenantId);
       res.json(p);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -901,7 +901,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const p = await storage.getProduct(Number(req.params.id));
       await storage.deleteProduct(Number(req.params.id));
-      if (p) callerIdService.broadcast({ type: "menu_updated" });
+      if (p) callerIdService.broadcast({ type: "menu_updated" }, (req as any).tenantId);
       res.json({ success: true });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -1958,7 +1958,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Simulate Caller ID (for testing from Settings UI)
   app.post("/api/caller-id/simulate", async (req, res) => {
-    const { phoneNumber, tenantId } = req.body;
+    const { phoneNumber, tenantId: bodyTenantId } = req.body;
+    const tenantId = bodyTenantId || (req as any).tenantId;
     await callerIdService.handleIncomingCall(phoneNumber || "0551234567", undefined, tenantId ? Number(tenantId) : undefined);
     res.json({ success: true });
   });
@@ -2010,7 +2011,7 @@ async function test(){
       // Web Push: notify all subscribed browsers (even closed tabs)
       const customerName = (callInfo as any)?.customer?.name;
       const customerAddress = (callInfo as any)?.customer?.address;
-      pushService.notifyIncomingCall(phoneNumber || "0123456789", customerName, customerAddress).catch(() => { });
+      pushService.notifyIncomingCall(phoneNumber || "0123456789", tenantId ? Number(tenantId) : undefined, customerName, customerAddress).catch(() => { });
       res.json({ success: true });
     } catch (e: any) {
       console.error("[CallerID] Error handling incoming call:", e);
@@ -2026,7 +2027,9 @@ async function test(){
   app.post("/api/push/subscribe", (req, res) => {
     const sub = req.body;
     if (!sub || !sub.endpoint) return res.status(400).json({ error: "Invalid subscription" });
-    pushService.subscribe(sub);
+    const tenantId = (req as any).tenantId;
+    if (!tenantId) return res.status(401).json({ error: "Tenant identification required" });
+    pushService.subscribe(sub, tenantId);
     res.json({ success: true });
   });
 

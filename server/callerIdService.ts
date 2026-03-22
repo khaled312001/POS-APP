@@ -8,6 +8,7 @@ interface ActiveCall {
   normalizedPhone: string;
   slot: number;
   timestamp: string;
+  tenantId: number | null;
   dbCallId?: number;
   customer?: {
     id: number;
@@ -22,18 +23,23 @@ interface ActiveCall {
   } | null;
 }
 
+interface TenantWebSocket extends WebSocket {
+  tenantId?: number;
+}
+
 /**
  * CallerIDService handles incoming calls from hardware (FRITZ!Card via CAPI)
  * and broadcasts them to connected POS clients via WebSockets.
- * Supports up to 4 simultaneous call slots (ISDN B-channels).
+ * Supports up to 4 simultaneous call slots per tenant.
  */
 const SLOT_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes — auto-free stuck slots if client never signals
 
 export class CallerIDService extends EventEmitter {
   private wss: WebSocketServer | null = null;
   private isSimulation: boolean = true;
-  private activeCallSlots: Map<number, ActiveCall> = new Map(); // slot 1-4
-  private slotTimeouts: Map<number, ReturnType<typeof setTimeout>> = new Map();
+  // Key: "tenantId-slot"
+  private activeCallSlots: Map<string, ActiveCall> = new Map();
+  private slotTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
   constructor() {
     super();
@@ -48,146 +54,126 @@ export class CallerIDService extends EventEmitter {
     // Initialize WebSocket Server
     this.wss = new WebSocketServer({ server, path: "/api/ws/caller-id" });
 
-    this.wss.on("connection", (ws: WebSocket) => {
+    this.wss.on("connection", (ws: TenantWebSocket) => {
       console.log("[CallerID] Client connected to WebSocket");
       ws.send(JSON.stringify({ type: "connected", status: "ready", mode: this.isSimulation ? "simulation" : "hardware" }));
-
-      // Send current active calls to newly connected client
-      if (this.activeCallSlots.size > 0) {
-        const activeCalls = Array.from(this.activeCallSlots.values());
-        ws.send(JSON.stringify({ type: "active_calls", calls: activeCalls }));
-      }
 
       ws.on("message", (message: any) => {
         try {
           const data = JSON.parse(message.toString());
-          if (data.type === "simulate_call") {
-            this.handleIncomingCall(data.phoneNumber || "0123456789", data.slot);
+
+          if (data.type === "register") {
+            const tenantId = Number(data.tenantId);
+            if (!isNaN(tenantId)) {
+              ws.tenantId = tenantId;
+              console.log(`[CallerID] Client registered for tenant: ${tenantId}`);
+
+              // Send current active calls for this tenant to newly connected client
+              const activeCalls = Array.from(this.activeCallSlots.values())
+                .filter(c => c.tenantId === tenantId);
+
+              if (activeCalls.length > 0) {
+                ws.send(JSON.stringify({ type: "active_calls", calls: activeCalls }));
+              }
+            }
+          } else if (data.type === "simulate_call") {
+            // Use tenantId from registration if available
+            const tenantId = data.tenantId || ws.tenantId;
+            this.handleIncomingCall(data.phoneNumber || "0123456789", data.slot, tenantId);
           } else if (data.type === "call_answered" || data.type === "call_ended") {
-            // Client signals call was handled — free the slot and cancel auto-expiry
-            const slot = data.slot;
-            if (slot) {
-              const call = this.activeCallSlots.get(slot);
+            const slot = Number(data.slot);
+            const tenantId = ws.tenantId;
+            if (slot && tenantId) {
+              const key = `${tenantId}-${slot}`;
+              const call = this.activeCallSlots.get(key);
               if (call?.dbCallId) {
                 import("./storage").then(({ storage }) => {
                   storage.updateCall(call.dbCallId!, { status: "answered" }).catch(() => { });
                 });
               }
-              this.activeCallSlots.delete(slot);
-              const t = this.slotTimeouts.get(slot);
-              if (t) { clearTimeout(t); this.slotTimeouts.delete(slot); }
-              this.broadcastCallSlotUpdate();
+              this.activeCallSlots.delete(key);
+              const t = this.slotTimeouts.get(key);
+              if (t) { clearTimeout(t); this.slotTimeouts.delete(key); }
+              this.broadcastCallSlotUpdate(tenantId);
             }
           }
         } catch (e) {
-          console.error("[CallerID] WS Message Error:", e);
+          console.error("[CallerID] WS message error:", e);
         }
+      });
+
+      ws.on("close", () => {
+        console.log("[CallerID] Client disconnected");
       });
     });
 
-    try {
-      // Attempt to load CAPI (Common ISDN API) for FRITZ!Card
-      // This requires the ffi-napi package and the capi2032.dll on Windows
-      this.initHardware().then(success => {
-        if (success) {
-          this.isSimulation = false;
-          console.log("[CallerID] Hardware (CAPI) connected successfully");
-        } else {
-          console.log("[CallerID] Hardware not found, running in simulation mode");
-        }
-      });
-    } catch (e) {
-      console.warn("[CallerID] Failed to init hardware, falling back to simulation", e);
-    }
-  }
-
-  private async initHardware(): Promise<boolean> {
-    // In a real production environment on Windows:
-    // 1. Install ffi-napi: npm install ffi-napi
-    // 2. The code would look like this:
-    /*
-    try {
-      const ffi = require('ffi-napi');
-      const capi = ffi.Library('capi2032.dll', {
-        'CAPI_REGISTER': ['uint32', ['uint32', 'uint32', 'uint32', 'uint32', 'pointer']],
-        'CAPI_RELEASE': ['uint32', ['uint32']],
-        'CAPI_PUT_MESSAGE': ['uint32', ['uint32', 'pointer']],
-        'CAPI_GET_MESSAGE': ['uint32', ['uint32', 'pointer']],
-        // ... more CAPI functions
-      });
-      return true;
-    } catch (e) {
-      return false;
-    }
-    */
-    return false; // Default to false for now as ffi-napi might not be compatible with this build env
+    console.log("[CallerID] WebSocket server listening on /api/ws/caller-id");
   }
 
   /**
-   * Handles an incoming call notification, assigning to the next free slot (1-4)
-   * Automatically looks up the customer by phone number across all tenants (or specific tenant)
+   * Main entry point when a call is detected
    */
   public async handleIncomingCall(phoneNumber: string, preferredSlot?: number, tenantId?: number): Promise<ActiveCall | null> {
     const normalized = normalizePhone(phoneNumber);
-    console.log(`[CallerID] Incoming call from: ${phoneNumber} (normalized: ${normalized})`);
+    const resolvedTenantId = tenantId || null;
+    console.log(`[CallerID] Incoming call for tenant ${resolvedTenantId}: ${phoneNumber} (Normalized: ${normalized})`);
 
-    // Check if a call from this number is already active to prevent duplicates
-    for (const [existingSlot, existingCall] of this.activeCallSlots.entries()) {
-      if (existingCall.normalizedPhone === normalized || existingCall.phoneNumber === phoneNumber) {
-        console.log(`[CallerID] Call from ${phoneNumber} already active in slot ${existingSlot}, ignoring duplicate.`);
-
-        // Update the timestamp to keep it fresh, but don't create a new notification
-        existingCall.timestamp = new Date().toISOString();
-        this.broadcastCallSlotUpdate();
-        return existingCall;
+    // 1. Assign a slot (1-4)
+    let slot = preferredSlot || 0;
+    if (slot < 1 || slot > 4) {
+      // Find first available slot for THIS tenant
+      for (let i = 1; i <= 4; i++) {
+        const key = `${resolvedTenantId}-${i}`;
+        if (!this.activeCallSlots.has(key)) {
+          slot = i;
+          break;
+        }
       }
     }
 
-    let slot = preferredSlot;
-    if (!slot || this.activeCallSlots.has(slot)) {
-      for (let s = 1; s <= 4; s++) {
-        if (!this.activeCallSlots.has(s)) { slot = s; break; }
-      }
-    }
-    if (!slot) {
-      console.warn("[CallerID] All 4 call slots occupied, dropping call from:", phoneNumber);
+    if (slot === 0) {
+      console.log(`[CallerID] No slots available for tenant ${resolvedTenantId}, dropping call notification`);
       return null;
     }
 
-    // Immediately reserve the slot to prevent race conditions during DB lookup
-    const callInfo: ActiveCall = { phoneNumber, normalizedPhone: normalized, slot, timestamp: new Date().toISOString(), customer: null };
-    this.activeCallSlots.set(slot, callInfo);
+    const key = `${resolvedTenantId}-${slot}`;
 
-    // Auto-expire the slot after 5 minutes in case the client never sends call_answered/call_ended
-    const existingTimeout = this.slotTimeouts.get(slot);
-    if (existingTimeout) clearTimeout(existingTimeout);
-    const expiryTimer = setTimeout(() => {
-      this.activeCallSlots.delete(slot);
-      this.slotTimeouts.delete(slot);
-      this.broadcastCallSlotUpdate();
-      console.log(`[CallerID] Slot ${slot} auto-expired after ${SLOT_EXPIRY_MS / 60000} min`);
+    // 2. Clear any existing timeout for this slot
+    const existingTimeout = this.slotTimeouts.get(key);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+      this.slotTimeouts.delete(key);
+    }
+
+    // 3. Prepare call info
+    const callInfo: ActiveCall = {
+      phoneNumber,
+      normalizedPhone: normalized,
+      slot,
+      timestamp: new Date().toISOString(),
+      tenantId: resolvedTenantId,
+      customer: null
+    };
+
+    // 4. Register in active slots
+    this.activeCallSlots.set(key, callInfo);
+
+    // 5. Set auto-expiry (prevent stuck slots)
+    const timeout = setTimeout(() => {
+      console.log(`[CallerID] Auto-expiring slot ${slot} for tenant ${resolvedTenantId}`);
+      this.activeCallSlots.delete(key);
+      this.slotTimeouts.delete(key);
+      if (resolvedTenantId) this.broadcastCallSlotUpdate(resolvedTenantId);
     }, SLOT_EXPIRY_MS);
-    this.slotTimeouts.set(slot, expiryTimer);
+    this.slotTimeouts.set(key, timeout);
 
+    // 6. Async Lookup Customer & Persist to DB
     try {
       const { storage } = await import("./storage");
-      const matches = await storage.findCustomerByPhone(phoneNumber, tenantId as number);
-      if (matches.length > 0) {
-        const c = matches[0];
-        callInfo.customer = {
-          id: c.id,
-          name: c.name,
-          phone: c.phone,
-          email: c.email,
-          address: c.address,
-          loyaltyPoints: c.loyaltyPoints,
-          visitCount: c.visitCount,
-          totalSpent: c.totalSpent,
-          notes: c.notes,
-        };
-        console.log(`[CallerID] Customer matched: ${callInfo.customer.name} (ID: ${callInfo.customer.id})`);
-      } else {
-        console.log(`[CallerID] No customer found for phone: ${phoneNumber}`);
+      const customers = await storage.findCustomerByPhone(normalized, resolvedTenantId as number);
+      if (customers && customers.length > 0) {
+        callInfo.customer = customers[0] as any;
+        console.log(`[CallerID] Matched customer: ${callInfo.customer?.name}`);
       }
     } catch (e) {
       console.error("[CallerID] Customer lookup error:", e);
@@ -197,16 +183,19 @@ export class CallerIDService extends EventEmitter {
     try {
       const { storage } = await import("./storage");
       const dbCall = await storage.createCall({
-        tenantId: tenantId || null,
+        tenantId: resolvedTenantId,
         phoneNumber: phoneNumber,
         customerId: callInfo.customer?.id || null,
-        status: "missed", // default to missed, update to answered if/when client responds
+        status: "missed",
       });
       callInfo.dbCallId = dbCall.id;
-      console.log(`[CallerID] Call recorded in DB with ID: ${dbCall.id}`);
+      console.log(`[CallerID] Call recorded in DB with ID: ${dbCall.id} for tenant ${resolvedTenantId}`);
     } catch (e) {
-      console.error("[CallerID] DB lookup/save error:", e);
+      console.error("[CallerID] DB save error:", e);
     }
+
+    const tenantActiveCalls = Array.from(this.activeCallSlots.values())
+      .filter(c => c.tenantId === resolvedTenantId);
 
     const payload = JSON.stringify({
       type: "incoming_call",
@@ -215,53 +204,57 @@ export class CallerIDService extends EventEmitter {
       slot,
       timestamp: callInfo.timestamp,
       customer: callInfo.customer,
-      totalActiveCalls: this.activeCallSlots.size,
-      allActiveCalls: Array.from(this.activeCallSlots.values()),
+      totalActiveCalls: tenantActiveCalls.length,
+      allActiveCalls: tenantActiveCalls,
     });
 
-    if (this.wss) {
-      this.wss.clients.forEach((client: WebSocket) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(payload);
-        }
-      });
-    }
+    this.broadcastToTenant(payload, resolvedTenantId || undefined);
 
-    this.emit("call", phoneNumber, slot, callInfo.customer);
+    this.emit("call", phoneNumber, slot, callInfo.customer, resolvedTenantId);
     return callInfo;
   }
 
-  /**
-   * Broadcasts updated slot information to all connected clients
-   */
-  private broadcastCallSlotUpdate() {
+  private broadcastToTenant(payload: string, tenantId?: number) {
     if (!this.wss) return;
-    const payload = JSON.stringify({
-      type: "calls_update",
-      allActiveCalls: Array.from(this.activeCallSlots.values()),
-      totalActiveCalls: this.activeCallSlots.size,
-    });
-    this.wss.clients.forEach((client: WebSocket) => {
-      if (client.readyState === WebSocket.OPEN) client.send(payload);
+    this.wss.clients.forEach((client: TenantWebSocket) => {
+      if (client.readyState === WebSocket.OPEN) {
+        // If tenantId is specified, only send to matching clients.
+        // If not specified (system-wide?), send to all.
+        if (!tenantId || client.tenantId === tenantId) {
+          client.send(payload);
+        }
+      }
     });
   }
 
   /**
-   * Broadcast any arbitrary message to all connected POS clients
+   * Broadcasts updated slot information to a specific tenant
    */
-  public broadcast(payload: object) {
-    if (!this.wss) return;
-    const msg = JSON.stringify(payload);
-    this.wss.clients.forEach((client: WebSocket) => {
-      if (client.readyState === WebSocket.OPEN) client.send(msg);
+  private broadcastCallSlotUpdate(tenantId: number) {
+    const tenantActiveCalls = Array.from(this.activeCallSlots.values())
+      .filter(c => c.tenantId === tenantId);
+
+    const payload = JSON.stringify({
+      type: "calls_update",
+      allActiveCalls: tenantActiveCalls,
+      totalActiveCalls: tenantActiveCalls.length,
     });
+    this.broadcastToTenant(payload, tenantId);
+  }
+
+  /**
+   * Broadcast any arbitrary message to a specific tenant
+   */
+  public broadcast(payload: object, tenantId?: number) {
+    const msg = JSON.stringify(payload);
+    this.broadcastToTenant(msg, tenantId);
   }
 
   /**
    * Mock function to trigger a call (for testing)
    */
-  public simulateCall(number: string = "0551234567", slot?: number) {
-    this.handleIncomingCall(number, slot);
+  public simulateCall(number: string = "0123456789", slot?: number, tenantId?: number) {
+    this.handleIncomingCall(number, slot, tenantId);
   }
 }
 

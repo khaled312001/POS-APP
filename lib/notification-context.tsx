@@ -279,6 +279,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
                 ws.onopen = () => {
                     retryCount = 0; // Reset backoff on successful connection
+                    // Register tenantId for isolated notifications
+                    if (tenant?.id) {
+                        ws.send(JSON.stringify({ type: "register", tenantId: tenant.id }));
+                    }
                 };
 
                 ws.onmessage = (event) => {

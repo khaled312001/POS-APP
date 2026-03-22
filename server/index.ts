@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import { registerSuperAdminRoutes } from "./superAdminRoutes";
 import { tenantAuthMiddleware } from "./tenantAuth";
 import { callerIdService } from "./callerIdService";
+import { whatsappService } from "./whatsappService";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync, getStripePublishableKey, getUncachableStripeClient, getStripeSecretKey } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
@@ -649,6 +650,9 @@ function setupPaymentGatewayRoutes(app: express.Application) {
   // --- Deferred initialization (after port is open) ---
 
   await callerIdService.init(server);
+
+  // Auto-connect WhatsApp if a session exists
+  whatsappService.connect().catch((err: any) => log('WhatsApp auto-connect error:', err));
 
   initStripe().catch(err => log('Stripe init error (non-fatal):', err));
 

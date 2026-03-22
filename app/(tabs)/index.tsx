@@ -197,47 +197,54 @@ export default function POSScreen() {
     });
   }, [incomingCalls]);
 
-  const PIZZA_TOPPINGS: { name: string; icon: string; category: string }[] = [
-    { name: "Tomatoes", icon: "🍅", category: "Vegetables" },
-    { name: "Sliced tomatoes", icon: "🍅", category: "Vegetables" },
-    { name: "Garlic", icon: "🧄", category: "Vegetables" },
-    { name: "Onions", icon: "🧅", category: "Vegetables" },
-    { name: "Capers", icon: "🌿", category: "Vegetables" },
-    { name: "Olives", icon: "🫒", category: "Vegetables" },
-    { name: "Oregano", icon: "🌿", category: "Vegetables" },
-    { name: "Vegetables", icon: "🥦", category: "Vegetables" },
+  const PIZZA_TOPPINGS = [
+    { name: "Tomatoes", names: ["Tomatoes", "Tomaten", "Extra Tomaten"], icon: "🍅", category: "Vegetables" },
+    { name: "Mushrooms", names: ["Mushrooms", "Pilze", "Champignons", "Extra Pilze"], icon: "🍄", category: "Vegetables" },
+    { name: "Ham", names: ["Ham", "Schinken", "Extra Schinken", "Prosciutto"], icon: "🥩", category: "Meat" },
+    { name: "Salami", names: ["Salami", "Extra Salami"], icon: "🥩", category: "Meat" },
+    { name: "Spicy Salami", names: ["Spicy Salami", "Scharfe Salami", "Extra Scharfe Salami", "Diavola"], icon: "🌶️", category: "Meat" },
+    { name: "Bacon", names: ["Bacon", "Speck", "Extra Speck"], icon: "🥓", category: "Meat" },
+    { name: "Chicken", names: ["Chicken", "Poulet", "Hähnchen", "Extra Poulet"], icon: "🍗", category: "Meat" },
+    { name: "Kebab", names: ["Kebab", "Kebabfleisch", "Extra Kebabfleisch"], icon: "🥙", category: "Meat" },
+    { name: "Minced Meat", names: ["Minced Meat", "Hackfleisch", "Extra Hackfleisch"], icon: "🥩", category: "Meat" },
+    { name: "Mozzarella", names: ["Mozzarella", "Extra Mozzarella", "Käse", "Extra Käse"], icon: "🧀", category: "Cheese" },
+    { name: "Gorgonzola", names: ["Gorgonzola", "Extra Gorgonzola"], icon: "🧀", category: "Cheese" },
+    { name: "Parmesan", names: ["Parmesan", "Extra Parmesan"], icon: "🧀", category: "Cheese" },
+    { name: "Olives", names: ["Olives", "Oliven", "Extra Oliven"], icon: "🫒", category: "Vegetables" },
+    { name: "Onions", names: ["Onions", "Zwiebeln", "Extra Zwiebeln"], icon: "🧅", category: "Vegetables" },
+    { name: "Garlic", names: ["Garlic", "Knoblauch", "Extra Knoblauch"], icon: "🧄", category: "Vegetables" },
+    { name: "Bell Peppers", names: ["Bell Peppers", "Peperoni", "Paprika", "Extra Peperoni"], icon: "🫑", category: "Vegetables" },
+    { name: "Corn", names: ["Corn", "Mais", "Extra Mais"], icon: "🌽", category: "Vegetables" },
+    { name: "Pineapple", names: ["Pineapple", "Ananas", "Extra Ananas"], icon: "🍍", category: "Others" },
+    { name: "Artichokes", names: ["Artichokes", "Artischocken", "Extra Artischocken"], icon: "🌿", category: "Vegetables" },
     { name: "Spinach", icon: "🥬", category: "Vegetables" },
-    { name: "Pepperoni", icon: "🍕", category: "Meat" },
-    { name: "Corn", icon: "🌽", category: "Vegetables" },
-    { name: "Broccoli", icon: "🥦", category: "Vegetables" },
-    { name: "Artichokes", icon: "🌿", category: "Vegetables" },
-    { name: "Arugula", icon: "🥬", category: "Vegetables" },
-    { name: "Pineapple", icon: "🍍", category: "Others" },
-    { name: "Mushrooms", icon: "🍄", category: "Vegetables" },
-    { name: "Ham", icon: "🥩", category: "Meat" },
-    { name: "Spicy salami", icon: "🌶️", category: "Meat" },
-    { name: "Salami", icon: "🥩", category: "Meat" },
-    { name: "Bacon", icon: "🥓", category: "Meat" },
-    { name: "Prosciutto", icon: "🥩", category: "Meat" },
-    { name: "Lamb", icon: "🥩", category: "Meat" },
-    { name: "Chicken", icon: "🍗", category: "Meat" },
-    { name: "Kebab", icon: "🥙", category: "Meat" },
-    { name: "Minced Meat", icon: "🥩", category: "Meat" },
-    { name: "Mayonnaise", icon: "🫙", category: "Sauces" },
-    { name: "Anchovies", icon: "🐟", category: "Seafood" },
-    { name: "Shrimp", icon: "🍤", category: "Seafood" },
-    { name: "Tuna", icon: "🐟", category: "Seafood" },
+    { name: "Arugula", names: ["Arugula", "Rucola", "Extra Rucola"], icon: "🥬", category: "Vegetables" },
+    { name: "Anchovies", names: ["Anchovies", "Sardellen", "Extra Sardellen"], icon: "🐟", category: "Seafood" },
+    { name: "Tuna", names: ["Tuna", "Thunfisch", "Extra Thunfisch"], icon: "🐟", category: "Seafood" },
+    { name: "Shrimp", names: ["Shrimp", "Crevetten", "Garnelen", "Extra Crevetten"], icon: "🍤", category: "Seafood" },
+    { name: "Mayonnaise", names: ["Mayonnaise", "Mayo"], icon: "🫙", category: "Sauces" },
     { name: "Ketchup", icon: "🫙", category: "Sauces" },
-    { name: "Mozzarella", icon: "🧀", category: "Cheese" },
-    { name: "Gorgonzola", icon: "🧀", category: "Cheese" },
-    { name: "Parmesan", icon: "🧀", category: "Cheese" },
-    { name: "Mascarpone", icon: "🧀", category: "Cheese" },
-    { name: "Kaeserand", icon: "🧀", category: "Cheese" },
+    { name: "Garlic Sauce", names: ["Garlic Sauce", "Knoblauchsauce"], icon: "🫙", category: "Sauces" },
+    { name: "Spicy Sauce", names: ["Spicy Sauce", "Scharfe Sauce"], icon: "🌶️", category: "Sauces" },
+    { name: "Yogurt Sauce", names: ["Yogurt Sauce", "Joghurtsauce"], icon: "🫙", category: "Sauces" },
     { name: "Cocktail Sauce", icon: "🫙", category: "Sauces" },
-    { name: "Spicy Sauce", icon: "🌶️", category: "Sauces" },
-    { name: "Yogurt Sauce", icon: "🫙", category: "Sauces" },
-    { name: "Bell Peppers", icon: "🫑", category: "Vegetables" },
   ];
+
+  const getToppingInfo = (label: string) => {
+    const clean = label.toLowerCase()
+      .replace(/^(extra|zusatz|mit)\s+/i, "")
+      .trim();
+
+    const found = PIZZA_TOPPINGS.find(t =>
+      t.name.toLowerCase() === clean ||
+      (t.names && t.names.some(n => n.toLowerCase() === clean)) ||
+      label.toLowerCase().includes(t.name.toLowerCase()) ||
+      (t.names && t.names.some(n => label.toLowerCase().includes(n.toLowerCase())))
+    );
+
+    return found || { icon: "✨", category: "Others" };
+  };
+
 
   const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["/api/categories", tenantId ? `?tenantId=${tenantId}` : ""],
@@ -1568,12 +1575,15 @@ export default function POSScreen() {
                     (m: any) => !m.required && m.options?.length > 0
                   );
                   const toppingOptions = extrasGroup
-                    ? extrasGroup.options.map((o: any) => ({
-                      name: o.label,
-                      price: Number(o.price || 0),
-                      icon: (PIZZA_TOPPINGS.find(pt => pt.name === o.label)?.icon || "✨"),
-                      category: (PIZZA_TOPPINGS.find(pt => pt.name === o.label)?.category || "Others")
-                    }))
+                    ? extrasGroup.options.map((o: any) => {
+                      const info = getToppingInfo(o.label);
+                      return {
+                        name: o.label,
+                        price: Number(o.price || 0),
+                        icon: info.icon,
+                        category: info.category
+                      };
+                    })
                     : PIZZA_TOPPINGS.map((t: any) => ({ name: t.name, price: 0, icon: t.icon, category: t.category }));
 
                   // Define display categories order
@@ -1612,26 +1622,26 @@ export default function POSScreen() {
                                   isSelected && styles.toppingRowSelected,
                                   {
                                     flexDirection: "column",
-                                    height: 70,
+                                    height: 100, // Increased height
                                     width: isTablet ? "23.5%" : "31.5%",
                                     justifyContent: "center",
                                     alignItems: "center",
-                                    paddingVertical: 8,
-                                    paddingHorizontal: 4,
-                                    gap: 4
+                                    paddingVertical: 10,
+                                    paddingHorizontal: 6,
+                                    gap: 6
                                   }
                                 ]}
                               >
-                                <Text style={{ fontSize: 24 }}>{topping.icon}</Text>
-                                <Text style={[styles.toppingName, { fontSize: 11, textAlign: "center" }, isSelected && { color: Colors.accent }]} numberOfLines={1}>
+                                <Text style={{ fontSize: 26 }}>{topping.icon}</Text>
+                                <Text style={[styles.toppingName, { fontSize: 11, textAlign: "center", color: isSelected ? Colors.accent : Colors.text }, { fontWeight: "500" }]} numberOfLines={2}>
                                   {topping.name}
                                 </Text>
                                 {topping.price > 0 && (
-                                  <Text style={[styles.toppingPrice, { fontSize: 9 }]}>+CHF {topping.price.toFixed(2)}</Text>
+                                  <Text style={[styles.toppingPrice, { fontSize: 10, fontWeight: "700" }]}>+CHF {topping.price.toFixed(2)}</Text>
                                 )}
                                 {isSelected && (
-                                  <View style={{ position: "absolute", top: 4, right: 4, width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" }}>
-                                    <Ionicons name="checkmark" size={12} color="#000" />
+                                  <View style={{ position: "absolute", top: 4, right: 4, width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center", elevation: 4 }}>
+                                    <Ionicons name="checkmark" size={14} color="#000" />
                                   </View>
                                 )}
                               </Pressable>
@@ -1641,6 +1651,7 @@ export default function POSScreen() {
                       </View>
                     );
                   });
+
                 })()}
 
                 {/* Add to Cart */}

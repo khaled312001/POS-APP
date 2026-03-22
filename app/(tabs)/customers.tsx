@@ -32,6 +32,13 @@ export default function CustomersScreen() {
   const [allCustomers, setAllCustomers] = useState<any[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const loadingMore = useRef(false);
+  // Detail & Edit Modals
+  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editCustomer, setEditCustomer] = useState<any | null>(null);
+  const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", notes: "" });
+
 
   // Total count query
   const { data: countData } = useQuery<{ count: number }>({

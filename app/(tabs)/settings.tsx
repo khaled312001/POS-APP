@@ -2430,7 +2430,11 @@ export default function SettingsScreen() {
                 onPress={async () => {
                   try {
                     setCallerIdStatus("testing");
-                    await apiRequest("POST", "/api/caller-id/simulate", { phoneNumber: testPhoneNumber, slot: 1 });
+                    await apiRequest("POST", "/api/caller-id/simulate", {
+                      phoneNumber: testPhoneNumber,
+                      slot: 1,
+                      tenantId: tenant?.id
+                    });
                     setCallerIdStatus("done");
                     setTimeout(() => setCallerIdStatus("idle"), 3000);
                   } catch (err: any) {
@@ -2455,7 +2459,11 @@ export default function SettingsScreen() {
                   const testNumbers = ["0551234567", "0509876543", "0521112233", "+41791234567"];
                   for (let i = 0; i < 4; i++) {
                     try {
-                      await apiRequest("POST", "/api/caller-id/simulate", { phoneNumber: testNumbers[i], slot: i + 1 });
+                      await apiRequest("POST", "/api/caller-id/simulate", {
+                        phoneNumber: testNumbers[i],
+                        slot: i + 1,
+                        tenantId: tenant?.id
+                      });
                       await new Promise((r) => setTimeout(r, 300));
                     } catch { }
                   }
