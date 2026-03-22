@@ -13,17 +13,21 @@ var schema_exports = {};
 __export(schema_exports, {
   activityLog: () => activityLog,
   branches: () => branches,
+  calls: () => calls,
   cashDrawerOperations: () => cashDrawerOperations,
   categories: () => categories,
   customers: () => customers,
+  dailyClosings: () => dailyClosings,
   employeeCommissions: () => employeeCommissions,
   employees: () => employees,
   expenses: () => expenses,
   insertActivityLogSchema: () => insertActivityLogSchema,
   insertBranchSchema: () => insertBranchSchema,
+  insertCallSchema: () => insertCallSchema,
   insertCashDrawerOperationSchema: () => insertCashDrawerOperationSchema,
   insertCategorySchema: () => insertCategorySchema,
   insertCustomerSchema: () => insertCustomerSchema,
+  insertDailyClosingSchema: () => insertDailyClosingSchema,
   insertEmployeeCommissionSchema: () => insertEmployeeCommissionSchema,
   insertEmployeeSchema: () => insertEmployeeSchema,
   insertExpenseSchema: () => insertExpenseSchema,
@@ -32,10 +36,12 @@ __export(schema_exports, {
   insertKitchenOrderSchema: () => insertKitchenOrderSchema,
   insertLandingPageConfigSchema: () => insertLandingPageConfigSchema,
   insertLicenseKeySchema: () => insertLicenseKeySchema,
+  insertMonthlyClosingSchema: () => insertMonthlyClosingSchema,
   insertNotificationSchema: () => insertNotificationSchema,
   insertOnlineOrderSchema: () => insertOnlineOrderSchema,
   insertPlatformCommissionSchema: () => insertPlatformCommissionSchema,
   insertPlatformSettingSchema: () => insertPlatformSettingSchema,
+  insertPrinterConfigSchema: () => insertPrinterConfigSchema,
   insertProductBatchSchema: () => insertProductBatchSchema,
   insertProductSchema: () => insertProductSchema,
   insertPurchaseOrderItemSchema: () => insertPurchaseOrderItemSchema,
@@ -56,6 +62,7 @@ __export(schema_exports, {
   insertTenantNotificationSchema: () => insertTenantNotificationSchema,
   insertTenantSchema: () => insertTenantSchema,
   insertTenantSubscriptionSchema: () => insertTenantSubscriptionSchema,
+  insertVehicleSchema: () => insertVehicleSchema,
   insertWarehouseSchema: () => insertWarehouseSchema,
   insertWarehouseTransferSchema: () => insertWarehouseTransferSchema,
   inventory: () => inventory,
@@ -63,10 +70,12 @@ __export(schema_exports, {
   kitchenOrders: () => kitchenOrders,
   landingPageConfig: () => landingPageConfig,
   licenseKeys: () => licenseKeys,
+  monthlyClosings: () => monthlyClosings,
   notifications: () => notifications,
   onlineOrders: () => onlineOrders,
   platformCommissions: () => platformCommissions,
   platformSettings: () => platformSettings,
+  printerConfigs: () => printerConfigs,
   productBatches: () => productBatches,
   products: () => products,
   purchaseOrderItems: () => purchaseOrderItems,
@@ -88,12 +97,13 @@ __export(schema_exports, {
   tenantNotifications: () => tenantNotifications,
   tenantSubscriptions: () => tenantSubscriptions,
   tenants: () => tenants,
+  vehicles: () => vehicles,
   warehouseTransfers: () => warehouseTransfers,
   warehouses: () => warehouses
 });
 import { pgTable, text, integer, decimal, boolean, timestamp, jsonb, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-var branches, employees, categories, products, inventory, customers, sales, saleItems, suppliers, purchaseOrders, purchaseOrderItems, shifts, notifications, expenses, tables, kitchenOrders, subscriptionPlans, subscriptions, activityLog, returns, returnItems, syncQueue, cashDrawerOperations, warehouses, warehouseTransfers, productBatches, inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications, platformSettings, platformCommissions, onlineOrders, landingPageConfig, insertBranchSchema, insertEmployeeSchema, insertCategorySchema, insertProductSchema, insertInventorySchema, insertCustomerSchema, insertSaleSchema, insertSaleItemSchema, insertSupplierSchema, insertPurchaseOrderSchema, insertPurchaseOrderItemSchema, insertShiftSchema, insertNotificationSchema, insertExpenseSchema, insertTableSchema, insertKitchenOrderSchema, insertSubscriptionPlanSchema, insertSubscriptionSchema, insertActivityLogSchema, insertReturnSchema, insertReturnItemSchema, insertCashDrawerOperationSchema, insertWarehouseSchema, insertWarehouseTransferSchema, insertProductBatchSchema, insertInventoryMovementSchema, insertStockCountSchema, insertStockCountItemSchema, insertSupplierContractSchema, insertEmployeeCommissionSchema, insertSuperAdminSchema, insertTenantSchema, insertTenantSubscriptionSchema, insertLicenseKeySchema, insertTenantNotificationSchema, insertOnlineOrderSchema, insertLandingPageConfigSchema, insertPlatformSettingSchema, insertPlatformCommissionSchema;
+var branches, employees, categories, products, inventory, customers, sales, saleItems, calls, suppliers, purchaseOrders, purchaseOrderItems, shifts, notifications, expenses, tables, kitchenOrders, subscriptionPlans, subscriptions, activityLog, returns, returnItems, syncQueue, cashDrawerOperations, warehouses, warehouseTransfers, productBatches, inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications, platformSettings, platformCommissions, onlineOrders, landingPageConfig, vehicles, printerConfigs, dailyClosings, monthlyClosings, insertBranchSchema, insertEmployeeSchema, insertCategorySchema, insertProductSchema, insertInventorySchema, insertCustomerSchema, insertSaleSchema, insertSaleItemSchema, insertSupplierSchema, insertPurchaseOrderSchema, insertPurchaseOrderItemSchema, insertShiftSchema, insertNotificationSchema, insertExpenseSchema, insertCallSchema, insertTableSchema, insertKitchenOrderSchema, insertSubscriptionPlanSchema, insertSubscriptionSchema, insertActivityLogSchema, insertReturnSchema, insertReturnItemSchema, insertCashDrawerOperationSchema, insertWarehouseSchema, insertWarehouseTransferSchema, insertProductBatchSchema, insertInventoryMovementSchema, insertStockCountSchema, insertStockCountItemSchema, insertSupplierContractSchema, insertEmployeeCommissionSchema, insertSuperAdminSchema, insertTenantSchema, insertTenantSubscriptionSchema, insertLicenseKeySchema, insertTenantNotificationSchema, insertOnlineOrderSchema, insertLandingPageConfigSchema, insertPlatformSettingSchema, insertPlatformCommissionSchema, insertVehicleSchema, insertPrinterConfigSchema, insertDailyClosingSchema, insertMonthlyClosingSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -229,6 +239,17 @@ var init_schema = __esm({
       total: decimal("total", { precision: 10, scale: 2 }).notNull(),
       modifiers: jsonb("modifiers").$type().default([]),
       notes: text("notes")
+    });
+    calls = pgTable("calls", {
+      id: serial("id").primaryKey(),
+      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      phoneNumber: text("phone_number").notNull(),
+      customerId: integer("customer_id").references(() => customers.id, { onDelete: "set null" }),
+      status: text("status").notNull().default("missed"),
+      // answered, missed
+      saleId: integer("sale_id").references(() => sales.id, { onDelete: "set null" }),
+      createdAt: timestamp("created_at").defaultNow()
     });
     suppliers = pgTable("suppliers", {
       id: serial("id").primaryKey(),
@@ -667,6 +688,76 @@ var init_schema = __esm({
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
+    vehicles = pgTable("vehicles", {
+      id: serial("id").primaryKey(),
+      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      licensePlate: text("license_plate").notNull(),
+      make: text("make"),
+      model: text("model"),
+      color: text("color"),
+      driverName: text("driver_name"),
+      driverPhone: text("driver_phone"),
+      isActive: boolean("is_active").default(true),
+      notes: text("notes"),
+      createdAt: timestamp("created_at").defaultNow()
+    });
+    printerConfigs = pgTable("printer_configs", {
+      id: serial("id").primaryKey(),
+      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      receiptType: text("receipt_type").notNull(),
+      // kitchen, home_delivery, take_away, restaurant, driver_order, check_out, lists, daily_close, monthly_close, accounts_receivable
+      printer1: text("printer_1"),
+      printer1Copy: boolean("printer_1_copy").default(false),
+      printer2: text("printer_2"),
+      printer2Copy: boolean("printer_2_copy").default(false),
+      paperSize: text("paper_size").default("80mm"),
+      isActive: boolean("is_active").default(true),
+      updatedAt: timestamp("updated_at").defaultNow()
+    });
+    dailyClosings = pgTable("daily_closings", {
+      id: serial("id").primaryKey(),
+      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      closingDate: text("closing_date").notNull(),
+      // YYYY-MM-DD
+      totalSales: decimal("total_sales", { precision: 12, scale: 2 }).default("0"),
+      totalCash: decimal("total_cash", { precision: 12, scale: 2 }).default("0"),
+      totalCard: decimal("total_card", { precision: 12, scale: 2 }).default("0"),
+      totalMobile: decimal("total_mobile", { precision: 12, scale: 2 }).default("0"),
+      totalTransactions: integer("total_transactions").default(0),
+      totalReturns: decimal("total_returns", { precision: 12, scale: 2 }).default("0"),
+      totalDiscounts: decimal("total_discounts", { precision: 12, scale: 2 }).default("0"),
+      openingCash: decimal("opening_cash", { precision: 12, scale: 2 }).default("0"),
+      closingCash: decimal("closing_cash", { precision: 12, scale: 2 }).default("0"),
+      notes: text("notes"),
+      status: text("status").default("closed"),
+      // closed, approved
+      createdAt: timestamp("created_at").defaultNow()
+    });
+    monthlyClosings = pgTable("monthly_closings", {
+      id: serial("id").primaryKey(),
+      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      closingMonth: text("closing_month").notNull(),
+      // YYYY-MM
+      totalSales: decimal("total_sales", { precision: 12, scale: 2 }).default("0"),
+      totalCash: decimal("total_cash", { precision: 12, scale: 2 }).default("0"),
+      totalCard: decimal("total_card", { precision: 12, scale: 2 }).default("0"),
+      totalMobile: decimal("total_mobile", { precision: 12, scale: 2 }).default("0"),
+      totalTransactions: integer("total_transactions").default(0),
+      totalReturns: decimal("total_returns", { precision: 12, scale: 2 }).default("0"),
+      totalDiscounts: decimal("total_discounts", { precision: 12, scale: 2 }).default("0"),
+      totalExpenses: decimal("total_expenses", { precision: 12, scale: 2 }).default("0"),
+      netRevenue: decimal("net_revenue", { precision: 12, scale: 2 }).default("0"),
+      notes: text("notes"),
+      status: text("status").default("closed"),
+      // closed, approved
+      createdAt: timestamp("created_at").defaultNow()
+    });
     insertBranchSchema = createInsertSchema(branches).omit({ id: true, createdAt: true, updatedAt: true });
     insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, updatedAt: true });
     insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true });
@@ -681,6 +772,7 @@ var init_schema = __esm({
     insertShiftSchema = createInsertSchema(shifts).omit({ id: true });
     insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
     insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
+    insertCallSchema = createInsertSchema(calls).omit({ id: true, createdAt: true });
     insertTableSchema = createInsertSchema(tables).omit({ id: true, createdAt: true });
     insertKitchenOrderSchema = createInsertSchema(kitchenOrders).omit({ id: true, createdAt: true, updatedAt: true });
     insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true, createdAt: true });
@@ -706,6 +798,10 @@ var init_schema = __esm({
     insertLandingPageConfigSchema = createInsertSchema(landingPageConfig).omit({ id: true, createdAt: true, updatedAt: true });
     insertPlatformSettingSchema = createInsertSchema(platformSettings).omit({ id: true, updatedAt: true });
     insertPlatformCommissionSchema = createInsertSchema(platformCommissions).omit({ id: true, createdAt: true });
+    insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true, createdAt: true });
+    insertPrinterConfigSchema = createInsertSchema(printerConfigs).omit({ id: true, updatedAt: true });
+    insertDailyClosingSchema = createInsertSchema(dailyClosings).omit({ id: true, createdAt: true });
+    insertMonthlyClosingSchema = createInsertSchema(monthlyClosings).omit({ id: true, createdAt: true });
   }
 });
 
@@ -730,6 +826,9 @@ var init_db = __esm({
       );
     }
     pool = new Pool({ connectionString });
+    pool.on("connect", (client2) => {
+      client2.query("SET client_encoding = 'UTF8'");
+    });
     db = drizzle(pool, { schema: schema_exports });
   }
 });
@@ -737,12 +836,14 @@ var init_db = __esm({
 // server/phoneUtils.ts
 var phoneUtils_exports = {};
 __export(phoneUtils_exports, {
+  digitsOnly: () => digitsOnly,
   getPhoneSearchVariants: () => getPhoneSearchVariants,
+  lastNDigits: () => lastNDigits,
   normalizePhone: () => normalizePhone,
   phonesMatch: () => phonesMatch
 });
 function normalizePhone(phone) {
-  let cleaned = phone.replace(/[\s\-\(\)\.]/g, "");
+  let cleaned = phone.replace(/[\s\-\(\)\.\/]/g, "");
   if (cleaned.startsWith("+41")) {
     cleaned = "0" + cleaned.slice(3);
   } else if (cleaned.startsWith("0041")) {
@@ -759,8 +860,14 @@ function normalizePhone(phone) {
 function phonesMatch(phone1, phone2) {
   return normalizePhone(phone1) === normalizePhone(phone2);
 }
+function digitsOnly(phone) {
+  return phone.replace(/\D/g, "");
+}
+function lastNDigits(phone, n = 8) {
+  return digitsOnly(phone).slice(-n);
+}
 function getPhoneSearchVariants(search) {
-  const cleaned = search.replace(/[\s\-\(\)\.]/g, "");
+  const cleaned = search.replace(/[\s\-\(\)\.\/]/g, "");
   const variants = /* @__PURE__ */ new Set();
   variants.add(cleaned);
   const normalized = normalizePhone(cleaned);
@@ -768,13 +875,19 @@ function getPhoneSearchVariants(search) {
   let baseNumber = normalized;
   if (baseNumber.startsWith("0")) {
     baseNumber = baseNumber.slice(1);
+  } else if (baseNumber.startsWith("+")) {
+    baseNumber = baseNumber.slice(1);
+    if (baseNumber.startsWith("41") && baseNumber.length === 11) {
+      variants.add("0" + baseNumber.slice(2));
+    }
   }
   if (baseNumber.length >= 8) {
     variants.add("+41" + baseNumber);
     variants.add("0041" + baseNumber);
     variants.add("0" + baseNumber);
+    variants.add(baseNumber);
   }
-  return Array.from(variants).filter((v) => v.length >= 4);
+  return Array.from(variants).filter((v) => v.length >= 6);
 }
 var init_phoneUtils = __esm({
   "server/phoneUtils.ts"() {
@@ -996,9 +1109,7 @@ var init_storage = __esm({
       // Customers
       async getCustomers(search, tenantId, limit = 50, offset = 0) {
         const conditions = [or(eq(customers.isActive, true), isNull(customers.isActive))];
-        if (tenantId) {
-          conditions.push(eq(customers.tenantId, tenantId));
-        }
+        if (tenantId) conditions.push(eq(customers.tenantId, tenantId));
         if (search) {
           const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(search.trim());
           if (looksLikePhone) {
@@ -1022,19 +1133,54 @@ var init_storage = __esm({
         }
         return db.select().from(customers).where(and(...conditions)).orderBy(desc(customers.createdAt)).limit(limit).offset(offset);
       },
+      async getCustomerCount(search, tenantId) {
+        const conditions = [or(eq(customers.isActive, true), isNull(customers.isActive))];
+        if (tenantId) conditions.push(eq(customers.tenantId, tenantId));
+        if (search) {
+          const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(search.trim());
+          if (looksLikePhone) {
+            const { getPhoneSearchVariants: getPhoneSearchVariants2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
+            const variants = getPhoneSearchVariants2(search.trim());
+            const phoneConditions = variants.map((v) => ilike(customers.phone || "", `%${v}%`));
+            const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
+            for (const v of variants) {
+              phoneConditions.push(sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
+            }
+            conditions.push(or(...phoneConditions));
+          } else {
+            conditions.push(
+              or(
+                ilike(customers.name, `%${search}%`),
+                ilike(customers.phone || "", `%${search}%`),
+                ilike(customers.email || "", `%${search}%`)
+              )
+            );
+          }
+        }
+        const [result] = await db.select({ count: sql`count(*)` }).from(customers).where(and(...conditions));
+        return Number(result?.count || 0);
+      },
       async findCustomerByPhone(phone, tenantId) {
-        const { getPhoneSearchVariants: getPhoneSearchVariants2, normalizePhone: normalizePhone2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
+        const { getPhoneSearchVariants: getPhoneSearchVariants2, normalizePhone: normalizePhone2, lastNDigits: lastNDigits2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
         const variants = getPhoneSearchVariants2(phone);
         const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
-        const phoneConditions = variants.map((v) => ilike(customers.phone || "", `%${v}%`));
+        const phoneConditions = variants.map((v) => ilike(customers.phone, `%${v}%`));
         for (const v of variants) {
           phoneConditions.push(sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
         }
+        const last8 = lastNDigits2(phone, 8);
+        if (last8.length >= 7) {
+          phoneConditions.push(
+            sql`RIGHT(REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g'), 8) = ${last8}`
+          );
+        }
         const conditions = [
           eq(customers.isActive, true),
-          eq(customers.tenantId, tenantId),
           or(...phoneConditions)
         ];
+        if (tenantId) {
+          conditions.push(eq(customers.tenantId, tenantId));
+        }
         const normalized = normalizePhone2(phone);
         const results = await db.select().from(customers).where(and(...conditions)).limit(5);
         results.sort((a, b) => {
@@ -1305,6 +1451,24 @@ var init_storage = __esm({
         const [log3] = await db.insert(activityLog).values(data).returning();
         return log3;
       },
+      // Calls
+      async getCalls(tenantId, limit = 50) {
+        const conditions = [];
+        if (tenantId) conditions.push(eq(calls.tenantId, tenantId));
+        let query = db.select().from(calls);
+        if (conditions.length > 0) {
+          query = query.where(and(...conditions));
+        }
+        return query.orderBy(desc(calls.createdAt)).limit(limit);
+      },
+      async createCall(data) {
+        const [call] = await db.insert(calls).values(data).returning();
+        return call;
+      },
+      async updateCall(id, data) {
+        const [call] = await db.update(calls).set(data).where(eq(calls.id, id)).returning();
+        return call;
+      },
       // Returns
       async getReturns(tenantId) {
         if (tenantId) {
@@ -1419,7 +1583,7 @@ var init_storage = __esm({
             }).from(sales).where(inArray2(sales.branchId, branchIds)).groupBy(sales.paymentMethod);
             recentSalesQuery = db.select().from(sales).where(inArray2(sales.branchId, branchIds)).orderBy(desc(sales.createdAt)).limit(5);
             profitRowQuery = db.select({
-              totalCost: sql`coalesce(sum(p.cost_price::numeric * si.quantity), 0)`
+              totalCost: sql`coalesce(sum(${products.costPrice}::numeric * ${saleItems.quantity}), 0)`
             }).from(saleItems).innerJoin(products, eq(saleItems.productId, products.id)).innerJoin(sales, eq(saleItems.saleId, sales.id)).where(inArray2(sales.branchId, branchIds));
           } else {
             return {
@@ -1469,8 +1633,8 @@ var init_storage = __esm({
           }).from(sales).groupBy(sales.paymentMethod);
           recentSalesQuery = db.select().from(sales).orderBy(desc(sales.createdAt)).limit(5);
           profitRowQuery = db.select({
-            totalCost: sql`coalesce(sum(p.cost_price::numeric * si.quantity), 0)`
-          }).from(sql`sale_items si join products p on si.product_id = p.id`);
+            totalCost: sql`coalesce(sum(${products.costPrice}::numeric * ${saleItems.quantity}), 0)`
+          }).from(saleItems).innerJoin(products, eq(saleItems.productId, products.id));
         }
         const [salesCount] = await salesCountQuery;
         const [totalRevenueRow] = await totalRevenueQuery;
@@ -1884,6 +2048,71 @@ var init_storage = __esm({
         return shift;
       },
       // ========== Super Admin System ==========
+      // Vehicles / Fleet Management
+      async getVehicles(tenantId, branchId) {
+        if (tenantId && branchId) return db.select().from(vehicles).where(and(eq(vehicles.tenantId, tenantId), eq(vehicles.branchId, branchId), eq(vehicles.isActive, true))).orderBy(desc(vehicles.createdAt));
+        if (tenantId) return db.select().from(vehicles).where(and(eq(vehicles.tenantId, tenantId), eq(vehicles.isActive, true))).orderBy(desc(vehicles.createdAt));
+        return db.select().from(vehicles).where(eq(vehicles.isActive, true)).orderBy(desc(vehicles.createdAt));
+      },
+      async createVehicle(data) {
+        const [v] = await db.insert(vehicles).values(data).returning();
+        return v;
+      },
+      async updateVehicle(id, data) {
+        const [v] = await db.update(vehicles).set(data).where(eq(vehicles.id, id)).returning();
+        return v;
+      },
+      async deleteVehicle(id) {
+        await db.update(vehicles).set({ isActive: false }).where(eq(vehicles.id, id));
+      },
+      // Printer Configurations
+      async getPrinterConfigs(tenantId, branchId) {
+        if (branchId) return db.select().from(printerConfigs).where(and(eq(printerConfigs.tenantId, tenantId), eq(printerConfigs.branchId, branchId)));
+        return db.select().from(printerConfigs).where(eq(printerConfigs.tenantId, tenantId));
+      },
+      async upsertPrinterConfig(data) {
+        const existing = await db.select().from(printerConfigs).where(and(eq(printerConfigs.tenantId, data.tenantId), eq(printerConfigs.receiptType, data.receiptType)));
+        if (existing.length > 0) {
+          const [c2] = await db.update(printerConfigs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(printerConfigs.id, existing[0].id)).returning();
+          return c2;
+        }
+        const [c] = await db.insert(printerConfigs).values(data).returning();
+        return c;
+      },
+      // Daily Closings
+      async getDailyClosings(tenantId, branchId) {
+        if (branchId) return db.select().from(dailyClosings).where(and(eq(dailyClosings.tenantId, tenantId), eq(dailyClosings.branchId, branchId))).orderBy(desc(dailyClosings.createdAt));
+        return db.select().from(dailyClosings).where(eq(dailyClosings.tenantId, tenantId)).orderBy(desc(dailyClosings.createdAt));
+      },
+      async createDailyClosing(data) {
+        const [dc] = await db.insert(dailyClosings).values(data).returning();
+        return dc;
+      },
+      async getDailyClosingByDate(tenantId, closingDate, branchId) {
+        if (branchId) {
+          const [dc2] = await db.select().from(dailyClosings).where(and(eq(dailyClosings.tenantId, tenantId), eq(dailyClosings.closingDate, closingDate), eq(dailyClosings.branchId, branchId)));
+          return dc2;
+        }
+        const [dc] = await db.select().from(dailyClosings).where(and(eq(dailyClosings.tenantId, tenantId), eq(dailyClosings.closingDate, closingDate)));
+        return dc;
+      },
+      // Monthly Closings
+      async getMonthlyClosings(tenantId, branchId) {
+        if (branchId) return db.select().from(monthlyClosings).where(and(eq(monthlyClosings.tenantId, tenantId), eq(monthlyClosings.branchId, branchId))).orderBy(desc(monthlyClosings.createdAt));
+        return db.select().from(monthlyClosings).where(eq(monthlyClosings.tenantId, tenantId)).orderBy(desc(monthlyClosings.createdAt));
+      },
+      async createMonthlyClosing(data) {
+        const [mc] = await db.insert(monthlyClosings).values(data).returning();
+        return mc;
+      },
+      async getMonthlyClosingByMonth(tenantId, closingMonth, branchId) {
+        if (branchId) {
+          const [mc2] = await db.select().from(monthlyClosings).where(and(eq(monthlyClosings.tenantId, tenantId), eq(monthlyClosings.closingMonth, closingMonth), eq(monthlyClosings.branchId, branchId)));
+          return mc2;
+        }
+        const [mc] = await db.select().from(monthlyClosings).where(and(eq(monthlyClosings.tenantId, tenantId), eq(monthlyClosings.closingMonth, closingMonth)));
+        return mc;
+      },
       // Super Admins
       async getSuperAdmins() {
         return db.select().from(superAdmins).orderBy(desc(superAdmins.createdAt));
@@ -2347,7 +2576,45 @@ function drinkSizeModifier(largeExtra) {
       required: false,
       options: [
         { label: "0.5l Klein", price: "0.00" },
-        { label: `1.0l Gross (+${largeExtra.toFixed(2)})`, price: largeExtra.toFixed(2) }
+        { label: `1.5l Gross (+${largeExtra.toFixed(2)})`, price: largeExtra.toFixed(2) }
+      ]
+    }
+  ];
+}
+function sauceModifier() {
+  return [
+    {
+      name: "Sauce",
+      required: false,
+      options: [
+        { label: "Cocktailsauce", price: "0.00" },
+        { label: "Joghurtsauce", price: "0.00" },
+        { label: "Joghurt + Cocktail", price: "0.00" }
+      ]
+    }
+  ];
+}
+function sideModifier() {
+  return [
+    {
+      name: "Beilage",
+      required: true,
+      options: [
+        { label: "Pommes Frites", price: "0.00" },
+        { label: "Salat", price: "0.00" }
+      ]
+    }
+  ];
+}
+function dressingModifier() {
+  return [
+    {
+      name: "Salatsauce",
+      required: false,
+      options: [
+        { label: "Italienisch", price: "0.00" },
+        { label: "Franz\xF6sisch", price: "0.00" },
+        { label: "ohne Salatsauce", price: "0.00" }
       ]
     }
   ];
@@ -2522,19 +2789,57 @@ async function seedPizzaLemon() {
   for (const p of CALZONES) await insertItem("Calzone", p);
   for (const p of PIDE) await insertItem("Pide", p);
   for (const p of LAHMACUN) await insertItem("Lahmacun", p);
-  for (const p of TELLERGERICHTE) await insertItem("Tellergerichte", p);
-  for (const p of FINGERFOOD) await insertItem("Fingerfood", p);
-  for (const p of SALATE) await insertItem("Salat", p);
+  const TELLER_WITH_SIDE = /* @__PURE__ */ new Set([
+    "Chicken Nuggets 8Stk",
+    "Pouletschnitzel",
+    "Pouletfl\xFCgeli 12Stk",
+    "Poulet Kebab Teller",
+    "Lamm Kebab Teller",
+    "K\xF6fte Teller",
+    "Cevapcici Teller",
+    "Falafel Teller"
+  ]);
+  for (const p of TELLERGERICHTE) {
+    await insertItem("Tellergerichte", p, TELLER_WITH_SIDE.has(p.name) ? sideModifier() : []);
+  }
+  const FINGER_WITH_SAUCE = /* @__PURE__ */ new Set([
+    "D\xF6ner Kebab Tasche",
+    "D\xFCr\xFCm Kebab",
+    "D\xF6ner Box",
+    "Poulet Kebab Tasche",
+    "Poulet Kebab Fladen",
+    "Lamm Kebab Tasche",
+    "Lamm Kebab Fladen",
+    "K\xF6fte Taschenbrot",
+    "Cevapcici Taschenbrot",
+    "Kebab Fladen+Raclette",
+    "Kebab Tasche+Raclette",
+    "Kebab Fladen+Speck",
+    "Kebab Tasche+Speck"
+  ]);
+  for (const p of FINGERFOOD) {
+    await insertItem("Fingerfood", p, FINGER_WITH_SAUCE.has(p.name) ? sauceModifier() : []);
+  }
+  const SALAT_WITH_DRESSING = /* @__PURE__ */ new Set([
+    "Gr\xFCner Salat",
+    "Gemischter Salat",
+    "Thon Salat",
+    "Lemon Salat"
+  ]);
+  for (const p of SALATE) {
+    await insertItem("Salat", p, SALAT_WITH_DRESSING.has(p.name) ? dressingModifier() : []);
+  }
   for (const p of DESSERTS) await insertItem("Dessert", p);
+  const DRINKS_WITH_SIZE = /* @__PURE__ */ new Set(["Coca-Cola", "Coca-Cola Zero", "Fanta", "Eistee Pfirsich"]);
   for (const p of GETRAENKE) {
-    const sizeMod = ["Coca-Cola", "Fanta", "Eistee"].includes(p.name) ? drinkSizeModifier(2) : [];
+    const sizeMod = DRINKS_WITH_SIZE.has(p.name) ? drinkSizeModifier(2) : [];
     await insertItem("Getr\xE4nke", p, sizeMod);
   }
   for (const p of BIER) await insertItem("Bier", p);
   for (const p of ALKOHOL) await insertItem("Alkoholische Getr\xE4nke", p);
   for (const p of TABAK) await insertItem("Tabakwaren", p);
   const total = PIZZAS.length + CALZONES.length + PIDE.length + LAHMACUN.length + TELLERGERICHTE.length + FINGERFOOD.length + SALATE.length + DESSERTS.length + GETRAENKE.length + BIER.length + ALKOHOL.length + TABAK.length;
-  console.log(`[PIZZA LEMON] \u2713 ${total} products inserted with updated images (v3) and prices.`);
+  console.log(`[PIZZA LEMON] \u2713 ${total} products inserted with updated images (v4) and prices.`);
   const [existingConfig] = await db.select().from(landingPageConfig).where(eq2(landingPageConfig.tenantId, tenant.id));
   const heroImage = IMG("pizzalemon_hero.png");
   if (!existingConfig) {
@@ -2582,8 +2887,8 @@ async function seedPizzaLemon() {
   await db.insert(tenantNotifications).values({
     tenantId: tenant.id,
     type: "info",
-    title: "Pizza Lemon Katalog aktualisiert (v3)!",
-    message: `Neue Bilder + Preise geladen. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
+    title: "Pizza Lemon Katalog aktualisiert (v4)!",
+    message: `Sauce/Beilage/Dressing Modifiers + neue Getr\xE4nke. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
     priority: "high"
   }).onConflictDoNothing();
   console.log(`[PIZZA LEMON] \u2713 Setup complete!`);
@@ -2591,7 +2896,7 @@ async function seedPizzaLemon() {
   console.log(`[PIZZA LEMON]    Pass:    ${STORE_PASSWORD}`);
   console.log(`[PIZZA LEMON]    License: ${LICENSE_KEY}`);
   console.log(`[PIZZA LEMON]    Admin PIN: 1234  |  Cashier PIN: 5678`);
-  console.log(`[PIZZA LEMON]    Menu: 35 Pizza, 3 Calzone, 9 Pide, 2 Lahmacun, 13 Tellergerichte, 23 Fingerfood, 9 Salat, 5 Dessert, 8 Getr\xE4nke, 2 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
+  console.log(`[PIZZA LEMON]    Menu: 34 Pizza, 3 Calzone, 9 Pide, 2 Lahmacun, 13 Tellergerichte, 24 Fingerfood, 9 Salat, 6 Dessert, 9 Getr\xE4nke, 2 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
 }
 var STORE_EMAIL, STORE_PASSWORD, LICENSE_KEY, BUSINESS_NAME, IMG, PIZZA_LEMON_CATEGORIES, PIZZAS, CALZONES, PIDE, LAHMACUN, TELLERGERICHTE, FINGERFOOD, SALATE, DESSERTS, GETRAENKE, BIER, ALKOHOL, TABAK;
 var init_seedPizzaLemon = __esm({
@@ -2691,8 +2996,9 @@ var init_seedPizzaLemon = __esm({
     ];
     FINGERFOOD = [
       { name: "D\xF6ner Kebab Tasche", description: "D\xF6ner Kebab im Taschenbrot", price: 13, image: IMG("pizzalemon_60_doener_kebab_tasche.jpg") },
-      { name: "D\xFCr\xFCm Kebab", description: "D\xF6ner Kebab im Fladenbrot", price: 13, image: IMG("pizzalemon_61_dueruem_kebab.jpg") },
+      { name: "D\xFCr\xFCm Kebab", description: "D\xF6ner Kebab im Fladenbrot", price: 14, image: IMG("pizzalemon_61_dueruem_kebab.jpg") },
       { name: "D\xF6ner Box", description: "D\xF6ner Kebab in der Box mit Salat und Pommes", price: 13, image: IMG("pizzalemon_62_doener_box.jpg") },
+      { name: "Falafel", description: "Knusprige Falafel im Taschenbrot oder D\xFCr\xFCm", price: 12, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
       { name: "Falafel Taschenbrot", description: "Knusprige Falafel im Taschenbrot", price: 12, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
       { name: "Falafel D\xFCr\xFCm", description: "Falafel im Fladenbrot", price: 12, image: IMG("pizzalemon_64_falafel_dueruem.jpg") },
       { name: "Poulet Pepito", description: "Gegrilltes Poulet im Fladenbrot", price: 12, image: IMG("pizzalemon_65_poulet_pepito.jpg") },
@@ -2728,23 +3034,25 @@ var init_seedPizzaLemon = __esm({
     DESSERTS = [
       { name: "Tiramisu", description: "Klassisches italienisches Tiramisu", price: 6, image: IMG("pizzalemon_92_tiramisu.jpg") },
       { name: "Baklava", description: "T\xFCrkisches Baklava mit Honig und N\xFCssen \u2013 Portion 4 Stk.", price: 8, image: IMG("pizzalemon_93_baklava.jpg") },
-      { name: "Marlenke", description: "Tschechischer Honigkuchen (Marlenka) mit Honig oder Schokolade", price: 6, image: IMG("pizzalemon_94_marlenke.jpg") },
+      { name: "Marlenke mit Honig", description: "Tschechischer Honigkuchen (Marlenka) mit Honig", price: 6, image: IMG("pizzalemon_94_marlenke.jpg") },
+      { name: "Marlenke mit Schokolade", description: "Tschechischer Honigkuchen (Marlenka) mit Schokolade", price: 6, image: IMG("pizzalemon_94_marlenke.jpg") },
       { name: "Choco-Mousse", description: "Cremige Schokoladenmousse", price: 7, image: IMG("pizzalemon_95_choco_mousse.jpg") },
       { name: "M\xF6venpick Glace", description: "M\xF6venpick Premium-Glac\xE9 \u2013 Erdbeer, Schokolade, Vanille, Caramel (175ml)", price: 6, image: IMG("pizzalemon_96_moevenpick_glace.jpg") }
     ];
     GETRAENKE = [
-      { name: "Coca-Cola", description: "Soft Drinks (Cola, Fanta, etc. 50cl)", price: 4, image: IMG("pizzalemon_97_coca_cola.jpg") },
-      { name: "Fanta", description: "Soft Drinks (Cola, Fanta, etc. 50cl)", price: 4, image: IMG("pizzalemon_98_fanta.jpg") },
-      { name: "Eistee", description: "Soft Drinks (Cola, Fanta, etc. 50cl)", price: 4, image: IMG("pizzalemon_99_eistee.jpg") },
-      { name: "Mineralwasser", description: "Mineralwasser", price: 4, image: IMG("pizzalemon_100_mineralwasser.jpg") },
-      { name: "Uludag Gazoz", description: "T\xFCrkische Limonade Uludag", price: 4, image: IMG("pizzalemon_101_uludag_gazoz.jpg") },
-      { name: "Rivella", description: "Rivella", price: 4, image: IMG("pizzalemon_102_rivella.jpg") },
-      { name: "Ayran", description: "T\xFCrkisches Joghurtgetr\xE4nk", price: 4, image: IMG("pizzalemon_103_ayran.jpg") },
-      { name: "Red Bull", description: "Red Bull Energy Drink", price: 6, image: IMG("pizzalemon_104_red_bull.jpg") }
+      { name: "Coca-Cola", description: "Coca-Cola, 0.5l / 1.5l", price: 4, image: IMG("pizzalemon_97_coca_cola.jpg") },
+      { name: "Coca-Cola Zero", description: "Coca-Cola Zero, 0.5l / 1.5l", price: 4, image: IMG("pizzalemon_97_coca_cola.jpg") },
+      { name: "Fanta", description: "Fanta Orange, 0.5l / 1.5l", price: 6, image: IMG("pizzalemon_98_fanta.jpg") },
+      { name: "Eistee Pfirsich", description: "Eistee Pfirsich, 0.5l / 1.5l", price: 4, image: IMG("pizzalemon_99_eistee.jpg") },
+      { name: "Uludag Gazoz", description: "T\xFCrkische Limonade Uludag, 0.5l", price: 4, image: IMG("pizzalemon_101_uludag_gazoz.jpg") },
+      { name: "Rivella Blau", description: "Rivella Blau, 0.5l", price: 4, image: IMG("pizzalemon_102_rivella.jpg") },
+      { name: "Rivella Rot", description: "Rivella Rot, 0.5l", price: 4, image: IMG("pizzalemon_102_rivella.jpg") },
+      { name: "Ayran", description: "T\xFCrkisches Joghurtgetr\xE4nk, 0.5l", price: 4, image: IMG("pizzalemon_103_ayran.jpg") },
+      { name: "Red Bull", description: "Red Bull Energy Drink, 250ml", price: 5, image: IMG("pizzalemon_104_red_bull.jpg") }
     ];
     BIER = [
       { name: "M\xFCllerbr\xE4u", description: "Schweizer Bier M\xFCllerbr\xE4u, 0.5l", price: 5, image: IMG("pizzalemon_105_muellerbraeu.jpg") },
-      { name: "Feldschl\xF6sschen", description: "Feldschl\xF6sschen Bier, 0.5l", price: 5, image: IMG("pizzalemon_106_feldschlosschen.jpg") }
+      { name: "Feldschl\xF6sschen", description: "Feldschl\xF6sschen Bier, 0.5l", price: 5, image: IMG("pizzalemon_106_feldschloesschen.jpg") }
     ];
     ALKOHOL = [
       { name: "Rotwein Merlot", description: "Merlot Rotwein, 50cl", price: 13, image: IMG("pizzalemon_107_rotwein_merlot.jpg") },
@@ -3236,6 +3544,7 @@ import { createServer } from "node:http";
 import * as xlsx from "xlsx";
 import path2 from "node:path";
 import fs3 from "node:fs";
+import { randomUUID as randomUUID3 } from "node:crypto";
 
 // server/objectStorage.ts
 import { Storage } from "@google-cloud/storage";
@@ -3389,11 +3698,13 @@ async function signObjectURL({ bucketName, objectName, method, ttlSec }) {
 init_phoneUtils();
 import { EventEmitter } from "events";
 import { WebSocketServer, WebSocket } from "ws";
+var SLOT_EXPIRY_MS = 5 * 60 * 1e3;
 var CallerIDService = class extends EventEmitter {
   wss = null;
   isSimulation = true;
+  // Key: "tenantId-slot"
   activeCallSlots = /* @__PURE__ */ new Map();
-  // slot 1-4
+  slotTimeouts = /* @__PURE__ */ new Map();
   constructor() {
     super();
   }
@@ -3406,141 +3717,178 @@ var CallerIDService = class extends EventEmitter {
     this.wss.on("connection", (ws) => {
       console.log("[CallerID] Client connected to WebSocket");
       ws.send(JSON.stringify({ type: "connected", status: "ready", mode: this.isSimulation ? "simulation" : "hardware" }));
-      if (this.activeCallSlots.size > 0) {
-        const activeCalls = Array.from(this.activeCallSlots.values());
-        ws.send(JSON.stringify({ type: "active_calls", calls: activeCalls }));
-      }
       ws.on("message", (message) => {
         try {
           const data = JSON.parse(message.toString());
-          if (data.type === "simulate_call") {
-            this.handleIncomingCall(data.phoneNumber || "0123456789", data.slot);
+          if (data.type === "register") {
+            const tenantId = Number(data.tenantId);
+            if (!isNaN(tenantId)) {
+              ws.tenantId = tenantId;
+              console.log(`[CallerID] Client registered for tenant: ${tenantId}`);
+              const activeCalls = Array.from(this.activeCallSlots.values()).filter((c) => c.tenantId === tenantId);
+              if (activeCalls.length > 0) {
+                ws.send(JSON.stringify({ type: "active_calls", calls: activeCalls }));
+              }
+            }
+          } else if (data.type === "simulate_call") {
+            const tenantId = data.tenantId || ws.tenantId;
+            this.handleIncomingCall(data.phoneNumber || "0123456789", data.slot, tenantId);
           } else if (data.type === "call_answered" || data.type === "call_ended") {
-            const slot = data.slot;
-            if (slot) {
-              this.activeCallSlots.delete(slot);
-              this.broadcastCallSlotUpdate();
+            const slot = Number(data.slot);
+            const tenantId = ws.tenantId;
+            if (slot && tenantId) {
+              const key = `${tenantId}-${slot}`;
+              const call = this.activeCallSlots.get(key);
+              if (call?.dbCallId) {
+                Promise.resolve().then(() => (init_storage(), storage_exports)).then(({ storage: storage2 }) => {
+                  storage2.updateCall(call.dbCallId, { status: "answered" }).catch(() => {
+                  });
+                });
+              }
+              this.activeCallSlots.delete(key);
+              const t = this.slotTimeouts.get(key);
+              if (t) {
+                clearTimeout(t);
+                this.slotTimeouts.delete(key);
+              }
+              this.broadcastCallSlotUpdate(tenantId);
             }
           }
         } catch (e) {
-          console.error("[CallerID] WS Message Error:", e);
+          console.error("[CallerID] WS message error:", e);
         }
+      });
+      ws.on("close", () => {
+        console.log("[CallerID] Client disconnected");
       });
     });
-    try {
-      this.initHardware().then((success) => {
-        if (success) {
-          this.isSimulation = false;
-          console.log("[CallerID] Hardware (CAPI) connected successfully");
-        } else {
-          console.log("[CallerID] Hardware not found, running in simulation mode");
-        }
-      });
-    } catch (e) {
-      console.warn("[CallerID] Failed to init hardware, falling back to simulation", e);
-    }
-  }
-  async initHardware() {
-    return false;
+    console.log("[CallerID] WebSocket server listening on /api/ws/caller-id");
   }
   /**
-   * Handles an incoming call notification, assigning to the next free slot (1-4)
-   * Automatically looks up the customer by phone number across all tenants (or specific tenant)
+   * Main entry point when a call is detected
    */
   async handleIncomingCall(phoneNumber, preferredSlot, tenantId) {
     const normalized = normalizePhone(phoneNumber);
-    console.log(`[CallerID] Incoming call from: ${phoneNumber} (normalized: ${normalized})`);
-    let slot = preferredSlot;
-    if (!slot || this.activeCallSlots.has(slot)) {
-      for (let s = 1; s <= 4; s++) {
-        if (!this.activeCallSlots.has(s)) {
-          slot = s;
+    const resolvedTenantId = tenantId || null;
+    console.log(`[CallerID] Incoming call for tenant ${resolvedTenantId}: ${phoneNumber} (Normalized: ${normalized})`);
+    let slot = preferredSlot || 0;
+    if (slot < 1 || slot > 4) {
+      for (let i = 1; i <= 4; i++) {
+        const key2 = `${resolvedTenantId}-${i}`;
+        if (!this.activeCallSlots.has(key2)) {
+          slot = i;
           break;
         }
       }
     }
-    if (!slot) {
-      console.warn("[CallerID] All 4 call slots occupied, dropping call from:", phoneNumber);
+    if (slot === 0) {
+      console.log(`[CallerID] No slots available for tenant ${resolvedTenantId}, dropping call notification`);
       return null;
     }
-    let customer = null;
+    const key = `${resolvedTenantId}-${slot}`;
+    const existingTimeout = this.slotTimeouts.get(key);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+      this.slotTimeouts.delete(key);
+    }
+    const callInfo = {
+      phoneNumber,
+      normalizedPhone: normalized,
+      slot,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      tenantId: resolvedTenantId,
+      customer: null
+    };
+    this.activeCallSlots.set(key, callInfo);
+    const timeout = setTimeout(() => {
+      console.log(`[CallerID] Auto-expiring slot ${slot} for tenant ${resolvedTenantId}`);
+      this.activeCallSlots.delete(key);
+      this.slotTimeouts.delete(key);
+      if (resolvedTenantId) this.broadcastCallSlotUpdate(resolvedTenantId);
+    }, SLOT_EXPIRY_MS);
+    this.slotTimeouts.set(key, timeout);
     try {
-      if (!tenantId) {
-        console.log("[CallerID] No tenantId provided, skipping customer lookup");
-      } else {
-        const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
-        const matches = await storage2.findCustomerByPhone(phoneNumber, tenantId);
-        if (matches.length > 0) {
-          const c = matches[0];
-          customer = {
-            id: c.id,
-            name: c.name,
-            phone: c.phone,
-            email: c.email,
-            loyaltyPoints: c.loyaltyPoints,
-            visitCount: c.visitCount,
-            totalSpent: c.totalSpent,
-            notes: c.notes
-          };
-          console.log(`[CallerID] Customer matched: ${customer.name} (ID: ${customer.id})`);
-        } else {
-          console.log(`[CallerID] No customer found for phone: ${phoneNumber}`);
-        }
+      const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+      const customers2 = await storage2.findCustomerByPhone(normalized, resolvedTenantId);
+      if (customers2 && customers2.length > 0) {
+        callInfo.customer = customers2[0];
+        console.log(`[CallerID] Matched customer: ${callInfo.customer?.name}`);
       }
     } catch (e) {
       console.error("[CallerID] Customer lookup error:", e);
     }
-    const callInfo = { phoneNumber, normalizedPhone: normalized, slot, timestamp: (/* @__PURE__ */ new Date()).toISOString(), customer };
-    this.activeCallSlots.set(slot, callInfo);
+    try {
+      const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+      const dbCall = await storage2.createCall({
+        tenantId: resolvedTenantId,
+        phoneNumber,
+        customerId: callInfo.customer?.id || null,
+        status: "missed"
+      });
+      callInfo.dbCallId = dbCall.id;
+      console.log(`[CallerID] Call recorded in DB with ID: ${dbCall.id} for tenant ${resolvedTenantId}`);
+    } catch (e) {
+      console.error("[CallerID] DB save error:", e);
+    }
+    const tenantActiveCalls = Array.from(this.activeCallSlots.values()).filter((c) => c.tenantId === resolvedTenantId);
     const payload = JSON.stringify({
       type: "incoming_call",
       phoneNumber,
       normalizedPhone: normalized,
       slot,
       timestamp: callInfo.timestamp,
-      customer,
-      totalActiveCalls: this.activeCallSlots.size,
-      allActiveCalls: Array.from(this.activeCallSlots.values())
+      customer: callInfo.customer,
+      totalActiveCalls: tenantActiveCalls.length,
+      allActiveCalls: tenantActiveCalls
     });
-    if (this.wss) {
-      this.wss.clients.forEach((client2) => {
-        if (client2.readyState === WebSocket.OPEN) {
-          client2.send(payload);
-        }
-      });
-    }
-    this.emit("call", phoneNumber, slot, customer);
+    this.broadcastToTenant(payload, resolvedTenantId || void 0);
+    this.emit("call", phoneNumber, slot, callInfo.customer, resolvedTenantId);
     return callInfo;
   }
-  /**
-   * Broadcasts updated slot information to all connected clients
-   */
-  broadcastCallSlotUpdate() {
+  broadcastToTenant(payload, tenantId) {
     if (!this.wss) return;
-    const payload = JSON.stringify({
-      type: "calls_update",
-      allActiveCalls: Array.from(this.activeCallSlots.values()),
-      totalActiveCalls: this.activeCallSlots.size
-    });
+    let total = 0, matched = 0;
     this.wss.clients.forEach((client2) => {
-      if (client2.readyState === WebSocket.OPEN) client2.send(payload);
+      if (client2.readyState === WebSocket.OPEN) {
+        total++;
+        if (!tenantId || client2.tenantId === tenantId) {
+          matched++;
+          client2.send(payload);
+        }
+      }
     });
+    console.log(`[CallerID] Broadcast: ${matched}/${total} clients matched tenant=${tenantId}`);
   }
   /**
-   * Broadcast any arbitrary message to all connected POS clients
+   * Broadcasts updated slot information to a specific tenant
    */
-  broadcast(payload) {
-    if (!this.wss) return;
-    const msg = JSON.stringify(payload);
-    this.wss.clients.forEach((client2) => {
-      if (client2.readyState === WebSocket.OPEN) client2.send(msg);
+  broadcastCallSlotUpdate(tenantId) {
+    const tenantActiveCalls = Array.from(this.activeCallSlots.values()).filter((c) => c.tenantId === tenantId);
+    const payload = JSON.stringify({
+      type: "calls_update",
+      allActiveCalls: tenantActiveCalls,
+      totalActiveCalls: tenantActiveCalls.length
     });
+    this.broadcastToTenant(payload, tenantId);
+  }
+  /**
+   * Broadcast any arbitrary message to a specific tenant
+   */
+  broadcast(payload, tenantId) {
+    const msg = JSON.stringify(payload);
+    this.broadcastToTenant(msg, tenantId);
+  }
+  /**
+   * Returns all currently active calls for a given tenant (for HTTP polling fallback).
+   */
+  getActiveCallsForTenant(tenantId) {
+    return Array.from(this.activeCallSlots.values()).filter((c) => c.tenantId === tenantId);
   }
   /**
    * Mock function to trigger a call (for testing)
    */
-  simulateCall(number = "0551234567", slot) {
-    this.handleIncomingCall(number, slot);
+  simulateCall(number = "0123456789", slot, tenantId) {
+    this.handleIncomingCall(number, slot, tenantId);
   }
 };
 var callerIdService = new CallerIDService();
@@ -3556,26 +3904,31 @@ var pushService = {
   /** Public VAPID key for the browser to use when subscribing */
   publicKey: VAPID_PUBLIC,
   /** Save a push subscription received from the browser */
-  subscribe(sub) {
-    subscriptions2.set(sub.endpoint, sub);
-    console.log(`[Push] Subscription saved. Total: ${subscriptions2.size}`);
+  subscribe(sub, tenantId) {
+    if (!tenantId) return;
+    subscriptions2.set(sub.endpoint, { sub, tenantId });
+    console.log(`[Push] Subscription saved for tenant ${tenantId}. Total: ${subscriptions2.size}`);
   },
   /** Remove a subscription (when browser unsubscribes) */
   unsubscribe(endpoint) {
     subscriptions2.delete(endpoint);
   },
-  /** Send a push payload to all subscribed browsers */
-  async broadcast(payload) {
+  /** Send a push payload to all subscribed browsers of a specific tenant */
+  async broadcast(payload, tenantId) {
     if (subscriptions2.size === 0) return;
     const msg = JSON.stringify(payload);
     const failed = [];
+    const recipients = Array.from(subscriptions2.values()).filter((record) => {
+      return !tenantId || record.tenantId === tenantId;
+    });
+    if (recipients.length === 0) return;
     await Promise.allSettled(
-      Array.from(subscriptions2.values()).map(async (sub) => {
+      recipients.map(async (record) => {
         try {
-          await webpush.sendNotification(sub, msg);
+          await webpush.sendNotification(record.sub, msg);
         } catch (err) {
           if (err.statusCode === 410 || err.statusCode === 404) {
-            failed.push(sub.endpoint);
+            failed.push(record.sub.endpoint);
           } else {
             console.error("[Push] Send failed:", err.message);
           }
@@ -3585,22 +3938,26 @@ var pushService = {
     failed.forEach((ep) => subscriptions2.delete(ep));
   },
   /** Push: incoming call notification */
-  async notifyIncomingCall(phoneNumber, customerName) {
+  async notifyIncomingCall(phoneNumber, tenantId, customerName, address) {
+    let body = phoneNumber;
+    if (customerName) body += ` \u2014 ${customerName}`;
+    if (address) body += `
+\u{1F4CD} ${address}`;
     await this.broadcast({
       type: "incoming_call",
       title: `\u{1F4DE} Incoming Call`,
-      body: customerName ? `${phoneNumber} \u2014 ${customerName}` : phoneNumber,
+      body,
       data: { type: "incoming_call", phoneNumber }
-    });
+    }, tenantId);
   },
   /** Push: new online order notification */
-  async notifyNewOrder(orderNumber, total) {
+  async notifyNewOrder(orderNumber, total, tenantId) {
     await this.broadcast({
       type: "new_online_order",
       title: "\u{1F6D2} New Online Order",
       body: `Order #${orderNumber} \u2014 CHF ${Number(total).toFixed(2)}`,
       data: { type: "new_online_order", orderNumber }
-    });
+    }, tenantId);
   }
 };
 
@@ -3884,6 +4241,7 @@ var lastError = null;
 var connectionLog = [];
 var connecting = false;
 var connectionPhase = "idle";
+var connectionStartTime = 0;
 var autoReconnectTimer = null;
 var pendingMessages = [];
 function log(event) {
@@ -3893,21 +4251,31 @@ function log(event) {
   console.log(`[WhatsApp] ${event}`);
 }
 function toChatId(phone) {
-  const digits = phone.replace(/\D/g, "");
+  let digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("410") && digits.length === 12) {
+    digits = "41" + digits.slice(3);
+  } else if (digits.startsWith("0") && digits.length === 10) {
+    digits = "41" + digits.slice(1);
+  } else if (digits.length === 9 && !digits.startsWith("0")) {
+    digits = "41" + digits;
+  }
   return `${digits}@c.us`;
 }
 async function cleanupProcesses() {
-  const isWindows = os.platform() === "win32";
-  if (!isWindows) {
-    try {
-      const { execSync } = await import("child_process");
+  try {
+    const { execSync } = await import("child_process");
+    const isWindows = os.platform() === "win32";
+    if (isWindows) {
+      execSync(`wmic process where "name='chrome.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: "ignore" });
+      execSync(`wmic process where "name='chromium.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: "ignore" });
+    } else {
       execSync(
         `pkill -9 -f 'wppconnect' 2>/dev/null; pkill -9 -f 'chromium.*barmagly' 2>/dev/null; true`,
         { timeout: 4e3 }
       );
-      await new Promise((r) => setTimeout(r, 500));
-    } catch {
     }
+    await new Promise((r) => setTimeout(r, 500));
+  } catch {
   }
   if (!fs2.existsSync(STORAGE_DIR)) {
     fs2.mkdirSync(STORAGE_DIR, { recursive: true });
@@ -4030,6 +4398,8 @@ async function _connectBackground(wpp) {
       "--window-size=1280,800"
     ];
     connectionPhase = "awaiting_qr";
+    let sessionConfirmedByEvent = false;
+    let stabilisationComplete = false;
     client = await wpp.create({
       session: SESSION_NAME,
       folderNameToken: TOKEN_DIR,
@@ -4057,42 +4427,56 @@ async function _connectBackground(wpp) {
         log(`Session "${session}": ${statusSession}`);
         if (statusSession === "qrReadSuccess") {
           connectionPhase = "qr_scanned";
-          log("QR scanned successfully \u2014 waiting for session to stabilize");
+          log("QR scanned \u2014 waiting for session to confirm");
         }
         if (statusSession === "inChat" || statusSession === "isLogged") {
+          sessionConfirmedByEvent = true;
           if (connectionPhase !== "ready") {
             connectionPhase = "qr_scanned";
           }
-        }
-        if (connectionPhase === "ready") {
-          if (statusSession === "notLogged" || statusSession === "browserClose" || statusSession === "desconnectedMobile" || statusSession === "disconnectedMobile") {
-            status = "disconnected";
-            clientReady = false;
-            client = null;
-            connectionPhase = "idle";
-            log(`Session lost: ${statusSession} \u2014 will auto-reconnect in 15s`);
-            scheduleAutoReconnect();
+          if (status === "disconnected" && !connecting) {
+            status = "connected";
+            clientReady = true;
+            connectionPhase = "ready";
+            log("WhatsApp reconnected natively from mobile");
           }
+        }
+        if (statusSession === "notLogged" || statusSession === "browserClose" || statusSession === "serverWssNotConnected" || statusSession === "disconnectedMobile" || statusSession === "desconnectedMobile" || statusSession === "deviceNotConnected") {
+          status = "disconnected";
+          clientReady = false;
+          client = null;
+          connectionPhase = "idle";
+          connecting = false;
+          log(`Session offline (${statusSession}) \u2014 will automatically retry/reconnect...`);
+          scheduleAutoReconnect();
         }
       }
     });
     log("WPP client created \u2014 waiting for session to stabilize...");
-    await new Promise((r) => setTimeout(r, 6e3));
-    const alive = await isClientAlive();
-    if (!alive) {
-      log("Client not alive after stabilization \u2014 retrying connection state check...");
-      await new Promise((r) => setTimeout(r, 5e3));
-      const retryAlive = await isClientAlive();
-      if (!retryAlive) {
-        throw new Error("WhatsApp session failed to stabilize after QR scan");
+    if (sessionConfirmedByEvent) {
+      log("Session confirmed via statusFind \u2014 settling for 3s...");
+      await new Promise((r) => setTimeout(r, 3e3));
+    } else {
+      await new Promise((r) => setTimeout(r, 8e3));
+      if (!sessionConfirmedByEvent) {
+        const alive = await isClientAlive();
+        if (!alive) {
+          log("Session not confirmed yet \u2014 retrying in 5s...");
+          await new Promise((r) => setTimeout(r, 5e3));
+          const retryAlive = await isClientAlive();
+          if (!retryAlive && !sessionConfirmedByEvent) {
+            throw new Error("WhatsApp session failed to stabilize \u2014 please scan the QR code again");
+          }
+        }
       }
     }
+    stabilisationComplete = true;
     status = "connected";
     clientReady = true;
     connectionPhase = "ready";
     lastQrCode = null;
     connecting = false;
-    log("WhatsApp client ready and verified");
+    log("\u2705 WhatsApp connected and ready");
     client.onMessage(async (message) => {
       log(`Msg from ${message.from}: ${(message.body || "").slice(0, 80)}`);
     });
@@ -4107,7 +4491,7 @@ async function _connectBackground(wpp) {
 }
 var whatsappService = {
   getStatus() {
-    return { status, lastError, log: connectionLog.slice(0, 20) };
+    return { status, lastError, log: connectionLog.slice(0, 20), phase: connectionPhase };
   },
   getQrCode() {
     return lastQrCode;
@@ -4122,10 +4506,16 @@ var whatsappService = {
       client = null;
     }
     if (connecting) {
-      log("Connection already in progress \u2014 ignored duplicate request");
-      return { status };
+      if (Date.now() - connectionStartTime > 6e4) {
+        log("Connection starting phase seems stuck for over 60s. Forcing restart...");
+        connecting = false;
+      } else {
+        log("Connection already in progress \u2014 ignored duplicate request");
+        return { status };
+      }
     }
     connecting = true;
+    connectionStartTime = Date.now();
     connectionPhase = "starting";
     clientReady = false;
     if (client) {
@@ -4997,7 +5387,7 @@ async function registerRoutes(app2) {
   app2.post("/api/categories", async (req, res) => {
     try {
       const c = await storage.createCategory(sanitizeDates(req.body));
-      callerIdService.broadcast({ type: "menu_updated" });
+      callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
       res.json(c);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -5006,7 +5396,7 @@ async function registerRoutes(app2) {
   app2.put("/api/categories/:id", async (req, res) => {
     try {
       const c = await storage.updateCategory(Number(req.params.id), sanitizeDates(req.body));
-      callerIdService.broadcast({ type: "menu_updated" });
+      callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
       res.json(c);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -5016,7 +5406,7 @@ async function registerRoutes(app2) {
     try {
       const c = await storage.getCategory(Number(req.params.id));
       await storage.deleteCategory(Number(req.params.id));
-      if (c) callerIdService.broadcast({ type: "menu_updated" });
+      if (c) callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -5099,7 +5489,7 @@ async function registerRoutes(app2) {
   app2.post("/api/products", async (req, res) => {
     try {
       const p = await storage.createProduct(sanitizeDates(req.body));
-      callerIdService.broadcast({ type: "menu_updated" });
+      callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
       res.json(p);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -5108,7 +5498,7 @@ async function registerRoutes(app2) {
   app2.put("/api/products/:id", async (req, res) => {
     try {
       const p = await storage.updateProduct(Number(req.params.id), sanitizeDates(req.body));
-      callerIdService.broadcast({ type: "menu_updated" });
+      callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
       res.json(p);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -5118,7 +5508,7 @@ async function registerRoutes(app2) {
     try {
       const p = await storage.getProduct(Number(req.params.id));
       await storage.deleteProduct(Number(req.params.id));
-      if (p) callerIdService.broadcast({ type: "menu_updated" });
+      if (p) callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -5175,6 +5565,15 @@ async function registerRoutes(app2) {
       const limit = req.query.limit ? Math.min(Number(req.query.limit), 200) : 50;
       const offset = req.query.offset ? Number(req.query.offset) : 0;
       res.json(await storage.getCustomers(req.query.search, tenantId, limit, offset));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/customers/count", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      const search = req.query.search;
+      res.json({ count: await storage.getCustomerCount(search, tenantId) });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -5295,6 +5694,16 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: e.message });
     }
   });
+  app2.get("/api/calls", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      const limit = req.query.limit ? Number(req.query.limit) : 50;
+      const calls2 = await storage.getCalls(tenantId, limit);
+      res.json(calls2);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
   app2.get("/api/sales", async (req, res) => {
     try {
       const limit = req.query.limit ? Number(req.query.limit) : void 0;
@@ -5347,6 +5756,9 @@ async function registerRoutes(app2) {
             totalSpent: String(Number(existingCustomer.totalSpent || 0) + Number(saleData.totalAmount))
           });
         }
+      }
+      if (req.body.callId) {
+        await storage.updateCall(Number(req.body.callId), { saleId: sale.id, status: "answered" });
       }
       await storage.createActivityLog({
         employeeId: saleData.employeeId,
@@ -6215,31 +6627,32 @@ async function registerRoutes(app2) {
       return res.sendStatus(500);
     }
   });
-  app2.post("/api/objects/upload", async (_req, res) => {
+  app2.post("/api/objects/upload", async (req, res) => {
     try {
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      res.json({ uploadURL });
+      const { imageData, contentType = "image/jpeg" } = req.body;
+      if (!imageData) {
+        return res.status(400).json({ error: "imageData is required" });
+      }
+      const uploadsDir = path2.resolve(process.cwd(), "uploads");
+      if (!fs3.existsSync(uploadsDir)) fs3.mkdirSync(uploadsDir, { recursive: true });
+      const ext = (contentType.split("/")[1] || "jpg").split(";")[0];
+      const filename = `${randomUUID3()}.${ext}`;
+      const filePath = path2.join(uploadsDir, filename);
+      const buffer = Buffer.from(imageData, "base64");
+      fs3.writeFileSync(filePath, buffer);
+      const objectPath = `/objects/${filename}`;
+      res.json({ objectPath });
     } catch (error) {
-      console.error("Error getting upload URL:", error);
+      console.error("Error uploading file:", error);
       res.status(500).json({ error: error.message });
     }
   });
   app2.put("/api/images/save", async (req, res) => {
     const { imageURL } = req.body;
-    if (process.env.NODE_ENV !== "production") console.log("Saving image path for URL:", imageURL);
     if (!imageURL) {
       return res.status(400).json({ error: "imageURL is required" });
     }
-    try {
-      const objectStorageService = new ObjectStorageService();
-      const objectPath = objectStorageService.normalizeObjectEntityPath(imageURL);
-      if (process.env.NODE_ENV !== "production") console.log("Normalized object path:", objectPath);
-      res.status(200).json({ objectPath });
-    } catch (error) {
-      console.error("Error saving image:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
+    res.status(200).json({ objectPath: imageURL });
   });
   app2.post("/api/products-with-stock", async (req, res) => {
     try {
@@ -6315,7 +6728,8 @@ async function registerRoutes(app2) {
     }
   });
   app2.post("/api/caller-id/simulate", async (req, res) => {
-    const { phoneNumber, tenantId } = req.body;
+    const { phoneNumber, tenantId: bodyTenantId } = req.body;
+    const tenantId = bodyTenantId || req.tenantId;
     await callerIdService.handleIncomingCall(phoneNumber || "0551234567", void 0, tenantId ? Number(tenantId) : void 0);
     res.json({ success: true });
   });
@@ -6346,21 +6760,34 @@ async function test(){
 }
 </script></body></html>`);
   });
+  app2.get("/api/caller-id/active-calls", (req, res) => {
+    const tenantId = req.tenantId || Number(req.query.tenantId);
+    if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+    const calls2 = callerIdService.getActiveCallsForTenant(Number(tenantId));
+    res.json({ calls: calls2 });
+  });
   app2.post("/api/caller-id/incoming", async (req, res) => {
-    const secret = req.headers["x-bridge-secret"] || req.body.secret;
-    if (process.env.CALLER_ID_BRIDGE_SECRET && secret !== process.env.CALLER_ID_BRIDGE_SECRET) {
-      return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const secret = req.headers["x-bridge-secret"] || req.body.secret;
+      if (process.env.CALLER_ID_BRIDGE_SECRET && secret !== process.env.CALLER_ID_BRIDGE_SECRET) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const { phoneNumber, slot } = req.body;
+      const tenantId = req.body.tenantId || req.tenantId;
+      const callInfo = await callerIdService.handleIncomingCall(
+        phoneNumber || "0123456789",
+        slot ? Number(slot) : void 0,
+        tenantId ? Number(tenantId) : void 0
+      );
+      const customerName = callInfo?.customer?.name;
+      const customerAddress = callInfo?.customer?.address;
+      pushService.notifyIncomingCall(phoneNumber || "0123456789", tenantId ? Number(tenantId) : void 0, customerName, customerAddress).catch(() => {
+      });
+      res.json({ success: true });
+    } catch (e) {
+      console.error("[CallerID] Error handling incoming call:", e);
+      res.status(500).json({ error: "Internal server error" });
     }
-    const { phoneNumber, tenantId, slot } = req.body;
-    const callInfo = await callerIdService.handleIncomingCall(
-      phoneNumber || "0123456789",
-      slot ? Number(slot) : void 0,
-      tenantId ? Number(tenantId) : void 0
-    );
-    const customerName = callInfo?.customer?.name;
-    pushService.notifyIncomingCall(phoneNumber || "0123456789", customerName).catch(() => {
-    });
-    res.json({ success: true });
   });
   app2.get("/api/push/vapid-public-key", (_req, res) => {
     res.json({ publicKey: pushService.publicKey });
@@ -6368,7 +6795,9 @@ async function test(){
   app2.post("/api/push/subscribe", (req, res) => {
     const sub = req.body;
     if (!sub || !sub.endpoint) return res.status(400).json({ error: "Invalid subscription" });
-    pushService.subscribe(sub);
+    const tenantId = req.tenantId;
+    if (!tenantId) return res.status(401).json({ error: "Tenant identification required" });
+    pushService.subscribe(sub, tenantId);
     res.json({ success: true });
   });
   app2.post("/api/push/unsubscribe", (req, res) => {
@@ -6436,10 +6865,11 @@ async function test(){
       const commissionRate = await storage.getCommissionRate();
       if (commissionRate > 0) {
         const factor = 1 + commissionRate / 100;
-        products2 = products2.map((p) => ({
-          ...p,
-          price: (parseFloat(p.price) * factor).toFixed(2)
-        }));
+        products2 = products2.map((p) => {
+          const rawPrice = parseFloat(p.price) * factor;
+          const rounded = Math.ceil(rawPrice * 2) / 2;
+          return { ...p, price: rounded.toFixed(2) };
+        });
       }
       const categories2 = sortCategoriesByPriority(await storage.getCategories(config.tenantId));
       const categoryOrder = categories2.map((c) => c.id);
@@ -6590,12 +7020,13 @@ async function test(){
     const qr = whatsappService.getQrCode();
     res.json({ qrCode: qr });
   });
-  app2.post("/api/super-admin/whatsapp/test", requireSuperAdmin, async (_req, res) => {
+  app2.post("/api/super-admin/whatsapp/test", requireSuperAdmin, async (req, res) => {
+    const targetPhone = (req.body?.phone || "201204593124").replace(/\D/g, "");
     const sent = await whatsappService.sendText(
-      "201204593124",
-      "\u{1F9EA} *Test Message*\n\nThis is a test from Barmagly POS WhatsApp integration."
+      targetPhone,
+      "\u{1F9EA} *Test Message*\n\nThis is a test from Barmagly POS WhatsApp integration.\n\n\u2705 If you receive this, the connection is working!"
     );
-    res.json({ success: sent });
+    res.json({ success: sent, phone: targetPhone });
   });
   app2.get("/api/landing-page-config", async (req, res) => {
     try {
@@ -6839,6 +7270,141 @@ async function test(){
       const filepath = path2.join(TENANT_BACKUP_DIR, filename);
       if (fs3.existsSync(filepath)) fs3.unlinkSync(filepath);
       res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/vehicles", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      res.json(await storage.getVehicles(tenantId, branchId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/vehicles", async (req, res) => {
+    try {
+      res.json(await storage.createVehicle(req.body));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/vehicles/:id", async (req, res) => {
+    try {
+      res.json(await storage.updateVehicle(Number(req.params.id), req.body));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/vehicles/:id", async (req, res) => {
+    try {
+      await storage.deleteVehicle(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/printer-configs", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : 1;
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      res.json(await storage.getPrinterConfigs(tenantId, branchId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/printer-configs", async (req, res) => {
+    try {
+      res.json(await storage.upsertPrinterConfig(req.body));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/daily-closings", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : 1;
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      res.json(await storage.getDailyClosings(tenantId, branchId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/daily-closings", async (req, res) => {
+    try {
+      const { tenantId, branchId, closingDate } = req.body;
+      const today = closingDate || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      const startOfDay = /* @__PURE__ */ new Date(today + "T00:00:00.000Z");
+      const endOfDay = /* @__PURE__ */ new Date(today + "T23:59:59.999Z");
+      const daySales = await storage.getSalesByDateRange(startOfDay, endOfDay);
+      const totalSales = daySales.reduce((s, sale) => s + Number(sale.totalAmount || 0), 0);
+      const totalCash = daySales.filter((s) => s.paymentMethod === "cash").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
+      const totalCard = daySales.filter((s) => s.paymentMethod === "card").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
+      const totalMobile = daySales.filter((s) => s.paymentMethod === "mobile").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
+      const totalDiscounts = daySales.reduce((s, sale) => s + Number(sale.discountAmount || 0), 0);
+      const dc = await storage.createDailyClosing({
+        tenantId,
+        branchId: branchId || null,
+        employeeId: req.body.employeeId || null,
+        closingDate: today,
+        totalSales: String(totalSales),
+        totalCash: String(totalCash),
+        totalCard: String(totalCard),
+        totalMobile: String(totalMobile),
+        totalTransactions: daySales.length,
+        totalReturns: "0",
+        totalDiscounts: String(totalDiscounts),
+        openingCash: String(req.body.openingCash || 0),
+        closingCash: String(req.body.closingCash || 0),
+        notes: req.body.notes || null,
+        status: "closed"
+      });
+      res.json(dc);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/monthly-closings", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : 1;
+      const branchId = req.query.branchId ? Number(req.query.branchId) : void 0;
+      res.json(await storage.getMonthlyClosings(tenantId, branchId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/monthly-closings", async (req, res) => {
+    try {
+      const { tenantId, branchId, closingMonth } = req.body;
+      const month = closingMonth || (/* @__PURE__ */ new Date()).toISOString().slice(0, 7);
+      const startOfMonth = /* @__PURE__ */ new Date(month + "-01T00:00:00.000Z");
+      const endOfMonth = /* @__PURE__ */ new Date(new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() + 1, 0).toISOString().split("T")[0] + "T23:59:59.999Z");
+      const monthSales = await storage.getSalesByDateRange(startOfMonth, endOfMonth);
+      const totalSales = monthSales.reduce((s, sale) => s + Number(sale.totalAmount || 0), 0);
+      const totalCash = monthSales.filter((s) => s.paymentMethod === "cash").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
+      const totalCard = monthSales.filter((s) => s.paymentMethod === "card").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
+      const totalMobile = monthSales.filter((s) => s.paymentMethod === "mobile").reduce((a, s) => a + Number(s.totalAmount || 0), 0);
+      const totalDiscounts = monthSales.reduce((s, sale) => s + Number(sale.discountAmount || 0), 0);
+      const expenses2 = await storage.getExpensesByDateRange(startOfMonth, endOfMonth);
+      const totalExpenses = expenses2.reduce((s, e) => s + Number(e.amount || 0), 0);
+      const mc = await storage.createMonthlyClosing({
+        tenantId,
+        branchId: branchId || null,
+        employeeId: req.body.employeeId || null,
+        closingMonth: month,
+        totalSales: String(totalSales),
+        totalCash: String(totalCash),
+        totalCard: String(totalCard),
+        totalMobile: String(totalMobile),
+        totalTransactions: monthSales.length,
+        totalReturns: "0",
+        totalDiscounts: String(totalDiscounts),
+        totalExpenses: String(totalExpenses),
+        netRevenue: String(totalSales - totalExpenses),
+        notes: req.body.notes || null,
+        status: "closed"
+      });
+      res.json(mc);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -8006,8 +8572,12 @@ var PUBLIC_ROUTES = [
   "/api/payment-gateway/config",
   "/api/products/template",
   "/api/dashboard/subscriptions",
-  "/api/caller-id/incoming"
+  "/api/caller-id/incoming",
   // Local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
+  "/api/push/vapid-public-key",
+  // Public — needed for SW push subscription before auth
+  "/api/push/subscribe"
+  // Public — SW registers subscription before full auth
 ];
 var PUBLIC_ROUTE_PATTERNS = [
   /^\/api\/store\/\d+\/menu$/
@@ -8121,7 +8691,9 @@ app.use((req, res, next) => {
 });
 function setupCors(app2) {
   app2.use((req, res, next) => {
-    const origins = /* @__PURE__ */ new Set();
+    const origins = /* @__PURE__ */ new Set([
+      "https://pos.barmagly.tech"
+    ]);
     if (process.env.REPLIT_DEV_DOMAIN) {
       origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
       origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}:5000`);
@@ -8153,6 +8725,7 @@ function setupCors(app2) {
 function setupBodyParsing(app2) {
   app2.use(
     express.json({
+      limit: "10mb",
       verify: (req, _res, buf) => {
         req.rawBody = buf;
       }
@@ -8273,6 +8846,15 @@ function configureExpoAndLanding(app2) {
         return res.status(200).send(html);
       }
     }
+    if (req.path === "/app/sw.js") {
+      const swPath = path4.resolve(process.cwd(), "dist", "sw.js");
+      if (fs5.existsSync(swPath)) {
+        res.setHeader("Content-Type", "application/javascript");
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Service-Worker-Allowed", "/app/");
+        return res.sendFile(swPath);
+      }
+    }
     if (req.path.startsWith("/super_admin")) {
       return res.redirect(301, req.url.replace("/super_admin", "/super-admin"));
     }
@@ -8339,7 +8921,14 @@ function configureExpoAndLanding(app2) {
   app2.use("/assets", express.static(path4.resolve(process.cwd(), "assets")));
   app2.use("/uploads", express.static(path4.resolve(process.cwd(), "uploads")));
   app2.use("/objects", express.static(path4.resolve(process.cwd(), "uploads")));
-  app2.use("/app", express.static(path4.resolve(process.cwd(), "dist")));
+  app2.use("/app/assets/images", express.static(path4.resolve(process.cwd(), "assets", "images")));
+  app2.use("/app", express.static(path4.resolve(process.cwd(), "dist"), {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith(".webmanifest")) {
+        res.setHeader("Content-Type", "application/manifest+json");
+      }
+    }
+  }));
   app2.use(express.static(path4.resolve(process.cwd(), "static-build")));
   const staticIndexPath = path4.resolve(process.cwd(), "dist", "index.html");
   app2.get("/app/{*splat}", (req, res, next) => {
@@ -8617,6 +9206,7 @@ function setupPaymentGatewayRoutes(app2) {
     });
   });
   await callerIdService.init(server);
+  whatsappService.connect().catch((err) => log2("WhatsApp auto-connect error:", err));
   initStripe().catch((err) => log2("Stripe init error (non-fatal):", err));
   try {
     const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
