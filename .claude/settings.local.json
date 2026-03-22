@@ -71,7 +71,8 @@
       "Bash(cat \"f:\\\\POS-APP\\\\app\\\\\\(tabs\\)\\\\products.tsx\")",
       "Bash(EXPO_PUBLIC_DOMAIN=pos.barmagly.tech npx expo export -p web)",
       "Bash(find f:/POS-APP -name .env* -o -name .wppconnect -type d)",
-      "Bash(wc -l \"f:/POS-APP/app/\\(tabs\\)/online-orders.tsx\")"
+      "Bash(wc -l \"f:/POS-APP/app/\\(tabs\\)/online-orders.tsx\")",
+      "Bash(find /f/POS-APP/public -type f ! -path */.*)"
     ]
   }
 }

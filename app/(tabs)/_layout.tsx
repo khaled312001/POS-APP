@@ -148,6 +148,32 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="online-orders"
+          options={{
+            title: t("onlineOrdersTitle" as any) || "Orders",
+            tabBarIcon: ({ color, size, focused }) => (
+              <View style={{ position: "relative" }}>
+                <Ionicons name="receipt" size={size} color={color} />
+                {pendingCount > 0 && (
+                  <Animated.View style={{
+                    position: "absolute", top: -4, right: -6,
+                    minWidth: 16, height: 16, borderRadius: 8,
+                    backgroundColor: Colors.danger,
+                    justifyContent: "center", alignItems: "center",
+                    paddingHorizontal: 3,
+                    transform: [{ scale: pulseAnim }],
+                    borderWidth: 1.5, borderColor: Colors.tabBar,
+                  }}>
+                    <Text style={{ color: "#fff", fontSize: 9, fontWeight: "900", lineHeight: 12 }}>
+                      {pendingCount > 9 ? "9+" : pendingCount}
+                    </Text>
+                  </Animated.View>
+                )}
+              </View>
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="products"
           options={{
             title: t("products"),
@@ -173,32 +199,6 @@ export default function TabLayout() {
               <Ionicons name="stats-chart" size={size} color={color} />
             ),
             href: isCashier ? null : undefined,
-          }}
-        />
-        <Tabs.Screen
-          name="online-orders"
-          options={{
-            title: t("onlineOrdersTitle" as any) || "Orders",
-            tabBarIcon: ({ color, size, focused }) => (
-              <View style={{ position: "relative" }}>
-                <Ionicons name="globe" size={size} color={color} />
-                {pendingCount > 0 && (
-                  <Animated.View style={{
-                    position: "absolute", top: -4, right: -6,
-                    minWidth: 16, height: 16, borderRadius: 8,
-                    backgroundColor: Colors.danger,
-                    justifyContent: "center", alignItems: "center",
-                    paddingHorizontal: 3,
-                    transform: [{ scale: pulseAnim }],
-                    borderWidth: 1.5, borderColor: Colors.tabBar,
-                  }}>
-                    <Text style={{ color: "#fff", fontSize: 9, fontWeight: "900", lineHeight: 12 }}>
-                      {pendingCount > 9 ? "9+" : pendingCount}
-                    </Text>
-                  </Animated.View>
-                )}
-              </View>
-            ),
           }}
         />
         <Tabs.Screen

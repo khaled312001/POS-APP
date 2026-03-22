@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   StyleSheet, Text, View, FlatList, Pressable, ScrollView,
   Alert, Platform, Animated, RefreshControl, Modal, TextInput, KeyboardAvoidingView,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
-import { useAuth } from "@/lib/auth-context";
 import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { useLanguage } from "@/lib/language-context";
@@ -23,6 +23,7 @@ const STATUS_META: Record<string, { label: string; labelAr: string; labelDe: str
   ready: { label: "Ready", labelAr: "جاهز", labelDe: "Fertig", color: "#2FD3C6", icon: "bag-check-outline", next: "delivered" },
   delivered: { label: "Delivered", labelAr: "تم التوصيل", labelDe: "Geliefert", color: "#10B981", icon: "checkmark-done-outline" },
   cancelled: { label: "Cancelled", labelAr: "ملغي", labelDe: "Storniert", color: "#EF4444", icon: "close-circle-outline" },
+  completed: { label: "Completed", labelAr: "مكتمل", labelDe: "Abgeschlossen", color: "#10B981", icon: "checkmark-done-outline" },
 };
 
 const PAY_ICON: Record<string, string> = { cash: "💵", card: "💳", mobile: "📱" };
@@ -45,15 +46,65 @@ function playNotificationSound() {
   } catch { }
 }
 
-export default function OnlineOrdersScreen() {
+const PIZZA_TOPPINGS = [
+  { name: "Tomato Sauce", names: ["Tomato Sauce", "Tomatensauce", "Extra Tomatensauce"], icon: "🍅", category: "Sauces" },
+  { name: "Tomatoes", names: ["Tomatoes", "Tomaten"], icon: "🍅", category: "Vegetables" },
+  { name: "Sliced Tomatoes", names: ["Sliced Tomatoes", "Tomatenscheiben"], icon: "🍅", category: "Vegetables" },
+  { name: "Garlic", names: ["Garlic", "Knoblauch"], icon: "🧄", category: "Vegetables" },
+  { name: "Onions", names: ["Onions", "Zwiebeln"], icon: "🧅", category: "Vegetables" },
+  { name: "Capers", names: ["Capers", "Kapern"], icon: "🫛", category: "Vegetables" },
+  { name: "Olives", names: ["Olives", "Oliven"], icon: "🫒", category: "Vegetables" },
+  { name: "Oregano", names: ["Oregano"], icon: "🌿", category: "Others" },
+  { name: "Vegetables", names: ["Vegetables", "Gemüse"], icon: "🥦", category: "Vegetables" },
+  { name: "Spinach", names: ["Spinach", "Spinat"], icon: "🥬", category: "Vegetables" },
+  { name: "Bell Peppers", names: ["Bell Peppers", "Peperoni", "Paprika"], icon: "🫑", category: "Vegetables" },
+  { name: "Corn", names: ["Corn", "Mais"], icon: "🌽", category: "Vegetables" },
+  { name: "Broccoli", names: ["Broccoli"], icon: "🥦", category: "Vegetables" },
+  { name: "Artichokes", names: ["Artichokes", "Artischocken"], icon: "🌿", category: "Vegetables" },
+  { name: "Arugula", names: ["Arugula", "Rucola"], icon: "🥬", category: "Vegetables" },
+  { name: "Egg", names: ["Egg", "Ei"], icon: "🥚", category: "Others" },
+  { name: "Pineapple", names: ["Pineapple", "Ananas"], icon: "🍍", category: "Others" },
+  { name: "Mushrooms", names: ["Mushrooms", "Pilze", "Champignons"], icon: "🍄", category: "Vegetables" },
+  { name: "Ham", names: ["Ham", "Schinken"], icon: "🥩", category: "Meat" },
+  { name: "Spicy Salami", names: ["Spicy Salami", "Scharfe Salami", "Diavola"], icon: "🌶️", category: "Meat" },
+  { name: "Salami", names: ["Salami"], icon: "🥩", category: "Meat" },
+  { name: "Bacon", names: ["Bacon", "Speck"], icon: "🥓", category: "Meat" },
+  { name: "Prosciutto", names: ["Prosciutto", "Rohschinken"], icon: "🥩", category: "Meat" },
+  { name: "Lamb", names: ["Lamb", "Lammfleisch"], icon: "🥩", category: "Meat" },
+  { name: "Chicken", names: ["Chicken", "Poulet", "Hähnchen"], icon: "🍗", category: "Meat" },
+  { name: "Kebab", names: ["Kebab", "Kebabfleisch"], icon: "🥙", category: "Meat" },
+  { name: "Minced Meat", names: ["Minced Meat", "Hackfleisch"], icon: "🥩", category: "Meat" },
+  { name: "Anchovies", names: ["Anchovies", "Sardellen"], icon: "🐟", category: "Seafood" },
+  { name: "Shrimp", names: ["Shrimp", "Crevetten", "Garnelen"], icon: "🍤", category: "Seafood" },
+  { name: "Tuna", names: ["Tuna", "Thunfisch"], icon: "🐟", category: "Seafood" },
+  { name: "Mayonnaise", names: ["Mayonnaise", "Mayo"], icon: "🫙", category: "Sauces" },
+  { name: "Ketchup", names: ["Ketchup"], icon: "🫙", category: "Sauces" },
+  { name: "Cocktail Sauce", names: ["Cocktail Sauce", "Cocktailsauce"], icon: "🫙", category: "Sauces" },
+  { name: "Spicy Sauce", names: ["Spicy Sauce", "Scharfe Sauce", "SCHARF"], icon: "🌶️", category: "Sauces" },
+  { name: "Garlic Sauce", names: ["Garlic Sauce", "Knoblauchsauce"], icon: "🫙", category: "Sauces" },
+  { name: "Yogurt Sauce", names: ["Yogurt Sauce", "Joghurtsauce"], icon: "🫙", category: "Sauces" },
+  { name: "Mozzarella", names: ["Mozzarella", "Extra Mozzarella", "Käse"], icon: "🧀", category: "Cheese" },
+  { name: "Gorgonzola", names: ["Gorgonzola"], icon: "🧀", category: "Cheese" },
+  { name: "Parmesan", names: ["Parmesan"], icon: "🧀", category: "Cheese" },
+  { name: "Mascarpone", names: ["Mascarpone"], icon: "🧀", category: "Cheese" },
+  { name: "Kaeserand", names: ["Kaeserand", "Käserand", "Cheese Crust"], icon: "🧀", category: "Cheese" },
+];
+
+export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
   const { tenant } = useLicense();
   const { language } = useLanguage();
   const qc = useQueryClient();
   const tenantId = tenant?.id;
+
+  const [viewMode, setViewMode] = useState<"online" | "pos" | "all">("all");
   const [filter, setFilter] = useState<string>("active");
   const [refreshing, setRefreshing] = useState(false);
   const [newOrderIds, setNewOrderIds] = useState<Set<number>>(new Set());
+  const knownOrderIds = useRef<Set<string>>(new Set());
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Edit state (unified for both types)
   const [editingOrder, setEditingOrder] = useState<any>(null);
   const [editForm, setEditForm] = useState<{
     customerName: string;
@@ -66,108 +117,38 @@ export default function OnlineOrdersScreen() {
     deliveryFee: number;
     totalAmount: number;
   }>({
-    customerName: "",
-    customerPhone: "",
-    customerAddress: "",
-    notes: "",
-    estimatedTime: "",
-    items: [],
-    subtotal: 0,
-    deliveryFee: 0,
-    totalAmount: 0,
+    customerName: "", customerPhone: "", customerAddress: "",
+    notes: "", estimatedTime: "", items: [],
+    subtotal: 0, deliveryFee: 0, totalAmount: 0,
   });
-  const [showProductPicker, setShowProductPicker] = useState(false);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const knownOrderIds = useRef<Set<number>>(new Set());
 
-  // Configuration States
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  const [pickerCategory, setPickerCategory] = useState<string>("all");
+
+  // Product configurator states
   const [configuringProduct, setConfiguringProduct] = useState<any>(null);
   const [configuringItemIndex, setConfiguringItemIndex] = useState<number | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [selectedToppings, setSelectedToppings] = useState<string[]>([]);
   const [showToppingsStep, setShowToppingsStep] = useState(false);
 
-  const PIZZA_TOPPINGS = [
-    // Sauces / Base
-    { name: "Tomato Sauce", names: ["Tomato Sauce", "Tomatensauce", "Extra Tomatensauce"], icon: "🍅", category: "Sauces" },
-    { name: "Tomatoes", names: ["Tomatoes", "Tomaten", "Extra Tomaten"], icon: "🍅", category: "Vegetables" },
-    { name: "Sliced Tomatoes", names: ["Sliced Tomatoes", "Tomatenscheiben", "Extra Tomatenscheiben"], icon: "🍅", category: "Vegetables" },
-    // Vegetables
-    { name: "Garlic", names: ["Garlic", "Knoblauch", "Extra Knoblauch"], icon: "🧄", category: "Vegetables" },
-    { name: "Onions", names: ["Onions", "Zwiebeln", "Extra Zwiebeln"], icon: "🧅", category: "Vegetables" },
-    { name: "Capers", names: ["Capers", "Kapern", "Extra Kapern"], icon: "🫛", category: "Vegetables" },
-    { name: "Olives", names: ["Olives", "Oliven", "Extra Oliven"], icon: "🫒", category: "Vegetables" },
-    { name: "Oregano", names: ["Oregano", "Extra Oregano"], icon: "🌿", category: "Others" },
-    { name: "Vegetables", names: ["Vegetables", "Gemüse", "Extra Gemüse"], icon: "🥦", category: "Vegetables" },
-    { name: "Spinach", names: ["Spinach", "Spinat", "Extra Spinat"], icon: "🥬", category: "Vegetables" },
-    { name: "Bell Peppers", names: ["Bell Peppers", "Peperoni", "Paprika", "Extra Peperoni"], icon: "🫑", category: "Vegetables" },
-    { name: "Corn", names: ["Corn", "Mais", "Extra Mais"], icon: "🌽", category: "Vegetables" },
-    { name: "Broccoli", names: ["Broccoli", "Extra Broccoli"], icon: "🥦", category: "Vegetables" },
-    { name: "Artichokes", names: ["Artichokes", "Artischocken", "Artischoken", "Extra Artischocken"], icon: "🌿", category: "Vegetables" },
-    { name: "Arugula", names: ["Arugula", "Rucola", "Rukola", "Extra Rucola"], icon: "🥬", category: "Vegetables" },
-    { name: "Egg", names: ["Egg", "Ei", "Extra Ei"], icon: "🥚", category: "Others" },
-    { name: "Pineapple", names: ["Pineapple", "Ananas", "Extra Ananas"], icon: "🍍", category: "Others" },
-    { name: "Mushrooms", names: ["Mushrooms", "Pilze", "Champignons", "Extra Pilze", "Extra Champignons"], icon: "🍄", category: "Vegetables" },
-    // Meat
-    { name: "Ham", names: ["Ham", "Schinken", "Extra Schinken"], icon: "🥩", category: "Meat" },
-    { name: "Spicy Salami", names: ["Spicy Salami", "Scharfe Salami", "Salami scharf", "Extra Scharfe Salami", "Diavola"], icon: "🌶️", category: "Meat" },
-    { name: "Salami", names: ["Salami", "Extra Salami"], icon: "🥩", category: "Meat" },
-    { name: "Bacon", names: ["Bacon", "Speck", "Extra Speck"], icon: "🥓", category: "Meat" },
-    { name: "Prosciutto", names: ["Prosciutto", "Rohschinken", "Raw Ham", "Extra Rohschinken"], icon: "🥩", category: "Meat" },
-    { name: "Lamb", names: ["Lamb", "Lammfleisch", "Extra Lammfleisch"], icon: "🥩", category: "Meat" },
-    { name: "Chicken", names: ["Chicken", "Poulet", "Hähnchen", "Extra Poulet"], icon: "🍗", category: "Meat" },
-    { name: "Kebab", names: ["Kebab", "Kebabfleisch", "Extra Kebabfleisch"], icon: "🥙", category: "Meat" },
-    { name: "Minced Meat", names: ["Minced Meat", "Hackfleisch", "Extra Hackfleisch"], icon: "🥩", category: "Meat" },
-    // Seafood
-    { name: "Anchovies", names: ["Anchovies", "Sardellen", "Extra Sardellen"], icon: "🐟", category: "Seafood" },
-    { name: "Shrimp", names: ["Shrimp", "Crevetten", "Garnelen", "Extra Crevetten"], icon: "🍤", category: "Seafood" },
-    { name: "Tuna", names: ["Tuna", "Thunfisch", "Thon", "Extra Thunfisch"], icon: "🐟", category: "Seafood" },
-    // Sauces
-    { name: "Mayonnaise", names: ["Mayonnaise", "Mayo", "Mayonaise"], icon: "🫙", category: "Sauces" },
-    { name: "Ketchup", names: ["Ketchup"], icon: "🫙", category: "Sauces" },
-    { name: "Cocktail Sauce", names: ["Cocktail Sauce", "Cocktailsauce", "Cocktail"], icon: "🫙", category: "Sauces" },
-    { name: "Spicy Sauce", names: ["Spicy Sauce", "Scharfe Sauce", "SCHARF", "Extra Scharf"], icon: "🌶️", category: "Sauces" },
-    { name: "Garlic Sauce", names: ["Garlic Sauce", "Knoblauchsauce"], icon: "🫙", category: "Sauces" },
-    { name: "Yogurt Sauce", names: ["Yogurt Sauce", "Joghurtsauce", "Joghurt"], icon: "🫙", category: "Sauces" },
-    // Cheese
-    { name: "Mozzarella", names: ["Mozzarella", "Extra Mozzarella", "Käse", "Extra Käse"], icon: "🧀", category: "Cheese" },
-    { name: "Gorgonzola", names: ["Gorgonzola", "Extra Gorgonzola"], icon: "🧀", category: "Cheese" },
-    { name: "Parmesan", names: ["Parmesan", "Extra Parmesan"], icon: "🧀", category: "Cheese" },
-    { name: "Mascarpone", names: ["Mascarpone", "Extra Mascarpone"], icon: "🧀", category: "Cheese" },
-    { name: "Kaeserand", names: ["Kaeserand", "Käserand", "Käserand (33cm)", "Käserand (45cm)", "Cheese Crust"], icon: "🧀", category: "Cheese" },
-  ];
-
-  const getToppingInfo = (label: string) => {
-    const clean = label.toLowerCase()
-      .replace(/^(extra|zusatz|mit)\s+/i, "")
-      .trim();
-
-    const found = PIZZA_TOPPINGS.find(t =>
-      t.name.toLowerCase() === clean ||
-      (t.names && t.names.some(n => n.toLowerCase() === clean)) ||
-      label.toLowerCase().includes(t.name.toLowerCase()) ||
-      (t.names && t.names.some(n => label.toLowerCase().includes(n.toLowerCase())))
-    );
-
-    return found || { icon: "✨", category: "Others" };
-  };
-
   const isRTL = language === "ar";
+  const lbl = (en: string, ar: string, de: string) =>
+    language === "ar" ? ar : language === "de" ? de : en;
 
-
-
-  const isPizzaProduct = useCallback((product: any) => {
-    if (!product) return false;
-    const name = (product.name || "").toLowerCase();
-    const catName = (product.categoryName || "").toLowerCase();
-    return name.includes("pizza") || catName.includes("pizza");
-  }, []);
-
-  const { data: orders = [], refetch } = useQuery<any[]>({
+  // --- Data Queries ---
+  const { data: onlineOrders = [], refetch: refetchOnline } = useQuery<any[]>({
     queryKey: ["/api/online-orders", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
     refetchInterval: 15000,
+  });
+
+  const { data: posOrders = [], refetch: refetchPos } = useQuery<any[]>({
+    queryKey: ["/api/sales", tenantId ? `?tenantId=${tenantId}&limit=100` : ""],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
+    refetchInterval: 30000,
   });
 
   const { data: allProducts = [] } = useQuery<any[]>({
@@ -176,24 +157,54 @@ export default function OnlineOrdersScreen() {
     enabled: !!tenantId,
   });
 
-  // Categories helper
-  const categories = allProducts ? Array.from(new Set(allProducts.map((p: any) => p.categoryName || "Other"))) : [];
+  const { data: allCategories = [] } = useQuery<any[]>({
+    queryKey: ["/api/categories", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
+  });
 
-  // Detect new orders and play sound
+  // Build category map for lookup
+  const categoryMap: Record<number, { name: string; color: string; image?: string }> = {};
+  (allCategories as any[]).forEach((c: any) => {
+    categoryMap[c.id] = { name: c.name, color: c.color || "#7C3AED", image: c.image };
+  });
+
+  // Enrich products with category info
+  const enrichedProducts = (allProducts as any[]).map((p: any) => ({
+    ...p,
+    categoryName: categoryMap[p.categoryId]?.name || "",
+    categoryColor: categoryMap[p.categoryId]?.color || "#7C3AED",
+  }));
+
+  // Normalize both sources into unified list
+  const unifiedOrders = [
+    ...(onlineOrders as any[]).map(o => ({ ...o, _type: "online" as const, _sortTime: new Date(o.createdAt).getTime() })),
+    ...(posOrders as any[]).map(s => ({ ...s, _type: "pos" as const, _sortTime: new Date(s.createdAt).getTime(), status: s.status || "completed" })),
+  ].sort((a, b) => b._sortTime - a._sortTime);
+
+  // Filter
+  const filteredOrders = unifiedOrders.filter(o => {
+    if (viewMode === "online" && o._type !== "online") return false;
+    if (viewMode === "pos" && o._type !== "pos") return false;
+    if (filter === "active") return ["pending", "accepted", "preparing", "ready"].includes(o.status);
+    if (filter === "done") return ["delivered", "cancelled", "completed"].includes(o.status);
+    return true;
+  });
+
+  const pendingCount = (onlineOrders as any[]).filter((o: any) => o.status === "pending").length;
+
+  // New order notification
   useEffect(() => {
-    if (!orders.length) return;
-    const incoming = orders.filter(o => !knownOrderIds.current.has(o.id) && o.status === "pending");
+    if (!onlineOrders.length) return;
+    const incoming = (onlineOrders as any[]).filter(o => !knownOrderIds.current.has(`online-${o.id}`) && o.status === "pending");
     if (incoming.length > 0) {
       playNotificationSound();
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setNewOrderIds(prev => {
         const next = new Set(prev);
         incoming.forEach(o => next.add(o.id));
         return next;
       });
-      // Pulse animation
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.08, duration: 200, useNativeDriver: Platform.OS !== 'web' }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 200, useNativeDriver: Platform.OS !== 'web' }),
@@ -201,10 +212,10 @@ export default function OnlineOrdersScreen() {
         Animated.timing(pulseAnim, { toValue: 1, duration: 150, useNativeDriver: Platform.OS !== 'web' }),
       ]).start();
     }
-    orders.forEach(o => knownOrderIds.current.add(o.id));
-  }, [orders]);
+    (onlineOrders as any[]).forEach(o => knownOrderIds.current.add(`online-${o.id}`));
+  }, [onlineOrders]);
 
-  // WebSocket for instant notifications (web only)
+  // WebSocket for instant notifications
   useEffect(() => {
     if (Platform.OS !== "web") return;
     const wsUrl = `${getApiUrl().replace("http", "ws")}/api/ws/caller-id`;
@@ -217,11 +228,7 @@ export default function OnlineOrdersScreen() {
           if (data.type === "new_online_order") {
             playNotificationSound();
             qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-            setNewOrderIds(prev => {
-              const next = new Set(prev);
-              next.add(data.order?.id);
-              return next;
-            });
+            setNewOrderIds(prev => { const next = new Set(prev); next.add(data.order?.id); return next; });
           } else if (data.type === "online_order_updated") {
             qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
           }
@@ -231,22 +238,23 @@ export default function OnlineOrdersScreen() {
     return () => ws?.close();
   }, []);
 
-  // Polling fallback for native (iOS/Android) — ensures orders refresh every 15s
+  // Polling for native
   useEffect(() => {
     if (Platform.OS === "web") return;
     const interval = setInterval(() => {
       qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+      qc.invalidateQueries({ queryKey: ["/api/sales"] });
     }, 15000);
     return () => clearInterval(interval);
   }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([refetchOnline(), refetchPos()]);
     setRefreshing(false);
-  }, [refetch]);
+  }, [refetchOnline, refetchPos]);
 
-  const updateStatus = async (id: number, status: string) => {
+  const updateOnlineStatus = async (id: number, status: string) => {
     try {
       await apiRequest("PUT", `/api/online-orders/${id}`, { status });
       qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
@@ -256,16 +264,16 @@ export default function OnlineOrdersScreen() {
     }
   };
 
-  const deleteOrder = async (id: number) => {
+  const deleteOnlineOrder = async (id: number) => {
     const confirmed = Platform.OS === "web"
-      ? window.confirm(language === "ar" ? "سيتم حذف هذا الطلب نهائياً" : language === "de" ? "Bestellung dauerhaft löschen?" : "Permanently delete this order?")
+      ? window.confirm(lbl("Permanently delete this order?", "سيتم حذف هذا الطلب نهائياً", "Bestellung dauerhaft löschen?"))
       : await new Promise<boolean>((resolve) => {
         Alert.alert(
-          language === "ar" ? "حذف الطلب" : language === "de" ? "Bestellung löschen?" : "Delete Order?",
-          language === "ar" ? "سيتم حذف هذا الطلب نهائياً" : language === "de" ? "Diese Bestellung wird dauerhaft gelöscht." : "This will permanently delete the order.",
+          lbl("Delete Order?", "حذف الطلب", "Bestellung löschen?"),
+          lbl("This will permanently delete the order.", "سيتم حذف هذا الطلب نهائياً", "Diese Bestellung wird dauerhaft gelöscht."),
           [
-            { text: language === "ar" ? "إلغاء" : language === "de" ? "Abbrechen" : "Cancel", style: "cancel", onPress: () => resolve(false) },
-            { text: language === "ar" ? "حذف" : language === "de" ? "Löschen" : "Delete", style: "destructive", onPress: () => resolve(true) },
+            { text: lbl("Cancel", "إلغاء", "Abbrechen"), style: "cancel", onPress: () => resolve(false) },
+            { text: lbl("Delete", "حذف", "Löschen"), style: "destructive", onPress: () => resolve(true) },
           ]
         );
       });
@@ -278,19 +286,92 @@ export default function OnlineOrdersScreen() {
     }
   };
 
-  const openEditOrder = (order: any) => {
-    setEditForm({
-      customerName: order.customerName || "",
-      customerPhone: order.customerPhone || "",
-      customerAddress: order.customerAddress || "",
-      notes: order.notes || "",
-      estimatedTime: order.estimatedTime ? String(order.estimatedTime) : "",
-      items: order.items ? JSON.parse(JSON.stringify(order.items)) : [],
-      subtotal: Number(order.subtotal || 0),
-      deliveryFee: Number(order.deliveryFee || 0),
-      totalAmount: Number(order.totalAmount || 0),
-    });
+  const openEditOrder = async (order: any) => {
+    if (order._type === "pos") {
+      // Fetch items for POS sale
+      try {
+        const res = await apiRequest("GET", `/api/sales/${order.id}`);
+        const full = await res.json();
+        const items = (full.items || []).map((it: any) => ({
+          productId: it.productId,
+          name: it.productName,
+          quantity: it.quantity,
+          unitPrice: Number(it.unitPrice),
+          total: Number(it.total),
+          notes: it.notes || "",
+          modifiers: it.modifiers || [],
+        }));
+        const subtotal = items.reduce((s: number, i: any) => s + i.total, 0);
+        setEditForm({
+          customerName: order.customerName || "",
+          customerPhone: order.customerPhone || "",
+          customerAddress: "",
+          notes: full.notes || "",
+          estimatedTime: "",
+          items,
+          subtotal,
+          deliveryFee: 0,
+          totalAmount: Number(full.totalAmount || subtotal),
+        });
+      } catch {
+        setEditForm({
+          customerName: "", customerPhone: "", customerAddress: "",
+          notes: order.notes || "", estimatedTime: "",
+          items: [], subtotal: 0, deliveryFee: 0, totalAmount: Number(order.totalAmount || 0),
+        });
+      }
+    } else {
+      setEditForm({
+        customerName: order.customerName || "",
+        customerPhone: order.customerPhone || "",
+        customerAddress: order.customerAddress || "",
+        notes: order.notes || "",
+        estimatedTime: order.estimatedTime ? String(order.estimatedTime) : "",
+        items: order.items ? JSON.parse(JSON.stringify(order.items)) : [],
+        subtotal: Number(order.subtotal || 0),
+        deliveryFee: Number(order.deliveryFee || 0),
+        totalAmount: Number(order.totalAmount || 0),
+      });
+    }
     setEditingOrder(order);
+  };
+
+  const saveEditOrder = async () => {
+    if (!editingOrder) return;
+    try {
+      if (editingOrder._type === "pos") {
+        await apiRequest("PUT", `/api/sales/${editingOrder.id}`, {
+          notes: editForm.notes || null,
+          subtotal: String(editForm.subtotal.toFixed(2)),
+          totalAmount: String(editForm.totalAmount.toFixed(2)),
+          items: editForm.items.map(it => ({
+            productId: it.productId,
+            productName: it.name,
+            quantity: it.quantity,
+            unitPrice: String(it.unitPrice),
+            total: String(it.total),
+            modifiers: it.modifiers || [],
+            notes: it.notes || null,
+          })),
+        });
+        qc.invalidateQueries({ queryKey: ["/api/sales"] });
+      } else {
+        await apiRequest("PUT", `/api/online-orders/${editingOrder.id}`, {
+          customerName: editForm.customerName,
+          customerPhone: editForm.customerPhone,
+          customerAddress: editForm.customerAddress || null,
+          notes: editForm.notes || null,
+          estimatedTime: editForm.estimatedTime ? Number(editForm.estimatedTime) : null,
+          items: editForm.items,
+          subtotal: String(editForm.subtotal.toFixed(2)),
+          totalAmount: String(editForm.totalAmount.toFixed(2)),
+        });
+        qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+      }
+      setEditingOrder(null);
+    } catch {
+      Alert.alert("Error", "Failed to update order");
+    }
   };
 
   const updateItemQty = (index: number, delta: number) => {
@@ -304,17 +385,27 @@ export default function OnlineOrdersScreen() {
         nextItems[index] = { ...it, quantity: newQty, total: newQty * it.unitPrice };
       }
       const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
-      return {
-        ...prev,
-        items: nextItems,
-        subtotal: newSubtotal,
-        totalAmount: newSubtotal + prev.deliveryFee
-      };
+      return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
     });
   };
 
+  const isPizzaProduct = useCallback((product: any) => {
+    if (!product) return false;
+    const name = (product.name || "").toLowerCase();
+    const catName = (product.categoryName || "").toLowerCase();
+    return name.includes("pizza") || catName.includes("pizza");
+  }, []);
+
+  const getToppingInfo = (label: string) => {
+    const clean = label.toLowerCase().replace(/^(extra|zusatz|mit)\s+/i, "").trim();
+    return PIZZA_TOPPINGS.find(t =>
+      t.name.toLowerCase() === clean ||
+      (t.names && t.names.some(n => n.toLowerCase() === clean)) ||
+      label.toLowerCase().includes(t.name.toLowerCase())
+    ) || { icon: "✨", category: "Others" };
+  };
+
   const addItemToOrder = (prod: any) => {
-    // If product is pizza or has modifiers, configure it first
     if (isPizzaProduct(prod) || (prod.modifiers && prod.modifiers.length > 0) || (prod.variants && prod.variants.length > 0)) {
       setConfiguringProduct(prod);
       setConfiguringItemIndex(null);
@@ -324,7 +415,6 @@ export default function OnlineOrdersScreen() {
       setShowProductPicker(false);
       return;
     }
-
     setEditForm(prev => {
       const existingIdx = prev.items.findIndex(i => i.productId === prod.id && (!i.notes || i.notes === ""));
       let nextItems = [...prev.items];
@@ -333,88 +423,58 @@ export default function OnlineOrdersScreen() {
         const newQty = it.quantity + 1;
         nextItems[existingIdx] = { ...it, quantity: newQty, total: newQty * it.unitPrice };
       } else {
-        nextItems.push({
-          productId: prod.id,
-          name: prod.name,
-          quantity: 1,
-          unitPrice: Number(prod.price),
-          total: Number(prod.price),
-        });
+        nextItems.push({ productId: prod.id, name: prod.name, quantity: 1, unitPrice: Number(prod.price), total: Number(prod.price) });
       }
       const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
-      return {
-        ...prev,
-        items: nextItems,
-        subtotal: newSubtotal,
-        totalAmount: newSubtotal + prev.deliveryFee,
-      };
+      return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
     });
     setShowProductPicker(false);
   };
 
   const editItemAddons = (index: number) => {
     const item = editForm.items[index];
-    const fullProduct = allProducts.find((p: any) => p.id === item.productId);
+    const fullProduct = enrichedProducts.find((p: any) => p.id === item.productId);
     if (!fullProduct) return;
-
     setConfiguringProduct(fullProduct);
     setConfiguringItemIndex(index);
-
-    // Parse existing addons from name "Product [Addon1, Addon2]"
     const nameStr = item.name || "";
     const match = nameStr.match(/\[(.*)\]/);
-    if (match && match[1]) {
-      setSelectedToppings(match[1].split(", ").map((t: string) => t.trim()));
-    } else {
-      setSelectedToppings([]);
-    }
-
+    if (match && match[1]) setSelectedToppings(match[1].split(", ").map((t: string) => t.trim()));
+    else setSelectedToppings([]);
     setShowToppingsStep(true);
   };
 
-  const saveEditOrder = async () => {
-    if (!editingOrder) return;
-    try {
-      await apiRequest("PUT", `/api/online-orders/${editingOrder.id}`, {
-        customerName: editForm.customerName,
-        customerPhone: editForm.customerPhone,
-        customerAddress: editForm.customerAddress || null,
-        notes: editForm.notes || null,
-        estimatedTime: editForm.estimatedTime ? Number(editForm.estimatedTime) : null,
-        items: editForm.items,
-        subtotal: String(editForm.subtotal.toFixed(2)),
-        totalAmount: String(editForm.totalAmount.toFixed(2)),
+  const applyConfiguringItem = () => {
+    const baseName = selectedVariant?.name ? `${configuringProduct.name} (${selectedVariant.name})` : configuringProduct.name;
+    const toppingsSuffix = selectedToppings.length > 0 ? ` [${selectedToppings.join(", ")}]` : "";
+    const finalName = baseName + toppingsSuffix;
+    const finalUnitPrice = Number(selectedVariant?.price || configuringProduct.price);
+
+    if (configuringItemIndex !== null) {
+      setEditForm(prev => {
+        const nextItems = [...prev.items];
+        nextItems[configuringItemIndex] = { ...nextItems[configuringItemIndex], name: finalName, unitPrice: finalUnitPrice, total: finalUnitPrice * nextItems[configuringItemIndex].quantity };
+        const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
+        return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
       });
-      qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-      setEditingOrder(null);
-    } catch {
-      Alert.alert("Error", "Failed to update order");
+    } else {
+      setEditForm(prev => {
+        const nextItems = [...prev.items, { productId: configuringProduct.id, name: finalName, quantity: 1, unitPrice: finalUnitPrice, total: finalUnitPrice }];
+        const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
+        return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
+      });
     }
+    setConfiguringProduct(null);
+    setConfiguringItemIndex(null);
   };
 
-  const filteredOrders = orders.filter((o: any) => {
-    if (filter === "active") return ["pending", "accepted", "preparing", "ready"].includes(o.status);
-    if (filter === "done") return ["delivered", "cancelled"].includes(o.status);
-    return true;
-  });
-
-  const pendingCount = orders.filter((o: any) => o.status === "pending").length;
-
-  const s = (key: string) => {
-    const meta = STATUS_META[key];
-    if (!meta) return key;
-    if (language === "ar") return meta.labelAr;
-    if (language === "de") return meta.labelDe;
-    return meta.label;
-  };
-
+  // --- Render Order Card ---
   const renderOrder = ({ item }: { item: any }) => {
-    const meta = STATUS_META[item.status] || STATUS_META.pending;
-    const isNew = newOrderIds.has(item.id);
+    const meta = STATUS_META[item.status] || STATUS_META.completed;
+    const isNew = newOrderIds.has(item.id) && item._type === "online";
     const orderDate = new Date(item.createdAt);
     const next = meta.next;
-
-    const nextLabel = next ? s(next) : null;
+    const isPOS = item._type === "pos";
 
     const nextBtnColor: Record<string, string[]> = {
       accepted: ["#3B82F6", "#1D4ED8"],
@@ -423,90 +483,102 @@ export default function OnlineOrdersScreen() {
       delivered: ["#10B981", "#059669"],
     };
 
+    const sourceColor = isPOS ? "#F59E0B" : "#6366F1";
+    const sourceBg = isPOS ? "rgba(245,158,11,0.12)" : "rgba(99,102,241,0.12)";
+    const sourceLabel = isPOS ? (language === "ar" ? "📞 كاشير" : "📞 POS") : (language === "ar" ? "🌐 إلكتروني" : "🌐 Online");
+    const orderId = isPOS ? (item.receiptNumber || `#${item.id}`) : `#${item.orderNumber}`;
+
     return (
       <Animated.View style={[
         styles.orderCard,
         isNew && styles.orderCardNew,
-        { borderLeftColor: meta.color, transform: isNew ? [{ scale: pulseAnim }] : [] },
+        isPOS && styles.orderCardPos,
+        { borderLeftColor: isPOS ? sourceColor : meta.color, transform: isNew ? [{ scale: pulseAnim }] : [] },
       ]}>
-        {/* Header */}
+        {/* Source badge + Header */}
         <View style={[styles.orderHeader, isRTL && { flexDirection: "row-reverse" }]}>
           <View style={[styles.orderNumRow, isRTL && { flexDirection: "row-reverse" }]}>
             {isNew && <View style={styles.newDot} />}
-            <Text style={styles.orderNum}>#{item.orderNumber}</Text>
+            <View style={[styles.sourceBadge, { backgroundColor: sourceBg, borderColor: sourceColor + "60" }]}>
+              <Text style={[styles.sourceBadgeText, { color: sourceColor }]}>{sourceLabel}</Text>
+            </View>
+            <Text style={styles.orderNum}>{orderId}</Text>
             <View style={[styles.statusBadge, { backgroundColor: meta.color + "22", borderColor: meta.color }]}>
               <Ionicons name={meta.icon as any} size={11} color={meta.color} />
-              <Text style={[styles.statusText, { color: meta.color }]}>{s(item.status)}</Text>
+              <Text style={[styles.statusText, { color: meta.color }]}>
+                {language === "ar" ? meta.labelAr : language === "de" ? meta.labelDe : meta.label}
+              </Text>
             </View>
           </View>
           <Text style={styles.orderAmount}>CHF {Number(item.totalAmount).toFixed(2)}</Text>
         </View>
 
-        {/* Customer */}
-        <View style={[styles.customerRow, isRTL && { flexDirection: "row-reverse" }]}>
-          <View style={styles.customerIcon}>
-            <Ionicons name="person" size={14} color={Colors.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.customerName, isRTL && { textAlign: "right" }]}>{item.customerName}</Text>
-            <Text style={[styles.customerSub, isRTL && { textAlign: "right" }]}>
-              {item.customerPhone}
-              {item.customerAddress ? ` • ${item.customerAddress}` : ""}
-            </Text>
-          </View>
-          <View style={styles.metaChips}>
-            <View style={styles.metaChip}>
-              <Text style={styles.metaChipText}>{PAY_ICON[item.paymentMethod] || "💵"} {item.paymentMethod?.toUpperCase()}</Text>
+        {/* Customer info */}
+        {(item.customerName || item.customerPhone) ? (
+          <View style={[styles.customerRow, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={styles.customerIcon}>
+              <Ionicons name="person" size={14} color={Colors.accent} />
             </View>
-            <View style={[styles.metaChip, { backgroundColor: item.orderType === "delivery" ? "rgba(99,102,241,0.15)" : "rgba(16,185,129,0.15)" }]}>
-              <Text style={styles.metaChipText}>{item.orderType === "delivery" ? "🛵" : "🏃"} {item.orderType}</Text>
+            <View style={{ flex: 1 }}>
+              {item.customerName ? <Text style={[styles.customerName, isRTL && { textAlign: "right" }]}>{item.customerName}</Text> : null}
+              <Text style={[styles.customerSub, isRTL && { textAlign: "right" }]}>
+                {item.customerPhone || ""}
+                {item.customerAddress ? ` • ${item.customerAddress}` : ""}
+              </Text>
             </View>
-          </View>
-        </View>
-
-        {/* Items */}
-        <View style={styles.itemsList}>
-          {(item.items || []).map((it: any, idx: number) => (
-            <View key={idx} style={{ marginBottom: 6 }}>
-              <View style={[styles.itemRow, isRTL && { flexDirection: "row-reverse" }]}>
-                <Text style={styles.itemQty}>{it.quantity}×</Text>
-                <Text style={[styles.itemName, { flex: 1 }, isRTL && { textAlign: "right" }]}>{it.name}</Text>
-                <Text style={styles.itemPrice}>CHF {Number(it.total).toFixed(2)}</Text>
-              </View>
-              {it.notes ? (
-                <Text style={[styles.itemAddons, isRTL && { textAlign: "right" }]}>↳ {it.notes}</Text>
+            <View style={styles.metaChips}>
+              {item.paymentMethod ? (
+                <View style={styles.metaChip}>
+                  <Text style={styles.metaChipText}>{PAY_ICON[item.paymentMethod] || "💵"} {item.paymentMethod?.toUpperCase()}</Text>
+                </View>
+              ) : null}
+              {item.orderType ? (
+                <View style={[styles.metaChip, { backgroundColor: item.orderType === "delivery" ? "rgba(99,102,241,0.15)" : "rgba(16,185,129,0.15)" }]}>
+                  <Text style={styles.metaChipText}>{item.orderType === "delivery" ? "🛵" : "🏃"} {item.orderType}</Text>
+                </View>
               ) : null}
             </View>
-          ))}
-          {item.notes ? (
-            <Text style={[styles.orderNotes, isRTL && { textAlign: "right" }]}>📝 {item.notes}</Text>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
 
-        {/* Totals */}
+        {/* Items - for online orders with full items data */}
+        {item.items && item.items.length > 0 ? (
+          <View style={styles.itemsList}>
+            {(item.items || []).slice(0, 4).map((it: any, idx: number) => (
+              <View key={idx} style={{ marginBottom: 4 }}>
+                <View style={[styles.itemRow, isRTL && { flexDirection: "row-reverse" }]}>
+                  <Text style={styles.itemQty}>{it.quantity}×</Text>
+                  <Text style={[styles.itemName, { flex: 1 }, isRTL && { textAlign: "right" }]}>{it.name || it.productName}</Text>
+                  <Text style={styles.itemPrice}>CHF {Number(it.total).toFixed(2)}</Text>
+                </View>
+                {it.notes ? <Text style={[styles.itemAddons, isRTL && { textAlign: "right" }]}>↳ {it.notes}</Text> : null}
+              </View>
+            ))}
+            {item.items.length > 4 && <Text style={styles.itemAddons}>+{item.items.length - 4} {lbl("more items", "عناصر أخرى", "weitere Artikel")}</Text>}
+            {item.notes ? <Text style={[styles.orderNotes, isRTL && { textAlign: "right" }]}>📝 {item.notes}</Text> : null}
+          </View>
+        ) : item.notes ? (
+          <View style={styles.itemsList}>
+            <Text style={[styles.orderNotes, isRTL && { textAlign: "right" }]}>📝 {item.notes}</Text>
+          </View>
+        ) : null}
+
+        {/* Time + fee */}
         <View style={[styles.totalsRow, isRTL && { flexDirection: "row-reverse" }]}>
           <Text style={styles.timeText}>
-            {orderDate.toLocaleDateString()} {orderDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            📅 {orderDate.toLocaleDateString()} ⏰ {orderDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           </Text>
-          <View style={[{ flexDirection: isRTL ? "row-reverse" : "row", gap: 4 }]}>
-            {item.deliveryFee && Number(item.deliveryFee) > 0 ? (
-              <Text style={styles.feeText}>+CHF {Number(item.deliveryFee).toFixed(2)} delivery</Text>
-            ) : null}
-          </View>
+          {item.deliveryFee && Number(item.deliveryFee) > 0 ? (
+            <Text style={styles.feeText}>+CHF {Number(item.deliveryFee).toFixed(2)} {lbl("delivery", "توصيل", "Lieferung")}</Text>
+          ) : null}
         </View>
 
         {/* Actions */}
         <View style={[styles.actions, isRTL && { flexDirection: "row-reverse" }]}>
-          {item.status !== "delivered" && item.status !== "cancelled" && next && nextBtnColor[next] && (
-            <Pressable
-              style={{ flex: 1, borderRadius: 10, overflow: "hidden" }}
-              onPress={() => updateStatus(item.id, next)}
-            >
-              <LinearGradient
-                colors={nextBtnColor[next] as [string, string]}
-                style={styles.actionBtnPrimary}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              >
+          {/* Next status button - only for online orders */}
+          {!isPOS && item.status !== "delivered" && item.status !== "cancelled" && next && nextBtnColor[next] && (
+            <Pressable style={{ flex: 1, borderRadius: 10, overflow: "hidden" }} onPress={() => updateOnlineStatus(item.id, next)}>
+              <LinearGradient colors={nextBtnColor[next] as [string, string]} style={styles.actionBtnPrimary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                 <Ionicons name={STATUS_META[next]?.icon as any || "arrow-forward"} size={16} color="#fff" />
                 <Text style={styles.actionBtnText}>
                   {language === "ar" ? STATUS_META[next]?.labelAr : language === "de" ? STATUS_META[next]?.labelDe : STATUS_META[next]?.label}
@@ -514,57 +586,87 @@ export default function OnlineOrdersScreen() {
               </LinearGradient>
             </Pressable>
           )}
-          {/* Edit button */}
+          {/* Edit */}
           <Pressable style={styles.editBtn} onPress={() => openEditOrder(item)}>
             <Ionicons name="pencil" size={16} color={Colors.accent} />
           </Pressable>
-          {/* Cancel button (active orders only) */}
-          {item.status !== "delivered" && item.status !== "cancelled" && (
-            <Pressable
-              style={styles.cancelBtn}
-              onPress={() => Alert.alert(
-                language === "ar" ? "إلغاء الطلب" : language === "de" ? "Stornieren?" : "Cancel Order?",
-                language === "ar" ? "هل أنت متأكد؟" : language === "de" ? "Sind Sie sicher?" : "Are you sure?",
+          {/* Cancel (online only, active) */}
+          {!isPOS && item.status !== "delivered" && item.status !== "cancelled" && (
+            <Pressable style={styles.cancelBtn} onPress={() =>
+              Alert.alert(
+                lbl("Cancel Order?", "إلغاء الطلب", "Stornieren?"),
+                lbl("Are you sure?", "هل أنت متأكد؟", "Sind Sie sicher?"),
                 [
-                  { text: language === "ar" ? "لا" : language === "de" ? "Nein" : "No", style: "cancel" },
-                  { text: language === "ar" ? "إلغاء" : language === "de" ? "Stornieren" : "Cancel", style: "destructive", onPress: () => updateStatus(item.id, "cancelled") },
+                  { text: lbl("No", "لا", "Nein"), style: "cancel" },
+                  { text: lbl("Cancel", "إلغاء", "Stornieren"), style: "destructive", onPress: () => updateOnlineStatus(item.id, "cancelled") },
                 ]
-              )}
-            >
+              )
+            }>
               <Ionicons name="close" size={18} color={Colors.danger} />
             </Pressable>
           )}
-          {/* Delete button — always visible for all orders */}
-          <Pressable style={styles.deleteBtn} onPress={() => deleteOrder(item.id)}>
-            <Ionicons name="trash-outline" size={16} color={Colors.danger} />
-          </Pressable>
+          {/* Delete (online orders only) */}
+          {!isPOS && (
+            <Pressable style={styles.deleteBtn} onPress={() => deleteOnlineOrder(item.id)}>
+              <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+            </Pressable>
+          )}
         </View>
       </Animated.View>
     );
   };
 
-  const editLabel = (en: string, ar: string, de: string) =>
-    language === "ar" ? ar : language === "de" ? de : en;
+  // --- Product Picker categories ---
+  const regularProducts = enrichedProducts.filter((p: any) => !p.isAddon);
+  const addonProducts = enrichedProducts.filter((p: any) => p.isAddon);
+  const pickerCategories = Array.from(new Set(regularProducts.map((p: any) => p.categoryName || "Other")));
+  const filteredPickerProducts = pickerCategory === "all"
+    ? regularProducts
+    : regularProducts.filter((p: any) => (p.categoryName || "Other") === pickerCategory);
+
+  // --- Topping options for configurator ---
+  const getToppingOptions = () => {
+    const extrasGroup = configuringProduct?.modifiers?.find((m: any) => !m.required && m.options?.length > 0);
+    return extrasGroup
+      ? extrasGroup.options.map((o: any) => {
+        const info = getToppingInfo(o.label);
+        return { name: o.label, price: Number(o.price || 0), icon: info.icon, category: info.category };
+      })
+      : PIZZA_TOPPINGS.map(t => ({ name: t.name, price: 0, icon: t.icon, category: t.category }));
+  };
+
+  const displayToppingCats = ["Cheese", "Meat", "Vegetables", "Seafood", "Sauces", "Others"];
+  const catLabel = (cat: string) =>
+    cat === "Cheese" ? lbl("Cheese", "أجبان", "Käse") :
+    cat === "Meat" ? lbl("Meat", "لحوم", "Fleisch") :
+    cat === "Vegetables" ? lbl("Vegetables", "خضروات", "Gemüse") :
+    cat === "Seafood" ? lbl("Seafood", "مأكولات بحرية", "Meeresfrüchte") :
+    cat === "Sauces" ? lbl("Sauces", "صوصات", "Saucen") :
+    lbl("Others", "أخرى", "Sonstiges");
 
   return (
     <View style={styles.container}>
-      {/* Edit Order Modal */}
+
+      {/* ===== EDIT ORDER MODAL ===== */}
       <Modal visible={!!editingOrder} animationType="slide" transparent onRequestClose={() => setEditingOrder(null)}>
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <View style={styles.modalSheet}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Text style={styles.modalTitle}>{editLabel("Edit Order", "تعديل الطلب", "Bestellung bearbeiten")} #{editingOrder?.orderNumber}</Text>
+              <Text style={styles.modalTitle}>
+                {lbl("Edit Order", "تعديل الطلب", "Bestellung bearbeiten")}{" "}
+                {editingOrder?._type === "pos" ? (editingOrder?.receiptNumber || `#${editingOrder?.id}`) : `#${editingOrder?.orderNumber}`}
+              </Text>
               <Pressable onPress={() => setEditingOrder(null)}>
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </Pressable>
             </View>
             <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-              {[
-                { label: editLabel("Customer Name", "اسم العميل", "Kundenname"), key: "customerName", placeholder: "Name" },
-                { label: editLabel("Phone", "الهاتف", "Telefon"), key: "customerPhone", placeholder: "+1 234 567" },
-                { label: editLabel("Address", "العنوان", "Adresse"), key: "customerAddress", placeholder: "Street, City" },
-                { label: editLabel("Estimated Time (min)", "وقت التوصيل (دقيقة)", "Geschätzte Zeit (Min)"), key: "estimatedTime", placeholder: "30" },
-                { label: editLabel("Notes", "ملاحظات", "Notizen"), key: "notes", placeholder: "..." },
+              {/* Online-order specific fields */}
+              {editingOrder?._type !== "pos" && [
+                { label: lbl("Customer Name", "اسم العميل", "Kundenname"), key: "customerName", placeholder: "Name" },
+                { label: lbl("Phone", "الهاتف", "Telefon"), key: "customerPhone", placeholder: "+1 234 567" },
+                { label: lbl("Address", "العنوان", "Adresse"), key: "customerAddress", placeholder: "Street, City" },
+                { label: lbl("Estimated Time (min)", "وقت التوصيل (دقيقة)", "Geschätzte Zeit (Min)"), key: "estimatedTime", placeholder: "30" },
               ].map((f: any) => (
                 <View key={f.key} style={styles.editField}>
                   <Text style={[styles.editLabel, isRTL && { textAlign: "right" }]}>{f.label}</Text>
@@ -575,24 +677,35 @@ export default function OnlineOrdersScreen() {
                     placeholder={f.placeholder}
                     placeholderTextColor={Colors.textMuted}
                     keyboardType={f.key === "estimatedTime" ? "number-pad" : "default"}
-                    multiline={f.key === "notes"}
                   />
                 </View>
               ))}
+              {/* Notes - for all types */}
+              <View style={styles.editField}>
+                <Text style={[styles.editLabel, isRTL && { textAlign: "right" }]}>{lbl("Notes", "ملاحظات", "Notizen")}</Text>
+                <TextInput
+                  style={[styles.editInput, isRTL && { textAlign: "right" }, { minHeight: 60 }]}
+                  value={editForm.notes}
+                  onChangeText={v => setEditForm(prev => ({ ...prev, notes: v }))}
+                  placeholder="..."
+                  placeholderTextColor={Colors.textMuted}
+                  multiline
+                />
+              </View>
 
-              {/* Items Management */}
+              {/* Items section */}
               <View style={[styles.editDivider, { marginTop: 10, marginBottom: 15 }]} />
               <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }, { marginBottom: 10, borderBottomWidth: 0 }]}>
-                <Text style={[styles.editLabel, { marginBottom: 0 }]}>{editLabel("Order Items", "محتويات الطلب", "Bestellartikel")}</Text>
-                <Pressable onPress={() => setShowProductPicker(true)} style={styles.addSmallBtn}>
+                <Text style={[styles.editLabel, { marginBottom: 0 }]}>{lbl("Order Items", "محتويات الطلب", "Bestellartikel")}</Text>
+                <Pressable onPress={() => { setPickerCategory("all"); setShowProductPicker(true); }} style={styles.addSmallBtn}>
                   <Ionicons name="add" size={16} color={Colors.accent} />
-                  <Text style={styles.addSmallText}>{editLabel("Add", "إضافة", "Hinzufügen")}</Text>
+                  <Text style={styles.addSmallText}>{lbl("Add", "إضافة", "Hinzufügen")}</Text>
                 </Pressable>
               </View>
 
               {editForm.items.length === 0 ? (
                 <View style={styles.emptyItems}>
-                  <Text style={styles.emptyItemsText}>{editLabel("No items in order", "لا توجد أصناف في الطلب", "Keine Artikel")}</Text>
+                  <Text style={styles.emptyItemsText}>{lbl("No items in order", "لا توجد أصناف في الطلب", "Keine Artikel")}</Text>
                 </View>
               ) : (
                 editForm.items.map((it, idx) => (
@@ -600,10 +713,10 @@ export default function OnlineOrdersScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.editItemName, isRTL && { textAlign: "right" }]}>{it.name}</Text>
                       <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
-                        <Text style={[styles.editItemPrice, isRTL && { textAlign: "right" }]}>CHF {Number(it.unitPrice).toFixed(2)}</Text>
+                        <Text style={styles.editItemPrice}>CHF {Number(it.unitPrice).toFixed(2)}</Text>
                         <Pressable onPress={() => editItemAddons(idx)} style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.accent + "15", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
                           <Ionicons name="options-outline" size={12} color={Colors.accent} />
-                          <Text style={{ fontSize: 10, color: Colors.accent, fontWeight: "700" }}>{editLabel("Edit Addons", "تعديل الإضافات", "Extras bearbeiten")}</Text>
+                          <Text style={{ fontSize: 10, color: Colors.accent, fontWeight: "700" }}>{lbl("Edit Addons", "تعديل الإضافات", "Extras bearbeiten")}</Text>
                         </Pressable>
                       </View>
                     </View>
@@ -626,34 +739,34 @@ export default function OnlineOrdersScreen() {
 
               <View style={[styles.editDivider, { marginVertical: 15 }]} />
               <View style={[styles.modalTotalRow, isRTL && { flexDirection: "row-reverse" }]}>
-                <Text style={styles.modalTotalLabel}>{editLabel("Subtotal", "المجموع الفرعي", "Zwischensumme")}</Text>
+                <Text style={styles.modalTotalLabel}>{lbl("Subtotal", "المجموع الفرعي", "Zwischensumme")}</Text>
                 <Text style={styles.modalTotalVal}>CHF {editForm.subtotal.toFixed(2)}</Text>
               </View>
               {editForm.deliveryFee > 0 && (
                 <View style={[styles.modalTotalRow, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Text style={styles.modalTotalLabel}>{editLabel("Delivery Fee", "رسوم التوصيل", "Liefergebühr")}</Text>
+                  <Text style={styles.modalTotalLabel}>{lbl("Delivery Fee", "رسوم التوصيل", "Liefergebühr")}</Text>
                   <Text style={styles.modalTotalVal}>CHF {editForm.deliveryFee.toFixed(2)}</Text>
                 </View>
               )}
               <View style={[styles.modalTotalRow, isRTL && { flexDirection: "row-reverse" }, { marginTop: 4 }]}>
-                <Text style={[styles.modalTotalLabel, { color: Colors.text, fontWeight: "700" }]}>{editLabel("Total", "الإجمالي", "Gesamt")}</Text>
+                <Text style={[styles.modalTotalLabel, { color: Colors.text, fontWeight: "700" }]}>{lbl("Total", "الإجمالي", "Gesamt")}</Text>
                 <Text style={[styles.modalTotalVal, { color: Colors.accent, fontSize: 18, fontWeight: "800" }]}>CHF {editForm.totalAmount.toFixed(2)}</Text>
               </View>
-
               <View style={{ height: 40 }} />
             </ScrollView>
             <View style={[styles.modalFooter, isRTL && { flexDirection: "row-reverse" }]}>
               <Pressable style={styles.modalCancelBtn} onPress={() => setEditingOrder(null)}>
-                <Text style={styles.modalCancelText}>{editLabel("Cancel", "إلغاء", "Abbrechen")}</Text>
+                <Text style={styles.modalCancelText}>{lbl("Cancel", "إلغاء", "Abbrechen")}</Text>
               </Pressable>
               <Pressable style={styles.modalSaveBtn} onPress={saveEditOrder}>
-                <Text style={styles.modalSaveText}>{editLabel("Save Changes", "حفظ", "Speichern")}</Text>
+                <Text style={styles.modalSaveText}>{lbl("Save Changes", "حفظ", "Speichern")}</Text>
               </Pressable>
             </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* ===== PRODUCT CONFIGURATOR MODAL ===== */}
       <Modal visible={!!configuringProduct} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxWidth: 700, padding: 24, maxHeight: "92%" }]}>
@@ -661,16 +774,14 @@ export default function OnlineOrdersScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.modalTitle, { fontSize: 22, fontWeight: "900" }]}>{configuringProduct?.name}</Text>
                 <Text style={{ fontSize: 13, color: Colors.textMuted, marginTop: 2 }}>
-                  {showToppingsStep ? (language === "ar" ? "اختر الإضافات" : language === "de" ? "Extras wählen" : "Select Extras") : (editLabel("Select Size", "اختر الحجم", "Größe wählen"))}
+                  {showToppingsStep ? lbl("Select Extras", "اختر الإضافات", "Extras wählen") : lbl("Select Size", "اختر الحجم", "Größe wählen")}
                 </Text>
               </View>
               <Pressable onPress={() => { setConfiguringProduct(null); setConfiguringItemIndex(null); }} style={{ padding: 4 }}>
                 <Ionicons name="close" size={24} color={Colors.textMuted} />
               </Pressable>
             </View>
-
             {!showToppingsStep ? (
-              /* SIZE SELECTION */
               <ScrollView style={{ marginTop: 15 }} showsVerticalScrollIndicator={false}>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
                   {configuringProduct?.variants?.map((v: any, idx: number) => (
@@ -679,33 +790,19 @@ export default function OnlineOrdersScreen() {
                       style={[styles.statusTab, { flex: 1, minWidth: 140, paddingVertical: 15 }, selectedVariant?.name === v.name && styles.statusTabActive]}
                       onPress={() => {
                         if (isPizzaProduct(configuringProduct)) {
-                          setSelectedVariant(v);
-                          setSelectedToppings([]);
-                          setShowToppingsStep(true);
+                          setSelectedVariant(v); setSelectedToppings([]); setShowToppingsStep(true);
                         } else {
-                          // Standard variant pick
                           const variantName = configuringProduct.name + (v.name ? ` (${v.name})` : "");
                           if (configuringItemIndex !== null) {
                             setEditForm(prev => {
                               const nextItems = [...prev.items];
-                              nextItems[configuringItemIndex] = {
-                                ...nextItems[configuringItemIndex],
-                                name: variantName,
-                                unitPrice: Number(v.price),
-                                total: Number(v.price) * nextItems[configuringItemIndex].quantity
-                              };
+                              nextItems[configuringItemIndex] = { ...nextItems[configuringItemIndex], name: variantName, unitPrice: Number(v.price), total: Number(v.price) * nextItems[configuringItemIndex].quantity };
                               const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
                               return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
                             });
                           } else {
                             setEditForm(prev => {
-                              const nextItems = [...prev.items, {
-                                productId: configuringProduct.id,
-                                name: variantName,
-                                quantity: 1,
-                                unitPrice: Number(v.price),
-                                total: Number(v.price),
-                              }];
+                              const nextItems = [...prev.items, { productId: configuringProduct.id, name: variantName, quantity: 1, unitPrice: Number(v.price), total: Number(v.price) }];
                               const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
                               return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
                             });
@@ -721,7 +818,6 @@ export default function OnlineOrdersScreen() {
                 </View>
               </ScrollView>
             ) : (
-              /* TOPPINGS GRID */
               <ScrollView style={{ marginTop: 10 }} showsVerticalScrollIndicator={false}>
                 <View style={{ backgroundColor: Colors.accent + "15", padding: 12, borderRadius: 10, marginBottom: 15, flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <Ionicons name="pizza" size={20} color={Colors.accent} />
@@ -729,113 +825,43 @@ export default function OnlineOrdersScreen() {
                     {selectedVariant?.name || configuringProduct?.name} — CHF {Number(selectedVariant?.price || configuringProduct?.price).toFixed(2)}
                   </Text>
                 </View>
-
-                {(() => {
-                  const extrasGroup = configuringProduct?.modifiers?.find((m: any) => !m.required && m.options?.length > 0);
-                  const toppingOptions = extrasGroup
-                    ? extrasGroup.options.map((o: any) => {
-                      const info = getToppingInfo(o.label);
-                      return {
-                        name: o.label,
-                        price: Number(o.price || 0),
-                        icon: info.icon,
-                        category: info.category
-                      };
-                    })
-                    : PIZZA_TOPPINGS.map((t) => ({ name: t.name, price: 0, icon: t.icon, category: t.category }));
-
-                  const displayCats = ["Cheese", "Meat", "Vegetables", "Seafood", "Sauces", "Others"];
-
-                  return displayCats.map((cat: string) => {
-                    const catToppings = toppingOptions.filter((t: any) => t.category === cat);
-                    if (catToppings.length === 0) return null;
-
-                    const catLabel = cat === "Cheese" ? (language === "ar" ? "أجبان" : "Käse") :
-                      cat === "Meat" ? (language === "ar" ? "لحوم" : "Fleisch") :
-                        cat === "Vegetables" ? (language === "ar" ? "خضروات" : "Gemüse") :
-                          cat === "Seafood" ? (language === "ar" ? "مأكولات بحرية" : "Meeresfrüchte") :
-                            cat === "Sauces" ? (language === "ar" ? "صوصات" : "Saucen") :
-                              (language === "ar" ? "أخرى" : "Sonstiges");
-
-                    return (
-                      <View key={cat} style={{ marginBottom: 18 }}>
-                        <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.accent, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>{catLabel}</Text>
-                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                          {catToppings.map((topping: any) => {
-                            const isSelected = selectedToppings.includes(topping.name);
-                            return (
-                              <Pressable
-                                key={topping.name}
-                                onPress={() => setSelectedToppings((prev: string[]) => isSelected ? prev.filter(t => t !== topping.name) : [...prev, topping.name])}
-                                style={[{
-                                  padding: 10, borderRadius: 12, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.cardBorder,
-                                  width: "31.5%", height: 100, alignItems: "center", justifyContent: "center", gap: 4
-                                }, isSelected && { borderColor: Colors.accent, backgroundColor: Colors.accent + "15" }]}
-                              >
-                                <Text style={{ fontSize: 26 }}>{topping.icon}</Text>
-                                <Text style={[{ fontSize: 11, color: Colors.text, textAlign: "center", fontWeight: "600" }, isSelected && { color: Colors.accent }]} numberOfLines={2}>{topping.name}</Text>
-                                {topping.price > 0 && (
-                                  <Text style={{ fontSize: 10, color: Colors.textMuted, fontWeight: "700" }}>+CHF {topping.price.toFixed(2)}</Text>
-                                )}
-                                {isSelected && (
-                                  <View style={{ position: "absolute", top: 4, right: 4, width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center", elevation: 4 }}>
-                                    <Ionicons name="checkmark" size={12} color="#000" />
-                                  </View>
-                                )}
-                              </Pressable>
-                            );
-                          })}
-                        </View>
+                {displayToppingCats.map((cat) => {
+                  const catToppings = getToppingOptions().filter((t: any) => t.category === cat);
+                  if (catToppings.length === 0) return null;
+                  return (
+                    <View key={cat} style={{ marginBottom: 18 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.accent, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>{catLabel(cat)}</Text>
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                        {catToppings.map((topping: any) => {
+                          const isSelected = selectedToppings.includes(topping.name);
+                          return (
+                            <Pressable
+                              key={topping.name}
+                              onPress={() => setSelectedToppings(prev => isSelected ? prev.filter(t => t !== topping.name) : [...prev, topping.name])}
+                              style={[{ padding: 10, borderRadius: 12, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.cardBorder, width: "31.5%", height: 90, alignItems: "center", justifyContent: "center", gap: 4 }, isSelected && { borderColor: Colors.accent, backgroundColor: Colors.accent + "15" }]}
+                            >
+                              <Text style={{ fontSize: 24 }}>{topping.icon}</Text>
+                              <Text style={[{ fontSize: 10, color: Colors.text, textAlign: "center", fontWeight: "600" }, isSelected && { color: Colors.accent }]} numberOfLines={2}>{topping.name}</Text>
+                              {isSelected && (
+                                <View style={{ position: "absolute", top: 4, right: 4, width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" }}>
+                                  <Ionicons name="checkmark" size={10} color="#000" />
+                                </View>
+                              )}
+                            </Pressable>
+                          );
+                        })}
                       </View>
-                    );
-                  });
-
-                })()}
-
+                    </View>
+                  );
+                })}
                 <View style={{ gap: 10, marginTop: 10 }}>
-                  <Pressable
-                    style={{ borderRadius: 12, overflow: "hidden" }}
-                    onPress={() => {
-                      const baseName = (selectedVariant?.name ? `${configuringProduct.name} (${selectedVariant.name})` : configuringProduct.name);
-                      const toppingsSuffix = selectedToppings.length > 0 ? ` [${selectedToppings.join(", ")}]` : "";
-                      const finalName = baseName + toppingsSuffix;
-                      const finalUnitPrice = Number(selectedVariant?.price || configuringProduct.price);
-
-                      if (configuringItemIndex !== null) {
-                        setEditForm(prev => {
-                          const nextItems = [...prev.items];
-                          nextItems[configuringItemIndex] = {
-                            ...nextItems[configuringItemIndex],
-                            name: finalName,
-                            unitPrice: finalUnitPrice,
-                            total: finalUnitPrice * nextItems[configuringItemIndex].quantity
-                          };
-                          const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
-                          return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
-                        });
-                      } else {
-                        setEditForm(prev => {
-                          const nextItems = [...prev.items, {
-                            productId: configuringProduct.id,
-                            name: finalName,
-                            quantity: 1,
-                            unitPrice: finalUnitPrice,
-                            total: finalUnitPrice,
-                          }];
-                          const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
-                          return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
-                        });
-                      }
-                      setConfiguringProduct(null);
-                      setConfiguringItemIndex(null);
-                    }}
-                  >
+                  <Pressable style={{ borderRadius: 12, overflow: "hidden" }} onPress={applyConfiguringItem}>
                     <LinearGradient colors={[Colors.accent, "#00A3A0"]} style={{ paddingVertical: 14, alignItems: "center" }}>
-                      <Text style={{ color: "#000", fontSize: 16, fontWeight: "800" }}>{editLabel("Apply Options", "تطبيق الخيارات", "Optionen anwenden")}</Text>
+                      <Text style={{ color: "#000", fontSize: 16, fontWeight: "800" }}>{lbl("Apply Options", "تطبيق الخيارات", "Optionen anwenden")}</Text>
                     </LinearGradient>
                   </Pressable>
                   <Pressable onPress={() => setShowToppingsStep(false)} style={{ paddingVertical: 8 }}>
-                    <Text style={{ color: Colors.textMuted, textAlign: "center", fontSize: 13 }}>{editLabel("← Back", "← العودة", "← Zurück")}</Text>
+                    <Text style={{ color: Colors.textMuted, textAlign: "center", fontSize: 13 }}>{lbl("← Back", "← العودة", "← Zurück")}</Text>
                   </Pressable>
                 </View>
               </ScrollView>
@@ -844,87 +870,127 @@ export default function OnlineOrdersScreen() {
         </View>
       </Modal>
 
-      {/* Product Picker Modal */}
+      {/* ===== PRODUCT PICKER MODAL ===== */}
       <Modal visible={showProductPicker} animationType="fade" transparent onRequestClose={() => setShowProductPicker(false)}>
         <View style={styles.pickerOverlay}>
-          <View style={styles.pickerSheet}>
+          <View style={[styles.pickerSheet, { maxHeight: "90%" }]}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Text style={styles.modalTitle}>{editLabel("Add Item", "إضافة صنف", "Artikel hinzufügen")}</Text>
+              <Text style={styles.modalTitle}>{lbl("Add Item", "إضافة صنف", "Artikel hinzufügen")}</Text>
               <Pressable onPress={() => setShowProductPicker(false)}>
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </Pressable>
             </View>
-            {/* Regular products */}
-            {allProducts.filter((p: any) => !p.isAddon).length > 0 && (
-              <>
-                <View style={styles.pickerSectionHeader}>
-                  <Text style={styles.pickerSectionTitle}>{editLabel("Items", "الأصناف", "Artikel")}</Text>
+
+            {/* Category filter tabs */}
+            {pickerCategories.length > 1 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12, flexGrow: 0 }}>
+                <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 4 }}>
+                  <Pressable
+                    style={[styles.pickerCatTab, pickerCategory === "all" && styles.pickerCatTabActive]}
+                    onPress={() => setPickerCategory("all")}
+                  >
+                    <Text style={[styles.pickerCatText, pickerCategory === "all" && styles.pickerCatTextActive]}>
+                      {lbl("All", "الكل", "Alle")}
+                    </Text>
+                  </Pressable>
+                  {pickerCategories.map(cat => {
+                    const catInfo = (allCategories as any[]).find((c: any) => c.name === cat);
+                    return (
+                      <Pressable
+                        key={cat}
+                        style={[styles.pickerCatTab, pickerCategory === cat && styles.pickerCatTabActive, pickerCategory === cat && { borderColor: catInfo?.color || Colors.accent }]}
+                        onPress={() => setPickerCategory(cat)}
+                      >
+                        <Text style={[styles.pickerCatText, pickerCategory === cat && { color: catInfo?.color || Colors.accent }]}>{cat}</Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
-                {allProducts.filter((p: any) => !p.isAddon).map((p: any) => (
-                  <View key={String(p.id)}>
-                    <Pressable style={[styles.pickerItem, isRTL && { flexDirection: "row-reverse" }]} onPress={() => addItemToOrder(p)}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.customerName, isRTL && { textAlign: "right" }]}>{p.name}</Text>
-                        <Text style={[styles.customerSub, isRTL && { textAlign: "right" }]}>{p.categoryName || ""}</Text>
-                      </View>
-                      <View style={{ alignItems: "flex-end" }}>
-                        <Text style={styles.orderAmount}>CHF {Number(p.price).toFixed(2)}</Text>
-                        {(p.modifiers?.length > 0 || p.variants?.length > 0 || isPizzaProduct(p)) && (
-                          <View style={{ backgroundColor: Colors.accent + "15", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginTop: 4 }}>
-                            <Text style={{ fontSize: 9, color: Colors.accent, fontWeight: "700" }}>{editLabel("CUSTOMIZABLE", "قابل للتعديل", "ANPASSBAR")}</Text>
+              </ScrollView>
+            )}
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+              {/* Regular Products Grid */}
+              {filteredPickerProducts.length > 0 && (
+                <>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+                    {filteredPickerProducts.map((p: any) => {
+                      const catColor = p.categoryColor || "#7C3AED";
+                      return (
+                        <Pressable
+                          key={String(p.id)}
+                          style={[styles.productCard, { borderColor: catColor + "40" }]}
+                          onPress={() => addItemToOrder(p)}
+                        >
+                          {p.image ? (
+                            <Image source={{ uri: p.image }} style={styles.productCardImage} resizeMode="cover" />
+                          ) : (
+                            <View style={[styles.productCardImagePlaceholder, { backgroundColor: catColor + "20" }]}>
+                              <Text style={{ fontSize: 30 }}>🍕</Text>
+                            </View>
+                          )}
+                          <View style={styles.productCardBody}>
+                            <Text style={styles.productCardName} numberOfLines={2}>{p.name}</Text>
+                            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                              <Text style={[styles.productCardPrice, { color: catColor }]}>CHF {Number(p.price).toFixed(2)}</Text>
+                              {(p.modifiers?.length > 0 || p.variants?.length > 0 || isPizzaProduct(p)) && (
+                                <View style={{ backgroundColor: catColor + "20", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                  <Text style={{ fontSize: 8, color: catColor, fontWeight: "700" }}>+</Text>
+                                </View>
+                              )}
+                            </View>
                           </View>
-                        )}
-                      </View>
-                    </Pressable>
-                    <View style={styles.pickerSep} />
+                        </Pressable>
+                      );
+                    })}
                   </View>
-                ))}
-              </>
-            )}
-            {/* Free addons section */}
-            {allProducts.filter((p: any) => p.isAddon).length > 0 && (
-              <>
-                <View style={styles.pickerSectionHeader}>
-                  <Text style={styles.pickerSectionTitle}>{editLabel("Free Addons", "إضافات مجانية", "Gratis Extras")}</Text>
-                  <View style={styles.freeBadge}>
-                    <Text style={styles.freeBadgeText}>{editLabel("FREE", "مجاني", "GRATIS")}</Text>
+                </>
+              )}
+
+              {/* Free Addons Section */}
+              {addonProducts.length > 0 && (pickerCategory === "all") && (
+                <>
+                  <View style={[styles.pickerSectionHeader, { marginBottom: 10 }]}>
+                    <Text style={styles.pickerSectionTitle}>{lbl("Free Addons", "إضافات مجانية", "Gratis Extras")}</Text>
+                    <View style={styles.freeBadge}>
+                      <Text style={styles.freeBadgeText}>{lbl("FREE", "مجاني", "GRATIS")}</Text>
+                    </View>
                   </View>
-                </View>
-                {allProducts.filter((p: any) => p.isAddon).map((p: any) => (
-                  <View key={String(p.id)}>
-                    <Pressable style={[styles.pickerItem, isRTL && { flexDirection: "row-reverse" }]} onPress={() => addItemToOrder({ ...p, price: 0 })}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.customerName, isRTL && { textAlign: "right" }]}>{p.name}</Text>
-                        <Text style={[styles.customerSub, isRTL && { textAlign: "right" }]}>{p.categoryName || ""}</Text>
-                      </View>
-                      <View style={{ alignItems: "flex-end" }}>
-                        <Text style={styles.freePrice}>{editLabel("Free", "مجاني", "Gratis")}</Text>
-                      </View>
-                    </Pressable>
-                    <View style={styles.pickerSep} />
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+                    {addonProducts.map((p: any) => (
+                      <Pressable
+                        key={String(p.id)}
+                        style={[styles.addonChip]}
+                        onPress={() => addItemToOrder({ ...p, price: 0 })}
+                      >
+                        <Text style={styles.addonChipText}>{p.name}</Text>
+                        <Text style={[styles.addonChipText, { color: Colors.success }]}>{lbl("Free", "مجاني", "Gratis")}</Text>
+                      </Pressable>
+                    ))}
                   </View>
-                ))}
-              </>
-            )}
-            {allProducts.length === 0 && (
-              <Text style={styles.emptyItemsText}>{editLabel("No products found", "لا يوجد منتجات", "Keine Produkte")}</Text>
-            )}
+                </>
+              )}
+
+              {enrichedProducts.length === 0 && (
+                <Text style={[styles.emptyItemsText, { textAlign: "center", marginTop: 40 }]}>{lbl("No products found", "لا يوجد منتجات", "Keine Produkte")}</Text>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top }]} >
+      {/* ===== HEADER ===== */}
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <LinearGradient colors={["#1E1B4B", "#312E81", "#0A0E27"]} style={styles.headerGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <View style={[styles.headerContent, isRTL && { flexDirection: "row-reverse" }]}>
             <View>
               <Text style={[styles.headerTitle, isRTL && { textAlign: "right" }]}>
-                {language === "ar" ? "الطلبات الإلكترونية" : language === "de" ? "Online-Bestellungen" : "Online Orders"}
+                {lbl("All Orders", "جميع الطلبات", "Alle Bestellungen")}
               </Text>
               <Text style={[styles.headerSub, isRTL && { textAlign: "right" }]}>
                 {pendingCount > 0
-                  ? (language === "ar" ? `${pendingCount} طلب جديد بانتظار الموافقة` : language === "de" ? `${pendingCount} neue Bestellung(en)` : `${pendingCount} new order${pendingCount > 1 ? "s" : ""} awaiting`)
-                  : (language === "ar" ? "لا توجد طلبات جديدة" : language === "de" ? "Keine neuen Bestellungen" : "No new orders")}
+                  ? lbl(`${pendingCount} online order${pendingCount > 1 ? "s" : ""} pending`, `${pendingCount} طلب إلكتروني جديد`, `${pendingCount} neue Online-Bestellung(en)`)
+                  : lbl("Live orders dashboard", "لوحة الطلبات المباشرة", "Live-Bestellübersicht")}
               </Text>
             </View>
             {pendingCount > 0 && (
@@ -934,21 +1000,32 @@ export default function OnlineOrdersScreen() {
             )}
           </View>
 
-          {/* Filter tabs */}
+          {/* Source tabs */}
           <View style={[styles.filterRow, isRTL && { flexDirection: "row-reverse" }]}>
             {[
-              { key: "active", labelEn: "Active", labelAr: "النشطة", labelDe: "Aktiv" },
-              { key: "done", labelEn: "Done", labelAr: "المكتملة", labelDe: "Erledigt" },
-              { key: "all", labelEn: "All", labelAr: "الكل", labelDe: "Alle" },
+              { key: "all", en: "All Orders", ar: "الكل", de: "Alle" },
+              { key: "online", en: "🌐 Online", ar: "🌐 إلكتروني", de: "🌐 Online" },
+              { key: "pos", en: "📞 POS", ar: "📞 كاشير", de: "📞 Kasse" },
             ].map(f => (
-              <Pressable
-                key={f.key}
-                onPress={() => setFilter(f.key)}
-                style={[styles.filterTab, filter === f.key && styles.filterTabActive]}
-              >
+              <Pressable key={f.key} onPress={() => setViewMode(f.key as any)} style={[styles.filterTab, viewMode === f.key && styles.filterTabActive]}>
+                <Text style={[styles.filterTabText, viewMode === f.key && styles.filterTabTextActive]}>
+                  {language === "ar" ? f.ar : language === "de" ? f.de : f.en}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Status filter */}
+          <View style={[styles.filterRow, isRTL && { flexDirection: "row-reverse" }]}>
+            {[
+              { key: "active", en: "Active", ar: "النشطة", de: "Aktiv" },
+              { key: "done", en: "Done", ar: "المكتملة", de: "Erledigt" },
+              { key: "all", en: "All", ar: "الكل", de: "Alle" },
+            ].map(f => (
+              <Pressable key={f.key} onPress={() => setFilter(f.key)} style={[styles.filterTab, filter === f.key && styles.filterTabActive]}>
                 <Text style={[styles.filterTabText, filter === f.key && styles.filterTabTextActive]}>
-                  {language === "ar" ? f.labelAr : language === "de" ? f.labelDe : f.labelEn}
-                  {f.key === "active" && pendingCount > 0 ? ` (${pendingCount})` : ""}
+                  {language === "ar" ? f.ar : language === "de" ? f.de : f.en}
+                  {f.key === "active" && pendingCount > 0 && viewMode !== "pos" ? ` (${pendingCount})` : ""}
                 </Text>
               </Pressable>
             ))}
@@ -956,23 +1033,19 @@ export default function OnlineOrdersScreen() {
         </LinearGradient>
       </View>
 
-      {/* Orders list */}
+      {/* ===== ORDER LIST ===== */}
       <FlatList
         data={filteredOrders}
-        keyExtractor={(item: any) => String(item.id)}
+        keyExtractor={(item: any) => `${item._type}-${item.id}`}
         renderItem={renderOrder}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
         ListEmptyComponent={
-          <View style={styles.emptyState} >
-            <Text style={styles.emptyIcon}>🌐</Text>
-            <Text style={styles.emptyTitle}>
-              {language === "ar" ? "لا توجد طلبات" : language === "de" ? "Keine Bestellungen" : "No orders yet"}
-            </Text>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>{viewMode === "online" ? "🌐" : viewMode === "pos" ? "📞" : "📋"}</Text>
+            <Text style={styles.emptyTitle}>{lbl("No orders yet", "لا توجد طلبات", "Keine Bestellungen")}</Text>
             <Text style={styles.emptyText}>
-              {language === "ar" ? "ستظهر الطلبات الإلكترونية هنا فور وصولها"
-                : language === "de" ? "Online-Bestellungen erscheinen hier sofort"
-                  : "Online orders will appear here in real time"}
+              {lbl("Orders will appear here in real time", "ستظهر الطلبات هنا فور وصولها", "Bestellungen erscheinen hier in Echtzeit")}
             </Text>
           </View>
         }
@@ -989,15 +1062,13 @@ const styles = StyleSheet.create({
   headerTitle: { color: "#fff", fontSize: 22, fontWeight: "800" },
   headerSub: { color: "rgba(255,255,255,0.6)", fontSize: 12, marginTop: 2 },
   pendingBadge: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: Colors.danger,
-    justifyContent: "center", alignItems: "center",
-    borderWidth: 2, borderColor: "rgba(255,255,255,0.3)",
+    width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.danger,
+    justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: "rgba(255,255,255,0.3)",
   },
   pendingBadgeText: { color: "#fff", fontWeight: "900", fontSize: 18 },
-  filterRow: { flexDirection: "row", gap: 8, paddingBottom: 12 },
+  filterRow: { flexDirection: "row", gap: 8, paddingBottom: 10 },
   filterTab: {
-    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999,
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)",
   },
   filterTabActive: { backgroundColor: Colors.accent + "22", borderColor: Colors.accent },
@@ -1006,56 +1077,50 @@ const styles = StyleSheet.create({
   listContent: { padding: 12, paddingBottom: 100, gap: 12 },
 
   orderCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16, padding: 14,
-    borderWidth: 1, borderColor: Colors.cardBorder,
-    borderLeftWidth: 4,
+    backgroundColor: Colors.surface, borderRadius: 16, padding: 14,
+    borderWidth: 1, borderColor: Colors.cardBorder, borderLeftWidth: 4,
   },
   orderCardNew: {
     borderColor: "#F59E0B",
     elevation: 6,
     ...(Platform.OS === "web" ? { boxShadow: "0px 0px 8px rgba(245,158,11,0.25)" } as any : { shadowColor: "#F59E0B", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 8 }),
   },
-  newDot: {
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: "#F59E0B", marginRight: 6,
+  orderCardPos: {
+    borderStyle: "dashed" as any,
   },
+  newDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#F59E0B", marginRight: 6 },
+  sourceBadge: {
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1,
+  },
+  sourceBadgeText: { fontSize: 10, fontWeight: "800" },
   orderHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  orderNumRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  orderNum: { color: Colors.text, fontWeight: "800", fontSize: 15 },
+  orderNumRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  orderNum: { color: Colors.text, fontWeight: "800", fontSize: 14 },
   statusBadge: {
     flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: 999, borderWidth: 1,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1,
   },
-  statusText: { fontSize: 11, fontWeight: "700" },
+  statusText: { fontSize: 10, fontWeight: "700" },
   orderAmount: { color: Colors.accent, fontWeight: "900", fontSize: 17 },
 
   customerRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 10 },
   customerIcon: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: "rgba(47,211,198,0.12)",
+    width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(47,211,198,0.12)",
     justifyContent: "center", alignItems: "center",
   },
   customerName: { color: Colors.text, fontWeight: "700", fontSize: 13 },
   customerSub: { color: Colors.textMuted, fontSize: 11, marginTop: 1 },
   metaChips: { flexDirection: "column", gap: 4, alignItems: "flex-end" },
-  metaChip: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6,
-  },
+  metaChip: { backgroundColor: "rgba(255,255,255,0.06)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
   metaChipText: { color: Colors.textSecondary, fontSize: 10, fontWeight: "600" },
 
-  itemsList: {
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 10, padding: 10, marginBottom: 10, gap: 5,
-  },
+  itemsList: { backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 10, padding: 10, marginBottom: 10, gap: 4 },
   itemRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   itemQty: { color: Colors.accent, fontWeight: "700", fontSize: 12, minWidth: 24 },
   itemName: { color: Colors.textSecondary, fontSize: 12 },
   itemAddons: { color: Colors.textMuted, fontSize: 11, marginLeft: 32, marginTop: 2, fontStyle: "italic" },
   itemPrice: { color: Colors.text, fontWeight: "600", fontSize: 12 },
-  orderNotes: { color: Colors.warning, fontSize: 11, marginTop: 6 },
+  orderNotes: { color: Colors.warning, fontSize: 11, marginTop: 4 },
 
   totalsRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   timeText: { color: Colors.textMuted, fontSize: 11 },
@@ -1069,57 +1134,40 @@ const styles = StyleSheet.create({
   actionBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
   editBtn: {
     width: 42, height: 42, borderRadius: 10,
-    backgroundColor: "rgba(47,211,198,0.1)",
-    borderWidth: 1, borderColor: "rgba(47,211,198,0.3)",
+    backgroundColor: "rgba(47,211,198,0.1)", borderWidth: 1, borderColor: "rgba(47,211,198,0.3)",
     justifyContent: "center", alignItems: "center",
   },
   cancelBtn: {
     width: 42, height: 42, borderRadius: 10,
-    backgroundColor: "rgba(239,68,68,0.1)",
-    borderWidth: 1, borderColor: "rgba(239,68,68,0.3)",
+    backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1, borderColor: "rgba(239,68,68,0.3)",
     justifyContent: "center", alignItems: "center",
   },
   deleteBtn: {
     width: 42, height: 42, borderRadius: 10,
-    backgroundColor: "rgba(239,68,68,0.1)",
-    borderWidth: 1, borderColor: "rgba(239,68,68,0.3)",
+    backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1, borderColor: "rgba(239,68,68,0.3)",
     justifyContent: "center", alignItems: "center",
   },
-  // Edit Modal
+
+  // Modal
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   modalSheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: 20, maxHeight: "85%",
+    backgroundColor: Colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: 20, maxHeight: "88%",
   },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   modalTitle: { color: Colors.text, fontWeight: "800", fontSize: 16 },
   editField: { marginBottom: 14 },
   editLabel: { color: Colors.textMuted, fontSize: 11, fontWeight: "600", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
   editInput: {
-    backgroundColor: Colors.background,
-    borderWidth: 1, borderColor: Colors.cardBorder,
-    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
-    color: Colors.text, fontSize: 14,
+    backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.cardBorder,
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: Colors.text, fontSize: 14,
   },
   modalFooter: { flexDirection: "row", gap: 10, marginTop: 16 },
-  modalCancelBtn: {
-    flex: 1, paddingVertical: 13, borderRadius: 10,
-    borderWidth: 1, borderColor: Colors.cardBorder,
-    alignItems: "center",
-  },
+  modalCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 10, borderWidth: 1, borderColor: Colors.cardBorder, alignItems: "center" },
   modalCancelText: { color: Colors.textMuted, fontWeight: "600", fontSize: 14 },
-  modalSaveBtn: {
-    flex: 2, paddingVertical: 13, borderRadius: 10,
-    backgroundColor: Colors.accent, alignItems: "center",
-  },
+  modalSaveBtn: { flex: 2, paddingVertical: 13, borderRadius: 10, backgroundColor: Colors.accent, alignItems: "center" },
   modalSaveText: { color: "#000", fontWeight: "800", fontSize: 14 },
-  emptyState: { alignItems: "center", paddingTop: 80, paddingHorizontal: 32 },
-  emptyIcon: { fontSize: 56, marginBottom: 16 },
-  emptyTitle: { color: Colors.text, fontSize: 18, fontWeight: "800", marginBottom: 8 },
-  emptyText: { color: Colors.textMuted, fontSize: 13, textAlign: "center", lineHeight: 20 },
 
-  // New Edit Styles
   editDivider: { height: 1, backgroundColor: Colors.cardBorder },
   addSmallBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, backgroundColor: Colors.accent + "15" },
   addSmallText: { color: Colors.accent, fontSize: 12, fontWeight: "700" },
@@ -1137,49 +1185,55 @@ const styles = StyleSheet.create({
   modalTotalLabel: { color: Colors.textMuted, fontSize: 12 },
   modalTotalVal: { color: Colors.text, fontSize: 13, fontWeight: "600" },
 
-  // Picker Styles
-  pickerOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 20 },
-  pickerSheet: { backgroundColor: Colors.surface, borderRadius: 20, width: "100%", maxWidth: 500, maxHeight: "80%", padding: 20, overflow: "scroll" as any },
-  pickerItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12 },
-  pickerSep: { height: 1, backgroundColor: Colors.cardBorder + "44" },
-  pickerSectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, marginTop: 6, borderBottomWidth: 1, borderBottomColor: Colors.cardBorder + "55" },
+  // Product Picker
+  pickerOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 16 },
+  pickerSheet: { backgroundColor: Colors.surface, borderRadius: 20, width: "100%", maxWidth: 600, padding: 20 },
+  pickerSectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.cardBorder + "55" },
   pickerSectionTitle: { color: Colors.textMuted, fontSize: 11, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.8, flex: 1 },
   freeBadge: { backgroundColor: Colors.success + "22", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   freeBadgeText: { color: Colors.success, fontSize: 10, fontWeight: "800" },
   freePrice: { color: Colors.success, fontWeight: "800", fontSize: 14 },
 
-  // New Styles for Topping Picker
+  pickerCatTab: {
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999,
+    backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.cardBorder,
+  },
+  pickerCatTabActive: { backgroundColor: Colors.accent + "15", borderColor: Colors.accent },
+  pickerCatText: { color: Colors.textMuted, fontSize: 12, fontWeight: "600" },
+  pickerCatTextActive: { color: Colors.accent },
+
+  // Product grid cards
+  productCard: {
+    width: "47%", borderRadius: 14, overflow: "hidden",
+    backgroundColor: Colors.surface, borderWidth: 1,
+    elevation: 2,
+    ...(Platform.OS === "web" ? { boxShadow: "0px 2px 6px rgba(0,0,0,0.12)" } as any : {}),
+  },
+  productCardImage: { width: "100%", height: 100 },
+  productCardImagePlaceholder: { width: "100%", height: 100, alignItems: "center", justifyContent: "center" },
+  productCardBody: { padding: 10 },
+  productCardName: { color: Colors.text, fontSize: 13, fontWeight: "700", lineHeight: 17 },
+  productCardPrice: { fontSize: 13, fontWeight: "800" },
+
+  addonChip: {
+    flexDirection: "row", gap: 6, paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 10, backgroundColor: Colors.background,
+    borderWidth: 1, borderColor: Colors.success + "40", alignItems: "center",
+  },
+  addonChipText: { color: Colors.text, fontSize: 12, fontWeight: "600" },
+
+  // Configurator
   modalContent: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 24,
-    width: "92%",
-    maxWidth: 600,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 24,
+    backgroundColor: Colors.surface, borderRadius: 20, padding: 24, width: "92%", maxWidth: 600,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 24,
   },
-  statusTab: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    alignItems: "center",
-  },
-  statusTabActive: {
-    backgroundColor: Colors.accent + "15",
-    borderColor: Colors.accent,
-  },
-  statusTabText: {
-    color: Colors.text,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  statusTabTextActive: {
-    color: Colors.accent,
-  },
+  statusTab: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.cardBorder, alignItems: "center" },
+  statusTabActive: { backgroundColor: Colors.accent + "15", borderColor: Colors.accent },
+  statusTabText: { color: Colors.text, fontSize: 14, fontWeight: "600" },
+  statusTabTextActive: { color: Colors.accent },
+
+  emptyState: { alignItems: "center", paddingTop: 80, paddingHorizontal: 32 },
+  emptyIcon: { fontSize: 56, marginBottom: 16 },
+  emptyTitle: { color: Colors.text, fontSize: 18, fontWeight: "800", marginBottom: 8 },
+  emptyText: { color: Colors.textMuted, fontSize: 13, textAlign: "center", lineHeight: 20 },
 });

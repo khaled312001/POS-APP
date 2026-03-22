@@ -127,6 +127,8 @@ export default function POSScreen() {
   const [newCustomerForm, setNewCustomerForm] = useState({ name: "", phone: "", address: "", email: "" });
   const [showOnlineOrders, setShowOnlineOrders] = useState(false);
   const [showCallHistory, setShowCallHistory] = useState(false);
+  const [callHistoryFilter, setCallHistoryFilter] = useState<"all" | "missed" | "answered" | "today">("all");
+  const [callHistorySearch, setCallHistorySearch] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [showOrderNotes, setShowOrderNotes] = useState(false);
   const [endOfDayLoading, setEndOfDayLoading] = useState(false);
@@ -3124,9 +3126,10 @@ export default function POSScreen() {
       </Modal>
 
       {/* ── Call History Panel ── */}
-      <Modal visible={showCallHistory} animationType="slide" transparent>
+      <Modal visible={showCallHistory} animationType="slide" transparent onShow={() => { setCallHistoryFilter("all"); setCallHistorySearch(""); }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: "92%" }]}>
+            {/* Header */}
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>
                 {language === "ar" ? "📞 سجل المكالمات" : language === "de" ? "📞 Anrufhistorie" : "📞 Call History"}
@@ -3136,14 +3139,110 @@ export default function POSScreen() {
               </Pressable>
             </View>
 
+            {/* Stats bar */}
+            {(() => {
+              const total = (callHistory as any[]).length;
+              const missed = (callHistory as any[]).filter((c: any) => c.status === "missed").length;
+              const answered = (callHistory as any[]).filter((c: any) => c.status === "answered").length;
+              const todayCount = (callHistory as any[]).filter((c: any) => {
+                const d = new Date(c.createdAt); const now = new Date();
+                return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+              }).length;
+              return (
+                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                  {[
+                    { label: language === "ar" ? "الكل" : language === "de" ? "Alle" : "Total", value: total, color: Colors.accent },
+                    { label: language === "ar" ? "فاتت" : language === "de" ? "Verpasst" : "Missed", value: missed, color: Colors.danger },
+                    { label: language === "ar" ? "رُدَّ عليها" : language === "de" ? "Beantw." : "Answered", value: answered, color: Colors.success },
+                    { label: language === "ar" ? "اليوم" : language === "de" ? "Heute" : "Today", value: todayCount, color: "#a78bfa" },
+                  ].map((s) => (
+                    <View key={s.label} style={{ flex: 1, minWidth: 70, backgroundColor: s.color + "18", borderRadius: 10, paddingVertical: 7, paddingHorizontal: 6, alignItems: "center" }}>
+                      <Text style={{ color: s.color, fontSize: 18, fontWeight: "800" }}>{s.value}</Text>
+                      <Text style={{ color: s.color, fontSize: 10, fontWeight: "600", opacity: 0.85, marginTop: 1 }}>{s.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
+
+            {/* Search bar */}
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", backgroundColor: Colors.surfaceLight, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder, gap: 6 }}>
+              <Ionicons name="search" size={16} color={Colors.textMuted} />
+              <TextInput
+                value={callHistorySearch}
+                onChangeText={setCallHistorySearch}
+                placeholder={language === "ar" ? "ابحث برقم أو اسم..." : language === "de" ? "Suche nach Nummer oder Name..." : "Search by number or name..."}
+                placeholderTextColor={Colors.textMuted}
+                style={{ flex: 1, color: Colors.text, fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+              />
+              {callHistorySearch.length > 0 && (
+                <Pressable onPress={() => setCallHistorySearch("")}>
+                  <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+                </Pressable>
+              )}
+            </View>
+
+            {/* Filter tabs */}
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 6, marginBottom: 10 }}>
+              {(["all", "missed", "answered", "today"] as const).map((f) => {
+                const labels: Record<string, Record<string, string>> = {
+                  all:      { ar: "الكل", de: "Alle", en: "All" },
+                  missed:   { ar: "فاتتني", de: "Verpasst", en: "Missed" },
+                  answered: { ar: "تم الرد", de: "Beantwortet", en: "Answered" },
+                  today:    { ar: "اليوم", de: "Heute", en: "Today" },
+                };
+                const label = labels[f][language] ?? labels[f]["en"];
+                const active = callHistoryFilter === f;
+                return (
+                  <Pressable key={f} onPress={() => setCallHistoryFilter(f)} style={{ flex: 1, paddingVertical: 6, borderRadius: 8, backgroundColor: active ? Colors.accent : Colors.surfaceLight, borderWidth: 1, borderColor: active ? Colors.accent : Colors.cardBorder, alignItems: "center" }}>
+                    <Text style={{ color: active ? Colors.white : Colors.textSecondary, fontSize: 12, fontWeight: "700" }}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
             <FlatList
-              data={callHistory}
-              keyExtractor={(item: any) => String(item.id)}
+              data={(() => {
+                // Group calls by phone number
+                const grouped = new Map<string, any>();
+                for (const call of (callHistory as any[])) {
+                  const key = call.phoneNumber;
+                  if (!grouped.has(key)) {
+                    grouped.set(key, { ...call, callCount: 1, missedCount: call.status === "missed" ? 1 : 0, answeredCount: call.status === "answered" ? 1 : 0 });
+                  } else {
+                    const existing = grouped.get(key)!;
+                    existing.callCount += 1;
+                    if (call.status === "missed") existing.missedCount += 1;
+                    if (call.status === "answered") existing.answeredCount += 1;
+                  }
+                }
+                let items = Array.from(grouped.values());
+
+                // Apply filter
+                const now = new Date();
+                if (callHistoryFilter === "missed") items = items.filter((i: any) => i.missedCount > 0 && i.answeredCount === 0);
+                if (callHistoryFilter === "answered") items = items.filter((i: any) => i.answeredCount > 0);
+                if (callHistoryFilter === "today") items = items.filter((i: any) => {
+                  const d = new Date(i.createdAt);
+                  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+                });
+
+                // Apply search
+                if (callHistorySearch.trim()) {
+                  const q = callHistorySearch.trim().toLowerCase();
+                  items = items.filter((i: any) => {
+                    const cust = customers.find((c: any) => c.id === i.customerId);
+                    return i.phoneNumber?.includes(q) || (cust?.name?.toLowerCase().includes(q));
+                  });
+                }
+                return items;
+              })()}
+              keyExtractor={(item: any) => String(item.phoneNumber)}
               renderItem={({ item }: { item: any }) => {
                 const callDate = new Date(item.createdAt);
-                const isMissed = item.status === "missed";
+                const hasAnswered = item.answeredCount > 0;
+                const isMissed = !hasAnswered;
                 const cust = customers.find((c: any) => c.id === item.customerId);
-                // Format date and time separately for clear display
                 const dateStr = callDate.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit", year: "numeric" });
                 const timeStr = callDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
@@ -3170,22 +3269,22 @@ export default function POSScreen() {
                       flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10
                     }}
                   >
-                    {/* Status icon */}
-                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: isMissed ? Colors.danger + "22" : Colors.success + "22", justifyContent: "center", alignItems: "center" }}>
-                      <Ionicons name={isMissed ? "call-outline" : "call"} size={22} color={isMissed ? Colors.danger : Colors.success} />
+                    {/* Avatar / status icon */}
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: cust ? Colors.accent + "22" : (isMissed ? Colors.danger + "22" : Colors.success + "22"), justifyContent: "center", alignItems: "center" }}>
+                      {cust
+                        ? <Text style={{ color: Colors.accent, fontSize: 18, fontWeight: "800" }}>{cust.name.charAt(0).toUpperCase()}</Text>
+                        : <Ionicons name={isMissed ? "call-outline" : "call"} size={22} color={isMissed ? Colors.danger : Colors.success} />
+                      }
                     </View>
 
                     {/* Main info */}
                     <View style={{ flex: 1 }}>
-                      {/* Customer name or phone number (no duplication) */}
                       <Text style={{ color: Colors.text, fontWeight: "800", fontSize: 16 }}>
                         {cust ? cust.name : item.phoneNumber}
                       </Text>
-                      {/* Phone number only if customer name is shown */}
                       {cust && (
                         <Text style={{ color: Colors.textSecondary, fontSize: 13, marginTop: 1 }}>{item.phoneNumber}</Text>
                       )}
-                      {/* Date + Time prominently */}
                       <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginTop: 4 }}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
                           <Ionicons name="calendar-outline" size={12} color={Colors.textMuted} />
@@ -3196,16 +3295,34 @@ export default function POSScreen() {
                           <Ionicons name="time-outline" size={12} color={Colors.textMuted} />
                           <Text style={{ color: Colors.textMuted, fontSize: 12, fontWeight: "600" }}>{timeStr}</Text>
                         </View>
+                        {item.callCount > 1 && (
+                          <>
+                            <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: Colors.textMuted }} />
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                              <Ionicons name="layers-outline" size={12} color={Colors.textMuted} />
+                              <Text style={{ color: Colors.textMuted, fontSize: 12, fontWeight: "600" }}>{item.callCount}x</Text>
+                            </View>
+                          </>
+                        )}
                       </View>
                     </View>
 
-                    {/* Right side: status + order badge */}
+                    {/* Right side: badges + arrow */}
                     <View style={{ alignItems: "flex-end", gap: 4 }}>
-                      <View style={{ backgroundColor: isMissed ? Colors.danger + "18" : Colors.success + "18", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-                        <Text style={{ color: isMissed ? Colors.danger : Colors.success, fontSize: 12, fontWeight: "700" }}>
-                          {isMissed ? (language === "ar" ? "فاتت" : language === "de" ? "Verpasst" : "Missed") : (language === "ar" ? "تم الرد" : language === "de" ? "Angenommen" : "Answered")}
-                        </Text>
-                      </View>
+                      {item.answeredCount > 0 && (
+                        <View style={{ backgroundColor: Colors.success + "18", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+                          <Text style={{ color: Colors.success, fontSize: 12, fontWeight: "700" }}>
+                            {language === "ar" ? "تم الرد" : language === "de" ? "Beantwortet" : "Answered"}
+                          </Text>
+                        </View>
+                      )}
+                      {item.missedCount > 0 && (
+                        <View style={{ backgroundColor: Colors.danger + "18", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+                          <Text style={{ color: Colors.danger, fontSize: 12, fontWeight: "700" }}>
+                            {item.missedCount > 1 ? `${item.missedCount} ` : ""}{language === "ar" ? "فاتت" : language === "de" ? "Verpasst" : "Missed"}
+                          </Text>
+                        </View>
+                      )}
                       {item.saleId && (
                         <View style={{ backgroundColor: Colors.accent + "22", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
                           <Text style={{ color: Colors.accent, fontSize: 10, fontWeight: "800" }}>
@@ -3222,7 +3339,7 @@ export default function POSScreen() {
                 <View style={{ alignItems: "center", paddingVertical: 40 }}>
                   <Ionicons name="call-outline" size={48} color={Colors.textMuted} />
                   <Text style={{ color: Colors.textMuted, fontSize: 15, marginTop: 12, fontWeight: "600" }}>
-                    {language === "ar" ? "لا يوجد سجل مكالمات" : language === "de" ? "Keine Anrufhistorie" : "No call history yet"}
+                    {callHistorySearch ? (language === "ar" ? "لا توجد نتائج" : language === "de" ? "Keine Ergebnisse" : "No results found") : (language === "ar" ? "لا يوجد سجل مكالمات" : language === "de" ? "Keine Anrufhistorie" : "No call history yet")}
                   </Text>
                 </View>
               }

@@ -1168,6 +1168,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  app.put("/api/sales/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { items, ...saleData } = req.body;
+      const sale = await storage.updateSale(id, sanitizeDates(saleData));
+      if (items !== undefined) {
+        await storage.deleteSaleItems(id);
+        for (const item of items) {
+          await storage.createSaleItem({
+            saleId: id,
+            productId: item.productId,
+            productName: item.productName || item.name,
+            quantity: item.quantity,
+            unitPrice: String(item.unitPrice),
+            total: String(item.total),
+            modifiers: item.modifiers || [],
+            notes: item.notes || null,
+          });
+        }
+      }
+      res.json(sale);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Suppliers
   app.get("/api/suppliers", async (req, res) => {
     try {

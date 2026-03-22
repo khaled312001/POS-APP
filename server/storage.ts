@@ -392,6 +392,9 @@ export const storage = {
   async getSaleItems(saleId: number) {
     return db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
   },
+  async deleteSaleItems(saleId: number) {
+    await db.delete(saleItems).where(eq(saleItems.saleId, saleId));
+  },
   async createSaleItem(data: InsertSaleItem) {
     const [item] = await db.insert(saleItems).values(data).returning();
     return item;
