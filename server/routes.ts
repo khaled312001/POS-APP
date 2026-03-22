@@ -1941,6 +1941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...mainBranch,
         storeType: tenant?.storeType || "supermarket",
         commissionRate,
+        whatsappAdminPhone: (tenant?.metadata as any)?.whatsappAdminPhone || "",
       });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -1962,12 +1963,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mainBranch = branches.find((b: any) => b.isMain) || branches[0];
       if (!mainBranch) return res.status(404).json({ error: "No branch found" });
 
-      const updatedBranch = await storage.updateBranch(mainBranch.id, branchData);
-      if (storeType && mainBranch.tenantId) {
-        await storage.updateTenant(mainBranch.tenantId as number, { storeType });
+      const { whatsappAdminPhone, ...cleanBranchData } = branchData;
+      const updatedBranch = await storage.updateBranch(mainBranch.id, cleanBranchData);
+      if (mainBranch.tenantId) {
+        const tenantUpdates: any = {};
+        if (storeType) tenantUpdates.storeType = storeType;
+        if (whatsappAdminPhone !== undefined) {
+          const existingTenant = await storage.getTenant(mainBranch.tenantId as number);
+          tenantUpdates.metadata = { ...(existingTenant?.metadata as any || {}), whatsappAdminPhone: whatsappAdminPhone.replace(/\D/g, "") };
+        }
+        if (Object.keys(tenantUpdates).length > 0) {
+          await storage.updateTenant(mainBranch.tenantId as number, tenantUpdates);
+        }
       }
 
-      res.json({ ...updatedBranch, storeType });
+      res.json({ ...updatedBranch, storeType, whatsappAdminPhone: whatsappAdminPhone?.replace(/\D/g, "") || "" });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -2228,6 +2238,10 @@ async function test(){
       try {
         const tenant = await storage.getTenant(resolvedTenantId);
         const storeName = tenant?.businessName || "Online Store";
+        // Get store-specific admin phone from metadata, fallback to global platform setting
+        const storeAdminPhone = (tenant?.metadata as any)?.whatsappAdminPhone as string | undefined;
+        const globalAdminPhone = await storage.getPlatformSetting("whatsapp_admin_phone");
+        const adminPhone = storeAdminPhone || globalAdminPhone || undefined;
         // Notify admin
         await whatsappService.sendOrderNotification({
           orderNumber,
@@ -2241,7 +2255,7 @@ async function test(){
           orderType: orderData.orderType || "delivery",
           paymentMethod: orderData.paymentMethod || "cash",
           notes: orderData.notes,
-        }, storeName);
+        }, storeName, adminPhone);
         // Confirm to customer
         if (orderData.customerPhone) {
           await whatsappService.sendCustomerConfirmation(
@@ -2334,12 +2348,52 @@ async function test(){
   });
 
   app.post("/api/super-admin/whatsapp/test", requireSuperAdmin as any, async (req: any, res: any) => {
-    const targetPhone = (req.body?.phone || "201204593124").replace(/\D/g, "");
+    const globalPhone = await storage.getPlatformSetting("whatsapp_admin_phone");
+    const targetPhone = (req.body?.phone || globalPhone || "").replace(/\D/g, "");
+    if (!targetPhone) return res.status(400).json({ error: "No phone number specified and no global admin phone configured" });
     const sent = await whatsappService.sendText(
       targetPhone,
       "🧪 *Test Message*\n\nThis is a test from Barmagly POS WhatsApp integration.\n\n✅ If you receive this, the connection is working!"
     );
     res.json({ success: sent, phone: targetPhone });
+  });
+
+  // Get/set global WhatsApp admin phone (super-admin default)
+  app.get("/api/super-admin/whatsapp/admin-phone", requireSuperAdmin as any, async (_req: any, res: any) => {
+    try {
+      const phone = await storage.getPlatformSetting("whatsapp_admin_phone");
+      res.json({ phone: phone || "" });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/super-admin/whatsapp/admin-phone", requireSuperAdmin as any, async (req: any, res: any) => {
+    try {
+      const { phone } = req.body;
+      if (phone === undefined) return res.status(400).json({ error: "phone required" });
+      await storage.setPlatformSetting("whatsapp_admin_phone", phone.replace(/\D/g, ""));
+      res.json({ success: true, phone: phone.replace(/\D/g, "") });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Get/set per-store WhatsApp admin phone
+  app.get("/api/super-admin/whatsapp/store-phone/:tenantId", requireSuperAdmin as any, async (req: any, res: any) => {
+    try {
+      const tenant = await storage.getTenant(Number(req.params.tenantId));
+      if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+      const phone = (tenant.metadata as any)?.whatsappAdminPhone || "";
+      res.json({ phone });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/super-admin/whatsapp/store-phone/:tenantId", requireSuperAdmin as any, async (req: any, res: any) => {
+    try {
+      const tenant = await storage.getTenant(Number(req.params.tenantId));
+      if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+      const phone = (req.body?.phone || "").replace(/\D/g, "");
+      const metadata = { ...(tenant.metadata as any || {}), whatsappAdminPhone: phone };
+      await storage.updateTenant(Number(req.params.tenantId), { metadata });
+      res.json({ success: true, phone });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   // ── Landing Page Config ────────────────────────────────────────────────────

@@ -105,7 +105,7 @@ export default function SettingsScreen() {
   const [printerPaperSize, setPrinterPaperSize] = useState("80mm");
   const [printerAutoPrint, setPrinterAutoPrint] = useState(false);
   const [showStoreSettings, setShowStoreSettings] = useState(false);
-  const [storeForm, setStoreForm] = useState({ name: "", address: "", phone: "", email: "", storeType: "supermarket", taxRate: "", deliveryFee: "" });
+  const [storeForm, setStoreForm] = useState({ name: "", address: "", phone: "", email: "", storeType: "supermarket", taxRate: "", deliveryFee: "", whatsappAdminPhone: "" });
   const [storeLogo, setStoreLogo] = useState<string | null>(null);
   const [storeLogoUploading, setStoreLogoUploading] = useState(false);
 
@@ -476,6 +476,7 @@ export default function SettingsScreen() {
       storeType: storeForm.storeType || "supermarket",
       taxRate: storeForm.taxRate !== "" ? storeForm.taxRate : undefined,
       deliveryFee: storeForm.deliveryFee !== "" ? storeForm.deliveryFee : undefined,
+      whatsappAdminPhone: storeForm.whatsappAdminPhone || "",
     });
   };
 
@@ -651,6 +652,7 @@ export default function SettingsScreen() {
                 storeType: storeSettings?.storeType || "supermarket",
                 taxRate: storeSettings?.taxRate != null ? String(storeSettings.taxRate) : "",
                 deliveryFee: storeSettings?.deliveryFee != null ? String(storeSettings.deliveryFee) : "",
+                whatsappAdminPhone: storeSettings?.whatsappAdminPhone || "",
               });
               setStoreLogo(storeSettings?.logo || null);
               setShowStoreSettings(true);
@@ -2064,6 +2066,18 @@ export default function SettingsScreen() {
                 placeholderTextColor={Colors.textMuted}
                 placeholder="e.g. 5.00"
                 keyboardType="decimal-pad"
+              />
+
+              <Text style={[styles.label, rtlTextAlign]}>
+                {isRTL ? "رقم واتساب الأدمن (للإشعارات)" : "WhatsApp Admin Phone (Notifications)"}
+              </Text>
+              <TextInput
+                style={[styles.input, rtlTextAlign]}
+                value={storeForm.whatsappAdminPhone}
+                onChangeText={(v) => setStoreForm({ ...storeForm, whatsappAdminPhone: v })}
+                placeholderTextColor={Colors.textMuted}
+                placeholder={isRTL ? "مثال: 201234567890" : "e.g. 201234567890"}
+                keyboardType="phone-pad"
               />
 
               <Pressable style={{ marginTop: 16 }} onPress={handleSaveStoreSettings}>

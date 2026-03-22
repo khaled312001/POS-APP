@@ -19,7 +19,6 @@ async function loadWppConnect() {
     return wppconnect;
 }
 
-const ADMIN_PHONE = "201204593124";
 const SESSION_NAME = "barmagly-pos";
 const STORAGE_DIR = path.resolve(process.cwd(), ".wppconnect");
 const CHROME_DATA_DIR = path.join(STORAGE_DIR, "chrome-data");
@@ -59,6 +58,7 @@ let connecting = false;
 let connectionPhase: "idle" | "starting" | "awaiting_qr" | "qr_scanned" | "ready" = "idle";
 let connectionStartTime = 0;
 let autoReconnectTimer: any = null;
+let keepAliveInterval: any = null;
 let pendingMessages: { phone: string; text: string; timestamp: number }[] = [];
 
 function log(event: string) {
@@ -131,11 +131,47 @@ async function isClientAlive(): Promise<boolean> {
     }
 }
 
+function startKeepAlive() {
+    if (keepAliveInterval) clearInterval(keepAliveInterval);
+    keepAliveInterval = setInterval(async () => {
+        if (status !== "connected" || !client || !clientReady) return;
+        try {
+            const alive = await isClientAlive();
+            if (!alive) {
+                log("Keepalive check failed — marking disconnected and scheduling reconnect");
+                clientReady = false;
+                status = "disconnected";
+                client = null;
+                connectionPhase = "idle";
+                scheduleAutoReconnect();
+            }
+        } catch { }
+    }, 60000); // check every 60 seconds
+}
+
+function stopKeepAlive() {
+    if (keepAliveInterval) {
+        clearInterval(keepAliveInterval);
+        keepAliveInterval = null;
+    }
+}
+
 function scheduleAutoReconnect() {
     if (autoReconnectTimer) clearTimeout(autoReconnectTimer);
     autoReconnectTimer = setTimeout(async () => {
         autoReconnectTimer = null;
         if (status === "disconnected" && !connecting) {
+            // If client is still alive (transient disconnect recovered natively), skip full reconnect
+            if (client) {
+                const alive = await isClientAlive();
+                if (alive) {
+                    log("Native recovery detected — resuming without full reconnect");
+                    status = "connected";
+                    clientReady = true;
+                    connectionPhase = "ready";
+                    return;
+                }
+            }
             // Clear stale chrome lock files before reconnecting
             try {
                 const fsMod = await import("fs");
@@ -308,12 +344,26 @@ async function _connectBackground(wpp: any): Promise<void> {
                     }
                 }
 
+                // Transient disconnects — phone went to sleep, network changed, WhatsApp refreshed.
+                // Do NOT null the client. WPPConnect often recovers natively via inChat/isLogged.
+                if (statusSession === "disconnectedMobile" || statusSession === "desconnectedMobile") {
+                    if (stabilisationComplete) {
+                        log(`Transient disconnect (${statusSession}) — waiting for native recovery…`);
+                        status = "disconnected";
+                        clientReady = false;
+                        connectionPhase = "idle";
+                        // Keep client reference alive so native recovery can happen.
+                        // scheduleAutoReconnect will check isClientAlive() first before doing a hard restart.
+                        scheduleAutoReconnect();
+                    }
+                    return;
+                }
+
+                // Hard/permanent disconnects — session is truly gone, needs new QR.
                 if (
                     statusSession === "notLogged" ||
                     statusSession === "browserClose" ||
                     statusSession === "serverWssNotConnected" ||
-                    statusSession === "disconnectedMobile" ||
-                    statusSession === "desconnectedMobile" ||
                     statusSession === "deviceNotConnected"
                 ) {
                     status = "disconnected";
@@ -323,7 +373,6 @@ async function _connectBackground(wpp: any): Promise<void> {
                     connecting = false;
 
                     log(`Session offline (${statusSession}) — will automatically retry/reconnect...`);
-                    // Usually disconnectedMobile recovers natively, but scheduling a restart provides a solid fallback.
                     scheduleAutoReconnect();
                 }
             },
@@ -360,6 +409,8 @@ async function _connectBackground(wpp: any): Promise<void> {
         lastQrCode = null;
         connecting = false;
         log("✅ WhatsApp connected and ready");
+
+        startKeepAlive();
 
         client.onMessage(async (message: any) => {
             log(`Msg from ${message.from}: ${(message.body || "").slice(0, 80)}`);
@@ -436,6 +487,7 @@ export const whatsappService = {
 
     async disconnect(): Promise<void> {
         if (autoReconnectTimer) { clearTimeout(autoReconnectTimer); autoReconnectTimer = null; }
+        stopKeepAlive();
         if (client) {
             try { await client.close(); } catch { }
             client = null;
@@ -511,7 +563,12 @@ export const whatsappService = {
         }
     },
 
-    async sendOrderNotification(order: OrderData, storeName?: string): Promise<boolean> {
+    async sendOrderNotification(order: OrderData, storeName?: string, adminPhone?: string): Promise<boolean> {
+        if (!adminPhone) {
+            log("No admin phone configured for this store — skipping admin notification");
+            return false;
+        }
+
         const itemLines = order.items
             .map((i, idx) => `  ${idx + 1}. ${i.name} x ${i.quantity} — ${Number(i.unitPrice).toFixed(2)}`)
             .join("\n");
@@ -537,7 +594,7 @@ export const whatsappService = {
             .filter(Boolean)
             .join("\n");
 
-        return this.sendText(ADMIN_PHONE, msg);
+        return this.sendText(adminPhone, msg);
     },
 
     async sendCustomerConfirmation(

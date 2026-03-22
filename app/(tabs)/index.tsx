@@ -15,6 +15,27 @@ import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import * as Haptics from "expo-haptics";
 import BarcodeScanner from "@/components/BarcodeScanner";
+
+// Web Audio click sound
+const playClickSound = (type: "light" | "medium" | "heavy" = "light") => {
+  if (Platform.OS !== "web" || typeof window === "undefined") return;
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    const freq = type === "heavy" ? 280 : type === "medium" ? 420 : 600;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.5, ctx.currentTime + 0.06);
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    osc.type = "sine";
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.1);
+    osc.onended = () => ctx.close();
+  } catch {}
+};
 import RealTimeClock from "@/components/RealTimeClock";
 import { useLanguage } from "@/lib/language-context";
 import { useNotifications } from "@/lib/notification-context";
@@ -700,28 +721,39 @@ export default function POSScreen() {
 
     const pmLabel = pmMethod === "cash" ? "BAR" : pmMethod === "card" ? "KARTE" : pmMethod.toUpperCase();
     const orderId = saleData?.id || "";
+    const custAddress = custObj?.address || "";
+    const mapsUrl = custAddress ? `https://maps.google.com/?q=${encodeURIComponent(custAddress)}` : "";
 
-    const customerInner = generateThermalReceiptHTML(fullSale, qrDataUrl, { title: "KUNDENBELEG", isPartial: true });
-    const driverInner = generateThermalReceiptHTML(fullSale, null, { title: `FAHRERAUFTRAG #${orderId}`, isPartial: true });
-    const kitchenInner = generateThermalReceiptHTML(fullSale, null, { isKitchen: true, isPartial: true });
+    // Generate QR for customer address map (async, build receipt after)
+    const buildAndPrint = async () => {
+      let printQrDataUrl: string | null = null;
+      try {
+        const QRCode = require("qrcode");
+        const qrContent = mapsUrl || `barmagly:receipt:${saleData?.receiptNumber || saleData?.id}`;
+        printQrDataUrl = await QRCode.toDataURL(qrContent, { width: 200, margin: 1, color: { dark: "#000000", light: "#ffffff" } });
+      } catch { }
 
-    const driverFooter = `
-      <div style="border:1px solid #000;margin-top:12px;font-family:'Courier New',monospace;font-size:12px;color:#000;">
-        <div style="display:flex;border-bottom:1px solid #000;padding:10px 10px;">
-          <span style="font-weight:700;width:110px;min-width:110px;">FAHRER</span>
-          <span style="flex:1;">&nbsp;</span>
-        </div>
-        <div style="display:flex;border-bottom:1px solid #000;padding:10px 10px;">
-          <span style="font-weight:700;width:110px;min-width:110px;">LIEFERZEIT</span>
-          <span style="flex:1;">&nbsp;</span>
-        </div>
-        <div style="display:flex;padding:10px 10px;">
-          <span style="font-weight:700;width:110px;min-width:110px;">NOTIZ</span>
-          <span style="flex:1;font-style:italic;">${pmLabel}</span>
-        </div>
-      </div>`;
+      const customerInner = generateThermalReceiptHTML(fullSale, printQrDataUrl, { title: "KUNDENBELEG", isPartial: true });
+      const driverInner = generateThermalReceiptHTML(fullSale, null, { title: `FAHRERAUFTRAG #${orderId}`, isPartial: true });
+      const kitchenInner = generateThermalReceiptHTML(fullSale, null, { isKitchen: true, isPartial: true });
 
-    const combinedHtml = `<!DOCTYPE html>
+      const driverFooter = `
+        <div style="border:1px solid #000;margin-top:12px;font-family:'Courier New',monospace;font-size:12px;color:#000;">
+          <div style="display:flex;border-bottom:1px solid #000;padding:10px 10px;">
+            <span style="font-weight:700;width:110px;min-width:110px;">FAHRER</span>
+            <span style="flex:1;">&nbsp;</span>
+          </div>
+          <div style="display:flex;border-bottom:1px solid #000;padding:10px 10px;">
+            <span style="font-weight:700;width:110px;min-width:110px;">LIEFERZEIT</span>
+            <span style="flex:1;">&nbsp;</span>
+          </div>
+          <div style="display:flex;padding:10px 10px;">
+            <span style="font-weight:700;width:110px;min-width:110px;">NOTIZ</span>
+            <span style="flex:1;font-style:italic;">${pmLabel}</span>
+          </div>
+        </div>`;
+
+      const combinedHtml = `<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -745,12 +777,15 @@ export default function POSScreen() {
 </body>
 </html>`;
 
-    printWin.document.write(combinedHtml);
-    printWin.document.close();
-    setTimeout(() => {
-      printWin.focus();
-      printWin.print();
-    }, 500);
+      printWin.document.write(combinedHtml);
+      printWin.document.close();
+      setTimeout(() => {
+        printWin.focus();
+        printWin.print();
+      }, 500);
+    };
+
+    buildAndPrint();
   };
 
   const completeSaleAfterPayment = (saleData: any) => {
@@ -780,7 +815,11 @@ export default function POSScreen() {
       employeeName: empName,
       date: new Date().toLocaleString(),
     });
-    generateQR(`barmagly:receipt:${saleData.receiptNumber || saleData.id}`);
+    const custAddress = selectedCustomer?.address || "";
+    const qrContent = custAddress
+      ? `https://maps.google.com/?q=${encodeURIComponent(custAddress)}`
+      : `barmagly:receipt:${saleData.receiptNumber || saleData.id}`;
+    generateQR(qrContent);
     cart.clearCart();
     setPhoneInput("");
     setCallerCustomer(null);
@@ -926,6 +965,7 @@ export default function POSScreen() {
     }
     cart.addItem({ id: product.id, name: product.name, price: Number(product.price) });
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    else playClickSound("medium");
     triggerFlash(product.id);
   }, [cart, isPizzaProduct, triggerFlash]);
 
@@ -1348,16 +1388,16 @@ export default function POSScreen() {
             {/* ALL chip */}
             <Pressable
               style={[styles.catChip, !selectedCategory && styles.catChipActive]}
-              onPress={() => setSelectedCategory(null)}
+              onPress={() => { playClickSound("light"); setSelectedCategory(null); }}
             >
               {!selectedCategory ? (
                 <LinearGradient colors={[Colors.gradientStart, Colors.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.catChipGrad}>
-                  <Ionicons name="grid" size={14} color={Colors.white} />
+                  <Ionicons name="grid" size={17} color={Colors.white} />
                   <Text style={[styles.catChipText, { color: Colors.white }]}>{t("allCategories")}</Text>
                 </LinearGradient>
               ) : (
                 <View style={styles.catChipGrad}>
-                  <Ionicons name="grid" size={14} color={Colors.accent} />
+                  <Ionicons name="grid" size={17} color={Colors.accent} />
                   <Text style={styles.catChipText}>{t("allCategories")}</Text>
                 </View>
               )}
@@ -1370,11 +1410,11 @@ export default function POSScreen() {
                 <Pressable
                   key={cat.id}
                   style={[styles.catChip, isActive && { borderColor: color, backgroundColor: `${color}22` }]}
-                  onPress={() => setSelectedCategory(isActive ? null : cat.id)}
+                  onPress={() => { playClickSound("light"); setSelectedCategory(isActive ? null : cat.id); }}
                 >
                   <View style={styles.catChipGrad}>
                     <View style={[styles.catDot, { backgroundColor: color }]} />
-                    <Ionicons name={iconName} size={14} color={isActive ? color : Colors.textSecondary} />
+                    <Ionicons name={iconName} size={17} color={isActive ? color : Colors.textSecondary} />
                     <Text style={[styles.catChipText, isActive && { color, fontWeight: "700" }]}>{cat.name}</Text>
                   </View>
                 </Pressable>
@@ -1515,7 +1555,7 @@ export default function POSScreen() {
                 <View style={[styles.cartItemActions, isRTL && { flexDirection: "row-reverse" }]}>
                   <Pressable
                     style={[styles.qtyBtn, item.quantity === 1 && { backgroundColor: `${Colors.danger}22`, borderColor: Colors.danger }]}
-                    onPress={() => { cart.updateQuantity(item.id, item.quantity - 1); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                    onPress={() => { cart.updateQuantity(item.id, item.quantity - 1); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); else playClickSound("light"); }}
                   >
                     <Ionicons name={item.quantity === 1 ? "trash-outline" : "remove"} size={14} color={item.quantity === 1 ? Colors.danger : Colors.text} />
                   </Pressable>
@@ -1524,7 +1564,7 @@ export default function POSScreen() {
                   </View>
                   <Pressable
                     style={[styles.qtyBtn, { backgroundColor: `${Colors.accent}22`, borderColor: Colors.accent }]}
-                    onPress={() => { cart.updateQuantity(item.id, item.quantity + 1); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                    onPress={() => { cart.updateQuantity(item.id, item.quantity + 1); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); else playClickSound("light"); }}
                   >
                     <Ionicons name="add" size={14} color={Colors.accent} />
                   </Pressable>
@@ -1571,7 +1611,7 @@ export default function POSScreen() {
           <Animated.View style={{ transform: [{ scale: checkoutPulse }] }}>
             <Pressable
               style={[styles.checkoutBtn, !cart.items.length && styles.checkoutBtnDisabled]}
-              onPress={() => { if (cart.items.length > 0) { setPaymentConfirmed(false); setShowCheckout(true); } }}
+              onPress={() => { if (cart.items.length > 0) { playClickSound("heavy"); setPaymentConfirmed(false); setShowCheckout(true); } }}
               disabled={!cart.items.length}
             >
               <LinearGradient
@@ -1636,6 +1676,7 @@ export default function POSScreen() {
                             variant: v,
                           });
                           if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          else playClickSound("medium");
                           setSelectedProductForOptions(null);
                         }
                       }}
@@ -3009,11 +3050,11 @@ const styles = StyleSheet.create({
 
   // ── Category grid (no scroll, wraps automatically)
   categoriesGrid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 10, paddingVertical: 8, gap: 6 },
-  catChip: { flexDirection: "row", borderRadius: 20, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.cardBorder, overflow: "hidden" },
+  catChip: { flexDirection: "row", borderRadius: 24, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.cardBorder, overflow: "hidden" },
   catChipActive: { borderColor: Colors.accent, borderWidth: 2 },
-  catChipGrad: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, gap: 5 },
-  catChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600" },
-  catDot: { width: 7, height: 7, borderRadius: 3.5 },
+  catChipGrad: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 9, gap: 7 },
+  catChipText: { color: Colors.textSecondary, fontSize: 14, fontWeight: "600" },
+  catDot: { width: 9, height: 9, borderRadius: 4.5 },
 
   // ── Kept for compat (unused now)
   categoriesRow: { flexGrow: 0 },
