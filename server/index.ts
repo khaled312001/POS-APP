@@ -320,6 +320,7 @@ function configureExpoAndLanding(app: express.Application) {
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
   app.use("/objects", express.static(path.resolve(process.cwd(), "uploads")));
+  app.use("/sounds", express.static(path.resolve(process.cwd(), "public", "sounds")));
   // Serve project icon assets at the /app/assets/images path so the PWA manifest icons resolve
   app.use("/app/assets/images", express.static(path.resolve(process.cwd(), "assets", "images")));
   app.use("/app", express.static(path.resolve(process.cwd(), "dist"), {

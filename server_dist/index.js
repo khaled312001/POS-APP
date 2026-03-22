@@ -8971,6 +8971,7 @@ function configureExpoAndLanding(app2) {
   app2.use("/assets", express.static(path4.resolve(process.cwd(), "assets")));
   app2.use("/uploads", express.static(path4.resolve(process.cwd(), "uploads")));
   app2.use("/objects", express.static(path4.resolve(process.cwd(), "uploads")));
+  app2.use("/sounds", express.static(path4.resolve(process.cwd(), "public", "sounds")));
   app2.use("/app/assets/images", express.static(path4.resolve(process.cwd(), "assets", "images")));
   app2.use("/app", express.static(path4.resolve(process.cwd(), "dist"), {
     setHeaders(res, filePath) {

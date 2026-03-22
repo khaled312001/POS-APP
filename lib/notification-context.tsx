@@ -31,6 +31,19 @@ function getAudioContext(): AudioContext | null {
     }
 }
 
+// Preloaded Audio element for phone ring — much more reliable than Web Audio API
+let ringAudioEl: HTMLAudioElement | null = null;
+function getRingAudio(): HTMLAudioElement | null {
+    if (Platform.OS !== "web" || typeof window === "undefined") return null;
+    if (!ringAudioEl) {
+        ringAudioEl = new Audio("/sounds/ring.wav");
+        ringAudioEl.loop = false;
+        ringAudioEl.volume = 0.8;
+        ringAudioEl.load();
+    }
+    return ringAudioEl;
+}
+
 /**
  * Play a single bell strike at a given frequency.
  * Shape: instant attack → slow exponential decay (like a real bell).
@@ -87,72 +100,43 @@ function playRestaurantBell() {
 }
 
 /**
- * Phone ring sound: classic dual-tone (440 Hz + 480 Hz) pulsed in a
- * "BRRRING … BRRRING …" pattern.  Returns a `stop()` function.
+ * Phone ring sound using a preloaded WAV file — far more reliable than
+ * Web Audio API which is blocked by browser autoplay policies.
+ * Returns a `stop()` function.
  */
 function startPhoneRing(): () => void {
-    const ctx = getAudioContext();
-    if (!ctx) return () => { };
+    if (Platform.OS !== "web") return () => { };
 
     let stopped = false;
     let timers: ReturnType<typeof setTimeout>[] = [];
+    const audio = getRingAudio();
 
-    function scheduleOneBurst(delay: number) {
-        const t = timers.length;
-        timers.push(setTimeout(() => {
-            if (stopped) return;
-            try {
-                const now = ctx.currentTime;
-
-                // Two repeating beeps inside each 1.2 s burst
-                for (let i = 0; i < 2; i++) {
-                    const t0 = now + i * 0.55;
-
-                    const osc1 = ctx.createOscillator();
-                    const osc2 = ctx.createOscillator();
-                    const gainNode = ctx.createGain();
-
-                    osc1.type = "sine";
-                    osc2.type = "sine";
-                    osc1.frequency.value = 440;   // A4
-                    osc2.frequency.value = 480;   // slightly detuned
-                    gainNode.gain.setValueAtTime(0, t0);
-                    gainNode.gain.linearRampToValueAtTime(0.35, t0 + 0.02);
-                    gainNode.gain.setValueAtTime(0.35, t0 + 0.38);
-                    gainNode.gain.linearRampToValueAtTime(0, t0 + 0.42);
-
-                    osc1.connect(gainNode);
-                    osc2.connect(gainNode);
-                    gainNode.connect(ctx.destination);
-
-                    osc1.start(t0); osc1.stop(t0 + 0.45);
-                    osc2.start(t0); osc2.stop(t0 + 0.45);
-                }
-            } catch { }
-        }, delay));
+    function playOnce() {
+        if (stopped || !audio) return;
+        try {
+            audio.currentTime = 0;
+            const p = audio.play();
+            if (p) p.catch(() => { });
+        } catch { }
     }
 
-    function ring(repeatCount = 0) {
-        if (stopped || repeatCount > 8) return; // max ~18 s of ringing
-        scheduleOneBurst(0);
-        // silence for 1.8 s between bursts
-        timers.push(setTimeout(() => ring(repeatCount + 1), 1800));
+    function ring(count = 0) {
+        if (stopped || count > 8) return;
+        playOnce();
+        // ring.wav is ~1 second — wait 2 s between repeats
+        timers.push(setTimeout(() => ring(count + 1), 2000));
     }
 
-    const doRing = () => {
-        ring();
-    };
-
-    if (ctx.state === "suspended") {
-        ctx.resume().then(doRing).catch(() => { });
-    } else {
-        doRing();
-    }
+    ring();
 
     return () => {
         stopped = true;
         timers.forEach(clearTimeout);
         timers = [];
+        if (audio && !audio.paused) {
+            audio.pause();
+            audio.currentTime = 0;
+        }
     };
 }
 
