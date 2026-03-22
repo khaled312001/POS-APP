@@ -72,12 +72,11 @@ function playRestaurantBell() {
     const ctx = getAudioContext();
     if (!ctx) return;
 
-    // Resume if suspended (browser autoplay policy)
     const play = () => {
         const t = ctx.currentTime;
-        playBellStrike(ctx, 659.25, t, 0.55);       // E5
-        playBellStrike(ctx, 523.25, t + 0.35, 0.45); // C5
-        playBellStrike(ctx, 659.25, t + 0.70, 0.40); // E5 again (softer)
+        playBellStrike(ctx, 659.25, t, 0.55);
+        playBellStrike(ctx, 523.25, t + 0.35, 0.45);
+        playBellStrike(ctx, 659.25, t + 0.70, 0.40);
     };
 
     if (ctx.state === "suspended") {
@@ -85,6 +84,76 @@ function playRestaurantBell() {
     } else {
         play();
     }
+}
+
+/**
+ * Phone ring sound: classic dual-tone (440 Hz + 480 Hz) pulsed in a
+ * "BRRRING … BRRRING …" pattern.  Returns a `stop()` function.
+ */
+function startPhoneRing(): () => void {
+    const ctx = getAudioContext();
+    if (!ctx) return () => { };
+
+    let stopped = false;
+    let timers: ReturnType<typeof setTimeout>[] = [];
+
+    function scheduleOneBurst(delay: number) {
+        const t = timers.length;
+        timers.push(setTimeout(() => {
+            if (stopped) return;
+            try {
+                const now = ctx.currentTime;
+
+                // Two repeating beeps inside each 1.2 s burst
+                for (let i = 0; i < 2; i++) {
+                    const t0 = now + i * 0.55;
+
+                    const osc1 = ctx.createOscillator();
+                    const osc2 = ctx.createOscillator();
+                    const gainNode = ctx.createGain();
+
+                    osc1.type = "sine";
+                    osc2.type = "sine";
+                    osc1.frequency.value = 440;   // A4
+                    osc2.frequency.value = 480;   // slightly detuned
+                    gainNode.gain.setValueAtTime(0, t0);
+                    gainNode.gain.linearRampToValueAtTime(0.35, t0 + 0.02);
+                    gainNode.gain.setValueAtTime(0.35, t0 + 0.38);
+                    gainNode.gain.linearRampToValueAtTime(0, t0 + 0.42);
+
+                    osc1.connect(gainNode);
+                    osc2.connect(gainNode);
+                    gainNode.connect(ctx.destination);
+
+                    osc1.start(t0); osc1.stop(t0 + 0.45);
+                    osc2.start(t0); osc2.stop(t0 + 0.45);
+                }
+            } catch { }
+        }, delay));
+    }
+
+    function ring(repeatCount = 0) {
+        if (stopped || repeatCount > 8) return; // max ~18 s of ringing
+        scheduleOneBurst(0);
+        // silence for 1.8 s between bursts
+        timers.push(setTimeout(() => ring(repeatCount + 1), 1800));
+    }
+
+    const doRing = () => {
+        ring();
+    };
+
+    if (ctx.state === "suspended") {
+        ctx.resume().then(doRing).catch(() => { });
+    } else {
+        doRing();
+    }
+
+    return () => {
+        stopped = true;
+        timers.forEach(clearTimeout);
+        timers = [];
+    };
 }
 
 // Session-scoped dismissed call IDs (cleared on tab/window close, not on navigation)
@@ -110,6 +179,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const wsRef = useRef<WebSocket | null>(null);
 
     const audioUnlockedRef = useRef(false);
+    // Holds the stop function for the currently playing ring
+    const stopRingRef = useRef<(() => void) | null>(null);
+    // Native haptic pulse interval
+    const hapticIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // Unlock AudioContext on first user gesture (browser autoplay policy)
     useEffect(() => {
@@ -138,6 +211,36 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             playRestaurantBell();
         } else {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+    }, []);
+
+    /** Start a repeating phone ring.  Safe to call multiple times — won't double-ring. */
+    const startCallRing = useCallback(() => {
+        // Don't start a new ring if one is already running
+        if (stopRingRef.current) return;
+
+        if (Platform.OS === "web") {
+            stopRingRef.current = startPhoneRing();
+        } else {
+            // Native: rapid haptic pulse every 800 ms
+            const pulse = () => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            };
+            pulse();
+            hapticIntervalRef.current = setInterval(pulse, 1800);
+            stopRingRef.current = () => { /* handled in stopCallRing */ };
+        }
+    }, []);
+
+    /** Stop the ring immediately. */
+    const stopCallRing = useCallback(() => {
+        if (stopRingRef.current) {
+            stopRingRef.current();
+            stopRingRef.current = null;
+        }
+        if (hapticIntervalRef.current) {
+            clearInterval(hapticIntervalRef.current);
+            hapticIntervalRef.current = null;
         }
     }, []);
 
@@ -182,7 +285,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                                 const filtered = prev.filter((c) => c.slot !== data.slot);
                                 return [...filtered, { ...data, id: callId }].slice(0, 4);
                             });
-                            if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                            // 🔔 Start phone ring sound
+                            startCallRing();
                         } else if (data.type === "active_calls" || data.type === "calls_update") {
                             const seen = getSeenCallIds();
                             const calls = (data.calls || data.allActiveCalls || [])
@@ -216,7 +320,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             if (ws) ws.close();
             clearTimeout(reconnectTimer);
         };
-    }, [qc, setOnlineOrderNotification, playNotificationSound, tenant?.id]);
+    }, [qc, setOnlineOrderNotification, playNotificationSound, startCallRing, tenant?.id]);
+
+    // Safety: stop ring if all calls are cleared externally (e.g. auto-dismiss timeout)
+    useEffect(() => {
+        if (incomingCalls.length === 0) stopCallRing();
+    }, [incomingCalls.length, stopCallRing]);
 
     // Polling is handled in _layout.tsx (which already queries /api/online-orders)
     // WebSocket above provides the real-time path; layout polling is the reliable fallback.
@@ -224,15 +333,19 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const dismissCall = useCallback((callId: string, slot: number) => {
         // Mark as seen so it won't re-appear after page refresh
         markCallSeen(callId);
-        // Remove from local state
-        setIncomingCalls((prev) => prev.filter((c) => c.id !== callId));
+        // Remove from local state — stop ring when all calls are gone
+        setIncomingCalls((prev) => {
+            const remaining = prev.filter((c) => c.id !== callId);
+            if (remaining.length === 0) stopCallRing();
+            return remaining;
+        });
         // Tell server to free the slot
         try {
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                 wsRef.current.send(JSON.stringify({ type: "call_answered", slot }));
             }
         } catch { }
-    }, []);
+    }, [stopCallRing]);
 
     return (
         <NotificationContext.Provider value={{

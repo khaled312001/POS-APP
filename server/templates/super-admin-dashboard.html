@@ -12,6 +12,7 @@
   <style>
     :root {
       --bg: #0A0E17;
+      --bg2: #0f1422;
       --sidebar: #0D1220;
       --card: rgba(18, 24, 38, 0.9);
       --pr: #2FD3C6;
@@ -58,26 +59,31 @@
     }
 
     .sb-logo {
-      padding: 22px 18px 16px;
-      border-bottom: 1px solid var(--bd)
+      padding: 22px 18px 18px;
+      border-bottom: 1px solid var(--bd);
+      background: linear-gradient(180deg, rgba(47,211,198,.04) 0%, transparent 100%)
     }
 
     .sb-brand {
       font-size: 16px;
-      font-weight: 700
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 30%, var(--pr));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text
     }
 
     .sb-badge {
       display: inline-block;
-      margin-top: 4px;
-      padding: 2px 8px;
+      margin-top: 5px;
+      padding: 2px 9px;
       background: var(--pr-dim);
       color: var(--pr);
       border: 1px solid var(--bd2);
       border-radius: 100px;
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 1px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
       text-transform: uppercase
     }
 
@@ -190,27 +196,27 @@
     }
 
     .topbar {
-      padding: 16px 28px;
+      padding: 14px 28px;
       border-bottom: 1px solid var(--bd);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: rgba(10, 14, 23, .8);
-      backdrop-filter: blur(8px);
+      background: rgba(10, 14, 23, .85);
+      backdrop-filter: blur(12px);
       position: sticky;
       top: 0;
       z-index: 50
     }
 
     .tb-title {
-      font-size: 17px;
+      font-size: 18px;
       font-weight: 700
     }
 
     .tb-sub {
       font-size: 12px;
       color: var(--mu);
-      margin-top: 1px
+      margin-top: 2px
     }
 
     .tb-r {
@@ -219,34 +225,45 @@
       gap: 10px
     }
 
+    .health-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 12px;
+      background: rgba(0,0,0,.3);
+      border: 1px solid var(--bd);
+      border-radius: 100px;
+      cursor: pointer;
+      transition: border-color .15s
+    }
+
+    .health-pill:hover {
+      border-color: var(--bd2)
+    }
+
     .hdot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
       background: var(--ok);
       box-shadow: 0 0 6px var(--ok);
-      animation: pulse 2s infinite
+      animation: pulse 2s infinite;
+      flex-shrink: 0
     }
 
     @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1
-      }
-
-      50% {
-        opacity: .5
-      }
+      0%, 100% { opacity: 1; transform: scale(1) }
+      50% { opacity: .6; transform: scale(.85) }
     }
 
     .hlabel {
       font-size: 12px;
-      color: var(--mu)
+      color: var(--mu);
+      font-weight: 500
     }
 
     .content {
-      padding: 26px;
+      padding: 28px;
       flex: 1
     }
 
@@ -271,33 +288,57 @@
       background: var(--card);
       border: 1px solid var(--bd);
       border-radius: 13px;
-      padding: 18px;
-      transition: border-color .2s
+      padding: 18px 20px;
+      transition: border-color .2s, box-shadow .2s, transform .15s;
+      position: relative;
+      overflow: hidden
+    }
+
+    .sc::before {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--pr), transparent);
+      opacity: 0;
+      transition: opacity .2s
     }
 
     .sc:hover {
-      border-color: var(--bd2)
+      border-color: var(--bd2);
+      box-shadow: 0 4px 20px rgba(47, 211, 198, .08);
+      transform: translateY(-1px)
+    }
+
+    .sc:hover::before {
+      opacity: 1
     }
 
     .sl {
-      font-size: 11px;
-      font-weight: 500;
+      font-size: 10px;
+      font-weight: 600;
       color: var(--mu);
       text-transform: uppercase;
-      letter-spacing: .5px;
-      margin-bottom: 7px
+      letter-spacing: .8px;
+      margin-bottom: 8px
     }
 
     .sv {
       font-size: 26px;
       font-weight: 800;
-      line-height: 1
+      line-height: 1;
+      background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,.75) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text
     }
 
     .ss {
       font-size: 11px;
       color: var(--mu);
-      margin-top: 3px
+      margin-top: 4px
     }
 
     /* ── TABLE ── */
@@ -316,15 +357,16 @@
     }
 
     thead th {
-      padding: 11px 14px;
+      padding: 11px 16px;
       text-align: left;
-      background: rgba(0, 0, 0, .25);
-      font-size: 11px;
-      font-weight: 600;
+      background: rgba(0, 0, 0, .3);
+      font-size: 10px;
+      font-weight: 700;
       color: var(--mu);
       text-transform: uppercase;
-      letter-spacing: .5px;
-      border-bottom: 1px solid var(--bd)
+      letter-spacing: .8px;
+      border-bottom: 1px solid var(--bd);
+      white-space: nowrap
     }
 
     tbody tr {
@@ -332,16 +374,20 @@
       transition: background .1s
     }
 
+    tbody tr:nth-child(even) {
+      background: rgba(255, 255, 255, .015)
+    }
+
     tbody tr:last-child {
       border-bottom: none
     }
 
     tbody tr:hover {
-      background: rgba(255, 255, 255, .025)
+      background: rgba(47, 211, 198, .04) !important
     }
 
     tbody td {
-      padding: 11px 14px;
+      padding: 12px 16px;
       vertical-align: middle
     }
 
@@ -349,46 +395,53 @@
     .badge {
       display: inline-flex;
       align-items: center;
-      padding: 2px 8px;
+      padding: 3px 9px;
       border-radius: 100px;
       font-size: 11px;
-      font-weight: 600
+      font-weight: 600;
+      letter-spacing: .2px
     }
 
     .bg {
       background: rgba(34, 197, 94, .12);
-      color: #22c55e;
-      border: 1px solid rgba(34, 197, 94, .2)
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, .25)
     }
 
     .br {
       background: rgba(239, 68, 68, .12);
-      color: #ef4444;
-      border: 1px solid rgba(239, 68, 68, .2)
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, .25)
     }
 
     .by {
       background: rgba(245, 158, 11, .12);
-      color: #f59e0b;
-      border: 1px solid rgba(245, 158, 11, .2)
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, .25)
     }
 
     .bb {
       background: rgba(59, 130, 246, .12);
       color: #60a5fa;
-      border: 1px solid rgba(59, 130, 246, .2)
+      border: 1px solid rgba(59, 130, 246, .25)
     }
 
     .bm {
       background: rgba(168, 85, 247, .12);
       color: #c084fc;
-      border: 1px solid rgba(168, 85, 247, .2)
+      border: 1px solid rgba(168, 85, 247, .25)
     }
 
     .bgr {
       background: rgba(148, 163, 184, .1);
       color: #94a3b8;
-      border: 1px solid rgba(148, 163, 184, .15)
+      border: 1px solid rgba(148, 163, 184, .18)
+    }
+
+    .bt {
+      background: rgba(47, 211, 198, .1);
+      color: var(--pr);
+      border: 1px solid var(--bd2)
     }
 
     /* ── BUTTONS ── */
@@ -396,14 +449,15 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 13px;
+      padding: 8px 14px;
       border-radius: 8px;
       font-size: 13px;
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
       border: none;
       transition: all .15s;
-      text-decoration: none
+      text-decoration: none;
+      white-space: nowrap
     }
 
     .btn svg {
@@ -413,37 +467,48 @@
 
     .btn-p {
       background: var(--pr);
-      color: #000
+      color: #0a1018;
+      font-weight: 700;
+      box-shadow: 0 2px 12px rgba(47, 211, 198, .3)
     }
 
     .btn-p:hover {
-      background: var(--pr2)
+      background: #38e8db;
+      box-shadow: 0 4px 16px rgba(47, 211, 198, .45);
+      transform: translateY(-1px)
+    }
+
+    .btn-p:active {
+      transform: translateY(0)
     }
 
     .btn-o {
-      background: transparent;
+      background: rgba(255,255,255,.04);
       color: var(--mu);
       border: 1px solid var(--bd)
     }
 
     .btn-o:hover {
       color: var(--tx);
-      border-color: var(--bd2)
+      border-color: var(--bd2);
+      background: rgba(47, 211, 198, .06)
     }
 
     .btn-d {
-      background: rgba(239, 68, 68, .1);
-      color: var(--danger);
+      background: rgba(239, 68, 68, .08);
+      color: #f87171;
       border: 1px solid rgba(239, 68, 68, .2)
     }
 
     .btn-d:hover {
-      background: rgba(239, 68, 68, .2)
+      background: rgba(239, 68, 68, .18);
+      border-color: rgba(239, 68, 68, .35)
     }
 
     .btn-sm {
-      padding: 4px 9px;
-      font-size: 11px
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600
     }
 
     /* ── CARDS ROW ── */
@@ -464,7 +529,13 @@
       background: var(--card);
       border: 1px solid var(--bd);
       border-radius: 13px;
-      padding: 18px
+      padding: 20px;
+      transition: border-color .2s, box-shadow .2s
+    }
+
+    .card:hover {
+      border-color: rgba(47, 211, 198, .12);
+      box-shadow: 0 2px 16px rgba(0,0,0,.2)
     }
 
     .ct {
@@ -489,7 +560,8 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: 14px;
-      flex-wrap: gap
+      gap: 8px;
+      flex-wrap: wrap
     }
 
     .sh-l {
@@ -503,8 +575,8 @@
     .mo {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, .75);
-      backdrop-filter: blur(4px);
+      background: rgba(0, 0, 0, .8);
+      backdrop-filter: blur(6px);
       display: none;
       align-items: center;
       justify-content: center;
@@ -517,58 +589,72 @@
     }
 
     .md {
-      background: #111827;
-      border: 1px solid var(--bd2);
+      background: #0f1624;
+      border: 1px solid rgba(47, 211, 198, .2);
       border-radius: 18px;
-      padding: 26px;
+      padding: 28px;
       width: 100%;
       max-width: 540px;
       max-height: 90vh;
-      overflow-y: auto
+      overflow-y: auto;
+      box-shadow: 0 24px 64px rgba(0,0,0,.6), 0 0 0 1px rgba(47,211,198,.06)
     }
+
+    .md::-webkit-scrollbar { width: 4px }
+    .md::-webkit-scrollbar-track { background: transparent }
+    .md::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px }
 
     .md-title {
       font-size: 16px;
       font-weight: 700;
-      margin-bottom: 18px
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--bd);
+      color: var(--tx)
     }
 
     .fr {
-      margin-bottom: 14px
+      margin-bottom: 15px
     }
 
     .fr label {
       display: block;
-      font-size: 11px;
-      font-weight: 500;
+      font-size: 10px;
+      font-weight: 700;
       color: var(--mu);
       text-transform: uppercase;
-      letter-spacing: .5px;
-      margin-bottom: 5px
+      letter-spacing: .8px;
+      margin-bottom: 6px
     }
 
     .fr input,
     .fr select,
     .fr textarea {
       width: 100%;
-      padding: 9px 11px;
-      background: rgba(0, 0, 0, .3);
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, .35);
       border: 1px solid var(--bd);
       border-radius: 8px;
       font-size: 13px;
       color: var(--tx);
       outline: none;
-      transition: border-color .15s
+      transition: border-color .15s, background .15s
     }
 
     .fr input:focus,
     .fr select:focus,
     .fr textarea:focus {
-      border-color: var(--pr)
+      border-color: var(--pr);
+      background: rgba(0,0,0,.5)
     }
 
     .fr select option {
       background: #111827
+    }
+
+    .fr textarea {
+      resize: vertical;
+      min-height: 72px
     }
 
     .fr-row {
@@ -581,18 +667,20 @@
       display: flex;
       gap: 8px;
       justify-content: flex-end;
-      margin-top: 18px
+      margin-top: 22px;
+      padding-top: 16px;
+      border-top: 1px solid var(--bd)
     }
 
     /* ── SPINNER ── */
     .spin {
-      width: 30px;
-      height: 30px;
-      border: 2px solid rgba(47, 211, 198, .15);
+      width: 28px;
+      height: 28px;
+      border: 2px solid rgba(47, 211, 198, .12);
       border-top-color: var(--pr);
       border-radius: 50%;
-      animation: spin .7s linear infinite;
-      margin: 32px auto
+      animation: spin .65s linear infinite;
+      margin: 36px auto
     }
 
     @keyframes spin {
@@ -601,96 +689,130 @@
       }
     }
 
+    /* skeleton shimmer */
+    @keyframes shimmer {
+      0% { background-position: -400px 0 }
+      100% { background-position: 400px 0 }
+    }
+
     .ls {
       text-align: center;
-      padding: 32px;
+      padding: 36px;
       color: var(--mu);
       font-size: 13px
+    }
+
+    .empty {
+      text-align: center;
+      color: var(--mu);
+      padding: 36px 20px;
+      font-size: 13px
+    }
+
+    .empty::before {
+      content: '○';
+      display: block;
+      font-size: 28px;
+      margin-bottom: 8px;
+      opacity: .3
     }
 
     /* ── TOAST ── */
     #toast {
       position: fixed;
-      bottom: 22px;
-      right: 22px;
+      bottom: 24px;
+      right: 24px;
       z-index: 9999;
-      background: #1e293b;
+      background: #1a2236;
       border: 1px solid var(--bd2);
-      border-radius: 10px;
-      padding: 11px 16px;
+      border-radius: 12px;
+      padding: 12px 18px;
       font-size: 13px;
-      font-weight: 500;
+      font-weight: 600;
       color: var(--tx);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
-      transform: translateY(80px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .5), 0 0 0 1px rgba(47,211,198,.08);
+      transform: translateY(100px) scale(.96);
       opacity: 0;
-      transition: all .3s;
-      pointer-events: none
+      transition: all .28s cubic-bezier(.34,1.56,.64,1);
+      pointer-events: none;
+      max-width: 360px;
+      min-width: 200px
     }
 
     #toast.show {
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
       opacity: 1
     }
 
     #toast.ok {
-      border-color: rgba(34, 197, 94, .4);
-      color: #22c55e
+      background: rgba(20, 40, 28, .95);
+      border-color: rgba(74, 222, 128, .35);
+      color: #4ade80
     }
 
     #toast.err {
-      border-color: rgba(239, 68, 68, .4);
-      color: #ef4444
+      background: rgba(40, 16, 16, .95);
+      border-color: rgba(248, 113, 113, .35);
+      color: #f87171
     }
 
     /* ── SEARCH ── */
     .srch {
-      padding: 9px 12px;
-      background: rgba(0, 0, 0, .2);
+      padding: 9px 14px;
+      background: rgba(0, 0, 0, .25);
       border: 1px solid var(--bd);
       border-radius: 9px;
       font-size: 13px;
       color: var(--tx);
       outline: none;
-      width: 220px;
-      transition: border-color .15s
+      width: 230px;
+      transition: border-color .15s, background .15s
     }
 
     .srch:focus {
-      border-color: var(--bd2)
+      border-color: var(--bd2);
+      background: rgba(0,0,0,.35)
     }
 
     .srch::placeholder {
-      color: var(--mu)
+      color: rgba(148,163,184,.6)
     }
 
     /* ── TABS ── */
     .tabs {
       display: flex;
-      gap: 4px;
-      margin-bottom: 20px;
+      gap: 2px;
+      margin-bottom: 22px;
       border-bottom: 1px solid var(--bd);
-      padding-bottom: 0
+      padding-bottom: 0;
+      overflow-x: auto;
+      scrollbar-width: none
     }
 
+    .tabs::-webkit-scrollbar { display: none }
+
     .tab {
-      padding: 9px 16px;
+      padding: 10px 18px;
       font-size: 13px;
       font-weight: 500;
       color: var(--mu);
       cursor: pointer;
       border-bottom: 2px solid transparent;
       transition: all .15s;
-      margin-bottom: -1px
+      margin-bottom: -1px;
+      white-space: nowrap;
+      border-radius: 6px 6px 0 0
     }
 
     .tab:hover {
-      color: var(--tx)
+      color: var(--tx);
+      background: rgba(255,255,255,.03)
     }
 
     .tab.active {
       color: var(--pr);
-      border-bottom-color: var(--pr)
+      border-bottom-color: var(--pr);
+      background: var(--pr-dim)
     }
 
     .tab-panel {
@@ -711,7 +833,7 @@
     }
 
     .store-sel select {
-      padding: 10px 14px;
+      padding: 10px 16px;
       background: var(--card);
       border: 1px solid var(--bd2);
       border-radius: 10px;
@@ -719,7 +841,13 @@
       font-weight: 600;
       color: var(--tx);
       outline: none;
-      min-width: 280px
+      min-width: 280px;
+      cursor: pointer;
+      transition: border-color .15s
+    }
+
+    .store-sel select:focus {
+      border-color: var(--pr)
     }
 
     .store-sel select option {
@@ -737,31 +865,85 @@
       border-top: 1px solid var(--bd)
     }
 
+    /* ── SECTION TITLE ── */
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--tx)
+    }
+
+    /* ── CARD ACTION BAR ── */
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap
+    }
+
+    /* ── AVATAR ── */
+    .tav {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: var(--pr-dim);
+      border: 1px solid var(--bd2);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--pr);
+      flex-shrink: 0;
+      vertical-align: middle;
+      margin-right: 8px
+    }
+
+    /* ── EXPIRING HIGHLIGHT ── */
+    .row-warn td {
+      background: rgba(245, 158, 11, .04) !important
+    }
+
+    .row-warn:hover td {
+      background: rgba(245, 158, 11, .07) !important
+    }
+
+    /* scrollbar global */
+    ::-webkit-scrollbar { width: 5px; height: 5px }
+    ::-webkit-scrollbar-track { background: transparent }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 3px }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.15) }
+
     /* ── HEALTH GRID ── */
     .hg {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: 10px
+      gap: 12px
     }
 
     .hi {
-      background: rgba(0, 0, 0, .2);
+      background: rgba(0, 0, 0, .25);
       border: 1px solid var(--bd);
-      border-radius: 10px;
-      padding: 13px;
-      text-align: center
+      border-radius: 11px;
+      padding: 15px;
+      text-align: center;
+      transition: border-color .15s
+    }
+
+    .hi:hover {
+      border-color: var(--bd2)
     }
 
     .hv {
-      font-size: 20px;
-      font-weight: 700;
+      font-size: 22px;
+      font-weight: 800;
       color: var(--pr)
     }
 
     .hl {
       font-size: 11px;
       color: var(--mu);
-      margin-top: 3px
+      margin-top: 4px;
+      font-weight: 500
     }
 
     /* color dot */
@@ -771,13 +953,6 @@
       border-radius: 50%;
       display: inline-block;
       flex-shrink: 0
-    }
-
-    .empty {
-      text-align: center;
-      color: var(--mu);
-      padding: 28px;
-      font-size: 13px
     }
   </style>
 </head>
@@ -886,17 +1061,22 @@
         <div class="tb-sub" id="vSub">Platform overview</div>
       </div>
       <div class="tb-r">
-        <div class="hdot" id="hdot"></div><span class="hlabel" id="hlabel">Checking...</span>
+        <div class="health-pill" onclick="show('system')" title="View system health">
+          <div class="hdot" id="hdot"></div>
+          <span class="hlabel" id="hlabel">Checking…</span>
+        </div>
       </div>
     </div>
     <div class="content">
 
       <!-- ══════════ DASHBOARD ══════════ -->
       <div class="view active" id="view-dashboard">
+        <div class="sh" style="margin-bottom:20px">
+          <div style="font-size:13px;color:var(--mu)">Platform overview — all tenants and activity</div>
+          <button class="btn btn-o" onclick="loadDash()">↻ Refresh</button>
+        </div>
         <div class="sg" id="sg">
-          <div class="ls">
-            <div class="spin"></div>
-          </div>
+          <div class="ls"><div class="spin"></div></div>
         </div>
         <div class="cr">
           <div class="card">
@@ -904,18 +1084,14 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16" />
               </svg>Active Stores</div>
-            <div id="storeList">
-              <div class="spin"></div>
-            </div>
+            <div id="storeList"><div class="spin"></div></div>
           </div>
           <div class="card">
             <div class="ct"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>Revenue by Tenant</div>
-            <div id="revList">
-              <div class="spin"></div>
-            </div>
+            <div id="revList"><div class="spin"></div></div>
           </div>
         </div>
       </div>
@@ -1336,12 +1512,13 @@
         </div>
         <div class="card">
           <div class="ct">Recent Commission Transactions</div>
-          <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">
-            <input id="commTenantFilter" type="number" placeholder="Filter by Tenant ID…"
-              style="padding:8px 10px;background:rgba(0,0,0,.3);border:1px solid var(--bd);border-radius:8px;font-size:13px;color:var(--tx);outline:none;width:180px" />
-            <button class="btn btn-o" onclick="loadCommissionTx()">Filter</button>
-            <button class="btn btn-p"
-              onclick="document.getElementById('commTenantFilter').value='';loadCommissionTx()">All</button>
+          <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="commTenantFilter"
+              style="padding:8px 12px;background:rgba(0,0,0,.3);border:1px solid var(--bd);border-radius:8px;font-size:13px;color:var(--tx);outline:none;min-width:200px">
+              <option value="">All Tenants</option>
+            </select>
+            <button class="btn btn-p" onclick="loadCommissionTx()">Apply Filter</button>
+            <button class="btn btn-o" onclick="document.getElementById('commTenantFilter').value='';loadCommissionTx()">Clear</button>
           </div>
           <div class="tw">
             <table>
@@ -1399,15 +1576,16 @@
               <tr>
                 <th>Tenant</th>
                 <th>Title</th>
+                <th>Message</th>
                 <th>Type</th>
                 <th>Priority</th>
-                <th>Read</th>
+                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="nTbl">
               <tr>
-                <td colspan="6" class="ls">
+                <td colspan="7" class="ls">
                   <div class="spin"></div>
                 </td>
               </tr>
@@ -1435,7 +1613,7 @@
             <thead>
               <tr>
                 <th>Store</th>
-                <th>Owner</th>
+                <th>Owner Name</th>
                 <th>Type</th>
                 <th>Status</th>
                 <th>Branches</th>
@@ -1501,7 +1679,8 @@
           <table>
             <thead>
               <tr>
-                <th>Store (Tenant ID)</th>
+                <th>Store</th>
+                <th>Branch</th>
                 <th>Category</th>
                 <th>Amount</th>
                 <th>Description</th>
@@ -1579,7 +1758,7 @@
           </div>
         </div>
         <div class="sh">
-          <div class="section-title" style="font-size:14px;font-weight:700">Backup Files</div>
+          <div class="section-title">Backup Files</div>
           <button class="btn btn-o" onclick="loadBackups()">↻ Refresh</button>
         </div>
         <div class="tw">
@@ -1605,13 +1784,29 @@
 
       <!-- ══════════ SETTINGS ══════════ -->
       <div class="view" id="view-settings">
-        <div class="card" style="max-width:460px">
-          <div class="ct">Change Password</div>
-          <div class="fr"><label>Current Password</label><input type="password" id="cp1" placeholder="••••••••"></div>
-          <div class="fr"><label>New Password</label><input type="password" id="cp2" placeholder="••••••••"></div>
-          <div class="fr"><label>Confirm New Password</label><input type="password" id="cp3" placeholder="••••••••">
+        <div class="cr" style="max-width:680px">
+          <div class="card">
+            <div class="ct">Account Info</div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <div style="width:48px;height:48px;border-radius:14px;background:var(--pr-dim);border:1px solid var(--bd2);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:var(--pr)" id="settingsInit">S</div>
+              <div>
+                <div style="font-size:16px;font-weight:700" id="settingsName">Super Admin</div>
+                <div style="font-size:12px;color:var(--mu)" id="settingsEmail">admin@barmagly.com</div>
+              </div>
+            </div>
+            <div style="padding:10px 14px;background:rgba(0,0,0,.2);border:1px solid var(--bd);border-radius:9px;font-size:13px;color:var(--mu)">
+              Role: <strong style="color:var(--pr)">Super Administrator</strong>
+            </div>
           </div>
-          <button class="btn btn-p" onclick="changePwd()">Update Password</button>
+          <div class="card">
+            <div class="ct">Change Password</div>
+            <div class="fr"><label>Current Password</label><input type="password" id="cp1" placeholder="••••••••"></div>
+            <div class="fr"><label>New Password</label><input type="password" id="cp2" placeholder="••••••••"></div>
+            <div class="fr"><label>Confirm New Password</label><input type="password" id="cp3" placeholder="••••••••"></div>
+            <div class="ma" style="margin-top:12px;padding-top:12px">
+              <button class="btn btn-p" onclick="changePwd()">Update Password</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1656,23 +1851,27 @@
           </div>
           <div class="card">
             <div class="ct">QR Code</div>
-            <div id="waQrArea" style="text-align:center;padding:16px">
-              <div style="color:var(--mu);font-size:13px">Click "Connect WhatsApp" to generate a QR code.<br>Scan it
-                with the WhatsApp mobile app.</div>
+            <div id="waQrArea" style="text-align:center;padding:20px 16px">
+              <div style="font-size:32px;margin-bottom:10px;opacity:.4">📱</div>
+              <div style="color:var(--mu);font-size:13px;line-height:1.6">Click <strong style="color:var(--tx)">"Connect WhatsApp"</strong> to generate a QR code.<br>Then scan it with the WhatsApp mobile app.</div>
             </div>
           </div>
         </div>
         <div class="cr" style="margin-top:16px">
           <div class="card">
             <div class="ct">Test Message</div>
-            <p style="font-size:13px;color:var(--mu);margin-bottom:12px">Send a test message to the admin phone to
-              verify the connection is working.</p>
-            <button class="btn btn-p" id="waTestBtn" onclick="waTest()" disabled
-              style="opacity:0.5;cursor:not-allowed">📱 Send Test Message</button>
+            <p style="font-size:13px;color:var(--mu);margin-bottom:12px">Send a test message to verify the connection is working.</p>
+            <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+              <input id="waTestPhone" type="tel" placeholder="+201010254819" value="+201010254819"
+                style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--bd);background:var(--bg2);color:var(--tx);font-size:13px;outline:none" />
+              <button class="btn btn-p" id="waTestBtn" onclick="waTest()" disabled
+                style="opacity:0.5;cursor:not-allowed;white-space:nowrap">📱 Send Test</button>
+            </div>
+            <p style="font-size:11px;color:var(--mu)">Admin WhatsApp: <strong>+201204593124</strong></p>
           </div>
           <div class="card">
             <div class="ct">Connection Log</div>
-            <div id="waLog" style="max-height:200px;overflow-y:auto;font-size:12px;color:var(--mu)">No events yet</div>
+            <div id="waLog" style="max-height:240px;overflow-y:auto;font-size:12px;color:var(--mu);font-family:monospace">No events yet</div>
           </div>
         </div>
       </div>
@@ -2029,8 +2228,16 @@
     if (!token) location.href = '/super-admin/login';
     try {
       const u = JSON.parse(localStorage.getItem('super_admin_user') || '{}');
-      if (u.name) { document.getElementById('adminName').textContent = u.name; document.getElementById('adminInit').textContent = u.name[0].toUpperCase(); }
-      if (u.email) document.getElementById('adminEmail').textContent = u.email;
+      if (u.name) {
+        document.getElementById('adminName').textContent = u.name;
+        document.getElementById('adminInit').textContent = u.name[0].toUpperCase();
+        document.getElementById('settingsName').textContent = u.name;
+        document.getElementById('settingsInit').textContent = u.name[0].toUpperCase();
+      }
+      if (u.email) {
+        document.getElementById('adminEmail').textContent = u.email;
+        document.getElementById('settingsEmail').textContent = u.email;
+      }
     } catch (e) { }
 
     /* ══════════════════════════════════════════════════════
@@ -2182,19 +2389,33 @@
       const sl = document.getElementById('storeList');
       if (!stores || !stores.length) { sl.innerHTML = '<div class="ls">No stores yet.</div>'; }
       else sl.innerHTML = stores.slice(0, 8).map(s => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)">
-      <div><div style="font-size:13px;font-weight:600">${s.businessName}</div><div style="font-size:11px;color:var(--mu)">${s.branchCount} branches · ${s.employeeCount} employees</div></div>
-      ${badge(s.status)}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--bd)">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="tav">${(s.businessName || '?')[0].toUpperCase()}</div>
+        <div>
+          <div style="font-size:13px;font-weight:600">${s.businessName}</div>
+          <div style="font-size:11px;color:var(--mu)">${s.branchCount} branches · ${s.employeeCount} employees</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">${badge(s.status)}${s.activeSub ? `<span class="badge bt">${s.activeSub.planType || 'sub'}</span>` : ''}</div>
     </div>`).join('');
       // Revenue
       const rev = await api('GET', '/analytics/revenue');
       const rl = document.getElementById('revList');
       if (!rev?.revenueByTenant?.length) { rl.innerHTML = '<div class="ls">No revenue data.</div>'; }
-      else rl.innerHTML = rev.revenueByTenant.slice(0, 8).map(r => `
-    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd)">
-      <span style="font-size:13px;font-weight:500">${r.businessName}</span>
-      <span style="font-size:13px;color:var(--pr);font-weight:700">${fmtM(r.revenue)}</span>
+      else {
+        const maxRev = Math.max(...rev.revenueByTenant.map(r => r.revenue), 1);
+        rl.innerHTML = rev.revenueByTenant.slice(0, 8).map(r => `
+    <div style="padding:10px 0;border-bottom:1px solid var(--bd)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span style="font-size:13px;font-weight:500">${r.businessName}</span>
+        <span style="font-size:13px;color:var(--pr);font-weight:700">${fmtM(r.revenue)}</span>
+      </div>
+      <div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
+        <div style="height:100%;width:${Math.round((r.revenue/maxRev)*100)}%;background:linear-gradient(90deg,var(--pr),var(--pr2));border-radius:2px"></div>
+      </div>
     </div>`).join('');
+      }
     }
 
     /* ══════════════════════════════════════════════════════
@@ -2476,7 +2697,7 @@
     <td style="font-family:monospace;font-size:12px">${e.pin || '—'}</td>
     <td style="color:var(--mu)">${brMap[e.branchId] || '—'}</td>
     <td>${badge(e.isActive !== false ? 'active' : 'inactive')}</td>
-    <td>${iBtn('✏️', 'btn-o', `editEmp(${e.id})`)}${iBtn('🔑', 'btn-o', `resetEmpPwd(${e.id},'${e.name.replace(/'/g, "\\'")}')`,)}${iBtn('🗑️', 'btn-d', `delEmp(${e.id},'${e.name.replace(/'/g, "\\'")}')`)}</td>
+    <td>${iBtn('✏️', 'btn-o', `editEmp(${e.id})`)}${iBtn('🔑', 'btn-o', `resetEmpPwd(${e.id},'${e.name.replace(/'/g, "\\'")}')`) }${iBtn('🗑️', 'btn-d', `delEmp(${e.id},'${e.name.replace(/'/g, "\\'")}')`)}</td>
   </tr>`).join('') || '<tr><td colspan="6" class="empty">No employees yet</td></tr>';
     }
     function editEmp(id) {
@@ -2648,13 +2869,18 @@
     async function loadTenants() {
       allTenants = await api('GET', '/tenants') || [];
       document.getElementById('tTbl').innerHTML = allTenants.map(t => `<tr>
-    <td style="color:var(--mu)">#${t.id}</td>
-    <td><div style="font-weight:600">${t.businessName}</div><div style="font-size:11px;color:var(--mu)">${t.ownerEmail}</div></td>
-    <td>${t.ownerName}</td>
+    <td style="color:var(--mu);font-size:12px">#${t.id}</td>
+    <td>
+      <div style="display:flex;align-items:center;gap:9px">
+        <div class="tav">${(t.businessName || '?')[0].toUpperCase()}</div>
+        <div><div style="font-weight:600">${t.businessName}</div><div style="font-size:11px;color:var(--mu)">${t.ownerEmail}</div></div>
+      </div>
+    </td>
+    <td style="color:var(--mu)">${t.ownerName}</td>
     <td>${badge(t.storeType || 'retail')}</td>
     <td>${badge(t.status)}</td>
-    <td style="font-size:12px;color:var(--mu)">${t.maxBranches}br / ${t.maxEmployees}emp</td>
-    <td>${iBtn('🏪', 'btn-p btn-sm', `gotoStore(${t.id})`)}${iBtn('🗑️', 'btn-d', `delTenant(${t.id},'${t.businessName.replace(/'/g, "\\'")}')`)}</td>
+    <td style="font-size:12px;color:var(--mu)">${t.maxBranches} br / ${t.maxEmployees} emp</td>
+    <td style="white-space:nowrap">${iBtn('View Store', 'btn-p btn-sm', `gotoStore(${t.id})`)} ${iBtn('🗑', 'btn-d btn-sm', `delTenant(${t.id},'${t.businessName.replace(/'/g, "\\'")}')`)}</td>
   </tr>`).join('') || '<tr><td colspan="7" class="empty">No tenants yet</td></tr>';
     }
     function gotoStore(id) { document.getElementById('storePicker').value = id; show('storemanager'); }
@@ -2676,18 +2902,26 @@
     ══════════════════════════════════════════════════════ */
     async function loadSubs() {
       const subs = await api('GET', '/subscriptions') || [];
-      document.getElementById('subTbl').innerHTML = subs.map(s => `<tr>
-    <td style="color:var(--mu)">#${s.id}</td>
-    <td>${s.tenant?.businessName || s.tenantId}</td>
-    <td><div style="font-weight:600">${s.planName}</div><div style="font-size:11px;color:var(--mu)">${s.planType}</div></td>
+      const now = new Date();
+      const in7 = new Date(now.getTime() + 7 * 86400000);
+      document.getElementById('subTbl').innerHTML = subs.map(s => {
+        const end = s.endDate ? new Date(s.endDate) : null;
+        const expiring = end && end > now && end <= in7 && s.status === 'active';
+        const expired = end && end < now;
+        const rowClass = expiring ? 'row-warn' : '';
+        return `<tr class="${rowClass}">
+    <td style="color:var(--mu);font-size:12px">#${s.id}</td>
+    <td style="font-weight:500">${s.tenant?.businessName || 'Tenant #' + s.tenantId}</td>
+    <td><div style="font-weight:600">${s.planName}</div><div style="font-size:11px;color:var(--mu);text-transform:capitalize">${s.planType}</div></td>
     <td>${badge(s.status)}</td>
     <td style="color:var(--pr);font-weight:700">${fmtM(s.price)}</td>
-    <td>${fmtD(s.endDate)}</td>
-    <td>
-      ${iBtn('+30d', 'btn-o', `extSub(${s.id})`)}
-      ${iBtn('🗑️', 'btn-d', `delSub(${s.id})`)}
+    <td style="${expiring ? 'color:var(--warn);font-weight:600' : expired ? 'color:var(--danger)' : ''}">${fmtD(s.endDate)}${expiring ? ' ⚠️' : ''}</td>
+    <td style="white-space:nowrap">
+      ${iBtn('+30 days', 'btn-o btn-sm', `extSub(${s.id})`)}
+      ${iBtn('🗑', 'btn-d btn-sm', `delSub(${s.id})`)}
     </td>
-  </tr>`).join('') || '<tr><td colspan="7" class="empty">No subscriptions</td></tr>';
+  </tr>`;
+      }).join('') || '<tr><td colspan="7" class="empty">No subscriptions</td></tr>';
     }
     async function saveSub() {
       const body = { tenantId: parseInt(document.getElementById('sTenant').value), planType: document.getElementById('sPlan').value, planName: document.getElementById('sPlanName').value, price: document.getElementById('sPrice').value, status: document.getElementById('sStatus').value };
@@ -2807,15 +3041,18 @@
        NOTIFICATIONS
     ══════════════════════════════════════════════════════ */
     async function loadNotifs() {
+      if (!allTenants.length) allTenants = await api('GET', '/tenants') || [];
+      const tMap = Object.fromEntries(allTenants.map(t => [t.id, t.businessName]));
       const notifs = await api('GET', '/tenant-notifications') || [];
-      document.getElementById('nTbl').innerHTML = notifs.map(n => `<tr>
-    <td>${n.tenantId}</td>
-    <td style="font-weight:500">${n.title}</td>
-    <td>${badge(n.type)}</td>
-    <td>${badge(n.priority)}</td>
-    <td>${n.isRead ? '<span style="color:var(--ok)">Yes</span>' : '<span style="color:var(--mu)">No</span>'}</td>
-    <td>${!n.isRead ? iBtn('✓', 'btn-o', `markRead(${n.id})`) : ''}</td>
-  </tr>`).join('') || '<tr><td colspan="6" class="empty">No notifications</td></tr>';
+      document.getElementById('nTbl').innerHTML = notifs.map(notif => `<tr>
+    <td style="font-weight:500">${tMap[notif.tenantId] || 'Tenant #' + notif.tenantId}</td>
+    <td style="font-weight:600">${notif.title}</td>
+    <td style="color:var(--mu);font-size:12px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${notif.message || '—'}</td>
+    <td>${badge(notif.type)}</td>
+    <td>${badge(notif.priority)}</td>
+    <td>${notif.isRead ? '<span style="color:var(--ok)">✓ Read</span>' : '<span style="color:var(--mu)">Unread</span>'}</td>
+    <td>${!notif.isRead ? iBtn('✓ Mark Read', 'btn-o btn-sm', `markRead(${notif.id})`) : ''}</td>
+  </tr>`).join('') || '<tr><td colspan="7" class="empty">No notifications yet</td></tr>';
     }
     async function sendNotif() {
       const body = { tenantId: parseInt(document.getElementById('nTenant').value), title: document.getElementById('nTitle').value, message: document.getElementById('nMsg').value, type: document.getElementById('nType').value, priority: document.getElementById('nPri').value };
@@ -3036,7 +3273,7 @@
       ].map(x => `<div class="sc"><div class="sl">${x.l}</div><div class="sv">${x.v}</div></div>`).join('');
       document.getElementById('rptTbl').innerHTML = reportData.map(r => `<tr>
     <td><div style="font-weight:600">${r.businessName}</div><div style="font-size:11px;color:var(--mu)">${r.ownerEmail}</div></td>
-    <td style="color:var(--mu)">${r.ownerEmail}</td>
+    <td style="color:var(--mu)">${r.ownerName || '—'}</td>
     <td>${badge(r.storeType || 'retail')}</td>
     <td>${badge(r.status)}</td>
     <td style="text-align:center">${r.branches}</td>
@@ -3062,12 +3299,21 @@
     ══════════════════════════════════════════════════════ */
     async function loadActivity() {
       const log = await api('GET', '/activity?limit=300') || [];
+      const actionColor = a => {
+        if (!a) return 'bgr';
+        const s = a.toLowerCase();
+        if (s.includes('delete') || s.includes('remove')) return 'br';
+        if (s.includes('create') || s.includes('add') || s.includes('register')) return 'bg';
+        if (s.includes('update') || s.includes('edit') || s.includes('change')) return 'bb';
+        if (s.includes('login') || s.includes('auth')) return 'bm';
+        return 'bgr';
+      };
       document.getElementById('actTbl').innerHTML = log.map(e => `<tr>
     <td style="color:var(--mu);font-size:12px;white-space:nowrap">${fmtDT(e.createdAt)}</td>
-    <td>${badge(e.action || 'action')}</td>
-    <td style="font-size:12px">${e.entityType || '—'} ${e.entityId ? '#' + e.entityId : ''}</td>
-    <td style="font-size:12px;color:var(--mu);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.details || '—'}</td>
-    <td style="color:var(--mu)">${e.employeeId ? '#' + e.employeeId : '—'}</td>
+    <td><span class="badge ${actionColor(e.action)}">${e.action || 'action'}</span></td>
+    <td style="font-size:12px;font-weight:500">${e.entityType || '—'}${e.entityId ? ' <span style="color:var(--mu)">#' + e.entityId + '</span>' : ''}</td>
+    <td style="font-size:12px;color:var(--mu);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.details || '').replace(/"/g, '&quot;')}">${e.details || '—'}</td>
+    <td style="color:var(--mu);font-size:12px">${e.employeeId ? 'Emp #' + e.employeeId : '—'}</td>
   </tr>`).join('') || '<tr><td colspan="5" class="empty">No activity yet</td></tr>';
     }
 
@@ -3075,6 +3321,7 @@
        EXPENSES
     ══════════════════════════════════════════════════════ */
     async function loadExpenses() {
+      if (!allTenants.length) allTenants = await api('GET', '/tenants') || [];
       const [expenses, byTenant] = await Promise.all([
         api('GET', '/expenses'),
         api('GET', '/expenses/by-tenant'),
@@ -3091,13 +3338,15 @@
         const extra = byTenant.filter(t => t.totalExpenses > 0).map(t => `<div class="sc"><div class="sl">${t.businessName}</div><div class="sv" style="font-size:18px">${fmtM(t.totalExpenses)}</div></div>`).join('');
         document.getElementById('expStats').innerHTML += extra;
       }
+      const tNameMap = Object.fromEntries((allTenants || []).map(t => [t.id, t.businessName]));
       document.getElementById('expTbl').innerHTML = arr.map(e => `<tr>
-    <td style="color:var(--mu)">Tenant ${e.tenantId || '—'} / Branch ${e.branchId || '—'}</td>
+    <td style="font-weight:500">${tNameMap[e.tenantId] || ('Tenant #' + (e.tenantId || '—'))}</td>
+    <td style="color:var(--mu);font-size:12px">${e.branchId ? 'Branch #' + e.branchId : '—'}</td>
     <td>${badge(e.category || 'other')}</td>
     <td style="font-weight:700;color:var(--danger)">${fmtM(e.amount)}</td>
     <td style="color:var(--mu)">${e.description || '—'}</td>
-    <td style="color:var(--mu)">${fmtD(e.date || e.createdAt)}</td>
-  </tr>`).join('') || '<tr><td colspan="5" class="empty">No expenses recorded</td></tr>';
+    <td style="color:var(--mu);font-size:12px">${fmtD(e.date || e.createdAt)}</td>
+  </tr>`).join('') || '<tr><td colspan="6" class="empty">No expenses recorded</td></tr>';
     }
 
     /* ══════════════════════════════════════════════════════
@@ -3178,6 +3427,10 @@
       // Load current rate
       const settings = await api('GET', '/commission/settings');
       if (settings) { document.getElementById('commRateInput').value = settings.commissionRate; }
+      // Populate tenant filter
+      if (!allTenants.length) allTenants = await api('GET', '/tenants') || [];
+      const sel = document.getElementById('commTenantFilter');
+      sel.innerHTML = '<option value="">All Tenants</option>' + allTenants.map(t => `<option value="${t.id}">${t.businessName}</option>`).join('');
       // Load summary
       await loadCommissionSummary();
       // Load transactions
@@ -3212,9 +3465,10 @@
       const txs = await api('GET', url);
       const tbl = document.getElementById('commTxTbl');
       if (!txs) { tbl.innerHTML = '<tr><td colspan="8" class="empty">Failed to load</td></tr>'; return; }
+      const tMap = Object.fromEntries((allTenants || []).map(t => [t.id, t.businessName]));
       tbl.innerHTML = txs.map(tx => `<tr>
     <td style="color:var(--mu);font-size:11px">${tx.id}</td>
-    <td>${tx.tenantId}</td>
+    <td style="font-weight:500">${tMap[tx.tenantId] || 'Tenant #' + tx.tenantId}</td>
     <td style="color:var(--mu)">${tx.orderId || '—'}</td>
     <td style="text-align:right">${fmtM(tx.saleTotal)}</td>
     <td style="text-align:right;color:var(--mu)">${parseFloat(tx.commissionRate || 0).toFixed(1)}%</td>
@@ -3247,10 +3501,16 @@
       const txt = document.getElementById('waStatusText');
       const btnC = document.getElementById('waBtnConnect');
       const btnD = document.getElementById('waBtnDisconnect');
+      const statusLabels = {
+        disconnected: '🔴 Disconnected',
+        connecting: '🟡 Connecting — please wait…',
+        qr_ready: '🟡 QR Ready — scan with WhatsApp',
+        connected: '🟢 Connected'
+      };
       const colors = { disconnected: 'var(--danger)', connecting: 'var(--warn)', qr_ready: 'var(--warn)', connected: 'var(--ok)' };
       dot.style.background = colors[d.status] || 'var(--danger)';
-      dot.style.boxShadow = '0 0 6px ' + (colors[d.status] || 'var(--danger)');
-      txt.textContent = d.status.replace('_', ' ').replace(/^./, c => c.toUpperCase());
+      dot.style.boxShadow = d.status === 'connected' ? '0 0 8px var(--ok)' : '0 0 6px ' + (colors[d.status] || 'var(--danger)');
+      txt.textContent = statusLabels[d.status] || d.status;
       const testBtn = document.getElementById('waTestBtn');
       if (d.status === 'connected') {
         btnC.style.display = 'none'; btnD.style.display = '';
@@ -3259,23 +3519,38 @@
         btnC.style.display = ''; btnD.style.display = 'none';
         if (testBtn) { testBtn.disabled = true; testBtn.style.opacity = '0.5'; testBtn.style.cursor = 'not-allowed'; }
       }
-      // Log
+      // Log — newest first, colour-coded
       const logEl = document.getElementById('waLog');
       if (d.log && d.log.length) {
-        logEl.innerHTML = d.log.map(l => `<div style="margin-bottom:4px"><span style="color:var(--pr)">${new Date(l.time).toLocaleTimeString()}</span> ${l.event}</div>`).join('');
+        logEl.innerHTML = d.log.map(l => {
+          const isError = l.event.toLowerCase().includes('fail') || l.event.toLowerCase().includes('error');
+          const isOk = l.event.includes('✅') || l.event.toLowerCase().includes('ready') || l.event.toLowerCase().includes('connected');
+          const color = isError ? 'var(--danger)' : isOk ? 'var(--ok)' : 'var(--mu)';
+          return `<div style="margin-bottom:5px;padding:3px 0;border-bottom:1px solid rgba(128,128,128,0.1)"><span style="color:var(--pr);font-size:10px">${new Date(l.time).toLocaleTimeString()}</span> <span style="color:${color}">${l.event}</span></div>`;
+        }).join('');
       }
       // QR
       const qrW = await api('GET', '/whatsapp/qr');
       const qrArea = document.getElementById('waQrArea');
       if (qrW?.qrCode) {
         const qrSrc = qrW.qrCode.startsWith('data:') ? qrW.qrCode : 'data:image/png;base64,' + qrW.qrCode;
-        qrArea.innerHTML = `<div style="display:inline-block;background:#ffffff;padding:20px;border-radius:16px;box-shadow:0 4px 32px rgba(0,0,0,0.25)"><img src="${qrSrc}" style="display:block;width:240px;height:240px;image-rendering:pixelated;image-rendering:crisp-edges" alt="WhatsApp QR"></div><div style="margin-top:12px;font-size:12px;color:var(--mu)">افتح WhatsApp ← الأجهزة المرتبطة ← ربط جهاز، ثم امسح الكود</div>`;
+        qrArea.innerHTML = `
+          <div style="display:inline-block;background:#fff;padding:20px;border-radius:16px;box-shadow:0 4px 32px rgba(0,0,0,0.25)">
+            <img src="${qrSrc}" style="display:block;width:240px;height:240px;image-rendering:pixelated" alt="WhatsApp QR">
+          </div>
+          <div style="margin-top:14px;font-size:13px;color:var(--tx);font-weight:600">📱 How to Scan / كيفية المسح:</div>
+          <div style="margin-top:6px;font-size:12px;color:var(--mu);line-height:1.9">
+            1. Open WhatsApp on your phone — افتح WhatsApp على هاتفك<br>
+            2. Tap ⋮ → Linked Devices — اضغط ⋮ ← الأجهزة المرتبطة<br>
+            3. Tap "Link a Device" — اضغط "ربط جهاز"<br>
+            4. Point the camera at the QR code above — وجّه الكاميرا نحو الكود أعلاه
+          </div>`;
       } else if (d.status === 'connected') {
-        qrArea.innerHTML = '<div style="font-size:14px;color:var(--ok);font-weight:600">✅ متصل — لا حاجة لرمز QR</div>';
-      } else if (d.status === 'connecting') {
-        qrArea.innerHTML = '<div style="color:var(--mu);font-size:13px">⏳ جاري تشغيل المتصفح، انتظر ظهور رمز QR…</div>';
+        qrArea.innerHTML = '<div style="font-size:36px;margin-bottom:10px">✅</div><div style="font-size:16px;color:var(--ok);font-weight:700">Connected to WhatsApp</div><div style="font-size:12px;color:var(--mu);margin-top:6px">You can now send messages and test the connection.<br><span style="opacity:.7">متصل — يمكنك إرسال رسائل الآن</span></div>';
+      } else if (d.status === 'connecting' || d.status === 'qr_ready') {
+        qrArea.innerHTML = '<div style="font-size:30px;margin-bottom:10px">⏳</div><div style="color:var(--tx);font-size:13px;font-weight:600">Launching browser & generating QR…</div><div style="color:var(--mu);font-size:12px;margin-top:6px">This may take 10–20 seconds.<br><span style="opacity:.7">جاري تشغيل المتصفح وتوليد رمز QR</span></div>';
       } else {
-        qrArea.innerHTML = '<div style="color:var(--mu);font-size:13px">اضغط "Connect WhatsApp" لتوليد رمز QR.</div>';
+        qrArea.innerHTML = '<div style="font-size:32px;margin-bottom:10px;opacity:.4">📱</div><div style="color:var(--mu);font-size:13px">Click "Connect WhatsApp" to start and generate a QR code.</div>';
       }
     }
 
@@ -3288,23 +3563,33 @@
     function waStartPolling() {
       waStopPolling();
       let attempts = 0;
+      const MAX_ATTEMPTS = 80; // 80 × 3s = 4 min (enough for QR scan + stabilisation)
       _waPollTimer = setInterval(async () => {
         attempts++;
         await waRefresh();
-        const statusTxt = (document.getElementById('waStatusText')?.textContent || '').toLowerCase().replace(' ', '_');
-        if (statusTxt === 'connected' || attempts >= 40) {
+        const d = await api('GET', '/whatsapp/status').catch(() => null);
+        if (d?.status === 'connected') {
           waStopPolling();
-          if (statusTxt === 'connected') toast('✅ WhatsApp متصل بنجاح!', 'ok');
-          else if (attempts >= 40) toast('⏱ انتهت مهلة الاتصال — حاول مرة أخرى', 'err');
+          toast('✅ WhatsApp connected successfully!', 'ok');
+        } else if (d?.status === 'disconnected' && attempts > 5) {
+          // Check if last log entry was a failure (gave up)
+          const lastLog = d?.log?.[0]?.event || '';
+          if (lastLog.toLowerCase().includes('fail') || lastLog.toLowerCase().includes('error')) {
+            waStopPolling();
+            toast('❌ Connection failed — check the log and try again', 'err');
+          }
+        } else if (attempts >= MAX_ATTEMPTS) {
+          waStopPolling();
+          toast('⏱ Connection timed out — please try again', 'err');
         }
       }, 3000);
     }
 
     async function waConnect() {
-      toast('جاري الاتصال بـ WhatsApp…', '');
+      toast('Connecting to WhatsApp…');
       const r = await api('POST', '/whatsapp/connect');
       if (r) {
-        toast('تم بدء الاتصال — انتظر ظهور رمز QR', '');
+        toast('Connection initiated — wait for QR code to appear');
         waStartPolling();
       }
     }
@@ -3312,16 +3597,19 @@
     async function waDisconnect() {
       waStopPolling();
       await api('POST', '/whatsapp/disconnect');
-      toast('تم قطع الاتصال بـ WhatsApp', 'ok');
+      toast('WhatsApp disconnected', 'ok');
       waRefresh();
     }
 
     async function waTest() {
       const btn = document.getElementById('waTestBtn');
+      const phoneInput = document.getElementById('waTestPhone');
+      const phone = (phoneInput?.value || '+201010254819').replace(/\D/g, '');
+      if (!phone) { toast('❌ Enter a phone number first', 'err'); return; }
       if (btn) { btn.disabled = true; btn.textContent = '⏳ Sending…'; }
-      const r = await api('POST', '/whatsapp/test');
-      if (btn) { btn.disabled = false; btn.textContent = '📱 Send Test Message'; }
-      if (r?.success) toast('✅ Test message sent to +201204593124!', 'ok');
+      const r = await api('POST', '/whatsapp/test', { phone });
+      if (btn) { btn.disabled = false; btn.textContent = '📱 Send Test'; }
+      if (r?.success) toast(`✅ Test message sent to +${r.phone || phone}!`, 'ok');
       else toast('❌ Failed — make sure WhatsApp is connected first', 'err');
     }
 

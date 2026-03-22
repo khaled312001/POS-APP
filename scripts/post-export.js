@@ -6,22 +6,79 @@ const distDir = path.resolve(__dirname, "../dist");
 
 // ── Service Worker ────────────────────────────────────────────────────────────
 const swContent = `// Barmagly POS — Service Worker
-// Handles Web Push notifications for incoming calls and online orders
-// even when the app tab is closed.
+// Handles offline caching and Web Push notifications.
 
-const CACHE_NAME = "barmagly-pos-v1";
+const CACHE_NAME = "barmagly-pos-v2";
+
+// Core app shell files to cache on install
+const APP_SHELL = [
+  "/app",
+  "/app/",
+  "/app/manifest.webmanifest",
+  "/app/favicon.ico",
+  "/app/assets/images/icon.png",
+];
 
 self.addEventListener("install", (event) => {
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      // Cache the app shell; ignore failures for individual assets
+      return Promise.allSettled(APP_SHELL.map((url) => cache.add(url)));
+    }).then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    // Remove old caches
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    ).then(() => clients.claim())
+  );
 });
 
-// ── Fetch handler (required for PWA installability) ───────────────────────────
+// ── Fetch handler ─────────────────────────────────────────────────────────────
 self.addEventListener("fetch", (event) => {
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Don't intercept API calls, WebSocket upgrades, or cross-origin requests
+  if (
+    url.pathname.startsWith("/api") ||
+    request.headers.get("upgrade") === "websocket" ||
+    url.origin !== self.location.origin
+  ) {
+    return;
+  }
+
+  // For navigation requests (HTML pages) — network first, fall back to cached /app
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request).catch(() =>
+        caches.match("/app").then((cached) => cached || caches.match("/app/"))
+      )
+    );
+    return;
+  }
+
+  // For static assets — cache first, then network, then cache the result
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
+      return fetch(request).then((response) => {
+        // Only cache successful same-origin responses
+        if (
+          response.ok &&
+          response.type === "basic" &&
+          (url.pathname.startsWith("/app") || url.pathname.startsWith("/assets"))
+        ) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(request));
+    })
+  );
 });
 
 // ── Push notification handler ─────────────────────────────────────────────────
@@ -36,7 +93,7 @@ self.addEventListener("push", (event) => {
   }
 
   const { type, title, body, data = {} } = payload;
-  const icon = "/app/favicon.ico";
+  const icon = "/app/assets/images/icon.png";
   const badge = "/app/favicon.ico";
   const tag = type || "generic";
 
@@ -55,15 +112,14 @@ self.addEventListener("push", (event) => {
       : [],
   };
 
-  // For incoming calls: skip the push notification if the POS app tab is already open and focused
-  // (the in-app WebSocket notification handles it — no need to show a duplicate browser notification)
+  // For incoming calls: skip push if POS app tab is already open and focused
   if (type === "incoming_call") {
     event.waitUntil(
       clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
         const hasFocusedAppTab = windowClients.some(
           (c) => c.url.includes("/app") && c.focused
         );
-        if (hasFocusedAppTab) return; // App is open & focused → in-app notification handles it
+        if (hasFocusedAppTab) return;
         return self.registration.showNotification(title || "Barmagly POS", options);
       })
     );
@@ -99,32 +155,37 @@ const manifestContent = JSON.stringify({
   name: "Barmagly POS",
   short_name: "Barmagly",
   description: "Point of Sale system for modern restaurants and stores",
-  start_url: "/app",
-  scope: "/app",
+  start_url: "/app/",
+  scope: "/app/",
   display: "standalone",
   orientation: "any",
   theme_color: "#2FD3C6",
   background_color: "#0A0E17",
   lang: "en",
   icons: [
-    { src: "/app/assets/images/icon.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
-    { src: "/app/assets/images/icon.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
+    { src: "/app/assets/images/icon.png", sizes: "192x192", type: "image/png", purpose: "any" },
+    { src: "/app/assets/images/icon.png", sizes: "512x512", type: "image/png", purpose: "any" },
+    { src: "/app/assets/images/icon.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
   ],
-  screenshots: [],
   categories: ["business", "productivity"],
 }, null, 2);
 
 fs.writeFileSync(path.join(distDir, "sw.js"), swContent);
 fs.writeFileSync(path.join(distDir, "manifest.webmanifest"), manifestContent);
 
-// ── Patch index.html to add manifest link ────────────────────────────────────
+// ── Patch index.html to add manifest + PWA meta tags ─────────────────────────
 const indexPath = path.join(distDir, "index.html");
 if (fs.existsSync(indexPath)) {
   let html = fs.readFileSync(indexPath, "utf8");
   if (!html.includes('rel="manifest"')) {
     html = html.replace(
       "</head>",
-      '  <link rel="manifest" href="/app/manifest.webmanifest" />\n  <link rel="apple-touch-icon" href="/app/assets/images/icon.png" />\n  <meta name="mobile-web-app-capable" content="yes" />\n  <meta name="apple-mobile-web-app-capable" content="yes" />\n  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />\n</head>'
+      '  <link rel="manifest" href="/app/manifest.webmanifest" />\n' +
+      '  <link rel="apple-touch-icon" href="/app/assets/images/icon.png" />\n' +
+      '  <meta name="mobile-web-app-capable" content="yes" />\n' +
+      '  <meta name="apple-mobile-web-app-capable" content="yes" />\n' +
+      '  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />\n' +
+      '</head>'
     );
     fs.writeFileSync(indexPath, html, "utf8");
     console.log("[post-export] Patched index.html with manifest link.");

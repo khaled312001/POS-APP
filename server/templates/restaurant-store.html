@@ -278,6 +278,57 @@
       justify-content: center;
       padding: 0 4px;
       border: 2px solid var(--P);
+      transition: transform .15s;
+    }
+
+    /* ── Animations ─────────────────────────────── */
+    @keyframes badgePop {
+      0%   { transform: scale(1); }
+      35%  { transform: scale(1.55); }
+      65%  { transform: scale(0.88); }
+      100% { transform: scale(1); }
+    }
+    .badge-pop { animation: badgePop .45s cubic-bezier(.36,.07,.19,.97) both; }
+
+    @keyframes cardTap {
+      0%   { transform: scale(1); }
+      45%  { transform: scale(0.94); }
+      100% { transform: scale(1); }
+    }
+    .card-tap { animation: cardTap .22s ease-out; }
+
+    @keyframes cartItemIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .cart-item { animation: cartItemIn .25s ease-out; }
+
+    @keyframes successPop {
+      0%   { transform: scale(0) rotate(-30deg); opacity: 0; }
+      60%  { transform: scale(1.15) rotate(5deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    .checkout-success-icon { animation: none; }
+    .checkout-success-icon.animate { animation: successPop .55s cubic-bezier(.36,.07,.19,.97) both; }
+
+    @keyframes flyDot {
+      0%   { opacity: 1; transform: scale(1); }
+      80%  { opacity: .6; }
+      100% { opacity: 0; transform: scale(0); }
+    }
+    .fly-dot {
+      position: fixed; width: 18px; height: 18px; border-radius: 50%;
+      background: var(--P); z-index: 9999; pointer-events: none;
+      transition: left .55s cubic-bezier(.25,.46,.45,.94), top .55s cubic-bezier(.25,.46,.45,.94), opacity .55s, transform .55s;
+    }
+
+    /* Product card active state */
+    .product-card:active { transform: scale(0.96); }
+
+    /* Confetti particle */
+    .confetti-p {
+      position: fixed; width: 10px; height: 10px; pointer-events: none;
+      z-index: 99999; border-radius: 2px;
     }
 
     .nav-hamburger {
@@ -1846,6 +1897,8 @@
       text-align: center;
       padding: 32px 20px;
       display: none;
+      flex-direction: column;
+      align-items: center;
     }
 
     .checkout-success-icon {
@@ -2673,11 +2726,13 @@
             <textarea class="form-textarea" id="co-notes" placeholder="Allergies, special requests..."></textarea>
           </div>
         </div>
-        <div class="checkout-success" id="checkout-success">
+        <div class="checkout-success" id="checkout-success" style="flex-direction:column;align-items:center">
           <div class="checkout-success-icon"><i class="fa-solid fa-check"></i></div>
-          <div class="checkout-success-title">Order Placed!</div>
+          <div class="checkout-success-title">🎉 Order Placed!</div>
           <p class="checkout-success-msg" id="success-msg">Your order has been received.</p>
-          <button class="btn-submit" style="margin-top:20px" onclick="closeCheckout()">Continue Browsing</button>
+          <button class="btn-submit" style="margin-top:20px;max-width:220px" onclick="closeCheckout()">
+            <i class="fa-solid fa-utensils" style="margin-right:8px"></i>Continue Browsing
+          </button>
         </div>
       </div>
       <div class="checkout-footer" id="checkout-footer">
@@ -2920,7 +2975,84 @@
       }
     }
 
-    function addToCart(product, qty = 1, size = null, addons = []) {
+    // ── Card tap: adds a quick scale animation then calls callback ──
+    function _tapCard(cardEl, cb) {
+      if (!cardEl) { cb && cb(); return; }
+      cardEl.classList.add('card-tap');
+      setTimeout(() => { cardEl.classList.remove('card-tap'); cb && cb(); }, 120);
+    }
+
+    // ── Cart animation helpers ─────────────────────────────
+    function flyToCartAnimation(sourceEl) {
+      const cartBtn = document.querySelector('.nav-cart-btn');
+      if (!cartBtn || !sourceEl) return;
+      const src = sourceEl.getBoundingClientRect();
+      const dst = cartBtn.getBoundingClientRect();
+      const dot = document.createElement('div');
+      dot.className = 'fly-dot';
+      dot.style.left = (src.left + src.width / 2 - 9) + 'px';
+      dot.style.top  = (src.top  + src.height / 2 - 9) + 'px';
+      document.body.appendChild(dot);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        dot.style.left    = (dst.left + dst.width / 2 - 9) + 'px';
+        dot.style.top     = (dst.top  + dst.height / 2 - 9) + 'px';
+        dot.style.opacity = '0';
+        dot.style.transform = 'scale(0)';
+      }));
+      setTimeout(() => dot.remove(), 700);
+    }
+
+    function pulseBadge() {
+      const b = document.getElementById('cart-count');
+      if (!b) return;
+      b.classList.remove('badge-pop');
+      void b.offsetWidth; // reflow
+      b.classList.add('badge-pop');
+      setTimeout(() => b.classList.remove('badge-pop'), 500);
+    }
+
+    function playOrderSuccess() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+        notes.forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.type = 'sine';
+          const t0 = audioCtx.currentTime + i * 0.13;
+          osc.frequency.setValueAtTime(freq, t0);
+          gain.gain.setValueAtTime(0, t0);
+          gain.gain.linearRampToValueAtTime(0.12, t0 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.35);
+          osc.start(t0); osc.stop(t0 + 0.35);
+        });
+      } catch (e) { }
+    }
+
+    function launchConfetti() {
+      const colors = ['#6366f1','#8b5cf6','#ec4899','#14b8a6','#f59e0b','#10b981','#ef4444'];
+      for (let i = 0; i < 70; i++) {
+        const p = document.createElement('div');
+        p.className = 'confetti-p';
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const x = 10 + Math.random() * (window.innerWidth - 20);
+        const finalY = window.innerHeight * 0.25 + Math.random() * window.innerHeight * 0.5;
+        const size = 7 + Math.random() * 9;
+        const rot = Math.random() * 720;
+        p.style.cssText += `background:${color};width:${size}px;height:${size}px;left:${x}px;top:-20px;border-radius:${Math.random()>.5?'50%':'2px'}`;
+        document.body.appendChild(p);
+        const dur = 900 + Math.random() * 900;
+        p.animate([
+          { top: '-20px', opacity: 1, transform: `rotate(0deg)` },
+          { top: finalY + 'px', opacity: 0, transform: `rotate(${rot}deg)` }
+        ], { duration: dur, easing: 'cubic-bezier(.25,.46,.45,.94)', fill: 'forwards' });
+        setTimeout(() => p.remove(), dur + 100);
+      }
+    }
+    // ──────────────────────────────────────────────────────
+
+    function addToCart(product, qty = 1, size = null, addons = [], sourceEl = null) {
       const key = `${product.id}-${size || 'def'}-${[...addons].sort().join(',')}`;
       const existing = cart.find(i => i.key === key);
       if (existing) {
@@ -2936,8 +3068,11 @@
         const addonNames = addons.map(aId => { const a = PIZZA_ADDONS.find(x => x.id === aId); return a ? a.name : ''; }).filter(Boolean);
         cart.push({ key, product, name, price, qty, size, addons: addonNames, image: product.image });
       }
-      updateCartUI(); playAdd();
-      showToast(`<i class="fa-solid fa-circle-check" style="color:#4ade80;margin-right:6px"></i>${product.name} added!`);
+      updateCartUI();
+      pulseBadge();
+      playAdd();
+      if (sourceEl) flyToCartAnimation(sourceEl);
+      showToast(`<i class="fa-solid fa-circle-check" style="color:#4ade80;margin-right:6px"></i><strong>${product.name}</strong> added!`);
     }
 
     function removeFromCart(key) {
@@ -3036,10 +3171,15 @@
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || 'Order failed');
         setDisp('checkout-form', 'none');
-        setDisp('checkout-success', 'block');
+        setDisp('checkout-success', 'flex');
         setDisp('checkout-footer', 'none');
-        setTxt('success-msg', `Order #${data.orderNumber} confirmed! ${type === 'delivery' ? 'Delivering to ' + address : 'Ready for pickup soon'}. Total: ${fmt(t.total)}`);
+        setTxt('success-msg', `Order #${data.orderNumber} confirmed! ${type === 'delivery' ? '🚚 Delivering to ' + address : '🏪 Ready for pickup soon'}. Total: ${fmt(t.total)}`);
         cart = []; updateCartUI();
+        // Trigger success animations
+        const icon = document.querySelector('.checkout-success-icon');
+        if (icon) { icon.classList.remove('animate'); void icon.offsetWidth; icon.classList.add('animate'); }
+        playOrderSuccess();
+        setTimeout(launchConfetti, 200);
       } catch (e) { setTxt('checkout-error', e.message); setDisp('checkout-error', 'block'); }
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-lock" style="margin-right:8px"></i>Place Order'; }
     }
@@ -3181,16 +3321,20 @@
       grid.innerHTML = active.map(p => {
         const cat = cats.find(c => c.id === p.categoryId);
         const isPizza = cat && (cat.name.toLowerCase().includes('pizza') || (cat.icon && cat.icon.includes('pizza')));
+        const pJson = JSON.stringify(p).replace(/"/g, '&quot;');
         const action = isPizza
-          ? `openPizzaModal(${JSON.stringify(p).replace(/"/g, '&quot;')})`
-          : `addToCart(${JSON.stringify(p).replace(/"/g, '&quot;')})`;
+          ? `_tapCard(this,()=>openPizzaModal(${pJson}))`
+          : `_tapCard(this,()=>addToCart(${pJson},1,null,[],this))`;
+        const btnAction = isPizza
+          ? `event.stopPropagation();_tapCard(this.closest('.product-card'),()=>openPizzaModal(${pJson}))`
+          : `event.stopPropagation();_tapCard(this.closest('.product-card'),()=>addToCart(${pJson},1,null,[],this.closest('.product-card')))`;
         const btnIcon = isPizza ? 'fa-pizza-slice' : 'fa-plus';
         const catName = cat ? cat.name : '';
         return `<div class="product-card" data-id="${p.id}" data-cat="${p.categoryId}" data-name="${(p.name || '').toLowerCase()}" data-desc="${(p.description || '').toLowerCase()}" onclick="${action}">
         <div class="product-img">
           ${p.image ? `<img src="${p.image}" alt="${p.name}" loading="lazy">` : `<div class="product-no-img"><i class="fa-solid fa-utensils"></i></div>`}
           ${catName ? `<div class="product-badge">${catName}</div>` : ''}
-          <button class="product-add-btn" onclick="event.stopPropagation();${action}"><i class="fa-solid ${btnIcon}"></i></button>
+          <button class="product-add-btn" onclick="${btnAction}"><i class="fa-solid ${btnIcon}"></i></button>
         </div>
         <div class="product-info">
           <div class="product-name">${p.name}</div>

@@ -214,6 +214,11 @@ async function _connectBackground(wpp: any): Promise<void> {
 
         connectionPhase = "awaiting_qr";
 
+        // Track whether statusFind confirmed the session is live
+        let sessionConfirmedByEvent = false;
+        // Track brief disconnects during stabilisation (disconnectedMobile is transient)
+        let stabilisationComplete = false;
+
         client = await wpp.create({
             session: SESSION_NAME,
             folderNameToken: TOKEN_DIR,
@@ -242,21 +247,22 @@ async function _connectBackground(wpp: any): Promise<void> {
 
                 if (statusSession === "qrReadSuccess") {
                     connectionPhase = "qr_scanned";
-                    log("QR scanned successfully — waiting for session to stabilize");
+                    log("QR scanned — waiting for session to confirm");
                 }
 
+                // inChat / isLogged = session IS authenticated and active
                 if (statusSession === "inChat" || statusSession === "isLogged") {
+                    sessionConfirmedByEvent = true;
                     if (connectionPhase !== "ready") {
                         connectionPhase = "qr_scanned";
                     }
                 }
 
-                if (connectionPhase === "ready") {
+                // Only handle fatal disconnects AFTER full stabilisation
+                if (stabilisationComplete && connectionPhase === "ready") {
                     if (
                         statusSession === "notLogged" ||
-                        statusSession === "browserClose" ||
-                        statusSession === "desconnectedMobile" ||
-                        statusSession === "disconnectedMobile"
+                        statusSession === "browserClose"
                     ) {
                         status = "disconnected";
                         clientReady = false;
@@ -265,29 +271,42 @@ async function _connectBackground(wpp: any): Promise<void> {
                         log(`Session lost: ${statusSession} — will auto-reconnect in 15s`);
                         scheduleAutoReconnect();
                     }
+                    // disconnectedMobile is often transient (phone screen-off, etc.) — just log it
                 }
             },
         });
 
         log("WPP client created — waiting for session to stabilize...");
-        await new Promise(r => setTimeout(r, 6000));
 
-        const alive = await isClientAlive();
-        if (!alive) {
-            log("Client not alive after stabilization — retrying connection state check...");
-            await new Promise(r => setTimeout(r, 5000));
-            const retryAlive = await isClientAlive();
-            if (!retryAlive) {
-                throw new Error("WhatsApp session failed to stabilize after QR scan");
+        // If statusFind already told us the session is live, trust it and settle briefly
+        if (sessionConfirmedByEvent) {
+            log("Session confirmed via statusFind — settling for 3s...");
+            await new Promise(r => setTimeout(r, 3000));
+        } else {
+            // Wait longer for the session events to arrive
+            await new Promise(r => setTimeout(r, 8000));
+
+            if (!sessionConfirmedByEvent) {
+                // Fall back to API check
+                const alive = await isClientAlive();
+                if (!alive) {
+                    log("Session not confirmed yet — retrying in 5s...");
+                    await new Promise(r => setTimeout(r, 5000));
+                    const retryAlive = await isClientAlive();
+                    if (!retryAlive && !sessionConfirmedByEvent) {
+                        throw new Error("WhatsApp session failed to stabilize — please scan the QR code again");
+                    }
+                }
             }
         }
 
+        stabilisationComplete = true;
         status = "connected";
         clientReady = true;
         connectionPhase = "ready";
         lastQrCode = null;
         connecting = false;
-        log("WhatsApp client ready and verified");
+        log("✅ WhatsApp connected and ready");
 
         client.onMessage(async (message: any) => {
             log(`Msg from ${message.from}: ${(message.body || "").slice(0, 80)}`);
@@ -303,8 +322,8 @@ async function _connectBackground(wpp: any): Promise<void> {
 }
 
 export const whatsappService = {
-    getStatus(): { status: WhatsAppStatus; lastError: string | null; log: typeof connectionLog } {
-        return { status, lastError, log: connectionLog.slice(0, 20) };
+    getStatus(): { status: WhatsAppStatus; lastError: string | null; log: typeof connectionLog; phase: string } {
+        return { status, lastError, log: connectionLog.slice(0, 20), phase: connectionPhase };
     },
 
     getQrCode(): string | null {

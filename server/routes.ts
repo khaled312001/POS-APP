@@ -2263,12 +2263,13 @@ async function test(){
     res.json({ qrCode: qr });
   });
 
-  app.post("/api/super-admin/whatsapp/test", requireSuperAdmin as any, async (_req: any, res: any) => {
+  app.post("/api/super-admin/whatsapp/test", requireSuperAdmin as any, async (req: any, res: any) => {
+    const targetPhone = (req.body?.phone || "201204593124").replace(/\D/g, "");
     const sent = await whatsappService.sendText(
-      "201204593124",
-      "🧪 *Test Message*\n\nThis is a test from Barmagly POS WhatsApp integration."
+      targetPhone,
+      "🧪 *Test Message*\n\nThis is a test from Barmagly POS WhatsApp integration.\n\n✅ If you receive this, the connection is working!"
     );
-    res.json({ success: sent });
+    res.json({ success: sent, phone: targetPhone });
   });
 
   // ── Landing Page Config ────────────────────────────────────────────────────

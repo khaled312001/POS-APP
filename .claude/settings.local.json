@@ -51,7 +51,10 @@
       "Bash(git -C F:/POS-APP show HEAD:dist/manifest.webmanifest)",
       "Bash(git -C F:/POS-APP log --oneline -3 dist/sw.js)",
       "Bash(git -C F:/POS-APP show 71b37ca:dist/sw.js)",
-      "Bash(git -C F:/POS-APP show 71b37ca -- dist/sw.js)"
+      "Bash(git -C F:/POS-APP show 71b37ca -- dist/sw.js)",
+      "Bash(find /F/POS-APP -name .env* -o -name *.env)",
+      "Bash(find /f/POS-APP -name manifest* -o -name *service-worker* -o -name sw.js)",
+      "Bash(find f:/POS-APP/assets -name *.png)"
     ]
   }
 }

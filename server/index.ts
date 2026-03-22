@@ -27,7 +27,9 @@ declare module "http" {
 
 function setupCors(app: express.Application) {
   app.use((req, res, next) => {
-    const origins = new Set<string>();
+    const origins = new Set<string>([
+      "https://pos.barmagly.tech",
+    ]);
 
     if (process.env.REPLIT_DEV_DOMAIN) {
       origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
@@ -221,12 +223,28 @@ function configureExpoAndLanding(app: express.Application) {
       return serveLandingPage({ req, res, appName });
     }
 
-    if (req.path === "/app" || req.path === "/app/" || req.path === "/app/index.html") {
+    // Redirect bare /app to /app/ so the service worker scope (/app/) covers the page URL
+    if (req.path === "/app") {
+      return res.redirect(302, "/app/");
+    }
+
+    if (req.path === "/app/" || req.path === "/app/index.html") {
       const indexPath = path.resolve(process.cwd(), "dist", "index.html");
       if (fs.existsSync(indexPath)) {
         const html = fs.readFileSync(indexPath, "utf-8");
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         return res.status(200).send(html);
+      }
+    }
+
+    // Serve service worker with no-cache headers so updates propagate immediately
+    if (req.path === "/app/sw.js") {
+      const swPath = path.resolve(process.cwd(), "dist", "sw.js");
+      if (fs.existsSync(swPath)) {
+        res.setHeader("Content-Type", "application/javascript");
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Service-Worker-Allowed", "/app/");
+        return res.sendFile(swPath);
       }
     }
 
@@ -305,7 +323,15 @@ function configureExpoAndLanding(app: express.Application) {
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
   app.use("/objects", express.static(path.resolve(process.cwd(), "uploads")));
-  app.use("/app", express.static(path.resolve(process.cwd(), "dist")));
+  // Serve project icon assets at the /app/assets/images path so the PWA manifest icons resolve
+  app.use("/app/assets/images", express.static(path.resolve(process.cwd(), "assets", "images")));
+  app.use("/app", express.static(path.resolve(process.cwd(), "dist"), {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith(".webmanifest")) {
+        res.setHeader("Content-Type", "application/manifest+json");
+      }
+    },
+  }));
   app.use(express.static(path.resolve(process.cwd(), "static-build")));
 
   // SPA catch-all: serve index.html for any unmatched route under /app

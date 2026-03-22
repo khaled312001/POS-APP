@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "expo-router";
 import {
   StyleSheet, Text, View, FlatList, Pressable, TextInput,
-  ScrollView, Modal, Alert, Platform, Dimensions, Image,
+  ScrollView, Modal, Alert, Platform, Dimensions, Image, Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -96,6 +96,9 @@ export default function POSScreen() {
   const [newCustomerForm, setNewCustomerForm] = useState({ name: "", phone: "", address: "", email: "" });
   const [showOnlineOrders, setShowOnlineOrders] = useState(false);
   const [endOfDayLoading, setEndOfDayLoading] = useState(false);
+  const [lastAddedId, setLastAddedId] = useState<number | null>(null);
+  const flashAnim = useRef(new Animated.Value(0)).current;
+  const checkoutPulse = useRef(new Animated.Value(1)).current;
 
   const { onlineOrderNotification, setOnlineOrderNotification, incomingCalls, setIncomingCalls, dismissCall } = useNotifications();
 
@@ -105,6 +108,25 @@ export default function POSScreen() {
   const processedCallIds = useRef<Set<string>>(new Set());
   // Store caller's full customer object directly (faster than waiting for customers list)
   const [callerCustomer, setCallerCustomer] = useState<any>(null);
+
+  // Pulse checkout button when cart has items
+  useEffect(() => {
+    if (cart.items.length > 0) {
+      Animated.sequence([
+        Animated.timing(checkoutPulse, { toValue: 1.03, duration: 180, useNativeDriver: true }),
+        Animated.timing(checkoutPulse, { toValue: 1, duration: 180, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [cart.items.length]);
+
+  // Flash animation when item added
+  const triggerFlash = useCallback((productId: number) => {
+    setLastAddedId(productId);
+    flashAnim.setValue(1);
+    Animated.timing(flashAnim, { toValue: 0, duration: 600, useNativeDriver: false }).start(() => {
+      setLastAddedId(null);
+    });
+  }, [flashAnim]);
 
   // AUTO-ASSIGN: when a call comes in, immediately add caller to the current cart
   useEffect(() => {
@@ -765,8 +787,9 @@ export default function POSScreen() {
       return;
     }
     cart.addItem({ id: product.id, name: product.name, price: Number(product.price) });
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [cart, isPizzaProduct]);
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    triggerFlash(product.id);
+  }, [cart, isPizzaProduct, triggerFlash]);
 
   const handleBarcodeScan = useCallback(async (barcode: string) => {
     try {
@@ -1143,38 +1166,43 @@ export default function POSScreen() {
             </Pressable>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesRow} contentContainerStyle={styles.categoriesContent}>
+          <View style={styles.categoriesGrid}>
+            {/* ALL chip */}
             <Pressable
-              style={[styles.categoryChip, styles.categoryChipAll, !selectedCategory && styles.categoryChipAllActive]}
+              style={[styles.catChip, !selectedCategory && styles.catChipActive]}
               onPress={() => setSelectedCategory(null)}
             >
-              <LinearGradient
-                colors={!selectedCategory ? [Colors.gradientStart, Colors.accent] : ["transparent", "transparent"]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.categoryChipGradient}
-              >
-                <Ionicons name="grid" size={22} color={!selectedCategory ? Colors.white : Colors.accent} />
-                <Text style={[styles.categoryChipText, !selectedCategory && styles.categoryChipTextAll]}>{t("allCategories")}</Text>
-              </LinearGradient>
+              {!selectedCategory ? (
+                <LinearGradient colors={[Colors.gradientStart, Colors.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.catChipGrad}>
+                  <Ionicons name="grid" size={14} color={Colors.white} />
+                  <Text style={[styles.catChipText, { color: Colors.white }]}>{t("allCategories")}</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.catChipGrad}>
+                  <Ionicons name="grid" size={14} color={Colors.accent} />
+                  <Text style={styles.catChipText}>{t("allCategories")}</Text>
+                </View>
+              )}
             </Pressable>
             {tenantCategories.map((cat: any) => {
               const isActive = selectedCategory === cat.id;
               const iconName = (cat.icon || "cube") as keyof typeof Ionicons.glyphMap;
+              const color = cat.color || Colors.accent;
               return (
                 <Pressable
                   key={cat.id}
-                  style={[styles.categoryChip, isActive && { borderColor: cat.color || Colors.accent, backgroundColor: `${cat.color || Colors.accent} 18` }]}
+                  style={[styles.catChip, isActive && { borderColor: color, backgroundColor: `${color}22` }]}
                   onPress={() => setSelectedCategory(isActive ? null : cat.id)}
                 >
-                  <View style={styles.categoryChipInner}>
-                    <View style={[styles.categoryDot, { backgroundColor: cat.color || Colors.accent }]} />
-                    <Ionicons name={iconName} size={22} color={isActive ? (cat.color || Colors.accent) : Colors.textSecondary} />
-                    <Text style={[styles.categoryChipText, isActive && { color: cat.color || Colors.accent }]}>{cat.name}</Text>
+                  <View style={styles.catChipGrad}>
+                    <View style={[styles.catDot, { backgroundColor: color }]} />
+                    <Ionicons name={iconName} size={14} color={isActive ? color : Colors.textSecondary} />
+                    <Text style={[styles.catChipText, isActive && { color, fontWeight: "700" }]}>{cat.name}</Text>
                   </View>
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </View>
 
           <FlatList
             data={filteredProducts}
@@ -1187,10 +1215,18 @@ export default function POSScreen() {
               const cat = categories.find((c: any) => c.id === item.categoryId);
               const catColor = cat?.color || Colors.accent;
               const catIcon = (cat?.icon || "cube") as keyof typeof Ionicons.glyphMap;
+              const cartQty = cart.items.find((i: any) => i.id === item.id || i.productId === item.id)?.quantity || 0;
+              const isJustAdded = lastAddedId === item.id;
               return (
-                <Pressable style={styles.productCard} onPress={() => handleAddToCart(item)}>
+                <Pressable
+                  style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] }]}
+                  onPress={() => handleAddToCart(item)}
+                >
+                  {isJustAdded && (
+                    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: catColor, opacity: flashAnim, borderRadius: 16 }]} />
+                  )}
                   <View style={[styles.productCardTopBorder, { backgroundColor: catColor }]} />
-                  <View style={[styles.productIcon, { backgroundColor: `${catColor} 15` }]}>
+                  <View style={[styles.productIcon, { backgroundColor: `${catColor}22` }]}>
                     {item.image ? (
                       <AnimatedProductImage uri={item.image.startsWith("http") || item.image.startsWith("file://") || item.image.startsWith("data:") ? item.image : `${getApiUrl().replace(/\/$/, "")}${item.image}`} />
                     ) : (
@@ -1198,14 +1234,20 @@ export default function POSScreen() {
                     )}
                   </View>
                   <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-                  <Text style={styles.productPrice}>CHF {Number(item.price).toFixed(2)}</Text>
+                  <Text style={[styles.productPrice, { color: catColor }]}>CHF {Number(item.price).toFixed(2)}</Text>
                   {tenant?.storeType !== "restaurant" && item.trackInventory && (
                     <Text style={[styles.barcodeText, { color: Colors.textSecondary }]}>Stock: {item.quantity || 0}</Text>
                   )}
                   {item.barcode ? <Text style={styles.barcodeText}>{item.barcode}</Text> : null}
-                  <View style={[styles.productAddBadge, { backgroundColor: `${catColor} 20` }]}>
-                    <Ionicons name="add" size={14} color={catColor} />
-                  </View>
+                  {cartQty > 0 ? (
+                    <View style={[styles.productCartBadge, { backgroundColor: catColor }]}>
+                      <Text style={styles.productCartBadgeText}>{cartQty}</Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.productAddBadge, { backgroundColor: `${catColor}22` }]}>
+                      <Ionicons name="add" size={14} color={catColor} />
+                    </View>
+                  )}
                 </Pressable>
               );
             }}
@@ -1282,26 +1324,39 @@ export default function POSScreen() {
             keyExtractor={(item) => String(item.productId)}
             scrollEnabled={!!cart.items.length}
             style={styles.cartList}
-            renderItem={({ item }) => (
+            renderItem={({ item, index }) => (
               <View style={[styles.cartItem, isRTL && { flexDirection: "row-reverse" }]}>
+                {/* Index badge */}
+                <View style={styles.cartItemIndexBadge}>
+                  <Text style={styles.cartItemIndexText}>{index + 1}</Text>
+                </View>
                 <View style={styles.cartItemInfo}>
                   <Text style={[styles.cartItemName, rtlTextAlign]} numberOfLines={1}>{item.name}</Text>
-                  <Text style={[styles.cartItemPrice, rtlTextAlign]}>CHF {(item.price * item.quantity).toFixed(2)}</Text>
+                  <Text style={[styles.cartItemUnit, rtlTextAlign]}>CHF {Number(item.price).toFixed(2)} × {item.quantity}</Text>
                 </View>
                 <View style={[styles.cartItemActions, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Pressable style={styles.qtyBtn} onPress={() => cart.updateQuantity(item.id, item.quantity - 1)}>
-                    <Ionicons name="remove" size={16} color={Colors.text} />
+                  <Pressable
+                    style={[styles.qtyBtn, item.quantity === 1 && { backgroundColor: `${Colors.danger}22`, borderColor: Colors.danger }]}
+                    onPress={() => { cart.updateQuantity(item.id, item.quantity - 1); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                  >
+                    <Ionicons name={item.quantity === 1 ? "trash-outline" : "remove"} size={14} color={item.quantity === 1 ? Colors.danger : Colors.text} />
                   </Pressable>
-                  <Text style={styles.qtyText}>{item.quantity}</Text>
-                  <Pressable style={styles.qtyBtn} onPress={() => cart.updateQuantity(item.id, item.quantity + 1)}>
-                    <Ionicons name="add" size={16} color={Colors.text} />
+                  <View style={styles.qtyBadge}>
+                    <Text style={styles.qtyText}>{item.quantity}</Text>
+                  </View>
+                  <Pressable
+                    style={[styles.qtyBtn, { backgroundColor: `${Colors.accent}22`, borderColor: Colors.accent }]}
+                    onPress={() => { cart.updateQuantity(item.id, item.quantity + 1); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                  >
+                    <Ionicons name="add" size={14} color={Colors.accent} />
                   </Pressable>
+                  <Text style={styles.cartItemTotal}>CHF {(item.price * item.quantity).toFixed(2)}</Text>
                 </View>
               </View>
             )}
             ListEmptyComponent={
               <View style={styles.cartEmpty}>
-                <Ionicons name="cart-outline" size={40} color={Colors.textMuted} />
+                <Ionicons name="cart-outline" size={44} color={Colors.textMuted} />
                 <Text style={styles.cartEmptyText}>{t("emptyCart")}</Text>
                 <Text style={styles.cartEmptySubtext}>{t("addToCart")}</Text>
               </View>
@@ -1335,27 +1390,32 @@ export default function POSScreen() {
             </View>
           </View>
 
-          <Pressable
-            style={[styles.checkoutBtn, !cart.items.length && styles.checkoutBtnDisabled]}
-            onPress={() => cart.items.length > 0 && setShowCheckout(true)}
-            disabled={!cart.items.length}
-          >
-            <LinearGradient
-              colors={cart.items.length > 0 ? [Colors.gradientStart, Colors.gradientMid, Colors.accent] : ["#333", "#444", "#555"]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={styles.checkoutBtnGradient}
+          <Animated.View style={{ transform: [{ scale: checkoutPulse }] }}>
+            <Pressable
+              style={[styles.checkoutBtn, !cart.items.length && styles.checkoutBtnDisabled]}
+              onPress={() => cart.items.length > 0 && setShowCheckout(true)}
+              disabled={!cart.items.length}
             >
-              <View style={[styles.checkoutBtnInner, isRTL && { flexDirection: "row-reverse" }]}>
-                <View style={[styles.checkoutBtnLeft, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Ionicons name="card" size={20} color={Colors.white} />
-                  <Text style={styles.checkoutBtnText}>{t("checkout")}</Text>
+              <LinearGradient
+                colors={cart.items.length > 0 ? [Colors.gradientStart, Colors.gradientMid, Colors.accent] : ["#333", "#444", "#555"]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={styles.checkoutBtnGradient}
+              >
+                <View style={[styles.checkoutBtnInner, isRTL && { flexDirection: "row-reverse" }]}>
+                  <View style={[styles.checkoutBtnLeft, isRTL && { flexDirection: "row-reverse" }]}>
+                    <Ionicons name="bag-check" size={20} color={Colors.white} />
+                    <Text style={styles.checkoutBtnText}>{t("checkout")}</Text>
+                  </View>
+                  <View style={styles.checkoutBtnPrice}>
+                    <Text style={styles.checkoutBtnPriceText}>CHF {cart.total.toFixed(2)}</Text>
+                    {cart.items.length > 0 && (
+                      <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 10, textAlign: "center" }}>{cart.itemCount} items</Text>
+                    )}
+                  </View>
                 </View>
-                <View style={styles.checkoutBtnPrice}>
-                  <Text style={styles.checkoutBtnPriceText}>CHF {cart.total.toFixed(2)}</Text>
-                </View>
-              </View>
-            </LinearGradient>
-          </Pressable>
+              </LinearGradient>
+            </Pressable>
+          </Animated.View>
         </View>
       </View>
 
@@ -2663,46 +2723,62 @@ const styles = StyleSheet.create({
   mainContent: { flex: 1 },
   productsSection: { flex: 1 },
   productsSectionTablet: { flex: 2 },
-  searchRow: { paddingHorizontal: 14, paddingTop: 14 },
+  searchRow: { paddingHorizontal: 14, paddingTop: 12 },
   searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 14, paddingHorizontal: 14, height: 44, borderWidth: 1, borderColor: Colors.inputBorder },
   searchInput: { flex: 1, color: Colors.text, marginLeft: 8, fontSize: 15 },
-  categoriesRow: { flexGrow: 0, flexShrink: 0, minHeight: 75, marginTop: 12, marginBottom: 6 },
-  categoriesContent: { paddingHorizontal: 14, gap: 10, alignItems: "center" },
-  categoryChip: { borderRadius: 28, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.cardBorder, overflow: "hidden" },
-  categoryChipAll: { borderColor: Colors.accent, borderWidth: 2 },
-  categoryChipAllActive: { borderColor: Colors.gradientStart },
-  categoryChipGradient: { flexDirection: "row", alignItems: "center", paddingHorizontal: 22, paddingVertical: 16, gap: 10 },
-  categoryChipInner: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 16, gap: 8 },
-  categoryChipText: { color: Colors.textSecondary, fontSize: 16, fontWeight: "700" },
-  categoryChipTextAll: { color: Colors.white, fontWeight: "800" },
-  categoryDot: { width: 10, height: 10, borderRadius: 5 },
-  productGrid: { padding: 10 },
-  productCard: { flex: 1, margin: 5, backgroundColor: Colors.surface, borderRadius: 16, padding: 14, alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder, minWidth: 90, overflow: "hidden", position: "relative" as const },
-  productCardTopBorder: { position: "absolute" as const, top: 0, left: 0, right: 0, height: 3, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
-  productIcon: { width: 54, height: 54, borderRadius: 16, justifyContent: "center", alignItems: "center", marginBottom: 10, marginTop: 4, overflow: "hidden" as const },
-  productName: { color: Colors.text, fontSize: 12, fontWeight: "600", textAlign: "center", marginBottom: 6, lineHeight: 16 },
-  productPrice: { color: Colors.accent, fontSize: 15, fontWeight: "800" },
-  productAddBadge: { position: "absolute" as const, top: 8, right: 8, width: 22, height: 22, borderRadius: 11, justifyContent: "center", alignItems: "center" },
+
+  // ── Category grid (no scroll, wraps automatically)
+  categoriesGrid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 10, paddingVertical: 8, gap: 6 },
+  catChip: { flexDirection: "row", borderRadius: 20, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.cardBorder, overflow: "hidden" },
+  catChipActive: { borderColor: Colors.accent, borderWidth: 2 },
+  catChipGrad: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, gap: 5 },
+  catChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600" },
+  catDot: { width: 7, height: 7, borderRadius: 3.5 },
+
+  // ── Kept for compat (unused now)
+  categoriesRow: { flexGrow: 0 },
+  categoriesContent: {},
+  categoryChip: {}, categoryChipAll: {}, categoryChipAllActive: {},
+  categoryChipGradient: {}, categoryChipInner: {},
+  categoryChipText: {}, categoryChipTextAll: {}, categoryDot: {},
+
+  // ── Products
+  productGrid: { padding: 8 },
+  productCard: { flex: 1, margin: 4, backgroundColor: Colors.surface, borderRadius: 14, padding: 12, alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder, minWidth: 80, overflow: "hidden", position: "relative" as const },
+  productCardTopBorder: { position: "absolute" as const, top: 0, left: 0, right: 0, height: 3, borderTopLeftRadius: 14, borderTopRightRadius: 14 },
+  productIcon: { width: 50, height: 50, borderRadius: 14, justifyContent: "center", alignItems: "center", marginBottom: 8, marginTop: 4, overflow: "hidden" as const },
+  productName: { color: Colors.text, fontSize: 11, fontWeight: "600", textAlign: "center", marginBottom: 4, lineHeight: 15 },
+  productPrice: { color: Colors.accent, fontSize: 14, fontWeight: "800" },
+  productAddBadge: { position: "absolute" as const, top: 7, right: 7, width: 20, height: 20, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  productCartBadge: { position: "absolute" as const, top: 7, right: 7, minWidth: 20, height: 20, borderRadius: 10, justifyContent: "center", alignItems: "center", paddingHorizontal: 4 },
+  productCartBadgeText: { color: Colors.white, fontSize: 11, fontWeight: "800" },
   barcodeText: { color: Colors.textMuted, fontSize: 9, marginTop: 3 },
   emptyState: { alignItems: "center", justifyContent: "center", paddingVertical: 60 },
   emptyText: { color: Colors.textMuted, fontSize: 15, marginTop: 12 },
-  cartSection: { backgroundColor: Colors.surface, borderTopWidth: 1, borderColor: Colors.cardBorder, maxHeight: 400 },
+
+  // ── Cart
+  cartSection: { backgroundColor: Colors.surface, borderTopWidth: 1, borderColor: Colors.cardBorder, maxHeight: 420 },
   cartSectionTablet: { flex: 1, borderTopWidth: 0, borderLeftWidth: 1, maxHeight: "100%" as any },
-  cartHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderColor: Colors.cardBorder },
-  cartTitle: { color: Colors.text, fontSize: 17, fontWeight: "700" },
-  customerSelect: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
+  cartHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderColor: Colors.cardBorder },
+  cartTitle: { color: Colors.text, fontSize: 16, fontWeight: "700" },
+  customerSelect: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
   customerSelectText: { color: Colors.textMuted, fontSize: 13, flex: 1 },
-  cartList: { maxHeight: 140 },
-  cartItem: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
-  cartItemInfo: { flex: 1 },
-  cartItemName: { color: Colors.text, fontSize: 13, fontWeight: "600" },
+  cartList: { maxHeight: 220 },
+  cartItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)", gap: 8 },
+  cartItemIndexBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  cartItemIndexText: { color: Colors.textMuted, fontSize: 10, fontWeight: "700" },
+  cartItemInfo: { flex: 1, minWidth: 0 },
+  cartItemName: { color: Colors.text, fontSize: 12, fontWeight: "600" },
+  cartItemUnit: { color: Colors.textMuted, fontSize: 11, marginTop: 1 },
   cartItemPrice: { color: Colors.accent, fontSize: 12, marginTop: 2, fontWeight: "500" },
-  cartItemActions: { flexDirection: "row", alignItems: "center", gap: 10 },
-  qtyBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder },
-  qtyText: { color: Colors.text, fontSize: 15, fontWeight: "700", minWidth: 22, textAlign: "center" },
-  cartEmpty: { alignItems: "center", paddingVertical: 24 },
-  cartEmptyText: { color: Colors.textMuted, fontSize: 14, marginTop: 8 },
-  cartEmptySubtext: { color: Colors.textMuted, fontSize: 12, marginTop: 4 },
+  cartItemTotal: { color: Colors.accent, fontSize: 13, fontWeight: "700", minWidth: 60, textAlign: "right" },
+  cartItemActions: { flexDirection: "row", alignItems: "center", gap: 6 },
+  qtyBtn: { width: 26, height: 26, borderRadius: 13, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder },
+  qtyBadge: { minWidth: 26, height: 26, borderRadius: 13, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder },
+  qtyText: { color: Colors.text, fontSize: 13, fontWeight: "700", textAlign: "center" },
+  cartEmpty: { alignItems: "center", paddingVertical: 28 },
+  cartEmptyText: { color: Colors.textMuted, fontSize: 13, marginTop: 8, fontWeight: "600" },
+  cartEmptySubtext: { color: Colors.textMuted, fontSize: 11, marginTop: 4 },
   cartSummary: { paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderColor: Colors.cardBorder },
   summaryRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
   summaryLabel: { color: Colors.textSecondary, fontSize: 13 },
