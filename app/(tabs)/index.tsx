@@ -1007,7 +1007,7 @@ ${kitchenReceipt}
     setDiscountInput("");
   };
 
-  const topPad = Platform.OS === "web" ? 67 : 0;
+  const topPad = Platform.OS === "web" ? 8 : 0;
 
   const handleSwitchAccount = async (pinCode: string) => {
     if (!switchTarget) return;
@@ -1142,25 +1142,25 @@ ${kitchenReceipt}
             <View style={[styles.headerRight, isRTL && { flexDirection: "row-reverse", alignItems: "center" }, { alignItems: "center" }]}>
               <RealTimeClock />
               <Pressable onPress={() => setShowCallHistory(true)} style={[styles.headerInvoiceBtn, { position: "relative" }]}>
-                <Ionicons name="call-outline" size={28} color={Colors.white} />
+                <Ionicons name="call-outline" size={20} color={Colors.white} />
                 <Text style={styles.headerInvoiceLabel}>{language === "ar" ? "مكالمات" : language === "de" ? "Anrufe" : "Calls"}</Text>
                 {incomingCalls.length > 0 && (
                   <View style={{ position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.danger }} />
                 )}
               </Pressable>
               <Pressable onPress={() => setShowOnlineOrders(true)} style={[styles.headerInvoiceBtn, { position: "relative" }]}>
-                <Ionicons name="globe-outline" size={28} color={Colors.white} />
+                <Ionicons name="globe-outline" size={20} color={Colors.white} />
                 <Text style={styles.headerInvoiceLabel}>{language === "ar" ? "طلبات" : language === "de" ? "Online" : "Orders"}</Text>
                 {onlineOrderNotification && (
                   <View style={{ position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.danger }} />
                 )}
               </Pressable>
               <Pressable onPress={handleEndOfDay} style={styles.headerInvoiceBtn} disabled={endOfDayLoading}>
-                <Ionicons name="power-outline" size={28} color={endOfDayLoading ? Colors.textMuted : Colors.danger} />
+                <Ionicons name="power-outline" size={20} color={endOfDayLoading ? Colors.textMuted : Colors.danger} />
                 <Text style={[styles.headerInvoiceLabel, { color: endOfDayLoading ? Colors.textMuted : Colors.danger }]}>{t("endOfDay")}</Text>
               </Pressable>
               <Pressable onPress={() => setShowInvoiceHistory(true)} style={styles.headerInvoiceBtn}>
-                <Ionicons name="receipt-outline" size={28} color={Colors.white} />
+                <Ionicons name="receipt-outline" size={20} color={Colors.white} />
                 <Text style={styles.headerInvoiceLabel}>{t("invoices")}</Text>
               </Pressable>
               {employee && (
@@ -3008,10 +3008,10 @@ ${kitchenReceipt}
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { overflow: "hidden" },
-  headerGradient: { paddingHorizontal: 16, paddingVertical: 14 },
+  headerGradient: { paddingHorizontal: 16, paddingVertical: 8 },
   headerContent: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  headerTitle: { fontSize: 22, fontWeight: "800", color: Colors.white, letterSpacing: 0.5 },
-  headerRight: { flexDirection: "row", alignItems: "center", gap: 12 },
+  headerTitle: { fontSize: 18, fontWeight: "800", color: Colors.white, letterSpacing: 0.5 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   employeeName: { color: Colors.white, fontSize: 13, opacity: 0.9 },
   mainContent: { flex: 1 },
   productsSection: { flex: 1 },
@@ -3050,14 +3050,14 @@ const styles = StyleSheet.create({
   emptyText: { color: Colors.textMuted, fontSize: 15, marginTop: 12 },
 
   // ── Cart
-  cartSection: { backgroundColor: Colors.surface, borderTopWidth: 1, borderColor: Colors.cardBorder, maxHeight: 420 },
-  cartSectionTablet: { flex: 1.2, borderTopWidth: 0, borderLeftWidth: 1, maxHeight: "100%" as any },
-  cartHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderColor: Colors.cardBorder },
-  cartTitle: { color: Colors.text, fontSize: 20, fontWeight: "700" },
-  customerSelect: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
+  cartSection: { backgroundColor: Colors.surface, borderTopWidth: 1, borderColor: Colors.cardBorder, maxHeight: 380 },
+  cartSectionTablet: { flex: 1.2, borderTopWidth: 0, borderLeftWidth: 1, maxHeight: "100%" as any, display: "flex" as any, flexDirection: "column" as any },
+  cartHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderColor: Colors.cardBorder },
+  cartTitle: { color: Colors.text, fontSize: 17, fontWeight: "700" },
+  customerSelect: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 6, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
   customerSelectText: { color: Colors.textMuted, fontSize: 13, flex: 1 },
-  cartList: { maxHeight: 340 },
-  cartItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)", gap: 10 },
+  cartList: { flex: 1 },
+  cartItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 7, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)", gap: 8 },
   cartItemIndexBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", flexShrink: 0 },
   cartItemIndexText: { color: Colors.textMuted, fontSize: 10, fontWeight: "700" },
   cartItemInfo: { flex: 1, minWidth: 0 },
@@ -3072,16 +3072,16 @@ const styles = StyleSheet.create({
   cartEmpty: { alignItems: "center", paddingVertical: 28 },
   cartEmptyText: { color: Colors.textMuted, fontSize: 13, marginTop: 8, fontWeight: "600" },
   cartEmptySubtext: { color: Colors.textMuted, fontSize: 11, marginTop: 4 },
-  cartSummary: { paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderColor: Colors.cardBorder },
-  summaryRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
+  cartSummary: { paddingHorizontal: 14, paddingVertical: 6, borderTopWidth: 1, borderColor: Colors.cardBorder },
+  summaryRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 },
   summaryLabel: { color: Colors.textSecondary, fontSize: 13 },
   summaryValue: { color: Colors.text, fontSize: 13, fontWeight: "600" },
   totalRow: { borderTopWidth: 1, borderColor: Colors.cardBorder, paddingTop: 10, marginTop: 6 },
   totalLabel: { color: Colors.text, fontSize: 22, fontWeight: "800" },
   totalValue: { color: Colors.accent, fontSize: 26, fontWeight: "800" },
-  checkoutBtn: { marginHorizontal: 16, marginVertical: 10, borderRadius: 16, overflow: "hidden", elevation: 4, boxShadow: "0px 4px 8px rgba(124, 58, 237, 0.3)" },
+  checkoutBtn: { marginHorizontal: 14, marginVertical: 7, borderRadius: 14, overflow: "hidden", elevation: 4, boxShadow: "0px 4px 8px rgba(124, 58, 237, 0.3)" },
   checkoutBtnDisabled: { opacity: 0.5, elevation: 0, boxShadow: "none" },
-  checkoutBtnGradient: { paddingVertical: 16, paddingHorizontal: 20 },
+  checkoutBtnGradient: { paddingVertical: 12, paddingHorizontal: 16 },
   checkoutBtnInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   checkoutBtnLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   checkoutBtnPrice: { backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20 },
@@ -3181,7 +3181,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 6,
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderColor: Colors.cardBorder,
@@ -3333,11 +3333,11 @@ const styles = StyleSheet.create({
   callActionBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: "center", alignItems: "center" },
 
   // Header Invoice & Avatar
-  headerInvoiceBtn: { flexDirection: "row" as const, alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.15)", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-  headerInvoiceLabel: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" as const },
+  headerInvoiceBtn: { flexDirection: "row" as const, alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.15)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16 },
+  headerInvoiceLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" as const },
   headerAvatarBtn: { padding: 2 },
-  headerAvatarCircle: { width: 42, height: 42, borderRadius: 21, justifyContent: "center" as const, alignItems: "center" as const, borderWidth: 2, borderColor: "rgba(255,255,255,0.4)" },
-  headerAvatarText: { color: "#FFFFFF", fontSize: 20, fontWeight: "800" as const },
+  headerAvatarCircle: { width: 34, height: 34, borderRadius: 17, justifyContent: "center" as const, alignItems: "center" as const, borderWidth: 2, borderColor: "rgba(255,255,255,0.4)" },
+  headerAvatarText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" as const },
 
   // Account Switcher
   switchCurrentAccount: { flexDirection: "row" as const, alignItems: "center", gap: 14, backgroundColor: Colors.surfaceLight, borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: Colors.accent + "30" },
