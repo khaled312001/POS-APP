@@ -130,6 +130,14 @@ function scheduleAutoReconnect() {
     autoReconnectTimer = setTimeout(async () => {
         autoReconnectTimer = null;
         if (status === "disconnected" && !connecting) {
+            // Clear stale chrome lock files before reconnecting
+            try {
+                const fsMod = await import("fs");
+                const lockFile = path.join(CHROME_DATA_DIR, "SingletonLock");
+                if (fsMod.existsSync(lockFile)) fsMod.unlinkSync(lockFile);
+                const cookieLock = path.join(CHROME_DATA_DIR, "Default", "Cookies-journal");
+                if (fsMod.existsSync(cookieLock)) fsMod.unlinkSync(cookieLock);
+            } catch { }
             log("Auto-reconnecting…");
             try {
                 await whatsappService.connect();
@@ -224,9 +232,18 @@ async function _connectBackground(wpp: any): Promise<void> {
             "--disable-gpu",
             "--no-first-run",
             "--no-zygote",
+            "--single-process",
             "--disable-extensions",
             "--disable-software-rasterizer",
-            "--disable-features=VizDisplayCompositor",
+            "--disable-features=VizDisplayCompositor,AudioServiceOutOfProcess",
+            "--disable-background-networking",
+            "--disable-default-apps",
+            "--disable-sync",
+            "--disable-translate",
+            "--hide-scrollbars",
+            "--metrics-recording-only",
+            "--mute-audio",
+            "--safebrowsing-disable-auto-update",
             "--window-size=1280,800",
         ];
 
@@ -247,11 +264,14 @@ async function _connectBackground(wpp: any): Promise<void> {
             logQR: false,
             autoClose: 0,
             disableWelcome: true,
+            waitForInjectToken: true,
             puppeteerOptions: {
                 executablePath: browserPath,
                 args: browserArgs,
                 headless: true,
                 userDataDir: CHROME_DATA_DIR,
+                timeout: 90000,
+                protocolTimeout: 90000,
             },
             browserArgs,
             catchQR: (base64Qr: string) => {
