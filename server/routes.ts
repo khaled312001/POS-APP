@@ -953,6 +953,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  app.get("/api/customers/count", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      const search = req.query.search as string | undefined;
+      res.json({ count: await storage.getCustomerCount(search, tenantId) });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Download Customers Excel Template (must be before :id route)
   app.get("/api/customers/template", (req, res) => {
     const templateData = [
@@ -1051,6 +1059,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getCustomerSales(Number(req.params.id))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // Calls
+  app.get("/api/calls", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      const limit = req.query.limit ? Number(req.query.limit) : 50;
+      const calls = await storage.getCalls(tenantId, limit);
+      res.json(calls);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Sales
   app.get("/api/sales", async (req, res) => {
     try {
@@ -1101,6 +1119,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
+
+      // Link call if callId was provided
+      if (req.body.callId) {
+        await storage.updateCall(Number(req.body.callId), { saleId: sale.id, status: "answered" });
+      }
+
       // Log activity
       await storage.createActivityLog({
         employeeId: saleData.employeeId,

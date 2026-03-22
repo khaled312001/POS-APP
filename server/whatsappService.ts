@@ -57,6 +57,7 @@ let lastError: string | null = null;
 let connectionLog: { time: string; event: string }[] = [];
 let connecting = false;
 let connectionPhase: "idle" | "starting" | "awaiting_qr" | "qr_scanned" | "ready" = "idle";
+let connectionStartTime = 0;
 let autoReconnectTimer: any = null;
 let pendingMessages: { phone: string; text: string; timestamp: number }[] = [];
 
@@ -68,24 +69,41 @@ function log(event: string) {
 }
 
 function toChatId(phone: string): string {
-    const digits = phone.replace(/\D/g, "");
+    let digits = phone.replace(/\D/g, "");
+
+    // Normalize Swiss numbers
+    // 1. If it starts with 410... (e.g. 410791234567) -> 41791234567
+    if (digits.startsWith("410") && digits.length === 12) {
+        digits = "41" + digits.slice(3);
+    }
+    // 2. If it starts with 0... (10 digits, e.g., 0791234567) -> 41791234567
+    else if (digits.startsWith("0") && digits.length === 10) {
+        digits = "41" + digits.slice(1);
+    }
+    // 3. If it has 9 digits and doesn't start with 0 (e.g. 791234567) -> 41791234567
+    else if (digits.length === 9 && !digits.startsWith("0")) {
+        digits = "41" + digits;
+    }
+
     return `${digits}@c.us`;
 }
 
 async function cleanupProcesses() {
-    // Only cleanup if we are not on Windows or if we really need to force a reset.
-    // On Windows, taskkill is noisy and often unnecessary if we use a stable userDataDir.
-    const isWindows = os.platform() === 'win32';
-    if (!isWindows) {
-        try {
-            const { execSync } = await import("child_process");
+    // Attempt robust cleanup on both Windows and Linux to prevent dangling browser locks
+    try {
+        const { execSync } = await import("child_process");
+        const isWindows = os.platform() === 'win32';
+        if (isWindows) {
+            execSync(`wmic process where "name='chrome.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: 'ignore' });
+            execSync(`wmic process where "name='chromium.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: 'ignore' });
+        } else {
             execSync(
                 `pkill -9 -f 'wppconnect' 2>/dev/null; pkill -9 -f 'chromium.*barmagly' 2>/dev/null; true`,
                 { timeout: 4000 }
             );
-            await new Promise(r => setTimeout(r, 500));
-        } catch { }
-    }
+        }
+        await new Promise(r => setTimeout(r, 500));
+    } catch { }
 
     // We don't wipe the whole /tmp anymore to preserve session data.
     // Instead, we just ensure the STORAGE_DIR exists.
@@ -256,22 +274,31 @@ async function _connectBackground(wpp: any): Promise<void> {
                     if (connectionPhase !== "ready") {
                         connectionPhase = "qr_scanned";
                     }
+                    if (status === "disconnected" && !connecting) {
+                        status = "connected";
+                        clientReady = true;
+                        connectionPhase = "ready";
+                        log("WhatsApp reconnected natively from mobile");
+                    }
                 }
 
-                // Only handle fatal disconnects AFTER full stabilisation
-                if (stabilisationComplete && connectionPhase === "ready") {
-                    if (
-                        statusSession === "notLogged" ||
-                        statusSession === "browserClose"
-                    ) {
-                        status = "disconnected";
-                        clientReady = false;
-                        client = null;
-                        connectionPhase = "idle";
-                        log(`Session lost: ${statusSession} — will auto-reconnect in 15s`);
-                        scheduleAutoReconnect();
-                    }
-                    // disconnectedMobile is often transient (phone screen-off, etc.) — just log it
+                if (
+                    statusSession === "notLogged" ||
+                    statusSession === "browserClose" ||
+                    statusSession === "serverWssNotConnected" ||
+                    statusSession === "disconnectedMobile" ||
+                    statusSession === "desconnectedMobile" ||
+                    statusSession === "deviceNotConnected"
+                ) {
+                    status = "disconnected";
+                    clientReady = false;
+                    client = null;
+                    connectionPhase = "idle";
+                    connecting = false;
+
+                    log(`Session offline (${statusSession}) — will automatically retry/reconnect...`);
+                    // Usually disconnectedMobile recovers natively, but scheduling a restart provides a solid fallback.
+                    scheduleAutoReconnect();
                 }
             },
         });
@@ -341,10 +368,16 @@ export const whatsappService = {
         }
 
         if (connecting) {
-            log("Connection already in progress — ignored duplicate request");
-            return { status };
+            if (Date.now() - connectionStartTime > 60000) {
+                log("Connection starting phase seems stuck for over 60s. Forcing restart...");
+                connecting = false;
+            } else {
+                log("Connection already in progress — ignored duplicate request");
+                return { status };
+            }
         }
         connecting = true;
+        connectionStartTime = Date.now();
         connectionPhase = "starting";
         clientReady = false;
 

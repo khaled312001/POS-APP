@@ -56,6 +56,7 @@ export default function POSScreen() {
   const [discountInput, setDiscountInput] = useState("");
   const [discountType, setDiscountType] = useState<"fixed" | "percent">("fixed");
   const [showScanner, setShowScanner] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvc, setCardCvc] = useState("");
@@ -95,10 +96,12 @@ export default function POSScreen() {
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [newCustomerForm, setNewCustomerForm] = useState({ name: "", phone: "", address: "", email: "" });
   const [showOnlineOrders, setShowOnlineOrders] = useState(false);
+  const [showCallHistory, setShowCallHistory] = useState(false);
   const [endOfDayLoading, setEndOfDayLoading] = useState(false);
   const [lastAddedId, setLastAddedId] = useState<number | null>(null);
   const flashAnim = useRef(new Animated.Value(0)).current;
   const checkoutPulse = useRef(new Animated.Value(1)).current;
+  const [activeCallId, setActiveCallId] = useState<number | null>(null);
 
   const { onlineOrderNotification, setOnlineOrderNotification, incomingCalls, setIncomingCalls, dismissCall } = useNotifications();
 
@@ -153,10 +156,12 @@ export default function POSScreen() {
         cart.setCustomerId(call.customer.id);
         setCallerCustomer(call.customer);
         setPhoneInput(call.customer.phone || call.phoneNumber);
+        if (call.dbCallId) setActiveCallId(Number(call.dbCallId));
       } else {
         // Unknown caller → pre-fill phone and immediately try silent lookup
         setPhoneInput(call.phoneNumber);
         setCallerCustomer(null);
+        if (call.dbCallId) setActiveCallId(Number(call.dbCallId));
         if (tenantId) {
           apiRequest("GET", `/api/customers/phone-lookup?phone=${encodeURIComponent(call.phoneNumber)}&tenantId=${tenantId}`)
             .then(res => res.ok ? res.json() : [])
@@ -170,7 +175,7 @@ export default function POSScreen() {
                 setIncomingCalls(prev => prev.map(c => c.id === call.id ? { ...c, customer: found } : c));
               }
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       }
 
@@ -275,6 +280,19 @@ export default function POSScreen() {
     enabled: showOnlineOrders && !!tenantId,
     refetchInterval: showOnlineOrders ? 30000 : false,
   });
+
+  const { data: callHistory = [] } = useQuery<any[]>({
+    queryKey: ["/api/calls", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: showCallHistory && !!tenantId,
+  });
+
+  const { data: customerCountData } = useQuery<{ count: number }>({
+    queryKey: ["/api/customers/count", `?tenantId=${tenantId || ""}${customerSearch ? `&search=${customerSearch}` : ""}`],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId && showCustomerPicker,
+  });
+  const totalCustomerCount = customerCountData?.count || 0;
 
   const { data: myShifts = [] } = useQuery<any[]>({
     queryKey: [tenantId ? `/api/shifts?tenantId=${tenantId}` : "/api/shifts"],
@@ -601,6 +619,7 @@ export default function POSScreen() {
     cart.clearCart();
     setPhoneInput("");
     setCallerCustomer(null);
+    setActiveCallId(null);
     setShowCheckout(false);
     setCashReceived("");
     setCardNumber("");
@@ -642,6 +661,7 @@ export default function POSScreen() {
       changeAmount: paymentMethod === "cash" && cashReceived
         ? (Number(cashReceived) - cart.total).toFixed(2) : "0",
       items: saleItems,
+      callId: activeCallId,
     };
     if (stripePaymentId) {
       data.notes = `Stripe: ${stripePaymentId}`;
@@ -986,6 +1006,13 @@ export default function POSScreen() {
             <Text style={[styles.headerTitle, rtlTextAlign]}>Barmagly POS</Text>
             <View style={[styles.headerRight, isRTL && { flexDirection: "row-reverse", alignItems: "center" }, { alignItems: "center" }]}>
               <RealTimeClock />
+              <Pressable onPress={() => setShowCallHistory(true)} style={[styles.headerInvoiceBtn, { position: "relative" }]}>
+                <Ionicons name="call-outline" size={28} color={Colors.white} />
+                <Text style={styles.headerInvoiceLabel}>{language === "ar" ? "مكالمات" : language === "de" ? "Anrufe" : "Calls"}</Text>
+                {incomingCalls.length > 0 && (
+                  <View style={{ position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.danger }} />
+                )}
+              </Pressable>
               <Pressable onPress={() => setShowOnlineOrders(true)} style={[styles.headerInvoiceBtn, { position: "relative" }]}>
                 <Ionicons name="globe-outline" size={28} color={Colors.white} />
                 <Text style={styles.headerInvoiceLabel}>{language === "ar" ? "طلبات" : language === "de" ? "Online" : "Orders"}</Text>
@@ -1981,34 +2008,67 @@ export default function POSScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Text style={[styles.modalTitle, rtlTextAlign]}>{t("selectCustomer")}</Text>
-              <Pressable onPress={() => setShowCustomerPicker(false)}>
+              <View style={{ flex: 1, flexDirection: isRTL ? "row-reverse" : "row", alignItems: "baseline", gap: 6 }}>
+                <Text style={[styles.modalTitle, rtlTextAlign]}>{t("selectCustomer")}</Text>
+                <Text style={{ fontSize: 13, color: Colors.accent, fontWeight: "800", backgroundColor: Colors.accent + "15", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, overflow: "hidden" }}>
+                  {totalCustomerCount} {t("total" as any) || "Total"}
+                </Text>
+              </View>
+              <Pressable onPress={() => { setShowCustomerPicker(false); setCustomerSearch(""); }}>
                 <Ionicons name="close" size={24} color={Colors.text} />
               </Pressable>
             </View>
-            <Pressable style={[styles.walkInBtn, isRTL && { flexDirection: "row-reverse" }]} onPress={() => { cart.setCustomerId(null); setShowCustomerPicker(false); }}>
-              <Ionicons name="person-outline" size={20} color={Colors.textSecondary} />
-              <Text style={[styles.walkInText, rtlTextAlign]}>{t("walkIn")}</Text>
+
+            <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+              <View style={[styles.searchBox, { height: 42, backgroundColor: Colors.surfaceLight, borderRadius: 12, borderWidth: 1, borderColor: Colors.cardBorder }]}>
+                <Ionicons name="search" size={16} color={Colors.textMuted} />
+                <TextInput
+                  style={[styles.searchInput, { fontSize: 14, color: Colors.text }]}
+                  placeholder={t("search" as any) + "..."}
+                  placeholderTextColor={Colors.textMuted}
+                  value={customerSearch}
+                  onChangeText={setCustomerSearch}
+                  autoFocus={Platform.OS === "web"}
+                />
+                {customerSearch ? (
+                  <Pressable onPress={() => setCustomerSearch("")}>
+                    <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+
+            <Pressable
+              style={[styles.walkInBtn, isRTL && { flexDirection: "row-reverse" }, { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.cardBorder, marginHorizontal: 20, marginBottom: 16 }]}
+              onPress={() => { cart.setCustomerId(null); setShowCustomerPicker(false); setCustomerSearch(""); }}
+            >
+              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.textSecondary + "15", justifyContent: "center", alignItems: "center", marginRight: 12 }}>
+                <Ionicons name="person-outline" size={18} color={Colors.textSecondary} />
+              </View>
+              <Text style={[styles.walkInText, rtlTextAlign, { fontSize: 15, fontWeight: "600", color: Colors.textSecondary }]}>{t("walkIn")}</Text>
             </Pressable>
             <FlatList
-              data={customers}
+              data={customers.filter((c: any) =>
+                (c.name || "").toLowerCase().includes(customerSearch.toLowerCase()) ||
+                (c.phone || "").includes(customerSearch)
+              )}
               keyExtractor={(item: any) => String(item.id)}
-              scrollEnabled={!!customers.length}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
               renderItem={({ item }: { item: any }) => (
                 <Pressable
                   style={[styles.customerCard, cart.customerId === item.id && styles.customerCardActive, isRTL && { flexDirection: "row-reverse" }]}
                   onPress={() => { cart.setCustomerId(item.id); setShowCustomerPicker(false); }}
                 >
-                  <View style={[styles.customerAvatar, isRTL ? { marginLeft: 10, marginRight: 0 } : null]}>
-                    <Text style={styles.customerAvatarText}>{item.name.charAt(0)}</Text>
+                  <View style={[styles.customerAvatar, { backgroundColor: cart.customerId === item.id ? Colors.white : Colors.primary + "15" }]}>
+                    <Text style={[styles.customerAvatarText, { color: cart.customerId === item.id ? Colors.primary : Colors.primary }]}>{item.name.charAt(0).toUpperCase()}</Text>
                   </View>
                   <View style={styles.customerCardInfo}>
-                    <Text style={[styles.customerCardName, rtlTextAlign]}>{item.name}</Text>
-                    <Text style={[styles.customerCardMeta, rtlTextAlign]}>{item.phone || item.email || t("noContact")}</Text>
+                    <Text style={[styles.customerCardName, rtlTextAlign, cart.customerId === item.id && { color: Colors.white }]}>{item.name}</Text>
+                    <Text style={[styles.customerCardMeta, rtlTextAlign, cart.customerId === item.id && { color: Colors.white + "CC" }]}>{item.phone || item.email || t("noContact")}</Text>
                   </View>
-                  <View style={[styles.customerLoyalty, isRTL && { flexDirection: "row-reverse" }]}>
-                    <Ionicons name="star" size={12} color={Colors.warning} />
-                    <Text style={styles.customerLoyaltyText}>{item.loyaltyPoints || 0}</Text>
+                  <View style={[styles.customerLoyalty, isRTL && { flexDirection: "row-reverse" }, { backgroundColor: cart.customerId === item.id ? Colors.white + "25" : Colors.warning + "15" }]}>
+                    <Ionicons name="star" size={12} color={cart.customerId === item.id ? Colors.white : Colors.warning} />
+                    <Text style={[styles.customerLoyaltyText, { color: cart.customerId === item.id ? Colors.white : Colors.warning, fontWeight: "700" }]}>{item.loyaltyPoints || 0}</Text>
                   </View>
                 </Pressable>
               )}
@@ -2059,7 +2119,7 @@ export default function POSScreen() {
                 <Ionicons name="call-outline" size={16} color={Colors.textMuted} />
                 <TextInput
                   style={[styles.newCustInput, isRTL && { textAlign: "right" }]}
-                  placeholder="+41 ..."
+                  placeholder="079 123 45 67"
                   placeholderTextColor={Colors.textMuted}
                   value={newCustomerForm.phone}
                   onChangeText={(v) => setNewCustomerForm((f) => ({ ...f, phone: v }))}
@@ -2743,6 +2803,88 @@ export default function POSScreen() {
                   <Text style={{ fontSize: 40 }}>🌐</Text>
                   <Text style={{ color: Colors.textMuted, fontSize: 15, marginTop: 12, fontWeight: "600" }}>
                     {language === "ar" ? "لا توجد طلبات إلكترونية" : language === "de" ? "Keine Online-Bestellungen" : "No online orders yet"}
+                  </Text>
+                </View>
+              }
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Call History Panel ── */}
+      <Modal visible={showCallHistory} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "92%" }]}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={[styles.modalTitle, rtlTextAlign]}>
+                {language === "ar" ? "📞 سجل المكالمات" : language === "de" ? "📞 Anrufhistorie" : "📞 Call History"}
+              </Text>
+              <Pressable onPress={() => setShowCallHistory(false)}>
+                <Ionicons name="close" size={24} color={Colors.text} />
+              </Pressable>
+            </View>
+
+            <FlatList
+              data={callHistory}
+              keyExtractor={(item: any) => String(item.id)}
+              renderItem={({ item }: { item: any }) => {
+                const callDate = new Date(item.createdAt);
+                const isMissed = item.status === "missed";
+                // Find customer in loaded customers list
+                const cust = customers.find((c: any) => c.id === item.customerId);
+
+                return (
+                  <Pressable
+                    onPress={() => {
+                      if (item.phoneNumber) {
+                        setPhoneInput(item.phoneNumber);
+                        if (cust) {
+                          cart.setCustomerId(cust.id);
+                          setCallerCustomer(cust);
+                        } else {
+                          handlePhoneSearch(item.phoneNumber);
+                        }
+                        setActiveCallId(item.id);
+                        setShowCallHistory(false);
+                      }
+                    }}
+                    style={{
+                      backgroundColor: Colors.surfaceLight,
+                      borderRadius: 14, padding: 14, marginBottom: 10,
+                      borderWidth: 1, borderColor: Colors.cardBorder,
+                      borderLeftWidth: 4, borderLeftColor: isMissed ? Colors.danger : Colors.success,
+                      flexDirection: "row", alignItems: "center"
+                    }}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isMissed ? Colors.danger + "20" : Colors.success + "20", justifyContent: "center", alignItems: "center", marginRight: 12 }}>
+                      <Ionicons name={isMissed ? "call-outline" : "call"} size={20} color={isMissed ? Colors.danger : Colors.success} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 15 }}>{cust ? cust.name : item.phoneNumber}</Text>
+                      <Text style={{ color: Colors.textSecondary, fontSize: 13 }}>{item.phoneNumber}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+                        <Ionicons name="time-outline" size={12} color={Colors.textMuted} style={{ marginRight: 4 }} />
+                        <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{callDate.toLocaleString()}</Text>
+                        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.textMuted, marginHorizontal: 6 }} />
+                        <Text style={{ color: isMissed ? Colors.danger : Colors.success, fontSize: 12, fontWeight: "600" }}>
+                          {isMissed ? (language === "ar" ? "فاتت" : language === "de" ? "Verpasst" : "Missed") : (language === "ar" ? "تم الرد" : language === "de" ? "Angenommen" : "Answered")}
+                        </Text>
+                      </View>
+                    </View>
+                    {item.saleId && (
+                      <View style={{ backgroundColor: Colors.accent + "20", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginRight: 8 }}>
+                        <Text style={{ color: Colors.accent, fontSize: 9, fontWeight: "800" }}>ORDERED</Text>
+                      </View>
+                    )}
+                    <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={18} color={Colors.textMuted} />
+                  </Pressable>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={{ alignItems: "center", paddingVertical: 40 }}>
+                  <Ionicons name="call-outline" size={48} color={Colors.textMuted} />
+                  <Text style={{ color: Colors.textMuted, fontSize: 15, marginTop: 12, fontWeight: "600" }}>
+                    {language === "ar" ? "لا يوجد سجل مكالمات" : language === "de" ? "Keine Anrufhistorie" : "No call history yet"}
                   </Text>
                 </View>
               }

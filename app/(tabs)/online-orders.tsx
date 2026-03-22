@@ -55,7 +55,28 @@ export default function OnlineOrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [newOrderIds, setNewOrderIds] = useState<Set<number>>(new Set());
   const [editingOrder, setEditingOrder] = useState<any>(null);
-  const [editForm, setEditForm] = useState({ customerName: "", customerPhone: "", customerAddress: "", notes: "", estimatedTime: "" });
+  const [editForm, setEditForm] = useState<{
+    customerName: string;
+    customerPhone: string;
+    customerAddress: string;
+    notes: string;
+    estimatedTime: string;
+    items: any[];
+    subtotal: number;
+    deliveryFee: number;
+    totalAmount: number;
+  }>({
+    customerName: "",
+    customerPhone: "",
+    customerAddress: "",
+    notes: "",
+    estimatedTime: "",
+    items: [],
+    subtotal: 0,
+    deliveryFee: 0,
+    totalAmount: 0,
+  });
+  const [showProductPicker, setShowProductPicker] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const knownOrderIds = useRef<Set<number>>(new Set());
 
@@ -66,6 +87,12 @@ export default function OnlineOrdersScreen() {
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
     refetchInterval: 15000,
+  });
+
+  const { data: allProducts = [] } = useQuery<any[]>({
+    queryKey: ["/api/products", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
   });
 
   // Detect new orders and play sound
@@ -149,15 +176,15 @@ export default function OnlineOrdersScreen() {
     const confirmed = Platform.OS === "web"
       ? window.confirm(language === "ar" ? "سيتم حذف هذا الطلب نهائياً" : language === "de" ? "Bestellung dauerhaft löschen?" : "Permanently delete this order?")
       : await new Promise<boolean>((resolve) => {
-          Alert.alert(
-            language === "ar" ? "حذف الطلب" : language === "de" ? "Bestellung löschen?" : "Delete Order?",
-            language === "ar" ? "سيتم حذف هذا الطلب نهائياً" : language === "de" ? "Diese Bestellung wird dauerhaft gelöscht." : "This will permanently delete the order.",
-            [
-              { text: language === "ar" ? "إلغاء" : language === "de" ? "Abbrechen" : "Cancel", style: "cancel", onPress: () => resolve(false) },
-              { text: language === "ar" ? "حذف" : language === "de" ? "Löschen" : "Delete", style: "destructive", onPress: () => resolve(true) },
-            ]
-          );
-        });
+        Alert.alert(
+          language === "ar" ? "حذف الطلب" : language === "de" ? "Bestellung löschen?" : "Delete Order?",
+          language === "ar" ? "سيتم حذف هذا الطلب نهائياً" : language === "de" ? "Diese Bestellung wird dauerhaft gelöscht." : "This will permanently delete the order.",
+          [
+            { text: language === "ar" ? "إلغاء" : language === "de" ? "Abbrechen" : "Cancel", style: "cancel", onPress: () => resolve(false) },
+            { text: language === "ar" ? "حذف" : language === "de" ? "Löschen" : "Delete", style: "destructive", onPress: () => resolve(true) },
+          ]
+        );
+      });
     if (!confirmed) return;
     try {
       await apiRequest("DELETE", `/api/online-orders/${id}`);
@@ -174,8 +201,60 @@ export default function OnlineOrdersScreen() {
       customerAddress: order.customerAddress || "",
       notes: order.notes || "",
       estimatedTime: order.estimatedTime ? String(order.estimatedTime) : "",
+      items: order.items ? JSON.parse(JSON.stringify(order.items)) : [],
+      subtotal: Number(order.subtotal || 0),
+      deliveryFee: Number(order.deliveryFee || 0),
+      totalAmount: Number(order.totalAmount || 0),
     });
     setEditingOrder(order);
+  };
+
+  const updateItemQty = (index: number, delta: number) => {
+    setEditForm(prev => {
+      const nextItems = [...prev.items];
+      const it = nextItems[index];
+      const newQty = Math.max(0, (it.quantity || 0) + delta);
+      if (newQty === 0) {
+        nextItems.splice(index, 1);
+      } else {
+        nextItems[index] = { ...it, quantity: newQty, total: newQty * it.unitPrice };
+      }
+      const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
+      return {
+        ...prev,
+        items: nextItems,
+        subtotal: newSubtotal,
+        totalAmount: newSubtotal + prev.deliveryFee
+      };
+    });
+  };
+
+  const addItemToOrder = (prod: any) => {
+    setEditForm(prev => {
+      const existingIdx = prev.items.findIndex(i => i.productId === prod.id);
+      let nextItems = [...prev.items];
+      if (existingIdx > -1) {
+        const it = nextItems[existingIdx];
+        const newQty = it.quantity + 1;
+        nextItems[existingIdx] = { ...it, quantity: newQty, total: newQty * it.unitPrice };
+      } else {
+        nextItems.push({
+          productId: prod.id,
+          name: prod.name,
+          quantity: 1,
+          unitPrice: Number(prod.price),
+          total: Number(prod.price),
+        });
+      }
+      const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
+      return {
+        ...prev,
+        items: nextItems,
+        subtotal: newSubtotal,
+        totalAmount: newSubtotal + prev.deliveryFee,
+      };
+    });
+    setShowProductPicker(false);
   };
 
   const saveEditOrder = async () => {
@@ -187,6 +266,9 @@ export default function OnlineOrdersScreen() {
         customerAddress: editForm.customerAddress || null,
         notes: editForm.notes || null,
         estimatedTime: editForm.estimatedTime ? Number(editForm.estimatedTime) : null,
+        items: editForm.items,
+        subtotal: String(editForm.subtotal.toFixed(2)),
+        totalAmount: String(editForm.totalAmount.toFixed(2)),
       });
       qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
       setEditingOrder(null);
@@ -382,6 +464,62 @@ export default function OnlineOrdersScreen() {
                   />
                 </View>
               ))}
+
+              {/* Items Management */}
+              <View style={[styles.editDivider, { marginTop: 10, marginBottom: 15 }]} />
+              <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }, { marginBottom: 10, borderBottomWidth: 0 }]}>
+                <Text style={[styles.editLabel, { marginBottom: 0 }]}>{editLabel("Order Items", "محتويات الطلب", "Bestellartikel")}</Text>
+                <Pressable onPress={() => setShowProductPicker(true)} style={styles.addSmallBtn}>
+                  <Ionicons name="add" size={16} color={Colors.accent} />
+                  <Text style={styles.addSmallText}>{editLabel("Add", "إضافة", "Hinzufügen")}</Text>
+                </Pressable>
+              </View>
+
+              {editForm.items.length === 0 ? (
+                <View style={styles.emptyItems}>
+                  <Text style={styles.emptyItemsText}>{editLabel("No items in order", "لا توجد أصناف في الطلب", "Keine Artikel")}</Text>
+                </View>
+              ) : (
+                editForm.items.map((it, idx) => (
+                  <View key={idx} style={[styles.editItemRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.editItemName, isRTL && { textAlign: "right" }]}>{it.name}</Text>
+                      <Text style={[styles.editItemPrice, isRTL && { textAlign: "right" }]}>CHF {Number(it.unitPrice).toFixed(2)}</Text>
+                    </View>
+                    <View style={[styles.qtyControl, isRTL && { flexDirection: "row-reverse" }]}>
+                      <Pressable onPress={() => updateItemQty(idx, -1)} style={styles.qtyBtn}>
+                        <Ionicons name="remove" size={16} color={Colors.text} />
+                      </Pressable>
+                      <Text style={styles.qtyVal}>{it.quantity}</Text>
+                      <Pressable onPress={() => updateItemQty(idx, 1)} style={styles.qtyBtn}>
+                        <Ionicons name="add" size={16} color={Colors.text} />
+                      </Pressable>
+                    </View>
+                    <Text style={styles.editItemTotal}>{(it.total || 0).toFixed(2)}</Text>
+                    <Pressable onPress={() => updateItemQty(idx, -it.quantity)} style={styles.itemDelBtn}>
+                      <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+                    </Pressable>
+                  </View>
+                ))
+              )}
+
+              <View style={[styles.editDivider, { marginVertical: 15 }]} />
+              <View style={[styles.modalTotalRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <Text style={styles.modalTotalLabel}>{editLabel("Subtotal", "المجموع الفرعي", "Zwischensumme")}</Text>
+                <Text style={styles.modalTotalVal}>CHF {editForm.subtotal.toFixed(2)}</Text>
+              </View>
+              {editForm.deliveryFee > 0 && (
+                <View style={[styles.modalTotalRow, isRTL && { flexDirection: "row-reverse" }]}>
+                  <Text style={styles.modalTotalLabel}>{editLabel("Delivery Fee", "رسوم التوصيل", "Liefergebühr")}</Text>
+                  <Text style={styles.modalTotalVal}>CHF {editForm.deliveryFee.toFixed(2)}</Text>
+                </View>
+              )}
+              <View style={[styles.modalTotalRow, isRTL && { flexDirection: "row-reverse" }, { marginTop: 4 }]}>
+                <Text style={[styles.modalTotalLabel, { color: Colors.text, fontWeight: "700" }]}>{editLabel("Total", "الإجمالي", "Gesamt")}</Text>
+                <Text style={[styles.modalTotalVal, { color: Colors.accent, fontSize: 18, fontWeight: "800" }]}>CHF {editForm.totalAmount.toFixed(2)}</Text>
+              </View>
+
+              <View style={{ height: 40 }} />
             </ScrollView>
             <View style={[styles.modalFooter, isRTL && { flexDirection: "row-reverse" }]}>
               <Pressable style={styles.modalCancelBtn} onPress={() => setEditingOrder(null)}>
@@ -395,8 +533,37 @@ export default function OnlineOrdersScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* Product Picker Modal */}
+      <Modal visible={showProductPicker} animationType="fade" transparent onRequestClose={() => setShowProductPicker(false)}>
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerSheet}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={styles.modalTitle}>{editLabel("Add Item", "إضافة صنف", "Artikel hinzufügen")}</Text>
+              <Pressable onPress={() => setShowProductPicker(false)}>
+                <Ionicons name="close" size={22} color={Colors.textMuted} />
+              </Pressable>
+            </View>
+            <FlatList
+              data={allProducts}
+              keyExtractor={(p) => String(p.id)}
+              renderItem={({ item: p }) => (
+                <Pressable style={[styles.pickerItem, isRTL && { flexDirection: "row-reverse" }]} onPress={() => addItemToOrder(p)}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.customerName, isRTL && { textAlign: "right" }]}>{p.name}</Text>
+                    <Text style={[styles.customerSub, isRTL && { textAlign: "right" }]}>{p.categoryName || ""}</Text>
+                  </View>
+                  <Text style={styles.orderAmount}>CHF {Number(p.price).toFixed(2)}</Text>
+                </Pressable>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.pickerSep} />}
+              ListEmptyComponent={<Text style={styles.emptyItemsText}>{editLabel("No products found", "لا يوجد منتجات", "Keine Produkte")}</Text>}
+            />
+          </View>
+        </View>
+      </Modal>
+
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+      <View style={[styles.header, { paddingTop: insets.top }]} >
         <LinearGradient colors={["#1E1B4B", "#312E81", "#0A0E27"]} style={styles.headerGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <View style={[styles.headerContent, isRTL && { flexDirection: "row-reverse" }]}>
             <View>
@@ -446,7 +613,7 @@ export default function OnlineOrdersScreen() {
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
+          <View style={styles.emptyState} >
             <Text style={styles.emptyIcon}>🌐</Text>
             <Text style={styles.emptyTitle}>
               {language === "ar" ? "لا توجد طلبات" : language === "de" ? "Keine Bestellungen" : "No orders yet"}
@@ -600,4 +767,28 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 56, marginBottom: 16 },
   emptyTitle: { color: Colors.text, fontSize: 18, fontWeight: "800", marginBottom: 8 },
   emptyText: { color: Colors.textMuted, fontSize: 13, textAlign: "center", lineHeight: 20 },
+
+  // New Edit Styles
+  editDivider: { height: 1, backgroundColor: Colors.cardBorder },
+  addSmallBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, backgroundColor: Colors.accent + "15" },
+  addSmallText: { color: Colors.accent, fontSize: 12, fontWeight: "700" },
+  emptyItems: { padding: 20, alignItems: "center" },
+  emptyItemsText: { color: Colors.textMuted, fontSize: 12 },
+  editItemRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.cardBorder + "44" },
+  editItemName: { color: Colors.text, fontSize: 13, fontWeight: "600" },
+  editItemPrice: { color: Colors.textMuted, fontSize: 11 },
+  qtyControl: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.background, borderRadius: 8, borderWidth: 1, borderColor: Colors.cardBorder },
+  qtyBtn: { width: 30, height: 30, justifyContent: "center", alignItems: "center" },
+  qtyVal: { color: Colors.text, fontSize: 13, fontWeight: "700", minWidth: 24, textAlign: "center" },
+  editItemTotal: { color: Colors.text, fontSize: 13, fontWeight: "700", minWidth: 50, textAlign: "right" },
+  itemDelBtn: { padding: 4 },
+  modalTotalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
+  modalTotalLabel: { color: Colors.textMuted, fontSize: 12 },
+  modalTotalVal: { color: Colors.text, fontSize: 13, fontWeight: "600" },
+
+  // Picker Styles
+  pickerOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 20 },
+  pickerSheet: { backgroundColor: Colors.surface, borderRadius: 20, width: "100%", maxWidth: 500, maxHeight: "80%", padding: 20 },
+  pickerItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12 },
+  pickerSep: { height: 1, backgroundColor: Colors.cardBorder + "44" },
 });

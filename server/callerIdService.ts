@@ -8,6 +8,7 @@ interface ActiveCall {
   normalizedPhone: string;
   slot: number;
   timestamp: string;
+  dbCallId?: number;
   customer?: {
     id: number;
     name: string;
@@ -66,6 +67,12 @@ export class CallerIDService extends EventEmitter {
             // Client signals call was handled — free the slot and cancel auto-expiry
             const slot = data.slot;
             if (slot) {
+              const call = this.activeCallSlots.get(slot);
+              if (call?.dbCallId) {
+                import("./storage").then(({ storage }) => {
+                  storage.updateCall(call.dbCallId!, { status: "answered" }).catch(() => { });
+                });
+              }
               this.activeCallSlots.delete(slot);
               const t = this.slotTimeouts.get(slot);
               if (t) { clearTimeout(t); this.slotTimeouts.delete(slot); }
@@ -184,6 +191,21 @@ export class CallerIDService extends EventEmitter {
       }
     } catch (e) {
       console.error("[CallerID] Customer lookup error:", e);
+    }
+
+    // Persist call to database
+    try {
+      const { storage } = await import("./storage");
+      const dbCall = await storage.createCall({
+        tenantId: tenantId || null,
+        phoneNumber: phoneNumber,
+        customerId: callInfo.customer?.id || null,
+        status: "missed", // default to missed, update to answered if/when client responds
+      });
+      callInfo.dbCallId = dbCall.id;
+      console.log(`[CallerID] Call recorded in DB with ID: ${dbCall.id}`);
+    } catch (e) {
+      console.error("[CallerID] DB lookup/save error:", e);
     }
 
     const payload = JSON.stringify({

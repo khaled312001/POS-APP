@@ -8,7 +8,7 @@ import {
   subscriptionPlans, subscriptions, syncQueue, activityLog, returns, returnItems,
   cashDrawerOperations, warehouses, warehouseTransfers, productBatches,
   inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions,
-  notifications,
+  notifications, calls,
   type InsertBranch, type InsertEmployee, type InsertCategory,
   type InsertProduct, type InsertInventory, type InsertCustomer,
   type InsertSale, type InsertSaleItem, type InsertSupplier,
@@ -18,7 +18,7 @@ import {
   type InsertCashDrawerOperation, type InsertWarehouse, type InsertWarehouseTransfer,
   type InsertProductBatch, type InsertInventoryMovement, type InsertStockCount,
   type InsertStockCountItem, type InsertSupplierContract, type InsertEmployeeCommission,
-  type InsertNotification, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications,
+  type InsertNotification, type InsertCall, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications,
   type InsertSuperAdmin, type InsertTenant, type InsertTenantSubscription, type InsertLicenseKey, type InsertTenantNotification,
   onlineOrders, landingPageConfig, platformSettings, platformCommissions,
   type InsertOnlineOrder, type InsertLandingPageConfig,
@@ -245,11 +245,7 @@ export const storage = {
   // Customers
   async getCustomers(search?: string, tenantId?: number, limit = 50, offset = 0) {
     const conditions: any[] = [or(eq(customers.isActive, true), isNull(customers.isActive))];
-
-    if (tenantId) {
-      conditions.push(eq(customers.tenantId, tenantId));
-    }
-
+    if (tenantId) conditions.push(eq(customers.tenantId, tenantId));
     if (search) {
       const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(search.trim());
       if (looksLikePhone) {
@@ -271,8 +267,34 @@ export const storage = {
         );
       }
     }
-
     return db.select().from(customers).where(and(...conditions)).orderBy(desc(customers.createdAt)).limit(limit).offset(offset);
+  },
+  async getCustomerCount(search?: string, tenantId?: number) {
+    const conditions: any[] = [or(eq(customers.isActive, true), isNull(customers.isActive))];
+    if (tenantId) conditions.push(eq(customers.tenantId, tenantId));
+    if (search) {
+      const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(search.trim());
+      if (looksLikePhone) {
+        const { getPhoneSearchVariants } = await import("./phoneUtils");
+        const variants = getPhoneSearchVariants(search.trim());
+        const phoneConditions = variants.map(v => ilike(customers.phone || "", `%${v}%`));
+        const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
+        for (const v of variants) {
+          phoneConditions.push(sql`${strippedCol} ILIKE ${'%' + v + '%'}`);
+        }
+        conditions.push(or(...phoneConditions));
+      } else {
+        conditions.push(
+          or(
+            ilike(customers.name, `%${search}%`),
+            ilike(customers.phone || "", `%${search}%`),
+            ilike(customers.email || "", `%${search}%`)
+          )
+        );
+      }
+    }
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(customers).where(and(...conditions));
+    return Number(result?.count || 0);
   },
 
   async findCustomerByPhone(phone: string, tenantId: number) {
@@ -580,6 +602,27 @@ export const storage = {
   async createActivityLog(data: InsertActivityLog) {
     const [log] = await db.insert(activityLog).values(data).returning();
     return log;
+  },
+
+  // Calls
+  async getCalls(tenantId?: number, limit = 50) {
+    const conditions = [];
+    if (tenantId) conditions.push(eq(calls.tenantId, tenantId));
+
+    let query = db.select().from(calls);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(desc(calls.createdAt)).limit(limit);
+  },
+  async createCall(data: InsertCall) {
+    const [call] = await db.insert(calls).values(data).returning();
+    return call;
+  },
+  async updateCall(id: number, data: Partial<InsertCall>) {
+    const [call] = await db.update(calls).set(data).where(eq(calls.id, id)).returning();
+    return call;
   },
 
   // Returns

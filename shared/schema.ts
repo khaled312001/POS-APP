@@ -141,6 +141,17 @@ export const saleItems = pgTable("sale_items", {
   notes: text("notes"),
 });
 
+export const calls = pgTable("calls", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }),
+  branchId: integer("branch_id").references(() => branches.id, { onDelete: 'cascade' }),
+  phoneNumber: text("phone_number").notNull(),
+  customerId: integer("customer_id").references(() => customers.id, { onDelete: 'set null' }),
+  status: text("status").notNull().default("missed"), // answered, missed
+  saleId: integer("sale_id").references(() => sales.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const suppliers = pgTable("suppliers", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }), // Added for multi-tenancy
@@ -614,6 +625,7 @@ export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderIte
 export const insertShiftSchema = createInsertSchema(shifts).omit({ id: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
+export const insertCallSchema = createInsertSchema(calls).omit({ id: true, createdAt: true });
 export const insertTableSchema = createInsertSchema(tables).omit({ id: true, createdAt: true });
 export const insertKitchenOrderSchema = createInsertSchema(kitchenOrders).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true, createdAt: true });
@@ -673,6 +685,8 @@ export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Expense = typeof expenses.$inferSelect;
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+export type Call = typeof calls.$inferSelect;
+export type InsertCall = z.infer<typeof insertCallSchema>;
 export type Table = typeof tables.$inferSelect;
 export type InsertTable = z.infer<typeof insertTableSchema>;
 export type KitchenOrder = typeof kitchenOrders.$inferSelect;
