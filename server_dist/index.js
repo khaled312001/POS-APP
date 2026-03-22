@@ -4322,6 +4322,14 @@ function scheduleAutoReconnect() {
   autoReconnectTimer = setTimeout(async () => {
     autoReconnectTimer = null;
     if (status === "disconnected" && !connecting) {
+      try {
+        const fsMod = await import("fs");
+        const lockFile = path.join(CHROME_DATA_DIR, "SingletonLock");
+        if (fsMod.existsSync(lockFile)) fsMod.unlinkSync(lockFile);
+        const cookieLock = path.join(CHROME_DATA_DIR, "Default", "Cookies-journal");
+        if (fsMod.existsSync(cookieLock)) fsMod.unlinkSync(cookieLock);
+      } catch {
+      }
       log("Auto-reconnecting\u2026");
       try {
         await whatsappService.connect();
@@ -4416,9 +4424,18 @@ async function _connectBackground(wpp) {
       "--disable-gpu",
       "--no-first-run",
       "--no-zygote",
+      "--single-process",
       "--disable-extensions",
       "--disable-software-rasterizer",
-      "--disable-features=VizDisplayCompositor",
+      "--disable-features=VizDisplayCompositor,AudioServiceOutOfProcess",
+      "--disable-background-networking",
+      "--disable-default-apps",
+      "--disable-sync",
+      "--disable-translate",
+      "--hide-scrollbars",
+      "--metrics-recording-only",
+      "--mute-audio",
+      "--safebrowsing-disable-auto-update",
       "--window-size=1280,800"
     ];
     connectionPhase = "awaiting_qr";
@@ -4434,11 +4451,14 @@ async function _connectBackground(wpp) {
       logQR: false,
       autoClose: 0,
       disableWelcome: true,
+      waitForInjectToken: true,
       puppeteerOptions: {
         executablePath: browserPath,
         args: browserArgs,
         headless: true,
-        userDataDir: CHROME_DATA_DIR
+        userDataDir: CHROME_DATA_DIR,
+        timeout: 9e4,
+        protocolTimeout: 9e4
       },
       browserArgs,
       catchQR: (base64Qr) => {
