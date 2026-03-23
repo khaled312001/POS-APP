@@ -1485,7 +1485,10 @@ export default function POSScreen() {
             keyExtractor={(item: any) => String(item.id)}
             contentContainerStyle={styles.productGrid}
             style={{ flex: 1 }}
-            scrollEnabled={!!filteredProducts.length}
+            scrollEnabled={true}
+            initialNumToRender={30}
+            maxToRenderPerBatch={30}
+            windowSize={10}
             renderItem={({ item }: { item: any }) => {
               const cat = categories.find((c: any) => c.id === item.categoryId);
               const catColor = cat?.color || Colors.accent;

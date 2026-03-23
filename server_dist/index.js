@@ -1250,6 +1250,9 @@ var init_storage = __esm({
       async getSaleItems(saleId) {
         return db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
       },
+      async deleteSaleItems(saleId) {
+        await db.delete(saleItems).where(eq(saleItems.saleId, saleId));
+      },
       async createSaleItem(data) {
         const [item] = await db.insert(saleItems).values(data).returning();
         return item;
@@ -1257,6 +1260,10 @@ var init_storage = __esm({
       async updateSale(id, data) {
         const [sale] = await db.update(sales).set(data).where(eq(sales.id, id)).returning();
         return sale;
+      },
+      async deleteSale(id) {
+        await db.delete(saleItems).where(eq(saleItems.saleId, id));
+        await db.delete(sales).where(eq(sales.id, id));
       },
       // Suppliers
       async getSuppliers(tenantId) {
@@ -1458,11 +1465,20 @@ var init_storage = __esm({
       async getCalls(tenantId, limit = 50) {
         const conditions = [];
         if (tenantId) conditions.push(eq(calls.tenantId, tenantId));
-        let query = db.select().from(calls);
-        if (conditions.length > 0) {
-          query = query.where(and(...conditions));
-        }
-        return query.orderBy(desc(calls.createdAt)).limit(limit);
+        const baseQuery = db.select({
+          id: calls.id,
+          tenantId: calls.tenantId,
+          branchId: calls.branchId,
+          phoneNumber: calls.phoneNumber,
+          customerId: calls.customerId,
+          status: calls.status,
+          saleId: calls.saleId,
+          createdAt: calls.createdAt,
+          customerName: customers.name,
+          customerAddress: customers.address
+        }).from(calls).leftJoin(customers, eq(calls.customerId, customers.id));
+        const withWhere = conditions.length > 0 ? baseQuery.where(and(...conditions)) : baseQuery;
+        return withWhere.orderBy(desc(calls.createdAt)).limit(limit);
       },
       async createCall(data) {
         const [call] = await db.insert(calls).values(data).returning();
@@ -2833,9 +2849,14 @@ async function seedPizzaLemon() {
     await insertItem("Salat", p, SALAT_WITH_DRESSING.has(p.name) ? dressingModifier() : []);
   }
   for (const p of DESSERTS) await insertItem("Dessert", p);
-  const DRINKS_WITH_SIZE = /* @__PURE__ */ new Set(["Coca-Cola", "Coca-Cola Zero", "Fanta", "Eistee Pfirsich"]);
+  const DRINKS_WITH_2EUR_SIZE = /* @__PURE__ */ new Set(["Coca-Cola", "Coca-Cola Zero", "Eistee Pfirsich"]);
   for (const p of GETRAENKE) {
-    const sizeMod = DRINKS_WITH_SIZE.has(p.name) ? drinkSizeModifier(2) : [];
+    let sizeMod = [];
+    if (DRINKS_WITH_2EUR_SIZE.has(p.name)) {
+      sizeMod = drinkSizeModifier(2);
+    } else if (p.name === "Fanta") {
+      sizeMod = drinkSizeModifier(0);
+    }
     await insertItem("Getr\xE4nke", p, sizeMod);
   }
   for (const p of BIER) await insertItem("Bier", p);
@@ -2890,8 +2911,8 @@ async function seedPizzaLemon() {
   await db.insert(tenantNotifications).values({
     tenantId: tenant.id,
     type: "info",
-    title: "Pizza Lemon Katalog aktualisiert (v4)!",
-    message: `Sauce/Beilage/Dressing Modifiers + neue Getr\xE4nke. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
+    title: "Pizza Lemon Katalog aktualisiert (v5)!",
+    message: `+Wunschpizza/Wunschpide/Extra Kebap, -Duplikate/-Crevettencocktail/-M\xFCllerbr\xE4u, Fanta-Preis korrigiert. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
     priority: "high"
   }).onConflictDoNothing();
   console.log(`[PIZZA LEMON] \u2713 Setup complete!`);
@@ -2899,7 +2920,7 @@ async function seedPizzaLemon() {
   console.log(`[PIZZA LEMON]    Pass:    ${STORE_PASSWORD}`);
   console.log(`[PIZZA LEMON]    License: ${LICENSE_KEY}`);
   console.log(`[PIZZA LEMON]    Admin PIN: 1234  |  Cashier PIN: 5678`);
-  console.log(`[PIZZA LEMON]    Menu: 34 Pizza, 3 Calzone, 9 Pide, 2 Lahmacun, 13 Tellergerichte, 24 Fingerfood, 9 Salat, 6 Dessert, 9 Getr\xE4nke, 2 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
+  console.log(`[PIZZA LEMON]    Menu: 35 Pizza, 3 Calzone, 10 Pide, 2 Lahmacun, 13 Tellergerichte, 24 Fingerfood, 8 Salat, 6 Dessert, 9 Getr\xE4nke, 1 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
 }
 var STORE_EMAIL, STORE_PASSWORD, LICENSE_KEY, BUSINESS_NAME, IMG, PIZZA_LEMON_CATEGORIES, PIZZAS, CALZONES, PIDE, LAHMACUN, TELLERGERICHTE, FINGERFOOD, SALATE, DESSERTS, GETRAENKE, BIER, ALKOHOL, TABAK;
 var init_seedPizzaLemon = __esm({
@@ -2927,6 +2948,7 @@ var init_seedPizzaLemon = __esm({
       { name: "Tabakwaren", color: "#4A5568", icon: "warning", sortOrder: 12 }
     ];
     PIZZAS = [
+      { name: "Wunschpizza", description: "Ihre Wunschpizza \u2013 w\xE4hlen Sie Ihre Zutaten", price: 14, price45: 27, image: IMG("pizzalemon_wunschpizza.jpg") },
       { name: "Margherita", description: "Tomaten, Mozzarella, Oregano", price: 14, price45: 25, image: IMG("pizzalemon_01_margherita.jpg") },
       { name: "Profumata", description: "Tomaten, Mozzarella, Knoblauch, Petersilie, Oregano", price: 14, price45: 27, image: IMG("pizzalemon_02_profumata.jpg") },
       { name: "Funghi", description: "Tomaten, Mozzarella, Pilze", price: 15, price45: 28, image: IMG("pizzalemon_03_funghi.jpg") },
@@ -2959,7 +2981,7 @@ var init_seedPizzaLemon = __esm({
       { name: "Padrone", description: "Tomaten, Mozzarella, Gorgonzola, Pilze", price: 20, price45: 33, image: IMG("pizzalemon_30_padrone.jpg") },
       { name: "Schloss Pizza", description: "Tomaten, Mozzarella, Kalbfleisch, Speck, scharfe Salami", price: 20, price45: 34, image: IMG("pizzalemon_31_schloss_pizza.jpg") },
       { name: "Italiano", description: "Tomaten, Mozzarella, Rohschinken, Mascarpone, Rucola", price: 20, price45: 34, image: IMG("pizzalemon_32_italiano.jpg") },
-      { name: "Americano", description: "Tomaten, Mozzarella, Speck, Mais, Zwiebeln", price: 21, price45: 34, image: IMG("pizzalemon_33_americano.jpg") },
+      { name: "Americano", description: "Tomaten, Mozzarella, Speck, Mais, Zwiebeln", price: 21, price45: 36, image: IMG("pizzalemon_33_americano.jpg") },
       { name: "Lemon Pizza", description: "Tomaten, Mozzarella, Lammfleisch, Knoblauch, Peperoncini, Scharf", price: 20, price45: 34, image: IMG("pizzalemon_34_lemon_pizza.jpg") }
     ];
     CALZONES = [
@@ -2968,6 +2990,7 @@ var init_seedPizzaLemon = __esm({
       { name: "Calzone Verdura", description: "Tomaten, Mozzarella, Saisongem\xFCse", price: 20, image: IMG("pizzalemon_c3_calzone_verdura.jpg") }
     ];
     PIDE = [
+      { name: "Wunschpide", description: "Ihre Wunschpide \u2013 w\xE4hlen Sie Ihre Zutaten", price: 15, image: IMG("pizzalemon_wunschpide.jpg") },
       { name: "Pide mit K\xE4se", description: "Pide mit Schafsk\xE4se", price: 15, image: IMG("pizzalemon_36_pide_mit_kaese.jpg") },
       { name: "Pide mit Hackfleisch", description: "Pide mit Hackfleisch und Tomaten", price: 17, image: IMG("pizzalemon_37_pide_mit_hackfleisch.jpg") },
       { name: "Pide mit K\xE4se und Hackfleisch", description: "Pide mit Schafsk\xE4se und Hackfleisch", price: 18, image: IMG("pizzalemon_38_pide_kaese_hackfleisch.jpg") },
@@ -3001,8 +3024,7 @@ var init_seedPizzaLemon = __esm({
       { name: "D\xF6ner Kebab Tasche", description: "D\xF6ner Kebab im Taschenbrot", price: 13, image: IMG("pizzalemon_60_doener_kebab_tasche.jpg") },
       { name: "D\xFCr\xFCm Kebab", description: "D\xF6ner Kebab im Fladenbrot", price: 14, image: IMG("pizzalemon_61_dueruem_kebab.jpg") },
       { name: "D\xF6ner Box", description: "D\xF6ner Kebab in der Box mit Salat und Pommes", price: 13, image: IMG("pizzalemon_62_doener_box.jpg") },
-      { name: "Falafel", description: "Knusprige Falafel im Taschenbrot oder D\xFCr\xFCm", price: 12, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
-      { name: "Falafel Taschenbrot", description: "Knusprige Falafel im Taschenbrot", price: 12, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
+      { name: "Falafel", description: "Knusprige Falafel im Taschenbrot", price: 12, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
       { name: "Falafel D\xFCr\xFCm", description: "Falafel im Fladenbrot", price: 12, image: IMG("pizzalemon_64_falafel_dueruem.jpg") },
       { name: "Poulet Pepito", description: "Gegrilltes Poulet im Fladenbrot", price: 12, image: IMG("pizzalemon_65_poulet_pepito.jpg") },
       { name: "Lamm Pepito", description: "Gegrilltes Lammfleisch im Fladenbrot", price: 14, image: IMG("pizzalemon_66_lamm_pepito.jpg") },
@@ -3021,7 +3043,8 @@ var init_seedPizzaLemon = __esm({
       { name: "Kebab Fladen+Raclette", description: "Kebab im Fladenbrot mit Raclettek\xE4se \xFCberbacken", price: 15, image: IMG("pizzalemon_79_kebab_fladen_raclette.jpg") },
       { name: "Kebab Tasche+Raclette", description: "Kebab im Taschenbrot mit Raclettek\xE4se \xFCberbacken", price: 15, image: IMG("pizzalemon_80_kebab_tasche_raclette.jpg") },
       { name: "Kebab Fladen+Speck", description: "Kebab im Fladenbrot mit Speck", price: 15, image: IMG("pizzalemon_81_kebab_fladen_speck.jpg") },
-      { name: "Kebab Tasche+Speck", description: "Kebab im Taschenbrot mit Speck", price: 15, image: IMG("pizzalemon_82_kebab_tasche_speck.jpg") }
+      { name: "Kebab Tasche+Speck", description: "Kebab im Taschenbrot mit Speck", price: 15, image: IMG("pizzalemon_82_kebab_tasche_speck.jpg") },
+      { name: "Extra Kebap", description: "Extra Portion Kebabfleisch", price: 5, image: IMG("pizzalemon_ex_kebap.jpg") }
     ];
     SALATE = [
       { name: "Gr\xFCner Salat", description: "Frischer Blattsalat, Sauce: Italienisch oder Franz\xF6sisch", price: 8, image: IMG("pizzalemon_83_gruener_salat.jpg") },
@@ -3031,8 +3054,7 @@ var init_seedPizzaLemon = __esm({
       { name: "Thon Salat", description: "Thunfisch, gemischter Salat", price: 10, image: IMG("pizzalemon_87_thon_salat.jpg") },
       { name: "Tomaten Salat", description: "Tomaten, Zwiebeln", price: 9, image: IMG("pizzalemon_88_tomaten_salat.jpg") },
       { name: "Tomaten Mozzarella", description: "Tomaten mit Mozzarella und Basilikum", price: 12, image: IMG("pizzalemon_89_tomaten_mozzarella.jpg") },
-      { name: "Knoblibrot", description: "Knuspriges Brot mit Knoblauchbutter", price: 5, image: IMG("pizzalemon_90_knoblibrot.jpg") },
-      { name: "Crevettencocktail", description: "Frischer Crevetten-Cocktailsalat", price: 15, image: IMG("pizzalemon_91_crevettencocktail.jpg") }
+      { name: "Knoblibrot", description: "Knuspriges Brot mit Knoblauchbutter", price: 5, image: IMG("pizzalemon_90_knoblibrot.jpg") }
     ];
     DESSERTS = [
       { name: "Tiramisu", description: "Klassisches italienisches Tiramisu", price: 6, image: IMG("pizzalemon_92_tiramisu.jpg") },
@@ -3054,7 +3076,6 @@ var init_seedPizzaLemon = __esm({
       { name: "Red Bull", description: "Red Bull Energy Drink, 250ml", price: 5, image: IMG("pizzalemon_104_red_bull.jpg") }
     ];
     BIER = [
-      { name: "M\xFCllerbr\xE4u", description: "Schweizer Bier M\xFCllerbr\xE4u, 0.5l", price: 5, image: IMG("pizzalemon_105_muellerbraeu.jpg") },
       { name: "Feldschl\xF6sschen", description: "Feldschl\xF6sschen Bier, 0.5l", price: 5, image: IMG("pizzalemon_106_feldschloesschen.jpg") }
     ];
     ALKOHOL = [
@@ -4252,7 +4273,6 @@ async function loadWppConnect() {
   }
   return wppconnect;
 }
-var ADMIN_PHONE = "201204593124";
 var SESSION_NAME = "barmagly-pos";
 var STORAGE_DIR = path.resolve(process.cwd(), ".wppconnect");
 var CHROME_DATA_DIR = path.join(STORAGE_DIR, "chrome-data");
@@ -4267,6 +4287,7 @@ var connecting = false;
 var connectionPhase = "idle";
 var connectionStartTime = 0;
 var autoReconnectTimer = null;
+var keepAliveInterval = null;
 var pendingMessages = [];
 function log(event) {
   const entry = { time: (/* @__PURE__ */ new Date()).toISOString(), event };
@@ -4322,11 +4343,45 @@ async function isClientAlive() {
     return false;
   }
 }
+function startKeepAlive() {
+  if (keepAliveInterval) clearInterval(keepAliveInterval);
+  keepAliveInterval = setInterval(async () => {
+    if (status !== "connected" || !client || !clientReady) return;
+    try {
+      const alive = await isClientAlive();
+      if (!alive) {
+        log("Keepalive check failed \u2014 marking disconnected and scheduling reconnect");
+        clientReady = false;
+        status = "disconnected";
+        client = null;
+        connectionPhase = "idle";
+        scheduleAutoReconnect();
+      }
+    } catch {
+    }
+  }, 6e4);
+}
+function stopKeepAlive() {
+  if (keepAliveInterval) {
+    clearInterval(keepAliveInterval);
+    keepAliveInterval = null;
+  }
+}
 function scheduleAutoReconnect() {
   if (autoReconnectTimer) clearTimeout(autoReconnectTimer);
   autoReconnectTimer = setTimeout(async () => {
     autoReconnectTimer = null;
     if (status === "disconnected" && !connecting) {
+      if (client) {
+        const alive = await isClientAlive();
+        if (alive) {
+          log("Native recovery detected \u2014 resuming without full reconnect");
+          status = "connected";
+          clientReady = true;
+          connectionPhase = "ready";
+          return;
+        }
+      }
       try {
         const fsMod = await import("fs");
         const lockFile = path.join(CHROME_DATA_DIR, "SingletonLock");
@@ -4490,7 +4545,17 @@ async function _connectBackground(wpp) {
             log("WhatsApp reconnected natively from mobile");
           }
         }
-        if (statusSession === "notLogged" || statusSession === "browserClose" || statusSession === "serverWssNotConnected" || statusSession === "disconnectedMobile" || statusSession === "desconnectedMobile" || statusSession === "deviceNotConnected") {
+        if (statusSession === "disconnectedMobile" || statusSession === "desconnectedMobile") {
+          if (stabilisationComplete) {
+            log(`Transient disconnect (${statusSession}) \u2014 waiting for native recovery\u2026`);
+            status = "disconnected";
+            clientReady = false;
+            connectionPhase = "idle";
+            scheduleAutoReconnect();
+          }
+          return;
+        }
+        if (statusSession === "notLogged" || statusSession === "browserClose" || statusSession === "serverWssNotConnected" || statusSession === "deviceNotConnected") {
           status = "disconnected";
           clientReady = false;
           client = null;
@@ -4526,6 +4591,7 @@ async function _connectBackground(wpp) {
     lastQrCode = null;
     connecting = false;
     log("\u2705 WhatsApp connected and ready");
+    startKeepAlive();
     client.onMessage(async (message) => {
       log(`Msg from ${message.from}: ${(message.body || "").slice(0, 80)}`);
     });
@@ -4595,6 +4661,7 @@ var whatsappService = {
       clearTimeout(autoReconnectTimer);
       autoReconnectTimer = null;
     }
+    stopKeepAlive();
     if (client) {
       try {
         await client.close();
@@ -4658,7 +4725,11 @@ var whatsappService = {
       return false;
     }
   },
-  async sendOrderNotification(order, storeName) {
+  async sendOrderNotification(order, storeName, adminPhone) {
+    if (!adminPhone) {
+      log("No admin phone configured for this store \u2014 skipping admin notification");
+      return false;
+    }
     const itemLines = order.items.map((i, idx) => `  ${idx + 1}. ${i.name} x ${i.quantity} \u2014 ${Number(i.unitPrice).toFixed(2)}`).join("\n");
     const msg = [
       `\u{1F6D2} New Order ${order.orderNumber}`,
@@ -4678,7 +4749,7 @@ var whatsappService = {
       `Payment: ${order.paymentMethod}`,
       order.notes ? `Notes: ${order.notes}` : ""
     ].filter(Boolean).join("\n");
-    return this.sendText(ADMIN_PHONE, msg);
+    return this.sendText(adminPhone, msg);
   },
   async sendCustomerConfirmation(customerPhone, orderNumber, storeName, totalAmount) {
     const msg = [
@@ -5465,8 +5536,21 @@ async function registerRoutes(app2) {
     try {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
       const search = req.query.search;
+      const applyMarkup = req.query.applyMarkup === "true";
       if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      res.json(await storage.getProductsByTenant(tenantId, search));
+      let products2 = await storage.getProductsByTenant(tenantId, search);
+      if (applyMarkup) {
+        const commissionRate = await storage.getCommissionRate();
+        if (commissionRate > 0) {
+          const factor = 1 + commissionRate / 100;
+          products2 = products2.map((p) => {
+            const rawPrice = parseFloat(p.price) * factor;
+            const rounded = Math.round(rawPrice * 2) / 2;
+            return { ...p, price: rounded.toFixed(2) };
+          });
+        }
+      }
+      res.json(products2);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -5843,6 +5927,39 @@ async function registerRoutes(app2) {
         sale.id
       );
       res.json(sale);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/sales/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { items, ...saleData } = req.body;
+      const sale = await storage.updateSale(id, sanitizeDates(saleData));
+      if (items !== void 0) {
+        await storage.deleteSaleItems(id);
+        for (const item of items) {
+          await storage.createSaleItem({
+            saleId: id,
+            productId: item.productId,
+            productName: item.productName || item.name,
+            quantity: item.quantity,
+            unitPrice: String(item.unitPrice),
+            total: String(item.total),
+            modifiers: item.modifiers || [],
+            notes: item.notes || null
+          });
+        }
+      }
+      res.json(sale);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/sales/:id", async (req, res) => {
+    try {
+      await storage.deleteSale(Number(req.params.id));
+      res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -6754,11 +6871,12 @@ async function registerRoutes(app2) {
       const mainBranch = branches2.find((b) => b.isMain) || branches2[0];
       if (!mainBranch) return res.status(404).json({ error: "No branch found" });
       const tenant = mainBranch.tenantId ? await storage.getTenant(mainBranch.tenantId) : null;
-      const commissionRate = await storage.getCommissionRate();
       res.json({
         ...mainBranch,
         storeType: tenant?.storeType || "supermarket",
-        commissionRate
+        commissionRate: 0,
+        // commission is baked into product prices via applyMarkup
+        whatsappAdminPhone: tenant?.metadata?.whatsappAdminPhone || ""
       });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -6776,11 +6894,20 @@ async function registerRoutes(app2) {
       }
       const mainBranch = branches2.find((b) => b.isMain) || branches2[0];
       if (!mainBranch) return res.status(404).json({ error: "No branch found" });
-      const updatedBranch = await storage.updateBranch(mainBranch.id, branchData);
-      if (storeType && mainBranch.tenantId) {
-        await storage.updateTenant(mainBranch.tenantId, { storeType });
+      const { whatsappAdminPhone, ...cleanBranchData } = branchData;
+      const updatedBranch = await storage.updateBranch(mainBranch.id, cleanBranchData);
+      if (mainBranch.tenantId) {
+        const tenantUpdates = {};
+        if (storeType) tenantUpdates.storeType = storeType;
+        if (whatsappAdminPhone !== void 0) {
+          const existingTenant = await storage.getTenant(mainBranch.tenantId);
+          tenantUpdates.metadata = { ...existingTenant?.metadata || {}, whatsappAdminPhone: whatsappAdminPhone.replace(/\D/g, "") };
+        }
+        if (Object.keys(tenantUpdates).length > 0) {
+          await storage.updateTenant(mainBranch.tenantId, tenantUpdates);
+        }
       }
-      res.json({ ...updatedBranch, storeType });
+      res.json({ ...updatedBranch, storeType, whatsappAdminPhone: whatsappAdminPhone?.replace(/\D/g, "") || "" });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -6939,7 +7066,7 @@ async function test(){
         const factor = 1 + commissionRate / 100;
         products2 = products2.map((p) => {
           const rawPrice = parseFloat(p.price) * factor;
-          const rounded = Math.ceil(rawPrice * 2) / 2;
+          const rounded = Math.round(rawPrice * 2) / 2;
           return { ...p, price: rounded.toFixed(2) };
         });
       }
@@ -6998,6 +7125,9 @@ async function test(){
       try {
         const tenant = await storage.getTenant(resolvedTenantId);
         const storeName = tenant?.businessName || "Online Store";
+        const storeAdminPhone = tenant?.metadata?.whatsappAdminPhone;
+        const globalAdminPhone = await storage.getPlatformSetting("whatsapp_admin_phone");
+        const adminPhone = storeAdminPhone || globalAdminPhone || void 0;
         await whatsappService.sendOrderNotification({
           orderNumber,
           customerName: orderData.customerName,
@@ -7010,7 +7140,7 @@ async function test(){
           orderType: orderData.orderType || "delivery",
           paymentMethod: orderData.paymentMethod || "cash",
           notes: orderData.notes
-        }, storeName);
+        }, storeName, adminPhone);
         if (orderData.customerPhone) {
           await whatsappService.sendCustomerConfirmation(
             orderData.customerPhone,
@@ -7092,13 +7222,75 @@ async function test(){
     const qr = whatsappService.getQrCode();
     res.json({ qrCode: qr });
   });
+  app2.get("/api/super-admin/whatsapp/session-info", requireSuperAdmin, async (_req, res) => {
+    try {
+      const pathMod = await import("path");
+      const fsMod = await import("fs");
+      const tokenDir = pathMod.resolve(process.cwd(), ".wppconnect", "tokens");
+      let hasSession = false;
+      let sessionModified = null;
+      if (fsMod.existsSync(tokenDir)) {
+        const files = fsMod.readdirSync(tokenDir).filter((f) => f.endsWith(".data.json") || f.endsWith(".json"));
+        if (files.length > 0) {
+          hasSession = true;
+          const stat = fsMod.statSync(pathMod.join(tokenDir, files[0]));
+          sessionModified = stat.mtime.toISOString();
+        }
+      }
+      res.json({ hasSession, sessionModified });
+    } catch (e) {
+      res.json({ hasSession: false, sessionModified: null, error: e.message });
+    }
+  });
   app2.post("/api/super-admin/whatsapp/test", requireSuperAdmin, async (req, res) => {
-    const targetPhone = (req.body?.phone || "201204593124").replace(/\D/g, "");
+    const globalPhone = await storage.getPlatformSetting("whatsapp_admin_phone");
+    const targetPhone = (req.body?.phone || globalPhone || "").replace(/\D/g, "");
+    if (!targetPhone) return res.status(400).json({ error: "No phone number specified and no global admin phone configured" });
     const sent = await whatsappService.sendText(
       targetPhone,
       "\u{1F9EA} *Test Message*\n\nThis is a test from Barmagly POS WhatsApp integration.\n\n\u2705 If you receive this, the connection is working!"
     );
     res.json({ success: sent, phone: targetPhone });
+  });
+  app2.get("/api/super-admin/whatsapp/admin-phone", requireSuperAdmin, async (_req, res) => {
+    try {
+      const phone = await storage.getPlatformSetting("whatsapp_admin_phone");
+      res.json({ phone: phone || "" });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/super-admin/whatsapp/admin-phone", requireSuperAdmin, async (req, res) => {
+    try {
+      const { phone } = req.body;
+      if (phone === void 0) return res.status(400).json({ error: "phone required" });
+      await storage.setPlatformSetting("whatsapp_admin_phone", phone.replace(/\D/g, ""));
+      res.json({ success: true, phone: phone.replace(/\D/g, "") });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/super-admin/whatsapp/store-phone/:tenantId", requireSuperAdmin, async (req, res) => {
+    try {
+      const tenant = await storage.getTenant(Number(req.params.tenantId));
+      if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+      const phone = tenant.metadata?.whatsappAdminPhone || "";
+      res.json({ phone });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/super-admin/whatsapp/store-phone/:tenantId", requireSuperAdmin, async (req, res) => {
+    try {
+      const tenant = await storage.getTenant(Number(req.params.tenantId));
+      if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+      const phone = (req.body?.phone || "").replace(/\D/g, "");
+      const metadata = { ...tenant.metadata || {}, whatsappAdminPhone: phone };
+      await storage.updateTenant(Number(req.params.tenantId), { metadata });
+      res.json({ success: true, phone });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
   });
   app2.get("/api/landing-page-config", async (req, res) => {
     try {
