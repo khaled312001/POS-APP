@@ -948,16 +948,16 @@ export default function OrdersScreen() {
                             key={toppingName}
                             onPress={() => setSelectedToppings(prev => isSelected ? prev.filter(t => t !== toppingName) : [...prev, toppingName])}
                             style={{
-                              flex: 1, height: 64,
+                              flex: 1, height: 48,
                               backgroundColor: isSelected ? Colors.accent : row.color,
                               justifyContent: "center", alignItems: "center",
                               borderWidth: isSelected ? 2 : 0.5,
                               borderColor: isSelected ? Colors.accent : "rgba(0,0,0,0.2)",
-                              paddingHorizontal: 2, paddingVertical: 4, gap: 2,
+                              paddingHorizontal: 2, paddingVertical: 2, gap: 1,
                             }}
                           >
-                            <Text style={{ fontSize: 18, lineHeight: 20 }}>{toppingEmoji(toppingName)}</Text>
-                            <Text style={{ fontSize: 11, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 13 }} numberOfLines={2}>
+                            <Text style={{ fontSize: 16, lineHeight: 18 }}>{toppingEmoji(toppingName)}</Text>
+                            <Text style={{ fontSize: 10, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 12 }} numberOfLines={2}>
                               {toppingDisplayName(toppingName)}
                             </Text>
                             {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
@@ -1019,23 +1019,23 @@ export default function OrdersScreen() {
                 {TOPPING_GRID.map((row, rowIdx) => (
                   <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 2 }}>
                     {row.items.map((toppingName, colIdx) => {
-                      if (!toppingName) return <View key={colIdx} style={{ flex: 1, height: 54, backgroundColor: row.color, opacity: 0.3 }} />;
+                      if (!toppingName) return <View key={colIdx} style={{ flex: 1, height: 48, backgroundColor: row.color, opacity: 0.3 }} />;
                       const isSelected = freeExtrasSelected.includes(toppingName);
                       return (
                         <Pressable
                           key={toppingName}
                           onPress={() => setFreeExtrasSelected(prev => isSelected ? prev.filter(t => t !== toppingName) : [...prev, toppingName])}
                           style={{
-                            flex: 1, height: 64,
+                            flex: 1, height: 48,
                             backgroundColor: isSelected ? Colors.accent : row.color,
                             justifyContent: "center", alignItems: "center",
                             borderWidth: isSelected ? 2 : 0.5,
                             borderColor: isSelected ? Colors.accent : "rgba(0,0,0,0.2)",
-                            paddingHorizontal: 2, paddingVertical: 4, gap: 2,
+                            paddingHorizontal: 2, paddingVertical: 2, gap: 1,
                           }}
                         >
-                          <Text style={{ fontSize: 18, lineHeight: 20 }}>{toppingEmoji(toppingName)}</Text>
-                          <Text style={{ fontSize: 11, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 13 }} numberOfLines={2}>
+                          <Text style={{ fontSize: 16, lineHeight: 18 }}>{toppingEmoji(toppingName)}</Text>
+                          <Text style={{ fontSize: 10, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 12 }} numberOfLines={2}>
                             {toppingDisplayName(toppingName)}
                           </Text>
                           {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
