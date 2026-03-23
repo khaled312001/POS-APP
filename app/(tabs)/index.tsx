@@ -1807,7 +1807,7 @@ export default function POSScreen() {
                                 playClickSound("light");
                               }}
                               style={{
-                                flex: 1, height: 54,
+                                flex: 1, height: isTablet ? 68 : 58,
                                 backgroundColor: isSelected ? Colors.accent : row.color,
                                 justifyContent: "center", alignItems: "center",
                                 borderWidth: isSelected ? 2 : 0.5,
@@ -1815,11 +1815,11 @@ export default function POSScreen() {
                                 paddingHorizontal: 2, paddingVertical: 4, gap: 2,
                               }}
                             >
-                              <Text style={{ fontSize: isTablet ? 18 : 16, lineHeight: 20 }}>{toppingEmoji(toppingName)}</Text>
-                              <Text style={{ fontSize: isTablet ? 10 : 8, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 11 }} numberOfLines={2}>
+                              <Text style={{ fontSize: isTablet ? 20 : 18, lineHeight: 22 }}>{toppingEmoji(toppingName)}</Text>
+                              <Text style={{ fontSize: isTablet ? 12 : 10, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 13 }} numberOfLines={2}>
                                 {toppingDisplayName(toppingName)}
                               </Text>
-                              {isSelected && <Text style={{ fontSize: 8, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
+                              {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
                             </Pressable>
                           );
                         })}
