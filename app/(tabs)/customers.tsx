@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
 import { apiRequest, getQueryFn } from "@/lib/query-client";
+import { playClickSound } from "@/lib/sound";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { useLicense } from "@/lib/license-context";
@@ -151,7 +152,7 @@ export default function CustomersScreen() {
             <Text style={{ color: Colors.white, fontSize: 13, fontWeight: "800" }}>{totalCount} {t("total" as any) || "Total"}</Text>
           </View>
         </View>
-        <Pressable style={styles.addBtn} onPress={() => { setEditCustomer(null); setForm({ name: "", email: "", phone: "", address: "", notes: "" }); setShowForm(true); }}>
+        <Pressable style={styles.addBtn} onPress={() => { playClickSound("medium"); setEditCustomer(null); setForm({ name: "", email: "", phone: "", address: "", notes: "" }); setShowForm(true); }}>
           <Ionicons name="add" size={24} color={Colors.white} />
         </Pressable>
       </LinearGradient>
@@ -186,7 +187,7 @@ export default function CustomersScreen() {
         ) : (
           <>
             {allCustomers.map((item: any) => (
-              <Pressable key={String(item.id)} style={[styles.card, isRTL && { flexDirection: "row-reverse" }]} onPress={() => { setSelectedCustomer(item); setShowDetail(true); }}>
+              <Pressable key={String(item.id)} style={[styles.card, isRTL && { flexDirection: "row-reverse" }]} onPress={() => { playClickSound("light"); setSelectedCustomer(item); setShowDetail(true); }}>
                 <View style={[styles.avatar, isRTL ? { marginLeft: 12, marginRight: 0 } : { marginRight: 12 }]}>
                   <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
                 </View>
@@ -223,7 +224,7 @@ export default function CustomersScreen() {
           <View style={styles.modalContent}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>{editCustomer ? t("edit") + " " + t("customers") : t("addCustomer")}</Text>
-              <Pressable onPress={() => setShowForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable onPress={() => { playClickSound("light"); setShowForm(false); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={[styles.label, rtlTextAlign]}>{t("customerName")} *</Text>
@@ -236,7 +237,7 @@ export default function CustomersScreen() {
               <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.address} onChangeText={(v) => setForm({ ...form, address: v })} placeholderTextColor={Colors.textMuted} placeholder={t("address")} />
               <Text style={[styles.label, rtlTextAlign]}>{t("notes")}</Text>
               <TextInput style={[styles.input, { height: 80, textAlignVertical: "top" }, rtlTextAlign, rtlText]} value={form.notes} onChangeText={(v) => setForm({ ...form, notes: v })} multiline placeholderTextColor={Colors.textMuted} placeholder={t("notes")} />
-              <Pressable style={styles.saveBtn} onPress={handleSave}>
+              <Pressable style={styles.saveBtn} onPress={() => { playClickSound("heavy"); handleSave(); }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
                   <Text style={styles.saveBtnText}>{editCustomer ? t("save") : t("addCustomer")}</Text>
                 </LinearGradient>
@@ -252,7 +253,7 @@ export default function CustomersScreen() {
           <View style={[styles.modalContent, { maxHeight: "90%" }]}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>{t("customerDetails")}</Text>
-              <Pressable onPress={() => setShowDetail(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable onPress={() => { playClickSound("light"); setShowDetail(false); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
 
             {selectedCustomer && (
@@ -306,7 +307,7 @@ export default function CustomersScreen() {
 
                 {canManage && (
                   <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, marginBottom: 16 }}>
-                    <Pressable style={{ flex: 1, borderRadius: 12, overflow: "hidden" }} onPress={() => { setShowDetail(false); openEdit(selectedCustomer); }}>
+                    <Pressable style={{ flex: 1, borderRadius: 12, overflow: "hidden" }} onPress={() => { playClickSound("medium"); setShowDetail(false); openEdit(selectedCustomer); }}>
                       <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", paddingVertical: 12, gap: 6 }}>
                         <Ionicons name="create-outline" size={18} color={Colors.white} />
                         <Text style={{ color: Colors.white, fontSize: 14, fontWeight: "600" }}>{t("edit")}</Text>

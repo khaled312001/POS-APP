@@ -12,7 +12,7 @@ import { Colors } from "@/constants/colors";
 import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { useLanguage } from "@/lib/language-context";
-import * as Haptics from "expo-haptics";
+import { playClickSound } from "@/lib/sound";
 
 const STATUS_FLOW = ["pending", "accepted", "preparing", "ready", "delivered"];
 
@@ -199,7 +199,7 @@ export default function OrdersScreen() {
     const incoming = (onlineOrders as any[]).filter(o => !knownOrderIds.current.has(`online-${o.id}`) && o.status === "pending");
     if (incoming.length > 0) {
       playNotificationSound();
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      playClickSound("medium");
       setNewOrderIds(prev => {
         const next = new Set(prev);
         incoming.forEach(o => next.add(o.id));
@@ -577,7 +577,7 @@ export default function OrdersScreen() {
         <View style={[styles.actions, isRTL && { flexDirection: "row-reverse" }]}>
           {/* Next status button - only for online orders */}
           {!isPOS && item.status !== "delivered" && item.status !== "cancelled" && next && nextBtnColor[next] && (
-            <Pressable style={{ flex: 1, borderRadius: 10, overflow: "hidden" }} onPress={() => updateOnlineStatus(item.id, next)}>
+            <Pressable style={{ flex: 1, borderRadius: 10, overflow: "hidden" }} onPress={() => { playClickSound("medium"); updateOnlineStatus(item.id, next); }}>
               <LinearGradient colors={nextBtnColor[next] as [string, string]} style={styles.actionBtnPrimary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                 <Ionicons name={STATUS_META[next]?.icon as any || "arrow-forward"} size={16} color="#fff" />
                 <Text style={styles.actionBtnText}>
@@ -587,7 +587,7 @@ export default function OrdersScreen() {
             </Pressable>
           )}
           {/* Edit */}
-          <Pressable style={styles.editBtn} onPress={() => openEditOrder(item)}>
+          <Pressable style={styles.editBtn} onPress={() => { playClickSound("light"); openEditOrder(item); }}>
             <Ionicons name="pencil" size={16} color={Colors.accent} />
           </Pressable>
           {/* Cancel (online only, active) */}
@@ -607,7 +607,7 @@ export default function OrdersScreen() {
           )}
           {/* Delete (online orders only) */}
           {!isPOS && (
-            <Pressable style={styles.deleteBtn} onPress={() => deleteOnlineOrder(item.id)}>
+            <Pressable style={styles.deleteBtn} onPress={() => { playClickSound("light"); deleteOnlineOrder(item.id); }}>
               <Ionicons name="trash-outline" size={16} color={Colors.danger} />
             </Pressable>
           )}
@@ -626,13 +626,7 @@ export default function OrdersScreen() {
 
   // --- Topping options for configurator ---
   const getToppingOptions = () => {
-    const extrasGroup = configuringProduct?.modifiers?.find((m: any) => !m.required && m.options?.length > 0);
-    return extrasGroup
-      ? extrasGroup.options.map((o: any) => {
-        const info = getToppingInfo(o.label);
-        return { name: o.label, price: Number(o.price || 0), icon: info.icon, category: info.category };
-      })
-      : PIZZA_TOPPINGS.map(t => ({ name: t.name, price: 0, icon: t.icon, category: t.category }));
+    return PIZZA_TOPPINGS.map(t => ({ name: t.name, price: 0, icon: t.icon, category: t.category }));
   };
 
   const displayToppingCats = ["Cheese", "Meat", "Vegetables", "Seafood", "Sauces", "Others"];
@@ -721,11 +715,11 @@ export default function OrdersScreen() {
                       </View>
                     </View>
                     <View style={[styles.qtyControl, isRTL && { flexDirection: "row-reverse" }]}>
-                      <Pressable onPress={() => updateItemQty(idx, -1)} style={styles.qtyBtn}>
+                      <Pressable onPress={() => { playClickSound("light"); updateItemQty(idx, -1); }} style={styles.qtyBtn}>
                         <Ionicons name="remove" size={16} color={Colors.text} />
                       </Pressable>
                       <Text style={styles.qtyVal}>{it.quantity}</Text>
-                      <Pressable onPress={() => updateItemQty(idx, 1)} style={styles.qtyBtn}>
+                      <Pressable onPress={() => { playClickSound("light"); updateItemQty(idx, 1); }} style={styles.qtyBtn}>
                         <Ionicons name="add" size={16} color={Colors.text} />
                       </Pressable>
                     </View>
@@ -755,10 +749,10 @@ export default function OrdersScreen() {
               <View style={{ height: 40 }} />
             </ScrollView>
             <View style={[styles.modalFooter, isRTL && { flexDirection: "row-reverse" }]}>
-              <Pressable style={styles.modalCancelBtn} onPress={() => setEditingOrder(null)}>
+              <Pressable style={styles.modalCancelBtn} onPress={() => { playClickSound("light"); setEditingOrder(null); }}>
                 <Text style={styles.modalCancelText}>{lbl("Cancel", "إلغاء", "Abbrechen")}</Text>
               </Pressable>
-              <Pressable style={styles.modalSaveBtn} onPress={saveEditOrder}>
+              <Pressable style={styles.modalSaveBtn} onPress={() => { playClickSound("heavy"); saveEditOrder(); }}>
                 <Text style={styles.modalSaveText}>{lbl("Save Changes", "حفظ", "Speichern")}</Text>
               </Pressable>
             </View>
@@ -1007,7 +1001,7 @@ export default function OrdersScreen() {
               { key: "online", en: "🌐 Online", ar: "🌐 إلكتروني", de: "🌐 Online" },
               { key: "pos", en: "📞 POS", ar: "📞 كاشير", de: "📞 Kasse" },
             ].map(f => (
-              <Pressable key={f.key} onPress={() => setViewMode(f.key as any)} style={[styles.filterTab, viewMode === f.key && styles.filterTabActive]}>
+              <Pressable key={f.key} onPress={() => { playClickSound("light"); setViewMode(f.key as any); }} style={[styles.filterTab, viewMode === f.key && styles.filterTabActive]}>
                 <Text style={[styles.filterTabText, viewMode === f.key && styles.filterTabTextActive]}>
                   {language === "ar" ? f.ar : language === "de" ? f.de : f.en}
                 </Text>
@@ -1022,7 +1016,7 @@ export default function OrdersScreen() {
               { key: "done", en: "Done", ar: "المكتملة", de: "Erledigt" },
               { key: "all", en: "All", ar: "الكل", de: "Alle" },
             ].map(f => (
-              <Pressable key={f.key} onPress={() => setFilter(f.key)} style={[styles.filterTab, filter === f.key && styles.filterTabActive]}>
+              <Pressable key={f.key} onPress={() => { playClickSound("light"); setFilter(f.key); }} style={[styles.filterTab, filter === f.key && styles.filterTabActive]}>
                 <Text style={[styles.filterTabText, filter === f.key && styles.filterTabTextActive]}>
                   {language === "ar" ? f.ar : language === "de" ? f.de : f.en}
                   {f.key === "active" && pendingCount > 0 && viewMode !== "pos" ? ` (${pendingCount})` : ""}

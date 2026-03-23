@@ -954,11 +954,11 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 12px;
-      border-radius: 10px;
+      padding: 12px 14px;
+      border-radius: 12px;
       cursor: pointer;
       transition: background var(--t), color var(--t);
-      margin-bottom: 2px;
+      margin-bottom: 4px;
     }
 
     .cat-item:hover {
@@ -982,14 +982,14 @@
     }
 
     .cat-item-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
       background: var(--P-light);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: .85rem;
+      font-size: .95rem;
       color: var(--P);
       transition: background var(--t);
       flex-shrink: 0;
@@ -1001,8 +1001,8 @@
     }
 
     .cat-item-name {
-      font-size: .88rem;
-      font-weight: 600;
+      font-size: .95rem;
+      font-weight: 700;
       color: var(--txt)
     }
 
@@ -1037,14 +1037,14 @@
     .cat-pill {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 8px 16px;
-      border-radius: 24px;
+      gap: 7px;
+      padding: 10px 20px;
+      border-radius: 28px;
       white-space: nowrap;
       background: var(--s1);
-      border: 1px solid var(--bd);
-      font-size: .85rem;
-      font-weight: 600;
+      border: 1.5px solid var(--bd);
+      font-size: .95rem;
+      font-weight: 700;
       color: var(--txt2);
       cursor: pointer;
       transition: all var(--t);
@@ -2633,12 +2633,12 @@
       <div style="font-size:.85rem;opacity:.85;margin-top:4px" id="sb-tagline" data-i18n="tagline">Great food, delivered fast</div>
     </div>
     <div class="sb-nav">
-      <a href="#hero" onclick="toggleSidebar()"><i class="fa-solid fa-house"></i> <span data-i18n="home">Home</span></a>
-      <a href="#menu" onclick="toggleSidebar()"><i class="fa-solid fa-utensils"></i> <span data-i18n="menu">Menu</span></a>
-      <a href="#about" onclick="toggleSidebar()"><i class="fa-solid fa-circle-info"></i> <span data-i18n="about">About</span></a>
-      <a href="#contact" onclick="toggleSidebar()"><i class="fa-solid fa-phone"></i> <span data-i18n="contact">Contact</span></a>
+      <a href="#hero" onclick="playClick();toggleSidebar()"><i class="fa-solid fa-house"></i> <span data-i18n="home">Home</span></a>
+      <a href="#menu" onclick="playClick();toggleSidebar()"><i class="fa-solid fa-utensils"></i> <span data-i18n="menu">Menu</span></a>
+      <a href="#about" onclick="playClick();toggleSidebar()"><i class="fa-solid fa-circle-info"></i> <span data-i18n="about">About</span></a>
+      <a href="#contact" onclick="playClick();toggleSidebar()"><i class="fa-solid fa-phone"></i> <span data-i18n="contact">Contact</span></a>
       <div class="sb-divider"></div>
-      <a href="javascript:void(0)" onclick="openCart();toggleSidebar()"><i class="fa-solid fa-basket-shopping"
+      <a href="javascript:void(0)" onclick="playClick();openCart();toggleSidebar()"><i class="fa-solid fa-basket-shopping"
           style="color:var(--P)"></i> <span data-i18n="viewCart">View Cart</span> (<span id="sb-cart-count">0</span>)</a>
     </div>
     <div class="sb-contact" id="sidebar-contact"></div>
@@ -2654,11 +2654,11 @@
       <p id="hero-subtitle">Delicious food crafted with passion, delivered to your door</p>
       <div class="hero-features" id="hero-features"></div>
       <div class="hero-cta">
-        <button class="btn-hero-primary" onclick="document.getElementById('menu').scrollIntoView({behavior:'smooth'})">
+        <button class="btn-hero-primary" onclick="playClick();document.getElementById('menu').scrollIntoView({behavior:'smooth'})">
           <i class="fa-solid fa-utensils"></i> <span data-i18n="orderNow">Order Now</span>
         </button>
         <button class="btn-hero-secondary"
-          onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})">
+          onclick="playClick();document.getElementById('about').scrollIntoView({behavior:'smooth'})">
           <i class="fa-solid fa-circle-info"></i> <span data-i18n="learnMore">Learn More</span>
         </button>
       </div>
@@ -2782,7 +2782,7 @@
               <div class="about-stat-lbl" data-i18n="categories">Categories</div>
             </div>
           </div>
-          <button class="btn-hero-primary" onclick="document.getElementById('menu').scrollIntoView({behavior:'smooth'})"
+          <button class="btn-hero-primary" onclick="playClick();document.getElementById('menu').scrollIntoView({behavior:'smooth'})"
             style="width:fit-content">
             <i class="fa-solid fa-basket-shopping"></i> <span data-i18n="orderNow">Order Now</span>
           </button>
@@ -3170,9 +3170,11 @@
     }
 
     function toggleLangMenu() {
+      playClick();
       document.getElementById('lang-menu').classList.toggle('open');
     }
     function changeLang(lang) {
+      playClick();
       applyLang(lang);
       document.getElementById('lang-menu').classList.remove('open');
     }
@@ -3257,6 +3259,7 @@
     // ===== THEME =====
     if (isDark) document.body.classList.add('dark');
     function toggleTheme() {
+      playClick();
       isDark = !isDark;
       document.body.classList.toggle('dark', isDark);
       localStorage.setItem('store_dark', isDark);
@@ -3291,10 +3294,12 @@
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.connect(gain); gain.connect(audioCtx.destination);
-        osc.type = 'sine'; osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(580, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(290, audioCtx.currentTime + 0.09);
+        gain.gain.setValueAtTime(0.14, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-        osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.1);
+        osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.12);
       } catch (e) { }
     }
     function playAdd() {
@@ -3326,17 +3331,20 @@
 
     // ===== SIDEBAR =====
     function toggleSidebar() {
+      playClick();
       document.getElementById('sidebar').classList.toggle('open');
       document.getElementById('sidebar-overlay').classList.toggle('open');
     }
 
     // ===== CART =====
     function openCart() {
+      playClick();
       addCls('cart-panel', 'open');
       addCls('cart-overlay', 'open');
       renderCart();
     }
     function closeCart() {
+      playClick();
       remCls('cart-panel', 'open');
       remCls('cart-overlay', 'open');
     }
@@ -3515,6 +3523,7 @@
     // ===== CHECKOUT =====
     function openCheckout() {
       if (!cart.length) { showToast(`<i class="fa-solid fa-circle-exclamation" style="margin-right:6px;color:#f59e0b"></i>${tr('cartIsEmpty')}`); return; }
+      playClick();
       closeCart();
       addCls('checkout-modal', 'open');
       setDisp('checkout-form', '');
@@ -3522,13 +3531,14 @@
       setDisp('checkout-footer', '');
       setDisp('checkout-error', 'none');
     }
-    function closeCheckout() { remCls('checkout-modal', 'open'); }
+    function closeCheckout() { playClick(); remCls('checkout-modal', 'open'); }
 
     document.getElementById('co-type')?.addEventListener('change', function () {
       setDisp('co-address-group', this.value === 'pickup' ? 'none' : '');
     });
 
     async function submitOrder() {
+      playClick();
       const name = getVal('co-name');
       const phone = iti ? iti.getNumber() : getVal('co-phone');
       const email = getVal('co-email');
@@ -3583,6 +3593,7 @@
 
     // ===== PIZZA BUILDER =====
     function openPizzaModal(product) {
+      playClick();
       selectedPizza = product;
       setTxt('pb-pizza-name', product.name);
       setTxt('pb-pizza-desc', product.description || tr('chooseSizeToppings'));
@@ -3610,7 +3621,7 @@
       updatePizzaTotal();
       addCls('pizza-modal', 'open');
     }
-    function closePizzaModal() { remCls('pizza-modal', 'open'); }
+    function closePizzaModal() { playClick(); remCls('pizza-modal', 'open'); }
     function selectSize(size, el) {
       playClick(); selectedSize = size;
       document.querySelectorAll('.pb-size').forEach(s => s.classList.remove('active'));

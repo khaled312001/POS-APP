@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
+import { playClickSound } from "@/lib/sound";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { useAuth } from "@/lib/auth-context";
 import { useLicense } from "@/lib/license-context";
@@ -226,6 +227,7 @@ export default function ProductsScreen() {
         <Text style={[styles.headerTitle, rtlTextAlign]}>{t("products")}</Text>
         {canManage && (
           <Pressable style={styles.addBtn} onPress={() => {
+            playClickSound("medium");
             if (viewMode === "products") {
               resetForm(); setEditProduct(null); setShowForm(true);
             } else {
@@ -240,13 +242,13 @@ export default function ProductsScreen() {
       <View style={{ flexDirection: isRTL ? "row-reverse" : "row", paddingHorizontal: 12, paddingTop: 10, gap: 8 }}>
         <Pressable
           style={{ flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: viewMode === "products" ? Colors.accent : Colors.surface, alignItems: "center", borderWidth: 1, borderColor: viewMode === "products" ? Colors.accent : Colors.cardBorder }}
-          onPress={() => setViewMode("products")}
+          onPress={() => { playClickSound("light"); setViewMode("products"); }}
         >
           <Text style={{ color: viewMode === "products" ? Colors.textDark : Colors.textSecondary, fontSize: 14, fontWeight: "600" }}>{t("products")}</Text>
         </Pressable>
         <Pressable
           style={{ flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: viewMode === "categories" ? Colors.accent : Colors.surface, alignItems: "center", borderWidth: 1, borderColor: viewMode === "categories" ? Colors.accent : Colors.cardBorder }}
-          onPress={() => setViewMode("categories")}
+          onPress={() => { playClickSound("light"); setViewMode("categories"); }}
         >
           <Text style={{ color: viewMode === "categories" ? Colors.textDark : Colors.textSecondary, fontSize: 14, fontWeight: "600" }}>{t("category")}</Text>
         </Pressable>
@@ -334,7 +336,7 @@ export default function ProductsScreen() {
           contentContainerStyle={styles.list}
           scrollEnabled={!!products.length}
           renderItem={({ item }: { item: any }) => (
-            <Pressable style={[styles.productCard, isRTL && { flexDirection: "row-reverse" }]} onPress={() => canManage ? openEdit(item) : null}>
+            <Pressable style={[styles.productCard, isRTL && { flexDirection: "row-reverse" }]} onPress={() => { if (canManage) { playClickSound("light"); openEdit(item); } }}>
               <View style={[styles.productIconWrap, isRTL ? { marginLeft: 12, marginRight: 0 } : {}]}>
                 {item.image ? (
                   <AnimatedProductImage uri={item.image.startsWith("http") || item.image.startsWith("file://") || item.image.startsWith("data:") ? item.image : `${getApiUrl().replace(/\/$/, "")}${item.image}`} />
@@ -537,7 +539,7 @@ export default function ProductsScreen() {
                   <TextInput style={[styles.input, rtlTextAlign]} value={initialStock} onChangeText={setInitialStock} keyboardType="number-pad" placeholderTextColor={Colors.textMuted} placeholder={t("enterInitialStock")} />
                 </View>
               )}
-              <Pressable style={styles.saveBtn} onPress={handleSave}>
+              <Pressable style={styles.saveBtn} onPress={() => { playClickSound("heavy"); handleSave(); }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
                   <Text style={styles.saveBtnText}>{editProduct ? t("editProduct") : t("addProduct")}</Text>
                 </LinearGradient>
@@ -599,6 +601,7 @@ export default function ProductsScreen() {
               </View>
 
               <Pressable style={styles.saveBtn} onPress={async () => {
+                playClickSound("heavy");
                 if (!catForm.name) return Alert.alert(t("error"), t("name"));
                 let imagePath = editCategory?.image || null;
                 if (categoryImage && !categoryImage.startsWith("/objects")) {

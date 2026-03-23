@@ -14,10 +14,11 @@ import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
+import { playClickSound } from "@/lib/sound";
 
 function SettingRow({ icon, label, value, onPress, color, rtl }: { icon: string; label: string; value?: string; onPress?: () => void; color?: string; rtl?: boolean }) {
   return (
-    <Pressable style={[rowStyles.row, rtl && { flexDirection: "row-reverse" }]} onPress={onPress}>
+    <Pressable style={[rowStyles.row, rtl && { flexDirection: "row-reverse" }]} onPress={onPress ? () => { playClickSound("light"); onPress(); } : undefined}>
       <View style={[rowStyles.iconWrap, { backgroundColor: (color || Colors.accent) + "20" }, rtl ? { marginLeft: 12, marginRight: 0 } : {}]}>
         <Ionicons name={icon as any} size={20} color={color || Colors.accent} />
       </View>

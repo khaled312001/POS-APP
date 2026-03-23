@@ -13,29 +13,8 @@ import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
-import * as Haptics from "expo-haptics";
 import BarcodeScanner from "@/components/BarcodeScanner";
-
-// Web Audio click sound
-const playClickSound = (type: "light" | "medium" | "heavy" = "light") => {
-  if (Platform.OS !== "web" || typeof window === "undefined") return;
-  try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    const freq = type === "heavy" ? 280 : type === "medium" ? 420 : 600;
-    osc.frequency.setValueAtTime(freq, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.5, ctx.currentTime + 0.06);
-    gain.gain.setValueAtTime(0.18, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-    osc.type = "sine";
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.1);
-    osc.onended = () => ctx.close();
-  } catch {}
-};
+import { playClickSound, playAddSound } from "@/lib/sound";
 import RealTimeClock from "@/components/RealTimeClock";
 import { useLanguage } from "@/lib/language-context";
 import { useNotifications } from "@/lib/notification-context";
@@ -857,7 +836,7 @@ export default function POSScreen() {
   };
 
   const completeSaleAfterPayment = (saleData: any) => {
-    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    playAddSound();
     const saleItems = cart.items.map((i) => ({ name: i.name, quantity: i.quantity, price: i.price, total: i.price * i.quantity }));
     const custName = selectedCustomer?.name || t("walkIn");
     const empName = employee?.name || "Staff";
@@ -1034,8 +1013,7 @@ export default function POSScreen() {
       return;
     }
     cart.addItem({ id: product.id, name: product.name, price: Number(product.price) });
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    else playClickSound("medium");
+    playAddSound();
     triggerFlash(product.id);
   }, [cart, isPizzaProduct, triggerFlash]);
 
@@ -1045,7 +1023,7 @@ export default function POSScreen() {
       const product = await res.json();
       if (product && product.id) {
         cart.addItem({ id: product.id, name: product.name, price: Number(product.price) });
-        if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        playAddSound();
         setShowScanner(false);
         Alert.alert(t("success"), `${product.name} - ${t("itemAdded")}`);
       }
@@ -1082,7 +1060,7 @@ export default function POSScreen() {
       const emp = await res.json();
       cart.clearCart();
       login(emp);
-      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      playClickSound("medium");
       setShowAccountSwitcher(false);
       setSwitchTarget(null);
       setSwitchPin("");
@@ -1101,7 +1079,7 @@ export default function POSScreen() {
     } catch {
       setSwitchError(t("invalidPin" as any) || "Invalid PIN");
       setSwitchPin("");
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      playClickSound("light");
     } finally {
       setSwitchLoading(false);
     }
@@ -1204,7 +1182,7 @@ export default function POSScreen() {
 
   const handleSwitchPinPress = (digit: string) => {
     if (switchPin.length < 4) {
-      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      playClickSound("light");
       const newPin = switchPin + digit;
       setSwitchPin(newPin);
       if (newPin.length === 4) {
@@ -1462,12 +1440,12 @@ export default function POSScreen() {
             >
               {!selectedCategory ? (
                 <LinearGradient colors={[Colors.gradientStart, Colors.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.catChipGrad}>
-                  <Ionicons name="grid" size={17} color={Colors.white} />
+                  <Ionicons name="grid" size={19} color={Colors.white} />
                   <Text style={[styles.catChipText, { color: Colors.white }]}>{t("allCategories")}</Text>
                 </LinearGradient>
               ) : (
                 <View style={styles.catChipGrad}>
-                  <Ionicons name="grid" size={17} color={Colors.accent} />
+                  <Ionicons name="grid" size={19} color={Colors.accent} />
                   <Text style={styles.catChipText}>{t("allCategories")}</Text>
                 </View>
               )}
@@ -1484,7 +1462,7 @@ export default function POSScreen() {
                 >
                   <View style={styles.catChipGrad}>
                     <View style={[styles.catDot, { backgroundColor: color }]} />
-                    <Ionicons name={iconName} size={17} color={isActive ? color : Colors.textSecondary} />
+                    <Ionicons name={iconName} size={19} color={isActive ? color : Colors.textSecondary} />
                     <Text style={[styles.catChipText, isActive && { color, fontWeight: "700" }]}>{cat.name}</Text>
                   </View>
                 </Pressable>
@@ -1647,7 +1625,7 @@ export default function POSScreen() {
                 <View style={[styles.cartItemActions, isRTL && { flexDirection: "row-reverse" }]}>
                   <Pressable
                     style={[styles.qtyBtn, item.quantity === 1 && { backgroundColor: `${Colors.danger}22`, borderColor: Colors.danger }]}
-                    onPress={() => { cart.updateQuantity(item.id, item.quantity - 1); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); else playClickSound("light"); }}
+                    onPress={() => { cart.updateQuantity(item.id, item.quantity - 1); playClickSound("light"); }}
                   >
                     <Ionicons name={item.quantity === 1 ? "trash-outline" : "remove"} size={14} color={item.quantity === 1 ? Colors.danger : Colors.text} />
                   </Pressable>
@@ -1656,7 +1634,7 @@ export default function POSScreen() {
                   </View>
                   <Pressable
                     style={[styles.qtyBtn, { backgroundColor: `${Colors.accent}22`, borderColor: Colors.accent }]}
-                    onPress={() => { cart.updateQuantity(item.id, item.quantity + 1); if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); else playClickSound("light"); }}
+                    onPress={() => { cart.updateQuantity(item.id, item.quantity + 1); playClickSound("light"); }}
                   >
                     <Ionicons name="add" size={14} color={Colors.accent} />
                   </Pressable>
@@ -1767,8 +1745,7 @@ export default function POSScreen() {
                             price: Number(selectedProductForOptions.price),
                             variant: v,
                           });
-                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          else playClickSound("medium");
+                          playAddSound();
                           setSelectedProductForOptions(null);
                         }
                       }}
@@ -1864,8 +1841,7 @@ export default function POSScreen() {
                                 setSelectedToppings((prev: string[]) =>
                                   isSelected ? prev.filter((t: string) => t !== toppingName) : [...prev, toppingName]
                                 );
-                                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                else playClickSound("light");
+                                playClickSound("light");
                               }}
                               style={{
                                 flex: 1, height: 54,
@@ -1920,8 +1896,7 @@ export default function POSScreen() {
                         price: Number(selectedProductForOptions.price),
                         variant: selectedVariant,
                       });
-                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      else playClickSound("medium");
+                      playAddSound();
                       setSelectedProductForOptions(null);
                       setSelectedVariant(null);
                       setSelectedToppings([]);
@@ -2447,7 +2422,7 @@ export default function POSScreen() {
               </Pressable>
             </View>
             <TextInput
-              style={[styles.input, { height: 100, textAlignVertical: "top", padding: 12, marginTop: 8 }, rtlTextAlign]}
+              style={[styles.searchInput, { flex: 0, height: 100, textAlignVertical: "top", padding: 12, marginTop: 8, backgroundColor: Colors.surface, borderRadius: 10, borderWidth: 1, borderColor: Colors.cardBorder }, rtlTextAlign]}
               multiline
               value={orderNotes}
               onChangeText={setOrderNotes}
@@ -2866,7 +2841,7 @@ export default function POSScreen() {
                       if (key === "") return <View key="empty" style={styles.switchKeyBtn} />;
                       if (key === "del") {
                         return (
-                          <Pressable key="del" style={styles.switchKeyBtn} onPress={() => { if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSwitchPin(switchPin.slice(0, -1)); }}>
+                          <Pressable key="del" style={styles.switchKeyBtn} onPress={() => { playClickSound("light"); setSwitchPin(switchPin.slice(0, -1)); }}>
                             <Ionicons name="backspace" size={24} color={Colors.text} />
                           </Pressable>
                         );
@@ -3372,11 +3347,11 @@ const styles = StyleSheet.create({
 
   // ── Category grid (no scroll, wraps automatically)
   categoriesGrid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 10, paddingVertical: 8, gap: 6 },
-  catChip: { flexDirection: "row", borderRadius: 24, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.cardBorder, overflow: "hidden" },
+  catChip: { flexDirection: "row", borderRadius: 28, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.cardBorder, overflow: "hidden" },
   catChipActive: { borderColor: Colors.accent, borderWidth: 2 },
-  catChipGrad: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 9, gap: 7 },
-  catChipText: { color: Colors.textSecondary, fontSize: 14, fontWeight: "600" },
-  catDot: { width: 9, height: 9, borderRadius: 4.5 },
+  catChipGrad: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 11, gap: 7 },
+  catChipText: { color: Colors.textSecondary, fontSize: 15, fontWeight: "700" },
+  catDot: { width: 10, height: 10, borderRadius: 5 },
 
   // ── Kept for compat (unused now)
   categoriesRow: { flexGrow: 0 },
