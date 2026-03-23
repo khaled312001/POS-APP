@@ -126,6 +126,7 @@ export default function OrdersScreen() {
   const [pickerCategory, setPickerCategory] = useState<string>("all");
   const [pickerSearch, setPickerSearch] = useState("");
   const [showFreeExtrasModal, setShowFreeExtrasModal] = useState(false);
+  const [freeExtrasSelected, setFreeExtrasSelected] = useState<string[]>([]);
 
   // Product configurator states
   const [configuringProduct, setConfiguringProduct] = useState<any>(null);
@@ -997,78 +998,88 @@ export default function OrdersScreen() {
       </Modal>
 
       {/* ===== FREE EXTRAS MODAL ===== */}
-      <Modal visible={showFreeExtrasModal} animationType="fade" transparent onRequestClose={() => setShowFreeExtrasModal(false)}>
+      <Modal visible={showFreeExtrasModal} animationType="fade" transparent onRequestClose={() => { setShowFreeExtrasModal(false); setFreeExtrasSelected([]); }}>
         <View style={styles.pickerOverlay}>
-          <View style={[styles.pickerSheet, { maxHeight: "80%" }]}>
+          <View style={[styles.pickerSheet, { maxHeight: "92%" }]}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <Ionicons name="leaf-outline" size={20} color={Colors.success} />
                 <Text style={styles.modalTitle}>{lbl("Free Extras", "إضافات مجانية", "Gratis Extras")}</Text>
               </View>
-              <Pressable onPress={() => setShowFreeExtrasModal(false)}>
+              <Pressable onPress={() => { setShowFreeExtrasModal(false); setFreeExtrasSelected([]); }}>
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </Pressable>
             </View>
-            <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: 12 }}>
-              {lbl("Tap to add free items to the order", "اضغط لإضافة صنف مجاني للطلب", "Tippen um gratis Artikel hinzuzufügen")}
+            <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: 8 }}>
+              {lbl("SELECT EXTRAS", "اختر الإضافات", "EXTRAS AUSWÄHLEN")}
             </Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {(() => {
-                const PREDEFINED_FREE = [
-                  { key: "ketchup",   icon: "🍅", label: lbl("Ketchup",        "كاتشاب",        "Ketchup") },
-                  { key: "mayo",      icon: "🫙", label: lbl("Mayonnaise",     "مايونيز",       "Mayonnaise") },
-                  { key: "cocktail",  icon: "🥂", label: lbl("Cocktail Sauce", "صلصة كوكتيل",  "Cocktailsauce") },
-                  { key: "spicy",     icon: "🌶️", label: lbl("Spicy Sauce",    "صلصة حارة",    "Scharfe Sauce") },
-                  { key: "yogurt",    icon: "🫙", label: lbl("Yogurt Sauce",   "صلصة زبادي",   "Joghurtsauce") },
-                  { key: "garlic",    icon: "🧄", label: lbl("Garlic Sauce",   "صلصة ثوم",     "Knoblauchsauce") },
-                  { key: "kaeserand", icon: "🧀", label: lbl("Cheese Crust",   "حافة الجبنة",  "Käserand") },
-                ];
-                const allExtras = [
-                  ...PREDEFINED_FREE,
-                  ...addonProducts.map((p: any) => ({ key: `db-${p.id}`, icon: "✨", label: p.name, productId: p.id })),
-                ];
-                return (
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, paddingBottom: 16 }}>
-                    {allExtras.map((extra: any) => {
-                      const inOrder = editForm.items.filter((i: any) => i.notes === `free:${extra.key}`).reduce((s: number, i: any) => s + i.quantity, 0);
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+              {/* Full POS-style color-coded topping grid */}
+              <View style={{ gap: 2, borderRadius: 8, overflow: "hidden", marginBottom: 10 }}>
+                {TOPPING_GRID.map((row, rowIdx) => (
+                  <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 2 }}>
+                    {row.items.map((toppingName, colIdx) => {
+                      if (!toppingName) return <View key={colIdx} style={{ flex: 1, height: 54, backgroundColor: row.color, opacity: 0.3 }} />;
+                      const isSelected = freeExtrasSelected.includes(toppingName);
                       return (
                         <Pressable
-                          key={extra.key}
-                          style={[styles.addonChip, { paddingHorizontal: 14, paddingVertical: 10, position: "relative" }]}
-                          onPress={() => {
-                            setEditForm(prev => {
-                              const existingIdx = prev.items.findIndex((i: any) => i.notes === `free:${extra.key}`);
-                              let nextItems = [...prev.items];
-                              if (existingIdx > -1) {
-                                const it = nextItems[existingIdx];
-                                nextItems[existingIdx] = { ...it, quantity: it.quantity + 1, total: 0 };
-                              } else {
-                                nextItems.push({ productId: extra.productId || 0, name: extra.label, quantity: 1, unitPrice: 0, total: 0, notes: `free:${extra.key}` });
-                              }
-                              const newSubtotal = nextItems.reduce((sum: number, i: any) => sum + (i.total || 0), 0);
-                              return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
-                            });
+                          key={toppingName}
+                          onPress={() => setFreeExtrasSelected(prev => isSelected ? prev.filter(t => t !== toppingName) : [...prev, toppingName])}
+                          style={{
+                            flex: 1, height: 54,
+                            backgroundColor: isSelected ? Colors.accent : row.color,
+                            justifyContent: "center", alignItems: "center",
+                            borderWidth: isSelected ? 2 : 0.5,
+                            borderColor: isSelected ? Colors.accent : "rgba(0,0,0,0.2)",
+                            paddingHorizontal: 2, paddingVertical: 4, gap: 2,
                           }}
                         >
-                          <Text style={{ fontSize: 20 }}>{extra.icon}</Text>
-                          <View>
-                            <Text style={styles.addonChipText}>{extra.label}</Text>
-                            <Text style={{ color: Colors.success, fontSize: 10, fontWeight: "700" }}>
-                              {lbl("FREE", "مجاني", "GRATIS")}{inOrder > 0 ? ` ×${inOrder}` : ""}
-                            </Text>
-                          </View>
+                          <Text style={{ fontSize: 16, lineHeight: 18 }}>{toppingEmoji(toppingName)}</Text>
+                          <Text style={{ fontSize: 8, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 10 }} numberOfLines={2}>
+                            {toppingDisplayName(toppingName)}
+                          </Text>
+                          {isSelected && <Text style={{ fontSize: 8, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
                         </Pressable>
                       );
                     })}
                   </View>
-                );
-              })()}
+                ))}
+              </View>
+              {/* Selected summary */}
+              {freeExtrasSelected.length > 0 && (
+                <View style={{ marginBottom: 10, padding: 8, backgroundColor: Colors.success + "15", borderRadius: 8, borderWidth: 1, borderColor: Colors.success + "40" }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <Text style={{ color: Colors.success, fontSize: 11, fontWeight: "700" }}>
+                      {lbl(`Selected (${freeExtrasSelected.length})`, `المختار (${freeExtrasSelected.length})`, `Ausgewählt (${freeExtrasSelected.length})`)}
+                    </Text>
+                    <Pressable onPress={() => setFreeExtrasSelected([])}>
+                      <Text style={{ color: Colors.danger, fontSize: 11, fontWeight: "600" }}>{lbl("Clear all", "مسح الكل", "Alle löschen")}</Text>
+                    </Pressable>
+                  </View>
+                  <Text style={{ color: Colors.text, fontSize: 11 }}>{freeExtrasSelected.map(t => toppingDisplayName(t)).join(", ")}</Text>
+                </View>
+              )}
             </ScrollView>
             <Pressable
               style={[styles.modalSaveBtn, { marginTop: 8 }]}
-              onPress={() => setShowFreeExtrasModal(false)}
+              onPress={() => {
+                if (freeExtrasSelected.length > 0) {
+                  setEditForm(prev => {
+                    const extrasName = freeExtrasSelected.map(t => toppingDisplayName(t)).join(", ");
+                    const nextItems = [
+                      ...prev.items,
+                      { productId: 0, name: `[Extras] ${extrasName}`, quantity: 1, unitPrice: 0, total: 0 },
+                    ];
+                    return { ...prev, items: nextItems };
+                  });
+                }
+                setShowFreeExtrasModal(false);
+                setFreeExtrasSelected([]);
+              }}
             >
-              <Text style={styles.modalSaveText}>{lbl("Done", "تم", "Fertig")}</Text>
+              <Text style={styles.modalSaveText}>
+                {freeExtrasSelected.length > 0 ? lbl(`Add ${freeExtrasSelected.length} Extras`, `إضافة ${freeExtrasSelected.length} إضافة`, `${freeExtrasSelected.length} hinzufügen`) : lbl("Done", "تم", "Fertig")}
+              </Text>
             </Pressable>
           </View>
         </View>
