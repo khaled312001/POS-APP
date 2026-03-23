@@ -1484,6 +1484,7 @@ export default function POSScreen() {
             key={isTablet ? "tablet3" : "phone2"}
             keyExtractor={(item: any) => String(item.id)}
             contentContainerStyle={styles.productGrid}
+            style={{ flex: 1 }}
             scrollEnabled={!!filteredProducts.length}
             renderItem={({ item }: { item: any }) => {
               const cat = categories.find((c: any) => c.id === item.categoryId);
@@ -1790,7 +1791,7 @@ export default function POSScreen() {
                       <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 2 }}>
                         {row.items.map((toppingName, colIdx) => {
                           if (!toppingName) {
-                            return <View key={colIdx} style={{ flex: 1, height: 54, backgroundColor: row.color, opacity: 0.25 }} />;
+                            return null;
                           }
                           const isSelected = selectedToppings.includes(toppingName);
                           return (

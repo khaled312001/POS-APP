@@ -654,6 +654,69 @@ export default function OrdersScreen() {
     return matchCat && matchSearch;
   });
 
+  // --- Color-coded topping grid (POS style) ---
+  const TOPPING_GRID: { color: string; textColor: string; items: (string | null)[] }[] = [
+    { color: "#1455A4", textColor: "#fff", items: ["Tomato Sauce", "Sliced Tomatoes", "Garlic", "Onions", "Capers", "Olives", "Oregano"] },
+    { color: "#1976D2", textColor: "#fff", items: ["Vegetables", "Spinach", "Bell Peppers", null, "Corn", "Broccoli", "Artichokes"] },
+    { color: "#E8EAF6", textColor: "#1a1a2e", items: ["Egg", "Pineapple", null, null, null, null, "Arugula"] },
+    { color: "#E8EAF6", textColor: "#1a1a2e", items: ["Mushrooms", null, null, null, null, null, null] },
+    { color: "#B71C1C", textColor: "#fff", items: ["Ham", "Spicy Salami", "Salami", "Bacon", "Prosciutto", null, null] },
+    { color: "#B71C1C", textColor: "#fff", items: ["Lamb", "Chicken", "Kebab", "Minced Meat", null, "Mayonnaise", null] },
+    { color: "#BF360C", textColor: "#fff", items: ["Anchovies", "Shrimp", "Tuna", null, null, "Ketchup", null] },
+    { color: "#1B5E20", textColor: "#fff", items: [null, null, null, null, null, "Cocktail Sauce", "Spicy Sauce"] },
+    { color: "#F9A825", textColor: "#1a1a2e", items: ["Mozzarella", "Gorgonzola", "Parmesan", "Mascarpone", "Kaeserand", "Yogurt Sauce", null] },
+  ];
+
+  const toppingDisplayName = (name: string): string => {
+    const de: Record<string, string> = {
+      "Tomato Sauce": "Tomatensauce", "Sliced Tomatoes": "Tomatenscheiben", "Garlic": "Knoblauch",
+      "Onions": "Zwiebeln", "Capers": "Kapern", "Olives": "Oliven", "Oregano": "Oregano",
+      "Vegetables": "Gemüse", "Spinach": "Spinat", "Bell Peppers": "Peperoni",
+      "Corn": "Mais", "Broccoli": "Broccoli", "Artichokes": "Artischoken",
+      "Egg": "Ei", "Pineapple": "Ananas", "Arugula": "Rukola", "Mushrooms": "Champignons",
+      "Ham": "Schinken", "Spicy Salami": "Salami scharf", "Salami": "Salami",
+      "Bacon": "Speck", "Prosciutto": "Rohschinken",
+      "Lamb": "Lammfleisch", "Chicken": "Poulet", "Kebab": "Kebab",
+      "Minced Meat": "Hackfleisch", "Mayonnaise": "Mayonaise",
+      "Anchovies": "Sardellen", "Shrimp": "Crevetten", "Tuna": "Thon",
+      "Ketchup": "Ketchup", "Cocktail Sauce": "Cocktail", "Spicy Sauce": "SCHARF",
+      "Mozzarella": "Mozzarella", "Gorgonzola": "Gorgonzola", "Parmesan": "Käse",
+      "Mascarpone": "Mascarpone", "Kaeserand": "Käserand", "Yogurt Sauce": "Joghurt",
+    };
+    const ar: Record<string, string> = {
+      "Tomato Sauce": "صلصة طماطم", "Sliced Tomatoes": "طماطم مقطعة", "Garlic": "ثوم",
+      "Onions": "بصل", "Capers": "كابر", "Olives": "زيتون", "Oregano": "أوريغانو",
+      "Vegetables": "خضار", "Spinach": "سبانخ", "Bell Peppers": "فلفل", "Corn": "ذرة",
+      "Broccoli": "بروكلي", "Artichokes": "أرضي شوكي", "Egg": "بيض", "Pineapple": "أناناس",
+      "Arugula": "جرجير", "Mushrooms": "مشروم", "Ham": "هام", "Spicy Salami": "سلامي حار",
+      "Salami": "سلامي", "Bacon": "لحم مدخن", "Prosciutto": "بروشوتو",
+      "Lamb": "لحم ضأن", "Chicken": "دجاج", "Kebab": "كباب", "Minced Meat": "لحم مفروم",
+      "Mayonnaise": "مايونيز", "Anchovies": "أنشوجة", "Shrimp": "جمبري", "Tuna": "تونة",
+      "Ketchup": "كاتشاب", "Cocktail Sauce": "صلصة كوكتيل", "Spicy Sauce": "حار",
+      "Mozzarella": "موزاريلا", "Gorgonzola": "جورجونزولا", "Parmesan": "جبنة",
+      "Mascarpone": "ماسكاربوني", "Kaeserand": "حافة جبنة", "Yogurt Sauce": "زبادي",
+    };
+    if (language === "de") return de[name] || name;
+    if (language === "ar") return ar[name] || name;
+    return name;
+  };
+
+  const toppingEmoji = (name: string): string => {
+    const map: Record<string, string> = {
+      "Tomato Sauce": "🍅", "Sliced Tomatoes": "🍅", "Garlic": "🧄", "Onions": "🧅",
+      "Capers": "🫛", "Olives": "🫒", "Oregano": "🌿", "Vegetables": "🥦",
+      "Spinach": "🥬", "Bell Peppers": "🫑", "Corn": "🌽", "Broccoli": "🥦",
+      "Artichokes": "🌿", "Arugula": "🥬", "Egg": "🥚", "Pineapple": "🍍",
+      "Mushrooms": "🍄", "Ham": "🥩", "Spicy Salami": "🌶️", "Salami": "🥩",
+      "Bacon": "🥓", "Prosciutto": "🥩", "Lamb": "🐑", "Chicken": "🍗",
+      "Kebab": "🥙", "Minced Meat": "🥩", "Mayonnaise": "🫙", "Anchovies": "🐟",
+      "Shrimp": "🍤", "Tuna": "🐟", "Ketchup": "🍅", "Cocktail Sauce": "🥂",
+      "Spicy Sauce": "🌶️", "Mozzarella": "🧀", "Gorgonzola": "🧀",
+      "Parmesan": "🧀", "Mascarpone": "🧀", "Kaeserand": "🧀", "Yogurt Sauce": "🥛",
+    };
+    return map[name] || "✨";
+  };
+
   // --- Topping options for configurator ---
   const getToppingOptions = () => {
     return PIZZA_TOPPINGS.map(t => ({ name: t.name, price: 0, icon: t.icon, category: t.category }));
@@ -843,42 +906,58 @@ export default function OrdersScreen() {
               </ScrollView>
             ) : (
               <ScrollView style={{ marginTop: 10 }} showsVerticalScrollIndicator={false}>
-                <View style={{ backgroundColor: Colors.accent + "15", padding: 12, borderRadius: 10, marginBottom: 15, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View style={{ backgroundColor: Colors.accent + "15", padding: 12, borderRadius: 10, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <Ionicons name="pizza" size={20} color={Colors.accent} />
                   <Text style={{ color: Colors.accent, fontWeight: "700", fontSize: 15 }}>
                     {selectedVariant?.name || configuringProduct?.name} — CHF {Number(selectedVariant?.price || configuringProduct?.price).toFixed(2)}
                   </Text>
                 </View>
-                {displayToppingCats.map((cat) => {
-                  const catToppings = getToppingOptions().filter((t: any) => t.category === cat);
-                  if (catToppings.length === 0) return null;
-                  return (
-                    <View key={cat} style={{ marginBottom: 18 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.accent, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>{catLabel(cat)}</Text>
-                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                        {catToppings.map((topping: any) => {
-                          const isSelected = selectedToppings.includes(topping.name);
-                          return (
-                            <Pressable
-                              key={topping.name}
-                              onPress={() => setSelectedToppings(prev => isSelected ? prev.filter(t => t !== topping.name) : [...prev, topping.name])}
-                              style={[{ padding: 10, borderRadius: 12, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.cardBorder, width: "31.5%", height: 90, alignItems: "center", justifyContent: "center", gap: 4 }, isSelected && { borderColor: Colors.accent, backgroundColor: Colors.accent + "15" }]}
-                            >
-                              <Text style={{ fontSize: 24 }}>{topping.icon}</Text>
-                              <Text style={[{ fontSize: 10, color: Colors.text, textAlign: "center", fontWeight: "600" }, isSelected && { color: Colors.accent }]} numberOfLines={2}>{topping.name}</Text>
-                              {isSelected && (
-                                <View style={{ position: "absolute", top: 4, right: 4, width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" }}>
-                                  <Ionicons name="checkmark" size={10} color="#000" />
-                                </View>
-                              )}
-                            </Pressable>
-                          );
-                        })}
-                      </View>
+                {/* Color-coded POS topping grid */}
+                <View style={{ gap: 2, borderRadius: 8, overflow: "hidden", marginBottom: 12 }}>
+                  {TOPPING_GRID.map((row, rowIdx) => (
+                    <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 2 }}>
+                      {row.items.map((toppingName, colIdx) => {
+                        if (!toppingName) return null;
+                        const isSelected = selectedToppings.includes(toppingName);
+                        return (
+                          <Pressable
+                            key={toppingName}
+                            onPress={() => setSelectedToppings(prev => isSelected ? prev.filter(t => t !== toppingName) : [...prev, toppingName])}
+                            style={{
+                              flex: 1, height: 54,
+                              backgroundColor: isSelected ? Colors.accent : row.color,
+                              justifyContent: "center", alignItems: "center",
+                              borderWidth: isSelected ? 2 : 0.5,
+                              borderColor: isSelected ? Colors.accent : "rgba(0,0,0,0.2)",
+                              paddingHorizontal: 2, paddingVertical: 4, gap: 2,
+                            }}
+                          >
+                            <Text style={{ fontSize: 16, lineHeight: 18 }}>{toppingEmoji(toppingName)}</Text>
+                            <Text style={{ fontSize: 8, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 10 }} numberOfLines={2}>
+                              {toppingDisplayName(toppingName)}
+                            </Text>
+                            {isSelected && <Text style={{ fontSize: 8, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
+                          </Pressable>
+                        );
+                      })}
                     </View>
-                  );
-                })}
-                <View style={{ gap: 10, marginTop: 10 }}>
+                  ))}
+                </View>
+                {/* Selected toppings summary */}
+                {selectedToppings.length > 0 && (
+                  <View style={{ marginBottom: 10, padding: 8, backgroundColor: Colors.accent + "15", borderRadius: 8, borderWidth: 1, borderColor: Colors.accent + "40" }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <Text style={{ color: Colors.accent, fontSize: 11, fontWeight: "700" }}>
+                        {lbl(`Selected (${selectedToppings.length})`, `الإضافات (${selectedToppings.length})`, `Ausgewählt (${selectedToppings.length})`)}
+                      </Text>
+                      <Pressable onPress={() => setSelectedToppings([])}>
+                        <Text style={{ color: "#EF4444", fontSize: 11, fontWeight: "600" }}>{lbl("Clear all", "مسح الكل", "Alle löschen")}</Text>
+                      </Pressable>
+                    </View>
+                    <Text style={{ color: Colors.text, fontSize: 11 }}>{selectedToppings.map(t => toppingDisplayName(t)).join(", ")}</Text>
+                  </View>
+                )}
+                <View style={{ gap: 10, marginTop: 6 }}>
                   <Pressable style={{ borderRadius: 12, overflow: "hidden" }} onPress={applyConfiguringItem}>
                     <LinearGradient colors={[Colors.accent, "#00A3A0"]} style={{ paddingVertical: 14, alignItems: "center" }}>
                       <Text style={{ color: "#000", fontSize: 16, fontWeight: "800" }}>{lbl("Apply Options", "تطبيق الخيارات", "Optionen anwenden")}</Text>

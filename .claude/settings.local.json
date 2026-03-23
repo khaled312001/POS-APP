@@ -83,7 +83,10 @@
       "Bash(curl -s -c /tmp/pizza3.txt -b /tmp/pizza3.txt \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1020\" -o /tmp/prod1020.html -w \"%{http_code}\")",
       "Bash(curl -sv -c /tmp/pizza3.txt -b /tmp/pizza3.txt \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1020\")",
       "Bash(curl -sv -c /tmp/pizza5.txt -b /tmp/pizza5.txt \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1020\")",
-      "Bash(curl -s https://pizzalemon.ch/pizza/magazabelirle.php)"
+      "Bash(curl -s https://pizzalemon.ch/pizza/magazabelirle.php)",
+      "Bash(find /f/POS-APP -name *.ts -path */drizzle/*)",
+      "Bash(find /f/POS-APP -name schema*)",
+      "Bash(cross-env EXPO_PUBLIC_DOMAIN=pos.barmagly.tech npx expo export -p web)"
     ]
   }
 }
