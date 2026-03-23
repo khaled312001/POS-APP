@@ -743,11 +743,11 @@ export default function OrdersScreen() {
   const displayToppingCats = ["Cheese", "Meat", "Vegetables", "Seafood", "Sauces", "Others"];
   const catLabel = (cat: string) =>
     cat === "Cheese" ? lbl("Cheese", "أجبان", "Käse") :
-    cat === "Meat" ? lbl("Meat", "لحوم", "Fleisch") :
-    cat === "Vegetables" ? lbl("Vegetables", "خضروات", "Gemüse") :
-    cat === "Seafood" ? lbl("Seafood", "مأكولات بحرية", "Meeresfrüchte") :
-    cat === "Sauces" ? lbl("Sauces", "صوصات", "Saucen") :
-    lbl("Others", "أخرى", "Sonstiges");
+      cat === "Meat" ? lbl("Meat", "لحوم", "Fleisch") :
+        cat === "Vegetables" ? lbl("Vegetables", "خضروات", "Gemüse") :
+          cat === "Seafood" ? lbl("Seafood", "مأكولات بحرية", "Meeresfrüchte") :
+            cat === "Sauces" ? lbl("Sauces", "صوصات", "Saucen") :
+              lbl("Others", "أخرى", "Sonstiges");
 
   return (
     <View style={styles.container}>
@@ -1015,11 +1015,11 @@ export default function OrdersScreen() {
             </Text>
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
               {/* Full POS-style color-coded topping grid */}
-              <View style={{ gap: 2, borderRadius: 8, overflow: "hidden", marginBottom: 10 }}>
+              <View style={{ gap: 0, borderRadius: 8, overflow: "hidden", marginBottom: 10 }}>
                 {TOPPING_GRID.map((row, rowIdx) => (
-                  <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 2 }}>
+                  <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 0 }}>
                     {row.items.map((toppingName, colIdx) => {
-                      if (!toppingName) return <View key={colIdx} style={{ flex: 1, height: 48, backgroundColor: row.color, opacity: 0.3 }} />;
+                      if (!toppingName) return <View key={colIdx} style={{ flex: 1, height: 48, backgroundColor: row.color, opacity: 0.3, borderWidth: 0.5, borderColor: "rgba(0,0,0,0.2)" }} />;
                       const isSelected = freeExtrasSelected.includes(toppingName);
                       return (
                         <Pressable
@@ -1061,7 +1061,7 @@ export default function OrdersScreen() {
               )}
             </ScrollView>
             <Pressable
-              style={[styles.modalSaveBtn, { marginTop: 8 }]}
+              style={{ paddingVertical: 13, borderRadius: 10, backgroundColor: Colors.accent, alignItems: "center", marginTop: 8 }}
               onPress={() => {
                 if (freeExtrasSelected.length > 0) {
                   setEditForm(prev => {

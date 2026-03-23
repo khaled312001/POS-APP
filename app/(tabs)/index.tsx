@@ -1026,6 +1026,7 @@ export default function POSScreen() {
     if (enrichedProduct.variants && Array.isArray(enrichedProduct.variants) && enrichedProduct.variants.length > 0) {
       setSelectedProductForOptions(enrichedProduct);
       setShowToppingsStep(false);
+      playClickSound("light");
       return;
     }
     // Pizza without variants: skip to toppings directly
@@ -1034,6 +1035,7 @@ export default function POSScreen() {
       setSelectedVariant(null);
       setSelectedToppings([]);
       setShowToppingsStep(true);
+      playClickSound("light");
       return;
     }
     cart.addItem({ id: product.id, name: product.name, price: Number(product.price) });
@@ -1750,15 +1752,6 @@ export default function POSScreen() {
               </Pressable>
             </View>
 
-            {/* Product Image */}
-            {selectedProductForOptions?.image && (
-              <View style={{ alignItems: "center", marginTop: 12, marginBottom: 4 }}>
-                <View style={{ width: 120, height: 120, borderRadius: 20, overflow: "hidden", backgroundColor: Colors.surfaceLight, borderWidth: 2, borderColor: Colors.cardBorder }}>
-                  <AnimatedProductImage uri={selectedProductForOptions.image.startsWith("http") || selectedProductForOptions.image.startsWith("file://") || selectedProductForOptions.image.startsWith("data:") ? selectedProductForOptions.image : `${getApiUrl().replace(/\/$/, "")}${selectedProductForOptions.image}`} />
-                </View>
-              </View>
-            )}
-
             {!showToppingsStep ? (
               /* ── SIZE SELECTION ── */
               <View style={{ marginTop: 20, gap: 12 }}>
@@ -1775,6 +1768,7 @@ export default function POSScreen() {
                           setSelectedVariant(v);
                           setSelectedToppings([]);
                           setShowToppingsStep(true);
+                          playClickSound("light");
                         } else {
                           cart.addItem({
                             id: selectedProductForOptions.id,
@@ -1812,14 +1806,14 @@ export default function POSScreen() {
                 )}
 
                 {/* Color-coded POS grid */}
-                <View style={{ gap: 2, borderRadius: 8, overflow: "hidden" }}>
+                <View style={{ gap: 0, borderRadius: 8, overflow: "hidden" }}>
                   {(() => {
                     // Always show full TOPPING_GRID — all toppings visible regardless of product modifiers
                     return TOPPING_GRID.map((row, rowIdx) => (
-                      <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 2 }}>
+                      <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 0 }}>
                         {row.items.map((toppingName, colIdx) => {
                           if (!toppingName) {
-                            return null;
+                            return <View key={colIdx} style={{ flex: 1, height: isTablet ? 52 : 46, backgroundColor: row.color, opacity: 0.3, borderWidth: 0.5, borderColor: "rgba(0,0,0,0.2)" }} />;
                           }
                           const isSelected = selectedToppings.includes(toppingName);
                           return (
