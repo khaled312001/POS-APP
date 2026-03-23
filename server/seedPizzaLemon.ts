@@ -3,7 +3,7 @@ import { eq, sql, inArray } from "drizzle-orm";
 import {
     branches, employees, categories, products, inventory,
     tenants, tenantSubscriptions, licenseKeys, tenantNotifications,
-    warehouses, tables, landingPageConfig,
+    warehouses, tables, landingPageConfig, vehicles,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { addYears } from "date-fns";
@@ -626,6 +626,17 @@ export async function seedPizzaLemon() {
         message: `+Wunschpizza/Wunschpide/Extra Kebap, -Duplikate/-Crevettencocktail/-Müllerbräu, Fanta-Preis korrigiert. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
         priority: "high",
     }).onConflictDoNothing();
+
+    // ── Sample Vehicles ──────────────────────────────────────────────────────
+    const existingVehicles = await db.select().from(vehicles).where(eq(vehicles.tenantId, tenant.id));
+    if (existingVehicles.length === 0) {
+        await db.insert(vehicles).values([
+            { tenantId: tenant.id, branchId: null, licensePlate: "ZH 123456", make: "Mercedes", model: "Vito", color: "Weiß", driverName: "Ahmed Ali", driverPhone: "+41791234567", isActive: true },
+            { tenantId: tenant.id, branchId: null, licensePlate: "ZH 654321", make: "Volkswagen", model: "Transporter", color: "Blau", driverName: "Mohamed Hassan", driverPhone: "+41799876543", isActive: true },
+            { tenantId: tenant.id, branchId: null, licensePlate: "ZH 111222", make: "Ford", model: "Transit", color: "Silber", driverName: "Omar Ibrahim", driverPhone: "+41761122334", isActive: true },
+        ]);
+        console.log("[PIZZA LEMON] ✓ 3 sample vehicles inserted.");
+    }
 
     console.log(`[PIZZA LEMON] ✓ Setup complete!`);
     console.log(`[PIZZA LEMON]    Email:   ${STORE_EMAIL}`);

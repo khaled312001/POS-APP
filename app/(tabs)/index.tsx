@@ -2002,56 +2002,61 @@ export default function POSScreen() {
                   <Text style={[styles.checkoutItemTotal, rtlTextAlign]}>CHF {(item.price * item.quantity).toFixed(2)}</Text>
                 </View>
               ))}
-              {/* Vehicle Picker — optional, delivery only */}
-              {cart.orderType === "delivery" && (vehicles as any[]).length > 0 && (
-                <View style={{ marginBottom: 8 }}>
+              {/* Vehicle Picker — delivery orders only */}
+              {cart.orderType === "delivery" && (
+                <View style={{ marginBottom: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.cardBorder, padding: 8, backgroundColor: Colors.surfaceLight }}>
                   <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                    <Ionicons name="car-outline" size={16} color={Colors.accent} />
-                    <Text style={{ color: Colors.text, fontSize: 13, fontWeight: "600" }}>
-                      {language === "ar" ? "تعيين مركبة (اختياري)" : language === "de" ? "Fahrzeug zuweisen (optional)" : "Assign Vehicle (optional)"}
+                    <Ionicons name="car-outline" size={15} color={Colors.accent} />
+                    <Text style={{ color: Colors.text, fontSize: 12, fontWeight: "600" }}>
+                      {language === "ar" ? "مركبة التوصيل (اختياري)" : language === "de" ? "Fahrzeug (optional)" : "Delivery Vehicle (optional)"}
                     </Text>
                   </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
-                    <View style={{ flexDirection: "row", gap: 8 }}>
-                      {/* "None" chip */}
-                      <Pressable
-                        onPress={() => cart.setVehicleId(null)}
-                        style={{
-                          paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5,
-                          borderColor: !cart.vehicleId ? Colors.accent : Colors.cardBorder,
-                          backgroundColor: !cart.vehicleId ? Colors.accent + "15" : Colors.surfaceLight,
-                          alignItems: "center", justifyContent: "center",
-                        }}
-                      >
-                        <Text style={{ color: !cart.vehicleId ? Colors.accent : Colors.textMuted, fontSize: 12, fontWeight: "600" }}>
-                          {language === "ar" ? "بدون" : language === "de" ? "Keins" : "None"}
-                        </Text>
-                      </Pressable>
-                      {(vehicles as any[]).map((v: any) => {
-                        const isSelected = cart.vehicleId === v.id;
-                        return (
-                          <Pressable
-                            key={v.id}
-                            onPress={() => cart.setVehicleId(isSelected ? null : v.id)}
-                            style={{
-                              paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5,
-                              borderColor: isSelected ? Colors.accent : Colors.cardBorder,
-                              backgroundColor: isSelected ? Colors.accent + "15" : Colors.surfaceLight,
-                              minWidth: 100,
-                            }}
-                          >
-                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 2 }}>
-                              <Text style={{ fontSize: 14 }}>🚗</Text>
-                              <Text style={{ color: isSelected ? Colors.accent : Colors.text, fontSize: 11, fontWeight: "700" }} numberOfLines={1}>
-                                {v.licensePlate}
-                              </Text>
-                            </View>
-                            <Text style={{ color: Colors.textMuted, fontSize: 10 }} numberOfLines={1}>{v.driverName || `${v.make} ${v.model}`}</Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </ScrollView>
+                  {(vehicles as any[]).length === 0 ? (
+                    <Text style={{ color: Colors.textMuted, fontSize: 11, textAlign: "center", paddingVertical: 4 }}>
+                      {language === "ar" ? "لا توجد مركبات مسجلة" : language === "de" ? "Kein Fahrzeug registriert" : "No vehicles registered"}
+                    </Text>
+                  ) : (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <View style={{ flexDirection: "row", gap: 6 }}>
+                        <Pressable
+                          onPress={() => cart.setVehicleId(null)}
+                          style={{
+                            paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5,
+                            borderColor: !cart.vehicleId ? Colors.accent : Colors.cardBorder,
+                            backgroundColor: !cart.vehicleId ? Colors.accent + "20" : Colors.surface,
+                            alignItems: "center", justifyContent: "center",
+                          }}
+                        >
+                          <Text style={{ color: !cart.vehicleId ? Colors.accent : Colors.textMuted, fontSize: 11, fontWeight: "600" }}>
+                            {language === "ar" ? "بدون" : language === "de" ? "Keins" : "None"}
+                          </Text>
+                        </Pressable>
+                        {(vehicles as any[]).map((v: any) => {
+                          const isSelected = cart.vehicleId === v.id;
+                          return (
+                            <Pressable
+                              key={v.id}
+                              onPress={() => cart.setVehicleId(isSelected ? null : v.id)}
+                              style={{
+                                paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5,
+                                borderColor: isSelected ? Colors.accent : Colors.cardBorder,
+                                backgroundColor: isSelected ? Colors.accent + "20" : Colors.surface,
+                                minWidth: 90,
+                              }}
+                            >
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginBottom: 1 }}>
+                                <Text style={{ fontSize: 12 }}>🚗</Text>
+                                <Text style={{ color: isSelected ? Colors.accent : Colors.text, fontSize: 10, fontWeight: "700" }} numberOfLines={1}>
+                                  {v.licensePlate}
+                                </Text>
+                              </View>
+                              <Text style={{ color: Colors.textMuted, fontSize: 9 }} numberOfLines={1}>{v.driverName || `${v.make} ${v.model}`}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </ScrollView>
+                  )}
                 </View>
               )}
 

@@ -2570,7 +2570,12 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={styles.modalTitle}>{t("vehicleManagement")}</Text>
-              <Pressable onPress={() => setShowVehicles(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
+              <Pressable
+                onPress={() => setShowVehicles(false)}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.danger + "20", alignItems: "center", justifyContent: "center" }}
+              >
+                <Ionicons name="close" size={20} color={Colors.danger} />
+              </Pressable>
             </View>
             <ScrollView>
               <Pressable style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: Colors.accent, borderRadius: 12, padding: 12, marginBottom: 12, justifyContent: "center" }} onPress={() => { setEditVehicle(null); setVehicleForm({ licensePlate: "", make: "", model: "", color: "", driverName: "", driverPhone: "", notes: "" }); setShowVehicleForm(true); }}>
