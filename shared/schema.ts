@@ -133,7 +133,7 @@ export const sales = pgTable("sales", {
 export const saleItems = pgTable("sale_items", {
   id: serial("id").primaryKey(),
   saleId: integer("sale_id").references(() => sales.id, { onDelete: 'cascade' }).notNull(),
-  productId: integer("product_id").references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  productId: integer("product_id").references(() => products.id, { onDelete: 'set null' }),
   productName: text("product_name").notNull(),
   quantity: integer("quantity").notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),

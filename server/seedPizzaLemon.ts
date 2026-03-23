@@ -439,9 +439,17 @@ export async function seedPizzaLemon() {
     }
 
     // ── Phase 7: Full product catalog reset ───────────────────────────────────
-    // Delete all existing products for this tenant and re-insert the complete updated menu
+    // In production: always delete and re-insert to keep catalog up-to-date.
+    // In development: skip reset if products already exist (dev + prod share the same DB;
+    // resetting on every dev restart would wipe production data mid-session).
+    const isProductionEnv = process.env.NODE_ENV === "production";
     const existingProds = await db.select().from(products)
         .where(eq(products.tenantId, tenant.id));
+
+    if (existingProds.length > 0 && !isProductionEnv) {
+        console.log(`[PIZZA LEMON] Dev mode: ${existingProds.length} products already exist — skipping catalog reset to protect shared DB.`);
+        return;
+    }
 
     if (existingProds.length > 0) {
         console.log(`[PIZZA LEMON] Deleting ${existingProds.length} existing products and re-inserting updated catalog...`);

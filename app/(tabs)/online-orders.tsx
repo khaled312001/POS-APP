@@ -161,7 +161,7 @@ export default function OrdersScreen() {
   });
 
   const { data: allCategories = [] } = useQuery<any[]>({
-    queryKey: ["/api/tenant-categories", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryKey: ["/api/categories", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });

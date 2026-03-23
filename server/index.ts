@@ -832,6 +832,19 @@ function setupPaymentGatewayRoutes(app: express.Application) {
     // vehicle_id column in sales table
     await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL;`);
 
+    // Fix sale_items.product_id FK: change from CASCADE to SET NULL to preserve sale history when products are re-seeded
+    await pool.query(`
+      ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL;
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sale_items_product_id_fkey') THEN
+          ALTER TABLE sale_items DROP CONSTRAINT sale_items_product_id_fkey;
+        END IF;
+        ALTER TABLE sale_items ADD CONSTRAINT sale_items_product_id_fkey
+          FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
+      END $$;
+    `);
+
     log("Schema migration complete");
   } catch (err) {
     log("Schema migration error (non-fatal):", err);

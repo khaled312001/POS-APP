@@ -123,6 +123,21 @@ lib/
 - **Build**: `npm run expo:static:build && npm run server:build`
 - **Run**: `npm run server:prod` — serves bundled server + static Expo build
 
+## Critical Database Notes
+
+### Shared Database (Dev + Prod)
+Dev and production servers share the same PostgreSQL database. `seedPizzaLemon()` guards against this:
+- **Dev mode** (`NODE_ENV !== "production"`): skips product delete+reinsert if products already exist.
+- **Production mode**: always performs full catalog reset on startup (expected behavior on deploy).
+
+### sale_items FK Safety
+`sale_items.product_id` uses `ON DELETE SET NULL` (not CASCADE). This preserves sale history
+(via `productName`, `quantity`, `unitPrice`) even when the product catalog is reset.
+
+### Schema Migrations
+All schema changes go through the auto-migration block in `server/index.ts` (runs on every startup).
+After schema changes, rebuild `server_dist/` with `npm run server:build`.
+
 ## Environment Variables
 
 - `DATABASE_URL` — PostgreSQL connection string (required)
