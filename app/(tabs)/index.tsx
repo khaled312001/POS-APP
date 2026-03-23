@@ -513,6 +513,12 @@ export default function POSScreen() {
       <span>CHF ${Number(saleData.deliveryFee).toFixed(2)}</span>
     </div>
   ` : ""}
+  ${vehicleObj ? `
+    <div class="flex-between" style="font-size:11px;color:#555;">
+      <span>&#x1F697; Driver:</span>
+      <span>${vehicleObj.driverName || ""}${vehicleObj.licensePlate ? ` (${vehicleObj.licensePlate})` : ""}</span>
+    </div>
+  ` : ""}
   
   <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
   
@@ -759,7 +765,7 @@ export default function POSScreen() {
     return num.length >= 15 && mm && yy && mm.length === 2 && yy.length >= 2 && cardCvc.length >= 3;
   };
 
-  const autoPrint3Copies = (saleData: any, cartItems: typeof cart.items, cartSubtotal: number, cartTax: number, cartDiscount: number, cartServiceFee: number, cartTotal: number, cartDeliveryFee: number, pmMethod: string, cashAmt: number, custName: string, empName: string, custObj?: any) => {
+  const autoPrint3Copies = (saleData: any, cartItems: typeof cart.items, cartSubtotal: number, cartTax: number, cartDiscount: number, cartServiceFee: number, cartTotal: number, cartDeliveryFee: number, pmMethod: string, cashAmt: number, custName: string, empName: string, custObj?: any, vehicleObj?: any) => {
     if (Platform.OS !== "web") return;
     const printWin = window.open("", "_blank", "width=400,height=600");
     if (!printWin) return;
@@ -856,9 +862,10 @@ export default function POSScreen() {
     const empName = employee?.name || "Staff";
     const cashAmt = Number(cashReceived) || 0;
     // Auto-print 3 copies on web
+    const vehicleObj = cart.vehicleId ? (vehicles as any[]).find((v: any) => v.id === cart.vehicleId) : undefined;
     autoPrint3Copies(
       saleData, cart.items, cart.subtotal, cart.tax, cart.discount, cart.serviceFee, cart.total, cart.deliveryFee,
-      paymentMethod, cashAmt, custName, empName, selectedCustomer
+      paymentMethod, cashAmt, custName, empName, selectedCustomer, vehicleObj
     );
     setLastSale({
       ...saleData,
@@ -875,6 +882,7 @@ export default function POSScreen() {
       customerName: custName,
       employeeName: empName,
       date: new Date().toLocaleString(),
+      vehicleId: cart.vehicleId || null,
     });
     const custAddress = selectedCustomer?.address || "";
     const qrContent = custAddress
@@ -2204,6 +2212,12 @@ export default function POSScreen() {
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(lastSale?.deliveryFee).toFixed(2)}</Text>
                     </View>
                   )}
+                  {lastSale?.vehicleId && (() => { const v = (vehicles as any[]).find((x: any) => x.id === lastSale.vehicleId); return v ? (
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                      <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>🚗 Driver:</Text>
+                      <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{v.driverName || ""}{v.licensePlate ? ` (${v.licensePlate})` : ""}</Text>
+                    </View>
+                  ) : null; })()}
 
                   <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
 
@@ -2733,6 +2747,12 @@ export default function POSScreen() {
                         <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(selectedInvoice.deliveryFee).toFixed(2)}</Text>
                       </View>
                     )}
+                    {selectedInvoice?.vehicleId && (() => { const v = (vehicles as any[]).find((x: any) => x.id === selectedInvoice.vehicleId); return v ? (
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                        <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>🚗 Driver:</Text>
+                        <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{v.driverName || ""}{v.licensePlate ? ` (${v.licensePlate})` : ""}</Text>
+                      </View>
+                    ) : null; })()}
 
                     <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
 
