@@ -125,6 +125,7 @@ export default function OrdersScreen() {
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [pickerCategory, setPickerCategory] = useState<string>("all");
   const [pickerSearch, setPickerSearch] = useState("");
+  const [showFreeExtrasModal, setShowFreeExtrasModal] = useState(false);
 
   // Product configurator states
   const [configuringProduct, setConfiguringProduct] = useState<any>(null);
@@ -645,10 +646,19 @@ export default function OrdersScreen() {
   };
 
   // --- Product Picker categories ---
-  const regularProducts = enrichedProducts.filter((p: any) => !p.isAddon);
+  // Show ALL products regardless of isAddon flag so no items are hidden
+  const regularProducts = enrichedProducts;
   const addonProducts = enrichedProducts.filter((p: any) => p.isAddon);
-  const pickerCategories = Array.from(new Set(regularProducts.map((p: any) => p.categoryName || "Other")));
-  const filteredPickerProducts = regularProducts.filter((p: any) => {
+  const allPickerCatNames = Array.from(new Set(enrichedProducts.map((p: any) => p.categoryName || "Other"))) as string[];
+  // Sort categories: Pizza first, then the rest
+  const pickerCategories = allPickerCatNames.sort((a: string, b: string) => {
+    const aIsPizza = a.toLowerCase().includes("pizza");
+    const bIsPizza = b.toLowerCase().includes("pizza");
+    if (aIsPizza && !bIsPizza) return -1;
+    if (!aIsPizza && bIsPizza) return 1;
+    return 0;
+  });
+  const filteredPickerProducts = enrichedProducts.filter((p: any) => {
     const matchCat = pickerCategory === "all" || (p.categoryName || "Other") === pickerCategory;
     const matchSearch = !pickerSearch.trim() || p.name?.toLowerCase().includes(pickerSearch.trim().toLowerCase());
     return matchCat && matchSearch;
@@ -784,10 +794,16 @@ export default function OrdersScreen() {
               <View style={[styles.editDivider, { marginTop: 10, marginBottom: 15 }]} />
               <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }, { marginBottom: 10, borderBottomWidth: 0 }]}>
                 <Text style={[styles.editLabel, { marginBottom: 0 }]}>{lbl("Order Items", "محتويات الطلب", "Bestellartikel")}</Text>
-                <Pressable onPress={() => { setPickerCategory("all"); setShowProductPicker(true); }} style={styles.addSmallBtn}>
-                  <Ionicons name="add" size={16} color={Colors.accent} />
-                  <Text style={styles.addSmallText}>{lbl("Add", "إضافة", "Hinzufügen")}</Text>
-                </Pressable>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <Pressable onPress={() => { setShowFreeExtrasModal(true); }} style={[styles.addSmallBtn, { borderColor: Colors.success + "60", backgroundColor: Colors.success + "12" }]}>
+                    <Ionicons name="leaf-outline" size={16} color={Colors.success} />
+                    <Text style={[styles.addSmallText, { color: Colors.success }]}>{lbl("Free Extras", "إضافات مجانية", "Gratis Extras")}</Text>
+                  </Pressable>
+                  <Pressable onPress={() => { const pizzaCat = (pickerCategories as string[]).find((c: string) => c.toLowerCase().includes("pizza")); setPickerCategory(pizzaCat || "all"); setShowProductPicker(true); }} style={styles.addSmallBtn}>
+                    <Ionicons name="add" size={16} color={Colors.accent} />
+                    <Text style={styles.addSmallText}>{lbl("Add", "إضافة", "Hinzufügen")}</Text>
+                  </Pressable>
+                </View>
               </View>
 
               {editForm.items.length === 0 ? (
@@ -1063,30 +1079,6 @@ export default function OrdersScreen() {
                         </Pressable>
                       );
                     })}
-                  </View>
-                </>
-              )}
-
-              {/* Free Addons Section */}
-              {addonProducts.length > 0 && (pickerCategory === "all") && (
-                <>
-                  <View style={[styles.pickerSectionHeader, { marginBottom: 10 }]}>
-                    <Text style={styles.pickerSectionTitle}>{lbl("Free Addons", "إضافات مجانية", "Gratis Extras")}</Text>
-                    <View style={styles.freeBadge}>
-                      <Text style={styles.freeBadgeText}>{lbl("FREE", "مجاني", "GRATIS")}</Text>
-                    </View>
-                  </View>
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-                    {addonProducts.map((p: any) => (
-                      <Pressable
-                        key={String(p.id)}
-                        style={[styles.addonChip]}
-                        onPress={() => addItemToOrder({ ...p, price: 0 })}
-                      >
-                        <Text style={styles.addonChipText}>{p.name}</Text>
-                        <Text style={[styles.addonChipText, { color: Colors.success }]}>{lbl("Free", "مجاني", "Gratis")}</Text>
-                      </Pressable>
-                    ))}
                   </View>
                 </>
               )}

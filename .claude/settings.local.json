@@ -86,7 +86,8 @@
       "Bash(curl -s https://pizzalemon.ch/pizza/magazabelirle.php)",
       "Bash(find /f/POS-APP -name *.ts -path */drizzle/*)",
       "Bash(find /f/POS-APP -name schema*)",
-      "Bash(cross-env EXPO_PUBLIC_DOMAIN=pos.barmagly.tech npx expo export -p web)"
+      "Bash(cross-env EXPO_PUBLIC_DOMAIN=pos.barmagly.tech npx expo export -p web)",
+      "Bash(wc -l /f/POS-APP/app/\\\\\\(tabs\\\\\\)/index.tsx /f/POS-APP/app/\\\\\\(tabs\\\\\\)/online-orders.tsx)"
     ]
   }
 }

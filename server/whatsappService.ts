@@ -273,8 +273,6 @@ async function _connectBackground(wpp: any): Promise<void> {
             "--disable-dev-shm-usage",
             "--disable-gpu",
             "--no-first-run",
-            "--no-zygote",
-            "--single-process",
             "--disable-extensions",
             "--disable-software-rasterizer",
             "--disable-features=VizDisplayCompositor,AudioServiceOutOfProcess",
