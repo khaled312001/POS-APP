@@ -662,6 +662,13 @@ export default function OrdersScreen() {
     const matchCat = pickerCategory === "all" || (p.categoryName || "Other") === pickerCategory;
     const matchSearch = !pickerSearch.trim() || p.name?.toLowerCase().includes(pickerSearch.trim().toLowerCase());
     return matchCat && matchSearch;
+  }).sort((a: any, b: any) => {
+    if (pickerCategory !== "all") return 0;
+    const aIsPizza = (a.categoryName || "").toLowerCase().includes("pizza");
+    const bIsPizza = (b.categoryName || "").toLowerCase().includes("pizza");
+    if (aIsPizza && !bIsPizza) return -1;
+    if (!aIsPizza && bIsPizza) return 1;
+    return 0;
   });
 
   // --- Color-coded topping grid (POS style) ---
@@ -985,6 +992,84 @@ export default function OrdersScreen() {
                 </View>
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===== FREE EXTRAS MODAL ===== */}
+      <Modal visible={showFreeExtrasModal} animationType="fade" transparent onRequestClose={() => setShowFreeExtrasModal(false)}>
+        <View style={styles.pickerOverlay}>
+          <View style={[styles.pickerSheet, { maxHeight: "80%" }]}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="leaf-outline" size={20} color={Colors.success} />
+                <Text style={styles.modalTitle}>{lbl("Free Extras", "إضافات مجانية", "Gratis Extras")}</Text>
+              </View>
+              <Pressable onPress={() => setShowFreeExtrasModal(false)}>
+                <Ionicons name="close" size={22} color={Colors.textMuted} />
+              </Pressable>
+            </View>
+            <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: 12 }}>
+              {lbl("Tap to add free items to the order", "اضغط لإضافة صنف مجاني للطلب", "Tippen um gratis Artikel hinzuzufügen")}
+            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {(() => {
+                const PREDEFINED_FREE = [
+                  { key: "ketchup",   icon: "🍅", label: lbl("Ketchup",        "كاتشاب",        "Ketchup") },
+                  { key: "mayo",      icon: "🫙", label: lbl("Mayonnaise",     "مايونيز",       "Mayonnaise") },
+                  { key: "cocktail",  icon: "🥂", label: lbl("Cocktail Sauce", "صلصة كوكتيل",  "Cocktailsauce") },
+                  { key: "spicy",     icon: "🌶️", label: lbl("Spicy Sauce",    "صلصة حارة",    "Scharfe Sauce") },
+                  { key: "yogurt",    icon: "🫙", label: lbl("Yogurt Sauce",   "صلصة زبادي",   "Joghurtsauce") },
+                  { key: "garlic",    icon: "🧄", label: lbl("Garlic Sauce",   "صلصة ثوم",     "Knoblauchsauce") },
+                  { key: "kaeserand", icon: "🧀", label: lbl("Cheese Crust",   "حافة الجبنة",  "Käserand") },
+                ];
+                const allExtras = [
+                  ...PREDEFINED_FREE,
+                  ...addonProducts.map((p: any) => ({ key: `db-${p.id}`, icon: "✨", label: p.name, productId: p.id })),
+                ];
+                return (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, paddingBottom: 16 }}>
+                    {allExtras.map((extra: any) => {
+                      const inOrder = editForm.items.filter((i: any) => i.notes === `free:${extra.key}`).reduce((s: number, i: any) => s + i.quantity, 0);
+                      return (
+                        <Pressable
+                          key={extra.key}
+                          style={[styles.addonChip, { paddingHorizontal: 14, paddingVertical: 10, position: "relative" }]}
+                          onPress={() => {
+                            setEditForm(prev => {
+                              const existingIdx = prev.items.findIndex((i: any) => i.notes === `free:${extra.key}`);
+                              let nextItems = [...prev.items];
+                              if (existingIdx > -1) {
+                                const it = nextItems[existingIdx];
+                                nextItems[existingIdx] = { ...it, quantity: it.quantity + 1, total: 0 };
+                              } else {
+                                nextItems.push({ productId: extra.productId || 0, name: extra.label, quantity: 1, unitPrice: 0, total: 0, notes: `free:${extra.key}` });
+                              }
+                              const newSubtotal = nextItems.reduce((sum: number, i: any) => sum + (i.total || 0), 0);
+                              return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
+                            });
+                          }}
+                        >
+                          <Text style={{ fontSize: 20 }}>{extra.icon}</Text>
+                          <View>
+                            <Text style={styles.addonChipText}>{extra.label}</Text>
+                            <Text style={{ color: Colors.success, fontSize: 10, fontWeight: "700" }}>
+                              {lbl("FREE", "مجاني", "GRATIS")}{inOrder > 0 ? ` ×${inOrder}` : ""}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                );
+              })()}
+            </ScrollView>
+            <Pressable
+              style={[styles.modalSaveBtn, { marginTop: 8 }]}
+              onPress={() => setShowFreeExtrasModal(false)}
+            >
+              <Text style={styles.modalSaveText}>{lbl("Done", "تم", "Fertig")}</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
