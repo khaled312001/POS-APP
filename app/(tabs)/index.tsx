@@ -1806,19 +1806,17 @@ export default function POSScreen() {
                 )}
 
                 {/* Color-coded POS grid */}
-                <View style={{ gap: 0, borderRadius: 8, overflow: "hidden" }}>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", borderRadius: 8, overflow: "hidden" }}>
                   {(() => {
                     // Always show full TOPPING_GRID — all toppings visible regardless of product modifiers
-                    return TOPPING_GRID.map((row, rowIdx) => (
-                      <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 0 }}>
-                        {row.items.map((toppingName, colIdx) => {
-                          if (!toppingName) {
-                            return <View key={colIdx} style={{ flex: 1, height: isTablet ? 52 : 46 }} />;
-                          }
-                          const isSelected = selectedToppings.includes(toppingName);
-                          return (
+                    return TOPPING_GRID.flatMap((row, rowIdx) =>
+                      row.items.map((toppingName, colIdx) => {
+                        if (!toppingName) return null;
+
+                        const isSelected = selectedToppings.includes(toppingName);
+                        return (
+                          <View key={`${rowIdx}-${colIdx}`} style={{ width: "14.28%", height: isTablet ? 52 : 46, padding: 1 }}>
                             <Pressable
-                              key={toppingName}
                               onPress={() => {
                                 setSelectedToppings((prev: string[]) =>
                                   isSelected ? prev.filter((t: string) => t !== toppingName) : [...prev, toppingName]
@@ -1826,11 +1824,12 @@ export default function POSScreen() {
                                 playClickSound("light");
                               }}
                               style={{
-                                flex: 1, height: isTablet ? 52 : 46,
+                                flex: 1,
                                 backgroundColor: isSelected ? Colors.accent : row.color,
                                 justifyContent: "center", alignItems: "center",
-                                borderWidth: isSelected ? 2 : 0.5,
-                                borderColor: isSelected ? Colors.accent : "rgba(0,0,0,0.2)",
+                                borderWidth: isSelected ? 2 : 0,
+                                borderColor: isSelected ? Colors.accent : "transparent",
+                                borderRadius: 4,
                                 paddingHorizontal: 2, paddingVertical: 2, gap: 1,
                               }}
                             >
@@ -1840,10 +1839,10 @@ export default function POSScreen() {
                               </Text>
                               {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
                             </Pressable>
-                          );
-                        })}
-                      </View>
-                    ));
+                          </View>
+                        );
+                      })
+                    );
                   })()}
                 </View>
 

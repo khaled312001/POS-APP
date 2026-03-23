@@ -161,7 +161,7 @@ export default function OrdersScreen() {
   });
 
   const { data: allCategories = [] } = useQuery<any[]>({
-    queryKey: ["/api/categories", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryKey: ["/api/tenant-categories", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });
@@ -774,20 +774,12 @@ export default function OrdersScreen() {
       Alert.alert("Print", "Printing is only supported on web currently.");
       return;
     }
-    const printWin = window.open("", "_blank", "width=400,height=600");
+    const printWin = window.open("", "_blank", "width=800,height=800");
     if (!printWin) return;
 
     const orderNum = editingOrder?._type === "pos" ? (editingOrder?.receiptNumber || `#${editingOrder?.id}`) : `#${editingOrder?.orderNumber}`;
     const dateStr = new Date().toLocaleDateString();
     const timeStr = new Date().toLocaleTimeString();
-
-    const itemsHtml = editForm.items.map((item: any) => `
-      <div style="display:flex;justify-content:space-between;padding:3px 0;">
-        <span style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.name}</span>
-        <span style="width:40px;text-align:center;">x${item.quantity}</span>
-        <span style="width:75px;text-align:right;">CHF ${Number(item.total || 0).toFixed(2)}</span>
-      </div>
-    `).join("");
 
     const storeName = storeSettings?.name || "POS System";
     const storeAddr = storeSettings?.address || "";
@@ -795,74 +787,141 @@ export default function OrdersScreen() {
     const storeEmail = storeSettings?.email || "";
     const logoUrl = storeSettings?.logo || "";
 
-    const logoHtml = logoUrl ? `<div style="text-align:center;margin:8px 0;"><img src="${logoUrl}" style="max-height:55px;max-width:200px;object-fit:contain;" /></div>` : "";
+    const generateInnerReceipt = (isKitchen: boolean, title: string) => {
+      const itemsHtml = editForm.items.map((item: any) => `
+        <div style="display:flex;justify-content:space-between;padding:3px 0;${isKitchen ? 'font-size:14px;font-weight:bold;' : ''}">
+          <span style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.name}</span>
+          <span style="width:40px;text-align:center;">x${item.quantity}</span>
+          ${!isKitchen ? `<span style="width:75px;text-align:right;">CHF ${Number(item.total || 0).toFixed(2)}</span>` : ""}
+        </div>
+      `).join("");
 
-    const html = `<!DOCTYPE html>
+      const logoHtml = logoUrl && !isKitchen ? `<div style="text-align:center;margin:8px 0;"><img src="${logoUrl}" style="max-height:55px;max-width:200px;object-fit:contain;" /></div>` : "";
+
+      return `
+        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
+        ${logoHtml}
+        <div class="center bold" style="font-size:18px;margin-bottom:4px;text-transform:uppercase;">${title}</div>
+        <div class="center bold" style="font-size:14px;">${storeName}</div>
+        ${!isKitchen ? `
+          ${storeAddr ? `<div class="center">${storeAddr}</div>` : ""}
+          ${storePhone ? `<div class="center">${storePhone}</div>` : ""}
+          ${storeEmail ? `<div class="center">${storeEmail}</div>` : ""}
+        ` : ""}
+        
+        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
+        
+        <div>${lbl("Date", "التاريخ", "Datum")}: ${dateStr}, ${timeStr}</div>
+        <div>${lbl("Order Number", "رقم الطلب", "Bestellnummer")}: ${orderNum}</div>
+        ${editForm.customerName ? `<div>${lbl("Customer", "العميل", "Kunde")}: ${editForm.customerName}</div>` : ""}
+        ${editForm.customerPhone ? `<div>${lbl("Phone", "الهاتف", "Telefon")}: ${editForm.customerPhone}</div>` : ""}
+        ${editForm.customerAddress ? `<div>${lbl("Address", "العنوان", "Adresse")}: ${editForm.customerAddress}</div>` : ""}
+        
+        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
+        
+        <div class="flex-between bold">
+          <span style="flex:2;">Item</span>
+          <span style="width:40px;text-align:center;">Qty</span>
+          ${!isKitchen ? `<span style="width:75px;text-align:right;">Total</span>` : ""}
+        </div>
+        
+        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
+        
+        ${itemsHtml}
+        
+        ${!isKitchen ? `
+        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
+        
+        <div class="flex-between">
+          <span>${lbl("Subtotal", "المجموع الفرعي", "Zwischensumme")}:</span>
+          <span>CHF ${Number(editForm.subtotal).toFixed(2)}</span>
+        </div>
+        ${editForm.deliveryFee > 0 ?
+            '<div class="flex-between"><span>' + lbl("Delivery Fee", "رسوم التوصيل", "Liefergebühr") + ':</span><span>CHF ' + Number(editForm.deliveryFee).toFixed(2) + '</span></div>'
+            : ""}
+        
+        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
+        
+        <div class="flex-between bold" style="font-size:15px;">
+          <span>TOTAL:</span>
+          <span>CHF ${Number(editForm.totalAmount).toFixed(2)}</span>
+        </div>
+        
+        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
+        
+        <div class="center bold" style="margin-top:14px;font-size:13px;">${lbl("Thank You", "شكراً لك", "Vielen Dank")}</div>
+        ${storeAddr ? `<div class="center" style="font-size:10px;margin-top:2px;">Visit us: ${storeAddr}</div>` : ""}
+        <div class="center sep" style="margin-top:10px;overflow:hidden;white-space:nowrap;">${"=".repeat(36)}</div>
+        ` : `
+        <div class="center bold" style="margin-top:14px;font-size:13px;">KÜCHENBON</div>
+        <div class="center sep" style="margin-top:10px;overflow:hidden;white-space:nowrap;">${"=".repeat(36)}</div>
+        `}
+      `;
+    };
+
+    const customerInner = generateInnerReceipt(false, lbl("CUSTOMER RECEIPT", "فاتورة العميل", "KUNDENBELEG"));
+    const driverInner = generateInnerReceipt(false, lbl(`DRIVER ORDER ${orderNum}`, `طلب السائق ${orderNum}`, `FAHRERAUFTRAG ${orderNum}`));
+    const kitchenInner = generateInnerReceipt(true, lbl("KITCHEN RECEIPT", "طلبية المطبخ", "KÜCHENBON"));
+
+    const driverFooter = `
+      <div style="border:1px solid #000;margin-top:12px;font-family:'Courier New',monospace;font-size:12px;color:#000;">
+        <div style="display:flex;border-bottom:1px solid #000;padding:10px 10px;">
+          <span style="font-weight:700;width:110px;min-width:110px;">FAHRER</span>
+          <span style="flex:1;">&nbsp;</span>
+        </div>
+        <div style="display:flex;border-bottom:1px solid #000;padding:10px 10px;">
+          <span style="font-weight:700;width:110px;min-width:110px;">LIEFERZEIT</span>
+          <span style="flex:1;">&nbsp;</span>
+        </div>
+        <div style="display:flex;padding:10px 10px;">
+          <span style="font-weight:700;width:110px;min-width:110px;">NOTIZ</span>
+          <span style="flex:1;">&nbsp;</span>
+        </div>
+      </div>`;
+
+    const combinedHtml = `<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
+  <title>Receipt ${orderNum}</title>
   <style>
-    @page { margin: 0; }
-    body { font-family: 'Courier New', monospace; font-size: 11px; width: 300px; margin: 0 auto; color: #000; background: #fff; padding: 15px; line-height: 1.2; }
+    @page { size: A4; margin: 15mm 20mm; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 13px; color: #333; line-height: 1.4; background: #fff; margin: 0; padding: 0; }
+    .page-break { page-break-after: always; }
+    
+    /* Thermal aesthetics for inside A4 wrapper */
+    .thermal-receipt {
+      width: 320px;
+      margin: 0 auto;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #000;
+    }
     .center { text-align: center; }
     .bold { font-weight: 800; }
     .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
     .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
-    .page-break { page-break-after: always; }
   </style>
 </head>
 <body>
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
-  ${logoHtml}
-  <div class="center bold" style="font-size:18px;margin-bottom:4px;text-transform:uppercase;">${lbl("ORDER RECEIPT", "فاتورة الطلب", "BESTELLBELEG")}</div>
-  <div class="center bold" style="font-size:14px;">${storeName}</div>
-  ${storeAddr ? `<div class="center">${storeAddr}</div>` : ""}
-  ${storePhone ? `<div class="center">${storePhone}</div>` : ""}
-  ${storeEmail ? `<div class="center">${storeEmail}</div>` : ""}
   
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
-  
-  <div>${lbl("Date", "التاريخ", "Datum")}: ${dateStr}, ${timeStr}</div>
-  <div>${lbl("Order Number", "رقم الطلب", "Bestellnummer")}: ${orderNum}</div>
-  ${editForm.customerName ? `<div>${lbl("Customer", "العميل", "Kunde")}: ${editForm.customerName}</div>` : ""}
-  ${editForm.customerPhone ? `<div>${lbl("Phone", "الهاتف", "Telefon")}: ${editForm.customerPhone}</div>` : ""}
-  ${editForm.customerAddress ? `<div>${lbl("Address", "العنوان", "Adresse")}: ${editForm.customerAddress}</div>` : ""}
-  
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
-  
-  <div class="flex-between bold">
-    <span style="flex:2;">Item</span>
-    <span style="width:40px;text-align:center;">Qty</span>
-    <span style="width:75px;text-align:right;">Total</span>
+  <div class="thermal-receipt">
+    ${customerInner}
   </div>
+
+  <div class="page-break"></div>
   
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
-  
-  ${itemsHtml}
-  
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
-  
-  <div class="flex-between">
-    <span>${lbl("Subtotal", "المجموع الفرعي", "Zwischensumme")}:</span>
-    <span>CHF ${Number(editForm.subtotal).toFixed(2)}</span>
+  <div class="thermal-receipt">
+    ${driverInner}
+    ${driverFooter}
   </div>
-  ${editForm.deliveryFee > 0 ?
-        '<div class="flex-between"><span>' + lbl("Delivery Fee", "رسوم التوصيل", "Liefergebühr") + ':</span><span>CHF ' + Number(editForm.deliveryFee).toFixed(2) + '</span></div>'
-        : ""}
-  
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
-  
-  <div class="flex-between bold" style="font-size:15px;">
-    <span>TOTAL:</span>
-    <span>CHF ${Number(editForm.totalAmount).toFixed(2)}</span>
+
+  <div class="page-break"></div>
+
+  <div class="thermal-receipt">
+    ${kitchenInner}
   </div>
-  
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
-  
-  <div class="center bold" style="margin-top:14px;font-size:13px;">${lbl("Thank You", "شكراً لك", "Vielen Dank")}</div>
-  ${storeAddr ? `<div class="center" style="font-size:10px;margin-top:2px;">Visit us: ${storeAddr}</div>` : ""}
-  <div class="center sep" style="margin-top:10px;overflow:hidden;white-space:nowrap;">${"=".repeat(36)}</div>
-  
+
   <script>
     window.onload = () => {
       setTimeout(() => {
@@ -874,7 +933,7 @@ export default function OrdersScreen() {
 </body>
 </html>`;
 
-    printWin.document.write(html);
+    printWin.document.write(combinedHtml);
     printWin.document.close();
   };
 
@@ -1070,35 +1129,35 @@ export default function OrdersScreen() {
                   </Text>
                 </View>
                 {/* Color-coded POS topping grid */}
-                <View style={{ gap: 2, borderRadius: 8, overflow: "hidden", marginBottom: 12 }}>
-                  {TOPPING_GRID.map((row, rowIdx) => (
-                    <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 2 }}>
-                      {row.items.map((toppingName, colIdx) => {
-                        if (!toppingName) return <View key={colIdx} style={{ flex: 1, height: 48 }} />;
-                        const isSelected = selectedToppings.includes(toppingName);
-                        return (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", borderRadius: 8, overflow: "hidden", marginBottom: 12 }}>
+                  {TOPPING_GRID.flatMap((row, rowIdx) =>
+                    row.items.map((toppingName, colIdx) => {
+                      if (!toppingName) return null;
+                      const isSelected = selectedToppings.includes(toppingName);
+                      return (
+                        <View key={`${rowIdx}-${colIdx}`} style={{ width: "14.28%", height: 48, padding: 1 }}>
                           <Pressable
-                            key={toppingName}
                             onPress={() => setSelectedToppings(prev => isSelected ? prev.filter(t => t !== toppingName) : [...prev, toppingName])}
                             style={{
-                              flex: 1, height: 48,
+                              flex: 1,
                               backgroundColor: isSelected ? Colors.accent : row.color,
                               justifyContent: "center", alignItems: "center",
-                              borderWidth: isSelected ? 2 : 0.5,
-                              borderColor: isSelected ? Colors.accent : "rgba(0,0,0,0.2)",
+                              borderWidth: isSelected ? 2 : 0,
+                              borderColor: isSelected ? Colors.accent : "transparent",
+                              borderRadius: 4,
                               paddingHorizontal: 2, paddingVertical: 2, gap: 1,
                             }}
                           >
                             <Text style={{ fontSize: 16, lineHeight: 18 }}>{toppingEmoji(toppingName)}</Text>
-                            <Text style={{ fontSize: 10, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 12 }} numberOfLines={2}>
+                            <Text style={{ fontSize: 10, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 11 }} numberOfLines={2}>
                               {toppingDisplayName(toppingName)}
                             </Text>
                             {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
                           </Pressable>
-                        );
-                      })}
-                    </View>
-                  ))}
+                        </View>
+                      );
+                    })
+                  )}
                 </View>
                 {/* Selected toppings summary */}
                 {selectedToppings.length > 0 && (
@@ -1147,36 +1206,36 @@ export default function OrdersScreen() {
               {lbl("SELECT EXTRAS", "اختر الإضافات", "EXTRAS AUSWÄHLEN")}
             </Text>
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-              {/* Full POS-style color-coded topping grid */}
-              <View style={{ gap: 0, borderRadius: 8, overflow: "hidden", marginBottom: 10 }}>
-                {TOPPING_GRID.map((row, rowIdx) => (
-                  <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 0 }}>
-                    {row.items.map((toppingName, colIdx) => {
-                      if (!toppingName) return <View key={colIdx} style={{ flex: 1, height: 48 }} />;
-                      const isSelected = freeExtrasSelected.includes(toppingName);
-                      return (
+              {/* POS Topping Grid */}
+              <View style={{ flexDirection: "row", flexWrap: "wrap", borderRadius: 8, overflow: "hidden" }}>
+                {TOPPING_GRID.flatMap((row, rowIdx) =>
+                  row.items.map((toppingName, colIdx) => {
+                    if (!toppingName) return null;
+                    const isSelected = freeExtrasSelected.includes(toppingName);
+                    return (
+                      <View key={`${rowIdx}-${colIdx}`} style={{ width: "14.28%", height: 48, padding: 1 }}>
                         <Pressable
-                          key={toppingName}
                           onPress={() => setFreeExtrasSelected(prev => isSelected ? prev.filter(t => t !== toppingName) : [...prev, toppingName])}
                           style={{
-                            flex: 1, height: 48,
+                            flex: 1,
                             backgroundColor: isSelected ? Colors.accent : row.color,
                             justifyContent: "center", alignItems: "center",
-                            borderWidth: isSelected ? 2 : 0.5,
-                            borderColor: isSelected ? Colors.accent : "rgba(0,0,0,0.2)",
+                            borderWidth: isSelected ? 2 : 0,
+                            borderColor: isSelected ? Colors.accent : "transparent",
+                            borderRadius: 4,
                             paddingHorizontal: 2, paddingVertical: 2, gap: 1,
                           }}
                         >
                           <Text style={{ fontSize: 16, lineHeight: 18 }}>{toppingEmoji(toppingName)}</Text>
-                          <Text style={{ fontSize: 10, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 12 }} numberOfLines={2}>
+                          <Text style={{ fontSize: 10, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 11 }} numberOfLines={2}>
                             {toppingDisplayName(toppingName)}
                           </Text>
                           {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
                         </Pressable>
-                      );
-                    })}
-                  </View>
-                ))}
+                      </View>
+                    );
+                  })
+                )}
               </View>
               {/* Selected summary */}
               {freeExtrasSelected.length > 0 && (
