@@ -262,7 +262,10 @@ const DESSERTS: MenuItem[] = [
     { name: "Marlenke mit Honig", description: "Tschechischer Honigkuchen (Marlenka) mit Honig", price: 6.00, image: IMG("pizzalemon_94_marlenke.jpg") },
     { name: "Marlenke mit Schokolade", description: "Tschechischer Honigkuchen (Marlenka) mit Schokolade", price: 6.00, image: IMG("pizzalemon_94_marlenke.jpg") },
     { name: "Choco-Mousse", description: "Cremige Schokoladenmousse", price: 7.00, image: IMG("pizzalemon_95_choco_mousse.jpg") },
-    { name: "Mövenpick Glace", description: "Mövenpick Premium-Glacé – Erdbeer, Schokolade, Vanille, Caramel (175ml)", price: 6.00, image: IMG("pizzalemon_96_moevenpick_glace.jpg") },
+    { name: "Mövenpick Glace Erdbeer", description: "Mövenpick Premium-Glacé Erdbeer (175ml)", price: 6.00, image: IMG("pizzalemon_96_moevenpick_glace.jpg") },
+    { name: "Mövenpick Glace Schokolade", description: "Mövenpick Premium-Glacé Schokolade (175ml)", price: 6.00, image: IMG("pizzalemon_96_moevenpick_glace.jpg") },
+    { name: "Mövenpick Glace Vanille", description: "Mövenpick Premium-Glacé Vanille (175ml)", price: 6.00, image: IMG("pizzalemon_96_moevenpick_glace.jpg") },
+    { name: "Mövenpick Glace Caramel", description: "Mövenpick Premium-Glacé Caramel (175ml)", price: 6.00, image: IMG("pizzalemon_96_moevenpick_glace.jpg") },
 ];
 
 // ─── GETRÄNKE ─────────────────────────────────────────────────────────────────
@@ -622,8 +625,8 @@ export async function seedPizzaLemon() {
     await db.insert(tenantNotifications).values({
         tenantId: tenant.id,
         type: "info",
-        title: "Pizza Lemon Katalog aktualisiert (v5)!",
-        message: `+Wunschpizza/Wunschpide/Extra Kebap, -Duplikate/-Crevettencocktail/-Müllerbräu, Fanta-Preis korrigiert. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
+        title: "Pizza Lemon Katalog aktualisiert (v6)!",
+        message: `+Mövenpick Glace Erdbeer/Schokolade/Vanille/Caramel (je einzeln), Bilder für Wunschpide+Extra Kebap hinzugefügt. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
         priority: "high",
     }).onConflictDoNothing();
 
@@ -643,5 +646,5 @@ export async function seedPizzaLemon() {
     console.log(`[PIZZA LEMON]    Pass:    ${STORE_PASSWORD}`);
     console.log(`[PIZZA LEMON]    License: ${LICENSE_KEY}`);
     console.log(`[PIZZA LEMON]    Admin PIN: 1234  |  Cashier PIN: 5678`);
-    console.log(`[PIZZA LEMON]    Menu: 35 Pizza, 3 Calzone, 10 Pide, 2 Lahmacun, 13 Tellergerichte, 24 Fingerfood, 8 Salat, 6 Dessert, 9 Getränke, 1 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
+    console.log(`[PIZZA LEMON]    Menu: 35 Pizza, 3 Calzone, 10 Pide, 2 Lahmacun, 13 Tellergerichte, 24 Fingerfood, 8 Salat, 9 Dessert, 9 Getränke, 1 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
 }
