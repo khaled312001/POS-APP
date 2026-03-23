@@ -221,6 +221,33 @@ export default function ProductsScreen() {
   const topPad = Platform.OS === "web" ? 67 : 0;
   const getCatName = (catId: number | null) => categories.find((c: any) => c.id === catId)?.name || t("uncategorized");
 
+  const getPriority = (name: string) => {
+    if (!name) return 999;
+    const n = name.toLowerCase();
+    if (/pizza|بيتزا|calzone|pide|lahmacun|burger|burg|sandwich|wrap|grill|shawarma|شاورما/.test(n)) return 1;
+    if (/pasta|meal|main|plate|chicken|meat|fish|teller|nuggets|schnitzel|kebab|دجاج|لحم|سمك/.test(n)) return 2;
+    if (/appetizer|starter|finger|snack|مقبلات|فاتح/.test(n)) return 3;
+    if (/salad|سلطة/.test(n)) return 6;
+    if (/dessert|sweet|حلوى|حلويات|baklava|tiramisu/.test(n)) return 7;
+    if (/drink|beverage|juice|water|coke|cola|bier|beer|wine|alcohol|عصير|مشروب/.test(n)) return 8;
+    if (/tabak|tobacco|cigarette/.test(n)) return 9;
+    return 5; // Default for other generic foods
+  };
+
+  const sortedCategories = [...categories].sort((a, b) => {
+    const aOrder = a.sortOrder || 0;
+    const bOrder = b.sortOrder || 0;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return getPriority(a.name) - getPriority(b.name);
+  });
+
+  const sortedProducts = [...products].sort((a, b) => {
+    const pA = getPriority(getCatName(a.categoryId));
+    const pB = getPriority(getCatName(b.categoryId));
+    if (pA !== pB) return pA - pB;
+    return a.name.localeCompare(b.name);
+  });
+
   return (
     <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
       <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid]} style={[styles.header, isRTL && { flexDirection: "row-reverse" }]}>
@@ -331,10 +358,10 @@ export default function ProductsScreen() {
 
       {viewMode === "products" && (
         <FlatList
-          data={products}
+          data={sortedProducts}
           keyExtractor={(item: any) => String(item.id)}
           contentContainerStyle={styles.list}
-          scrollEnabled={!!products.length}
+          scrollEnabled={!!sortedProducts.length}
           renderItem={({ item }: { item: any }) => (
             <Pressable style={[styles.productCard, isRTL && { flexDirection: "row-reverse" }]} onPress={() => { if (canManage) { playClickSound("light"); openEdit(item); } }}>
               <View style={[styles.productIconWrap, isRTL ? { marginLeft: 12, marginRight: 0 } : {}]}>
@@ -394,10 +421,10 @@ export default function ProductsScreen() {
 
       {viewMode === "categories" && (
         <FlatList
-          data={categories}
+          data={sortedCategories}
           keyExtractor={(item: any) => String(item.id)}
           contentContainerStyle={styles.list}
-          scrollEnabled={!!categories.length}
+          scrollEnabled={!!sortedCategories.length}
           renderItem={({ item }: { item: any }) => (
             <Pressable style={[styles.productCard, isRTL && { flexDirection: "row-reverse" }]} onPress={() => {
               if (!canManage) return;

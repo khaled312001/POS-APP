@@ -442,6 +442,7 @@ export default function POSScreen() {
     const timeStr = saleDate.toLocaleTimeString();
     const empName = saleData.employeeName || employee?.name || "Staff";
     const custName = saleData.customerName || "";
+    const vehicleObj = vehicles.find((v: any) => v.id == saleData.vehicleId);
 
     const itemsHtml = (saleData.items || []).map((item: any) => `
       <div style="display:flex;justify-content:space-between;padding:3px 0;${isKitchen ? 'font-size:14px;font-weight:bold;' : ''}">
