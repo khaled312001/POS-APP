@@ -40,6 +40,10 @@ export class CallerIDService extends EventEmitter {
   // Key: "tenantId-slot"
   private activeCallSlots: Map<string, ActiveCall> = new Map();
   private slotTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  // Deduplication: track recent calls to prevent double-counting
+  // Key: "normalizedPhone-tenantId", Value: timestamp
+  private recentCalls: Map<string, number> = new Map();
+  private readonly DEDUP_WINDOW_MS = 5000; // 5 seconds
 
   constructor() {
     super();
@@ -135,6 +139,25 @@ export class CallerIDService extends EventEmitter {
     }
 
     console.log(`[CallerID] Incoming call for tenant ${resolvedTenantId}: ${phoneNumber} (Normalized: ${normalized})`);
+
+    // ── Deduplication: skip if the same phone+tenant was already processed recently ──
+    const dedupKey = `${normalized}-${resolvedTenantId}`;
+    const now = Date.now();
+    const lastSeen = this.recentCalls.get(dedupKey);
+    if (lastSeen && (now - lastSeen) < this.DEDUP_WINDOW_MS) {
+      console.log(`[CallerID] Duplicate call from ${normalized} within ${this.DEDUP_WINDOW_MS}ms — skipping`);
+      // Return existing active call if any
+      const existing = Array.from(this.activeCallSlots.values())
+        .find(c => c.normalizedPhone === normalized && c.tenantId === resolvedTenantId);
+      return existing || null;
+    }
+    this.recentCalls.set(dedupKey, now);
+    // Clean up old entries periodically
+    if (this.recentCalls.size > 100) {
+      for (const [k, ts] of this.recentCalls) {
+        if (now - ts > this.DEDUP_WINDOW_MS * 2) this.recentCalls.delete(k);
+      }
+    }
 
     // 1. Assign a slot (1-4)
     let slot = preferredSlot || 0;
