@@ -167,7 +167,7 @@ const PIZZAS: MenuItem[] = [
     { name: "Padrone", description: "Tomaten, Mozzarella, Gorgonzola, Pilze", price: 20.00, price45: 33.00, image: IMG("pizzalemon_30_padrone.jpg") },
     { name: "Schloss Pizza", description: "Tomaten, Mozzarella, Kalbfleisch, Speck, scharfe Salami", price: 20.00, price45: 34.00, image: IMG("pizzalemon_31_schloss_pizza.jpg") },
     { name: "Italiano", description: "Tomaten, Mozzarella, Rohschinken, Mascarpone, Rucola", price: 20.00, price45: 34.00, image: IMG("pizzalemon_32_italiano.jpg") },
-    { name: "Americano", description: "Tomaten, Mozzarella, Speck, Mais, Zwiebeln", price: 21.00, price45: 34.00, image: IMG("pizzalemon_33_americano.jpg") },
+    { name: "Americano", description: "Tomaten, Mozzarella, Speck, Mais, Zwiebeln", price: 21.00, price45: 36.00, image: IMG("pizzalemon_33_americano.jpg") },
     { name: "Lemon Pizza", description: "Tomaten, Mozzarella, Lammfleisch, Knoblauch, Peperoncini, Scharf", price: 20.00, price45: 34.00, image: IMG("pizzalemon_34_lemon_pizza.jpg") },
 ];
 
