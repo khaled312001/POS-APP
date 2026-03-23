@@ -1749,6 +1749,15 @@ export default function POSScreen() {
               </Pressable>
             </View>
 
+            {/* Product Image */}
+            {selectedProductForOptions?.image && (
+              <View style={{ alignItems: "center", marginTop: 12, marginBottom: 4 }}>
+                <View style={{ width: 120, height: 120, borderRadius: 20, overflow: "hidden", backgroundColor: Colors.surfaceLight, borderWidth: 2, borderColor: Colors.cardBorder }}>
+                  <AnimatedProductImage uri={selectedProductForOptions.image.startsWith("http") || selectedProductForOptions.image.startsWith("file://") || selectedProductForOptions.image.startsWith("data:") ? selectedProductForOptions.image : `${getApiUrl().replace(/\/$/, "")}${selectedProductForOptions.image}`} />
+                </View>
+              </View>
+            )}
+
             {!showToppingsStep ? (
               /* ── SIZE SELECTION ── */
               <View style={{ marginTop: 20, gap: 12 }}>
@@ -2212,12 +2221,14 @@ export default function POSScreen() {
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(lastSale?.deliveryFee).toFixed(2)}</Text>
                     </View>
                   )}
-                  {lastSale?.vehicleId && (() => { const v = (vehicles as any[]).find((x: any) => x.id === lastSale.vehicleId); return v ? (
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                      <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>🚗 Driver:</Text>
-                      <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{v.driverName || ""}{v.licensePlate ? ` (${v.licensePlate})` : ""}</Text>
-                    </View>
-                  ) : null; })()}
+                  {lastSale?.vehicleId && (() => {
+                    const v = (vehicles as any[]).find((x: any) => x.id === lastSale.vehicleId); return v ? (
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                        <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>🚗 Driver:</Text>
+                        <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{v.driverName || ""}{v.licensePlate ? ` (${v.licensePlate})` : ""}</Text>
+                      </View>
+                    ) : null;
+                  })()}
 
                   <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
 
@@ -2676,7 +2687,7 @@ export default function POSScreen() {
               {selectedInvoice && (
                 <View style={{ padding: 20, backgroundColor: "#fff" }}>
                   <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
-                  
+
                   {storeSettings?.logo && (
                     <View style={{ alignItems: "center", marginVertical: 8 }}>
                       <Image source={{ uri: storeSettings.logo.startsWith("http") || storeSettings.logo.startsWith("file://") || storeSettings.logo.startsWith("data:") ? storeSettings.logo : `${getApiUrl().replace(/\/$/, "")}${storeSettings.logo}` }} style={{ width: 150, height: 50, resizeMode: "contain" }} />
@@ -2685,10 +2696,10 @@ export default function POSScreen() {
 
                   <Text style={{ color: "#000", fontSize: 18, fontWeight: "900", textAlign: "center", textTransform: "uppercase", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("viewReceipt" as any) || "RECHNUNG"}</Text>
                   <Text style={{ color: "#000", fontSize: 14, fontWeight: "700", textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings?.name || tenant?.name || "POS System"}</Text>
-                  
+
                   {storeSettings?.address && <Text style={{ color: "#000", fontSize: 11, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.address}</Text>}
                   {storeSettings?.phone && <Text style={{ color: "#000", fontSize: 11, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.phone}</Text>}
-                  
+
                   <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 4, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
 
                   <View style={{ marginVertical: 4 }}>
@@ -2747,12 +2758,14 @@ export default function POSScreen() {
                         <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(selectedInvoice.deliveryFee).toFixed(2)}</Text>
                       </View>
                     )}
-                    {selectedInvoice?.vehicleId && (() => { const v = (vehicles as any[]).find((x: any) => x.id === selectedInvoice.vehicleId); return v ? (
-                      <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                        <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>🚗 Driver:</Text>
-                        <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{v.driverName || ""}{v.licensePlate ? ` (${v.licensePlate})` : ""}</Text>
-                      </View>
-                    ) : null; })()}
+                    {selectedInvoice?.vehicleId && (() => {
+                      const v = (vehicles as any[]).find((x: any) => x.id === selectedInvoice.vehicleId); return v ? (
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
+                          <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>🚗 Driver:</Text>
+                          <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{v.driverName || ""}{v.licensePlate ? ` (${v.licensePlate})` : ""}</Text>
+                        </View>
+                      ) : null;
+                    })()}
 
                     <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
 
@@ -3237,10 +3250,10 @@ export default function POSScreen() {
             <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 6, marginBottom: 10 }}>
               {(["all", "missed", "answered", "today"] as const).map((f) => {
                 const labels: Record<string, Record<string, string>> = {
-                  all:      { ar: "الكل", de: "Alle", en: "All" },
-                  missed:   { ar: "فاتتني", de: "Verpasst", en: "Missed" },
+                  all: { ar: "الكل", de: "Alle", en: "All" },
+                  missed: { ar: "فاتتني", de: "Verpasst", en: "Missed" },
                   answered: { ar: "تم الرد", de: "Beantwortet", en: "Answered" },
-                  today:    { ar: "اليوم", de: "Heute", en: "Today" },
+                  today: { ar: "اليوم", de: "Heute", en: "Today" },
                 };
                 const label = labels[f][language] ?? labels[f]["en"];
                 const active = callHistoryFilter === f;

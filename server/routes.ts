@@ -1083,7 +1083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/calls", async (req, res) => {
     try {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
-      const limit = req.query.limit ? Number(req.query.limit) : 50;
+      const limit = req.query.limit ? Number(req.query.limit) : 500;
       const calls = await storage.getCalls(tenantId, limit);
       res.json(calls);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
