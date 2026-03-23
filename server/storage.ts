@@ -614,7 +614,7 @@ export const storage = {
   },
 
   // Calls
-  async getCalls(tenantId?: number, limit = 50) {
+  async getCalls(tenantId?: number, limit = 500) {
     const conditions = [];
     if (tenantId) conditions.push(eq(calls.tenantId, tenantId));
 
