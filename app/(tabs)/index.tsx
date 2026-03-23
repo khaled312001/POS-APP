@@ -1813,7 +1813,7 @@ export default function POSScreen() {
                       <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 0 }}>
                         {row.items.map((toppingName, colIdx) => {
                           if (!toppingName) {
-                            return <View key={colIdx} style={{ flex: 1, height: isTablet ? 52 : 46, backgroundColor: row.color, opacity: 0.3, borderWidth: 0.5, borderColor: "rgba(0,0,0,0.2)" }} />;
+                            return <View key={colIdx} style={{ flex: 1, height: isTablet ? 52 : 46 }} />;
                           }
                           const isSelected = selectedToppings.includes(toppingName);
                           return (

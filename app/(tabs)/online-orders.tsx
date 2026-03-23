@@ -749,6 +749,90 @@ export default function OrdersScreen() {
             cat === "Sauces" ? lbl("Sauces", "صوصات", "Saucen") :
               lbl("Others", "أخرى", "Sonstiges");
 
+  const printEditedOrder = () => {
+    if (Platform.OS !== "web") {
+      Alert.alert("Print", "Printing is only supported on web currently.");
+      return;
+    }
+    const printWin = window.open("", "_blank", "width=400,height=600");
+    if (!printWin) return;
+
+    const orderNum = editingOrder?._type === "pos" ? (editingOrder?.receiptNumber || `#${editingOrder?.id}`) : `#${editingOrder?.orderNumber}`;
+    const dateStr = new Date().toLocaleDateString();
+    const timeStr = new Date().toLocaleTimeString();
+
+    const itemsHtml = editForm.items.map((item: any) => `
+      <div style="display:flex;justify-content:space-between;padding:3px 0;">
+        <span style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.name}</span>
+        <span style="width:40px;text-align:center;">x${item.quantity}</span>
+        <span style="width:75px;text-align:right;">CHF ${Number(item.total || 0).toFixed(2)}</span>
+      </div>
+    `).join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    @page { margin: 0; }
+    body { font-family: 'Courier New', Courier, monospace; width: 300px; margin: 0 auto; padding: 10px; color: #000; font-size: 12px; }
+    .center { text-align: center; }
+    .bold { font-weight: bold; }
+    .flex-between { display: flex; justify-content: space-between; margin: 3px 0; }
+    .sep { border-bottom: 1px dashed #000; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <div class="center bold" style="font-size:18px;margin-bottom:4px;">${lbl("ORDER RECEIPT", "فاتورة الطلب", "BESTELLBELEG")}</div>
+  <div class="center sep" style="border-bottom: 1px solid #000; margin: 5px 0;"></div>
+  
+  <div>${lbl("Date", "التاريخ", "Datum")}: ${dateStr}, ${timeStr}</div>
+  <div>${lbl("Order Number", "رقم الطلب", "Bestellnummer")}: ${orderNum}</div>
+  ${editForm.customerName ? "<div>" + lbl("Customer", "العميل", "Kunde") + ": " + editForm.customerName + "</div>" : ""}
+  ${editForm.customerPhone ? "<div>" + lbl("Phone", "الهاتف", "Telefon") + ": " + editForm.customerPhone + "</div>" : ""}
+  ${editForm.customerAddress ? "<div>" + lbl("Address", "العنوان", "Adresse") + ": " + editForm.customerAddress + "</div>" : ""}
+  
+  <div class="center sep" style="border-bottom: 1px solid #000; margin: 5px 0;"></div>
+  
+  <div class="flex-between bold">
+    <span style="flex:2;">Item</span>
+    <span style="width:40px;text-align:center;">Qty</span>
+    <span style="width:75px;text-align:right;">Total</span>
+  </div>
+  
+  <div class="center sep" style="border-bottom: 1px solid #000; margin: 5px 0;"></div>
+  
+  ${itemsHtml}
+  
+  <div class="center sep" style="border-bottom: 1px solid #000; margin: 5px 0;"></div>
+  
+  <div class="flex-between">
+    <span>${lbl("Subtotal", "المجموع الفرعي", "Zwischensumme")}:</span>
+    <span>CHF ${Number(editForm.subtotal).toFixed(2)}</span>
+  </div>
+  ${editForm.deliveryFee > 0 ?
+        '<div class="flex-between"><span>' + lbl("Delivery Fee", "رسوم التوصيل", "Liefergebühr") + ':</span><span>CHF ' + Number(editForm.deliveryFee).toFixed(2) + '</span></div>'
+        : ""}
+  
+  <div class="flex-between bold" style="font-size:14px;margin-top:5px;">
+    <span>${lbl("Total", "الإجمالي", "Gesamt")}:</span>
+    <span>CHF ${Number(editForm.totalAmount).toFixed(2)}</span>
+  </div>
+  
+  <script>
+    window.onload = () => {
+      setTimeout(() => {
+        window.print();
+        window.close();
+      }, 300);
+    };
+  </script>
+</body>
+</html>`;
+
+    printWin.document.write(html);
+    printWin.document.close();
+  };
+
   return (
     <View style={styles.container}>
 
@@ -869,6 +953,10 @@ export default function OrdersScreen() {
               <Pressable style={styles.modalCancelBtn} onPress={() => { playClickSound("light"); setEditingOrder(null); }}>
                 <Text style={styles.modalCancelText}>{lbl("Cancel", "إلغاء", "Abbrechen")}</Text>
               </Pressable>
+              <Pressable style={[styles.modalCancelBtn, { backgroundColor: Colors.cardBorder + "40", borderColor: "transparent" }]} onPress={() => { playClickSound("light"); printEditedOrder(); }}>
+                <Ionicons name="print-outline" size={18} color={Colors.text} style={{ marginBottom: 2 }} />
+                <Text style={[styles.modalCancelText, { color: Colors.text, fontSize: 12 }]}>{lbl("Print", "طباعة", "Drucken")}</Text>
+              </Pressable>
               <Pressable style={styles.modalSaveBtn} onPress={() => { playClickSound("heavy"); saveEditOrder(); }}>
                 <Text style={styles.modalSaveText}>{lbl("Save Changes", "حفظ", "Speichern")}</Text>
               </Pressable>
@@ -879,7 +967,7 @@ export default function OrdersScreen() {
 
       {/* ===== PRODUCT CONFIGURATOR MODAL ===== */}
       <Modal visible={!!configuringProduct} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
+        <View style={styles.pickerOverlay}>
           <View style={[styles.modalContent, { maxWidth: 700, padding: 24, maxHeight: "92%" }]}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <View style={{ flex: 1 }}>
@@ -941,7 +1029,7 @@ export default function OrdersScreen() {
                   {TOPPING_GRID.map((row, rowIdx) => (
                     <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 2 }}>
                       {row.items.map((toppingName, colIdx) => {
-                        if (!toppingName) return null;
+                        if (!toppingName) return <View key={colIdx} style={{ flex: 1, height: 48 }} />;
                         const isSelected = selectedToppings.includes(toppingName);
                         return (
                           <Pressable
@@ -972,7 +1060,7 @@ export default function OrdersScreen() {
                   <View style={{ marginBottom: 10, padding: 8, backgroundColor: Colors.accent + "15", borderRadius: 8, borderWidth: 1, borderColor: Colors.accent + "40" }}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                       <Text style={{ color: Colors.accent, fontSize: 11, fontWeight: "700" }}>
-                        {lbl(`Selected (${selectedToppings.length})`, `الإضافات (${selectedToppings.length})`, `Ausgewählt (${selectedToppings.length})`)}
+                        {lbl(`Selected(${selectedToppings.length})`, `الإضافات(${selectedToppings.length})`, `Ausgewählt(${selectedToppings.length})`)}
                       </Text>
                       <Pressable onPress={() => setSelectedToppings([])}>
                         <Text style={{ color: "#EF4444", fontSize: 11, fontWeight: "600" }}>{lbl("Clear all", "مسح الكل", "Alle löschen")}</Text>
@@ -1019,7 +1107,7 @@ export default function OrdersScreen() {
                 {TOPPING_GRID.map((row, rowIdx) => (
                   <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 0 }}>
                     {row.items.map((toppingName, colIdx) => {
-                      if (!toppingName) return <View key={colIdx} style={{ flex: 1, height: 48, backgroundColor: row.color, opacity: 0.3, borderWidth: 0.5, borderColor: "rgba(0,0,0,0.2)" }} />;
+                      if (!toppingName) return <View key={colIdx} style={{ flex: 1, height: 48 }} />;
                       const isSelected = freeExtrasSelected.includes(toppingName);
                       return (
                         <Pressable
@@ -1050,7 +1138,7 @@ export default function OrdersScreen() {
                 <View style={{ marginBottom: 10, padding: 8, backgroundColor: Colors.success + "15", borderRadius: 8, borderWidth: 1, borderColor: Colors.success + "40" }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                     <Text style={{ color: Colors.success, fontSize: 11, fontWeight: "700" }}>
-                      {lbl(`Selected (${freeExtrasSelected.length})`, `المختار (${freeExtrasSelected.length})`, `Ausgewählt (${freeExtrasSelected.length})`)}
+                      {lbl(`Selected(${freeExtrasSelected.length})`, `المختار(${freeExtrasSelected.length})`, `Ausgewählt(${freeExtrasSelected.length})`)}
                     </Text>
                     <Pressable onPress={() => setFreeExtrasSelected([])}>
                       <Text style={{ color: Colors.danger, fontSize: 11, fontWeight: "600" }}>{lbl("Clear all", "مسح الكل", "Alle löschen")}</Text>
@@ -1068,7 +1156,7 @@ export default function OrdersScreen() {
                     const extrasName = freeExtrasSelected.map(t => toppingDisplayName(t)).join(", ");
                     const nextItems = [
                       ...prev.items,
-                      { productId: 0, name: `[Extras] ${extrasName}`, quantity: 1, unitPrice: 0, total: 0 },
+                      { productId: 0, name: `[Extras] ${extrasName} `, quantity: 1, unitPrice: 0, total: 0 },
                     ];
                     return { ...prev, items: nextItems };
                   });
@@ -1197,7 +1285,7 @@ export default function OrdersScreen() {
               </Text>
               <Text style={[styles.headerSub, isRTL && { textAlign: "right" }]}>
                 {pendingCount > 0
-                  ? lbl(`${pendingCount} online order${pendingCount > 1 ? "s" : ""} pending`, `${pendingCount} طلب إلكتروني جديد`, `${pendingCount} neue Online-Bestellung(en)`)
+                  ? lbl(`${pendingCount} online order${pendingCount > 1 ? "s" : ""} pending`, `${pendingCount} طلب إلكتروني جديد`, `${pendingCount} neue Online - Bestellung(en)`)
                   : lbl("Live orders dashboard", "لوحة الطلبات المباشرة", "Live-Bestellübersicht")}
               </Text>
             </View>
@@ -1244,7 +1332,7 @@ export default function OrdersScreen() {
       {/* ===== ORDER LIST ===== */}
       <FlatList
         data={filteredOrders}
-        keyExtractor={(item: any) => `${item._type}-${item.id}`}
+        keyExtractor={(item: any) => `${item._type} -${item.id} `}
         renderItem={renderOrder}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
