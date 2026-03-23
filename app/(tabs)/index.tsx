@@ -396,8 +396,16 @@ export default function POSScreen() {
   const { data: callHistory = [] } = useQuery<any[]>({
     queryKey: ["/api/calls", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
-    enabled: showCallHistory && !!tenantId,
+    enabled: !!tenantId,
+    refetchInterval: 5000,
   });
+
+  // Invalidate call history immediately when a new call arrives
+  useEffect(() => {
+    if (incomingCalls.length > 0) {
+      qc.invalidateQueries({ queryKey: ["/api/calls"] });
+    }
+  }, [incomingCalls.length]);
 
   const { data: customerCountData } = useQuery<{ count: number }>({
     queryKey: ["/api/customers/count", `?tenantId=${tenantId || ""}${debouncedCustomerSearch ? `&search=${encodeURIComponent(debouncedCustomerSearch)}` : ""}`],
@@ -3001,7 +3009,7 @@ export default function POSScreen() {
                       {item.status === "pending" && (
                         <Pressable
                           onPress={async () => {
-                            await apiRequest("PUT", `/ api / online - orders / ${item.id} `, { status: "accepted", estimatedTime: 30 });
+                            await apiRequest("PUT", `/api/online-orders/${item.id}`, { status: "accepted", estimatedTime: 30 });
                             qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
                           }}
                           style={{ backgroundColor: Colors.info, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
@@ -3014,7 +3022,7 @@ export default function POSScreen() {
                       {item.status === "accepted" && (
                         <Pressable
                           onPress={async () => {
-                            await apiRequest("PUT", `/ api / online - orders / ${item.id} `, { status: "preparing" });
+                            await apiRequest("PUT", `/api/online-orders/${item.id}`, { status: "preparing" });
                             qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
                           }}
                           style={{ backgroundColor: Colors.secondary, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
@@ -3027,7 +3035,7 @@ export default function POSScreen() {
                       {item.status === "preparing" && (
                         <Pressable
                           onPress={async () => {
-                            await apiRequest("PUT", `/ api / online - orders / ${item.id} `, { status: "ready" });
+                            await apiRequest("PUT", `/api/online-orders/${item.id}`, { status: "ready" });
                             qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
                           }}
                           style={{ backgroundColor: Colors.accent, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
@@ -3040,7 +3048,7 @@ export default function POSScreen() {
                       {item.status === "ready" && (
                         <Pressable
                           onPress={async () => {
-                            await apiRequest("PUT", `/ api / online - orders / ${item.id} `, { status: "delivered" });
+                            await apiRequest("PUT", `/api/online-orders/${item.id}`, { status: "delivered" });
                             qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
                           }}
                           style={{ backgroundColor: "#22c55e", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
@@ -3053,7 +3061,7 @@ export default function POSScreen() {
                       {item.status !== "cancelled" && item.status !== "delivered" && (
                         <Pressable
                           onPress={async () => {
-                            await apiRequest("PUT", `/ api / online - orders / ${item.id} `, { status: "cancelled" });
+                            await apiRequest("PUT", `/api/online-orders/${item.id}`, { status: "cancelled" });
                             qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
                           }}
                           style={{ backgroundColor: Colors.danger, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
@@ -3206,8 +3214,8 @@ export default function POSScreen() {
                 if (callHistorySearch.trim()) {
                   const q = callHistorySearch.trim().toLowerCase();
                   items = items.filter((i: any) => {
-                    const cust = customers.find((c: any) => c.id === i.customerId);
-                    return i.phoneNumber?.includes(q) || (cust?.name?.toLowerCase().includes(q));
+                    const custName = i.customerName || customers.find((c: any) => c.id === i.customerId)?.name || "";
+                    return i.phoneNumber?.includes(q) || custName.toLowerCase().includes(q);
                   });
                 }
                 return items;
@@ -3217,7 +3225,8 @@ export default function POSScreen() {
                 const callDate = new Date(item.createdAt);
                 const hasAnswered = item.answeredCount > 0;
                 const isMissed = !hasAnswered;
-                const cust = customers.find((c: any) => c.id === item.customerId);
+                const custFromList = customers.find((c: any) => c.id === item.customerId);
+                const custName: string | null = item.customerName || custFromList?.name || null;
                 const dateStr = callDate.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit", year: "numeric" });
                 const timeStr = callDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
@@ -3226,9 +3235,9 @@ export default function POSScreen() {
                     onPress={() => {
                       if (item.phoneNumber) {
                         setPhoneInput(item.phoneNumber);
-                        if (cust) {
-                          cart.setCustomerId(cust.id);
-                          setCallerCustomer(cust);
+                        if (custFromList) {
+                          cart.setCustomerId(custFromList.id);
+                          setCallerCustomer(custFromList);
                         } else {
                           handlePhoneSearch(item.phoneNumber);
                         }
@@ -3245,21 +3254,21 @@ export default function POSScreen() {
                     }}
                   >
                     {/* Avatar / status icon */}
-                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: cust ? Colors.accent + "22" : (isMissed ? Colors.danger + "22" : Colors.success + "22"), justifyContent: "center", alignItems: "center" }}>
-                      {cust
-                        ? <Text style={{ color: Colors.accent, fontSize: 18, fontWeight: "800" }}>{cust.name.charAt(0).toUpperCase()}</Text>
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: custName ? Colors.accent + "22" : (isMissed ? Colors.danger + "22" : Colors.success + "22"), justifyContent: "center", alignItems: "center" }}>
+                      {custName
+                        ? <Text style={{ color: Colors.accent, fontSize: 18, fontWeight: "800" }}>{custName.charAt(0).toUpperCase()}</Text>
                         : <Ionicons name={isMissed ? "call-outline" : "call"} size={22} color={isMissed ? Colors.danger : Colors.success} />
                       }
                     </View>
 
                     {/* Main info */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: Colors.text, fontWeight: "800", fontSize: 16 }}>
-                        {cust ? cust.name : item.phoneNumber}
-                      </Text>
-                      {cust && (
-                        <Text style={{ color: Colors.textSecondary, fontSize: 13, marginTop: 1 }}>{item.phoneNumber}</Text>
+                      {custName && (
+                        <Text style={{ color: Colors.accent, fontWeight: "800", fontSize: 15 }}>{custName}</Text>
                       )}
+                      <Text style={{ color: custName ? Colors.textSecondary : Colors.text, fontWeight: custName ? "600" : "800", fontSize: custName ? 13 : 16, marginTop: custName ? 1 : 0 }}>
+                        {item.phoneNumber}
+                      </Text>
                       <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginTop: 4 }}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
                           <Ionicons name="calendar-outline" size={12} color={Colors.textMuted} />

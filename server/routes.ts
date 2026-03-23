@@ -1192,6 +1192,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  app.delete("/api/sales/:id", async (req, res) => {
+    try {
+      await storage.deleteSale(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Suppliers
   app.get("/api/suppliers", async (req, res) => {
     try {

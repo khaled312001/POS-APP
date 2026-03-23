@@ -98,7 +98,7 @@ export default function OrdersScreen() {
   const tenantId = tenant?.id;
 
   const [viewMode, setViewMode] = useState<"online" | "pos" | "all">("all");
-  const [filter, setFilter] = useState<string>("active");
+  const [filter, setFilter] = useState<string>("all");
   const [refreshing, setRefreshing] = useState(false);
   const [newOrderIds, setNewOrderIds] = useState<Set<number>>(new Set());
   const knownOrderIds = useRef<Set<string>>(new Set());
@@ -283,6 +283,28 @@ export default function OrdersScreen() {
       qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
     } catch {
       Alert.alert("Error", "Failed to delete order");
+    }
+  };
+
+  const deletePosOrder = async (id: number) => {
+    const confirmed = Platform.OS === "web"
+      ? window.confirm(lbl("Permanently delete this invoice?", "سيتم حذف هذه الفاتورة نهائياً", "Rechnung dauerhaft löschen?"))
+      : await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          lbl("Delete Invoice?", "حذف الفاتورة", "Rechnung löschen?"),
+          lbl("This will permanently delete the invoice.", "سيتم حذف هذه الفاتورة نهائياً", "Diese Rechnung wird dauerhaft gelöscht."),
+          [
+            { text: lbl("Cancel", "إلغاء", "Abbrechen"), style: "cancel", onPress: () => resolve(false) },
+            { text: lbl("Delete", "حذف", "Löschen"), style: "destructive", onPress: () => resolve(true) },
+          ]
+        );
+      });
+    if (!confirmed) return;
+    try {
+      await apiRequest("DELETE", `/api/sales/${id}`);
+      qc.invalidateQueries({ queryKey: ["/api/sales"] });
+    } catch {
+      Alert.alert("Error", "Failed to delete invoice");
     }
   };
 
@@ -605,9 +627,14 @@ export default function OrdersScreen() {
               <Ionicons name="close" size={18} color={Colors.danger} />
             </Pressable>
           )}
-          {/* Delete (online orders only) */}
+          {/* Delete */}
           {!isPOS && (
             <Pressable style={styles.deleteBtn} onPress={() => { playClickSound("light"); deleteOnlineOrder(item.id); }}>
+              <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+            </Pressable>
+          )}
+          {isPOS && (
+            <Pressable style={styles.deleteBtn} onPress={() => { playClickSound("light"); deletePosOrder(item.id); }}>
               <Ionicons name="trash-outline" size={16} color={Colors.danger} />
             </Pressable>
           )}

@@ -623,7 +623,7 @@ const en = {
   callerIdNote: "When you simulate a call, a notification banner will appear on the POS screen showing the caller info. If the phone number matches a customer, their name will be displayed.",
 
   // Online Orders
-  onlineOrdersTitle: "Online Orders",
+  onlineOrdersTitle: "Orders",
   newOnlineOrder: "New Online Order!",
   tapToView: "Tap to view details",
   loadToPOS: "Load to POS",
@@ -1352,7 +1352,7 @@ const ar: typeof en = {
   callerIdNote: "عند محاكاة مكالمة، سيظهر شعار إشعار على شاشة نقطة البيع يعرض معلومات المتصل. إذا تطابق رقم الهاتف مع عميل، سيتم عرض اسمه.",
 
   // Online Orders
-  onlineOrdersTitle: "الطلبات الإلكترونية",
+  onlineOrdersTitle: "الطلبات",
   newOnlineOrder: "طلب جديد!",
   tapToView: "اضغط لعرض التفاصيل",
   loadToPOS: "تحميل للنقطة",
@@ -2081,7 +2081,7 @@ const de: typeof en = {
   callerIdNote: "Wenn Sie einen Anruf simulieren, erscheint ein Benachrichtigungsbanner auf dem Kassenbildschirm mit den Anruferinformationen. Wenn die Telefonnummer einem Kunden zugeordnet ist, wird der Name angezeigt.",
 
   // Online Orders
-  onlineOrdersTitle: "Online-Bestellungen",
+  onlineOrdersTitle: "Bestellungen",
   newOnlineOrder: "Neue Bestellung!",
   tapToView: "Tippen für Details",
   loadToPOS: "In POS laden",

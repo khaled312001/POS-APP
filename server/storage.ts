@@ -403,6 +403,10 @@ export const storage = {
     const [sale] = await db.update(sales).set(data).where(eq(sales.id, id)).returning();
     return sale;
   },
+  async deleteSale(id: number) {
+    await db.delete(saleItems).where(eq(saleItems.saleId, id));
+    await db.delete(sales).where(eq(sales.id, id));
+  },
 
   // Suppliers
   async getSuppliers(tenantId?: number) {
@@ -614,12 +618,26 @@ export const storage = {
     const conditions = [];
     if (tenantId) conditions.push(eq(calls.tenantId, tenantId));
 
-    let query = db.select().from(calls);
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions)) as any;
-    }
+    const baseQuery = db
+      .select({
+        id: calls.id,
+        tenantId: calls.tenantId,
+        branchId: calls.branchId,
+        phoneNumber: calls.phoneNumber,
+        customerId: calls.customerId,
+        status: calls.status,
+        saleId: calls.saleId,
+        createdAt: calls.createdAt,
+        customerName: customers.name,
+      })
+      .from(calls)
+      .leftJoin(customers, eq(calls.customerId, customers.id));
 
-    return query.orderBy(desc(calls.createdAt)).limit(limit);
+    const withWhere = conditions.length > 0
+      ? baseQuery.where(and(...conditions))
+      : baseQuery;
+
+    return withWhere.orderBy(desc(calls.createdAt)).limit(limit);
   },
   async createCall(data: InsertCall) {
     const [call] = await db.insert(calls).values(data).returning();
