@@ -1356,6 +1356,7 @@
         }
     </style>
 </head>
+
 <body>
     <!-- WhatsApp -->
     <a class="wa-float" href="https://wa.me/201010254819" target="_blank" title="WhatsApp Support">
@@ -1650,902 +1651,958 @@
             </div>
         </div>
     </section>
-<!-- PRICING -->
-<section class="section-py" id="pricing">
-    <div class="container">
-        <div class="section-header reveal">
-            <div class="chip" data-de="Transparente Preise" data-en="Transparent Pricing" data-ar="أسعار شفافة">
-                Transparente Preise</div>
-            <h2 data-de="Wählen Sie Ihren Plan" data-en="Choose Your Plan" data-ar="اختر خطتك">Wählen Sie Ihren <span
-                    class="text-primary">Plan</span></h2>
-            <p data-de="Einfache Preise, die mit Ihrem Unternehmen wachsen. Jederzeit den Plan wechseln."
-                data-en="Simple pricing that grows with your business. Switch plans anytime."
-                data-ar="أسعار بسيطة تنمو مع عملك. غير خطتك في أي وقت.">Einfache Preise, die mit Ihrem Unternehmen
-                wachsen. Jederzeit den Plan wechseln.</p>
-        </div>
-
-        <div class="pricing-toggle">
-            <span class="toggle-label active" id="lbl-monthly" data-de="Monatlich" data-en="Monthly"
-                data-ar="شهري">Monatlich</span>
-            <div class="toggle-switch" id="billingToggle" onclick="toggleBilling()">
-                <div class="toggle-knob"></div>
-            </div>
-            <span class="toggle-label" id="lbl-annual" data-de="Jährlich" data-en="Annual"
-                data-ar="سنوي">Jährlich</span>
-            <span class="save-badge" data-de="Bis zu 16% sparen" data-en="Save up to 16%" data-ar="وفر حتى 16%">Bis zu
-                16% sparen</span>
-        </div>
-
-        <div class="pricing-grid">
-            <!-- Basic -->
-            <div class="pricing-card reveal" id="card-basic">
-                <div
-                    style="display:inline-flex;align-items:center;gap:8px;background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.25);padding:4px 14px;border-radius:100px;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;">
-                    🟢 <span data-de="Basis-Paket" data-en="Basic Package" data-ar="الباقة الأساسية">Basis-Paket</span>
-                </div>
-                <div class="pricing-plan-name" data-de="POS Starter" data-en="POS Starter" data-ar="نقطة بيع المبتدئين">
-                    POS Starter</div>
-                <div class="pricing-price">
-                    <div class="pricing-amount" id="basic-price">CHF 149</div>
-                    <div class="pricing-period" id="basic-period" data-de="/ Monat" data-en="/ month" data-ar="/ شهر">/
-                        Monat</div>
-                </div>
-                <div class="pricing-tagline" id="basic-tagline"
-                    data-de="Ein professionelles Kassensystem für kleine Geschäfte — verwalten Sie Verkäufe & Inventar einfach."
-                    data-en="A professional POS system for small shops — manage sales & inventory with ease."
-                    data-ar="نظام نقطة بيع احترافي للمتاجر الصغيرة — أدر مبيعاتك ومخزونك بسهولة.">Ein professionelles
-                    Kassensystem für kleine Geschäfte — verwalten Sie Verkäufe &amp; Inventar einfach.</div>
-                <ul class="pricing-features">
-                    <li><span class="check check-yes">✓</span><span data-de="Schnelles & einfaches Kassensystem"
-                            data-en="Fast & easy-to-use POS cashier system"
-                            data-ar="نظام صراف سريع وسهل الاستخدام">Schnelles &amp; einfaches Kassensystem</span></li>
-                    <li><span class="check check-yes">✓</span><span data-de="Produkt- & Kategorieverwaltung"
-                            data-en="Product & category management" data-ar="إدارة المنتجات والفئات">Produkt- &amp;
-                            Kategorieverwaltung</span></li>
-                    <li><span class="check check-yes">✓</span><span
-                            data-de="Bestandsverwaltung & Niedrigbestandswarnungen"
-                            data-en="Inventory management & low-stock alerts"
-                            data-ar="إدارة المخزون وتنبيهات نفاد المخزون">Bestandsverwaltung &amp;
-                            Niedrigbestandswarnungen</span></li>
-                    <li><span class="check check-yes">✓</span><span data-de="Rechnungserstellung & -druck"
-                            data-en="Invoice creation & printing" data-ar="إنشاء الفواتير وطباعتها">Rechnungserstellung
-                            &amp; -druck</span></li>
-                    <li><span class="check check-yes">✓</span><span data-de="Tägliche Verkaufs- & Gewinnberichte"
-                            data-en="Daily sales & profit reports" data-ar="تقارير المبيعات والأرباح اليومية">Tägliche
-                            Verkaufs- &amp; Gewinnberichte</span></li>
-                    <li><span class="check check-yes">✓</span><span data-de="Berichte über Bestseller"
-                            data-en="Bestselling product reports" data-ar="تقارير المنتجات الأكثر مبيعاً">Berichte über
-                            Bestseller</span></li>
-                    <li><span class="check check-yes">✓</span><span data-de="Management-Kontrollfeld"
-                            data-en="Management control panel"
-                            data-ar="لوحة تحكم الإدارة">Management-Kontrollfeld</span></li>
-                    <li><span class="check check-yes">✓</span><span data-de="Admin-Konto + 1 Kassierer-Konto"
-                            data-en="Admin account + 1 Cashier account" data-ar="حساب مدير + حساب صراف">Admin-Konto + 1
-                            Kassierer-Konto</span></li>
-                    <li><span class="check check-yes">✓</span><span data-de="Barcode-Scanner-Unterstützung"
-                            data-en="Barcode scanner support"
-                            data-ar="دعم ماسح الباركود">Barcode-Scanner-Unterstützung</span></li>
-                    <li><span class="check check-yes">✓</span><span data-de="Vollständige Verkaufshistorie"
-                            data-en="Complete sales history" data-ar="سجل مبيعات كامل">Vollständige
-                            Verkaufshistorie</span></li>
-                    <li><span class="check check-yes">✓</span><span data-de="Funktioniert über Computer oder Webbrowser"
-                            data-en="Works via computer or web browser"
-                            data-ar="يعمل عبر الكمبيوتر أو متصفح الإنترنت">Funktioniert über Computer oder
-                            Webbrowser</span></li>
-                    <li style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)"><span
-                            class="check check-yes">✓</span><span data-de="System-Hosting & Datensicherung"
-                            data-en="System hosting & data backup"
-                            data-ar="استضافة النظام ونسخ البيانات الاحتياطية">System-Hosting &amp; Datensicherung</span>
-                    </li>
-                    <li><span class="check check-yes">✓</span><span data-de="System-Updates & technischer Support"
-                            data-en="System updates & technical support"
-                            data-ar="تحديثات النظام والدعم الفني">System-Updates &amp; technischer Support</span></li>
-                </ul>
-                <button class="pricing-cta pricing-cta-ghost" onclick="openModal('basic')"
-                    data-de="Mit POS Starter beginnen" data-en="Start with POS Starter"
-                    data-ar="ابدأ بباقة نقطة البيع">Mit POS Starter beginnen</button>
+    <!-- PRICING -->
+    <section class="section-py" id="pricing">
+        <div class="container">
+            <div class="section-header reveal">
+                <div class="chip" data-de="Transparente Preise" data-en="Transparent Pricing" data-ar="أسعار شفافة">
+                    Transparente Preise</div>
+                <h2 data-de="Wählen Sie Ihren Plan" data-en="Choose Your Plan" data-ar="اختر خطتك">Wählen Sie Ihren
+                    <span class="text-primary">Plan</span></h2>
+                <p data-de="Einfache Preise, die mit Ihrem Unternehmen wachsen. Jederzeit den Plan wechseln."
+                    data-en="Simple pricing that grows with your business. Switch plans anytime."
+                    data-ar="أسعار بسيطة تنمو مع عملك. غير خطتك في أي وقت.">Einfache Preise, die mit Ihrem Unternehmen
+                    wachsen. Jederzeit den Plan wechseln.</p>
             </div>
 
-            <!-- Advanced -->
-            <div class="pricing-card featured reveal" id="card-advanced">
-                <div class="pricing-badge" data-de="AM BELIEBTESTEN" data-en="MOST POPULAR" data-ar="الأكثر شعبية">AM
-                    BELIEBTESTEN</div>
-                <div
-                    style="display:inline-flex;align-items:center;gap:8px;background:rgba(99,102,241,.15);color:#818cf8;border:1px solid rgba(99,102,241,.3);padding:4px 14px;border-radius:100px;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;">
-                    🔵 <span data-de="Erweitertes Paket" data-en="Advanced Package"
-                        data-ar="الباقة المتقدمة">Erweitertes Paket</span></div>
-                <div class="pricing-plan-name" data-de="Smart Business Growth" data-en="Smart Business Growth"
-                    data-ar="نمو الأعمال الذكي">Smart Business Growth</div>
-                <div class="pricing-price">
-                    <div class="pricing-amount" id="advanced-price">CHF 349</div>
-                    <div class="pricing-period" id="advanced-period" data-de="/ Monat" data-en="/ month"
-                        data-ar="/ شهر">/ Monat</div>
+            <div class="pricing-toggle">
+                <span class="toggle-label active" id="lbl-monthly" data-de="Monatlich" data-en="Monthly"
+                    data-ar="شهري">Monatlich</span>
+                <div class="toggle-switch" id="billingToggle" onclick="toggleBilling()">
+                    <div class="toggle-knob"></div>
                 </div>
-                <div class="pricing-tagline" id="advanced-tagline"
-                    data-de="Alles im Basic-Paket plus Online-Shop, CRM, Multi-Gerät-POS, erweiterte Berichte & Marketing."
-                    data-en="Everything in Basic plus online store, CRM, multi-device POS, advanced reports & marketing services."
-                    data-ar="كل شيء في الأساسي بالإضافة إلى المتجر الإلكتروني وإدارة العملاء ونقطة البيع متعددة الأجهزة والتسويق.">
-                    Alles im Basic-Paket plus Online-Shop, CRM, Multi-Gerät-POS, erweiterte Berichte &amp; Marketing.
-                </div>
-                <div style="font-size:.7rem;font-weight:800;color:var(--primary);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;"
-                    data-de="✦ Alle Basic-Funktionen PLUS:" data-en="✦ All Basic Features PLUS:"
-                    data-ar="✦ كل مميزات الأساسي بالإضافة إلى:">✦ Alle Basic-Funktionen PLUS:</div>
-                <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;"
-                    data-de="🛒 Online-Shop" data-en="🛒 Online Store" data-ar="🛒 المتجر الإلكتروني">🛒 Online-Shop
-                </div>
-                <ul class="pricing-features" style="margin-bottom:14px">
-                    <li><span class="check check-yes">✓</span><span data-de="Vollständig integrierter Online-Shop"
-                            data-en="Fully integrated online store" data-ar="متجر إلكتروني متكامل بالكامل">Vollständig
-                            integrierter Online-Shop</span></li>
-                    <li><span class="check check-yes">✓</span><span
-                            data-de="Produktanzeige, Warenkorb & Auftragsverwaltung"
-                            data-en="Product display, shopping cart & order management"
-                            data-ar="عرض المنتجات، سلة التسوق وإدارة الطلبات">Produktanzeige, Warenkorb &amp;
-                            Auftragsverwaltung</span></li>
-                    <li><span class="check check-yes">✓</span><span data-de="Kundenkonten & Rabattgutscheine"
-                            data-en="Customer accounts & discount coupons"
-                            data-ar="حسابات العملاء وقسائم الخصم">Kundenkonten &amp; Rabattgutscheine</span></li>
-                </ul>
-                <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;"
-                    data-de="👥 CRM-System" data-en="👥 CRM System" data-ar="👥 نظام إدارة العملاء">👥 CRM-System</div>
-                <ul class="pricing-features" style="margin-bottom:14px">
-                    <li><span class="check check-yes">✓</span><span
-                            data-de="Kundendatenbank, Bestellhistorie & Segmentierung"
-                            data-en="Customer database, order history & segmentation"
-                            data-ar="قاعدة بيانات العملاء، سجل الطلبات والتقسيم">Kundendatenbank, Bestellhistorie &amp;
-                            Segmentierung</span></li>
-                    <li><span class="check check-yes">✓</span><span data-de="Kaufverfolgung & Treueprogramm"
-                            data-en="Purchase tracking & loyalty system"
-                            data-ar="تتبع المشتريات ونظام الولاء">Kaufverfolgung &amp; Treueprogramm</span></li>
-                </ul>
-                <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;"
-                    data-de="📱 Multi-Gerät-POS" data-en="📱 Multi-Device POS" data-ar="📱 نقطة بيع متعددة الأجهزة">📱
-                    Multi-Gerät-POS</div>
-                <ul class="pricing-features" style="margin-bottom:14px">
-                    <li><span class="check check-yes">✓</span><span
-                            data-de="Funktioniert auf Mobilgerät, Tablet & Computer"
-                            data-en="Works on mobile, tablet & computer"
-                            data-ar="يعمل على الجوال، الجهاز اللوحي والكمبيوتر">Funktioniert auf Mobilgerät, Tablet
-                            &amp; Computer</span></li>
-                    <li><span class="check check-yes">✓</span><span
-                            data-de="Verkaufs-, Kunden- & Produktleistungsberichte"
-                            data-en="Sales, customer & product performance reports"
-                            data-ar="تقارير المبيعات والعملاء وأداء المنتجات">Verkaufs-, Kunden- &amp;
-                            Produktleistungsberichte</span></li>
-                </ul>
-                <div style="font-size:.72rem;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;"
-                    data-de="🚀 Marketing- & Vertriebsdienste (von unserem Team)"
-                    data-en="🚀 Marketing & Sales Services (by our team)"
-                    data-ar="🚀 خدمات التسويق والمبيعات (من فريقنا)">🚀 Marketing- &amp; Vertriebsdienste (von unserem
-                    Team)</div>
-                <ul class="pricing-features" style="margin-bottom:14px">
-                    <li><span class="check check-yes"
-                            style="background:rgba(129,140,248,.15);color:#818cf8">✓</span><span
-                            data-de="Professionelles Verkaufs-Landingpage-Design"
-                            data-en="Professional sales landing page design"
-                            data-ar="تصميم صفحة مبيعات احترافية">Professionelles Verkaufs-Landingpage-Design</span></li>
-                    <li><span class="check check-yes"
-                            style="background:rgba(129,140,248,.15);color:#818cf8">✓</span><span
-                            data-de="Werbekampagnenverwaltung & -analyse"
-                            data-en="Advertising campaign management & analysis"
-                            data-ar="إدارة الحملات الإعلانية وتحليلها">Werbekampagnenverwaltung &amp; -analyse</span>
-                    </li>
-                    <li><span class="check check-yes"
-                            style="background:rgba(129,140,248,.15);color:#818cf8">✓</span><span
-                            data-de="Monatlicher Content-Plan & Social-Media-Posts"
-                            data-en="Monthly content plan & social media posting"
-                            data-ar="خطة محتوى شهرية ونشر على وسائل التواصل">Monatlicher Content-Plan &amp;
-                            Social-Media-Posts</span></li>
-                    <li><span class="check check-yes"
-                            style="background:rgba(129,140,248,.15);color:#818cf8">✓</span><span
-                            data-de="Design von Marketingangeboten & Kampagnenoptimierung"
-                            data-en="Marketing offer design & campaign optimization"
-                            data-ar="تصميم عروض التسويق وتحسين الحملات">Design von Marketingangeboten &amp;
-                            Kampagnenoptimierung</span></li>
-                </ul>
-                <button class="pricing-cta pricing-cta-primary" onclick="openModal('advanced')"
-                    data-de="Smart Business Growth starten" data-en="Start Smart Business Growth"
-                    data-ar="ابدأ خطة نمو الأعمال الذكي">Smart Business Growth starten</button>
+                <span class="toggle-label" id="lbl-annual" data-de="Jährlich" data-en="Annual"
+                    data-ar="سنوي">Jährlich</span>
+                <span class="save-badge" data-de="Bis zu 16% sparen" data-en="Save up to 16%" data-ar="وفر حتى 16%">Bis
+                    zu
+                    16% sparen</span>
             </div>
-        </div>
 
-        <div style="text-align:center;margin-top:40px;padding:28px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);max-width:780px;margin-left:auto;margin-right:auto;"
-            class="reveal">
-            <div style="font-size:.8rem;color:var(--muted);line-height:1.9">
-                <span style="color:var(--primary);font-weight:700" data-de="Jährliche Abrechnung:"
-                    data-en="Annual billing:" data-ar="الفوترة السنوية:">Jährliche Abrechnung:</span>
-                <span
-                    data-de="POS Starter — CHF 1.499/Jahr (sparen Sie CHF 289) · Smart Business Growth — CHF 3.499/Jahr (sparen Sie CHF 689)"
-                    data-en="POS Starter — CHF 1,499/year (save CHF 289) · Smart Business Growth — CHF 3,499/year (save CHF 689)"
-                    data-ar="نقطة بيع المبتدئين — 1,499 فرنك/سنة (وفر 289 فرنك) · نمو الأعمال الذكي — 3,499 فرنك/سنة (وفر 689 فرنك)">POS
-                    Starter — CHF 1.499/Jahr (sparen Sie CHF 289) · Smart Business Growth — CHF 3.499/Jahr (sparen Sie
-                    CHF 689)</span>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- TESTIMONIALS -->
-<section class="section-py" id="testimonials">
-    <div class="container">
-        <div class="section-header reveal">
-            <div class="chip" data-de="Kundenstimmen" data-en="Testimonials" data-ar="آراء العملاء">Kundenstimmen</div>
-            <h2 data-de="Was unsere Kunden sagen" data-en="What Our Customers Say" data-ar="ماذا يقول عملاؤنا">Was
-                unsere <span class="text-primary">Kunden sagen</span></h2>
-        </div>
-        <div class="testimonials-grid">
-            <div class="testimonial-card reveal">
-                <div class="testimonial-stars">★★★★★</div>
-                <p class="testimonial-text"
-                    data-de="Barmagly POS hat unser Restaurant komplett verändert. Die Bestellverwaltung ist blitzschnell und die Berichte helfen uns, bessere Entscheidungen zu treffen."
-                    data-en="Barmagly POS has completely transformed our restaurant. Order management is lightning-fast and the reports help us make better decisions."
-                    data-ar="برمجلي POS غير مطعمنا بالكامل. إدارة الطلبات سريعة للغاية والتقارير تساعدنا في اتخاذ قرارات أفضل.">
-                    Barmagly POS hat unser Restaurant komplett verändert. Die Bestellverwaltung ist blitzschnell und die
-                    Berichte helfen uns, bessere Entscheidungen zu treffen.</p>
-                <div class="testimonial-author">
-                    <div class="testimonial-avatar">MK</div>
-                    <div>
-                        <div class="testimonial-name">Marco K.</div>
-                        <div class="testimonial-role" data-de="Restaurantbesitzer, Zürich"
-                            data-en="Restaurant Owner, Zürich" data-ar="صاحب مطعم، زيورخ">Restaurantbesitzer, Zürich
-                        </div>
+            <div class="pricing-grid">
+                <!-- Basic -->
+                <div class="pricing-card reveal" id="card-basic">
+                    <div
+                        style="display:inline-flex;align-items:center;gap:8px;background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.25);padding:4px 14px;border-radius:100px;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;">
+                        🟢 <span data-de="Basis-Paket" data-en="Basic Package"
+                            data-ar="الباقة الأساسية">Basis-Paket</span>
                     </div>
-                </div>
-            </div>
-            <div class="testimonial-card reveal">
-                <div class="testimonial-stars">★★★★★</div>
-                <p class="testimonial-text"
-                    data-de="Die WhatsApp-Integration ist fantastisch! Unsere Kunden erhalten automatisch Bestellbestätigungen. Der Support ist auch erstklassig."
-                    data-en="The WhatsApp integration is fantastic! Our customers automatically receive order confirmations. Support is also top-notch."
-                    data-ar="تكامل واتساب رائع! عملاؤنا يتلقون تأكيدات الطلب تلقائياً. الدعم أيضاً ممتاز.">Die
-                    WhatsApp-Integration ist fantastisch! Unsere Kunden erhalten automatisch Bestellbestätigungen. Der
-                    Support ist auch erstklassig.</p>
-                <div class="testimonial-author">
-                    <div class="testimonial-avatar">SA</div>
-                    <div>
-                        <div class="testimonial-name">Sara A.</div>
-                        <div class="testimonial-role" data-de="Café-Inhaberin, Bern" data-en="Café Owner, Bern"
-                            data-ar="صاحبة مقهى، برن">Café-Inhaberin, Bern</div>
+                    <div class="pricing-plan-name" data-de="POS Starter" data-en="POS Starter"
+                        data-ar="نقطة بيع المبتدئين">
+                        POS Starter</div>
+                    <div class="pricing-price">
+                        <div class="pricing-amount" id="basic-price">CHF 149</div>
+                        <div class="pricing-period" id="basic-period" data-de="/ Monat" data-en="/ month"
+                            data-ar="/ شهر">/
+                            Monat</div>
                     </div>
-                </div>
-            </div>
-            <div class="testimonial-card reveal">
-                <div class="testimonial-stars">★★★★★</div>
-                <p class="testimonial-text"
-                    data-de="Wir nutzen Barmagly für 3 Filialen gleichzeitig. Das Multi-Branch-Dashboard gibt mir den perfekten Überblick über alle Standorte."
-                    data-en="We use Barmagly for 3 branches simultaneously. The multi-branch dashboard gives me the perfect overview of all locations."
-                    data-ar="نستخدم برمجلي لـ 3 فروع في نفس الوقت. لوحة التحكم متعددة الفروع تمنحني نظرة مثالية على جميع المواقع.">
-                    Wir nutzen Barmagly für 3 Filialen gleichzeitig. Das Multi-Branch-Dashboard gibt mir den perfekten
-                    Überblick über alle Standorte.</p>
-                <div class="testimonial-author">
-                    <div class="testimonial-avatar">TH</div>
-                    <div>
-                        <div class="testimonial-name">Thomas H.</div>
-                        <div class="testimonial-role" data-de="Einzelhandelskette, Basel" data-en="Retail Chain, Basel"
-                            data-ar="سلسلة تجارية، بازل">Einzelhandelskette, Basel</div>
+                    <div class="pricing-tagline" id="basic-tagline"
+                        data-de="Ein professionelles Kassensystem für kleine Geschäfte — verwalten Sie Verkäufe & Inventar einfach."
+                        data-en="A professional POS system for small shops — manage sales & inventory with ease."
+                        data-ar="نظام نقطة بيع احترافي للمتاجر الصغيرة — أدر مبيعاتك ومخزونك بسهولة.">Ein
+                        professionelles
+                        Kassensystem für kleine Geschäfte — verwalten Sie Verkäufe &amp; Inventar einfach.</div>
+                    <div
+                        style="display:flex;align-items:center;gap:8px;font-size:.85rem;font-weight:700;color:var(--danger);margin-bottom:20px;padding:8px 12px;background:rgba(239,68,68,.08);border-radius:10px;border:1px solid rgba(239,68,68,.15);">
+                        <span style="font-size:1.1rem">٪</span>
+                        <span data-de="6% Provision pro Verkauf" data-en="6% commission per sale"
+                            data-ar="عمولة 6% على كل عملية بيع">6% Provision pro Verkauf</span>
                     </div>
+                    <ul class="pricing-features">
+                        <li><span class="check check-yes">✓</span><span data-de="Schnelles & einfaches Kassensystem"
+                                data-en="Fast & easy-to-use POS cashier system"
+                                data-ar="نظام صراف سريع وسهل الاستخدام">Schnelles &amp; einfaches Kassensystem</span>
+                        </li>
+                        <li><span class="check check-yes">✓</span><span data-de="Produkt- & Kategorieverwaltung"
+                                data-en="Product & category management" data-ar="إدارة المنتجات والفئات">Produkt- &amp;
+                                Kategorieverwaltung</span></li>
+                        <li><span class="check check-yes">✓</span><span
+                                data-de="Bestandsverwaltung & Niedrigbestandswarnungen"
+                                data-en="Inventory management & low-stock alerts"
+                                data-ar="إدارة المخزون وتنبيهات نفاد المخزون">Bestandsverwaltung &amp;
+                                Niedrigbestandswarnungen</span></li>
+                        <li><span class="check check-yes">✓</span><span data-de="Rechnungserstellung & -druck"
+                                data-en="Invoice creation & printing"
+                                data-ar="إنشاء الفواتير وطباعتها">Rechnungserstellung
+                                &amp; -druck</span></li>
+                        <li><span class="check check-yes">✓</span><span data-de="Tägliche Verkaufs- & Gewinnberichte"
+                                data-en="Daily sales & profit reports"
+                                data-ar="تقارير المبيعات والأرباح اليومية">Tägliche
+                                Verkaufs- &amp; Gewinnberichte</span></li>
+                        <li><span class="check check-yes">✓</span><span data-de="Berichte über Bestseller"
+                                data-en="Bestselling product reports" data-ar="تقارير المنتجات الأكثر مبيعاً">Berichte
+                                über
+                                Bestseller</span></li>
+                        <li><span class="check check-yes">✓</span><span data-de="Management-Kontrollfeld"
+                                data-en="Management control panel"
+                                data-ar="لوحة تحكم الإدارة">Management-Kontrollfeld</span></li>
+                        <li><span class="check check-yes">✓</span><span data-de="Admin-Konto + 1 Kassierer-Konto"
+                                data-en="Admin account + 1 Cashier account" data-ar="حساب مدير + حساب صراف">Admin-Konto
+                                + 1
+                                Kassierer-Konto</span></li>
+                        <li><span class="check check-yes">✓</span><span data-de="Barcode-Scanner-Unterstützung"
+                                data-en="Barcode scanner support"
+                                data-ar="دعم ماسح الباركود">Barcode-Scanner-Unterstützung</span></li>
+                        <li><span class="check check-yes">✓</span><span data-de="Vollständige Verkaufshistorie"
+                                data-en="Complete sales history" data-ar="سجل مبيعات كامل">Vollständige
+                                Verkaufshistorie</span></li>
+                        <li><span class="check check-yes">✓</span><span
+                                data-de="Funktioniert über Computer oder Webbrowser"
+                                data-en="Works via computer or web browser"
+                                data-ar="يعمل عبر الكمبيوتر أو متصفح الإنترنت">Funktioniert über Computer oder
+                                Webbrowser</span></li>
+                        <li style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)"><span
+                                class="check check-yes">✓</span><span data-de="System-Hosting & Datensicherung"
+                                data-en="System hosting & data backup"
+                                data-ar="استضافة النظام ونسخ البيانات الاحتياطية">System-Hosting &amp;
+                                Datensicherung</span>
+                        </li>
+                        <li><span class="check check-yes">✓</span><span data-de="System-Updates & technischer Support"
+                                data-en="System updates & technical support"
+                                data-ar="تحديثات النظام والدعم الفني">System-Updates &amp; technischer Support</span>
+                        </li>
+                    </ul>
+                    <button class="pricing-cta pricing-cta-ghost" onclick="openModal('basic')"
+                        data-de="Mit POS Starter beginnen" data-en="Start with POS Starter"
+                        data-ar="ابدأ بباقة نقطة البيع">Mit POS Starter beginnen</button>
                 </div>
-            </div>
-        </div>
-    </div>
-</section>
 
-<!-- FAQ -->
-<section class="section-py" id="faq"
-    style="background: linear-gradient(180deg, transparent, rgba(47,211,198,.03) 50%, transparent);">
-    <div class="container">
-        <div class="section-header reveal">
-            <div class="chip" data-de="Häufige Fragen" data-en="FAQ" data-ar="الأسئلة الشائعة">Häufige Fragen</div>
-            <h2 data-de="Häufig gestellte Fragen" data-en="Frequently Asked Questions" data-ar="الأسئلة المتكررة">Häufig
-                gestellte <span class="text-primary">Fragen</span></h2>
-        </div>
-        <div class="faq-list">
-            <div class="faq-item reveal">
-                <div class="faq-q" onclick="toggleFaq(this)"><span
-                        data-de="Für welche Branchen ist Barmagly POS geeignet?"
-                        data-en="What industries is Barmagly POS suitable for?"
-                        data-ar="لأي قطاعات يصلح برمجلي POS؟">Für welche Branchen ist Barmagly POS geeignet?</span><svg
-                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <path d="M6 9l6 6 6-6" />
-                    </svg></div>
-                <div class="faq-a">
-                    <div class="faq-a-inner"
-                        data-de="Barmagly POS ist ideal für Restaurants, Cafés, Pizzerien, Bäckereien, Einzelhandelsgeschäfte und jede Art von Geschäft, das ein modernes Kassensystem benötigt."
-                        data-en="Barmagly POS is ideal for restaurants, cafés, pizzerias, bakeries, retail stores, and any type of business needing a modern POS system."
-                        data-ar="برمجلي POS مثالي للمطاعم والمقاهي والبيتزا والمخابز ومتاجر التجزئة وأي نوع من الأعمال التي تحتاج إلى نظام كاشير حديث.">
-                        Barmagly POS ist ideal für Restaurants, Cafés, Pizzerien, Bäckereien, Einzelhandelsgeschäfte und
-                        jede Art von Geschäft, das ein modernes Kassensystem benötigt.</div>
+                <!-- Advanced -->
+                <div class="pricing-card featured reveal" id="card-advanced">
+                    <div class="pricing-badge" data-de="AM BELIEBTESTEN" data-en="MOST POPULAR" data-ar="الأكثر شعبية">
+                        AM
+                        BELIEBTESTEN</div>
+                    <div
+                        style="display:inline-flex;align-items:center;gap:8px;background:rgba(99,102,241,.15);color:#818cf8;border:1px solid rgba(99,102,241,.3);padding:4px 14px;border-radius:100px;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;">
+                        🔵 <span data-de="Erweitertes Paket" data-en="Advanced Package"
+                            data-ar="الباقة المتقدمة">Erweitertes Paket</span></div>
+                    <div class="pricing-plan-name" data-de="Smart Business Growth" data-en="Smart Business Growth"
+                        data-ar="نمو الأعمال الذكي">Smart Business Growth</div>
+                    <div class="pricing-price">
+                        <div class="pricing-amount" id="advanced-price">CHF 349</div>
+                        <div class="pricing-period" id="advanced-period" data-de="/ Monat" data-en="/ month"
+                            data-ar="/ شهر">/ Monat</div>
+                    </div>
+                    <div class="pricing-tagline" id="advanced-tagline"
+                        data-de="Alles im Basic-Paket plus Online-Shop, CRM, Multi-Gerät-POS, erweiterte Berichte & Marketing."
+                        data-en="Everything in Basic plus online store, CRM, multi-device POS, advanced reports & marketing services."
+                        data-ar="كل شيء في الأساسي بالإضافة إلى المتجر الإلكتروني وإدارة العملاء ونقطة البيع متعددة الأجهزة والتسويق.">
+                        Alles im Basic-Paket plus Online-Shop, CRM, Multi-Gerät-POS, erweiterte Berichte &amp;
+                        Marketing.
+                    </div>
+                    <div
+                        style="display:flex;align-items:center;gap:8px;font-size:.85rem;font-weight:700;color:var(--primary);margin-bottom:20px;padding:8px 12px;background:var(--primary-soft);border-radius:10px;border:1px solid rgba(47,211,198,.2);">
+                        <span style="font-size:1.1rem">٪</span>
+                        <span data-de="5% Provision pro Verkauf" data-en="5% commission per sale"
+                            data-ar="عمولة 5% على كل عملية بيع">5% Provision pro Verkauf</span>
+                    </div>
+                    <div style="font-size:.7rem;font-weight:800;color:var(--primary);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;"
+                        data-de="✦ Alle Basic-Funktionen PLUS:" data-en="✦ All Basic Features PLUS:"
+                        data-ar="✦ كل مميزات الأساسي بالإضافة إلى:">✦ Alle Basic-Funktionen PLUS:</div>
+                    <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;"
+                        data-de="🛒 Online-Shop" data-en="🛒 Online Store" data-ar="🛒 المتجر الإلكتروني">🛒 Online-Shop
+                    </div>
+                    <ul class="pricing-features" style="margin-bottom:14px">
+                        <li><span class="check check-yes">✓</span><span data-de="Vollständig integrierter Online-Shop"
+                                data-en="Fully integrated online store"
+                                data-ar="متجر إلكتروني متكامل بالكامل">Vollständig
+                                integrierter Online-Shop</span></li>
+                        <li><span class="check check-yes">✓</span><span
+                                data-de="Produktanzeige, Warenkorb & Auftragsverwaltung"
+                                data-en="Product display, shopping cart & order management"
+                                data-ar="عرض المنتجات، سلة التسوق وإدارة الطلبات">Produktanzeige, Warenkorb &amp;
+                                Auftragsverwaltung</span></li>
+                        <li><span class="check check-yes">✓</span><span data-de="Kundenkonten & Rabattgutscheine"
+                                data-en="Customer accounts & discount coupons"
+                                data-ar="حسابات العملاء وقسائم الخصم">Kundenkonten &amp; Rabattgutscheine</span></li>
+                    </ul>
+                    <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;"
+                        data-de="👥 CRM-System" data-en="👥 CRM System" data-ar="👥 نظام إدارة العملاء">👥 CRM-System
+                    </div>
+                    <ul class="pricing-features" style="margin-bottom:14px">
+                        <li><span class="check check-yes">✓</span><span
+                                data-de="Kundendatenbank, Bestellhistorie & Segmentierung"
+                                data-en="Customer database, order history & segmentation"
+                                data-ar="قاعدة بيانات العملاء، سجل الطلبات والتقسيم">Kundendatenbank, Bestellhistorie
+                                &amp;
+                                Segmentierung</span></li>
+                        <li><span class="check check-yes">✓</span><span data-de="Kaufverfolgung & Treueprogramm"
+                                data-en="Purchase tracking & loyalty system"
+                                data-ar="تتبع المشتريات ونظام الولاء">Kaufverfolgung &amp; Treueprogramm</span></li>
+                    </ul>
+                    <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;"
+                        data-de="📱 Multi-Gerät-POS" data-en="📱 Multi-Device POS" data-ar="📱 نقطة بيع متعددة الأجهزة">
+                        📱
+                        Multi-Gerät-POS</div>
+                    <ul class="pricing-features" style="margin-bottom:14px">
+                        <li><span class="check check-yes">✓</span><span
+                                data-de="Funktioniert auf Mobilgerät, Tablet & Computer"
+                                data-en="Works on mobile, tablet & computer"
+                                data-ar="يعمل على الجوال، الجهاز اللوحي والكمبيوتر">Funktioniert auf Mobilgerät, Tablet
+                                &amp; Computer</span></li>
+                        <li><span class="check check-yes">✓</span><span
+                                data-de="Verkaufs-, Kunden- & Produktleistungsberichte"
+                                data-en="Sales, customer & product performance reports"
+                                data-ar="تقارير المبيعات والعملاء وأداء المنتجات">Verkaufs-, Kunden- &amp;
+                                Produktleistungsberichte</span></li>
+                    </ul>
+                    <div style="font-size:.72rem;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;"
+                        data-de="🚀 Marketing- & Vertriebsdienste (von unserem Team)"
+                        data-en="🚀 Marketing & Sales Services (by our team)"
+                        data-ar="🚀 خدمات التسويق والمبيعات (من فريقنا)">🚀 Marketing- &amp; Vertriebsdienste (von
+                        unserem
+                        Team)</div>
+                    <ul class="pricing-features" style="margin-bottom:14px">
+                        <li><span class="check check-yes"
+                                style="background:rgba(129,140,248,.15);color:#818cf8">✓</span><span
+                                data-de="Professionelles Verkaufs-Landingpage-Design"
+                                data-en="Professional sales landing page design"
+                                data-ar="تصميم صفحة مبيعات احترافية">Professionelles Verkaufs-Landingpage-Design</span>
+                        </li>
+                        <li><span class="check check-yes"
+                                style="background:rgba(129,140,248,.15);color:#818cf8">✓</span><span
+                                data-de="Werbekampagnenverwaltung & -analyse"
+                                data-en="Advertising campaign management & analysis"
+                                data-ar="إدارة الحملات الإعلانية وتحليلها">Werbekampagnenverwaltung &amp;
+                                -analyse</span>
+                        </li>
+                        <li><span class="check check-yes"
+                                style="background:rgba(129,140,248,.15);color:#818cf8">✓</span><span
+                                data-de="Monatlicher Content-Plan & Social-Media-Posts"
+                                data-en="Monthly content plan & social media posting"
+                                data-ar="خطة محتوى شهرية ونشر على وسائل التواصل">Monatlicher Content-Plan &amp;
+                                Social-Media-Posts</span></li>
+                        <li><span class="check check-yes"
+                                style="background:rgba(129,140,248,.15);color:#818cf8">✓</span><span
+                                data-de="Design von Marketingangeboten & Kampagnenoptimierung"
+                                data-en="Marketing offer design & campaign optimization"
+                                data-ar="تصميم عروض التسويق وتحسين الحملات">Design von Marketingangeboten &amp;
+                                Kampagnenoptimierung</span></li>
+                    </ul>
+                    <button class="pricing-cta pricing-cta-primary" onclick="openModal('advanced')"
+                        data-de="Smart Business Growth starten" data-en="Start Smart Business Growth"
+                        data-ar="ابدأ خطة نمو الأعمال الذكي">Smart Business Growth starten</button>
                 </div>
             </div>
-            <div class="faq-item reveal">
-                <div class="faq-q" onclick="toggleFaq(this)"><span data-de="Kann ich den Plan jederzeit wechseln?"
-                        data-en="Can I switch plans at any time?" data-ar="هل يمكنني تغيير الخطة في أي وقت؟">Kann ich
-                        den Plan jederzeit wechseln?</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2.5">
-                        <path d="M6 9l6 6 6-6" />
-                    </svg></div>
-                <div class="faq-a">
-                    <div class="faq-a-inner"
-                        data-de="Ja! Sie können jederzeit zwischen dem Basic- und Advanced-Plan wechseln. Die Abrechnung wird anteilig angepasst."
-                        data-en="Yes! You can switch between Basic and Advanced plans at any time. Billing will be prorated accordingly."
-                        data-ar="نعم! يمكنك التبديل بين الخطة الأساسية والمتقدمة في أي وقت. سيتم تعديل الفواتير بشكل تناسبي.">
-                        Ja! Sie können jederzeit zwischen dem Basic- und Advanced-Plan wechseln. Die Abrechnung wird
-                        anteilig angepasst.</div>
-                </div>
-            </div>
-            <div class="faq-item reveal">
-                <div class="faq-q" onclick="toggleFaq(this)"><span data-de="Gibt es eine kostenlose Testphase?"
-                        data-en="Is there a free trial?" data-ar="هل توجد فترة تجريبية مجانية؟">Gibt es eine kostenlose
-                        Testphase?</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <path d="M6 9l6 6 6-6" />
-                    </svg></div>
-                <div class="faq-a">
-                    <div class="faq-a-inner"
-                        data-de="Ja, alle Pläne beinhalten eine 30-tägige kostenlose Testphase. Keine Kreditkarte erforderlich zum Starten."
-                        data-en="Yes, all plans include a 30-day free trial. No credit card required to start."
-                        data-ar="نعم، جميع الخطط تتضمن فترة تجريبية مجانية لمدة 30 يوماً. لا يلزم بطاقة ائتمان للبدء.">
-                        Ja, alle Pläne beinhalten eine 30-tägige kostenlose Testphase. Keine Kreditkarte erforderlich
-                        zum Starten.</div>
-                </div>
-            </div>
-            <div class="faq-item reveal">
-                <div class="faq-q" onclick="toggleFaq(this)"><span data-de="Welche Zahlungsmethoden werden unterstützt?"
-                        data-en="What payment methods are supported?" data-ar="ما هي طرق الدفع المدعومة؟">Welche
-                        Zahlungsmethoden werden unterstützt?</span><svg viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2.5">
-                        <path d="M6 9l6 6 6-6" />
-                    </svg></div>
-                <div class="faq-a">
-                    <div class="faq-a-inner"
-                        data-de="Barmagly unterstützt Bargeld, Kreditkarten (Visa, Mastercard), kontaktlose NFC-Zahlungen, TWINT und Stripe-Integration."
-                        data-en="Barmagly supports cash, credit cards (Visa, Mastercard), contactless NFC payments, TWINT, and Stripe integration."
-                        data-ar="برمجلي يدعم النقد، بطاقات الائتمان (Visa، Mastercard)، الدفع عبر NFC بدون تلامس، TWINT وتكامل Stripe.">
-                        Barmagly unterstützt Bargeld, Kreditkarten (Visa, Mastercard), kontaktlose NFC-Zahlungen, TWINT
-                        und Stripe-Integration.</div>
-                </div>
-            </div>
-            <div class="faq-item reveal">
-                <div class="faq-q" onclick="toggleFaq(this)"><span data-de="Sind meine Daten sicher?"
-                        data-en="Is my data secure?" data-ar="هل بياناتي آمنة؟">Sind meine Daten sicher?</span><svg
-                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <path d="M6 9l6 6 6-6" />
-                    </svg></div>
-                <div class="faq-a">
-                    <div class="faq-a-inner"
-                        data-de="Absolut. Wir verwenden 256-Bit-SSL-Verschlüsselung, automatische tägliche Backups, rollenbasierte Zugriffskontrolle und gerätegebundene Lizenzschlüssel."
-                        data-en="Absolutely. We use 256-bit SSL encryption, automatic daily backups, role-based access control, and device-bound license keys."
-                        data-ar="بالتأكيد. نستخدم تشفير SSL 256 بت، نسخ احتياطية يومية تلقائية، تحكم في الوصول المستند إلى الأدوار ومفاتيح ترخيص مرتبطة بالجهاز.">
-                        Absolut. Wir verwenden 256-Bit-SSL-Verschlüsselung, automatische tägliche Backups,
-                        rollenbasierte Zugriffskontrolle und gerätegebundene Lizenzschlüssel.</div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
 
-<!-- CTA -->
-<section class="cta-section">
-    <div class="container">
-        <div class="chip" data-de="Heute starten" data-en="Start Today" data-ar="ابدأ اليوم">Heute starten</div>
-        <h2 data-de="Bereit, Ihr Unternehmen zu transformieren?" data-en="Ready to transform your business?"
-            data-ar="هل أنت مستعد لتحويل عملك؟">Bereit, Ihr Unternehmen zu <span
-                class="text-primary">transformieren</span>?</h2>
-        <p data-de="Schließen Sie sich Hunderten von Filialen an, die bereits Barmagly POS verwenden. Holen Sie sich Ihren Lizenzschlüssel und beginnen Sie in Minuten."
-            data-en="Join hundreds of stores already using Barmagly POS. Get your license key and start selling in minutes."
-            data-ar="انضم إلى مئات المتاجر التي تستخدم برمجلي POS. احصل على مفتاح الترخيص الخاص بك وابدأ البيع في دقائق.">
-            Schließen Sie sich Hunderten von Filialen an, die bereits Barmagly POS verwenden. Holen Sie sich Ihren
-            Lizenzschlüssel und beginnen Sie in Minuten.</p>
-        <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
-            <button class="btn-hero-primary" onclick="openModal('advanced')"
-                data-de="Smart Business Growth — CHF 349/Mo" data-en="Smart Business Growth — CHF 349/mo"
-                data-ar="نمو الأعمال الذكي — 349 فرنك/شهر">Smart Business Growth — CHF 349/Mo</button>
-            <button class="btn-hero-ghost" onclick="openModal('basic')" data-de="POS Starter — CHF 149/Mo"
-                data-en="POS Starter — CHF 149/mo" data-ar="نقطة بيع المبتدئين — 149 فرنك/شهر">POS Starter — CHF
-                149/Mo</button>
+            <div style="text-align:center;margin-top:40px;padding:28px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);max-width:780px;margin-left:auto;margin-right:auto;"
+                class="reveal">
+                <div style="font-size:.8rem;color:var(--muted);line-height:1.9">
+                    <span style="color:var(--primary);font-weight:700" data-de="Jährliche Abrechnung:"
+                        data-en="Annual billing:" data-ar="الفوترة السنوية:">Jährliche Abrechnung:</span>
+                    <span
+                        data-de="POS Starter — CHF 1.499/Jahr (sparen Sie CHF 289) · Smart Business Growth — CHF 3.499/Jahr (sparen Sie CHF 689)"
+                        data-en="POS Starter — CHF 1,499/year (save CHF 289) · Smart Business Growth — CHF 3,499/year (save CHF 689)"
+                        data-ar="نقطة بيع المبتدئين — 1,499 فرنك/سنة (وفر 289 فرنك) · نمو الأعمال الذكي — 3,499 فرنك/سنة (وفر 689 فرنك)">POS
+                        Starter — CHF 1.499/Jahr (sparen Sie CHF 289) · Smart Business Growth — CHF 3.499/Jahr (sparen
+                        Sie
+                        CHF 689)</span>
+                </div>
+            </div>
         </div>
-    </div>
-</section>
+    </section>
 
-<!-- FOOTER -->
-<footer>
-    <div class="container">
-        <div class="footer-grid">
-            <div>
-                <div class="footer-brand-name">Barmagly POS</div>
-                <div class="footer-brand-desc"
-                    data-de="Cloud-basiertes Kassensystem für moderne Restaurants, Cafés und Einzelhandelsgeschäfte. Vertraut in ganz Europa und dem Nahen Osten."
-                    data-en="Cloud-powered point-of-sale for the modern restaurant, café, and retail store. Trusted across Europe & the Middle East."
-                    data-ar="نقطة بيع سحابية للمطعم والمقهى ومتجر التجزئة الحديث. موثوق به في أوروبا والشرق الأوسط.">
-                    Cloud-basiertes Kassensystem für moderne Restaurants, Cafés und Einzelhandelsgeschäfte. Vertraut in
-                    ganz Europa und dem Nahen Osten.</div>
+    <!-- TESTIMONIALS -->
+    <section class="section-py" id="testimonials">
+        <div class="container">
+            <div class="section-header reveal">
+                <div class="chip" data-de="Kundenstimmen" data-en="Testimonials" data-ar="آراء العملاء">Kundenstimmen
+                </div>
+                <h2 data-de="Was unsere Kunden sagen" data-en="What Our Customers Say" data-ar="ماذا يقول عملاؤنا">Was
+                    unsere <span class="text-primary">Kunden sagen</span></h2>
             </div>
-            <div class="footer-col">
-                <div class="footer-col-title" data-de="Produkt" data-en="Product" data-ar="المنتج">Produkt</div>
-                <a href="#features" data-de="Funktionen" data-en="Features" data-ar="المميزات">Funktionen</a>
-                <a href="#pricing" data-de="Preise" data-en="Pricing" data-ar="الأسعار">Preise</a>
-                <a href="#faq" data-de="FAQ" data-en="FAQ" data-ar="الأسئلة">FAQ</a>
-            </div>
-            <div class="footer-col">
-                <div class="footer-col-title" data-de="Unternehmen" data-en="Company" data-ar="الشركة">Unternehmen</div>
-                <a href="#" data-de="Über uns" data-en="About" data-ar="عنا">Über uns</a>
-                <a href="#" data-de="Kontakt" data-en="Contact" data-ar="التواصل">Kontakt</a>
-                <a href="https://wa.me/201010254819" data-de="WhatsApp-Support" data-en="WhatsApp Support"
-                    data-ar="دعم واتساب">WhatsApp-Support</a>
-            </div>
-            <div class="footer-col">
-                <div class="footer-col-title" data-de="Zugang" data-en="Access" data-ar="الوصول">Zugang</div>
-                <a href="BASE_URL_PLACEHOLDER/super-admin/login" data-de="Admin-Login" data-en="Admin Login"
-                    data-ar="تسجيل الدخول للمشرف">Admin-Login</a>
-                <a href="#" onclick="openModal('basic');return false" data-de="Lizenz erhalten" data-en="Get License"
-                    data-ar="احصل على ترخيص">Lizenz erhalten</a>
-            </div>
-        </div>
-        <div class="footer-bottom">
-            <span class="footer-copy">© 2026 Barmagly POS. All rights reserved.</span>
-            <span class="footer-copy">🇨🇭 Swiss Quality Software</span>
-        </div>
-    </div>
-</footer>
-<!-- SUBSCRIPTION MODAL -->
-<div class="modal-overlay" id="modal">
-    <div class="modal">
-        <div class="modal-header">
-            <h3 id="modal-title" data-de="Starten Sie Ihren Plan" data-en="Start Your Plan" data-ar="ابدأ خطتك">Starten
-                Sie Ihren Plan</h3>
-            <button class="modal-close" onclick="closeModal()">✕</button>
-        </div>
-        <div class="modal-body">
-            <div id="modal-error" class="modal-error" style="display:none"></div>
-            <!-- Step 1 -->
-            <div class="modal-step active" id="step1">
-                <div class="plan-summary" id="plan-summary-box">
-                    <div class="plan-summary-top">
-                        <span class="plan-summary-name" id="summary-plan-name">Growth Plan</span>
+            <div class="testimonials-grid">
+                <div class="testimonial-card reveal">
+                    <div class="testimonial-stars">★★★★★</div>
+                    <p class="testimonial-text"
+                        data-de="Barmagly POS hat unser Restaurant komplett verändert. Die Bestellverwaltung ist blitzschnell und die Berichte helfen uns, bessere Entscheidungen zu treffen."
+                        data-en="Barmagly POS has completely transformed our restaurant. Order management is lightning-fast and the reports help us make better decisions."
+                        data-ar="برمجلي POS غير مطعمنا بالكامل. إدارة الطلبات سريعة للغاية والتقارير تساعدنا في اتخاذ قرارات أفضل.">
+                        Barmagly POS hat unser Restaurant komplett verändert. Die Bestellverwaltung ist blitzschnell und
+                        die
+                        Berichte helfen uns, bessere Entscheidungen zu treffen.</p>
+                    <div class="testimonial-author">
+                        <div class="testimonial-avatar">MK</div>
                         <div>
-                            <div class="plan-summary-price" id="summary-price">CHF 349</div>
-                            <div class="plan-summary-period" id="summary-period">pro Monat</div>
+                            <div class="testimonial-name">Marco K.</div>
+                            <div class="testimonial-role" data-de="Restaurantbesitzer, Zürich"
+                                data-en="Restaurant Owner, Zürich" data-ar="صاحب مطعم، زيورخ">Restaurantbesitzer, Zürich
+                            </div>
                         </div>
                     </div>
-                    <div class="plan-summary-addons" id="summary-addons" style="display:none"></div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" data-de="Unternehmensname *" data-en="Business Name *"
-                        data-ar="اسم الشركة *">Unternehmensname *</label>
-                    <input class="form-input" id="f-business" type="text" placeholder="z.B. Pizza Palace" required>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label" data-de="Name des Inhabers *" data-en="Owner Name *"
-                            data-ar="اسم المالك *">Name des Inhabers *</label>
-                        <input class="form-input" id="f-name" type="text" placeholder="Vollständiger Name" required>
+                <div class="testimonial-card reveal">
+                    <div class="testimonial-stars">★★★★★</div>
+                    <p class="testimonial-text"
+                        data-de="Die WhatsApp-Integration ist fantastisch! Unsere Kunden erhalten automatisch Bestellbestätigungen. Der Support ist auch erstklassig."
+                        data-en="The WhatsApp integration is fantastic! Our customers automatically receive order confirmations. Support is also top-notch."
+                        data-ar="تكامل واتساب رائع! عملاؤنا يتلقون تأكيدات الطلب تلقائياً. الدعم أيضاً ممتاز.">Die
+                        WhatsApp-Integration ist fantastisch! Unsere Kunden erhalten automatisch Bestellbestätigungen.
+                        Der
+                        Support ist auch erstklassig.</p>
+                    <div class="testimonial-author">
+                        <div class="testimonial-avatar">SA</div>
+                        <div>
+                            <div class="testimonial-name">Sara A.</div>
+                            <div class="testimonial-role" data-de="Café-Inhaberin, Bern" data-en="Café Owner, Bern"
+                                data-ar="صاحبة مقهى، برن">Café-Inhaberin, Bern</div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label" data-de="Telefon" data-en="Phone" data-ar="الهاتف">Telefon</label>
-                        <input class="form-input" id="f-phone" type="tel" placeholder="+41 79 000 0000">
+                </div>
+                <div class="testimonial-card reveal">
+                    <div class="testimonial-stars">★★★★★</div>
+                    <p class="testimonial-text"
+                        data-de="Wir nutzen Barmagly für 3 Filialen gleichzeitig. Das Multi-Branch-Dashboard gibt mir den perfekten Überblick über alle Standorte."
+                        data-en="We use Barmagly for 3 branches simultaneously. The multi-branch dashboard gives me the perfect overview of all locations."
+                        data-ar="نستخدم برمجلي لـ 3 فروع في نفس الوقت. لوحة التحكم متعددة الفروع تمنحني نظرة مثالية على جميع المواقع.">
+                        Wir nutzen Barmagly für 3 Filialen gleichzeitig. Das Multi-Branch-Dashboard gibt mir den
+                        perfekten
+                        Überblick über alle Standorte.</p>
+                    <div class="testimonial-author">
+                        <div class="testimonial-avatar">TH</div>
+                        <div>
+                            <div class="testimonial-name">Thomas H.</div>
+                            <div class="testimonial-role" data-de="Einzelhandelskette, Basel"
+                                data-en="Retail Chain, Basel" data-ar="سلسلة تجارية، بازل">Einzelhandelskette, Basel
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" data-de="Geschäfts-E-Mail *" data-en="Business Email *"
-                        data-ar="البريد الإلكتروني للأعمال *">Geschäfts-E-Mail *</label>
-                    <input class="form-input" id="f-email" type="email" placeholder="info@ihrunternehmen.com" required>
-                </div>
-                <div id="plan-includes"
-                    style="margin-top:16px;padding:14px 16px;border-radius:12px;background:var(--surface);border:1px solid var(--border);font-size:.82rem;line-height:1.8;color:var(--muted)">
                 </div>
             </div>
-            <!-- Step 2 -->
-            <div class="modal-step" id="step2">
-                <div class="plan-summary" id="payment-summary">
-                    <div class="plan-summary-top">
-                        <span class="plan-summary-name" id="pay-plan-name">Growth Plan</span>
-                        <div>
-                            <div class="plan-summary-price" id="pay-price">CHF 349</div>
-                            <div class="plan-summary-period" id="pay-period">fällig heute</div>
-                        </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section-py" id="faq"
+        style="background: linear-gradient(180deg, transparent, rgba(47,211,198,.03) 50%, transparent);">
+        <div class="container">
+            <div class="section-header reveal">
+                <div class="chip" data-de="Häufige Fragen" data-en="FAQ" data-ar="الأسئلة الشائعة">Häufige Fragen</div>
+                <h2 data-de="Häufig gestellte Fragen" data-en="Frequently Asked Questions" data-ar="الأسئلة المتكررة">
+                    Häufig
+                    gestellte <span class="text-primary">Fragen</span></h2>
+            </div>
+            <div class="faq-list">
+                <div class="faq-item reveal">
+                    <div class="faq-q" onclick="toggleFaq(this)"><span
+                            data-de="Für welche Branchen ist Barmagly POS geeignet?"
+                            data-en="What industries is Barmagly POS suitable for?"
+                            data-ar="لأي قطاعات يصلح برمجلي POS؟">Für welche Branchen ist Barmagly POS
+                            geeignet?</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5">
+                            <path d="M6 9l6 6 6-6" />
+                        </svg></div>
+                    <div class="faq-a">
+                        <div class="faq-a-inner"
+                            data-de="Barmagly POS ist ideal für Restaurants, Cafés, Pizzerien, Bäckereien, Einzelhandelsgeschäfte und jede Art von Geschäft, das ein modernes Kassensystem benötigt."
+                            data-en="Barmagly POS is ideal for restaurants, cafés, pizzerias, bakeries, retail stores, and any type of business needing a modern POS system."
+                            data-ar="برمجلي POS مثالي للمطاعم والمقاهي والبيتزا والمخابز ومتاجر التجزئة وأي نوع من الأعمال التي تحتاج إلى نظام كاشير حديث.">
+                            Barmagly POS ist ideal für Restaurants, Cafés, Pizzerien, Bäckereien, Einzelhandelsgeschäfte
+                            und
+                            jede Art von Geschäft, das ein modernes Kassensystem benötigt.</div>
                     </div>
                 </div>
-                <div id="stripe-payment-section">
+                <div class="faq-item reveal">
+                    <div class="faq-q" onclick="toggleFaq(this)"><span data-de="Kann ich den Plan jederzeit wechseln?"
+                            data-en="Can I switch plans at any time?" data-ar="هل يمكنني تغيير الخطة في أي وقت؟">Kann
+                            ich
+                            den Plan jederzeit wechseln?</span><svg viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5">
+                            <path d="M6 9l6 6 6-6" />
+                        </svg></div>
+                    <div class="faq-a">
+                        <div class="faq-a-inner"
+                            data-de="Ja! Sie können jederzeit zwischen dem Basic- und Advanced-Plan wechseln. Die Abrechnung wird anteilig angepasst."
+                            data-en="Yes! You can switch between Basic and Advanced plans at any time. Billing will be prorated accordingly."
+                            data-ar="نعم! يمكنك التبديل بين الخطة الأساسية والمتقدمة في أي وقت. سيتم تعديل الفواتير بشكل تناسبي.">
+                            Ja! Sie können jederzeit zwischen dem Basic- und Advanced-Plan wechseln. Die Abrechnung wird
+                            anteilig angepasst.</div>
+                    </div>
+                </div>
+                <div class="faq-item reveal">
+                    <div class="faq-q" onclick="toggleFaq(this)"><span data-de="Gibt es eine kostenlose Testphase?"
+                            data-en="Is there a free trial?" data-ar="هل توجد فترة تجريبية مجانية؟">Gibt es eine
+                            kostenlose
+                            Testphase?</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5">
+                            <path d="M6 9l6 6 6-6" />
+                        </svg></div>
+                    <div class="faq-a">
+                        <div class="faq-a-inner"
+                            data-de="Ja, alle Pläne beinhalten eine 30-tägige kostenlose Testphase. Keine Kreditkarte erforderlich zum Starten."
+                            data-en="Yes, all plans include a 30-day free trial. No credit card required to start."
+                            data-ar="نعم، جميع الخطط تتضمن فترة تجريبية مجانية لمدة 30 يوماً. لا يلزم بطاقة ائتمان للبدء.">
+                            Ja, alle Pläne beinhalten eine 30-tägige kostenlose Testphase. Keine Kreditkarte
+                            erforderlich
+                            zum Starten.</div>
+                    </div>
+                </div>
+                <div class="faq-item reveal">
+                    <div class="faq-q" onclick="toggleFaq(this)"><span
+                            data-de="Welche Zahlungsmethoden werden unterstützt?"
+                            data-en="What payment methods are supported?" data-ar="ما هي طرق الدفع المدعومة؟">Welche
+                            Zahlungsmethoden werden unterstützt?</span><svg viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5">
+                            <path d="M6 9l6 6 6-6" />
+                        </svg></div>
+                    <div class="faq-a">
+                        <div class="faq-a-inner"
+                            data-de="Barmagly unterstützt Bargeld, Kreditkarten (Visa, Mastercard), kontaktlose NFC-Zahlungen, TWINT und Stripe-Integration."
+                            data-en="Barmagly supports cash, credit cards (Visa, Mastercard), contactless NFC payments, TWINT, and Stripe integration."
+                            data-ar="برمجلي يدعم النقد، بطاقات الائتمان (Visa، Mastercard)، الدفع عبر NFC بدون تلامس، TWINT وتكامل Stripe.">
+                            Barmagly unterstützt Bargeld, Kreditkarten (Visa, Mastercard), kontaktlose NFC-Zahlungen,
+                            TWINT
+                            und Stripe-Integration.</div>
+                    </div>
+                </div>
+                <div class="faq-item reveal">
+                    <div class="faq-q" onclick="toggleFaq(this)"><span data-de="Sind meine Daten sicher?"
+                            data-en="Is my data secure?" data-ar="هل بياناتي آمنة؟">Sind meine Daten sicher?</span><svg
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="M6 9l6 6 6-6" />
+                        </svg></div>
+                    <div class="faq-a">
+                        <div class="faq-a-inner"
+                            data-de="Absolut. Wir verwenden 256-Bit-SSL-Verschlüsselung, automatische tägliche Backups, rollenbasierte Zugriffskontrolle und gerätegebundene Lizenzschlüssel."
+                            data-en="Absolutely. We use 256-bit SSL encryption, automatic daily backups, role-based access control, and device-bound license keys."
+                            data-ar="بالتأكيد. نستخدم تشفير SSL 256 بت، نسخ احتياطية يومية تلقائية، تحكم في الوصول المستند إلى الأدوار ومفاتيح ترخيص مرتبطة بالجهاز.">
+                            Absolut. Wir verwenden 256-Bit-SSL-Verschlüsselung, automatische tägliche Backups,
+                            rollenbasierte Zugriffskontrolle und gerätegebundene Lizenzschlüssel.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+        <div class="container">
+            <div class="chip" data-de="Heute starten" data-en="Start Today" data-ar="ابدأ اليوم">Heute starten</div>
+            <h2 data-de="Bereit, Ihr Unternehmen zu transformieren?" data-en="Ready to transform your business?"
+                data-ar="هل أنت مستعد لتحويل عملك؟">Bereit, Ihr Unternehmen zu <span
+                    class="text-primary">transformieren</span>?</h2>
+            <p data-de="Schließen Sie sich Hunderten von Filialen an, die bereits Barmagly POS verwenden. Holen Sie sich Ihren Lizenzschlüssel und beginnen Sie in Minuten."
+                data-en="Join hundreds of stores already using Barmagly POS. Get your license key and start selling in minutes."
+                data-ar="انضم إلى مئات المتاجر التي تستخدم برمجلي POS. احصل على مفتاح الترخيص الخاص بك وابدأ البيع في دقائق.">
+                Schließen Sie sich Hunderten von Filialen an, die bereits Barmagly POS verwenden. Holen Sie sich Ihren
+                Lizenzschlüssel und beginnen Sie in Minuten.</p>
+            <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+                <button class="btn-hero-primary" onclick="openModal('advanced')"
+                    data-de="Smart Business Growth — CHF 349/Mo" data-en="Smart Business Growth — CHF 349/mo"
+                    data-ar="نمو الأعمال الذكي — 349 فرنك/شهر">Smart Business Growth — CHF 349/Mo</button>
+                <button class="btn-hero-ghost" onclick="openModal('basic')" data-de="POS Starter — CHF 149/Mo"
+                    data-en="POS Starter — CHF 149/mo" data-ar="نقطة بيع المبتدئين — 149 فرنك/شهر">POS Starter — CHF
+                    149/Mo</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="container">
+            <div class="footer-grid">
+                <div>
+                    <div class="footer-brand-name">Barmagly POS</div>
+                    <div class="footer-brand-desc"
+                        data-de="Cloud-basiertes Kassensystem für moderne Restaurants, Cafés und Einzelhandelsgeschäfte. Vertraut in ganz Europa und dem Nahen Osten."
+                        data-en="Cloud-powered point-of-sale for the modern restaurant, café, and retail store. Trusted across Europe & the Middle East."
+                        data-ar="نقطة بيع سحابية للمطعم والمقهى ومتجر التجزئة الحديث. موثوق به في أوروبا والشرق الأوسط.">
+                        Cloud-basiertes Kassensystem für moderne Restaurants, Cafés und Einzelhandelsgeschäfte. Vertraut
+                        in
+                        ganz Europa und dem Nahen Osten.</div>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-col-title" data-de="Produkt" data-en="Product" data-ar="المنتج">Produkt</div>
+                    <a href="#features" data-de="Funktionen" data-en="Features" data-ar="المميزات">Funktionen</a>
+                    <a href="#pricing" data-de="Preise" data-en="Pricing" data-ar="الأسعار">Preise</a>
+                    <a href="#faq" data-de="FAQ" data-en="FAQ" data-ar="الأسئلة">FAQ</a>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-col-title" data-de="Unternehmen" data-en="Company" data-ar="الشركة">Unternehmen
+                    </div>
+                    <a href="#" data-de="Über uns" data-en="About" data-ar="عنا">Über uns</a>
+                    <a href="#" data-de="Kontakt" data-en="Contact" data-ar="التواصل">Kontakt</a>
+                    <a href="https://wa.me/201010254819" data-de="WhatsApp-Support" data-en="WhatsApp Support"
+                        data-ar="دعم واتساب">WhatsApp-Support</a>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-col-title" data-de="Zugang" data-en="Access" data-ar="الوصول">Zugang</div>
+                    <a href="BASE_URL_PLACEHOLDER/super-admin/login" data-de="Admin-Login" data-en="Admin Login"
+                        data-ar="تسجيل الدخول للمشرف">Admin-Login</a>
+                    <a href="#" onclick="openModal('basic');return false" data-de="Lizenz erhalten"
+                        data-en="Get License" data-ar="احصل على ترخيص">Lizenz erhalten</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span class="footer-copy">© 2026 Barmagly POS. All rights reserved.</span>
+                <span class="footer-copy">🇨🇭 Swiss Quality Software</span>
+            </div>
+        </div>
+    </footer>
+    <!-- SUBSCRIPTION MODAL -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-title" data-de="Starten Sie Ihren Plan" data-en="Start Your Plan" data-ar="ابدأ خطتك">
+                    Starten
+                    Sie Ihren Plan</h3>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-error" class="modal-error" style="display:none"></div>
+                <!-- Step 1 -->
+                <div class="modal-step active" id="step1">
+                    <div class="plan-summary" id="plan-summary-box">
+                        <div class="plan-summary-top">
+                            <span class="plan-summary-name" id="summary-plan-name">Growth Plan</span>
+                            <div>
+                                <div class="plan-summary-price" id="summary-price">CHF 349</div>
+                                <div class="plan-summary-period" id="summary-period">pro Monat</div>
+                            </div>
+                        </div>
+                        <div class="plan-summary-addons" id="summary-addons" style="display:none"></div>
+                    </div>
                     <div class="form-group">
-                        <label class="form-label" data-de="Kartennummer" data-en="Card Number"
-                            data-ar="رقم البطاقة">Kartennummer</label>
-                        <div class="stripe-field" id="card-number-el"></div>
+                        <label class="form-label" data-de="Unternehmensname *" data-en="Business Name *"
+                            data-ar="اسم الشركة *">Unternehmensname *</label>
+                        <input class="form-input" id="f-business" type="text" placeholder="z.B. Pizza Palace" required>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label" data-de="Ablaufdatum" data-en="Expiry"
-                                data-ar="انتهاء الصلاحية">Ablaufdatum</label>
-                            <div class="stripe-field" id="card-expiry-el"></div>
+                            <label class="form-label" data-de="Name des Inhabers *" data-en="Owner Name *"
+                                data-ar="اسم المالك *">Name des Inhabers *</label>
+                            <input class="form-input" id="f-name" type="text" placeholder="Vollständiger Name" required>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">CVC</label>
-                            <div class="stripe-field" id="card-cvc-el"></div>
+                            <label class="form-label" data-de="Telefon" data-en="Phone" data-ar="الهاتف">Telefon</label>
+                            <input class="form-input" id="f-phone" type="tel" placeholder="+41 79 000 0000">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" data-de="Geschäfts-E-Mail *" data-en="Business Email *"
+                            data-ar="البريد الإلكتروني للأعمال *">Geschäfts-E-Mail *</label>
+                        <input class="form-input" id="f-email" type="email" placeholder="info@ihrunternehmen.com"
+                            required>
+                    </div>
+                    <div id="plan-includes"
+                        style="margin-top:16px;padding:14px 16px;border-radius:12px;background:var(--surface);border:1px solid var(--border);font-size:.82rem;line-height:1.8;color:var(--muted)">
+                    </div>
+                </div>
+                <!-- Step 2 -->
+                <div class="modal-step" id="step2">
+                    <div class="plan-summary" id="payment-summary">
+                        <div class="plan-summary-top">
+                            <span class="plan-summary-name" id="pay-plan-name">Growth Plan</span>
+                            <div>
+                                <div class="plan-summary-price" id="pay-price">CHF 349</div>
+                                <div class="plan-summary-period" id="pay-period">fällig heute</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="stripe-payment-section">
+                        <div class="form-group">
+                            <label class="form-label" data-de="Kartennummer" data-en="Card Number"
+                                data-ar="رقم البطاقة">Kartennummer</label>
+                            <div class="stripe-field" id="card-number-el"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" data-de="Ablaufdatum" data-en="Expiry"
+                                    data-ar="انتهاء الصلاحية">Ablaufdatum</label>
+                                <div class="stripe-field" id="card-expiry-el"></div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">CVC</label>
+                                <div class="stripe-field" id="card-cvc-el"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="manual-payment-section" style="display:none;">
+                        <div
+                            style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;text-align:center;">
+                            <div style="font-size:36px;margin-bottom:12px;">🏦</div>
+                            <h4 style="font-size:1rem;font-weight:700;margin-bottom:8px;"
+                                data-de="Zahlung per Banküberweisung" data-en="Bank Transfer Payment"
+                                data-ar="الدفع عبر التحويل المصرفي">Zahlung per Banküberweisung</h4>
+                            <p style="font-size:.85rem;color:var(--muted);line-height:1.7;margin-bottom:16px;"
+                                data-de="Online-Kartenzahlung ist derzeit nicht verfügbar. Ihr Konto wird erstellt und nach Bestätigung Ihrer Banküberweisung aktiviert."
+                                data-en="Online card payment is currently unavailable. Your account will be created and activated after we confirm your bank transfer."
+                                data-ar="الدفع بالبطاقة عبر الإنترنت غير متاح حالياً. سيتم إنشاء حسابك وتفعيله بعد تأكيد التحويل المصرفي.">
+                                Online-Kartenzahlung ist derzeit nicht verfügbar. Ihr Konto wird erstellt und nach
+                                Bestätigung Ihrer Banküberweisung aktiviert.</p>
+                            <div
+                                style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:100px;background:rgba(16,185,129,.1);color:#10b981;font-size:.8rem;font-weight:600;">
+                                <span>✓</span><span data-de="30-Tage-Testversion inklusive"
+                                    data-en="30-day free trial included"
+                                    data-ar="تجربة مجانية لمدة 30 يوماً">30-Tage-Testversion inklusive</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div id="manual-payment-section" style="display:none;">
-                    <div
-                        style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;text-align:center;">
-                        <div style="font-size:36px;margin-bottom:12px;">🏦</div>
-                        <h4 style="font-size:1rem;font-weight:700;margin-bottom:8px;"
-                            data-de="Zahlung per Banküberweisung" data-en="Bank Transfer Payment"
-                            data-ar="الدفع عبر التحويل المصرفي">Zahlung per Banküberweisung</h4>
-                        <p style="font-size:.85rem;color:var(--muted);line-height:1.7;margin-bottom:16px;"
-                            data-de="Online-Kartenzahlung ist derzeit nicht verfügbar. Ihr Konto wird erstellt und nach Bestätigung Ihrer Banküberweisung aktiviert."
-                            data-en="Online card payment is currently unavailable. Your account will be created and activated after we confirm your bank transfer."
-                            data-ar="الدفع بالبطاقة عبر الإنترنت غير متاح حالياً. سيتم إنشاء حسابك وتفعيله بعد تأكيد التحويل المصرفي.">
-                            Online-Kartenzahlung ist derzeit nicht verfügbar. Ihr Konto wird erstellt und nach
-                            Bestätigung Ihrer Banküberweisung aktiviert.</p>
-                        <div
-                            style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:100px;background:rgba(16,185,129,.1);color:#10b981;font-size:.8rem;font-weight:600;">
-                            <span>✓</span><span data-de="30-Tage-Testversion inklusive"
-                                data-en="30-day free trial included"
-                                data-ar="تجربة مجانية لمدة 30 يوماً">30-Tage-Testversion inklusive</span>
+                <!-- Step 3 -->
+                <div class="modal-step" id="step3">
+                    <div class="modal-success">
+                        <div class="modal-success-icon">🎉</div>
+                        <h3 data-de="Sie sind startklar!" data-en="You're All Set!" data-ar="أنت على استعداد!">Sie sind
+                            startklar!</h3>
+                        <p><span data-de="Ihr Lizenzschlüssel wurde gesendet an"
+                                data-en="Your license key has been sent to" data-ar="تم إرسال مفتاح الترخيص إلى">Ihr
+                                Lizenzschlüssel wurde gesendet an</span> <strong id="success-email"></strong>.</p>
+                        <div id="success-key-box"
+                            style="background:rgba(47,211,198,0.08);border:1px solid rgba(47,211,198,0.3);border-radius:14px;padding:18px 20px;margin:16px 0;text-align:center;display:none">
+                            <div
+                                style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:10px">
+                                Your License Key</div>
+                            <div id="success-license-key"
+                                style="font-size:17px;font-weight:800;letter-spacing:3px;color:#2FD3C6;font-family:monospace;word-break:break-all">
+                            </div>
+                            <button onclick="copyLicenseKey()"
+                                style="margin-top:12px;background:rgba(47,211,198,0.15);border:1px solid rgba(47,211,198,0.3);color:#2FD3C6;border-radius:8px;padding:6px 16px;cursor:pointer;font-size:12px;font-weight:600">📋
+                                Copy Key</button>
                         </div>
+                        <p style="font-size:13px;color:rgba(255,255,255,0.6)"><span
+                                data-de="Öffnen Sie die Barmagly POS App und geben Sie E-Mail, Passwort und Lizenzschlüssel ein."
+                                data-en="Open the Barmagly POS app and enter your email, password, and license key to activate."
+                                data-ar="افتح تطبيق برمجلي POS وأدخل بريدك الإلكتروني وكلمة المرور ومفتاح الترخيص.">Öffnen
+                                Sie die Barmagly POS App und geben Sie E-Mail, Passwort und Lizenzschlüssel ein.</span>
+                        </p>
                     </div>
                 </div>
             </div>
-            <!-- Step 3 -->
-            <div class="modal-step" id="step3">
-                <div class="modal-success">
-                    <div class="modal-success-icon">🎉</div>
-                    <h3 data-de="Sie sind startklar!" data-en="You're All Set!" data-ar="أنت على استعداد!">Sie sind
-                        startklar!</h3>
-                    <p><span data-de="Ihr Lizenzschlüssel wurde gesendet an" data-en="Your license key has been sent to"
-                            data-ar="تم إرسال مفتاح الترخيص إلى">Ihr Lizenzschlüssel wurde gesendet an</span> <strong
-                            id="success-email"></strong>.</p>
-                    <div id="success-key-box"
-                        style="background:rgba(47,211,198,0.08);border:1px solid rgba(47,211,198,0.3);border-radius:14px;padding:18px 20px;margin:16px 0;text-align:center;display:none">
-                        <div
-                            style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:10px">
-                            Your License Key</div>
-                        <div id="success-license-key"
-                            style="font-size:17px;font-weight:800;letter-spacing:3px;color:#2FD3C6;font-family:monospace;word-break:break-all">
-                        </div>
-                        <button onclick="copyLicenseKey()"
-                            style="margin-top:12px;background:rgba(47,211,198,0.15);border:1px solid rgba(47,211,198,0.3);color:#2FD3C6;border-radius:8px;padding:6px 16px;cursor:pointer;font-size:12px;font-weight:600">📋
-                            Copy Key</button>
-                    </div>
-                    <p style="font-size:13px;color:rgba(255,255,255,0.6)"><span
-                            data-de="Öffnen Sie die Barmagly POS App und geben Sie E-Mail, Passwort und Lizenzschlüssel ein."
-                            data-en="Open the Barmagly POS app and enter your email, password, and license key to activate."
-                            data-ar="افتح تطبيق برمجلي POS وأدخل بريدك الإلكتروني وكلمة المرور ومفتاح الترخيص.">Öffnen
-                            Sie die Barmagly POS App und geben Sie E-Mail, Passwort und Lizenzschlüssel ein.</span></p>
+            <div class="modal-footer" id="modal-footer">
+                <button class="btn-modal-submit" id="modal-next-btn" onclick="modalNext()"><span
+                        data-de="Weiter zur Zahlung →" data-en="Continue to Payment →" data-ar="المتابعة للدفع →">Weiter
+                        zur
+                        Zahlung →</span></button>
+                <button class="btn-modal-back" id="modal-back-btn" style="display:none" onclick="modalBack()"><span
+                        data-de="← Zurück" data-en="← Back" data-ar="→ رجوع">← Zurück</span></button>
+                <div class="ssl-note"><span>🔒</span><span data-de="Gesicherte Verbindung · 256-Bit-SSL-Verschlüsselung"
+                        data-en="Secured connection · 256-bit SSL encryption"
+                        data-ar="اتصال آمن · تشفير SSL 256 بت">Gesicherte Verbindung ·
+                        256-Bit-SSL-Verschlüsselung</span>
                 </div>
-            </div>
-        </div>
-        <div class="modal-footer" id="modal-footer">
-            <button class="btn-modal-submit" id="modal-next-btn" onclick="modalNext()"><span
-                    data-de="Weiter zur Zahlung →" data-en="Continue to Payment →" data-ar="المتابعة للدفع →">Weiter zur
-                    Zahlung →</span></button>
-            <button class="btn-modal-back" id="modal-back-btn" style="display:none" onclick="modalBack()"><span
-                    data-de="← Zurück" data-en="← Back" data-ar="→ رجوع">← Zurück</span></button>
-            <div class="ssl-note"><span>🔒</span><span data-de="Gesicherte Verbindung · 256-Bit-SSL-Verschlüsselung"
-                    data-en="Secured connection · 256-bit SSL encryption"
-                    data-ar="اتصال آمن · تشفير SSL 256 بت">Gesicherte Verbindung · 256-Bit-SSL-Verschlüsselung</span>
             </div>
         </div>
     </div>
-</div>
 
-<script>
-    /* ═══════ LANGUAGE ═══════ */
-    const LANGS = ['de', 'en', 'ar'];
-    let lang = localStorage.getItem('barmagly_lang') || 'de';
-    const DIR = { en: 'ltr', ar: 'rtl', de: 'ltr' };
-    const FLAGS = { de: '🇩🇪', en: '🇬🇧', ar: '🇸🇦' };
-    const LABELS = { de: 'DE', en: 'EN', ar: 'AR' };
+    <script>
+        /* ═══════ LANGUAGE ═══════ */
+        const LANGS = ['de', 'en', 'ar'];
+        let lang = localStorage.getItem('barmagly_lang') || 'de';
+        const DIR = { en: 'ltr', ar: 'rtl', de: 'ltr' };
+        const FLAGS = { de: '🇩🇪', en: '🇬🇧', ar: '🇸🇦' };
+        const LABELS = { de: 'DE', en: 'EN', ar: 'AR' };
 
-    function applyLang(l) {
-        lang = l;
-        localStorage.setItem('barmagly_lang', l);
-        document.documentElement.lang = l;
-        document.documentElement.dir = DIR[l];
-        document.querySelectorAll('[data-' + l + ']').forEach(function (el) {
-            var txt = el.getAttribute('data-' + l);
-            if (txt) el.textContent = txt;
-        });
-        document.getElementById('langFlag').textContent = FLAGS[l];
-        document.getElementById('langLabel').textContent = LABELS[l];
-        document.querySelectorAll('.lang-option').forEach(function (o) {
-            o.classList.toggle('active', o.dataset.lang === l);
-        });
-        updatePricingUI();
-    }
-
-    function switchLang(l) {
-        applyLang(l);
-        closeLangMenu();
-    }
-
-    function toggleLangMenu() {
-        document.getElementById('langDropdown').classList.toggle('open');
-    }
-    function closeLangMenu() {
-        document.getElementById('langDropdown').classList.remove('open');
-    }
-    document.addEventListener('click', function (e) {
-        if (!e.target.closest('.lang-dropdown')) closeLangMenu();
-    });
-
-    /* ═══════ MOBILE NAV ═══════ */
-    function toggleMobileNav() {
-        var links = document.querySelector('.nav-links');
-        links.style.display = links.style.display === 'flex' ? 'none' : 'flex';
-    }
-
-    /* ═══════ NAVBAR SCROLL ═══════ */
-    window.addEventListener('scroll', function () {
-        document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 40);
-    });
-
-    /* ═══════ REVEAL ═══════ */
-    var ro = new IntersectionObserver(function (entries) {
-        entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('visible'); ro.unobserve(e.target); } });
-    }, { threshold: 0.1 });
-    document.querySelectorAll('.reveal').forEach(function (el) { ro.observe(el); });
-
-    /* ═══════ FAQ ═══════ */
-    function toggleFaq(el) {
-        var item = el.closest('.faq-item');
-        item.classList.toggle('open');
-    }
-
-    /* ═══════ BILLING TOGGLE ═══════ */
-    var isAnnual = false;
-    var PLANS = {
-        basic: {
-            name: { de: 'POS Starter', en: 'POS Starter', ar: 'نقطة بيع المبتدئين' },
-            monthly: 149, annual: 1499,
-            includes: {
-                de: '✓ POS-System · ✓ Inventar · ✓ Rechnungen · ✓ Berichte · ✓ Hosting & Backups · ✓ Technischer Support',
-                en: '✓ POS system · ✓ Inventory · ✓ Invoicing · ✓ Reports · ✓ Hosting & backups · ✓ Technical support',
-                ar: '✓ نقطة البيع · ✓ المخزون · ✓ الفواتير · ✓ التقارير · ✓ الاستضافة والنسخ الاحتياطية · ✓ الدعم الفني'
-            }
-        },
-        advanced: {
-            name: { de: 'Smart Business Growth', en: 'Smart Business Growth', ar: 'نمو الأعمال الذكي' },
-            monthly: 349, annual: 3499,
-            includes: {
-                de: '✓ Alles im Basic · ✓ Online-Shop · ✓ CRM · ✓ Multi-Gerät-POS · ✓ Erweiterte Berichte · ✓ Landingpage-Design · ✓ Werbekampagnen · ✓ Social-Media-Management',
-                en: '✓ Everything in Basic · ✓ Online store · ✓ CRM · ✓ Multi-device POS · ✓ Advanced reports · ✓ Landing page design · ✓ Ad campaigns · ✓ Social media management',
-                ar: '✓ كل شيء في الأساسي · ✓ متجر إلكتروني · ✓ إدارة العملاء · ✓ نقطة بيع متعددة الأجهزة · ✓ تقارير متقدمة · ✓ تصميم صفحة مبيعات · ✓ حملات إعلانية · ✓ إدارة وسائل التواصل'
-            }
-        }
-    };
-
-    function toggleBilling() {
-        isAnnual = !isAnnual;
-        document.getElementById('billingToggle').classList.toggle('on', isAnnual);
-        document.getElementById('lbl-monthly').classList.toggle('active', !isAnnual);
-        document.getElementById('lbl-annual').classList.toggle('active', isAnnual);
-        updatePricingUI();
-    }
-
-    function updatePricingUI() {
-        var bp = document.getElementById('basic-price');
-        var bperiod = document.getElementById('basic-period');
-        var btagline = document.getElementById('basic-tagline');
-        var ap = document.getElementById('advanced-price');
-        var aperiod = document.getElementById('advanced-period');
-        var atagline = document.getElementById('advanced-tagline');
-        if (isAnnual) {
-            bp.textContent = 'CHF 1.499';
-            bperiod.textContent = { de: '/ Jahr', en: '/ year', ar: '/ سنة' }[lang] || '/ Jahr';
-            btagline.textContent = { de: 'Jährlich CHF 1.499 — sparen Sie CHF 289', en: 'Billed CHF 1,499/year — save CHF 289', ar: 'يُفوتر بـ 1,499 فرنك/سنة — وفر 289 فرنك' }[lang];
-            ap.textContent = 'CHF 3.499';
-            aperiod.textContent = { de: '/ Jahr', en: '/ year', ar: '/ سنة' }[lang] || '/ Jahr';
-            atagline.textContent = { de: 'Jährlich CHF 3.499 — sparen Sie CHF 689', en: 'Billed CHF 3,499/year — save CHF 689', ar: 'يُفوتر بـ 3,499 فرنك/سنة — وفر 689 فرنك' }[lang];
-        } else {
-            bp.textContent = 'CHF 149';
-            bperiod.textContent = { de: '/ Monat', en: '/ month', ar: '/ شهر' }[lang] || '/ Monat';
-            btagline.textContent = btagline.getAttribute('data-' + lang) || btagline.getAttribute('data-de');
-            ap.textContent = 'CHF 349';
-            aperiod.textContent = { de: '/ Monat', en: '/ month', ar: '/ شهر' }[lang] || '/ Monat';
-            atagline.textContent = atagline.getAttribute('data-' + lang) || atagline.getAttribute('data-de');
-        }
-    }
-
-    /* ═══════ MODAL ═══════ */
-    var stripe, cardNumber, cardExpiry, cardCvc, stripeReady = false;
-    var currentPlan = 'advanced';
-    var modalStep = 1;
-
-    async function initStripe() {
-        if (stripeReady) return;
-        try {
-            var res = await fetch('/api/stripe/publishable-key');
-            var data = await res.json();
-            var pk = data.publishableKey;
-            if (!pk || pk.includes('dummy') || pk.includes('placeholder')) throw new Error('Stripe not configured');
-            stripe = Stripe(pk);
-            var elements = stripe.elements({ appearance: { theme: 'night', variables: { colorPrimary: '#2FD3C6', borderRadius: '10px' } } });
-            var style = { style: { base: { color: '#f0f4f8', fontSize: '15px', fontFamily: 'Inter,sans-serif', '::placeholder': { color: '#506070' } } } };
-            cardNumber = elements.create('cardNumber', style);
-            cardExpiry = elements.create('cardExpiry', style);
-            cardCvc = elements.create('cardCvc', style);
-            cardNumber.mount('#card-number-el');
-            cardExpiry.mount('#card-expiry-el');
-            cardCvc.mount('#card-cvc-el');
-            ['cardNumber', 'cardExpiry', 'cardCvc'].forEach(function (name, i) {
-                var el = [cardNumber, cardExpiry, cardCvc][i];
-                var container = document.getElementById(['card-number-el', 'card-expiry-el', 'card-cvc-el'][i]);
-                el.on('focus', function () { container.classList.add('focused'); });
-                el.on('blur', function () { container.classList.remove('focused'); });
+        function applyLang(l) {
+            lang = l;
+            localStorage.setItem('barmagly_lang', l);
+            document.documentElement.lang = l;
+            document.documentElement.dir = DIR[l];
+            document.querySelectorAll('[data-' + l + ']').forEach(function (el) {
+                var txt = el.getAttribute('data-' + l);
+                if (txt) el.textContent = txt;
             });
-            stripeReady = true;
-            document.getElementById('stripe-payment-section').style.display = '';
-            document.getElementById('manual-payment-section').style.display = 'none';
-        } catch (e) {
-            console.warn('Stripe init failed:', e);
-            stripeReady = false;
-            document.getElementById('stripe-payment-section').style.display = 'none';
-            document.getElementById('manual-payment-section').style.display = '';
+            document.getElementById('langFlag').textContent = FLAGS[l];
+            document.getElementById('langLabel').textContent = LABELS[l];
+            document.querySelectorAll('.lang-option').forEach(function (o) {
+                o.classList.toggle('active', o.dataset.lang === l);
+            });
+            updatePricingUI();
         }
-    }
 
-    function openModal(plan) {
-        currentPlan = plan;
-        modalStep = 1;
-        document.getElementById('step1').classList.add('active');
-        document.getElementById('step2').classList.remove('active');
-        document.getElementById('step3').classList.remove('active');
-        document.getElementById('modal-back-btn').style.display = 'none';
-        document.getElementById('modal-footer').style.display = 'flex';
-        setError('');
-        updateModalSummary();
-        document.getElementById('modal').classList.add('open');
-        document.body.style.overflow = 'hidden';
-        setTimeout(initStripe, 300);
-    }
+        function switchLang(l) {
+            applyLang(l);
+            closeLangMenu();
+        }
 
-    function closeModal() {
-        document.getElementById('modal').classList.remove('open');
-        document.body.style.overflow = '';
-    }
+        function toggleLangMenu() {
+            document.getElementById('langDropdown').classList.toggle('open');
+        }
+        function closeLangMenu() {
+            document.getElementById('langDropdown').classList.remove('open');
+        }
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.lang-dropdown')) closeLangMenu();
+        });
 
-    document.getElementById('modal').addEventListener('click', function (e) { if (e.target === document.getElementById('modal')) closeModal(); });
+        /* ═══════ MOBILE NAV ═══════ */
+        function toggleMobileNav() {
+            var links = document.querySelector('.nav-links');
+            links.style.display = links.style.display === 'flex' ? 'none' : 'flex';
+        }
 
-    function updateModalSummary() {
-        var plan = PLANS[currentPlan] || PLANS.basic;
-        var suffix = isAnnual ? (lang === 'ar' ? 'سنوي' : lang === 'en' ? 'Annual' : 'Jährlich') : (lang === 'ar' ? 'شهري' : lang === 'en' ? 'Monthly' : 'Monatlich');
-        var planName = (plan.name[lang] || plan.name.de) + ' (' + suffix + ')';
-        document.getElementById('summary-plan-name').textContent = planName;
-        document.getElementById('pay-plan-name').textContent = planName;
-        var price = isAnnual ? 'CHF ' + (currentPlan === 'advanced' ? '3.499' : '1.499') : 'CHF ' + plan.monthly;
-        var period = isAnnual ? (lang === 'ar' ? 'في السنة' : lang === 'en' ? 'per year' : 'pro Jahr') : (lang === 'ar' ? 'في الشهر' : lang === 'en' ? 'per month' : 'pro Monat');
-        document.getElementById('summary-price').textContent = price;
-        document.getElementById('pay-price').textContent = price;
-        document.getElementById('summary-period').textContent = period;
-        document.getElementById('pay-period').textContent = lang === 'ar' ? 'مستحق اليوم' : lang === 'en' ? 'due today' : 'fällig heute';
-        document.getElementById('modal-title').textContent = lang === 'ar' ? 'ابدأ خطتك' : lang === 'en' ? 'Start Your Plan' : 'Starten Sie Ihren Plan';
-        document.getElementById('summary-addons').style.display = 'none';
-        var pi = document.getElementById('plan-includes');
-        if (pi) pi.textContent = plan.includes[lang] || plan.includes.de;
-    }
+        /* ═══════ NAVBAR SCROLL ═══════ */
+        window.addEventListener('scroll', function () {
+            document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 40);
+        });
 
-    function setError(msg) {
-        var el = document.getElementById('modal-error');
-        el.style.display = msg ? 'block' : 'none';
-        el.textContent = msg;
-    }
+        /* ═══════ REVEAL ═══════ */
+        var ro = new IntersectionObserver(function (entries) {
+            entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('visible'); ro.unobserve(e.target); } });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.reveal').forEach(function (el) { ro.observe(el); });
 
-    async function modalNext() {
-        if (modalStep === 1) {
-            var business = document.getElementById('f-business').value.trim();
-            var name = document.getElementById('f-name').value.trim();
-            var email = document.getElementById('f-email').value.trim();
-            if (!business || !name || !email) {
-                setError(lang === 'ar' ? 'يرجى ملء جميع الحقول المطلوبة' : lang === 'en' ? 'Please fill in all required fields.' : 'Bitte füllen Sie alle Pflichtfelder aus.');
-                return;
+        /* ═══════ FAQ ═══════ */
+        function toggleFaq(el) {
+            var item = el.closest('.faq-item');
+            item.classList.toggle('open');
+        }
+
+        /* ═══════ BILLING TOGGLE ═══════ */
+        var isAnnual = false;
+        var PLANS = {
+            basic: {
+                name: { de: 'POS Starter', en: 'POS Starter', ar: 'نقطة بيع المبتدئين' },
+                monthly: 149, annual: 1499,
+                includes: {
+                    de: '✓ POS-System · ✓ Inventar · ✓ Rechnungen · ✓ Berichte · ✓ Hosting & Backups · ✓ Technischer Support',
+                    en: '✓ POS system · ✓ Inventory · ✓ Invoicing · ✓ Reports · ✓ Hosting & backups · ✓ Technical support',
+                    ar: '✓ نقطة البيع · ✓ المخزون · ✓ الفواتير · ✓ التقارير · ✓ الاستضافة والنسخ الاحتياطية · ✓ الدعم الفني'
+                }
+            },
+            advanced: {
+                name: { de: 'Smart Business Growth', en: 'Smart Business Growth', ar: 'نمو الأعمال الذكي' },
+                monthly: 349, annual: 3499,
+                includes: {
+                    de: '✓ Alles im Basic · ✓ Online-Shop · ✓ CRM · ✓ Multi-Gerät-POS · ✓ Erweiterte Berichte · ✓ Landingpage-Design · ✓ Werbekampagnen · ✓ Social-Media-Management',
+                    en: '✓ Everything in Basic · ✓ Online store · ✓ CRM · ✓ Multi-device POS · ✓ Advanced reports · ✓ Landing page design · ✓ Ad campaigns · ✓ Social media management',
+                    ar: '✓ كل شيء في الأساسي · ✓ متجر إلكتروني · ✓ إدارة العملاء · ✓ نقطة بيع متعددة الأجهزة · ✓ تقارير متقدمة · ✓ تصميم صفحة مبيعات · ✓ حملات إعلانية · ✓ إدارة وسائل التواصل'
+                }
             }
-            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                setError(lang === 'ar' ? 'يرجى إدخال بريد إلكتروني صالح' : lang === 'en' ? 'Please enter a valid email address.' : 'Bitte geben Sie eine gültige E-Mail-Adresse ein.');
-                return;
-            }
-            setError('');
-            document.getElementById('step1').classList.remove('active');
-            document.getElementById('step2').classList.add('active');
-            document.getElementById('modal-back-btn').style.display = '';
-            modalStep = 2;
-        } else if (modalStep === 2) {
-            await submitPayment();
-        }
-    }
-
-    function modalBack() {
-        if (modalStep === 2) {
-            document.getElementById('step2').classList.remove('active');
-            document.getElementById('step1').classList.add('active');
-            document.getElementById('modal-back-btn').style.display = 'none';
-            setError('');
-            modalStep = 1;
-        }
-    }
-
-    function copyLicenseKey() {
-        var key = document.getElementById('success-license-key').textContent;
-        if (navigator.clipboard) navigator.clipboard.writeText(key);
-        var btn = event.target; btn.textContent = '✅ Copied!';
-        setTimeout(function () { btn.textContent = '📋 Copy Key'; }, 2000);
-    }
-
-    function showSuccess(email, licenseKey) {
-        document.getElementById('success-email').textContent = email;
-        var keyBox = document.getElementById('success-key-box');
-        var keyEl = document.getElementById('success-license-key');
-        if (licenseKey && keyBox && keyEl) { keyEl.textContent = licenseKey; keyBox.style.display = 'block'; }
-        document.getElementById('step2').classList.remove('active');
-        document.getElementById('step3').classList.add('active');
-        document.getElementById('modal-footer').style.display = 'none';
-        applyLang(lang);
-    }
-
-    async function submitPayment() {
-        var btn = document.getElementById('modal-next-btn');
-        var resetBtn = function () {
-            btn.disabled = false;
-            btn.querySelector('span').setAttribute('data-de', 'Abschließen & Bezahlen →');
-            btn.querySelector('span').setAttribute('data-en', 'Complete & Pay →');
-            btn.querySelector('span').setAttribute('data-ar', 'إكمال والدفع →');
-            applyLang(lang);
         };
-        btn.disabled = true;
-        btn.querySelector('span').textContent = lang === 'ar' ? 'جارٍ المعالجة...' : lang === 'en' ? 'Processing...' : 'Wird verarbeitet...';
-        setError('');
-        try {
-            var business = document.getElementById('f-business').value.trim();
-            var name = document.getElementById('f-name').value.trim();
-            var email = document.getElementById('f-email').value.trim();
-            var phone = document.getElementById('f-phone').value.trim();
-            var planType = isAnnual ? 'yearly' : 'monthly';
-            var planName = currentPlan === 'advanced' ? 'advanced' : 'basic';
-            var paymentMethodId = null;
-            if (stripeReady && cardNumber) {
-                var result = await stripe.createPaymentMethod({ type: 'card', card: cardNumber, billing_details: { name: name, email: email } });
-                if (result.error) { setError(result.error.message); resetBtn(); return; }
-                paymentMethodId = result.paymentMethod.id;
+
+        function toggleBilling() {
+            isAnnual = !isAnnual;
+            document.getElementById('billingToggle').classList.toggle('on', isAnnual);
+            document.getElementById('lbl-monthly').classList.toggle('active', !isAnnual);
+            document.getElementById('lbl-annual').classList.toggle('active', isAnnual);
+            updatePricingUI();
+        }
+
+        function updatePricingUI() {
+            var bp = document.getElementById('basic-price');
+            var bperiod = document.getElementById('basic-period');
+            var btagline = document.getElementById('basic-tagline');
+            var ap = document.getElementById('advanced-price');
+            var aperiod = document.getElementById('advanced-period');
+            var atagline = document.getElementById('advanced-tagline');
+            if (isAnnual) {
+                bp.textContent = 'CHF 1.499';
+                bperiod.textContent = { de: '/ Jahr', en: '/ year', ar: '/ سنة' }[lang] || '/ Jahr';
+                btagline.textContent = { de: 'Jährlich CHF 1.499 — sparen Sie CHF 289', en: 'Billed CHF 1,499/year — save CHF 289', ar: 'يُفوتر بـ 1,499 فرنك/سنة — وفر 289 فرنك' }[lang];
+                ap.textContent = 'CHF 3.499';
+                aperiod.textContent = { de: '/ Jahr', en: '/ year', ar: '/ سنة' }[lang] || '/ Jahr';
+                atagline.textContent = { de: 'Jährlich CHF 3.499 — sparen Sie CHF 689', en: 'Billed CHF 3,499/year — save CHF 689', ar: 'يُفوتر بـ 3,499 فرنك/سنة — وفر 689 فرنك' }[lang];
+            } else {
+                bp.textContent = 'CHF 149';
+                bperiod.textContent = { de: '/ Monat', en: '/ month', ar: '/ شهر' }[lang] || '/ Monat';
+                btagline.textContent = btagline.getAttribute('data-' + lang) || btagline.getAttribute('data-de');
+                ap.textContent = 'CHF 349';
+                aperiod.textContent = { de: '/ Monat', en: '/ month', ar: '/ شهر' }[lang] || '/ Monat';
+                atagline.textContent = atagline.getAttribute('data-' + lang) || atagline.getAttribute('data-de');
             }
-            var res = await fetch('/api/landing/subscribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ businessName: business, ownerName: name, ownerEmail: email, ownerPhone: phone || null, planType: planType, planName: planName, paymentMethodId: paymentMethodId, lang: lang })
-            });
-            var data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Subscription failed');
-            if (data.requiresAction && data.clientSecret) {
-                btn.querySelector('span').textContent = lang === 'ar' ? 'جارٍ التحقق...' : lang === 'en' ? 'Verifying...' : 'Wird verifiziert...';
-                var confirmResult = await stripe.confirmCardPayment(data.clientSecret);
-                if (confirmResult.error) { setError(confirmResult.error.message); resetBtn(); return; }
-                var confirmRes = await fetch('/api/landing/confirm-subscription', {
+        }
+
+        /* ═══════ MODAL ═══════ */
+        var stripe, cardNumber, cardExpiry, cardCvc, stripeReady = false;
+        var currentPlan = 'advanced';
+        var modalStep = 1;
+
+        async function initStripe() {
+            if (stripeReady) return;
+            try {
+                var res = await fetch('/api/stripe/publishable-key');
+                var data = await res.json();
+                var pk = data.publishableKey;
+                if (!pk || pk.includes('dummy') || pk.includes('placeholder')) throw new Error('Stripe not configured');
+                stripe = Stripe(pk);
+                var elements = stripe.elements({ appearance: { theme: 'night', variables: { colorPrimary: '#2FD3C6', borderRadius: '10px' } } });
+                var style = { style: { base: { color: '#f0f4f8', fontSize: '15px', fontFamily: 'Inter,sans-serif', '::placeholder': { color: '#506070' } } } };
+                cardNumber = elements.create('cardNumber', style);
+                cardExpiry = elements.create('cardExpiry', style);
+                cardCvc = elements.create('cardCvc', style);
+                cardNumber.mount('#card-number-el');
+                cardExpiry.mount('#card-expiry-el');
+                cardCvc.mount('#card-cvc-el');
+                ['cardNumber', 'cardExpiry', 'cardCvc'].forEach(function (name, i) {
+                    var el = [cardNumber, cardExpiry, cardCvc][i];
+                    var container = document.getElementById(['card-number-el', 'card-expiry-el', 'card-cvc-el'][i]);
+                    el.on('focus', function () { container.classList.add('focused'); });
+                    el.on('blur', function () { container.classList.remove('focused'); });
+                });
+                stripeReady = true;
+                document.getElementById('stripe-payment-section').style.display = '';
+                document.getElementById('manual-payment-section').style.display = 'none';
+            } catch (e) {
+                console.warn('Stripe init failed:', e);
+                stripeReady = false;
+                document.getElementById('stripe-payment-section').style.display = 'none';
+                document.getElementById('manual-payment-section').style.display = '';
+            }
+        }
+
+        function openModal(plan) {
+            currentPlan = plan;
+            modalStep = 1;
+            document.getElementById('step1').classList.add('active');
+            document.getElementById('step2').classList.remove('active');
+            document.getElementById('step3').classList.remove('active');
+            document.getElementById('modal-back-btn').style.display = 'none';
+            document.getElementById('modal-footer').style.display = 'flex';
+            setError('');
+            updateModalSummary();
+            document.getElementById('modal').classList.add('open');
+            document.body.style.overflow = 'hidden';
+            setTimeout(initStripe, 300);
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        document.getElementById('modal').addEventListener('click', function (e) { if (e.target === document.getElementById('modal')) closeModal(); });
+
+        function updateModalSummary() {
+            var plan = PLANS[currentPlan] || PLANS.basic;
+            var suffix = isAnnual ? (lang === 'ar' ? 'سنوي' : lang === 'en' ? 'Annual' : 'Jährlich') : (lang === 'ar' ? 'شهري' : lang === 'en' ? 'Monthly' : 'Monatlich');
+            var planName = (plan.name[lang] || plan.name.de) + ' (' + suffix + ')';
+            document.getElementById('summary-plan-name').textContent = planName;
+            document.getElementById('pay-plan-name').textContent = planName;
+            var price = isAnnual ? 'CHF ' + (currentPlan === 'advanced' ? '3.499' : '1.499') : 'CHF ' + plan.monthly;
+            var period = isAnnual ? (lang === 'ar' ? 'في السنة' : lang === 'en' ? 'per year' : 'pro Jahr') : (lang === 'ar' ? 'في الشهر' : lang === 'en' ? 'per month' : 'pro Monat');
+            document.getElementById('summary-price').textContent = price;
+            document.getElementById('pay-price').textContent = price;
+            document.getElementById('summary-period').textContent = period;
+            document.getElementById('pay-period').textContent = lang === 'ar' ? 'مستحق اليوم' : lang === 'en' ? 'due today' : 'fällig heute';
+            document.getElementById('modal-title').textContent = lang === 'ar' ? 'ابدأ خطتك' : lang === 'en' ? 'Start Your Plan' : 'Starten Sie Ihren Plan';
+            document.getElementById('summary-addons').style.display = 'none';
+            var pi = document.getElementById('plan-includes');
+            if (pi) pi.textContent = plan.includes[lang] || plan.includes.de;
+        }
+
+        function setError(msg) {
+            var el = document.getElementById('modal-error');
+            el.style.display = msg ? 'block' : 'none';
+            el.textContent = msg;
+        }
+
+        async function modalNext() {
+            if (modalStep === 1) {
+                var business = document.getElementById('f-business').value.trim();
+                var name = document.getElementById('f-name').value.trim();
+                var email = document.getElementById('f-email').value.trim();
+                if (!business || !name || !email) {
+                    setError(lang === 'ar' ? 'يرجى ملء جميع الحقول المطلوبة' : lang === 'en' ? 'Please fill in all required fields.' : 'Bitte füllen Sie alle Pflichtfelder aus.');
+                    return;
+                }
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    setError(lang === 'ar' ? 'يرجى إدخال بريد إلكتروني صالح' : lang === 'en' ? 'Please enter a valid email address.' : 'Bitte geben Sie eine gültige E-Mail-Adresse ein.');
+                    return;
+                }
+                setError('');
+                document.getElementById('step1').classList.remove('active');
+                document.getElementById('step2').classList.add('active');
+                document.getElementById('modal-back-btn').style.display = '';
+                modalStep = 2;
+            } else if (modalStep === 2) {
+                await submitPayment();
+            }
+        }
+
+        function modalBack() {
+            if (modalStep === 2) {
+                document.getElementById('step2').classList.remove('active');
+                document.getElementById('step1').classList.add('active');
+                document.getElementById('modal-back-btn').style.display = 'none';
+                setError('');
+                modalStep = 1;
+            }
+        }
+
+        function copyLicenseKey() {
+            var key = document.getElementById('success-license-key').textContent;
+            if (navigator.clipboard) navigator.clipboard.writeText(key);
+            var btn = event.target; btn.textContent = '✅ Copied!';
+            setTimeout(function () { btn.textContent = '📋 Copy Key'; }, 2000);
+        }
+
+        function showSuccess(email, licenseKey) {
+            document.getElementById('success-email').textContent = email;
+            var keyBox = document.getElementById('success-key-box');
+            var keyEl = document.getElementById('success-license-key');
+            if (licenseKey && keyBox && keyEl) { keyEl.textContent = licenseKey; keyBox.style.display = 'block'; }
+            document.getElementById('step2').classList.remove('active');
+            document.getElementById('step3').classList.add('active');
+            document.getElementById('modal-footer').style.display = 'none';
+            applyLang(lang);
+        }
+
+        async function submitPayment() {
+            var btn = document.getElementById('modal-next-btn');
+            var resetBtn = function () {
+                btn.disabled = false;
+                btn.querySelector('span').setAttribute('data-de', 'Abschließen & Bezahlen →');
+                btn.querySelector('span').setAttribute('data-en', 'Complete & Pay →');
+                btn.querySelector('span').setAttribute('data-ar', 'إكمال والدفع →');
+                applyLang(lang);
+            };
+            btn.disabled = true;
+            btn.querySelector('span').textContent = lang === 'ar' ? 'جارٍ المعالجة...' : lang === 'en' ? 'Processing...' : 'Wird verarbeitet...';
+            setError('');
+            try {
+                var business = document.getElementById('f-business').value.trim();
+                var name = document.getElementById('f-name').value.trim();
+                var email = document.getElementById('f-email').value.trim();
+                var phone = document.getElementById('f-phone').value.trim();
+                var planType = isAnnual ? 'yearly' : 'monthly';
+                var planName = currentPlan === 'advanced' ? 'advanced' : 'basic';
+                var paymentMethodId = null;
+                if (stripeReady && cardNumber) {
+                    var result = await stripe.createPaymentMethod({ type: 'card', card: cardNumber, billing_details: { name: name, email: email } });
+                    if (result.error) { setError(result.error.message); resetBtn(); return; }
+                    paymentMethodId = result.paymentMethod.id;
+                }
+                var res = await fetch('/api/landing/subscribe', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ paymentIntentId: confirmResult.paymentIntent.id, businessName: business, ownerName: name, ownerEmail: email, ownerPhone: phone || null, planType: planType, planName: planName })
+                    body: JSON.stringify({ businessName: business, ownerName: name, ownerEmail: email, ownerPhone: phone || null, planType: planType, planName: planName, paymentMethodId: paymentMethodId, lang: lang })
                 });
-                var confirmData = await confirmRes.json();
-                if (!confirmRes.ok) throw new Error(confirmData.error || 'Subscription confirmation failed');
-                showSuccess(email, confirmData.licenseKey);
-                return;
+                var data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Subscription failed');
+                if (data.requiresAction && data.clientSecret) {
+                    btn.querySelector('span').textContent = lang === 'ar' ? 'جارٍ التحقق...' : lang === 'en' ? 'Verifying...' : 'Wird verifiziert...';
+                    var confirmResult = await stripe.confirmCardPayment(data.clientSecret);
+                    if (confirmResult.error) { setError(confirmResult.error.message); resetBtn(); return; }
+                    var confirmRes = await fetch('/api/landing/confirm-subscription', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ paymentIntentId: confirmResult.paymentIntent.id, businessName: business, ownerName: name, ownerEmail: email, ownerPhone: phone || null, planType: planType, planName: planName })
+                    });
+                    var confirmData = await confirmRes.json();
+                    if (!confirmRes.ok) throw new Error(confirmData.error || 'Subscription confirmation failed');
+                    showSuccess(email, confirmData.licenseKey);
+                    return;
+                }
+                showSuccess(email, data.licenseKey);
+            } catch (e) {
+                setError(e.message || (lang === 'ar' ? 'حدث خطأ، يرجى المحاولة مرة أخرى' : lang === 'en' ? 'Something went wrong. Please try again.' : 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.'));
+                resetBtn();
             }
-            showSuccess(email, data.licenseKey);
-        } catch (e) {
-            setError(e.message || (lang === 'ar' ? 'حدث خطأ، يرجى المحاولة مرة أخرى' : lang === 'en' ? 'Something went wrong. Please try again.' : 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.'));
-            resetBtn();
         }
-    }
 
-    var nextBtn = document.getElementById('modal-next-btn');
-    document.getElementById('modal').addEventListener('click', function () {
-        if (modalStep === 2) {
-            nextBtn.querySelector('span').setAttribute('data-de', 'Abschließen & Bezahlen →');
-            nextBtn.querySelector('span').setAttribute('data-en', 'Complete & Pay →');
-            nextBtn.querySelector('span').setAttribute('data-ar', 'إكمال والدفع →');
-            applyLang(lang);
-        }
-    });
+        var nextBtn = document.getElementById('modal-next-btn');
+        document.getElementById('modal').addEventListener('click', function () {
+            if (modalStep === 2) {
+                nextBtn.querySelector('span').setAttribute('data-de', 'Abschließen & Bezahlen →');
+                nextBtn.querySelector('span').setAttribute('data-en', 'Complete & Pay →');
+                nextBtn.querySelector('span').setAttribute('data-ar', 'إكمال والدفع →');
+                applyLang(lang);
+            }
+        });
 
-    // Init
-    applyLang(lang);
-</script>
+        // Init
+        applyLang(lang);
+    </script>
 </body>
 
 </html>
