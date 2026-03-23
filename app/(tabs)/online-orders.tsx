@@ -166,6 +166,12 @@ export default function OrdersScreen() {
     enabled: !!tenantId,
   });
 
+  const { data: storeSettings } = useQuery<any>({
+    queryKey: ["/api/store-settings", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
+  });
+
   // Build category map for lookup
   const categoryMap: Record<number, { name: string; color: string; image?: string }> = {};
   (allCategories as any[]).forEach((c: any) => {
@@ -173,11 +179,25 @@ export default function OrdersScreen() {
   });
 
   // Enrich products with category info
-  const enrichedProducts = (allProducts as any[]).map((p: any) => ({
-    ...p,
-    categoryName: categoryMap[p.categoryId]?.name || "",
-    categoryColor: categoryMap[p.categoryId]?.color || "#7C3AED",
-  }));
+  const enrichedProducts = (allProducts as any[]).map((p: any) => {
+    let variants = p.variants;
+    if ((!p.variants || p.variants.length === 0) && p.modifiers && Array.isArray(p.modifiers) && p.modifiers.length > 0) {
+      const sizeGroup = p.modifiers.find((m: any) => m.required === true);
+      if (sizeGroup?.options?.length > 0) {
+        const basePrice = Number(p.price);
+        variants = sizeGroup.options.map((opt: any) => ({
+          name: opt.label,
+          price: basePrice + Number(opt.price),
+        }));
+      }
+    }
+    return {
+      ...p,
+      variants,
+      categoryName: (allCategories as any[]).find((c: any) => c.id === p.categoryId)?.name || "Other",
+      categoryColor: (allCategories as any[]).find((c: any) => c.id === p.categoryId)?.color || "#7C3AED",
+    };
+  });
 
   // Normalize both sources into unified list
   const unifiedOrders = [
@@ -769,29 +789,46 @@ export default function OrdersScreen() {
       </div>
     `).join("");
 
+    const storeName = storeSettings?.name || "POS System";
+    const storeAddr = storeSettings?.address || "";
+    const storePhone = storeSettings?.phone || "";
+    const storeEmail = storeSettings?.email || "";
+    const logoUrl = storeSettings?.logo || "";
+
+    const logoHtml = logoUrl ? `<div style="text-align:center;margin:8px 0;"><img src="${logoUrl}" style="max-height:55px;max-width:200px;object-fit:contain;" /></div>` : "";
+
     const html = `<!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
+  <meta charset="UTF-8">
   <style>
     @page { margin: 0; }
-    body { font-family: 'Courier New', Courier, monospace; width: 300px; margin: 0 auto; padding: 10px; color: #000; font-size: 12px; }
+    body { font-family: 'Courier New', monospace; font-size: 11px; width: 300px; margin: 0 auto; color: #000; background: #fff; padding: 15px; line-height: 1.2; }
     .center { text-align: center; }
-    .bold { font-weight: bold; }
-    .flex-between { display: flex; justify-content: space-between; margin: 3px 0; }
-    .sep { border-bottom: 1px dashed #000; margin: 8px 0; }
+    .bold { font-weight: 800; }
+    .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
+    .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
+    .page-break { page-break-after: always; }
   </style>
 </head>
 <body>
-  <div class="center bold" style="font-size:18px;margin-bottom:4px;">${lbl("ORDER RECEIPT", "فاتورة الطلب", "BESTELLBELEG")}</div>
-  <div class="center sep" style="border-bottom: 1px solid #000; margin: 5px 0;"></div>
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
+  ${logoHtml}
+  <div class="center bold" style="font-size:18px;margin-bottom:4px;text-transform:uppercase;">${lbl("ORDER RECEIPT", "فاتورة الطلب", "BESTELLBELEG")}</div>
+  <div class="center bold" style="font-size:14px;">${storeName}</div>
+  ${storeAddr ? `<div class="center">${storeAddr}</div>` : ""}
+  ${storePhone ? `<div class="center">${storePhone}</div>` : ""}
+  ${storeEmail ? `<div class="center">${storeEmail}</div>` : ""}
+  
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
   
   <div>${lbl("Date", "التاريخ", "Datum")}: ${dateStr}, ${timeStr}</div>
   <div>${lbl("Order Number", "رقم الطلب", "Bestellnummer")}: ${orderNum}</div>
-  ${editForm.customerName ? "<div>" + lbl("Customer", "العميل", "Kunde") + ": " + editForm.customerName + "</div>" : ""}
-  ${editForm.customerPhone ? "<div>" + lbl("Phone", "الهاتف", "Telefon") + ": " + editForm.customerPhone + "</div>" : ""}
-  ${editForm.customerAddress ? "<div>" + lbl("Address", "العنوان", "Adresse") + ": " + editForm.customerAddress + "</div>" : ""}
+  ${editForm.customerName ? `<div>${lbl("Customer", "العميل", "Kunde")}: ${editForm.customerName}</div>` : ""}
+  ${editForm.customerPhone ? `<div>${lbl("Phone", "الهاتف", "Telefon")}: ${editForm.customerPhone}</div>` : ""}
+  ${editForm.customerAddress ? `<div>${lbl("Address", "العنوان", "Adresse")}: ${editForm.customerAddress}</div>` : ""}
   
-  <div class="center sep" style="border-bottom: 1px solid #000; margin: 5px 0;"></div>
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
   
   <div class="flex-between bold">
     <span style="flex:2;">Item</span>
@@ -799,11 +836,11 @@ export default function OrdersScreen() {
     <span style="width:75px;text-align:right;">Total</span>
   </div>
   
-  <div class="center sep" style="border-bottom: 1px solid #000; margin: 5px 0;"></div>
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
   
   ${itemsHtml}
   
-  <div class="center sep" style="border-bottom: 1px solid #000; margin: 5px 0;"></div>
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
   
   <div class="flex-between">
     <span>${lbl("Subtotal", "المجموع الفرعي", "Zwischensumme")}:</span>
@@ -813,17 +850,25 @@ export default function OrdersScreen() {
         '<div class="flex-between"><span>' + lbl("Delivery Fee", "رسوم التوصيل", "Liefergebühr") + ':</span><span>CHF ' + Number(editForm.deliveryFee).toFixed(2) + '</span></div>'
         : ""}
   
-  <div class="flex-between bold" style="font-size:14px;margin-top:5px;">
-    <span>${lbl("Total", "الإجمالي", "Gesamt")}:</span>
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
+  
+  <div class="flex-between bold" style="font-size:15px;">
+    <span>TOTAL:</span>
     <span>CHF ${Number(editForm.totalAmount).toFixed(2)}</span>
   </div>
+  
+  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
+  
+  <div class="center bold" style="margin-top:14px;font-size:13px;">${lbl("Thank You", "شكراً لك", "Vielen Dank")}</div>
+  ${storeAddr ? `<div class="center" style="font-size:10px;margin-top:2px;">Visit us: ${storeAddr}</div>` : ""}
+  <div class="center sep" style="margin-top:10px;overflow:hidden;white-space:nowrap;">${"=".repeat(36)}</div>
   
   <script>
     window.onload = () => {
       setTimeout(() => {
         window.print();
         window.close();
-      }, 300);
+      }, 500);
     };
   </script>
 </body>
@@ -1203,30 +1248,28 @@ export default function OrdersScreen() {
 
             {/* Category filter tabs */}
             {pickerCategories.length > 1 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12, flexGrow: 0 }}>
-                <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 4 }}>
-                  <Pressable
-                    style={[styles.pickerCatTab, pickerCategory === "all" && styles.pickerCatTabActive]}
-                    onPress={() => setPickerCategory("all")}
-                  >
-                    <Text style={[styles.pickerCatText, pickerCategory === "all" && styles.pickerCatTextActive]}>
-                      {lbl("All", "الكل", "Alle")}
-                    </Text>
-                  </Pressable>
-                  {pickerCategories.map(cat => {
-                    const catInfo = (allCategories as any[]).find((c: any) => c.name === cat);
-                    return (
-                      <Pressable
-                        key={cat}
-                        style={[styles.pickerCatTab, pickerCategory === cat && styles.pickerCatTabActive, pickerCategory === cat && { borderColor: catInfo?.color || Colors.accent }]}
-                        onPress={() => setPickerCategory(cat)}
-                      >
-                        <Text style={[styles.pickerCatText, pickerCategory === cat && { color: catInfo?.color || Colors.accent }]}>{cat}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </ScrollView>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+                <Pressable
+                  style={[styles.pickerCatTab, pickerCategory === "all" && styles.pickerCatTabActive]}
+                  onPress={() => setPickerCategory("all")}
+                >
+                  <Text style={[styles.pickerCatText, pickerCategory === "all" && styles.pickerCatTextActive]}>
+                    {lbl("All", "الكل", "Alle")}
+                  </Text>
+                </Pressable>
+                {pickerCategories.map(cat => {
+                  const catInfo = (allCategories as any[]).find((c: any) => c.name === cat);
+                  return (
+                    <Pressable
+                      key={cat}
+                      style={[styles.pickerCatTab, pickerCategory === cat && styles.pickerCatTabActive, pickerCategory === cat && { borderColor: catInfo?.color || Colors.accent }]}
+                      onPress={() => setPickerCategory(cat)}
+                    >
+                      <Text style={[styles.pickerCatText, pickerCategory === cat && { color: catInfo?.color || Colors.accent }]}>{cat}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             )}
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
