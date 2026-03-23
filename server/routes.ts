@@ -813,8 +813,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
       const search = req.query.search as string | undefined;
+      const applyMarkup = req.query.applyMarkup === "true";
       if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      res.json(await storage.getProductsByTenant(tenantId, search));
+      let products = await storage.getProductsByTenant(tenantId, search);
+      if (applyMarkup) {
+        const commissionRate = await storage.getCommissionRate();
+        if (commissionRate > 0) {
+          const factor = 1 + (commissionRate / 100);
+          products = (products as any[]).map((p: any) => {
+            const rawPrice = parseFloat(p.price) * factor;
+            const rounded = Math.round(rawPrice * 2) / 2; // nearest 0.5
+            return { ...p, price: rounded.toFixed(2) };
+          });
+        }
+      }
+      res.json(products);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -1967,11 +1980,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!mainBranch) return res.status(404).json({ error: "No branch found" });
 
       const tenant = mainBranch.tenantId ? await storage.getTenant(mainBranch.tenantId) : null;
-      const commissionRate = await storage.getCommissionRate();
       res.json({
         ...mainBranch,
         storeType: tenant?.storeType || "supermarket",
-        commissionRate,
+        commissionRate: 0, // commission is baked into product prices via applyMarkup
         whatsappAdminPhone: (tenant?.metadata as any)?.whatsappAdminPhone || "",
       });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -2197,7 +2209,7 @@ async function test(){
         const factor = 1 + (commissionRate / 100);
         products = products.map((p: any) => {
           const rawPrice = parseFloat(p.price) * factor;
-          const rounded = Math.ceil(rawPrice * 2) / 2; // round up to nearest 0.5
+          const rounded = Math.round(rawPrice * 2) / 2; // nearest 0.5
           return { ...p, price: rounded.toFixed(2) };
         });
       }
@@ -2376,6 +2388,25 @@ async function test(){
   app.get("/api/super-admin/whatsapp/qr", requireSuperAdmin as any, async (_req: any, res: any) => {
     const qr = whatsappService.getQrCode();
     res.json({ qrCode: qr });
+  });
+
+  app.get("/api/super-admin/whatsapp/session-info", requireSuperAdmin as any, async (_req: any, res: any) => {
+    try {
+      const pathMod = await import("path");
+      const fsMod = await import("fs");
+      const tokenDir = pathMod.resolve(process.cwd(), ".wppconnect", "tokens");
+      let hasSession = false;
+      let sessionModified: string | null = null;
+      if (fsMod.existsSync(tokenDir)) {
+        const files = fsMod.readdirSync(tokenDir).filter((f: string) => f.endsWith(".data.json") || f.endsWith(".json"));
+        if (files.length > 0) {
+          hasSession = true;
+          const stat = fsMod.statSync(pathMod.join(tokenDir, files[0]));
+          sessionModified = stat.mtime.toISOString();
+        }
+      }
+      res.json({ hasSession, sessionModified });
+    } catch (e: any) { res.json({ hasSession: false, sessionModified: null, error: e.message }); }
   });
 
   app.post("/api/super-admin/whatsapp/test", requireSuperAdmin as any, async (req: any, res: any) => {

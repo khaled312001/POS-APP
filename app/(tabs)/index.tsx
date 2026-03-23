@@ -338,7 +338,7 @@ export default function POSScreen() {
   });
 
   const { data: products = [] } = useQuery<any[]>({
-    queryKey: ["/api/products", `?tenantId=${tenantId || ""}${search ? `&search=${search}` : ""}`],
+    queryKey: ["/api/products", `?tenantId=${tenantId || ""}${search ? `&search=${search}` : ""}&applyMarkup=true`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: true,
   });
@@ -1785,56 +1785,7 @@ export default function POSScreen() {
                 {/* Color-coded POS grid */}
                 <View style={{ gap: 2, borderRadius: 8, overflow: "hidden" }}>
                   {(() => {
-                    // If product has custom modifiers, use those; otherwise use TOPPING_GRID
-                    const extrasGroup = selectedProductForOptions?.modifiers?.find(
-                      (m: any) => !m.required && m.options?.length > 0
-                    );
-
-                    if (extrasGroup) {
-                      // Custom modifiers: show in grouped grid
-                      const toppingOptions = extrasGroup.options.map((o: any) => {
-                        const info = getToppingInfo(o.label);
-                        return { name: o.label, price: 0, icon: info.icon, category: info.category };
-                      });
-                      const displayCats = ["Cheese", "Meat", "Vegetables", "Seafood", "Sauces", "Others"];
-                      return displayCats.map((cat: string) => {
-                        const catToppings = toppingOptions.filter((t: any) => t.category === cat);
-                        if (catToppings.length === 0) return null;
-                        const rowColor = cat === "Cheese" ? "#F9A825" : cat === "Meat" ? "#B71C1C" : cat === "Vegetables" ? "#1976D2" : cat === "Seafood" ? "#BF360C" : cat === "Sauces" ? "#1455A4" : "#616161";
-                        const textColor = cat === "Cheese" ? "#1a1a2e" : "#fff";
-                        return (
-                          <View key={cat} style={{ flexDirection: "row", flexWrap: "wrap", gap: 2 }}>
-                            {catToppings.map((topping: any) => {
-                              const isSelected = selectedToppings.includes(topping.name);
-                              return (
-                                <Pressable
-                                  key={topping.name}
-                                  onPress={() => setSelectedToppings((prev: string[]) =>
-                                    isSelected ? prev.filter((t: string) => t !== topping.name) : [...prev, topping.name]
-                                  )}
-                                  style={{
-                                    height: 58, minWidth: 80, flex: 1,
-                                    backgroundColor: isSelected ? Colors.accent : rowColor,
-                                    justifyContent: "center", alignItems: "center",
-                                    borderWidth: isSelected ? 2 : 1,
-                                    borderColor: isSelected ? Colors.accent : "rgba(0,0,0,0.15)",
-                                    paddingHorizontal: 4, paddingVertical: 4, gap: 2,
-                                  }}
-                                >
-                                  <Text style={{ fontSize: 16, lineHeight: 18 }}>{topping.icon || toppingEmoji(topping.name)}</Text>
-                                  <Text style={{ fontSize: 9, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : textColor }} numberOfLines={2}>
-                                    {topping.name}
-                                  </Text>
-                                  {isSelected && <Text style={{ fontSize: 9, fontWeight: "900", color: "#000" }}>✓</Text>}
-                                </Pressable>
-                              );
-                            })}
-                          </View>
-                        );
-                      });
-                    }
-
-                    // Standard POS grid — full TOPPING_GRID (image 2 layout)
+                    // Always show full TOPPING_GRID — all toppings visible regardless of product modifiers
                     return TOPPING_GRID.map((row, rowIdx) => (
                       <View key={rowIdx} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 2 }}>
                         {row.items.map((toppingName, colIdx) => {
@@ -2412,53 +2363,81 @@ export default function POSScreen() {
         </View>
       </Modal>
 
-      {/* ── SPEZIF / Order Notes Modal ── */}
-      <Modal visible={showOrderNotes} animationType="fade" transparent>
+      {/* ── Order Notes Modal ── */}
+      <Modal visible={showOrderNotes} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: 320 }]}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <View>
-                <Text style={[styles.modalTitle, rtlTextAlign]}>
-                  {language === "ar" ? "ملاحظات الطلب" : language === "de" ? "Bestellnotiz (SPEZIF)" : "Order Notes (SPEZIF)"}
-                </Text>
-                <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                  {language === "ar" ? "تعليمات خاصة للطلب" : language === "de" ? "Besondere Anweisungen für die Bestellung" : "Special instructions for this order"}
-                </Text>
-              </View>
-              <Pressable onPress={() => setShowOrderNotes(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
-              </Pressable>
-            </View>
-            <TextInput
-              style={[styles.searchInput, { flex: 0, height: 100, textAlignVertical: "top", padding: 12, marginTop: 8, backgroundColor: Colors.surface, borderRadius: 10, borderWidth: 1, borderColor: Colors.cardBorder }, rtlTextAlign]}
-              multiline
-              value={orderNotes}
-              onChangeText={setOrderNotes}
-              placeholder={language === "ar" ? "مثال: بدون بصل، توصيل عند الباب الخلفي..." : language === "de" ? "z.B.: ohne Zwiebeln, Lieferung am Hintereingang..." : "e.g.: no onions, ring doorbell twice..."}
-              placeholderTextColor={Colors.textMuted}
-              autoFocus
-            />
-            <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
-              {orderNotes.trim() !== "" && (
+          <View style={{ backgroundColor: Colors.surface, borderRadius: 24, width: "92%", maxWidth: 440, overflow: "hidden", borderWidth: 1, borderColor: Colors.cardBorder }}>
+            {/* Header with gradient strip */}
+            <LinearGradient colors={["#1C2251", Colors.surface]} style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.accent + "22", justifyContent: "center", alignItems: "center" }}>
+                    <Ionicons name="document-text-outline" size={20} color={Colors.accent} />
+                  </View>
+                  <View>
+                    <Text style={{ color: Colors.text, fontSize: 17, fontWeight: "800", textAlign: isRTL ? "right" : "left" }}>
+                      {language === "ar" ? "ملاحظات الطلب" : language === "de" ? "Bestellnotiz" : "Order Notes"}
+                    </Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 1, textAlign: isRTL ? "right" : "left" }}>
+                      {language === "ar" ? "تعليمات خاصة للطلب" : language === "de" ? "Besondere Anweisungen" : "Special instructions for this order"}
+                    </Text>
+                  </View>
+                </View>
                 <Pressable
-                  style={[styles.modalCancelBtn, { flex: 1, marginTop: 0, borderColor: Colors.danger }]}
-                  onPress={() => { setOrderNotes(""); setShowOrderNotes(false); }}
+                  onPress={() => setShowOrderNotes(false)}
+                  style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center" }}
                 >
-                  <Text style={[styles.modalCancelBtnText, { color: Colors.danger }]}>
-                    {language === "ar" ? "مسح" : language === "de" ? "Löschen" : "Clear"}
-                  </Text>
+                  <Ionicons name="close" size={18} color={Colors.textSecondary} />
                 </Pressable>
-              )}
-              <Pressable
-                style={{ flex: 2, borderRadius: 14, overflow: "hidden" }}
-                onPress={() => setShowOrderNotes(false)}
-              >
-                <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ paddingVertical: 14, alignItems: "center", borderRadius: 14 }}>
-                  <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "800" }}>
-                    {language === "ar" ? "حفظ" : language === "de" ? "Speichern" : "Save"}
-                  </Text>
-                </LinearGradient>
-              </Pressable>
+              </View>
+            </LinearGradient>
+
+            {/* Body */}
+            <View style={{ paddingHorizontal: 20, paddingBottom: 20 }}>
+              <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 14, borderWidth: 1, borderColor: Colors.inputBorder, overflow: "hidden", marginBottom: 14 }}>
+                <TextInput
+                  style={{ color: Colors.text, fontSize: 15, padding: 14, minHeight: 110, textAlignVertical: "top", textAlign: isRTL ? "right" : "left" }}
+                  multiline
+                  value={orderNotes}
+                  onChangeText={setOrderNotes}
+                  placeholder={language === "ar" ? "مثال: بدون بصل، اتصل عند الوصول..." : language === "de" ? "z.B.: ohne Zwiebeln, bei Ankunft anrufen..." : "e.g.: no onions, ring doorbell twice..."}
+                  placeholderTextColor={Colors.textMuted}
+                  autoFocus
+                />
+                {orderNotes.length > 0 && (
+                  <View style={{ flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 12, paddingBottom: 8 }}>
+                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{orderNotes.length} {language === "ar" ? "حرف" : "chars"}</Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10 }}>
+                {orderNotes.trim() !== "" && (
+                  <Pressable
+                    style={{ flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.danger + "60", alignItems: "center", backgroundColor: Colors.danger + "10" }}
+                    onPress={() => { setOrderNotes(""); setShowOrderNotes(false); }}
+                  >
+                    <Text style={{ color: Colors.danger, fontSize: 15, fontWeight: "700" }}>
+                      {language === "ar" ? "مسح" : language === "de" ? "Löschen" : "Clear"}
+                    </Text>
+                  </Pressable>
+                )}
+                <Pressable
+                  style={{ flex: 2, borderRadius: 14, overflow: "hidden" }}
+                  onPress={() => setShowOrderNotes(false)}
+                >
+                  <LinearGradient
+                    colors={[Colors.accent, Colors.gradientMid]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={{ paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 7 }}
+                  >
+                    <Ionicons name="checkmark-circle" size={18} color={Colors.textDark} />
+                    <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "800" }}>
+                      {language === "ar" ? "حفظ الملاحظة" : language === "de" ? "Speichern" : "Save Note"}
+                    </Text>
+                  </LinearGradient>
+                </Pressable>
+              </View>
             </View>
           </View>
         </View>
@@ -3269,6 +3248,12 @@ export default function POSScreen() {
                       <Text style={{ color: custName ? Colors.textSecondary : Colors.text, fontWeight: custName ? "600" : "800", fontSize: custName ? 13 : 16, marginTop: custName ? 1 : 0 }}>
                         {item.phoneNumber}
                       </Text>
+                      {item.customerAddress ? (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
+                          <Ionicons name="location-outline" size={11} color={Colors.textMuted} />
+                          <Text style={{ color: Colors.textMuted, fontSize: 11, fontWeight: "500" }} numberOfLines={1}>{item.customerAddress}</Text>
+                        </View>
+                      ) : null}
                       <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginTop: 4 }}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
                           <Ionicons name="calendar-outline" size={12} color={Colors.textMuted} />

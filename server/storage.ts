@@ -629,6 +629,7 @@ export const storage = {
         saleId: calls.saleId,
         createdAt: calls.createdAt,
         customerName: customers.name,
+        customerAddress: customers.address,
       })
       .from(calls)
       .leftJoin(customers, eq(calls.customerId, customers.id));

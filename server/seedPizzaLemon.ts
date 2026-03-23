@@ -134,6 +134,7 @@ interface MenuItem { name: string; description: string; price: number; price45?:
 
 // ─── PIZZA (01-34) ─────────────────────────────────────────────────────────────
 const PIZZAS: MenuItem[] = [
+    { name: "Wunschpizza", description: "Ihre Wunschpizza – wählen Sie Ihre Zutaten", price: 14.00, price45: 27.00, image: IMG("pizzalemon_wunschpizza.jpg") },
     { name: "Margherita", description: "Tomaten, Mozzarella, Oregano", price: 14.00, price45: 25.00, image: IMG("pizzalemon_01_margherita.jpg") },
     { name: "Profumata", description: "Tomaten, Mozzarella, Knoblauch, Petersilie, Oregano", price: 14.00, price45: 27.00, image: IMG("pizzalemon_02_profumata.jpg") },
     { name: "Funghi", description: "Tomaten, Mozzarella, Pilze", price: 15.00, price45: 28.00, image: IMG("pizzalemon_03_funghi.jpg") },
@@ -179,6 +180,7 @@ const CALZONES: MenuItem[] = [
 
 // ─── PIDE ─────────────────────────────────────────────────────────────────────
 const PIDE: MenuItem[] = [
+    { name: "Wunschpide", description: "Ihre Wunschpide – wählen Sie Ihre Zutaten", price: 15.00, image: IMG("pizzalemon_wunschpide.jpg") },
     { name: "Pide mit Käse", description: "Pide mit Schafskäse", price: 15.00, image: IMG("pizzalemon_36_pide_mit_kaese.jpg") },
     { name: "Pide mit Hackfleisch", description: "Pide mit Hackfleisch und Tomaten", price: 17.00, image: IMG("pizzalemon_37_pide_mit_hackfleisch.jpg") },
     { name: "Pide mit Käse und Hackfleisch", description: "Pide mit Schafskäse und Hackfleisch", price: 18.00, image: IMG("pizzalemon_38_pide_kaese_hackfleisch.jpg") },
@@ -218,8 +220,7 @@ const FINGERFOOD: MenuItem[] = [
     { name: "Döner Kebab Tasche", description: "Döner Kebab im Taschenbrot", price: 13.00, image: IMG("pizzalemon_60_doener_kebab_tasche.jpg") },
     { name: "Dürüm Kebab", description: "Döner Kebab im Fladenbrot", price: 14.00, image: IMG("pizzalemon_61_dueruem_kebab.jpg") },
     { name: "Döner Box", description: "Döner Kebab in der Box mit Salat und Pommes", price: 13.00, image: IMG("pizzalemon_62_doener_box.jpg") },
-    { name: "Falafel", description: "Knusprige Falafel im Taschenbrot oder Dürüm", price: 12.00, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
-    { name: "Falafel Taschenbrot", description: "Knusprige Falafel im Taschenbrot", price: 12.00, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
+    { name: "Falafel", description: "Knusprige Falafel im Taschenbrot", price: 12.00, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
     { name: "Falafel Dürüm", description: "Falafel im Fladenbrot", price: 12.00, image: IMG("pizzalemon_64_falafel_dueruem.jpg") },
     { name: "Poulet Pepito", description: "Gegrilltes Poulet im Fladenbrot", price: 12.00, image: IMG("pizzalemon_65_poulet_pepito.jpg") },
     { name: "Lamm Pepito", description: "Gegrilltes Lammfleisch im Fladenbrot", price: 14.00, image: IMG("pizzalemon_66_lamm_pepito.jpg") },
@@ -239,6 +240,7 @@ const FINGERFOOD: MenuItem[] = [
     { name: "Kebab Tasche+Raclette", description: "Kebab im Taschenbrot mit Raclettekäse überbacken", price: 15.00, image: IMG("pizzalemon_80_kebab_tasche_raclette.jpg") },
     { name: "Kebab Fladen+Speck", description: "Kebab im Fladenbrot mit Speck", price: 15.00, image: IMG("pizzalemon_81_kebab_fladen_speck.jpg") },
     { name: "Kebab Tasche+Speck", description: "Kebab im Taschenbrot mit Speck", price: 15.00, image: IMG("pizzalemon_82_kebab_tasche_speck.jpg") },
+    { name: "Extra Kebap", description: "Extra Portion Kebabfleisch", price: 5.00, image: IMG("pizzalemon_ex_kebap.jpg") },
 ];
 
 // ─── SALAT ────────────────────────────────────────────────────────────────────
@@ -251,7 +253,6 @@ const SALATE: MenuItem[] = [
     { name: "Tomaten Salat", description: "Tomaten, Zwiebeln", price: 9.00, image: IMG("pizzalemon_88_tomaten_salat.jpg") },
     { name: "Tomaten Mozzarella", description: "Tomaten mit Mozzarella und Basilikum", price: 12.00, image: IMG("pizzalemon_89_tomaten_mozzarella.jpg") },
     { name: "Knoblibrot", description: "Knuspriges Brot mit Knoblauchbutter", price: 5.00, image: IMG("pizzalemon_90_knoblibrot.jpg") },
-    { name: "Crevettencocktail", description: "Frischer Crevetten-Cocktailsalat", price: 15.00, image: IMG("pizzalemon_91_crevettencocktail.jpg") },
 ];
 
 // ─── DESSERT ──────────────────────────────────────────────────────────────────
@@ -279,7 +280,6 @@ const GETRAENKE: MenuItem[] = [
 
 // ─── BIER ─────────────────────────────────────────────────────────────────────
 const BIER: MenuItem[] = [
-    { name: "Müllerbräu", description: "Schweizer Bier Müllerbräu, 0.5l", price: 5.00, image: IMG("pizzalemon_105_muellerbraeu.jpg") },
     { name: "Feldschlösschen", description: "Feldschlösschen Bier, 0.5l", price: 5.00, image: IMG("pizzalemon_106_feldschloesschen.jpg") },
 ];
 
@@ -548,10 +548,15 @@ export async function seedPizzaLemon() {
 
     for (const p of DESSERTS) await insertItem("Dessert", p);
 
-    // Drinks with size modifier for Cola/Zero/Fanta/Eistee (0.5l/1.5l +2.00)
-    const DRINKS_WITH_SIZE = new Set(["Coca-Cola", "Coca-Cola Zero", "Fanta", "Eistee Pfirsich"]);
+    // Drinks with size modifier: Cola/Zero/Eistee 0.5l→1.5l = +2.00; Fanta both sizes = 6.00 (same price)
+    const DRINKS_WITH_2EUR_SIZE = new Set(["Coca-Cola", "Coca-Cola Zero", "Eistee Pfirsich"]);
     for (const p of GETRAENKE) {
-        const sizeMod = DRINKS_WITH_SIZE.has(p.name) ? drinkSizeModifier(2.00) : [];
+        let sizeMod: any[] = [];
+        if (DRINKS_WITH_2EUR_SIZE.has(p.name)) {
+            sizeMod = drinkSizeModifier(2.00);
+        } else if (p.name === "Fanta") {
+            sizeMod = drinkSizeModifier(0.00); // 0.5l and 1.5l both CHF 6.00
+        }
         await insertItem("Getränke", p, sizeMod);
     }
 
@@ -617,8 +622,8 @@ export async function seedPizzaLemon() {
     await db.insert(tenantNotifications).values({
         tenantId: tenant.id,
         type: "info",
-        title: "Pizza Lemon Katalog aktualisiert (v4)!",
-        message: `Sauce/Beilage/Dressing Modifiers + neue Getränke. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
+        title: "Pizza Lemon Katalog aktualisiert (v5)!",
+        message: `+Wunschpizza/Wunschpide/Extra Kebap, -Duplikate/-Crevettencocktail/-Müllerbräu, Fanta-Preis korrigiert. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
         priority: "high",
     }).onConflictDoNothing();
 
@@ -627,5 +632,5 @@ export async function seedPizzaLemon() {
     console.log(`[PIZZA LEMON]    Pass:    ${STORE_PASSWORD}`);
     console.log(`[PIZZA LEMON]    License: ${LICENSE_KEY}`);
     console.log(`[PIZZA LEMON]    Admin PIN: 1234  |  Cashier PIN: 5678`);
-    console.log(`[PIZZA LEMON]    Menu: 34 Pizza, 3 Calzone, 9 Pide, 2 Lahmacun, 13 Tellergerichte, 24 Fingerfood, 9 Salat, 6 Dessert, 9 Getränke, 2 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
+    console.log(`[PIZZA LEMON]    Menu: 35 Pizza, 3 Calzone, 10 Pide, 2 Lahmacun, 13 Tellergerichte, 24 Fingerfood, 8 Salat, 6 Dessert, 9 Getränke, 1 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
 }

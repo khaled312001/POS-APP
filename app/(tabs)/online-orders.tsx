@@ -124,6 +124,7 @@ export default function OrdersScreen() {
 
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [pickerCategory, setPickerCategory] = useState<string>("all");
+  const [pickerSearch, setPickerSearch] = useState("");
 
   // Product configurator states
   const [configuringProduct, setConfiguringProduct] = useState<any>(null);
@@ -152,7 +153,7 @@ export default function OrdersScreen() {
   });
 
   const { data: allProducts = [] } = useQuery<any[]>({
-    queryKey: ["/api/products", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryKey: ["/api/products", tenantId ? `?tenantId=${tenantId}&applyMarkup=true` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });
@@ -647,9 +648,11 @@ export default function OrdersScreen() {
   const regularProducts = enrichedProducts.filter((p: any) => !p.isAddon);
   const addonProducts = enrichedProducts.filter((p: any) => p.isAddon);
   const pickerCategories = Array.from(new Set(regularProducts.map((p: any) => p.categoryName || "Other")));
-  const filteredPickerProducts = pickerCategory === "all"
-    ? regularProducts
-    : regularProducts.filter((p: any) => (p.categoryName || "Other") === pickerCategory);
+  const filteredPickerProducts = regularProducts.filter((p: any) => {
+    const matchCat = pickerCategory === "all" || (p.categoryName || "Other") === pickerCategory;
+    const matchSearch = !pickerSearch.trim() || p.name?.toLowerCase().includes(pickerSearch.trim().toLowerCase());
+    return matchCat && matchSearch;
+  });
 
   // --- Topping options for configurator ---
   const getToppingOptions = () => {
@@ -892,14 +895,31 @@ export default function OrdersScreen() {
       </Modal>
 
       {/* ===== PRODUCT PICKER MODAL ===== */}
-      <Modal visible={showProductPicker} animationType="fade" transparent onRequestClose={() => setShowProductPicker(false)}>
+      <Modal visible={showProductPicker} animationType="fade" transparent onRequestClose={() => { setShowProductPicker(false); setPickerSearch(""); }}>
         <View style={styles.pickerOverlay}>
           <View style={[styles.pickerSheet, { maxHeight: "90%" }]}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={styles.modalTitle}>{lbl("Add Item", "إضافة صنف", "Artikel hinzufügen")}</Text>
-              <Pressable onPress={() => setShowProductPicker(false)}>
+              <Pressable onPress={() => { setShowProductPicker(false); setPickerSearch(""); }}>
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </Pressable>
+            </View>
+
+            {/* Search bar */}
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: Colors.surfaceLight, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, marginBottom: 10, borderWidth: 1, borderColor: Colors.cardBorder, gap: 7 }}>
+              <Ionicons name="search" size={15} color={Colors.textMuted} />
+              <TextInput
+                value={pickerSearch}
+                onChangeText={setPickerSearch}
+                placeholder={lbl("Search products...", "ابحث عن منتج...", "Produkt suchen...")}
+                placeholderTextColor={Colors.textMuted}
+                style={{ flex: 1, color: Colors.text, fontSize: 13 }}
+              />
+              {pickerSearch.length > 0 && (
+                <Pressable onPress={() => setPickerSearch("")}>
+                  <Ionicons name="close-circle" size={15} color={Colors.textMuted} />
+                </Pressable>
+              )}
             </View>
 
             {/* Category filter tabs */}
@@ -934,7 +954,7 @@ export default function OrdersScreen() {
               {/* Regular Products Grid */}
               {filteredPickerProducts.length > 0 && (
                 <>
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>
                     {filteredPickerProducts.map((p: any) => {
                       const catColor = p.categoryColor || "#7C3AED";
                       return (
@@ -947,7 +967,7 @@ export default function OrdersScreen() {
                             <Image source={{ uri: p.image }} style={styles.productCardImage} resizeMode="cover" />
                           ) : (
                             <View style={[styles.productCardImagePlaceholder, { backgroundColor: catColor + "20" }]}>
-                              <Text style={{ fontSize: 30 }}>🍕</Text>
+                              <Text style={{ fontSize: 20 }}>🍕</Text>
                             </View>
                           )}
                           <View style={styles.productCardBody}>
@@ -1225,16 +1245,16 @@ const styles = StyleSheet.create({
 
   // Product grid cards
   productCard: {
-    width: "47%", borderRadius: 14, overflow: "hidden",
+    width: "31%", borderRadius: 12, overflow: "hidden",
     backgroundColor: Colors.surface, borderWidth: 1,
     elevation: 2,
     ...(Platform.OS === "web" ? { boxShadow: "0px 2px 6px rgba(0,0,0,0.12)" } as any : {}),
   },
-  productCardImage: { width: "100%", height: 100 },
-  productCardImagePlaceholder: { width: "100%", height: 100, alignItems: "center", justifyContent: "center" },
-  productCardBody: { padding: 10 },
-  productCardName: { color: Colors.text, fontSize: 13, fontWeight: "700", lineHeight: 17 },
-  productCardPrice: { fontSize: 13, fontWeight: "800" },
+  productCardImage: { width: "100%", height: 70 },
+  productCardImagePlaceholder: { width: "100%", height: 70, alignItems: "center", justifyContent: "center" },
+  productCardBody: { padding: 7 },
+  productCardName: { color: Colors.text, fontSize: 11, fontWeight: "700", lineHeight: 14 },
+  productCardPrice: { fontSize: 11, fontWeight: "800" },
 
   addonChip: {
     flexDirection: "row", gap: 6, paddingHorizontal: 12, paddingVertical: 8,

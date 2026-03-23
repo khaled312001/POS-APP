@@ -73,7 +73,17 @@
       "Bash(find f:/POS-APP -name .env* -o -name .wppconnect -type d)",
       "Bash(wc -l \"f:/POS-APP/app/\\(tabs\\)/online-orders.tsx\")",
       "Bash(find /f/POS-APP/public -type f ! -path */.*)",
-      "Bash(wc -l 'f:/POS-APP/app/\\(tabs\\)/index.tsx')"
+      "Bash(wc -l 'f:/POS-APP/app/\\(tabs\\)/index.tsx')",
+      "Bash(curl -s -L --max-redirs 0 -o /dev/null -w '%{http_code} %{redirect_url}' \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1020\")",
+      "Bash(curl -s -c /tmp/pizza_cookies.txt -b /tmp/pizza_cookies.txt \"https://pizzalemon.ch/lemon/index.php?route=common/home\" -o /tmp/pizza_home.html -w \"%{http_code}\")",
+      "Bash(curl -sv -c /tmp/pizza_cookies.txt \"https://pizzalemon.ch/lemon/index.php?route=common/home\")",
+      "Bash(curl -sv \"https://pizzalemon.ch/pizza/index.php?route=common/home\")",
+      "Bash(curl -sv \"https://pizzalemon.ch/lemon/index.php?route=common/home\")",
+      "Bash(curl -s https://pizzalemon.ch/pizza/index_ge.php)",
+      "Bash(curl -s -c /tmp/pizza3.txt -b /tmp/pizza3.txt \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1020\" -o /tmp/prod1020.html -w \"%{http_code}\")",
+      "Bash(curl -sv -c /tmp/pizza3.txt -b /tmp/pizza3.txt \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1020\")",
+      "Bash(curl -sv -c /tmp/pizza5.txt -b /tmp/pizza5.txt \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1020\")",
+      "Bash(curl -s https://pizzalemon.ch/pizza/magazabelirle.php)"
     ]
   }
 }

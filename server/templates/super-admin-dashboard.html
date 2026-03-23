@@ -1846,7 +1846,17 @@
                 style="display:none">Disconnect</button>
               <button class="btn btn-o" onclick="waRefresh()">↻ Refresh Status</button>
             </div>
-            <div style="font-size:12px;color:var(--mu);margin-top:12px">Admin number: <strong>+201204593124</strong>
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bd)">
+              <div style="font-size:12px;color:var(--mu);margin-bottom:6px;font-weight:600">📞 Admin Number / رقم الإدارة:</div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input id="waAdminPhone" type="tel" placeholder="201204593124"
+                  style="flex:1;padding:7px 12px;border-radius:8px;border:1px solid var(--bd);background:var(--bg2);color:var(--tx);font-size:13px;outline:none;direction:ltr" />
+                <button class="btn btn-p" onclick="waSaveAdminPhone()" style="white-space:nowrap;font-size:12px;padding:7px 14px">💾 Save</button>
+              </div>
+              <div style="font-size:11px;color:var(--mu);margin-top:4px">كل إشعارات الطلبات ستُرسل لهذا الرقم — digits only, e.g. 201204593124</div>
+            </div>
+            <div id="waSessionInfo" style="margin-top:10px;padding:8px 12px;border-radius:8px;background:var(--bg2);font-size:11px;color:var(--mu);display:none">
+              💾 <span id="waSessionText"></span>
             </div>
           </div>
           <div class="card">
@@ -1867,10 +1877,13 @@
               <button class="btn btn-p" id="waTestBtn" onclick="waTest()" disabled
                 style="opacity:0.5;cursor:not-allowed;white-space:nowrap">📱 Send Test</button>
             </div>
-            <p style="font-size:11px;color:var(--mu)">Admin WhatsApp: <strong>+201204593124</strong></p>
+            <p style="font-size:11px;color:var(--mu)">Admin WhatsApp: <strong id="waAdminPhoneDisplay">—</strong></p>
           </div>
           <div class="card">
-            <div class="ct">Connection Log</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <div class="ct" style="margin-bottom:0">Connection Log</div>
+              <button class="btn btn-o" onclick="waClearLog()" style="font-size:11px;padding:4px 10px">🗑 Clear</button>
+            </div>
             <div id="waLog" style="max-height:240px;overflow-y:auto;font-size:12px;color:var(--mu);font-family:monospace">No events yet</div>
           </div>
         </div>
@@ -2325,7 +2338,7 @@
       if (v === 'backup') { loadBackups(); fillBkTenants(); }
       if (v === 'landingpages') loadLandingPages();
       if (v === 'commission') loadCommission();
-      if (v === 'whatsapp') waRefresh();
+      if (v === 'whatsapp') { waRefresh(); waLoadAdminPhone(); }
     }
 
     /* ══════════════════════════════════════════════════════
@@ -3583,6 +3596,53 @@
           toast('⏱ Connection timed out — please try again', 'err');
         }
       }, 3000);
+    }
+
+    async function waLoadAdminPhone() {
+      const d = await api('GET', '/whatsapp/admin-phone');
+      const inp = document.getElementById('waAdminPhone');
+      const display = document.getElementById('waAdminPhoneDisplay');
+      if (d?.phone) {
+        if (inp) inp.value = d.phone;
+        if (display) display.textContent = '+' + d.phone;
+      } else {
+        if (display) display.textContent = 'Not set';
+      }
+      // Show session persistence info
+      const si = await api('GET', '/whatsapp/session-info').catch(() => null);
+      const sessionInfoEl = document.getElementById('waSessionInfo');
+      const sessionTextEl = document.getElementById('waSessionText');
+      if (sessionInfoEl && sessionTextEl) {
+        if (si?.hasSession) {
+          const ago = si.sessionModified ? new Date(si.sessionModified).toLocaleString() : '—';
+          sessionTextEl.innerHTML = `Session saved — auto-reconnect on restart ✅ <span style="opacity:.6">(last saved: ${ago})</span>`;
+          sessionInfoEl.style.display = '';
+          sessionInfoEl.style.borderLeft = '3px solid var(--ok)';
+        } else {
+          sessionTextEl.innerHTML = 'No saved session — QR scan required after restart ⚠️';
+          sessionInfoEl.style.display = '';
+          sessionInfoEl.style.borderLeft = '3px solid var(--warn)';
+        }
+      }
+    }
+
+    async function waSaveAdminPhone() {
+      const raw = document.getElementById('waAdminPhone')?.value || '';
+      const phone = raw.replace(/\D/g, '');
+      if (!phone || phone.length < 7) { toast('❌ Enter a valid phone number (digits only)', 'err'); return; }
+      const r = await api('PUT', '/whatsapp/admin-phone', { phone });
+      if (r?.success) {
+        toast('✅ Admin phone saved!', 'ok');
+        const display = document.getElementById('waAdminPhoneDisplay');
+        if (display) display.textContent = '+' + r.phone;
+      } else {
+        toast('❌ Failed to save phone number', 'err');
+      }
+    }
+
+    function waClearLog() {
+      const logEl = document.getElementById('waLog');
+      if (logEl) logEl.innerHTML = '<span style="color:var(--mu);font-size:11px;opacity:.6">— log cleared —</span>';
     }
 
     async function waConnect() {
