@@ -2002,8 +2002,8 @@ export default function POSScreen() {
                   <Text style={[styles.checkoutItemTotal, rtlTextAlign]}>CHF {(item.price * item.quantity).toFixed(2)}</Text>
                 </View>
               ))}
-              {/* Vehicle Picker — delivery orders only */}
-              {cart.orderType === "delivery" && (
+              {/* Vehicle Picker — always shown (optional) */}
+              {(
                 <View style={{ marginBottom: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.cardBorder, padding: 8, backgroundColor: Colors.surfaceLight }}>
                   <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
                     <Ionicons name="car-outline" size={15} color={Colors.accent} />
