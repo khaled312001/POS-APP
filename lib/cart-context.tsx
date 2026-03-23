@@ -43,6 +43,8 @@ interface CartContextValue {
   setTableNumber: (t: string) => void;
   orderType: string;
   setOrderType: (t: string) => void;
+  vehicleId: number | null;
+  setVehicleId: (id: number | null) => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -56,6 +58,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [customerId, setCustomerId] = useState<number | null>(null);
   const [tableNumber, setTableNumber] = useState("");
   const [orderType, setOrderType] = useState("dine_in");
+  const [vehicleId, setVehicleId] = useState<number | null>(null);
 
   const addItem = useCallback((product: AddItemProps) => {
     setItems((prev) => {
@@ -104,6 +107,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setDiscount(0);
     setCustomerId(null);
     setTableNumber("");
+    setVehicleId(null);
   }, []);
 
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price * i.quantity, 0), [items]);
@@ -117,9 +121,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       items, addItem, removeItem, updateQuantity, clearCart,
       subtotal, itemCount, discount, setDiscount, taxRate, setTaxRate,
       tax, deliveryFee, setDeliveryFee, serviceFeeRate, setServiceFeeRate, serviceFee, total, customerId, setCustomerId,
-      tableNumber, setTableNumber, orderType, setOrderType,
+      tableNumber, setTableNumber, orderType, setOrderType, vehicleId, setVehicleId,
     }),
-    [items, subtotal, itemCount, discount, taxRate, tax, deliveryFee, serviceFeeRate, serviceFee, total, customerId, tableNumber, orderType]
+    [items, subtotal, itemCount, discount, taxRate, tax, deliveryFee, serviceFeeRate, serviceFee, total, customerId, tableNumber, orderType, vehicleId]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

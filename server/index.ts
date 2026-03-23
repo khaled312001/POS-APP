@@ -829,6 +829,9 @@ function setupPaymentGatewayRoutes(app: express.Application) {
       `);
     }
 
+    // vehicle_id column in sales table
+    await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL;`);
+
     log("Schema migration complete");
   } catch (err) {
     log("Schema migration error (non-fatal):", err);

@@ -421,6 +421,12 @@ export default function POSScreen() {
   });
   const myActiveShift = (myShifts as any[]).find((s: any) => s.employeeId === employee?.id && !s.endTime && s.status === "open");
 
+  const { data: vehicles = [] } = useQuery<any[]>({
+    queryKey: [tenantId ? `/api/vehicles?tenantId=${tenantId}` : "/api/vehicles"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
+  });
+
   const generateThermalReceiptHTML = (saleData: any, qrUrl: string | null = null, options: { isKitchen?: boolean, isPartial?: boolean, title?: string } = {}) => {
     const { isKitchen = false, isPartial = false, title = isKitchen ? "KÜCHENBON" : (t("viewReceipt" as any) || "RECHNUNG") } = options;
     const storeName = storeSettings?.name || tenant?.name || "POS System";
@@ -918,6 +924,7 @@ export default function POSScreen() {
       status: "completed",
       tableNumber: cart.tableNumber || null,
       orderType: cart.orderType,
+      vehicleId: cart.vehicleId || null,
       changeAmount: paymentMethod === "cash" && cashReceived
         ? (Number(cashReceived) - cart.total).toFixed(2) : "0",
       items: saleItems,
@@ -1995,6 +2002,59 @@ export default function POSScreen() {
                   <Text style={[styles.checkoutItemTotal, rtlTextAlign]}>CHF {(item.price * item.quantity).toFixed(2)}</Text>
                 </View>
               ))}
+              {/* Vehicle Picker — optional, delivery only */}
+              {cart.orderType === "delivery" && (vehicles as any[]).length > 0 && (
+                <View style={{ marginBottom: 8 }}>
+                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                    <Ionicons name="car-outline" size={16} color={Colors.accent} />
+                    <Text style={{ color: Colors.text, fontSize: 13, fontWeight: "600" }}>
+                      {language === "ar" ? "تعيين مركبة (اختياري)" : language === "de" ? "Fahrzeug zuweisen (optional)" : "Assign Vehicle (optional)"}
+                    </Text>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      {/* "None" chip */}
+                      <Pressable
+                        onPress={() => cart.setVehicleId(null)}
+                        style={{
+                          paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5,
+                          borderColor: !cart.vehicleId ? Colors.accent : Colors.cardBorder,
+                          backgroundColor: !cart.vehicleId ? Colors.accent + "15" : Colors.surfaceLight,
+                          alignItems: "center", justifyContent: "center",
+                        }}
+                      >
+                        <Text style={{ color: !cart.vehicleId ? Colors.accent : Colors.textMuted, fontSize: 12, fontWeight: "600" }}>
+                          {language === "ar" ? "بدون" : language === "de" ? "Keins" : "None"}
+                        </Text>
+                      </Pressable>
+                      {(vehicles as any[]).map((v: any) => {
+                        const isSelected = cart.vehicleId === v.id;
+                        return (
+                          <Pressable
+                            key={v.id}
+                            onPress={() => cart.setVehicleId(isSelected ? null : v.id)}
+                            style={{
+                              paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5,
+                              borderColor: isSelected ? Colors.accent : Colors.cardBorder,
+                              backgroundColor: isSelected ? Colors.accent + "15" : Colors.surfaceLight,
+                              minWidth: 100,
+                            }}
+                          >
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 2 }}>
+                              <Text style={{ fontSize: 14 }}>🚗</Text>
+                              <Text style={{ color: isSelected ? Colors.accent : Colors.text, fontSize: 11, fontWeight: "700" }} numberOfLines={1}>
+                                {v.licensePlate}
+                              </Text>
+                            </View>
+                            <Text style={{ color: Colors.textMuted, fontSize: 10 }} numberOfLines={1}>{v.driverName || `${v.make} ${v.model}`}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+                </View>
+              )}
+
               {/* Delivery Fee Stepper — editable in 0.50 CHF increments */}
               <View style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder }]}>
                 <View style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6 }]}>

@@ -125,6 +125,7 @@ export const sales = pgTable("sales", {
   changeAmount: decimal("change_amount", { precision: 10, scale: 2 }).default("0"),
   tableNumber: text("table_number"),
   orderType: text("order_type").default("dine_in"),
+  vehicleId: integer("vehicle_id"),
   paymentDetails: jsonb("payment_details").$type<{ method: string; amount: number }[]>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
