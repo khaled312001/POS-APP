@@ -12,7 +12,6 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900&family=Noto+Kufi+Arabic:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
-    <script src="https://js.stripe.com/v3/"></script>
     <style>
         :root {
             --bg: #050B18;
@@ -1045,249 +1044,6 @@
             }
         }
 
-        /* ── Modal ── */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, .7);
-            backdrop-filter: blur(8px);
-            z-index: 99999;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .modal-overlay.open {
-            display: flex;
-        }
-
-        .modal {
-            background: #0d1629;
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            width: 100%;
-            max-width: 560px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: var(--shadow);
-            position: relative;
-        }
-
-        .modal-header {
-            padding: 28px 32px 20px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .modal-header h3 {
-            font-size: 1.2rem;
-            font-weight: 800;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            color: var(--muted);
-            cursor: pointer;
-            font-size: 1.4rem;
-            line-height: 1;
-        }
-
-        .modal-body {
-            padding: 28px 32px;
-        }
-
-        .modal-step {
-            display: none;
-        }
-
-        .modal-step.active {
-            display: block;
-        }
-
-        .plan-summary {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 20px;
-            margin-bottom: 24px;
-        }
-
-        .plan-summary-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .plan-summary-name {
-            font-weight: 700;
-            font-size: 1rem;
-        }
-
-        .plan-summary-price {
-            font-size: 1.4rem;
-            font-weight: 900;
-            color: var(--primary);
-        }
-
-        .plan-summary-period {
-            font-size: .8rem;
-            color: var(--muted);
-        }
-
-        .plan-summary-addons {
-            font-size: .8rem;
-            color: #818cf8;
-            margin-top: 6px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-label {
-            display: block;
-            font-size: .8rem;
-            font-weight: 600;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            margin-bottom: 8px;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 13px 16px;
-            border-radius: var(--radius-sm);
-            background: rgba(255, 255, 255, .05);
-            border: 1px solid var(--border);
-            color: var(--text);
-            font-size: .95rem;
-            outline: none;
-            transition: border-color .2s;
-        }
-
-        .form-input:focus {
-            border-color: rgba(47, 211, 198, .5);
-        }
-
-        .form-input::placeholder {
-            color: var(--muted);
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-
-        .stripe-field {
-            padding: 13px 16px;
-            border-radius: var(--radius-sm);
-            background: rgba(255, 255, 255, .05);
-            border: 1px solid var(--border);
-            transition: border-color .2s;
-        }
-
-        .stripe-field.focused {
-            border-color: rgba(47, 211, 198, .5);
-        }
-
-        .modal-footer {
-            padding: 20px 32px 28px;
-            border-top: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .btn-modal-submit {
-            width: 100%;
-            padding: 15px;
-            border-radius: 12px;
-            border: none;
-            background: var(--primary);
-            color: #000;
-            font-size: .98rem;
-            font-weight: 800;
-            cursor: pointer;
-            transition: var(--transition);
-        }
-
-        .btn-modal-submit:hover {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
-        }
-
-        .btn-modal-submit:disabled {
-            opacity: .6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-modal-back {
-            background: none;
-            border: 1px solid var(--border);
-            color: var(--muted);
-            width: 100%;
-            padding: 12px;
-            border-radius: 12px;
-            cursor: pointer;
-            font-size: .9rem;
-            font-weight: 600;
-            transition: var(--transition);
-        }
-
-        .btn-modal-back:hover {
-            border-color: rgba(255, 255, 255, .2);
-            color: var(--text);
-        }
-
-        .ssl-note {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            justify-content: center;
-            font-size: .75rem;
-            color: var(--muted2);
-        }
-
-        .modal-success {
-            text-align: center;
-            padding: 20px 0;
-        }
-
-        .modal-success-icon {
-            font-size: 60px;
-            margin-bottom: 16px;
-        }
-
-        .modal-success h3 {
-            font-size: 1.5rem;
-            font-weight: 800;
-            margin-bottom: 8px;
-        }
-
-        .modal-success p {
-            color: var(--muted);
-            font-size: .9rem;
-            line-height: 1.7;
-        }
-
-        .modal-error {
-            padding: 12px 16px;
-            border-radius: 10px;
-            background: rgba(239, 68, 68, .1);
-            border: 1px solid rgba(239, 68, 68, .2);
-            color: #fca5a5;
-            font-size: .85rem;
-            margin-bottom: 16px;
-        }
-
         /* ── Responsive ── */
         @media(max-width:900px) {
 
@@ -1425,8 +1181,8 @@
                     Einzelhandelsgeschäfte. Verwalten Sie Verkäufe, Inventar, Mitarbeiter und Kunden — alles an einem
                     Ort, auf Deutsch, Englisch und Arabisch.</p>
                 <div class="hero-cta">
-                    <button class="btn-hero-primary" onclick="openModal('advanced')" data-de="Kostenlos testen"
-                        data-en="Start Free Trial" data-ar="ابدأ تجربة مجانية">Kostenlos testen</button>
+                    <a class="btn-hero-primary" href="https://wa.me/201010254819" target="_blank" data-de="Kostenlos testen"
+                        data-en="Start Free Trial" data-ar="ابدأ تجربة مجانية">Kostenlos testen</a>
                     <a class="btn-hero-ghost" href="#features" data-de="Funktionen ansehen ↓" data-en="See Features ↓"
                         data-ar="شاهد المميزات ↓">Funktionen ansehen ↓</a>
                 </div>
@@ -1761,9 +1517,9 @@
                                 data-ar="تحديثات النظام والدعم الفني">System-Updates &amp; technischer Support</span>
                         </li>
                     </ul>
-                    <button class="pricing-cta pricing-cta-ghost" onclick="openModal('basic')"
+                    <a class="pricing-cta pricing-cta-ghost" href="https://wa.me/201010254819" target="_blank"
                         data-de="Mit POS Starter beginnen" data-en="Start with POS Starter"
-                        data-ar="ابدأ بباقة نقطة البيع">Mit POS Starter beginnen</button>
+                        data-ar="ابدأ بباقة نقطة البيع">Mit POS Starter beginnen</a>
                 </div>
 
                 <!-- Advanced -->
@@ -1878,9 +1634,9 @@
                                 data-ar="تصميم عروض التسويق وتحسين الحملات">Design von Marketingangeboten &amp;
                                 Kampagnenoptimierung</span></li>
                     </ul>
-                    <button class="pricing-cta pricing-cta-primary" onclick="openModal('advanced')"
+                    <a class="pricing-cta pricing-cta-primary" href="https://wa.me/201010254819" target="_blank"
                         data-de="Smart Business Growth starten" data-en="Start Smart Business Growth"
-                        data-ar="ابدأ خطة نمو الأعمال الذكي">Smart Business Growth starten</button>
+                        data-ar="ابدأ خطة نمو الأعمال الذكي">Smart Business Growth starten</a>
                 </div>
             </div>
 
@@ -2086,12 +1842,12 @@
                 Schließen Sie sich Hunderten von Filialen an, die bereits Barmagly POS verwenden. Holen Sie sich Ihren
                 Lizenzschlüssel und beginnen Sie in Minuten.</p>
             <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
-                <button class="btn-hero-primary" onclick="openModal('advanced')"
+                <a class="btn-hero-primary" href="https://wa.me/201010254819" target="_blank"
                     data-de="Smart Business Growth — CHF 399/Mo" data-en="Smart Business Growth — CHF 399/mo"
-                    data-ar="نمو الأعمال الذكي — 399 فرنك/شهر">Smart Business Growth — CHF 399/Mo</button>
-                <button class="btn-hero-ghost" onclick="openModal('basic')" data-de="POS Starter — CHF 199/Mo"
+                    data-ar="نمو الأعمال الذكي — 399 فرنك/شهر">Smart Business Growth — CHF 399/Mo</a>
+                <a class="btn-hero-ghost" href="https://wa.me/201010254819" target="_blank" data-de="POS Starter — CHF 199/Mo"
                     data-en="POS Starter — CHF 199/mo" data-ar="نقطة بيع المبتدئين — 199 فرنك/شهر">POS Starter — CHF
-                    199/Mo</button>
+                    199/Mo</a>
             </div>
         </div>
     </section>
@@ -2128,7 +1884,7 @@
                     <div class="footer-col-title" data-de="Zugang" data-en="Access" data-ar="الوصول">Zugang</div>
                     <a href="BASE_URL_PLACEHOLDER/super-admin/login" data-de="Admin-Login" data-en="Admin Login"
                         data-ar="تسجيل الدخول للمشرف">Admin-Login</a>
-                    <a href="#" onclick="openModal('basic');return false" data-de="Lizenz erhalten"
+                    <a href="https://wa.me/201010254819" target="_blank" data-de="Lizenz erhalten"
                         data-en="Get License" data-ar="احصل على ترخيص">Lizenz erhalten</a>
                 </div>
             </div>
@@ -2138,152 +1894,6 @@
             </div>
         </div>
     </footer>
-    <!-- SUBSCRIPTION MODAL -->
-    <div class="modal-overlay" id="modal">
-        <div class="modal">
-            <div class="modal-header">
-                <h3 id="modal-title" data-de="Starten Sie Ihren Plan" data-en="Start Your Plan" data-ar="ابدأ خطتك">
-                    Starten
-                    Sie Ihren Plan</h3>
-                <button class="modal-close" onclick="closeModal()">✕</button>
-            </div>
-            <div class="modal-body">
-                <div id="modal-error" class="modal-error" style="display:none"></div>
-                <!-- Step 1 -->
-                <div class="modal-step active" id="step1">
-                    <div class="plan-summary" id="plan-summary-box">
-                        <div class="plan-summary-top">
-                            <span class="plan-summary-name" id="summary-plan-name">Growth Plan</span>
-                            <div>
-                                <div class="plan-summary-price" id="summary-price">CHF 399</div>
-                                <div class="plan-summary-period" id="summary-period">pro Monat</div>
-                            </div>
-                        </div>
-                        <div class="plan-summary-addons" id="summary-addons" style="display:none"></div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" data-de="Unternehmensname *" data-en="Business Name *"
-                            data-ar="اسم الشركة *">Unternehmensname *</label>
-                        <input class="form-input" id="f-business" type="text" placeholder="z.B. Pizza Palace" required>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label" data-de="Name des Inhabers *" data-en="Owner Name *"
-                                data-ar="اسم المالك *">Name des Inhabers *</label>
-                            <input class="form-input" id="f-name" type="text" placeholder="Vollständiger Name" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" data-de="Telefon" data-en="Phone" data-ar="الهاتف">Telefon</label>
-                            <input class="form-input" id="f-phone" type="tel" placeholder="+41 79 000 0000">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" data-de="Geschäfts-E-Mail *" data-en="Business Email *"
-                            data-ar="البريد الإلكتروني للأعمال *">Geschäfts-E-Mail *</label>
-                        <input class="form-input" id="f-email" type="email" placeholder="info@ihrunternehmen.com"
-                            required>
-                    </div>
-                    <div id="plan-includes"
-                        style="margin-top:16px;padding:14px 16px;border-radius:12px;background:var(--surface);border:1px solid var(--border);font-size:.82rem;line-height:1.8;color:var(--muted)">
-                    </div>
-                </div>
-                <!-- Step 2 -->
-                <div class="modal-step" id="step2">
-                    <div class="plan-summary" id="payment-summary">
-                        <div class="plan-summary-top">
-                            <span class="plan-summary-name" id="pay-plan-name">Growth Plan</span>
-                            <div>
-                                <div class="plan-summary-price" id="pay-price">CHF 399</div>
-                                <div class="plan-summary-period" id="pay-period">fällig heute</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="stripe-payment-section">
-                        <div class="form-group">
-                            <label class="form-label" data-de="Kartennummer" data-en="Card Number"
-                                data-ar="رقم البطاقة">Kartennummer</label>
-                            <div class="stripe-field" id="card-number-el"></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label" data-de="Ablaufdatum" data-en="Expiry"
-                                    data-ar="انتهاء الصلاحية">Ablaufdatum</label>
-                                <div class="stripe-field" id="card-expiry-el"></div>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">CVC</label>
-                                <div class="stripe-field" id="card-cvc-el"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="manual-payment-section" style="display:none;">
-                        <div
-                            style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;text-align:center;">
-                            <div style="font-size:36px;margin-bottom:12px;">🏦</div>
-                            <h4 style="font-size:1rem;font-weight:700;margin-bottom:8px;"
-                                data-de="Zahlung per Banküberweisung" data-en="Bank Transfer Payment"
-                                data-ar="الدفع عبر التحويل المصرفي">Zahlung per Banküberweisung</h4>
-                            <p style="font-size:.85rem;color:var(--muted);line-height:1.7;margin-bottom:16px;"
-                                data-de="Online-Kartenzahlung ist derzeit nicht verfügbar. Ihr Konto wird erstellt und nach Bestätigung Ihrer Banküberweisung aktiviert."
-                                data-en="Online card payment is currently unavailable. Your account will be created and activated after we confirm your bank transfer."
-                                data-ar="الدفع بالبطاقة عبر الإنترنت غير متاح حالياً. سيتم إنشاء حسابك وتفعيله بعد تأكيد التحويل المصرفي.">
-                                Online-Kartenzahlung ist derzeit nicht verfügbar. Ihr Konto wird erstellt und nach
-                                Bestätigung Ihrer Banküberweisung aktiviert.</p>
-                            <div
-                                style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:100px;background:rgba(16,185,129,.1);color:#10b981;font-size:.8rem;font-weight:600;">
-                                <span>✓</span><span data-de="30-Tage-Testversion inklusive"
-                                    data-en="30-day free trial included"
-                                    data-ar="تجربة مجانية لمدة 30 يوماً">30-Tage-Testversion inklusive</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <!-- Step 3 -->
-                <div class="modal-step" id="step3">
-                    <div class="modal-success">
-                        <div class="modal-success-icon">🎉</div>
-                        <h3 data-de="Sie sind startklar!" data-en="You're All Set!" data-ar="أنت على استعداد!">Sie sind
-                            startklar!</h3>
-                        <p><span data-de="Ihr Lizenzschlüssel wurde gesendet an"
-                                data-en="Your license key has been sent to" data-ar="تم إرسال مفتاح الترخيص إلى">Ihr
-                                Lizenzschlüssel wurde gesendet an</span> <strong id="success-email"></strong>.</p>
-                        <div id="success-key-box"
-                            style="background:rgba(47,211,198,0.08);border:1px solid rgba(47,211,198,0.3);border-radius:14px;padding:18px 20px;margin:16px 0;text-align:center;display:none">
-                            <div
-                                style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:10px">
-                                Your License Key</div>
-                            <div id="success-license-key"
-                                style="font-size:17px;font-weight:800;letter-spacing:3px;color:#2FD3C6;font-family:monospace;word-break:break-all">
-                            </div>
-                            <button onclick="copyLicenseKey()"
-                                style="margin-top:12px;background:rgba(47,211,198,0.15);border:1px solid rgba(47,211,198,0.3);color:#2FD3C6;border-radius:8px;padding:6px 16px;cursor:pointer;font-size:12px;font-weight:600">📋
-                                Copy Key</button>
-                        </div>
-                        <p style="font-size:13px;color:rgba(255,255,255,0.6)"><span
-                                data-de="Öffnen Sie die Barmagly POS App und geben Sie E-Mail, Passwort und Lizenzschlüssel ein."
-                                data-en="Open the Barmagly POS app and enter your email, password, and license key to activate."
-                                data-ar="افتح تطبيق برمجلي POS وأدخل بريدك الإلكتروني وكلمة المرور ومفتاح الترخيص.">Öffnen
-                                Sie die Barmagly POS App und geben Sie E-Mail, Passwort und Lizenzschlüssel ein.</span>
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer" id="modal-footer">
-                <button class="btn-modal-submit" id="modal-next-btn" onclick="modalNext()"><span
-                        data-de="Weiter zur Zahlung →" data-en="Continue to Payment →" data-ar="المتابعة للدفع →">Weiter
-                        zur
-                        Zahlung →</span></button>
-                <button class="btn-modal-back" id="modal-back-btn" style="display:none" onclick="modalBack()"><span
-                        data-de="← Zurück" data-en="← Back" data-ar="→ رجوع">← Zurück</span></button>
-                <div class="ssl-note"><span>🔒</span><span data-de="Gesicherte Verbindung · 256-Bit-SSL-Verschlüsselung"
-                        data-en="Secured connection · 256-bit SSL encryption"
-                        data-ar="اتصال آمن · تشفير SSL 256 بت">Gesicherte Verbindung ·
-                        256-Bit-SSL-Verschlüsselung</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script>
         /* ═══════ LANGUAGE ═══════ */
         const LANGS = ['de', 'en', 'ar'];
@@ -2401,204 +2011,6 @@
                 atagline.textContent = atagline.getAttribute('data-' + lang) || atagline.getAttribute('data-de');
             }
         }
-
-        /* ═══════ MODAL ═══════ */
-        var stripe, cardNumber, cardExpiry, cardCvc, stripeReady = false;
-        var currentPlan = 'advanced';
-        var modalStep = 1;
-
-        async function initStripe() {
-            if (stripeReady) return;
-            try {
-                var res = await fetch('/api/stripe/publishable-key');
-                var data = await res.json();
-                var pk = data.publishableKey;
-                if (!pk || pk.includes('dummy') || pk.includes('placeholder')) throw new Error('Stripe not configured');
-                stripe = Stripe(pk);
-                var elements = stripe.elements({ appearance: { theme: 'night', variables: { colorPrimary: '#2FD3C6', borderRadius: '10px' } } });
-                var style = { style: { base: { color: '#f0f4f8', fontSize: '15px', fontFamily: 'Inter,sans-serif', '::placeholder': { color: '#506070' } } } };
-                cardNumber = elements.create('cardNumber', style);
-                cardExpiry = elements.create('cardExpiry', style);
-                cardCvc = elements.create('cardCvc', style);
-                cardNumber.mount('#card-number-el');
-                cardExpiry.mount('#card-expiry-el');
-                cardCvc.mount('#card-cvc-el');
-                ['cardNumber', 'cardExpiry', 'cardCvc'].forEach(function (name, i) {
-                    var el = [cardNumber, cardExpiry, cardCvc][i];
-                    var container = document.getElementById(['card-number-el', 'card-expiry-el', 'card-cvc-el'][i]);
-                    el.on('focus', function () { container.classList.add('focused'); });
-                    el.on('blur', function () { container.classList.remove('focused'); });
-                });
-                stripeReady = true;
-                document.getElementById('stripe-payment-section').style.display = '';
-                document.getElementById('manual-payment-section').style.display = 'none';
-            } catch (e) {
-                console.warn('Stripe init failed:', e);
-                stripeReady = false;
-                document.getElementById('stripe-payment-section').style.display = 'none';
-                document.getElementById('manual-payment-section').style.display = '';
-            }
-        }
-
-        function openModal(plan) {
-            currentPlan = plan;
-            modalStep = 1;
-            document.getElementById('step1').classList.add('active');
-            document.getElementById('step2').classList.remove('active');
-            document.getElementById('step3').classList.remove('active');
-            document.getElementById('modal-back-btn').style.display = 'none';
-            document.getElementById('modal-footer').style.display = 'flex';
-            setError('');
-            updateModalSummary();
-            document.getElementById('modal').classList.add('open');
-            document.body.style.overflow = 'hidden';
-            setTimeout(initStripe, 300);
-        }
-
-        function closeModal() {
-            document.getElementById('modal').classList.remove('open');
-            document.body.style.overflow = '';
-        }
-
-        document.getElementById('modal').addEventListener('click', function (e) { if (e.target === document.getElementById('modal')) closeModal(); });
-
-        function updateModalSummary() {
-            var plan = PLANS[currentPlan] || PLANS.basic;
-            var suffix = isAnnual ? (lang === 'ar' ? 'سنوي' : lang === 'en' ? 'Annual' : 'Jährlich') : (lang === 'ar' ? 'شهري' : lang === 'en' ? 'Monthly' : 'Monatlich');
-            var planName = (plan.name[lang] || plan.name.de) + ' (' + suffix + ')';
-            document.getElementById('summary-plan-name').textContent = planName;
-            document.getElementById('pay-plan-name').textContent = planName;
-            var price = isAnnual ? 'CHF ' + (currentPlan === 'advanced' ? '3.990' : '1.990') : 'CHF ' + plan.monthly;
-            var period = isAnnual ? (lang === 'ar' ? 'في السنة' : lang === 'en' ? 'per year' : 'pro Jahr') : (lang === 'ar' ? 'في الشهر' : lang === 'en' ? 'per month' : 'pro Monat');
-            document.getElementById('summary-price').textContent = price;
-            document.getElementById('pay-price').textContent = price;
-            document.getElementById('summary-period').textContent = period;
-            document.getElementById('pay-period').textContent = lang === 'ar' ? 'مستحق اليوم' : lang === 'en' ? 'due today' : 'fällig heute';
-            document.getElementById('modal-title').textContent = lang === 'ar' ? 'ابدأ خطتك' : lang === 'en' ? 'Start Your Plan' : 'Starten Sie Ihren Plan';
-            document.getElementById('summary-addons').style.display = 'none';
-            var pi = document.getElementById('plan-includes');
-            if (pi) pi.textContent = plan.includes[lang] || plan.includes.de;
-        }
-
-        function setError(msg) {
-            var el = document.getElementById('modal-error');
-            el.style.display = msg ? 'block' : 'none';
-            el.textContent = msg;
-        }
-
-        async function modalNext() {
-            if (modalStep === 1) {
-                var business = document.getElementById('f-business').value.trim();
-                var name = document.getElementById('f-name').value.trim();
-                var email = document.getElementById('f-email').value.trim();
-                if (!business || !name || !email) {
-                    setError(lang === 'ar' ? 'يرجى ملء جميع الحقول المطلوبة' : lang === 'en' ? 'Please fill in all required fields.' : 'Bitte füllen Sie alle Pflichtfelder aus.');
-                    return;
-                }
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                    setError(lang === 'ar' ? 'يرجى إدخال بريد إلكتروني صالح' : lang === 'en' ? 'Please enter a valid email address.' : 'Bitte geben Sie eine gültige E-Mail-Adresse ein.');
-                    return;
-                }
-                setError('');
-                document.getElementById('step1').classList.remove('active');
-                document.getElementById('step2').classList.add('active');
-                document.getElementById('modal-back-btn').style.display = '';
-                modalStep = 2;
-            } else if (modalStep === 2) {
-                await submitPayment();
-            }
-        }
-
-        function modalBack() {
-            if (modalStep === 2) {
-                document.getElementById('step2').classList.remove('active');
-                document.getElementById('step1').classList.add('active');
-                document.getElementById('modal-back-btn').style.display = 'none';
-                setError('');
-                modalStep = 1;
-            }
-        }
-
-        function copyLicenseKey() {
-            var key = document.getElementById('success-license-key').textContent;
-            if (navigator.clipboard) navigator.clipboard.writeText(key);
-            var btn = event.target; btn.textContent = '✅ Copied!';
-            setTimeout(function () { btn.textContent = '📋 Copy Key'; }, 2000);
-        }
-
-        function showSuccess(email, licenseKey) {
-            document.getElementById('success-email').textContent = email;
-            var keyBox = document.getElementById('success-key-box');
-            var keyEl = document.getElementById('success-license-key');
-            if (licenseKey && keyBox && keyEl) { keyEl.textContent = licenseKey; keyBox.style.display = 'block'; }
-            document.getElementById('step2').classList.remove('active');
-            document.getElementById('step3').classList.add('active');
-            document.getElementById('modal-footer').style.display = 'none';
-            applyLang(lang);
-        }
-
-        async function submitPayment() {
-            var btn = document.getElementById('modal-next-btn');
-            var resetBtn = function () {
-                btn.disabled = false;
-                btn.querySelector('span').setAttribute('data-de', 'Abschließen & Bezahlen →');
-                btn.querySelector('span').setAttribute('data-en', 'Complete & Pay →');
-                btn.querySelector('span').setAttribute('data-ar', 'إكمال والدفع →');
-                applyLang(lang);
-            };
-            btn.disabled = true;
-            btn.querySelector('span').textContent = lang === 'ar' ? 'جارٍ المعالجة...' : lang === 'en' ? 'Processing...' : 'Wird verarbeitet...';
-            setError('');
-            try {
-                var business = document.getElementById('f-business').value.trim();
-                var name = document.getElementById('f-name').value.trim();
-                var email = document.getElementById('f-email').value.trim();
-                var phone = document.getElementById('f-phone').value.trim();
-                var planType = isAnnual ? 'yearly' : 'monthly';
-                var planName = currentPlan === 'advanced' ? 'advanced' : 'basic';
-                var paymentMethodId = null;
-                if (stripeReady && cardNumber) {
-                    var result = await stripe.createPaymentMethod({ type: 'card', card: cardNumber, billing_details: { name: name, email: email } });
-                    if (result.error) { setError(result.error.message); resetBtn(); return; }
-                    paymentMethodId = result.paymentMethod.id;
-                }
-                var res = await fetch('/api/landing/subscribe', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ businessName: business, ownerName: name, ownerEmail: email, ownerPhone: phone || null, planType: planType, planName: planName, paymentMethodId: paymentMethodId, lang: lang })
-                });
-                var data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Subscription failed');
-                if (data.requiresAction && data.clientSecret) {
-                    btn.querySelector('span').textContent = lang === 'ar' ? 'جارٍ التحقق...' : lang === 'en' ? 'Verifying...' : 'Wird verifiziert...';
-                    var confirmResult = await stripe.confirmCardPayment(data.clientSecret);
-                    if (confirmResult.error) { setError(confirmResult.error.message); resetBtn(); return; }
-                    var confirmRes = await fetch('/api/landing/confirm-subscription', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ paymentIntentId: confirmResult.paymentIntent.id, businessName: business, ownerName: name, ownerEmail: email, ownerPhone: phone || null, planType: planType, planName: planName })
-                    });
-                    var confirmData = await confirmRes.json();
-                    if (!confirmRes.ok) throw new Error(confirmData.error || 'Subscription confirmation failed');
-                    showSuccess(email, confirmData.licenseKey);
-                    return;
-                }
-                showSuccess(email, data.licenseKey);
-            } catch (e) {
-                setError(e.message || (lang === 'ar' ? 'حدث خطأ، يرجى المحاولة مرة أخرى' : lang === 'en' ? 'Something went wrong. Please try again.' : 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.'));
-                resetBtn();
-            }
-        }
-
-        var nextBtn = document.getElementById('modal-next-btn');
-        document.getElementById('modal').addEventListener('click', function () {
-            if (modalStep === 2) {
-                nextBtn.querySelector('span').setAttribute('data-de', 'Abschließen & Bezahlen →');
-                nextBtn.querySelector('span').setAttribute('data-en', 'Complete & Pay →');
-                nextBtn.querySelector('span').setAttribute('data-ar', 'إكمال والدفع →');
-                applyLang(lang);
-            }
-        });
 
         // Init
         applyLang(lang);
