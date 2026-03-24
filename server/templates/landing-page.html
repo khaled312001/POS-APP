@@ -1890,12 +1890,12 @@
                     <span style="color:var(--primary);font-weight:700" data-de="Jährliche Abrechnung:"
                         data-en="Annual billing:" data-ar="الفوترة السنوية:">Jährliche Abrechnung:</span>
                     <span
-                        data-de="POS Starter — CHF 1.499/Jahr (sparen Sie CHF 289) · Smart Business Growth — CHF 3.499/Jahr (sparen Sie CHF 689)"
-                        data-en="POS Starter — CHF 1,499/year (save CHF 289) · Smart Business Growth — CHF 3,499/year (save CHF 689)"
-                        data-ar="نقطة بيع المبتدئين — 1,499 فرنك/سنة (وفر 289 فرنك) · نمو الأعمال الذكي — 3,499 فرنك/سنة (وفر 689 فرنك)">POS
-                        Starter — CHF 1.499/Jahr (sparen Sie CHF 289) · Smart Business Growth — CHF 3.499/Jahr (sparen
+                        data-de="POS Starter — CHF 1.990/Jahr (sparen Sie CHF 398) · Smart Business Growth — CHF 3.990/Jahr (sparen Sie CHF 798)"
+                        data-en="POS Starter — CHF 1,990/year (save CHF 398) · Smart Business Growth — CHF 3,990/year (save CHF 798)"
+                        data-ar="نقطة بيع المبتدئين — 1,990 فرنك/سنة (وفر 398 فرنك) · نمو الأعمال الذكي — 3,990 فرنك/سنة (وفر 798 فرنك)">POS
+                        Starter — CHF 1.990/Jahr (sparen Sie CHF 398) · Smart Business Growth — CHF 3.990/Jahr (sparen
                         Sie
-                        CHF 689)</span>
+                        CHF 798)</span>
                 </div>
             </div>
         </div>
@@ -2087,11 +2087,11 @@
                 Lizenzschlüssel und beginnen Sie in Minuten.</p>
             <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
                 <button class="btn-hero-primary" onclick="openModal('advanced')"
-                    data-de="Smart Business Growth — CHF 349/Mo" data-en="Smart Business Growth — CHF 349/mo"
-                    data-ar="نمو الأعمال الذكي — 349 فرنك/شهر">Smart Business Growth — CHF 349/Mo</button>
-                <button class="btn-hero-ghost" onclick="openModal('basic')" data-de="POS Starter — CHF 149/Mo"
-                    data-en="POS Starter — CHF 149/mo" data-ar="نقطة بيع المبتدئين — 149 فرنك/شهر">POS Starter — CHF
-                    149/Mo</button>
+                    data-de="Smart Business Growth — CHF 399/Mo" data-en="Smart Business Growth — CHF 399/mo"
+                    data-ar="نمو الأعمال الذكي — 399 فرنك/شهر">Smart Business Growth — CHF 399/Mo</button>
+                <button class="btn-hero-ghost" onclick="openModal('basic')" data-de="POS Starter — CHF 199/Mo"
+                    data-en="POS Starter — CHF 199/mo" data-ar="نقطة بيع المبتدئين — 199 فرنك/شهر">POS Starter — CHF
+                    199/Mo</button>
             </div>
         </div>
     </section>
@@ -2155,7 +2155,7 @@
                         <div class="plan-summary-top">
                             <span class="plan-summary-name" id="summary-plan-name">Growth Plan</span>
                             <div>
-                                <div class="plan-summary-price" id="summary-price">CHF 349</div>
+                                <div class="plan-summary-price" id="summary-price">CHF 399</div>
                                 <div class="plan-summary-period" id="summary-period">pro Monat</div>
                             </div>
                         </div>
@@ -2193,7 +2193,7 @@
                         <div class="plan-summary-top">
                             <span class="plan-summary-name" id="pay-plan-name">Growth Plan</span>
                             <div>
-                                <div class="plan-summary-price" id="pay-price">CHF 349</div>
+                                <div class="plan-summary-price" id="pay-price">CHF 399</div>
                                 <div class="plan-summary-period" id="pay-period">fällig heute</div>
                             </div>
                         </div>
@@ -2386,17 +2386,17 @@
             var aperiod = document.getElementById('advanced-period');
             var atagline = document.getElementById('advanced-tagline');
             if (isAnnual) {
-                bp.textContent = 'CHF 1.499';
+                bp.textContent = 'CHF 1.990';
                 bperiod.textContent = { de: '/ Jahr', en: '/ year', ar: '/ سنة' }[lang] || '/ Jahr';
-                btagline.textContent = { de: 'Jährlich CHF 1.499 — sparen Sie CHF 289', en: 'Billed CHF 1,499/year — save CHF 289', ar: 'يُفوتر بـ 1,499 فرنك/سنة — وفر 289 فرنك' }[lang];
-                ap.textContent = 'CHF 3.499';
+                btagline.textContent = { de: 'Jährlich CHF 1.990 — sparen Sie CHF 398', en: 'Billed CHF 1,990/year — save CHF 398', ar: 'يُفوتر بـ 1,990 فرنك/سنة — وفر 398 فرنك' }[lang];
+                ap.textContent = 'CHF 3.990';
                 aperiod.textContent = { de: '/ Jahr', en: '/ year', ar: '/ سنة' }[lang] || '/ Jahr';
-                atagline.textContent = { de: 'Jährlich CHF 3.499 — sparen Sie CHF 689', en: 'Billed CHF 3,499/year — save CHF 689', ar: 'يُفوتر بـ 3,499 فرنك/سنة — وفر 689 فرنك' }[lang];
+                atagline.textContent = { de: 'Jährlich CHF 3.990 — sparen Sie CHF 798', en: 'Billed CHF 3,990/year — save CHF 798', ar: 'يُفوتر بـ 3,990 فرنك/سنة — وفر 798 فرنك' }[lang];
             } else {
-                bp.textContent = 'CHF 149';
+                bp.textContent = 'CHF 199';
                 bperiod.textContent = { de: '/ Monat', en: '/ month', ar: '/ شهر' }[lang] || '/ Monat';
                 btagline.textContent = btagline.getAttribute('data-' + lang) || btagline.getAttribute('data-de');
-                ap.textContent = 'CHF 349';
+                ap.textContent = 'CHF 399';
                 aperiod.textContent = { de: '/ Monat', en: '/ month', ar: '/ شهر' }[lang] || '/ Monat';
                 atagline.textContent = atagline.getAttribute('data-' + lang) || atagline.getAttribute('data-de');
             }
@@ -2468,7 +2468,7 @@
             var planName = (plan.name[lang] || plan.name.de) + ' (' + suffix + ')';
             document.getElementById('summary-plan-name').textContent = planName;
             document.getElementById('pay-plan-name').textContent = planName;
-            var price = isAnnual ? 'CHF ' + (currentPlan === 'advanced' ? '3.499' : '1.499') : 'CHF ' + plan.monthly;
+            var price = isAnnual ? 'CHF ' + (currentPlan === 'advanced' ? '3.990' : '1.990') : 'CHF ' + plan.monthly;
             var period = isAnnual ? (lang === 'ar' ? 'في السنة' : lang === 'en' ? 'per year' : 'pro Jahr') : (lang === 'ar' ? 'في الشهر' : lang === 'en' ? 'per month' : 'pro Monat');
             document.getElementById('summary-price').textContent = price;
             document.getElementById('pay-price').textContent = price;
