@@ -2805,7 +2805,7 @@ async function seedPizzaLemon() {
       modifiers: mods,
       ...item.image ? { image: item.image } : {}
     }).returning();
-    await db.insert(inventory).values({ productId: prod.id, branchId, quantity: 999, lowStockThreshold: 0, reorderPoint: 0 });
+    await db.insert(inventory).values({ productId: prod.id, branchId, quantity: 999, lowStockThreshold: 0, reorderPoint: 0 }).onConflictDoNothing();
   }
   for (const p of PIZZAS) {
     const price45 = p.price45 ?? p.price + 14;
@@ -9667,11 +9667,36 @@ function setupPaymentGatewayRoutes(app2) {
       ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL;
       DO $$
       BEGIN
+        -- Drop the OLD Drizzle-generated CASCADE constraint (may still exist from initial schema)
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sale_items_product_id_products_id_fk') THEN
+          ALTER TABLE sale_items DROP CONSTRAINT sale_items_product_id_products_id_fk;
+        END IF;
+        -- Drop and re-create the SET NULL constraint to ensure correct behavior
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sale_items_product_id_fkey') THEN
           ALTER TABLE sale_items DROP CONSTRAINT sale_items_product_id_fkey;
         END IF;
         ALTER TABLE sale_items ADD CONSTRAINT sale_items_product_id_fkey
           FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
+      END $$;
+    `);
+    await pool2.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_product_id_products_id_fk') THEN
+          ALTER TABLE inventory DROP CONSTRAINT inventory_product_id_products_id_fk;
+        END IF;
+        ALTER TABLE inventory ADD CONSTRAINT inventory_product_id_products_id_fk
+          FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
+      END $$;
+    `);
+    await pool2.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_branch_id_branches_id_fk') THEN
+          ALTER TABLE inventory DROP CONSTRAINT inventory_branch_id_branches_id_fk;
+        END IF;
+        ALTER TABLE inventory ADD CONSTRAINT inventory_branch_id_branches_id_fk
+          FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE;
       END $$;
     `);
     log2("Schema migration complete");

@@ -513,7 +513,7 @@ export async function seedPizzaLemon() {
             modifiers: mods,
             ...(item.image ? { image: item.image } : {}),
         }).returning();
-        await db.insert(inventory).values({ productId: prod.id, branchId, quantity: 999, lowStockThreshold: 0, reorderPoint: 0 });
+        await db.insert(inventory).values({ productId: prod.id, branchId, quantity: 999, lowStockThreshold: 0, reorderPoint: 0 }).onConflictDoNothing();
     }
 
     // Insert pizzas with per-pizza size modifiers

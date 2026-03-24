@@ -130,9 +130,15 @@ Dev and production servers share the same PostgreSQL database. `seedPizzaLemon()
 - **Dev mode** (`NODE_ENV !== "production"`): skips product delete+reinsert if products already exist.
 - **Production mode**: always performs full catalog reset on startup (expected behavior on deploy).
 
-### sale_items FK Safety
+### Database Endpoints (TWO different Neon endpoints — IMPORTANT)
+- **Active DB** (`ep-polished-sun-amr4cmn7.c-5.us-east-1.aws.neon.tech`): Real production database, used by dev+prod servers via `.env`. Contains 39K+ customers and all live data.
+- **Disabled DB** (`ep-long-sound-ajwt8qyz`): Old Replit-provisioned endpoint, **DISABLED**. Only Replit's internal executeSql tool and Publishing panel check use this → causes cosmetic "Failed to fetch PostgreSQL major version" warning. The app works fine regardless. **Never run `createDatabase()`** — it would provision a new empty database.
+
+### sale_items FK Safety (CRITICAL)
 `sale_items.product_id` uses `ON DELETE SET NULL` (not CASCADE). This preserves sale history
 (via `productName`, `quantity`, `unitPrice`) even when the product catalog is reset.
+- Only `sale_items_product_id_fkey` (SET NULL) must exist.
+- The old Drizzle-generated `sale_items_product_id_products_id_fk` (CASCADE) was dropped in migration. The migration in `server/index.ts` drops it again if it ever reappears.
 
 ### Schema Migrations
 All schema changes go through the auto-migration block in `server/index.ts` (runs on every startup).
