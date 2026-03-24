@@ -105,6 +105,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const clearCart = useCallback(() => {
     setItems([]);
     setDiscount(0);
+    setDeliveryFee(0);
     setCustomerId(null);
     setTableNumber("");
     setVehicleId(null);
