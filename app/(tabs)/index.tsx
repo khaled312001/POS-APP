@@ -561,8 +561,8 @@ export default function POSScreen() {
 <head>
   <meta charset="UTF-8">
   <style>
-    @page { margin: 0; }
-    body { font-family: 'Courier New', monospace; font-size: 11px; width: 300px; margin: 0 auto; color: #000; background: #fff; padding: 15px; line-height: 1.2; }
+    @page { size: 80mm auto; margin: 4mm; }
+    body { font-family: 'Courier New', monospace; font-size: 14px; width: 72mm; margin: 0 auto; color: #000; background: #fff; padding: 0; line-height: 1.4; }
     .center { text-align: center; }
     .bold { font-weight: 800; }
     .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
@@ -827,10 +827,10 @@ export default function POSScreen() {
   <meta charset="UTF-8">
   <title>Rechnung ${saleData?.receiptNumber || '#' + saleData?.id}</title>
   <style>
-    @page { size: A4; margin: 15mm 20mm; }
+    @page { size: 80mm auto; margin: 4mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Courier New', monospace; font-size: 11px; color: #000; background: #fff; line-height: 1.3; }
-    .receipt-unit { width: 300px; margin: 0 auto; padding: 12px 6px; page-break-after: always; }
+    body { font-family: 'Courier New', monospace; font-size: 14px; color: #000; background: #fff; line-height: 1.4; width: 72mm; margin: 0 auto; }
+    .receipt-unit { width: 100%; padding: 8px 0; page-break-after: always; }
     .receipt-unit:last-child { page-break-after: avoid; }
     .center { text-align: center; }
     .bold { font-weight: 800; }
@@ -1162,8 +1162,8 @@ export default function POSScreen() {
 <head>
   <title>Daily Invoices</title>
   <style>
-    @page { margin: 0; }
-    body { font-family: 'Courier New', monospace; font-size: 11px; width: 300px; margin: 0 auto; color: #000; background: #fff; padding: 15px; line-height: 1.2; }
+    @page { size: 80mm auto; margin: 4mm; }
+    body { font-family: 'Courier New', monospace; font-size: 14px; width: 72mm; margin: 0 auto; color: #000; background: #fff; padding: 0; line-height: 1.4; }
     .center { text-align: center; }
     .bold { font-weight: 800; }
     .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
