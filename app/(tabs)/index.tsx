@@ -830,8 +830,8 @@ export default function POSScreen() {
     @page { size: 80mm auto; margin: 4mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Courier New', monospace; font-size: 14px; color: #000; background: #fff; line-height: 1.4; width: 72mm; margin: 0 auto; }
-    .receipt-unit { width: 100%; padding: 8px 0; page-break-after: always; }
-    .receipt-unit:last-child { page-break-after: avoid; }
+    .receipt-unit { width: 100%; padding: 8px 0; page-break-after: always; break-after: always; page-break-inside: avoid; break-inside: avoid; }
+    .receipt-unit:last-child { page-break-after: avoid; break-after: avoid; }
     .center { text-align: center; }
     .bold { font-weight: 800; }
     .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
@@ -1146,14 +1146,9 @@ export default function POSScreen() {
         if (Platform.OS === "web") {
           const printWindow = window.open("", "_blank", "width=380,height=600");
           if (printWindow) {
-            const combinedHtml = fullSales.map((inv, index) => {
+            const combinedHtml = fullSales.map((inv) => {
               const html = generateThermalReceiptHTML(inv, null, { isPartial: true });
-              return `
-                <div class="receipt-unit">
-                  ${html}
-                </div>
-                ${index < fullSales.length - 1 ? '<div class="page-break"></div>' : ''}
-              `;
+              return `<div class="receipt-unit">${html}</div>`;
             }).join("");
 
             printWindow.document.write(`
@@ -1168,7 +1163,8 @@ export default function POSScreen() {
     .bold { font-weight: 800; }
     .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
     .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
-    .page-break { page-break-after: always; }
+    .receipt-unit { page-break-after: always; break-after: always; page-break-inside: avoid; break-inside: avoid; }
+    .receipt-unit:last-child { page-break-after: avoid; break-after: avoid; }
   </style>
 </head>
 <body>
