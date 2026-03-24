@@ -837,11 +837,40 @@ function setupPaymentGatewayRoutes(app: express.Application) {
       ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL;
       DO $$
       BEGIN
+        -- Drop the OLD Drizzle-generated CASCADE constraint (may still exist from initial schema)
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sale_items_product_id_products_id_fk') THEN
+          ALTER TABLE sale_items DROP CONSTRAINT sale_items_product_id_products_id_fk;
+        END IF;
+        -- Drop and re-create the SET NULL constraint to ensure correct behavior
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sale_items_product_id_fkey') THEN
           ALTER TABLE sale_items DROP CONSTRAINT sale_items_product_id_fkey;
         END IF;
         ALTER TABLE sale_items ADD CONSTRAINT sale_items_product_id_fkey
           FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
+      END $$;
+    `);
+
+    // Fix inventory.product_id FK: ensure it's ON DELETE CASCADE so product re-seeding works
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_product_id_products_id_fk') THEN
+          ALTER TABLE inventory DROP CONSTRAINT inventory_product_id_products_id_fk;
+        END IF;
+        ALTER TABLE inventory ADD CONSTRAINT inventory_product_id_products_id_fk
+          FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
+      END $$;
+    `);
+
+    // Fix inventory.branch_id FK: ensure it's ON DELETE CASCADE
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_branch_id_branches_id_fk') THEN
+          ALTER TABLE inventory DROP CONSTRAINT inventory_branch_id_branches_id_fk;
+        END IF;
+        ALTER TABLE inventory ADD CONSTRAINT inventory_branch_id_branches_id_fk
+          FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE;
       END $$;
     `);
 
