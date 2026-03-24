@@ -498,6 +498,12 @@ export default function POSScreen() {
       <span>-CHF ${Number(saleData.discount).toFixed(2)}</span>
     </div>
   ` : ""}
+  ${Number(saleData.minimumOrderSurcharge) > 0 ? `
+    <div class="flex-between">
+      <span>Mindestbestellwert:</span>
+      <span>+CHF ${Number(saleData.minimumOrderSurcharge).toFixed(2)}</span>
+    </div>
+  ` : ""}
   ${Number(saleData.serviceFee || saleData.serviceFeeAmount) > 0 ? `
     <div class="flex-between">
       <span>${t("serviceTax") || "Service Tax"}:</span>
@@ -766,7 +772,7 @@ export default function POSScreen() {
     return num.length >= 15 && mm && yy && mm.length === 2 && yy.length >= 2 && cardCvc.length >= 3;
   };
 
-  const autoPrint3Copies = (saleData: any, cartItems: typeof cart.items, cartSubtotal: number, cartTax: number, cartDiscount: number, cartServiceFee: number, cartTotal: number, cartDeliveryFee: number, pmMethod: string, cashAmt: number, custName: string, empName: string, custObj?: any, vehicleObj?: any) => {
+  const autoPrint3Copies = (saleData: any, cartItems: typeof cart.items, cartSubtotal: number, cartTax: number, cartDiscount: number, cartServiceFee: number, cartTotal: number, cartDeliveryFee: number, pmMethod: string, cashAmt: number, custName: string, empName: string, custObj?: any, vehicleObj?: any, cartMinOrderSurcharge: number = 0) => {
     if (Platform.OS !== "web") return;
     const printWin = window.open("", "_blank", "width=400,height=600");
     if (!printWin) return;
@@ -778,6 +784,7 @@ export default function POSScreen() {
       tax: cartTax,
       discount: cartDiscount,
       serviceFee: cartServiceFee,
+      minimumOrderSurcharge: cartMinOrderSurcharge,
       total: cartTotal,
       deliveryFee: cartDeliveryFee,
       paymentMethod: pmMethod,
@@ -866,7 +873,7 @@ export default function POSScreen() {
     const vehicleObj = cart.vehicleId ? (vehicles as any[]).find((v: any) => v.id === cart.vehicleId) : undefined;
     autoPrint3Copies(
       saleData, cart.items, cart.subtotal, cart.tax, cart.discount, cart.serviceFee, cart.total, cart.deliveryFee,
-      paymentMethod, cashAmt, custName, empName, selectedCustomer, vehicleObj
+      paymentMethod, cashAmt, custName, empName, selectedCustomer, vehicleObj, cart.minimumOrderSurcharge
     );
     setLastSale({
       ...saleData,
@@ -876,6 +883,7 @@ export default function POSScreen() {
       serviceFee: cart.serviceFee,
       discount: cart.discount,
       deliveryFee: cart.deliveryFee,
+      minimumOrderSurcharge: cart.minimumOrderSurcharge,
       total: cart.total,
       paymentMethod,
       cashReceived: cashAmt,
@@ -927,6 +935,7 @@ export default function POSScreen() {
       taxAmount: cart.tax.toFixed(2),
       serviceFeeAmount: cart.serviceFee.toFixed(2),
       discountAmount: cart.discount.toFixed(2),
+      minimumOrderSurcharge: cart.minimumOrderSurcharge.toFixed(2),
       totalAmount: cart.total.toFixed(2),
       paymentMethod: pm,
       paymentStatus: "completed",
@@ -1687,6 +1696,12 @@ export default function POSScreen() {
               <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
                 <Text style={[styles.summaryLabel, { color: Colors.success }, rtlTextAlign]}>{t("discount")}</Text>
                 <Text style={[styles.summaryValue, { color: Colors.success }, rtlTextAlign]}>-CHF {cart.discount.toFixed(2)}</Text>
+              </View>
+            )}
+            {cart.minimumOrderSurcharge > 0 && (
+              <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <Text style={[styles.summaryLabel, { color: Colors.warning ?? "#F59E0B" }, rtlTextAlign]}>Mindestbestellwert (min. CHF 20)</Text>
+                <Text style={[styles.summaryValue, { color: Colors.warning ?? "#F59E0B" }, rtlTextAlign]}>+CHF {cart.minimumOrderSurcharge.toFixed(2)}</Text>
               </View>
             )}
             {cart.serviceFee > 0 && (

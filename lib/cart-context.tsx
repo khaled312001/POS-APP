@@ -37,6 +37,7 @@ interface CartContextValue {
   serviceFeeRate: number;
   setServiceFeeRate: (r: number) => void;
   serviceFee: number;
+  minimumOrderSurcharge: number; // CHF added when subtotal < 20
   total: number;
   customerId: number | null;
   setCustomerId: (id: number | null) => void;
@@ -112,12 +113,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setVehicleId(null);
   }, []);
 
+  const MIN_ORDER_AMOUNT = 20;
+
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price * i.quantity, 0), [items]);
   // discount auto-scales with subtotal using the stored rate
   const discount = useMemo(() => (subtotal * discountRate) / 100, [subtotal, discountRate]);
-  const tax = useMemo(() => ((subtotal - discount) * taxRate) / 100, [subtotal, discount, taxRate]);
-  const serviceFee = useMemo(() => ((subtotal - discount) * serviceFeeRate) / 100, [subtotal, discount, serviceFeeRate]);
-  const total = useMemo(() => subtotal - discount + tax + deliveryFee + serviceFee, [subtotal, discount, tax, deliveryFee, serviceFee]);
+  // minimum order surcharge: brings subtotal up to 20 CHF when cart has items
+  const minimumOrderSurcharge = useMemo(
+    () => (items.length > 0 && subtotal - discount < MIN_ORDER_AMOUNT ? MIN_ORDER_AMOUNT - (subtotal - discount) : 0),
+    [items.length, subtotal, discount]
+  );
+  const tax = useMemo(() => ((subtotal - discount + minimumOrderSurcharge) * taxRate) / 100, [subtotal, discount, minimumOrderSurcharge, taxRate]);
+  const serviceFee = useMemo(() => ((subtotal - discount + minimumOrderSurcharge) * serviceFeeRate) / 100, [subtotal, discount, minimumOrderSurcharge, serviceFeeRate]);
+  const total = useMemo(() => subtotal - discount + minimumOrderSurcharge + tax + deliveryFee + serviceFee, [subtotal, discount, minimumOrderSurcharge, tax, deliveryFee, serviceFee]);
   const itemCount = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items]);
 
   // setDiscount accepts a rate percentage (0-100)
@@ -127,10 +135,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     () => ({
       items, addItem, removeItem, updateQuantity, clearCart,
       subtotal, itemCount, discount, discountRate, setDiscount, taxRate, setTaxRate,
-      tax, deliveryFee, setDeliveryFee, serviceFeeRate, setServiceFeeRate, serviceFee, total, customerId, setCustomerId,
-      tableNumber, setTableNumber, orderType, setOrderType, vehicleId, setVehicleId,
+      tax, deliveryFee, setDeliveryFee, serviceFeeRate, setServiceFeeRate, serviceFee, minimumOrderSurcharge, total,
+      customerId, setCustomerId, tableNumber, setTableNumber, orderType, setOrderType, vehicleId, setVehicleId,
     }),
-    [items, subtotal, itemCount, discount, discountRate, taxRate, tax, deliveryFee, serviceFeeRate, serviceFee, total, customerId, tableNumber, orderType, vehicleId]
+    [items, subtotal, itemCount, discount, discountRate, taxRate, tax, deliveryFee, serviceFeeRate, serviceFee, minimumOrderSurcharge, total, customerId, tableNumber, orderType, vehicleId]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
