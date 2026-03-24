@@ -1062,15 +1062,16 @@ export default function POSScreen() {
   const applyDiscount = () => {
     const val = Number(discountInput);
     if (isNaN(val) || val <= 0) return;
-    let discountAmount = 0;
+    let rate = 0;
     if (discountType === "percent") {
-      const pct = isCashier ? Math.min(val, maxCashierDiscountPct) : val;
-      discountAmount = cart.subtotal * (pct / 100);
+      rate = isCashier ? Math.min(val, maxCashierDiscountPct) : val;
     } else {
+      // convert fixed amount to a percentage rate so it scales with future items
       const maxFixed = isCashier ? cart.subtotal * (maxCashierDiscountPct / 100) : Infinity;
-      discountAmount = Math.min(val, maxFixed);
+      const discountAmount = Math.min(val, maxFixed);
+      rate = cart.subtotal > 0 ? (discountAmount / cart.subtotal) * 100 : 0;
     }
-    cart.setDiscount(discountAmount);
+    cart.setDiscount(rate); // passes rate (percentage)
     setShowDiscountModal(false);
     setDiscountInput("");
   };

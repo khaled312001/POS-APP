@@ -27,7 +27,8 @@ interface CartContextValue {
   subtotal: number;
   itemCount: number;
   discount: number;
-  setDiscount: (d: number) => void;
+  discountRate: number; // percentage 0-100, auto-applies to new items
+  setDiscount: (d: number) => void; // accepts rate (percentage)
   taxRate: number;
   setTaxRate: (r: number) => void;
   tax: number;
@@ -51,7 +52,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [discount, setDiscount] = useState(0);
+  const [discountRate, setDiscountRate] = useState(0); // stored as percentage 0-100
   const [taxRate, setTaxRate] = useState(7.7);
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [serviceFeeRate, setServiceFeeRate] = useState(0);
@@ -104,7 +105,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => {
     setItems([]);
-    setDiscount(0);
+    setDiscountRate(0);
     setDeliveryFee(0);
     setCustomerId(null);
     setTableNumber("");
@@ -112,19 +113,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price * i.quantity, 0), [items]);
+  // discount auto-scales with subtotal using the stored rate
+  const discount = useMemo(() => (subtotal * discountRate) / 100, [subtotal, discountRate]);
   const tax = useMemo(() => ((subtotal - discount) * taxRate) / 100, [subtotal, discount, taxRate]);
   const serviceFee = useMemo(() => ((subtotal - discount) * serviceFeeRate) / 100, [subtotal, discount, serviceFeeRate]);
   const total = useMemo(() => subtotal - discount + tax + deliveryFee + serviceFee, [subtotal, discount, tax, deliveryFee, serviceFee]);
   const itemCount = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items]);
 
+  // setDiscount accepts a rate percentage (0-100)
+  const setDiscount = useCallback((rate: number) => setDiscountRate(rate), []);
+
   const value = useMemo(
     () => ({
       items, addItem, removeItem, updateQuantity, clearCart,
-      subtotal, itemCount, discount, setDiscount, taxRate, setTaxRate,
+      subtotal, itemCount, discount, discountRate, setDiscount, taxRate, setTaxRate,
       tax, deliveryFee, setDeliveryFee, serviceFeeRate, setServiceFeeRate, serviceFee, total, customerId, setCustomerId,
       tableNumber, setTableNumber, orderType, setOrderType, vehicleId, setVehicleId,
     }),
-    [items, subtotal, itemCount, discount, taxRate, tax, deliveryFee, serviceFeeRate, serviceFee, total, customerId, tableNumber, orderType, vehicleId]
+    [items, subtotal, itemCount, discount, discountRate, taxRate, tax, deliveryFee, serviceFeeRate, serviceFee, total, customerId, tableNumber, orderType, vehicleId]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
