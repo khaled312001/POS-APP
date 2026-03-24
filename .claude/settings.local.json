@@ -92,7 +92,12 @@
       "Bash(find 'f:/POS-APP/New Menu Images' -name *wunsch* -o -name *pide*)",
       "Bash(head -20 echo --- find f:/POS-APP/Final_Menu_Images_v3 -name *wunsch* -o -name *pide*)",
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_HFhrVY7sSDp3@ep-polished-sun-amr4cmn7.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require\" npx tsx -e \"import\\(''''./server/seedPizzaLemon.ts''''\\).then\\(m => m.seedPizzaLemon\\(\\)\\).then\\(\\(\\) => { console.log\\(''''DONE''''\\); process.exit\\(0\\); }\\).catch\\(e => { console.error\\(e\\); process.exit\\(1\\); }\\)\")",
-      "Bash(node --env-file=.env -e \"require\\(''''./server/seedPizzaLemon.ts''''\\)\")"
+      "Bash(node --env-file=.env -e \"require\\(''''./server/seedPizzaLemon.ts''''\\)\")",
+      "Bash(find f:/POS-APP/server -type f -name *.ts -o -name *.js)",
+      "Bash(curl -s http://localhost:5001 -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s http://localhost:5000 -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s http://localhost:8081 -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s http://localhost:8080 -o /dev/null -w \"%{http_code}\")"
     ]
   }
 }
