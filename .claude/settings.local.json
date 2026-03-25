@@ -97,7 +97,13 @@
       "Bash(curl -s http://localhost:5001 -o /dev/null -w \"%{http_code}\")",
       "Bash(curl -s http://localhost:5000 -o /dev/null -w \"%{http_code}\")",
       "Bash(curl -s http://localhost:8081 -o /dev/null -w \"%{http_code}\")",
-      "Bash(curl -s http://localhost:8080 -o /dev/null -w \"%{http_code}\")"
+      "Bash(curl -s http://localhost:8080 -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s -H \"x-license-key: PIZZALEMON-MAIN-2024-LMNA-B001\" \"http://localhost:5000/api/products?tenantId=24&applyMarkup=true\")",
+      "Bash(echo \"Exit: $?\")",
+      "Read(//tmp/**)",
+      "Bash(curl -s -H \"x-license-key: PIZZALEMON-MAIN-2024-LMNA-B001\" \"http://localhost:5000/api/products?tenantId=24\")",
+      "Bash(curl -s -H 'x-license-key: PIZZALEMON-MAIN-2024-LMNA-B001' http://localhost:5000/api/products?tenantId=24)",
+      "Bash(curl -s -H \"x-license-key: PIZZALEMON-MAIN-2024-LMNA-B001\" \"http://localhost:5000/api/categories?tenantId=24\")"
     ]
   }
 }

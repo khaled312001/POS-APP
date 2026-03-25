@@ -340,7 +340,7 @@ export default function POSScreen() {
   const { data: products = [] } = useQuery<any[]>({
     queryKey: ["/api/products", `?tenantId=${tenantId || ""}${search ? `&search=${search}` : ""}&applyMarkup=true`],
     queryFn: getQueryFn({ on401: "throw" }),
-    enabled: true,
+    enabled: !!tenantId,
   });
 
   // Sort categories: pizza first, then rest by sortOrder
