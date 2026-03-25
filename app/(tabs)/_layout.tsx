@@ -1,6 +1,6 @@
 import { Tabs, Redirect } from "expo-router";
 import { Platform, StyleSheet } from "react-native";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/colors";
 import { BlurView } from "expo-blur";
@@ -9,7 +9,7 @@ import { useLanguage } from "@/lib/language-context";
 import { useLicense } from "@/lib/license-context";
 import { useNotifications } from "@/lib/notification-context";
 import { Text, View, Animated, Pressable } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { getQueryFn, getApiUrl } from "@/lib/query-client";
 
@@ -18,11 +18,35 @@ export default function TabLayout() {
   const { t, isRTL } = useLanguage();
   const { subscription, tenant } = useLicense();
   const tenantId = tenant?.id;
+  const qc = useQueryClient();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const notifPulse = useRef(new Animated.Value(1)).current;
   const [pendingCount, setPendingCount] = useState(0);
-  // Track the newest order ID we've already notified about (prevents duplicates)
   const lastNotifiedOrderIdRef = useRef<number | null>(null);
+
+  // ── Global Refresh ──────────────────────────────────────────────────────────
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshSpin = useRef(new Animated.Value(0)).current;
+  const spinAnim = useRef<Animated.CompositeAnimation | null>(null);
+
+  const handleGlobalRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    spinAnim.current = Animated.loop(
+      Animated.timing(refreshSpin, { toValue: 1, duration: 700, useNativeDriver: Platform.OS !== "web" })
+    );
+    spinAnim.current.start();
+    try {
+      await qc.invalidateQueries();
+      await qc.refetchQueries({ type: "active" });
+    } finally {
+      spinAnim.current?.stop();
+      refreshSpin.setValue(0);
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, qc, refreshSpin]);
+
+  const refreshRotate = refreshSpin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
   const { data: onlineOrders = [] } = useQuery<any[]>({
     queryKey: ["/api/online-orders", tenantId ? `?tenantId=${tenantId}` : ""],
@@ -212,6 +236,37 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
+
+      {/* Global Refresh Button — visible on every tab */}
+      <Pressable
+        onPress={handleGlobalRefresh}
+        disabled={isRefreshing}
+        style={{
+          position: "absolute",
+          bottom: Platform.OS === "web" ? 100 : 72,
+          right: 16,
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          backgroundColor: isRefreshing ? Colors.cardBg : Colors.accent,
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 9998,
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.15)",
+          ...(Platform.OS === "web"
+            ? { boxShadow: "0px 4px 16px rgba(0,0,0,0.4)" }
+            : { elevation: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }),
+        }}
+      >
+        <Animated.View style={{ transform: [{ rotate: refreshRotate }] }}>
+          <Ionicons
+            name="refresh-outline"
+            size={22}
+            color={isRefreshing ? Colors.textMuted : Colors.white}
+          />
+        </Animated.View>
+      </Pressable>
 
       {/* Global Online Order Notification Toast — visible on every tab */}
       {onlineOrderNotification && (
