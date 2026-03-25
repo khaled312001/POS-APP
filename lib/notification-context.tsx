@@ -248,6 +248,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         let ws: WebSocket;
         let reconnectTimer: ReturnType<typeof setTimeout>;
         let retryCount = 0;
+        let destroyed = false; // prevents stale reconnects after effect cleanup
 
         function getReconnectDelay(): number {
             // Exponential backoff: 1s, 2s, 4s, 8s, 16s... capped at 30s, with jitter
@@ -257,6 +258,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
 
         function connect() {
+            if (destroyed) return;
             try {
                 ws = new WebSocket(wsUrl);
                 wsRef.current = ws;
@@ -304,6 +306,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 };
 
                 ws.onclose = () => {
+                    if (destroyed) return;
                     clearTimeout(reconnectTimer);
                     reconnectTimer = setTimeout(connect, getReconnectDelay());
                 };
@@ -313,15 +316,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                     ws.close();
                 };
             } catch {
-                clearTimeout(reconnectTimer);
-                reconnectTimer = setTimeout(connect, getReconnectDelay());
+                if (!destroyed) {
+                    clearTimeout(reconnectTimer);
+                    reconnectTimer = setTimeout(connect, getReconnectDelay());
+                }
             }
         }
 
         connect();
         return () => {
-            if (ws) ws.close();
+            destroyed = true;
             clearTimeout(reconnectTimer);
+            if (ws) ws.close();
         };
     }, [qc, setOnlineOrderNotification, playNotificationSound, startCallRing, tenant?.id]);
 

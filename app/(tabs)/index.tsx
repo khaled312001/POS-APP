@@ -868,8 +868,9 @@ export default function POSScreen() {
           </div>
         </div>`;
 
-      // Build a standalone single-receipt HTML (one per print job → one cut each)
-      const receiptCss = `
+      // Combine all 3 receipts into 1 print job → 1 dialog
+      // EPSON cut between pages: set driver → "Cut Type: After each page"
+      const combinedCss = `
         <style>
           @page { size: 80mm auto; margin: 4mm; }
           * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -878,21 +879,18 @@ export default function POSScreen() {
           .bold { font-weight: 900; }
           .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
           .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
+          .rp { page-break-after: always; break-after: page; }
+          .rp:last-child { page-break-after: auto; break-after: auto; }
         </style>`;
-      const wrapHtml = (title: string, body: string) =>
-        `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>${title}</title>${receiptCss}</head><body>${body}</body></html>`;
 
       const jobTitle = saleData?.receiptNumber || `#${saleData?.id}`;
-      const job1 = wrapHtml(`KUNDENBELEG ${jobTitle}`, customerInner);
-      const job2 = wrapHtml(`FAHRERAUFTRAG ${jobTitle}`, driverInner + driverFooter);
-      const job3 = wrapHtml(`KÜCHENBON ${jobTitle}`, kitchenInner);
+      const combinedHtml = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>${jobTitle}</title>${combinedCss}</head><body>` +
+        `<div class="rp">${customerInner}</div>` +
+        `<div class="rp">${driverInner + driverFooter}</div>` +
+        `<div class="rp">${kitchenInner}</div>` +
+        `</body></html>`;
 
-      // Print 3 separate jobs → printer cuts after EACH job (not just at end)
-      printHtmlViaIframe(job1, () =>
-        printHtmlViaIframe(job2, () =>
-          printHtmlViaIframe(job3)
-        )
-      );
+      printHtmlViaIframe(combinedHtml);
     };
 
     buildAndPrint();

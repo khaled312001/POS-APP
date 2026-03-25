@@ -2291,11 +2291,11 @@ async function test(){
         console.error("[Commission] Failed to track commission:", commErr);
       }
 
-      // Broadcast to all connected POS clients (WebSocket)
+      // Broadcast to connected POS clients for this tenant (WebSocket)
       callerIdService.broadcast({
         type: "new_online_order",
         order,
-      });
+      }, resolvedTenantId);
       // Web Push: notify even closed browser tabs
       pushService.notifyNewOrder(orderNumber, orderData.totalAmount || "0").catch(() => { });
 
