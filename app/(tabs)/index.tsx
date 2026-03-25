@@ -558,7 +558,7 @@ export default function POSScreen() {
     </div>
   ` : ""}
   ${vehicleObj ? `
-    <div class="flex-between" style="font-size:11px;color:#555;">
+    <div class="flex-between" style="font-size:12px;color:#000;font-weight:700;">
       <span>&#x1F697; Driver:</span>
       <span>${vehicleObj.driverName || ""}${vehicleObj.licensePlate ? ` (${vehicleObj.licensePlate})` : ""}</span>
     </div>
@@ -593,7 +593,7 @@ export default function POSScreen() {
   
   <div class="center bold" style="margin-top:14px;font-size:13px;">${isKitchen ? "KÜCHENBON" : t("thankYou")}</div>
   ${!isKitchen && storeAddr ? `<div class="center" style="font-size:10px;margin-top:2px;">${t("visitUs")}: ${storeAddr}</div>` : ""}
-  <div class="center" style="font-size:9px;color:#999;margin-top:6px;">${t("poweredBy")}</div>
+  <div class="center" style="font-size:10px;color:#000;margin-top:6px;">${t("poweredBy")}</div>
   <div class="center sep" style="margin-top:6px;overflow:hidden;white-space:nowrap;">${"=".repeat(36)}</div>
 `;
 
@@ -605,9 +605,9 @@ export default function POSScreen() {
   <meta charset="UTF-8">
   <style>
     @page { size: 80mm auto; margin: 4mm; }
-    body { font-family: 'Courier New', monospace; font-size: 14px; width: 72mm; margin: 0 auto; color: #000; background: #fff; padding: 0; line-height: 1.4; }
+    body { font-family: 'Courier New', monospace; font-size: 15px; font-weight: 600; width: 72mm; margin: 0 auto; color: #000; background: #fff; padding: 0; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .center { text-align: center; }
-    .bold { font-weight: 800; }
+    .bold { font-weight: 900; }
     .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
     .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
     .page-break { page-break-after: always; }
@@ -863,7 +863,7 @@ export default function POSScreen() {
     /* Fixed page height → each receipt-unit becomes a real page → auto-cutter fires between them */
     @page { size: 80mm 300mm; margin: 4mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Courier New', monospace; font-size: 14px; color: #000; background: #fff; line-height: 1.4; width: 72mm; margin: 0 auto; }
+    body { font-family: 'Courier New', monospace; font-size: 15px; font-weight: 600; color: #000; background: #fff; line-height: 1.45; width: 72mm; margin: 0 auto; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .receipt-unit { width: 100%; padding: 8px 0; page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; }
     .receipt-unit:last-child { page-break-after: auto; break-after: auto; }
     .center { text-align: center; }
@@ -1207,9 +1207,9 @@ export default function POSScreen() {
   <title>Daily Invoices</title>
   <style>
     @page { size: 80mm 300mm; margin: 4mm; }
-    body { font-family: 'Courier New', monospace; font-size: 14px; width: 72mm; margin: 0 auto; color: #000; background: #fff; padding: 0; line-height: 1.4; }
+    body { font-family: 'Courier New', monospace; font-size: 15px; font-weight: 600; width: 72mm; margin: 0 auto; color: #000; background: #fff; padding: 0; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .center { text-align: center; }
-    .bold { font-weight: 800; }
+    .bold { font-weight: 900; }
     .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
     .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
     .receipt-unit { page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; }

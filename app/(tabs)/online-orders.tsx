@@ -913,19 +913,20 @@ export default function OrdersScreen() {
   <title>Receipt ${orderNum}</title>
   <style>
     @page { size: A4; margin: 15mm 20mm; }
-    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 13px; color: #333; line-height: 1.4; background: #fff; margin: 0; padding: 0; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 13px; color: #000; line-height: 1.4; background: #fff; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .page-break { page-break-after: always; }
-    
+
     /* Thermal aesthetics for inside A4 wrapper */
     .thermal-receipt {
       width: 320px;
       margin: 0 auto;
       font-family: 'Courier New', monospace;
-      font-size: 11px;
+      font-size: 13px;
+      font-weight: 600;
       color: #000;
     }
     .center { text-align: center; }
-    .bold { font-weight: 800; }
+    .bold { font-weight: 900; }
     .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
     .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
   </style>
