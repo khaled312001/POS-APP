@@ -115,6 +115,23 @@ export default function POSScreen() {
   const flashAnim = useRef(new Animated.Value(0)).current;
   const checkoutPulse = useRef(new Animated.Value(1)).current;
   const [activeCallId, setActiveCallId] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshSpin = useRef(new Animated.Value(0)).current;
+
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    Animated.loop(
+      Animated.timing(refreshSpin, { toValue: 1, duration: 600, useNativeDriver: Platform.OS !== "web" })
+    ).start();
+    await qc.invalidateQueries();
+    await qc.refetchQueries({ type: "active" });
+    refreshSpin.stopAnimation();
+    refreshSpin.setValue(0);
+    setIsRefreshing(false);
+  }, [isRefreshing, qc, refreshSpin]);
+
+  const refreshRotate = refreshSpin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
   const { onlineOrderNotification, setOnlineOrderNotification, incomingCalls, setIncomingCalls, dismissCall } = useNotifications();
 
@@ -1244,6 +1261,14 @@ export default function POSScreen() {
                 {onlineOrderNotification && (
                   <View style={{ position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.danger }} />
                 )}
+              </Pressable>
+              <Pressable onPress={handleRefresh} style={styles.headerInvoiceBtn} disabled={isRefreshing}>
+                <Animated.View style={{ transform: [{ rotate: refreshRotate }] }}>
+                  <Ionicons name="refresh-outline" size={20} color={isRefreshing ? Colors.textMuted : Colors.white} />
+                </Animated.View>
+                <Text style={[styles.headerInvoiceLabel, { color: isRefreshing ? Colors.textMuted : Colors.white }]}>
+                  {language === "ar" ? "تحديث" : language === "de" ? "Reload" : "Refresh"}
+                </Text>
               </Pressable>
               <Pressable onPress={handleEndOfDay} style={styles.headerInvoiceBtn} disabled={endOfDayLoading}>
                 <Ionicons name="power-outline" size={20} color={endOfDayLoading ? Colors.textMuted : Colors.danger} />
