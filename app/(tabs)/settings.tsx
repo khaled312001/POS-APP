@@ -16,6 +16,38 @@ import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { playClickSound } from "@/lib/sound";
 
+function printHtmlViaIframe(html: string, onDone?: () => void) {
+  if (typeof document === "undefined") return;
+  const frameId = `_rp_${Date.now()}`;
+  const iframe = document.createElement("iframe");
+  iframe.id = frameId;
+  Object.assign(iframe.style, { position: "fixed", right: "0", bottom: "0", width: "1px", height: "1px", border: "none", opacity: "0", pointerEvents: "none", zIndex: "-1" });
+  document.body.appendChild(iframe);
+  const cleanup = (url: string) => { URL.revokeObjectURL(url); setTimeout(() => iframe?.remove(), 1000); };
+  try {
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    iframe.src = url;
+    iframe.onload = () => {
+      setTimeout(() => {
+        try {
+          const win = iframe.contentWindow;
+          if (!win) return;
+          win.focus();
+          if (onDone) {
+            win.addEventListener("afterprint", () => { cleanup(url); onDone(); }, { once: true });
+            setTimeout(() => { try { onDone(); } catch (_) {} }, 8000);
+          } else {
+            win.addEventListener("afterprint", () => cleanup(url), { once: true });
+            setTimeout(() => cleanup(url), 8000);
+          }
+          win.print();
+        } catch (_) { onDone?.(); }
+      }, 400);
+    };
+  } catch (_) { iframe.remove(); onDone?.(); }
+}
+
 function SettingRow({ icon, label, value, onPress, color, rtl }: { icon: string; label: string; value?: string; onPress?: () => void; color?: string; rtl?: boolean }) {
   return (
     <Pressable style={[rowStyles.row, rtl && { flexDirection: "row-reverse" }]} onPress={onPress ? () => { playClickSound("light"); onPress(); } : undefined}>
@@ -2763,6 +2795,62 @@ export default function SettingsScreen() {
                   </LinearGradient>
                 </Pressable>
               </View>
+
+              {/* Print daily report button */}
+              <Pressable style={{ backgroundColor: "#F59E0B" + "20", borderRadius: 12, padding: 14, marginBottom: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: "#F59E0B" + "60" }} onPress={async () => {
+                if (Platform.OS !== "web") { Alert.alert("Info", "Drucken ist nur im Web verfügbar."); return; }
+                try {
+                  const today = new Date().toISOString().split("T")[0];
+                  const res = await apiRequest("GET", `/api/reports/daily-sales-report?date=${today}`);
+                  const salesData: any[] = await res.json();
+                  if (!salesData || salesData.length === 0) { Alert.alert("Personalbericht", "Keine Bestellungen für heute gefunden."); return; }
+                  const storeName = (storeSettings as any)?.name || tenant?.name || "POS System";
+                  const dateObj = new Date();
+                  const dateStr = dateObj.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+                  const cashierName = employee?.name || "Kassierer";
+                  const total = salesData.reduce((s: number, sale: any) => s + Number(sale.totalAmount || 0), 0);
+                  const rowsHtml = salesData.map((sale: any, idx: number) => {
+                    const addr = sale.customerAddress || "";
+                    const parts = addr.split(",");
+                    const street = parts[0]?.trim() || "–";
+                    const city = parts[1]?.trim() || parts[0]?.trim() || "–";
+                    const timeStr = new Date(sale.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+                    const amt = Number(sale.totalAmount || 0).toFixed(2);
+                    return `<tr><td>${idx + 1}</td><td>${street}</td><td>${city}</td><td>${timeStr}</td><td style="text-align:right;">${amt}</td></tr>`;
+                  }).join("");
+                  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Personalbericht</title><style>
+                    body { font-family: 'Courier New', monospace; font-size: 11px; margin: 0; padding: 10px; color: #000; }
+                    h2 { text-align: center; font-size: 14px; margin: 4px 0; }
+                    .sub { text-align: center; font-size: 11px; margin-bottom: 8px; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 4px; text-align: left; font-size: 10px; }
+                    td { padding: 2px 4px; font-size: 10px; border-bottom: 1px dotted #ccc; }
+                    .total-row { border-top: 1px solid #000; font-weight: bold; }
+                    .total-row td { padding-top: 4px; }
+                  </style></head><body>
+                    <h2>Personalbericht</h2>
+                    <div class="sub">${dateStr}</div>
+                    <div class="sub">${storeName}</div>
+                    <br/>
+                    <div style="font-weight:bold;margin-bottom:4px;">Nr &nbsp; Kassierer: ${cashierName}</div>
+                    <table>
+                      <thead><tr><th>Nr</th><th>Adresse</th><th>Gebiet</th><th>Zeit</th><th style="text-align:right;">Total</th></tr></thead>
+                      <tbody>${rowsHtml}</tbody>
+                      <tfoot>
+                        <tr class="total-row"><td colspan="4">Umsatz Total</td><td style="text-align:right;">${total.toFixed(2)}</td></tr>
+                        <tr><td colspan="4">TAGESAUSGAB</td><td style="text-align:right;">0.00</td></tr>
+                        <tr class="total-row"><td colspan="2">${salesData.length}&nbsp;&nbsp;TOTAL Kassierer</td><td colspan="2"></td><td style="text-align:right;">${total.toFixed(2)}</td></tr>
+                      </tfoot>
+                    </table>
+                    <br/>
+                    <div style="text-align:center;font-size:10px;">${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} &nbsp; ${dateStr}</div>
+                  </body></html>`;
+                  printHtmlViaIframe(html);
+                } catch (e: any) { Alert.alert("Fehler", e.message); }
+              }}>
+                <Ionicons name="print-outline" size={20} color="#F59E0B" />
+                <Text style={{ color: "#F59E0B", fontWeight: "700", fontSize: 14 }}>Personalbericht drucken</Text>
+              </Pressable>
 
               {/* Past closings */}
               <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 15, marginBottom: 10 }}>{t("dailyClosing")} {t("entries")}</Text>

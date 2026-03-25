@@ -1708,6 +1708,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.getReturnsReport()); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // Daily Sales Report (for Tagesabschluss print)
+  app.get("/api/reports/daily-sales-report", async (req, res) => {
+    try {
+      const date = req.query.date as string || new Date().toISOString().split("T")[0];
+      const startOfDay = new Date(date + "T00:00:00.000Z");
+      const endOfDay = new Date(date + "T23:59:59.999Z");
+      const salesData = await storage.getSalesWithCustomerByDateRange(startOfDay, endOfDay);
+      res.json(salesData);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Report Exports
   app.get("/api/reports/sales-export", async (req, res) => {
     try {

@@ -682,6 +682,21 @@ export const storage = {
   async getSalesByDateRange(startDate: Date, endDate: Date) {
     return db.select().from(sales).where(and(gte(sales.createdAt, startDate), lte(sales.createdAt, endDate))).orderBy(desc(sales.createdAt));
   },
+  async getSalesWithCustomerByDateRange(startDate: Date, endDate: Date) {
+    return db.select({
+      id: sales.id,
+      receiptNumber: sales.receiptNumber,
+      totalAmount: sales.totalAmount,
+      createdAt: sales.createdAt,
+      customerId: sales.customerId,
+      employeeId: sales.employeeId,
+      customerName: customers.name,
+      customerAddress: customers.address,
+    }).from(sales)
+      .leftJoin(customers, eq(sales.customerId, customers.id))
+      .where(and(gte(sales.createdAt, startDate), lte(sales.createdAt, endDate)))
+      .orderBy(sales.createdAt);
+  },
   async getTopProducts(limit?: number) {
     const topLimit = limit || 10;
     const result = await db.select({
