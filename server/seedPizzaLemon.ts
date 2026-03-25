@@ -270,15 +270,19 @@ const DESSERTS: MenuItem[] = [
 
 // ─── GETRÄNKE ─────────────────────────────────────────────────────────────────
 const GETRAENKE: MenuItem[] = [
-    { name: "Coca-Cola", description: "Coca-Cola, 0.5l / 1.5l", price: 4.00, image: IMG("pizzalemon_97_coca_cola.jpg") },
-    { name: "Coca-Cola Zero", description: "Coca-Cola Zero, 0.5l / 1.5l", price: 4.00, image: IMG("pizzalemon_97_coca_cola.jpg") },
-    { name: "Fanta", description: "Fanta Orange, 0.5l / 1.5l", price: 6.00, image: IMG("pizzalemon_98_fanta.jpg") },
-    { name: "Eistee Pfirsich", description: "Eistee Pfirsich, 0.5l / 1.5l", price: 4.00, image: IMG("pizzalemon_99_eistee.jpg") },
+    { name: "Coca-Cola", description: "Coca-Cola, 0.5l", price: 4.00, image: IMG("pizzalemon_97_coca_cola.jpg") },
+    { name: "Coca-Cola 1.5l", description: "Coca-Cola, 1.5l Flasche", price: 6.00, image: IMG("pizzalemon_coca_cola_1500ml.jpg") },
+    { name: "Coca-Cola Zero", description: "Coca-Cola Zero, 0.5l", price: 4.00, image: IMG("pizzalemon_97_coca_cola.jpg") },
+    { name: "Coca-Cola Zero 1.5l", description: "Coca-Cola Zero, 1.5l Flasche", price: 6.00, image: IMG("pizzalemon_coca_cola_zero_1500ml.jpg") },
+    { name: "Fanta", description: "Fanta Orange, 0.5l", price: 6.00, image: IMG("pizzalemon_98_fanta.jpg") },
+    { name: "Fanta 1.5l", description: "Fanta Orange, 1.5l Flasche", price: 6.00, image: IMG("pizzalemon_fanta_1500ml.jpg") },
+    { name: "Eistee Pfirsich", description: "Eistee Pfirsich, 0.5l", price: 4.00, image: IMG("pizzalemon_99_eistee.jpg") },
+    { name: "Eistee Pfirsich 1.5l", description: "Eistee Pfirsich, 1.5l Flasche", price: 6.00, image: IMG("pizzalemon_eistee_1500ml.jpg") },
     { name: "Uludag Gazoz", description: "Türkische Limonade Uludag, 0.5l", price: 4.00, image: IMG("pizzalemon_101_uludag_gazoz.jpg") },
     { name: "Rivella Blau", description: "Rivella Blau, 0.5l", price: 4.00, image: IMG("pizzalemon_102_rivella.jpg") },
     { name: "Rivella Rot", description: "Rivella Rot, 0.5l", price: 4.00, image: IMG("pizzalemon_102_rivella.jpg") },
-    { name: "Ayran", description: "Türkisches Joghurtgetränk, 0.5l", price: 4.00, image: IMG("pizzalemon_103_ayran.jpg") },
-    { name: "Red Bull", description: "Red Bull Energy Drink, 250ml", price: 5.00, image: IMG("pizzalemon_104_red_bull.jpg") },
+    { name: "Ayran", description: "Türkisches Joghurtgetränk, 0.25l", price: 4.00, image: IMG("pizzalemon_103_ayran.jpg") },
+    { name: "Red Bull", description: "Red Bull Energy Drink, 0.25l", price: 5.00, image: IMG("pizzalemon_104_red_bull.jpg") },
 ];
 
 // ─── BIER ─────────────────────────────────────────────────────────────────────
