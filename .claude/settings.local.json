@@ -103,7 +103,15 @@
       "Read(//tmp/**)",
       "Bash(curl -s -H \"x-license-key: PIZZALEMON-MAIN-2024-LMNA-B001\" \"http://localhost:5000/api/products?tenantId=24\")",
       "Bash(curl -s -H 'x-license-key: PIZZALEMON-MAIN-2024-LMNA-B001' http://localhost:5000/api/products?tenantId=24)",
-      "Bash(curl -s -H \"x-license-key: PIZZALEMON-MAIN-2024-LMNA-B001\" \"http://localhost:5000/api/categories?tenantId=24\")"
+      "Bash(curl -s -H \"x-license-key: PIZZALEMON-MAIN-2024-LMNA-B001\" \"http://localhost:5000/api/categories?tenantId=24\")",
+      "Bash(curl -s \"https://pizzalemon.ch/lemon/index.php?route=product/category&path=92\")",
+      "Bash(curl -s \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1094\")",
+      "Bash(curl -s \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1096\")",
+      "Bash(curl -s \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1064\")",
+      "Bash(curl -s \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1098\")",
+      "Bash(curl -v \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1094\")",
+      "Bash(curl -s -L -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36\" \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1094\")",
+      "Bash(curl -s \"https://pizzalemon.ch/lemon/index.php?route=product/category&path=120\")"
     ]
   }
 }
