@@ -2250,6 +2250,28 @@ async function test(){
         status: "pending",
       });
 
+      // ── Auto-save new customer ────────────────────────────────────────────
+      try {
+        const { customerName, customerPhone, customerEmail, customerAddress } = orderData;
+        if (customerName) {
+          let existing: any[] = [];
+          if (customerPhone) {
+            existing = await storage.findCustomerByPhone(customerPhone, resolvedTenantId);
+          }
+          if (existing.length === 0) {
+            await storage.createCustomer({
+              tenantId: resolvedTenantId,
+              name: customerName,
+              phone: customerPhone || null,
+              email: customerEmail || null,
+              address: customerAddress || null,
+            });
+          }
+        }
+      } catch (autoErr) {
+        console.error("[AutoCustomer] Failed to auto-save customer from online order:", autoErr);
+      }
+
       // Track platform commission
       try {
         const commissionRate = await storage.getCommissionRate();

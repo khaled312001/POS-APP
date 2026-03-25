@@ -952,6 +952,26 @@ export default function POSScreen() {
     if (orderNotes.trim()) notesParts.push(orderNotes.trim());
     if (stripePaymentId) notesParts.push(`Stripe: ${stripePaymentId}`);
     if (notesParts.length > 0) data.notes = notesParts.join(" | ");
+
+    // ── Auto-save new customer if phone was entered but no customer linked ──
+    if (!data.customerId && phoneInput.trim()) {
+      try {
+        const autoName = newCustomerForm.name.trim() || phoneInput.trim();
+        const autoRes = await apiRequest("POST", "/api/customers", {
+          tenantId,
+          name: autoName,
+          phone: phoneInput.trim(),
+          address: newCustomerForm.address.trim() || null,
+          email: newCustomerForm.email.trim() || null,
+        });
+        if (autoRes.ok) {
+          const newCust = await autoRes.json();
+          data.customerId = newCust.id;
+          qc.invalidateQueries({ queryKey: ["/api/customers"] });
+        }
+      } catch (_) { /* non-fatal */ }
+    }
+
     const res = await apiRequest("POST", "/api/sales", data);
     return await res.json();
   };
