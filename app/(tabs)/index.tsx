@@ -53,12 +53,15 @@ function printHtmlViaIframe(html: string, onDone?: () => void) {
           win.focus();
           // afterprint fires when print dialog closes → trigger next job
           if (onDone) {
-            win.addEventListener("afterprint", () => { cleanup(url); onDone(); }, { once: true });
-            // Fallback: if afterprint never fires (some browsers), still call onDone
-            setTimeout(() => { try { onDone(); } catch (_) {} }, 8000);
+            let fired = false;
+            const once = () => { if (fired) return; fired = true; cleanup(url); onDone(); };
+            win.addEventListener("afterprint", once, { once: true });
+            setTimeout(once, 8000);
           } else {
-            win.addEventListener("afterprint", () => cleanup(url), { once: true });
-            setTimeout(() => cleanup(url), 8000);
+            let cleaned = false;
+            const doClean = () => { if (cleaned) return; cleaned = true; cleanup(url); };
+            win.addEventListener("afterprint", doClean, { once: true });
+            setTimeout(doClean, 8000);
           }
           win.print();
         } catch (_) { onDone?.(); }
