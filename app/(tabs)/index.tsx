@@ -860,11 +860,12 @@ export default function POSScreen() {
   <meta charset="UTF-8">
   <title>Rechnung ${saleData?.receiptNumber || '#' + saleData?.id}</title>
   <style>
-    @page { size: 80mm auto; margin: 4mm; }
+    /* Fixed page height → each receipt-unit becomes a real page → auto-cutter fires between them */
+    @page { size: 80mm 300mm; margin: 4mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Courier New', monospace; font-size: 14px; color: #000; background: #fff; line-height: 1.4; width: 72mm; margin: 0 auto; }
-    .receipt-unit { width: 100%; padding: 8px 0; page-break-after: always; break-after: always; page-break-inside: avoid; break-inside: avoid; }
-    .receipt-unit:last-child { page-break-after: avoid; break-after: avoid; }
+    .receipt-unit { width: 100%; padding: 8px 0; page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; }
+    .receipt-unit:last-child { page-break-after: auto; break-after: auto; }
     .center { text-align: center; }
     .bold { font-weight: 800; }
     .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
@@ -1205,14 +1206,14 @@ export default function POSScreen() {
 <head>
   <title>Daily Invoices</title>
   <style>
-    @page { size: 80mm auto; margin: 4mm; }
+    @page { size: 80mm 300mm; margin: 4mm; }
     body { font-family: 'Courier New', monospace; font-size: 14px; width: 72mm; margin: 0 auto; color: #000; background: #fff; padding: 0; line-height: 1.4; }
     .center { text-align: center; }
     .bold { font-weight: 800; }
     .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
     .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
-    .receipt-unit { page-break-after: always; break-after: always; page-break-inside: avoid; break-inside: avoid; }
-    .receipt-unit:last-child { page-break-after: avoid; break-after: avoid; }
+    .receipt-unit { page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; }
+    .receipt-unit:last-child { page-break-after: auto; break-after: auto; }
   </style>
 </head>
 <body>${combinedHtml}</body>
