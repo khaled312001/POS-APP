@@ -141,7 +141,7 @@ export default function CustomersScreen() {
     });
   };
 
-  const topPad = Platform.OS === "web" ? 67 : 0;
+  const topPad = Platform.OS === "web" ? 48 : 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>

@@ -1378,7 +1378,7 @@ export default function OrdersScreen() {
       </Modal>
 
       {/* ===== HEADER ===== */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+      <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 48 : insets.top }]}>
         <LinearGradient colors={["#1E1B4B", "#312E81", "#0A0E27"]} style={styles.headerGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <View style={[styles.headerContent, isRTL && { flexDirection: "row-reverse" }]}>
             <View>

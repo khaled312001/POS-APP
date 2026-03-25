@@ -218,7 +218,7 @@ export default function ProductsScreen() {
     return new Date(dateStr) < new Date();
   };
 
-  const topPad = Platform.OS === "web" ? 67 : 0;
+  const topPad = Platform.OS === "web" ? 48 : 0;
   const getCatName = (catId: number | null) => categories.find((c: any) => c.id === catId)?.name || t("uncategorized");
 
   const getPriority = (name: string) => {

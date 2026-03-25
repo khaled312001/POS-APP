@@ -487,7 +487,7 @@ export default function ReportsScreen() {
     }
   };
 
-  const topPad = Platform.OS === "web" ? 67 : 0;
+  const topPad = Platform.OS === "web" ? 48 : 0;
   const bottomPad = Platform.OS === "web" ? 84 : 60;
 
   if (isCashier) {

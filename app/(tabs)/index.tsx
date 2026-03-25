@@ -1085,7 +1085,7 @@ export default function POSScreen() {
     setDiscountInput("");
   };
 
-  const topPad = Platform.OS === "web" ? 8 : 0;
+  const topPad = Platform.OS === "web" ? 48 : 0;
 
   const handleSwitchAccount = async (pinCode: string) => {
     if (!switchTarget) return;

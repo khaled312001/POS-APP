@@ -561,7 +561,7 @@ export default function SettingsScreen() {
 
   const closedShifts = shifts.filter((s: any) => s.endTime && s.status === "closed");
 
-  const topPad = Platform.OS === "web" ? 67 : 0;
+  const topPad = Platform.OS === "web" ? 48 : 0;
   const roleColors: Record<string, string> = { admin: Colors.danger, manager: Colors.warning, cashier: Colors.info, owner: Colors.secondary };
 
   const formatDuration = (startTime: string, endTime: string) => {

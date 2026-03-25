@@ -13,6 +13,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { getQueryFn, getApiUrl } from "@/lib/query-client";
 
+// ── Web-only fixed toolbar height (screens reserve this via topPad) ──────────
+const WEB_TOOLBAR_H = 48;
+
 export default function TabLayout() {
   const { isLoggedIn, isCashier } = useAuth();
   const { t, isRTL } = useLanguage();
@@ -30,10 +33,14 @@ export default function TabLayout() {
   const spinAnim = useRef<Animated.CompositeAnimation | null>(null);
 
   const handleGlobalRefresh = useCallback(async () => {
+    if (Platform.OS === "web") {
+      (window as any).location.reload();
+      return;
+    }
     if (isRefreshing) return;
     setIsRefreshing(true);
     spinAnim.current = Animated.loop(
-      Animated.timing(refreshSpin, { toValue: 1, duration: 700, useNativeDriver: Platform.OS !== "web" })
+      Animated.timing(refreshSpin, { toValue: 1, duration: 700, useNativeDriver: true })
     );
     spinAnim.current.start();
     try {
@@ -237,36 +244,75 @@ export default function TabLayout() {
         />
       </Tabs>
 
-      {/* Global Refresh Button — visible on every tab */}
-      <Pressable
-        onPress={handleGlobalRefresh}
-        disabled={isRefreshing}
-        style={{
-          position: "absolute",
-          bottom: Platform.OS === "web" ? 100 : 72,
-          right: 16,
-          width: 44,
-          height: 44,
-          borderRadius: 22,
-          backgroundColor: isRefreshing ? Colors.cardBg : Colors.accent,
-          justifyContent: "center",
+      {/* ── Web fixed toolbar with refresh button ─────────────────────────── */}
+      {Platform.OS === "web" && (
+        <View style={{
+          position: "absolute" as const,
+          top: 0, left: 0, right: 0,
+          height: WEB_TOOLBAR_H,
+          backgroundColor: Colors.background,
+          borderBottomWidth: 1,
+          borderBottomColor: "rgba(255,255,255,0.08)",
+          flexDirection: "row",
           alignItems: "center",
+          justifyContent: "flex-end",
+          paddingHorizontal: 16,
           zIndex: 9998,
-          borderWidth: 1,
-          borderColor: "rgba(255,255,255,0.15)",
-          ...(Platform.OS === "web"
-            ? { boxShadow: "0px 4px 16px rgba(0,0,0,0.4)" }
-            : { elevation: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }),
-        }}
-      >
-        <Animated.View style={{ transform: [{ rotate: refreshRotate }] }}>
-          <Ionicons
-            name="refresh-outline"
-            size={22}
-            color={isRefreshing ? Colors.textMuted : Colors.white}
-          />
-        </Animated.View>
-      </Pressable>
+        }}>
+          <Pressable
+            onPress={handleGlobalRefresh}
+            style={({ pressed }) => ({
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              paddingHorizontal: 14,
+              paddingVertical: 8,
+              borderRadius: 10,
+              backgroundColor: pressed ? Colors.cardBg : "rgba(255,255,255,0.07)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.12)",
+            })}
+          >
+            <Ionicons name="refresh-outline" size={18} color={Colors.white} />
+            <Text style={{ color: Colors.white, fontSize: 13, fontWeight: "600" }}>
+              Refresh
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* ── Native: floating refresh button (bottom-right) ─────────────────── */}
+      {Platform.OS !== "web" && (
+        <Pressable
+          onPress={handleGlobalRefresh}
+          disabled={isRefreshing}
+          style={{
+            position: "absolute",
+            bottom: 72,
+            right: 16,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            backgroundColor: isRefreshing ? Colors.cardBg : Colors.accent,
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9998,
+            elevation: 8,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+          }}
+        >
+          <Animated.View style={{ transform: [{ rotate: refreshRotate }] }}>
+            <Ionicons
+              name="refresh-outline"
+              size={22}
+              color={isRefreshing ? Colors.textMuted : Colors.white}
+            />
+          </Animated.View>
+        </Pressable>
+      )}
 
       {/* Global Online Order Notification Toast — visible on every tab */}
       {onlineOrderNotification && (
@@ -276,7 +322,7 @@ export default function TabLayout() {
             setOnlineOrderNotification(null);
           }}
           style={{
-            position: "absolute", top: 16, left: 12, right: 12,
+            position: "absolute", top: Platform.OS === "web" ? WEB_TOOLBAR_H + 8 : 16, left: 12, right: 12,
             borderRadius: 18, overflow: "hidden",
             zIndex: 99999,
             ...(Platform.OS === "web"
