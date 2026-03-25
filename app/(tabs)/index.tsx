@@ -820,29 +820,22 @@ export default function POSScreen() {
   const autoPrint3Copies = (saleData: any, cartItems: typeof cart.items, cartSubtotal: number, cartTax: number, cartDiscount: number, cartServiceFee: number, cartTotal: number, cartDeliveryFee: number, pmMethod: string, cashAmt: number, custName: string, empName: string, custObj?: any, vehicleObj?: any, cartMinOrderSurcharge: number = 0) => {
     if (Platform.OS !== "web") return;
 
-    const fullSale = {
-      ...saleData,
-      items: cartItems.map(i => ({ productName: i.name, quantity: i.quantity, total: i.price * i.quantity })),
-      subtotal: cartSubtotal,
-      tax: cartTax,
-      discount: cartDiscount,
-      serviceFee: cartServiceFee,
-      minimumOrderSurcharge: cartMinOrderSurcharge,
-      total: cartTotal,
-      deliveryFee: cartDeliveryFee,
-      paymentMethod: pmMethod,
-      cashReceived: cashAmt,
-      change: pmMethod === "cash" ? cashAmt - cartTotal : 0,
-      customerName: custName,
-      employeeName: empName,
-    };
-
     const pmLabel = pmMethod === "cash" ? "BAR" : pmMethod === "card" ? "KARTE" : pmMethod.toUpperCase();
-    const orderId = saleData?.id || "";
     const custAddress = custObj?.address || "";
+    const custPhone = custObj?.phone || "";
     const mapsUrl = custAddress ? `https://maps.google.com/?q=${encodeURIComponent(custAddress)}` : "";
 
-    // Generate QR for customer address map (async, build receipt after)
+    const fullItems = cartItems.map(i => {
+      const cat = (categories as any[]).find((c: any) => c.id === (i as any).categoryId);
+      return {
+        productName: i.name,
+        quantity: i.quantity,
+        unitPrice: i.price,
+        total: i.price * i.quantity,
+        categoryName: (cat?.name || "ARTIKEL").toUpperCase(),
+      };
+    });
+
     const buildAndPrint = async () => {
       let printQrDataUrl: string | null = null;
       try {
@@ -851,46 +844,147 @@ export default function POSScreen() {
         printQrDataUrl = await QRCode.toDataURL(qrContent, { width: 200, margin: 1, color: { dark: "#000000", light: "#ffffff" } });
       } catch { }
 
-      const customerInner = generateThermalReceiptHTML(fullSale, printQrDataUrl, { title: "KUNDENBELEG", isPartial: true });
-      const driverInner = generateThermalReceiptHTML(fullSale, null, { title: `FAHRERAUFTRAG #${orderId}`, isPartial: true });
-      const kitchenInner = generateThermalReceiptHTML(fullSale, null, { isKitchen: true, isPartial: true });
+      const storeName = storeSettings?.name || tenant?.name || "POS System";
+      const storeAddr = storeSettings?.address || "";
+      const storePhone = storeSettings?.phone || "";
+      const logoPath = storeSettings?.logo || "";
+      const logoUrl = logoPath ? (logoPath.startsWith("http") || logoPath.startsWith("data:") ? logoPath : `${getApiUrl().replace(/\/$/, "")}${logoPath}`) : "";
 
-      const driverFooter = `
-        <div style="border:1px solid #000;margin-top:12px;font-family:'Courier New',monospace;font-size:12px;color:#000;">
-          <div style="display:flex;border-bottom:1px solid #000;padding:10px 10px;">
-            <span style="font-weight:700;width:110px;min-width:110px;">FAHRER</span>
-            <span style="flex:1;">&nbsp;</span>
+      const receiptNum = saleData?.receiptNumber || `#${saleData?.id}`;
+      const saleDate = new Date(saleData?.createdAt || Date.now());
+      const timeStr = saleDate.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
+      const dateStr = saleDate.toLocaleDateString("de-CH");
+      const isDelivery = !!custAddress;
+      const itemCount = fullItems.reduce((s, i) => s + i.quantity, 0);
+
+      const css = `<style>
+        @page { size: 80mm auto; margin: 3mm 4mm; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #000; background: #fff; width: 72mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; line-height: 1.4; }
+        hr { border: none; border-top: 1px solid #000; margin: 3px 0; }
+      </style>`;
+
+      const hLeft = `<div style="flex:0 0 auto;min-width:66px;">
+        <div style="font-size:9px;">${receiptNum}</div>
+        <div style="font-size:9px;">Kassierer</div>
+        <div style="font-size:22px;font-weight:700;line-height:1.05;">${timeStr}</div>
+        <div style="font-size:9px;">${dateStr}</div>
+      </div>`;
+
+      const hRight = `<div style="flex:1;padding-left:6px;">
+        ${custName && custName !== "Laufkunde" ? `<div style="font-weight:700;font-size:11px;">${custName}</div>` : ""}
+        ${custAddress ? `<div style="font-size:10px;">${custAddress}</div>` : ""}
+        ${isDelivery ? `<div style="font-size:9px;font-style:italic;">Hauslieferung ohne Service und Zubereitung</div>` : ""}
+        ${custPhone ? `<div style="margin-top:2px;font-size:10px;"><b>Tel</b>&nbsp;&nbsp;${custPhone}</div>` : ""}
+      </div>`;
+
+      const itemRows = (showPrice: boolean) => fullItems.map(i => `
+        <div style="display:flex;padding:2px 0;font-size:11px;">
+          <span style="width:14px;">${i.quantity}</span>
+          <span style="flex:1;overflow:hidden;">${i.productName}</span>
+          ${showPrice ? `<span style="width:36px;text-align:right;font-size:10px;">${Number(i.unitPrice).toFixed(2)}</span><span style="width:36px;text-align:right;">${Number(i.total).toFixed(2)}</span>` : ""}
+        </div>`).join("");
+
+      const totalBox = `<div style="display:flex;border:1px solid #000;padding:4px 6px;margin:5px 0;">
+        <span style="font-weight:700;">${itemCount}</span>
+        <span style="flex:1;"></span>
+        <span style="font-size:10px;align-self:center;">Fr</span>
+        <span style="font-weight:700;font-size:16px;margin-left:5px;">${Number(cartTotal).toFixed(2)}</span>
+      </div>`;
+
+      // ── JOB 1: KUNDENBELEG (نسخة العميل / المطعم) ──────────────
+      const job1 = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">${css}</head><body>
+        ${logoUrl
+          ? `<div style="text-align:center;margin-bottom:5px;"><img src="${logoUrl}" style="max-height:50px;max-width:180px;object-fit:contain;"></div>`
+          : `<div style="font-size:15px;font-weight:700;text-align:center;margin-bottom:3px;">${storeName}</div>`}
+        <div style="text-align:center;font-size:11px;margin-bottom:4px;">Rechnung</div>
+        <div style="display:flex;margin-bottom:3px;">${hLeft}${hRight}</div>
+        <hr>
+        <div style="display:flex;font-size:9px;font-weight:700;padding:2px 0;">
+          <span style="width:14px;"></span><span style="flex:1;">Artikel</span>
+          <span style="width:36px;text-align:right;">Preis</span>
+          <span style="width:36px;text-align:right;">Total</span>
+        </div>
+        <hr>
+        ${itemRows(true)}
+        <hr>
+        ${totalBox}
+        ${Number(cartDiscount) > 0 ? `<div style="display:flex;font-size:10px;padding:1px 0;"><span style="flex:1;">Rabatt:</span><span>-CHF ${Number(cartDiscount).toFixed(2)}</span></div>` : ""}
+        ${Number(cartDeliveryFee) > 0 ? `<div style="display:flex;font-size:10px;padding:1px 0;"><span style="flex:1;">Liefergebühr:</span><span>CHF ${Number(cartDeliveryFee).toFixed(2)}</span></div>` : ""}
+        <div style="text-align:center;font-size:10px;margin-top:6px;">Vielen Dank für Ihren Einkauf!</div>
+        ${storeAddr ? `<div style="text-align:center;font-size:9px;margin-top:1px;">${storeName} · ${storeAddr}${storePhone ? " · Tel: " + storePhone : ""}</div>` : ""}
+        ${printQrDataUrl ? `<div style="text-align:center;margin-top:6px;"><img src="${printQrDataUrl}" style="width:72px;height:72px;"></div>` : ""}
+      </body></html>`;
+
+      // ── JOB 2: FAHRERAUFTRAG (نسخة السائق / التوصيل) ──────────
+      const job2 = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">${css}</head><body>
+        <div style="font-size:19px;font-weight:700;margin-bottom:4px;">Fahrerauftrag ${receiptNum}</div>
+        <div style="display:flex;margin-bottom:3px;">${hLeft}${hRight}</div>
+        <hr>
+        <div style="display:flex;font-size:9px;font-weight:700;padding:2px 0;">
+          <span style="width:14px;"></span><span style="flex:1;">Artikel</span>
+          <span style="width:36px;text-align:right;">Preis</span>
+          <span style="width:36px;text-align:right;">Total</span>
+        </div>
+        <hr>
+        ${itemRows(true)}
+        <hr>
+        ${totalBox}
+        <div style="border:1px solid #000;margin-top:3px;">
+          <div style="display:flex;border-bottom:1px solid #000;padding:7px 8px;">
+            <span style="font-weight:700;width:80px;">FAHRER</span><span style="flex:1;"></span>
           </div>
-          <div style="display:flex;border-bottom:1px solid #000;padding:10px 10px;">
-            <span style="font-weight:700;width:110px;min-width:110px;">LIEFERZEIT</span>
-            <span style="flex:1;">&nbsp;</span>
+          <div style="display:flex;border-bottom:1px solid #000;padding:7px 8px;">
+            <span style="font-weight:700;width:80px;">LIEFERZEIT</span><span style="flex:1;"></span>
           </div>
-          <div style="display:flex;padding:10px 10px;">
-            <span style="font-weight:700;width:110px;min-width:110px;">NOTIZ</span>
+          <div style="display:flex;padding:7px 8px;">
+            <span style="font-weight:700;width:80px;">NOTIZ</span>
             <span style="flex:1;font-style:italic;">${pmLabel}</span>
           </div>
-        </div>`;
+        </div>
+      </body></html>`;
 
-      // 3 separate print jobs → EPSON cuts after each job (not between CSS pages)
-      const receiptCss = `
-        <style>
-          @page { size: 80mm auto; margin: 4mm; }
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Courier New', monospace; font-size: 15px; font-weight: 600; color: #000; background: #fff; line-height: 1.45; width: 72mm; margin: 0 auto; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .center { text-align: center; }
-          .bold { font-weight: 900; }
-          .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
-          .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
-        </style>`;
-      const wrapHtml = (title: string, body: string) =>
-        `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>${title}</title>${receiptCss}</head><body>${body}</body></html>`;
+      // ── JOB 3: KÜCHENBON (نسخة المطبخ) ─────────────────────────
+      const grouped: Record<string, typeof fullItems> = {};
+      fullItems.forEach(i => {
+        if (!grouped[i.categoryName]) grouped[i.categoryName] = [];
+        grouped[i.categoryName].push(i);
+      });
+      const cats = Object.keys(grouped);
+      const kitchenItems = (cats.length > 1 || cats[0] !== "ARTIKEL")
+        ? cats.map(cat => `
+            <div style="background:#000;color:#fff;font-weight:700;padding:2px 5px;font-size:11px;margin-top:4px;">${cat}</div>
+            ${grouped[cat].map(i => `<div style="display:flex;padding:2px 4px;font-size:13px;font-weight:700;">
+              <span style="width:18px;">${i.quantity}</span>
+              <span style="flex:1;">${i.productName.toUpperCase()}</span>
+            </div>`).join("")}`).join("")
+        : fullItems.map(i => `<div style="display:flex;padding:2px 4px;font-size:13px;font-weight:700;">
+            <span style="width:18px;">${i.quantity}</span>
+            <span style="flex:1;">${i.productName.toUpperCase()}</span>
+          </div>`).join("");
 
-      const jobTitle = saleData?.receiptNumber || `#${saleData?.id}`;
-      const job1 = wrapHtml(`KUNDENBELEG ${jobTitle}`, customerInner);
-      const job2 = wrapHtml(`FAHRERAUFTRAG ${jobTitle}`, driverInner + driverFooter);
-      const job3 = wrapHtml(`KÜCHENBON ${jobTitle}`, kitchenInner);
+      const job3 = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">${css}</head><body>
+        <div style="font-size:18px;font-weight:700;font-style:italic;text-align:center;margin-bottom:3px;">AENDERUNG</div>
+        <div style="font-size:11px;font-weight:700;">${storeName} ${receiptNum}</div>
+        <div style="font-size:9px;">Kassierer</div>
+        <hr style="margin:3px 0;">
+        <div style="display:flex;margin:3px 0;">
+          <div style="flex:0 0 auto;min-width:66px;">
+            <div style="font-size:22px;font-weight:700;line-height:1.05;">${timeStr}</div>
+            <div style="font-size:9px;">${saleDate.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+          </div>
+          <div style="flex:1;padding-left:6px;">
+            ${custName && custName !== "Laufkunde" ? `<div style="font-weight:700;font-size:11px;">${custName}</div>` : ""}
+            ${custAddress ? `<div style="font-size:10px;">${custAddress}</div>` : ""}
+            ${custPhone ? `<div style="font-size:10px;"><b>Tel</b>&nbsp;${custPhone}</div>` : ""}
+          </div>
+        </div>
+        <hr>
+        ${kitchenItems}
+        <hr style="margin-top:5px;">
+        <div style="font-size:13px;font-weight:700;">${itemCount}</div>
+      </body></html>`;
 
-      // Chain 3 jobs via afterprint — each job end triggers EPSON auto-cut
       printHtmlViaIframe(job1, () =>
         printHtmlViaIframe(job2, () =>
           printHtmlViaIframe(job3)
