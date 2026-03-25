@@ -19,6 +19,43 @@ import RealTimeClock from "@/components/RealTimeClock";
 import { useLanguage } from "@/lib/language-context";
 import { useNotifications } from "@/lib/notification-context";
 
+// ── Web receipt printing via hidden iframe (no popup-blocking) ──────────────
+function printHtmlViaIframe(html: string) {
+  if (typeof document === "undefined") return;
+  const frameId = "_receipt_print_frame";
+  const existing = document.getElementById(frameId);
+  if (existing) existing.remove();
+
+  const iframe = document.createElement("iframe");
+  iframe.id = frameId;
+  Object.assign(iframe.style, {
+    position: "fixed", right: "0", bottom: "0",
+    width: "1px", height: "1px",
+    border: "none", opacity: "0",
+    pointerEvents: "none", zIndex: "-1",
+  });
+  document.body.appendChild(iframe);
+
+  try {
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    iframe.src = url;
+    iframe.onload = () => {
+      // Wait a tick for images to render, then print
+      setTimeout(() => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch (_) {}
+        URL.revokeObjectURL(url);
+        setTimeout(() => iframe?.remove(), 3000);
+      }, 400);
+    };
+  } catch (_) {
+    iframe.remove();
+  }
+}
+
 const AnimatedProductImage = ({ uri }: { uri: string }) => {
   return (
     <Image
@@ -612,17 +649,8 @@ export default function POSScreen() {
       return;
     }
     if (Platform.OS === "web" && selectedInvoice) {
-      const printWindow = window.open("", "_blank", "width=400,height=600");
-      if (printWindow) {
-        const html = generateThermalReceiptHTML(selectedInvoice, reprintQrDataUrl);
-        printWindow.document.write(html);
-        printWindow.document.close();
-        // Wait for potential images to load
-        setTimeout(() => {
-          printWindow.focus();
-          printWindow.print();
-        }, 500);
-      }
+      const html = generateThermalReceiptHTML(selectedInvoice, reprintQrDataUrl);
+      printHtmlViaIframe(html);
     }
   };
 
@@ -774,8 +802,6 @@ export default function POSScreen() {
 
   const autoPrint3Copies = (saleData: any, cartItems: typeof cart.items, cartSubtotal: number, cartTax: number, cartDiscount: number, cartServiceFee: number, cartTotal: number, cartDeliveryFee: number, pmMethod: string, cashAmt: number, custName: string, empName: string, custObj?: any, vehicleObj?: any, cartMinOrderSurcharge: number = 0) => {
     if (Platform.OS !== "web") return;
-    const printWin = window.open("", "_blank", "width=400,height=600");
-    if (!printWin) return;
 
     const fullSale = {
       ...saleData,
@@ -852,12 +878,7 @@ export default function POSScreen() {
 </body>
 </html>`;
 
-      printWin.document.write(combinedHtml);
-      printWin.document.close();
-      setTimeout(() => {
-        printWin.focus();
-        printWin.print();
-      }, 500);
+      printHtmlViaIframe(combinedHtml);
     };
 
     buildAndPrint();
@@ -1174,15 +1195,12 @@ export default function POSScreen() {
         }
 
         if (Platform.OS === "web") {
-          const printWindow = window.open("", "_blank", "width=380,height=600");
-          if (printWindow) {
-            const combinedHtml = fullSales.map((inv) => {
-              const html = generateThermalReceiptHTML(inv, null, { isPartial: true });
-              return `<div class="receipt-unit">${html}</div>`;
-            }).join("");
+          const combinedHtml = fullSales.map((inv) => {
+            const html = generateThermalReceiptHTML(inv, null, { isPartial: true });
+            return `<div class="receipt-unit">${html}</div>`;
+          }).join("");
 
-            printWindow.document.write(`
-<!DOCTYPE html>
+          printHtmlViaIframe(`<!DOCTYPE html>
 <html>
 <head>
   <title>Daily Invoices</title>
@@ -1197,16 +1215,8 @@ export default function POSScreen() {
     .receipt-unit:last-child { page-break-after: avoid; break-after: avoid; }
   </style>
 </head>
-<body>
-  ${combinedHtml}
-</body>
+<body>${combinedHtml}</body>
 </html>`);
-            printWindow.document.close();
-            setTimeout(() => {
-              printWindow.focus();
-              printWindow.print();
-            }, 500);
-          }
         } else {
           Alert.alert(t("success"), `Sent ${fullSales.length} invoices to printer queue.`);
         }

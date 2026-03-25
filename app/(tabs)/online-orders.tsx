@@ -14,6 +14,35 @@ import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { useLanguage } from "@/lib/language-context";
 import { playClickSound } from "@/lib/sound";
 
+// ── Web receipt printing via hidden iframe (no popup-blocking) ──────────────
+function printHtmlViaIframe(html: string) {
+  if (typeof document === "undefined") return;
+  const frameId = "_receipt_print_frame";
+  const existing = document.getElementById(frameId);
+  if (existing) existing.remove();
+  const iframe = document.createElement("iframe");
+  iframe.id = frameId;
+  Object.assign(iframe.style, {
+    position: "fixed", right: "0", bottom: "0",
+    width: "1px", height: "1px",
+    border: "none", opacity: "0",
+    pointerEvents: "none", zIndex: "-1",
+  });
+  document.body.appendChild(iframe);
+  try {
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    iframe.src = url;
+    iframe.onload = () => {
+      setTimeout(() => {
+        try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch (_) {}
+        URL.revokeObjectURL(url);
+        setTimeout(() => iframe?.remove(), 3000);
+      }, 400);
+    };
+  } catch (_) { iframe.remove(); }
+}
+
 const STATUS_FLOW = ["pending", "accepted", "preparing", "ready", "delivered"];
 
 const STATUS_META: Record<string, { label: string; labelAr: string; labelDe: string; color: string; icon: string; next?: string }> = {
@@ -774,8 +803,6 @@ export default function OrdersScreen() {
       Alert.alert("Print", "Printing is only supported on web currently.");
       return;
     }
-    const printWin = window.open("", "_blank", "width=800,height=800");
-    if (!printWin) return;
 
     const orderNum = editingOrder?._type === "pos" ? (editingOrder?.receiptNumber || `#${editingOrder?.id}`) : `#${editingOrder?.orderNumber}`;
     const dateStr = new Date().toLocaleDateString();
@@ -922,19 +949,10 @@ export default function OrdersScreen() {
     ${kitchenInner}
   </div>
 
-  <script>
-    window.onload = () => {
-      setTimeout(() => {
-        window.print();
-        window.close();
-      }, 500);
-    };
-  </script>
 </body>
 </html>`;
 
-    printWin.document.write(combinedHtml);
-    printWin.document.close();
+    printHtmlViaIframe(combinedHtml);
   };
 
   return (
