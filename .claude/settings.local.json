@@ -111,7 +111,16 @@
       "Bash(curl -s \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1098\")",
       "Bash(curl -v \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1094\")",
       "Bash(curl -s -L -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36\" \"https://pizzalemon.ch/lemon/index.php?route=product/product&product_id=1094\")",
-      "Bash(curl -s \"https://pizzalemon.ch/lemon/index.php?route=product/category&path=120\")"
+      "Bash(curl -s \"https://pizzalemon.ch/lemon/index.php?route=product/category&path=120\")",
+      "Bash(git pull:*)",
+      "Bash(head -60 \"f:/POS-APP/app/\\(tabs\\)/online-orders.tsx\")",
+      "Bash(head -60 \"f:/POS-APP/app/\\(tabs\\)/products.tsx\")",
+      "Bash(head -20 grep -n \"insets\\\\|SafeArea\\\\|header\\\\|paddingTop\" \"f:/POS-APP/app/\\(tabs\\)/settings.tsx\")",
+      "Bash(head -10 grep -n \"headerContent\\\\|headerGrad\\\\|headerTitle\\\\|headerRow\\\\|styles.header\" \"f:/POS-APP/app/\\(tabs\\)/customers.tsx\")",
+      "Bash(head -10 grep -n \"headerContent\\\\|headerGrad\\\\|headerTitle\\\\|headerRow\\\\|styles.header\" \"f:/POS-APP/app/\\(tabs\\)/reports.tsx\")",
+      "Bash(sed -n '240,270p' \"f:/POS-APP/app/\\(tabs\\)/products.tsx\")",
+      "Bash(sed -n '140,165p' \"f:/POS-APP/app/\\(tabs\\)/customers.tsx\")",
+      "Bash(sed -n '1335,1360p' \"f:/POS-APP/app/\\(tabs\\)/reports.tsx\")"
     ]
   }
 }
