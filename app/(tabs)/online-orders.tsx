@@ -15,11 +15,9 @@ import { useLanguage } from "@/lib/language-context";
 import { playClickSound } from "@/lib/sound";
 
 // ── Web receipt printing via hidden iframe (no popup-blocking) ──────────────
-function printHtmlViaIframe(html: string) {
+function printHtmlViaIframe(html: string, onDone?: () => void) {
   if (typeof document === "undefined") return;
-  const frameId = "_receipt_print_frame";
-  const existing = document.getElementById(frameId);
-  if (existing) existing.remove();
+  const frameId = `_rp_${Date.now()}`;
   const iframe = document.createElement("iframe");
   iframe.id = frameId;
   Object.assign(iframe.style, {
@@ -29,18 +27,29 @@ function printHtmlViaIframe(html: string) {
     pointerEvents: "none", zIndex: "-1",
   });
   document.body.appendChild(iframe);
+  const cleanup = (url: string) => { URL.revokeObjectURL(url); setTimeout(() => iframe?.remove(), 1000); };
   try {
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     iframe.src = url;
     iframe.onload = () => {
       setTimeout(() => {
-        try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch (_) {}
-        URL.revokeObjectURL(url);
-        setTimeout(() => iframe?.remove(), 3000);
+        try {
+          const win = iframe.contentWindow;
+          if (!win) return;
+          win.focus();
+          if (onDone) {
+            win.addEventListener("afterprint", () => { cleanup(url); onDone(); }, { once: true });
+            setTimeout(() => { try { onDone(); } catch (_) {} }, 8000);
+          } else {
+            win.addEventListener("afterprint", () => cleanup(url), { once: true });
+            setTimeout(() => cleanup(url), 8000);
+          }
+          win.print();
+        } catch (_) { onDone?.(); }
       }, 400);
     };
-  } catch (_) { iframe.remove(); }
+  } catch (_) { iframe.remove(); onDone?.(); }
 }
 
 const STATUS_FLOW = ["pending", "accepted", "preparing", "ready", "delivered"];

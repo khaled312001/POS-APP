@@ -20,12 +20,12 @@ import { useLanguage } from "@/lib/language-context";
 import { useNotifications } from "@/lib/notification-context";
 
 // ── Web receipt printing via hidden iframe (no popup-blocking) ──────────────
-function printHtmlViaIframe(html: string) {
+// onDone fires after the print dialog is dismissed (afterprint event).
+// Use it to chain sequential jobs so each job ends with an auto-cut.
+function printHtmlViaIframe(html: string, onDone?: () => void) {
   if (typeof document === "undefined") return;
-  const frameId = "_receipt_print_frame";
-  const existing = document.getElementById(frameId);
-  if (existing) existing.remove();
-
+  // Use a unique id per call so sequential iframes don't collide
+  const frameId = `_rp_${Date.now()}`;
   const iframe = document.createElement("iframe");
   iframe.id = frameId;
   Object.assign(iframe.style, {
@@ -36,23 +36,37 @@ function printHtmlViaIframe(html: string) {
   });
   document.body.appendChild(iframe);
 
+  const cleanup = (url: string) => {
+    URL.revokeObjectURL(url);
+    setTimeout(() => iframe?.remove(), 1000);
+  };
+
   try {
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     iframe.src = url;
     iframe.onload = () => {
-      // Wait a tick for images to render, then print
       setTimeout(() => {
         try {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-        } catch (_) {}
-        URL.revokeObjectURL(url);
-        setTimeout(() => iframe?.remove(), 3000);
+          const win = iframe.contentWindow;
+          if (!win) return;
+          win.focus();
+          // afterprint fires when print dialog closes → trigger next job
+          if (onDone) {
+            win.addEventListener("afterprint", () => { cleanup(url); onDone(); }, { once: true });
+            // Fallback: if afterprint never fires (some browsers), still call onDone
+            setTimeout(() => { try { onDone(); } catch (_) {} }, 8000);
+          } else {
+            win.addEventListener("afterprint", () => cleanup(url), { once: true });
+            setTimeout(() => cleanup(url), 8000);
+          }
+          win.print();
+        } catch (_) { onDone?.(); }
       }, 400);
     };
   } catch (_) {
     iframe.remove();
+    onDone?.();
   }
 }
 
@@ -854,32 +868,31 @@ export default function POSScreen() {
           </div>
         </div>`;
 
-      const combinedHtml = `<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <title>Rechnung ${saleData?.receiptNumber || '#' + saleData?.id}</title>
-  <style>
-    /* Fixed page height → each receipt-unit becomes a real page → auto-cutter fires between them */
-    @page { size: 80mm 300mm; margin: 4mm; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Courier New', monospace; font-size: 15px; font-weight: 600; color: #000; background: #fff; line-height: 1.45; width: 72mm; margin: 0 auto; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .receipt-unit { width: 100%; padding: 8px 0; page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; }
-    .receipt-unit:last-child { page-break-after: auto; break-after: auto; }
-    .center { text-align: center; }
-    .bold { font-weight: 800; }
-    .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
-    .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
-  </style>
-</head>
-<body>
-  <div class="receipt-unit">${customerInner}</div>
-  <div class="receipt-unit">${driverInner}${driverFooter}</div>
-  <div class="receipt-unit">${kitchenInner}</div>
-</body>
-</html>`;
+      // Build a standalone single-receipt HTML (one per print job → one cut each)
+      const receiptCss = `
+        <style>
+          @page { size: 80mm auto; margin: 4mm; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Courier New', monospace; font-size: 15px; font-weight: 600; color: #000; background: #fff; line-height: 1.45; width: 72mm; margin: 0 auto; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .center { text-align: center; }
+          .bold { font-weight: 900; }
+          .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
+          .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
+        </style>`;
+      const wrapHtml = (title: string, body: string) =>
+        `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>${title}</title>${receiptCss}</head><body>${body}</body></html>`;
 
-      printHtmlViaIframe(combinedHtml);
+      const jobTitle = saleData?.receiptNumber || `#${saleData?.id}`;
+      const job1 = wrapHtml(`KUNDENBELEG ${jobTitle}`, customerInner);
+      const job2 = wrapHtml(`FAHRERAUFTRAG ${jobTitle}`, driverInner + driverFooter);
+      const job3 = wrapHtml(`KÜCHENBON ${jobTitle}`, kitchenInner);
+
+      // Print 3 separate jobs → printer cuts after EACH job (not just at end)
+      printHtmlViaIframe(job1, () =>
+        printHtmlViaIframe(job2, () =>
+          printHtmlViaIframe(job3)
+        )
+      );
     };
 
     buildAndPrint();
@@ -933,7 +946,8 @@ export default function POSScreen() {
     setCardError("");
     setNfcStatus("waiting");
     setPaymentConfirmed(false);
-    setShowReceipt(true);
+    // Receipt modal hidden — auto-print already handles output
+    // setShowReceipt(true);
     qc.invalidateQueries({ queryKey: ["/api/sales"] });
     qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
     qc.invalidateQueries({ queryKey: ["/api/inventory"] });
