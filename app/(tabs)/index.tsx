@@ -1009,9 +1009,10 @@ export default function POSScreen() {
     // Auto-print 3 copies on web
     const vehicleObj = cart.vehicleId ? (vehicles as any[]).find((v: any) => v.id === cart.vehicleId) : undefined;
     autoPrint3Copies(
-      saleData, cart.items, cart.subtotal, cart.tax, cart.discount, cart.serviceFee, cart.total, cart.deliveryFee,
+      saleData, cart.items, cart.subtotal, cart.tax, cart.discount, cart.serviceFee, cart.total + manualAdjustment, cart.deliveryFee,
       paymentMethod, cashAmt, custName, empName, selectedCustomer, vehicleObj, cart.minimumOrderSurcharge
     );
+    setManualAdjustment(0);
     setLastSale({
       ...saleData,
       items: saleItems,
@@ -2116,7 +2117,7 @@ export default function POSScreen() {
                 </Pressable>
               </View>
 
-              <Text style={styles.modalTotal}>CHF {cart.total.toFixed(2)}</Text>
+              <Text style={styles.modalTotal}>CHF {(cart.total + manualAdjustment).toFixed(2)}</Text>
 
               {selectedCustomer && (
                 <View style={[styles.customerInfo, isRTL && { flexDirection: "row-reverse" }]}>
@@ -2160,7 +2161,7 @@ export default function POSScreen() {
                     keyboardType="decimal-pad"
                   />
                   {cashReceived && Number(cashReceived) >= cart.total && (
-                    <Text style={styles.changeText}>{t("change")}: CHF {(Number(cashReceived) - cart.total).toFixed(2)}</Text>
+                    <Text style={styles.changeText}>{t("change")}: CHF {(Number(cashReceived) - (cart.total + manualAdjustment)).toFixed(2)}</Text>
                   )}
                 </View>
               )}
@@ -2175,7 +2176,7 @@ export default function POSScreen() {
                   </View>
                   <Ionicons name="wifi" size={18} color={paymentConfirmed ? Colors.success : Colors.textSecondary} />
                   <Text style={[{ color: paymentConfirmed ? Colors.success : Colors.text, fontSize: 13, fontWeight: "600", flex: 1 }, rtlTextAlign]}>
-                    {t("confirmPayment" as any) || "Confirm NFC payment"} — CHF {cart.total.toFixed(2)}
+                    {t("confirmPayment" as any) || "Confirm NFC payment"} — CHF {(cart.total + manualAdjustment).toFixed(2)}
                   </Text>
                 </Pressable>
               )}
@@ -2190,7 +2191,7 @@ export default function POSScreen() {
                   </View>
                   <Ionicons name="card" size={18} color={paymentConfirmed ? Colors.success : Colors.textSecondary} />
                   <Text style={[{ color: paymentConfirmed ? Colors.success : Colors.text, fontSize: 13, fontWeight: "600", flex: 1 }, rtlTextAlign]}>
-                    {t("confirmPayment" as any) || "Confirm card payment via terminal"} — CHF {cart.total.toFixed(2)}
+                    {t("confirmPayment" as any) || "Confirm card payment via terminal"} — CHF {(cart.total + manualAdjustment).toFixed(2)}
                   </Text>
                 </Pressable>
               )}
@@ -2297,7 +2298,7 @@ export default function POSScreen() {
                     {paymentConfirmed && <Ionicons name="checkmark" size={14} color={Colors.white} />}
                   </View>
                   <Text style={[{ color: paymentConfirmed ? Colors.success : Colors.text, fontSize: 13, fontWeight: "600", flex: 1 }, rtlTextAlign]}>
-                    {t("confirmPayment" as any)} — CHF {cart.total.toFixed(2)}
+                    {t("confirmPayment" as any)} — CHF {(cart.total + manualAdjustment).toFixed(2)}
                   </Text>
                 </Pressable>
               )}
