@@ -16,6 +16,19 @@ import { useLicense } from "@/lib/license-context";
 
 const PAGE_SIZE = 200;
 
+function InfoRow({ icon, label, value, isRTL }: { icon: string; label: string; value: string; isRTL?: boolean }) {
+  if (!value) return null;
+  return (
+    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+      <Ionicons name={icon as any} size={15} color={Colors.accent} style={{ marginTop: 2 }} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: Colors.textMuted, fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</Text>
+        <Text style={{ color: Colors.text, fontSize: 14, marginTop: 1 }}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function CustomersScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
@@ -38,7 +51,7 @@ export default function CustomersScreen() {
   const [showDetail, setShowDetail] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editCustomer, setEditCustomer] = useState<any | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", notes: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", notes: "", company: "", firstName: "", lastName: "", street: "", streetNr: "", houseNr: "", city: "", postalCode: "", salutation: "" });
 
 
   // Total count query
@@ -89,7 +102,7 @@ export default function CustomersScreen() {
   };
 
   const invalidateCustomers = () => {
-    qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).includes(`/api/customers?tenantId=${tenant?.id}`) });
+    qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).includes(`/api/customers`) });
     setOffset(0);
     setAllCustomers([]);
     setHasMore(true);
@@ -108,7 +121,7 @@ export default function CustomersScreen() {
       invalidateCustomers();
       setShowForm(false);
       setEditCustomer(null);
-      setForm({ name: "", email: "", phone: "", address: "", notes: "" });
+      resetForm();
     },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
@@ -123,25 +136,63 @@ export default function CustomersScreen() {
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
+  const resetForm = () => setForm({ name: "", email: "", phone: "", address: "", notes: "", company: "", firstName: "", lastName: "", street: "", streetNr: "", houseNr: "", city: "", postalCode: "", salutation: "" });
+
   const openEdit = (c: any) => {
     setEditCustomer(c);
-    setForm({ name: c.name, email: c.email || "", phone: c.phone || "", address: c.address || "", notes: c.notes || "" });
+    setForm({
+      name: c.name || "",
+      email: c.email || "",
+      phone: c.phone || "",
+      address: c.address || "",
+      notes: c.notes || "",
+      company: c.company || "",
+      firstName: c.firstName || "",
+      lastName: c.lastName || "",
+      street: c.street || "",
+      streetNr: c.streetNr || "",
+      houseNr: c.houseNr || "",
+      city: c.city || "",
+      postalCode: c.postalCode || "",
+      salutation: c.salutation || "",
+    });
     setShowForm(true);
   };
 
   const handleSave = () => {
-    if (!form.name) return Alert.alert(t("error"), t("customerName"));
+    if (!form.name && !form.lastName) return Alert.alert(t("error"), t("customerName"));
+    const name = form.name || [form.lastName, form.firstName].filter(Boolean).join(", ");
     saveMutation.mutate({
-      name: form.name,
+      name,
       email: form.email || undefined,
       phone: form.phone || undefined,
       address: form.address || undefined,
       notes: form.notes || undefined,
+      company: form.company || undefined,
+      firstName: form.firstName || undefined,
+      lastName: form.lastName || undefined,
+      street: form.street || undefined,
+      streetNr: form.streetNr || undefined,
+      houseNr: form.houseNr || undefined,
+      city: form.city || undefined,
+      postalCode: form.postalCode || undefined,
+      salutation: form.salutation || undefined,
       tenantId: tenant?.id,
     });
   };
 
   const topPad = Platform.OS === "web" ? 48 : 0;
+
+  // Helper to get subtitle for list card
+  const getSubtitle = (item: any) => {
+    const parts: string[] = [];
+    if (item.company) parts.push(item.company);
+    if (item.city) parts.push(item.city);
+    if (item.phone) parts.push(item.phone);
+    if (parts.length === 0 && item.email) parts.push(item.email);
+    if (parts.length === 0) parts.push(t("noContactInfo"));
+    return parts.join(" · ");
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
@@ -152,7 +203,7 @@ export default function CustomersScreen() {
             <Text style={{ color: Colors.white, fontSize: 13, fontWeight: "800" }}>{totalCount} {t("total" as any) || "Total"}</Text>
           </View>
         </View>
-        <Pressable style={styles.addBtn} onPress={() => { playClickSound("medium"); setEditCustomer(null); setForm({ name: "", email: "", phone: "", address: "", notes: "" }); setShowForm(true); }}>
+        <Pressable style={styles.addBtn} onPress={() => { playClickSound("medium"); setEditCustomer(null); resetForm(); setShowForm(true); }}>
           <Ionicons name="add" size={24} color={Colors.white} />
         </Pressable>
       </LinearGradient>
@@ -192,15 +243,29 @@ export default function CustomersScreen() {
                   <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={styles.cardInfo}>
-                  <Text style={[styles.cardName, rtlTextAlign]}>{item.name}</Text>
-                  <Text style={[styles.cardMeta, rtlTextAlign]}>{item.phone || item.email || t("noContactInfo")}</Text>
+                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <Text style={[styles.cardName, rtlTextAlign]} numberOfLines={1}>{item.name}</Text>
+                    {item.salutation ? <Text style={{ color: Colors.textMuted, fontSize: 11, fontStyle: "italic" }}>({item.salutation})</Text> : null}
+                  </View>
+                  <Text style={[styles.cardMeta, rtlTextAlign]} numberOfLines={1}>{getSubtitle(item)}</Text>
+                  {item.customerNr ? <Text style={{ color: Colors.textMuted, fontSize: 10, marginTop: 1 }}>#{item.customerNr}</Text> : null}
                 </View>
                 <View style={[styles.cardRight, isRTL && { alignItems: "flex-start" }]}>
-                  <View style={[styles.loyaltyBadge, isRTL && { flexDirection: "row-reverse" }]}>
-                    <Ionicons name="star" size={12} color={Colors.warning} />
-                    <Text style={styles.loyaltyText}>{item.loyaltyPoints || 0}</Text>
-                  </View>
-                  <Text style={styles.totalSpent}>CHF {Number(item.totalSpent || 0).toFixed(0)}</Text>
+                  {(item.orderCount > 0 || item.visitCount > 0) && (
+                    <View style={[styles.loyaltyBadge, isRTL && { flexDirection: "row-reverse" }]}>
+                      <Ionicons name="receipt-outline" size={11} color={Colors.accent} />
+                      <Text style={[styles.loyaltyText, { color: Colors.accent }]}>{item.orderCount || item.visitCount || 0}</Text>
+                    </View>
+                  )}
+                  {(Number(item.totalSpent || 0) > 0 || Number(item.legacyTotalSpent || 0) > 0) && (
+                    <Text style={styles.totalSpent}>CHF {Number(item.totalSpent || item.legacyTotalSpent || 0).toFixed(0)}</Text>
+                  )}
+                  {item.loyaltyPoints > 0 && (
+                    <View style={[styles.loyaltyBadge, isRTL && { flexDirection: "row-reverse" }]}>
+                      <Ionicons name="star" size={11} color={Colors.warning} />
+                      <Text style={styles.loyaltyText}>{item.loyaltyPoints}</Text>
+                    </View>
+                  )}
                 </View>
               </Pressable>
             ))}
@@ -221,22 +286,71 @@ export default function CustomersScreen() {
       {/* Add / Edit Customer Modal */}
       <Modal visible={showForm} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { maxHeight: "90%" }]}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>{editCustomer ? t("edit") + " " + t("customers") : t("addCustomer")}</Text>
               <Pressable onPress={() => { playClickSound("light"); setShowForm(false); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={[styles.sectionLabel, rtlTextAlign]}>📋 {language === "ar" ? "معلومات أساسية" : "Basic Info"}</Text>
+
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <View style={{ width: 80 }}>
+                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "اللقب" : "Anrede"}</Text>
+                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.salutation} onChangeText={(v) => setForm({ ...form, salutation: v })} placeholderTextColor={Colors.textMuted} placeholder="Herr/Frau" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "الاسم الأول" : "Vorname"}</Text>
+                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.firstName} onChangeText={(v) => setForm({ ...form, firstName: v })} placeholderTextColor={Colors.textMuted} placeholder={language === "ar" ? "الاسم الأول" : "First Name"} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "الاسم الأخير" : "Nachname"}</Text>
+                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.lastName} onChangeText={(v) => setForm({ ...form, lastName: v })} placeholderTextColor={Colors.textMuted} placeholder={language === "ar" ? "اسم العائلة" : "Last Name"} />
+                </View>
+              </View>
+
               <Text style={[styles.label, rtlTextAlign]}>{t("customerName")} *</Text>
               <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} placeholderTextColor={Colors.textMuted} placeholder={t("customerName")} />
+
+              <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "الشركة" : "Firma"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.company} onChangeText={(v) => setForm({ ...form, company: v })} placeholderTextColor={Colors.textMuted} placeholder={language === "ar" ? "اسم الشركة" : "Company"} />
+
               <Text style={[styles.label, rtlTextAlign]}>{t("phone")}</Text>
-              <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.phone} onChangeText={(v) => setForm({ ...form, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+1234567890" />
+              <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.phone} onChangeText={(v) => setForm({ ...form, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+41..." />
+
               <Text style={[styles.label, rtlTextAlign]}>{t("email")}</Text>
               <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.email} onChangeText={(v) => setForm({ ...form, email: v })} keyboardType="email-address" placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" />
-              <Text style={[styles.label, rtlTextAlign]}>{t("address")}</Text>
+
+              <Text style={[styles.sectionLabel, rtlTextAlign]}>📍 {language === "ar" ? "العنوان" : "Address"}</Text>
+
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <View style={{ flex: 2 }}>
+                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "الشارع" : "Strasse"}</Text>
+                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.street} onChangeText={(v) => setForm({ ...form, street: v })} placeholderTextColor={Colors.textMuted} placeholder={language === "ar" ? "الشارع" : "Street"} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "رقم" : "Nr."}</Text>
+                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.streetNr} onChangeText={(v) => setForm({ ...form, streetNr: v })} placeholderTextColor={Colors.textMuted} placeholder="Nr." />
+                </View>
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <View style={{ width: 80 }}>
+                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "الرمز" : "PLZ"}</Text>
+                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.postalCode} onChangeText={(v) => setForm({ ...form, postalCode: v })} keyboardType="numeric" placeholderTextColor={Colors.textMuted} placeholder="PLZ" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "المدينة" : "Ort"}</Text>
+                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.city} onChangeText={(v) => setForm({ ...form, city: v })} placeholderTextColor={Colors.textMuted} placeholder={language === "ar" ? "المدينة" : "City"} />
+                </View>
+              </View>
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("address")} ({language === "ar" ? "كامل" : "Full"})</Text>
               <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.address} onChangeText={(v) => setForm({ ...form, address: v })} placeholderTextColor={Colors.textMuted} placeholder={t("address")} />
+
               <Text style={[styles.label, rtlTextAlign]}>{t("notes")}</Text>
               <TextInput style={[styles.input, { height: 80, textAlignVertical: "top" }, rtlTextAlign, rtlText]} value={form.notes} onChangeText={(v) => setForm({ ...form, notes: v })} multiline placeholderTextColor={Colors.textMuted} placeholder={t("notes")} />
+
               <Pressable style={styles.saveBtn} onPress={() => { playClickSound("heavy"); handleSave(); }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
                   <Text style={styles.saveBtnText}>{editCustomer ? t("save") : t("addCustomer")}</Text>
@@ -258,50 +372,100 @@ export default function CustomersScreen() {
 
             {selectedCustomer && (
               <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={{ alignItems: "center", marginBottom: 20 }}>
+                {/* Header */}
+                <View style={{ alignItems: "center", marginBottom: 16 }}>
                   <View style={[styles.avatar, { width: 64, height: 64, borderRadius: 32, marginRight: 0, marginBottom: 10 }]}>
                     <Text style={[styles.avatarText, { fontSize: 28 }]}>{selectedCustomer.name.charAt(0).toUpperCase()}</Text>
                   </View>
                   <Text style={{ color: Colors.text, fontSize: 20, fontWeight: "700" }}>{selectedCustomer.name}</Text>
-                  {selectedCustomer.phone && <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 4 }}>{selectedCustomer.phone}</Text>}
-                  {selectedCustomer.email && <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 2 }}>{selectedCustomer.email}</Text>}
+                  {selectedCustomer.salutation && <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>({selectedCustomer.salutation})</Text>}
+                  {selectedCustomer.company && <Text style={{ color: Colors.accent, fontSize: 13, marginTop: 4, fontWeight: "600" }}>🏢 {selectedCustomer.company}</Text>}
+                  {selectedCustomer.customerNr && <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }}>Kunden-Nr: #{selectedCustomer.customerNr}</Text>}
                 </View>
 
-                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, marginBottom: 16 }}>
-                  <View style={{ flex: 1, backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 14, alignItems: "center" }}>
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
-                      <Ionicons name="star" size={16} color={Colors.warning} />
-                      <Text style={{ color: Colors.warning, fontSize: 20, fontWeight: "800" }}>{selectedCustomer.loyaltyPoints || 0}</Text>
+                {/* Stats Row */}
+                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 6, marginBottom: 14 }}>
+                  <View style={styles.statBox}>
+                    <Text style={[styles.statValue, { color: Colors.accent }]}>CHF {Number(selectedCustomer.totalSpent || selectedCustomer.legacyTotalSpent || 0).toFixed(0)}</Text>
+                    <Text style={styles.statLabel}>{t("totalSpent")}</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={[styles.statValue, { color: Colors.info }]}>{selectedCustomer.orderCount || selectedCustomer.visitCount || 0}</Text>
+                    <Text style={styles.statLabel}>{t("visits")}</Text>
+                  </View>
+                  {Number(selectedCustomer.averageOrderValue || 0) > 0 && (
+                    <View style={styles.statBox}>
+                      <Text style={[styles.statValue, { color: Colors.warning }]}>CHF {Number(selectedCustomer.averageOrderValue).toFixed(0)}</Text>
+                      <Text style={styles.statLabel}>⌀ {language === "ar" ? "متوسط" : "Avg"}</Text>
                     </View>
-                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{t("loyaltyPoints")}</Text>
-                  </View>
-                  <View style={{ flex: 1, backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 14, alignItems: "center" }}>
-                    <Text style={{ color: Colors.accent, fontSize: 20, fontWeight: "800" }}>CHF {Number(selectedCustomer.totalSpent || 0).toFixed(0)}</Text>
-                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{t("totalSpent")}</Text>
-                  </View>
-                  <View style={{ flex: 1, backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 14, alignItems: "center" }}>
-                    <Text style={{ color: Colors.info, fontSize: 20, fontWeight: "800" }}>{selectedCustomer.visitCount || 0}</Text>
-                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{t("visits")}</Text>
-                  </View>
+                  )}
+                  {(selectedCustomer.loyaltyPoints || 0) > 0 && (
+                    <View style={styles.statBox}>
+                      <View style={{ flexDirection: "row", gap: 3, alignItems: "center" }}>
+                        <Ionicons name="star" size={14} color={Colors.warning} />
+                        <Text style={[styles.statValue, { color: Colors.warning }]}>{selectedCustomer.loyaltyPoints}</Text>
+                      </View>
+                      <Text style={styles.statLabel}>{t("loyaltyPoints")}</Text>
+                    </View>
+                  )}
                 </View>
 
-                {selectedCustomer.address && (
-                  <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                      <Ionicons name="location-outline" size={14} color={Colors.textMuted} />
-                      <Text style={[{ color: Colors.textSecondary, fontSize: 12, fontWeight: "600" }, rtlTextAlign]}>{t("address").toUpperCase()}</Text>
-                    </View>
-                    <Text style={[{ color: Colors.text, fontSize: 14 }, rtlTextAlign]}>{selectedCustomer.address}</Text>
+                {/* Contact Info */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.sectionTitle}>📞 {language === "ar" ? "معلومات الاتصال" : "Contact"}</Text>
+                  <InfoRow icon="call-outline" label={language === "ar" ? "هاتف" : "Telefon"} value={selectedCustomer.phone} isRTL={isRTL} />
+                  <InfoRow icon="mail-outline" label={language === "ar" ? "بريد" : "Email"} value={selectedCustomer.email} isRTL={isRTL} />
+                  {selectedCustomer.zhd && <InfoRow icon="person-outline" label="z.Hd." value={selectedCustomer.zhd} isRTL={isRTL} />}
+                </View>
+
+                {/* Address */}
+                {(selectedCustomer.address || selectedCustomer.street || selectedCustomer.city) && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.sectionTitle}>📍 {language === "ar" ? "العنوان" : "Adresse"}</Text>
+                    {selectedCustomer.street && (
+                      <InfoRow icon="navigate-outline" label={language === "ar" ? "الشارع" : "Strasse"} value={`${selectedCustomer.street || ""} ${selectedCustomer.streetNr || ""} ${selectedCustomer.houseNr || ""}`.trim()} isRTL={isRTL} />
+                    )}
+                    {(selectedCustomer.postalCode || selectedCustomer.city) && (
+                      <InfoRow icon="business-outline" label={language === "ar" ? "المدينة" : "Ort"} value={`${selectedCustomer.postalCode || ""} ${selectedCustomer.city || ""}`.trim()} isRTL={isRTL} />
+                    )}
+                    {selectedCustomer.address && !selectedCustomer.street && (
+                      <InfoRow icon="location-outline" label={language === "ar" ? "العنوان" : "Adresse"} value={selectedCustomer.address} isRTL={isRTL} />
+                    )}
                   </View>
                 )}
 
+                {/* Delivery */}
+                {(selectedCustomer.howToGo || selectedCustomer.screenInfo) && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.sectionTitle}>🚗 {language === "ar" ? "توصيل" : "Lieferung"}</Text>
+                    <InfoRow icon="car-outline" label={language === "ar" ? "كيف تصل" : "How to Go"} value={selectedCustomer.howToGo} isRTL={isRTL} />
+                    <InfoRow icon="tv-outline" label="Screen Info" value={selectedCustomer.screenInfo} isRTL={isRTL} />
+                  </View>
+                )}
+
+                {/* Order History Dates */}
+                {(selectedCustomer.firstOrderDate || selectedCustomer.lastOrderDate) && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.sectionTitle}>📅 {language === "ar" ? "تاريخ الطلبات" : "Bestellhistorie"}</Text>
+                    <InfoRow icon="calendar-outline" label={language === "ar" ? "أول طلب" : "Erste Bestellung"} value={selectedCustomer.firstOrderDate} isRTL={isRTL} />
+                    <InfoRow icon="time-outline" label={language === "ar" ? "آخر طلب" : "Letzte Bestellung"} value={selectedCustomer.lastOrderDate} isRTL={isRTL} />
+                  </View>
+                )}
+
+                {/* Notes */}
                 {selectedCustomer.notes && (
-                  <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                      <Ionicons name="document-text-outline" size={14} color={Colors.textMuted} />
-                      <Text style={[{ color: Colors.textSecondary, fontSize: 12, fontWeight: "600" }, rtlTextAlign]}>{t("notes").toUpperCase()}</Text>
-                    </View>
-                    <Text style={[{ color: Colors.text, fontSize: 14 }, rtlTextAlign]}>{selectedCustomer.notes}</Text>
+                  <View style={styles.detailSection}>
+                    <Text style={styles.sectionTitle}>📝 {language === "ar" ? "ملاحظات" : "Notizen"}</Text>
+                    <Text style={{ color: Colors.text, fontSize: 14, lineHeight: 20 }}>{selectedCustomer.notes}</Text>
+                  </View>
+                )}
+
+                {/* Source */}
+                {selectedCustomer.source && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: Colors.surfaceLight, borderRadius: 8, padding: 8, marginBottom: 12 }}>
+                    <Ionicons name="cloud-outline" size={14} color={Colors.textMuted} />
+                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>Source: {selectedCustomer.source}</Text>
+                    {selectedCustomer.legacyRef && <Text style={{ color: Colors.textMuted, fontSize: 11 }}>| Ref: {selectedCustomer.legacyRef}</Text>}
                   </View>
                 )}
 
@@ -399,14 +563,21 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", paddingVertical: 60 },
   emptyText: { color: Colors.textMuted, fontSize: 15, marginTop: 12 },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" },
-  modalContent: { backgroundColor: Colors.surface, borderRadius: 20, padding: 24, width: "90%", maxWidth: 460, maxHeight: "85%" },
+  modalContent: { backgroundColor: Colors.surface, borderRadius: 20, padding: 24, width: "90%", maxWidth: 520, maxHeight: "85%" },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   modalTitle: { color: Colors.text, fontSize: 20, fontWeight: "700" },
-  label: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600", marginBottom: 6, marginTop: 12, textTransform: "uppercase" as const, letterSpacing: 0.5 },
+  label: { color: Colors.textSecondary, fontSize: 11, fontWeight: "600", marginBottom: 4, marginTop: 10, textTransform: "uppercase" as const, letterSpacing: 0.5 },
+  sectionLabel: { color: Colors.accent, fontSize: 13, fontWeight: "700", marginTop: 16, marginBottom: 4 },
   input: { backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: Colors.text, fontSize: 15, borderWidth: 1, borderColor: Colors.inputBorder },
   saveBtn: { borderRadius: 14, overflow: "hidden", marginTop: 20, marginBottom: 16 },
   saveBtnGradient: { paddingVertical: 14, alignItems: "center" },
   saveBtnText: { color: Colors.white, fontSize: 16, fontWeight: "700" },
   loadMoreBtn: { marginVertical: 16, marginHorizontal: 4, borderRadius: 12, backgroundColor: Colors.gradientMid, paddingVertical: 14, alignItems: "center" },
   loadMoreText: { color: Colors.white, fontSize: 15, fontWeight: "600" },
+  // Detail modal styles
+  statBox: { flex: 1, backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 10, alignItems: "center" },
+  statValue: { fontSize: 18, fontWeight: "800" },
+  statLabel: { color: Colors.textMuted, fontSize: 10, marginTop: 2 },
+  detailSection: { backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 10 },
+  sectionTitle: { color: Colors.textSecondary, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
 });

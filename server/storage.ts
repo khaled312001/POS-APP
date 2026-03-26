@@ -264,7 +264,13 @@ export const storage = {
           or(
             ilike(customers.name, `%${search}%`),
             ilike(customers.phone || "", `%${search}%`),
-            ilike(customers.email || "", `%${search}%`)
+            ilike(customers.email || "", `%${search}%`),
+            ilike(customers.company || "", `%${search}%`),
+            ilike(customers.city || "", `%${search}%`),
+            ilike(customers.street || "", `%${search}%`),
+            ilike(customers.postalCode || "", `%${search}%`),
+            ilike(customers.firstName || "", `%${search}%`),
+            ilike(customers.lastName || "", `%${search}%`)
           )
         );
       }
@@ -290,7 +296,13 @@ export const storage = {
           or(
             ilike(customers.name, `%${search}%`),
             ilike(customers.phone || "", `%${search}%`),
-            ilike(customers.email || "", `%${search}%`)
+            ilike(customers.email || "", `%${search}%`),
+            ilike(customers.company || "", `%${search}%`),
+            ilike(customers.city || "", `%${search}%`),
+            ilike(customers.street || "", `%${search}%`),
+            ilike(customers.postalCode || "", `%${search}%`),
+            ilike(customers.firstName || "", `%${search}%`),
+            ilike(customers.lastName || "", `%${search}%`)
           )
         );
       }

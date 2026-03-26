@@ -874,6 +874,31 @@ function setupPaymentGatewayRoutes(app: express.Application) {
       END $$;
     `);
 
+    // 7. customer extended columns migration
+    await pool.query(`
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS customer_nr integer;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS salutation text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_name text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_name text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS street text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS street_nr text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS house_nr text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS city text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS postal_code text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS company text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS zhd text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS how_to_go text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS screen_info text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS source text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_order_date text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_order_date text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS legacy_total_spent numeric(12,2) DEFAULT 0;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS average_order_value numeric(10,2) DEFAULT 0;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS order_count integer DEFAULT 0;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS legacy_ref text;
+    `);
+    log("Customer extended columns migration complete");
+
     log("Schema migration complete");
   } catch (err) {
     log("Schema migration error (non-fatal):", err);

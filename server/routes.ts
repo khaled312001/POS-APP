@@ -1002,12 +1002,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
       const customers = await storage.getCustomers(undefined, tenantId);
       const exportData = customers.map((c: any) => ({
+        Nr: c.customerNr || "",
+        Anrede: c.salutation || "",
+        Namen: c.lastName || "",
+        Vorname: c.firstName || "",
         Name: c.name || "",
+        Firma: c.company || "",
         Phone: c.phone || "",
         Email: c.email || "",
+        Strasse: c.street || "",
+        StrassNr: c.streetNr || "",
+        HausNr: c.houseNr || "",
+        PLZ: c.postalCode || "",
+        Ort: c.city || "",
         Address: c.address || "",
+        HowToGo: c.howToGo || "",
+        ZHD: c.zhd || "",
+        ScreenInfo: c.screenInfo || "",
         LoyaltyPoints: c.loyaltyPoints || 0,
-        TotalPurchases: c.totalPurchases || 0,
+        TotalSpent: c.totalSpent || "0",
+        OrderCount: c.orderCount || 0,
+        AvgOrderValue: c.averageOrderValue || "0",
+        FirstOrder: c.firstOrderDate || "",
+        LastOrder: c.lastOrderDate || "",
+        Source: c.source || "",
+        Notes: c.notes || "",
         CreatedAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "",
       }));
       const ws = xlsx.utils.json_to_sheet(exportData);
@@ -1054,6 +1073,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const results = await storage.bulkCreateCustomers(customersToInsert as any);
       res.json({ success: true, count: results.length });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Bulk Import from KUNDEN_ALL CSV file on disk
+  app.post("/api/customers/import-csv", async (req: any, res) => {
+    try {
+      const tenantId = req.body.tenantId ? Number(req.body.tenantId) : undefined;
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+
+      const csvPath = require("path").resolve(process.cwd(), "KUNDEN_ALL_fixed.csv");
+      if (!require("fs").existsSync(csvPath)) {
+        return res.status(404).json({ error: "CSV file not found on server" });
+      }
+
+      const csvContent = require("fs").readFileSync(csvPath, "utf-8");
+      const lines = csvContent.split("\n");
+      const headers = lines[0].replace(/\r$/, "").split(",");
+
+      let imported = 0;
+      let skipped = 0;
+      const batchSize = 100;
+      let batch: any[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].replace(/\r$/, "").trim();
+        if (!line) { skipped++; continue; }
+
+        // Parse CSV line handling commas inside fields
+        const values: string[] = [];
+        let current = "";
+        let inQuotes = false;
+        for (let j = 0; j < line.length; j++) {
+          const ch = line[j];
+          if (ch === '"') { inQuotes = !inQuotes; continue; }
+          if (ch === ',' && !inQuotes) { values.push(current.trim()); current = ""; continue; }
+          current += ch;
+        }
+        values.push(current.trim());
+
+        // Map CSV columns: Nr,ANREDE,NAMEN,VORNAME,STRASSE,HOWTOGO,FIRMA,ZHD,ORT,PLZ,TEL1,STRASSNR,HAUSNR,QUADRAT,SCREENINFO,R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,R11,R12,R13,R14,R15,R16,R17,R18,R19,R20,_source
+        const nr = values[0] || "";
+        const anrede = values[1] || "";
+        const namen = values[2] || "";
+        const vorname = values[3] || "";
+        const strasse = values[4] || "";
+        const howToGo = values[5] || "";
+        const firma = values[6] || "";
+        const zhd = values[7] || "";
+        const ort = values[8] || "";
+        const plz = values[9] || "";
+        const tel1 = values[10] || "";
+        const strassNr = values[11] || "";
+        const hausNr = values[12] || "";
+        const quadrat = values[13] || "";
+        const screenInfo = values[14] || "";
+        const r1 = values[15] || "";
+        const r6 = values[20] || ""; // first order date
+        const r7 = values[21] || ""; // last order date
+        const r10 = values[24] || ""; // total spent
+        const r11 = values[25] || ""; // average order value
+        const r12 = values[26] || ""; // order count
+        const _source = values[values.length - 1] || "";
+
+        // Build full name: NAMEN + VORNAME
+        const fullName = [namen, vorname].filter(s => s && s.trim()).join(", ").trim() || "Unknown";
+
+        // Build address: STRASSE STRASSNR HAUSNR, PLZ ORT
+        const addressParts = [strasse, strassNr, hausNr].filter(s => s && s.trim()).join(" ").trim();
+        const cityParts = [plz, ort].filter(s => s && s.trim()).join(" ").trim();
+        const address = [addressParts, cityParts].filter(s => s).join(", ");
+
+        // Build notes from QUADRAT, SCREENINFO, HOWTOGO
+        const noteParts = [];
+        if (screenInfo) noteParts.push(screenInfo);
+        if (howToGo) noteParts.push(`Directions: ${howToGo}`);
+        if (quadrat) noteParts.push(`Quadrat: ${quadrat}`);
+        const notes = noteParts.join(" | ") || undefined;
+
+        const customerData: any = {
+          tenantId,
+          name: fullName,
+          phone: tel1 || undefined,
+          address: address || undefined,
+          notes,
+          isActive: true,
+          customerNr: nr ? parseInt(nr) || undefined : undefined,
+          salutation: anrede || undefined,
+          firstName: vorname || undefined,
+          lastName: namen || undefined,
+          street: strasse || undefined,
+          streetNr: strassNr || undefined,
+          houseNr: hausNr || undefined,
+          city: ort || undefined,
+          postalCode: plz || undefined,
+          company: firma || undefined,
+          zhd: zhd || undefined,
+          howToGo: howToGo || undefined,
+          screenInfo: screenInfo || undefined,
+          source: _source || undefined,
+          firstOrderDate: r6 || undefined,
+          lastOrderDate: r7 || undefined,
+          legacyTotalSpent: r10 ? String(parseFloat(r10) || 0) : "0",
+          averageOrderValue: r11 ? String(parseFloat(r11) || 0) : "0",
+          orderCount: r12 ? parseInt(r12) || 0 : 0,
+          legacyRef: r1 || undefined,
+          totalSpent: r10 ? String(parseFloat(r10) || 0) : "0",
+          visitCount: r12 ? parseInt(r12) || 0 : 0,
+        };
+
+        batch.push(customerData);
+
+        if (batch.length >= batchSize) {
+          const results = await storage.bulkCreateCustomers(batch);
+          imported += results.length;
+          batch = [];
+        }
+      }
+
+      // Insert remaining batch
+      if (batch.length > 0) {
+        const results = await storage.bulkCreateCustomers(batch);
+        imported += results.length;
+      }
+
+      res.json({ success: true, imported, skipped, total: lines.length - 1 });
+    } catch (e: any) {
+      console.error("[CSV Import Error]", e);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.get("/api/customers/:id", async (req, res) => {
