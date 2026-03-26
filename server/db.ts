@@ -17,14 +17,37 @@ const isNeon = connectionString.includes("neon.tech");
 let poolConfig: pg.PoolConfig;
 
 if (isNeon) {
-  // Parse URL into explicit params — avoids pg's sslmode handling issues with Neon
-  const url = new URL(connectionString);
+  // node's URL parser does not handle postgresql:// correctly — use regex
+  // Handles: postgresql://user:pass@host[:port]/dbname[?params]
+  const match = connectionString.match(
+    /^(?:postgresql|postgres):\/\/([^:@]+):([^@]+)@([^/:]+)(?::(\d+))?\/([^?]*)?/
+  );
+
+  let host = "";
+  let user = "";
+  let password = "";
+  let port = 5432;
+  let database = "";
+
+  if (match) {
+    user     = decodeURIComponent(match[1] || "");
+    password = decodeURIComponent(match[2] || "");
+    host     = match[3] || "";
+    port     = match[4] ? parseInt(match[4]) : 5432;
+    database = match[5] || "";
+  }
+
+  // Fall back to the environment variable override, then to "neondb" (Neon's default)
+  database = process.env.NEON_DATABASE || database || "neondb";
+
+  console.log(`[DB] Connecting to Neon — host: ${host}, database: ${database}, user: ${user}`);
+
   poolConfig = {
-    host: url.hostname,
-    database: url.pathname.slice(1).split("?")[0],
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    port: parseInt(url.port || "5432"),
+    host,
+    database,
+    user,
+    password,
+    port,
     ssl: { rejectUnauthorized: false },
   };
 } else {
