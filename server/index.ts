@@ -11,9 +11,20 @@ import { WebhookHandlers } from "./webhookHandlers";
 import * as fs from "fs";
 import * as path from "path";
 
-// Use Neon production database if NEON_DATABASE_URL is set
-if (process.env.NEON_DATABASE_URL) {
-  process.env.DATABASE_URL = process.env.NEON_DATABASE_URL;
+// Use Neon production database — prefer explicit PG* vars, fall back to NEON_DATABASE_URL
+if (process.env.PGHOST && process.env.PGHOST.includes("neon.tech")) {
+  // Build a complete, reliable Neon connection string from individual PG vars
+  const neonUrl = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || "neondb"}?sslmode=require`;
+  process.env.DATABASE_URL = neonUrl;
+  process.env.NEON_DATABASE_URL = neonUrl;
+} else if (process.env.NEON_DATABASE_URL) {
+  // NEON_DATABASE_URL may be missing the database name — append "neondb" if needed
+  let neonUrl = process.env.NEON_DATABASE_URL;
+  if (!neonUrl.match(/neon\.tech\/\w+/)) {
+    neonUrl = neonUrl.replace(/\/$/, "") + "/neondb?sslmode=require";
+    process.env.NEON_DATABASE_URL = neonUrl;
+  }
+  process.env.DATABASE_URL = neonUrl;
 }
 
 const app = express();

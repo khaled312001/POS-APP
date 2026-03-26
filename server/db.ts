@@ -4,44 +4,45 @@ import * as schema from "@shared/schema";
 
 const { Pool } = pg;
 
-const connectionString = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
-}
-
-const isNeon = connectionString.includes("neon.tech");
-
 let poolConfig: pg.PoolConfig;
 
-if (isNeon) {
-  // node's URL parser does not handle postgresql:// correctly — use regex
-  // Handles: postgresql://user:pass@host[:port]/dbname[?params]
-  const match = connectionString.match(
+// PGHOST/PGDATABASE/etc are Replit-managed — they point to Neon only when using Neon integration
+const pgHost     = process.env.PGHOST     || "";
+const pgDatabase = process.env.PGDATABASE || "";
+const pgUser     = process.env.PGUSER     || "";
+const pgPassword = process.env.PGPASSWORD || "";
+const pgPort     = process.env.PGPORT ? parseInt(process.env.PGPORT) : 5432;
+
+const isNeonHost = pgHost.includes("neon.tech");
+
+// The NEON_DATABASE_URL secret (set by the user) or the workflow-overridden DATABASE_URL
+const neonUrl = process.env.NEON_DATABASE_URL || "";
+const isNeonUrl = neonUrl.includes("neon.tech");
+
+if (isNeonHost) {
+  // PG* vars point directly at Neon — most reliable, no URL parsing
+  console.log(`[DB] Neon via PG* vars — host: ${pgHost}, database: ${pgDatabase}, user: ${pgUser}`);
+  poolConfig = {
+    host:     pgHost,
+    database: pgDatabase || "neondb",
+    user:     pgUser,
+    password: pgPassword,
+    port:     pgPort,
+    ssl: { rejectUnauthorized: false },
+  };
+} else if (isNeonUrl) {
+  // Parse the Neon URL — do NOT use local PG* vars (they point to Helium)
+  const match = neonUrl.match(
     /^(?:postgresql|postgres):\/\/([^:@]+):([^@]+)@([^/:]+)(?::(\d+))?\/([^?]*)?/
   );
 
-  let host = "";
-  let user = "";
-  let password = "";
-  let port = 5432;
-  let database = "";
+  const host     = match?.[3] || "";
+  const user     = match?.[1] ? decodeURIComponent(match[1]) : "";
+  const password = match?.[2] ? decodeURIComponent(match[2]) : "";
+  const port     = match?.[4] ? parseInt(match[4]) : 5432;
+  const database = match?.[5] || "neondb";  // default to "neondb" when path is empty
 
-  if (match) {
-    user     = decodeURIComponent(match[1] || "");
-    password = decodeURIComponent(match[2] || "");
-    host     = match[3] || "";
-    port     = match[4] ? parseInt(match[4]) : 5432;
-    database = match[5] || "";
-  }
-
-  // Fall back to the environment variable override, then to "neondb" (Neon's default)
-  database = process.env.NEON_DATABASE || database || "neondb";
-
-  console.log(`[DB] Connecting to Neon — host: ${host}, database: ${database}, user: ${user}`);
-
+  console.log(`[DB] Neon via URL parse — host: ${host}, database: ${database}, user: ${user}`);
   poolConfig = {
     host,
     database,
@@ -51,12 +52,18 @@ if (isNeon) {
     ssl: { rejectUnauthorized: false },
   };
 } else {
+  // Local / Replit Helium
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
+  }
+  console.log(`[DB] Local/Helium — using DATABASE_URL`);
   poolConfig = { connectionString };
 }
 
 export const pool = new Pool(poolConfig);
 
-// Ensure UTF-8 encoding for all connections to properly handle special characters (German, Arabic, etc.)
+// Ensure UTF-8 encoding for all connections to properly handle special characters
 pool.on("connect", (client) => {
   client.query("SET client_encoding = 'UTF8'");
 });
