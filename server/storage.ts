@@ -1531,9 +1531,41 @@ export const storage = {
   // (Removed duplicate getTenants, getTenant, updateTenant to fix TypeScript errors)
 
   // Bulk Operations
-  async bulkCreateCustomers(data: InsertCustomer[]) {
+  async bulkCreateCustomers(data: any[]) {
     if (data.length === 0) return [];
-    return db.insert(customers).values(data).returning();
+    return db.insert(customers).values(data)
+      .onConflictDoUpdate({
+        target: [customers.phone, customers.tenantId],
+        set: {
+          customerNr: sql`EXCLUDED.customer_nr`,
+          salutation: sql`EXCLUDED.salutation`,
+          firstName: sql`EXCLUDED.first_name`,
+          lastName: sql`EXCLUDED.last_name`,
+          name: sql`EXCLUDED.name`,
+          address: sql`EXCLUDED.address`,
+          street: sql`EXCLUDED.street`,
+          streetNr: sql`EXCLUDED.street_nr`,
+          houseNr: sql`EXCLUDED.house_nr`,
+          city: sql`EXCLUDED.city`,
+          postalCode: sql`EXCLUDED.postal_code`,
+          company: sql`EXCLUDED.company`,
+          zhd: sql`EXCLUDED.zhd`,
+          howToGo: sql`EXCLUDED.how_to_go`,
+          screenInfo: sql`EXCLUDED.screen_info`,
+          source: sql`EXCLUDED.source`,
+          firstOrderDate: sql`EXCLUDED.first_order_date`,
+          lastOrderDate: sql`EXCLUDED.last_order_date`,
+          totalSpent: sql`EXCLUDED.total_spent`,
+          legacyTotalSpent: sql`EXCLUDED.legacy_total_spent`,
+          averageOrderValue: sql`EXCLUDED.average_order_value`,
+          orderCount: sql`EXCLUDED.order_count`,
+          visitCount: sql`EXCLUDED.visit_count`,
+          notes: sql`EXCLUDED.notes`,
+          legacyRef: sql`EXCLUDED.legacy_ref`,
+          updatedAt: sql`now()`
+        }
+      })
+      .returning();
   },
   async bulkCreateProducts(data: InsertProduct[]) {
     if (data.length === 0) return [];

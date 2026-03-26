@@ -1136,7 +1136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const _source = values[values.length - 1] || "";
 
         // Build full name: NAMEN + VORNAME
-        const fullName = [namen, vorname].filter(s => s && s.trim()).join(", ").trim() || "Unknown";
+        const fullName = [namen, vorname].filter(s => s && s.trim()).join(", ").trim() || tel1 || "Unknown";
 
         // Build address: STRASSE STRASSNR HAUSNR, PLZ ORT
         const addressParts = [strasse, strassNr, hausNr].filter(s => s && s.trim()).join(" ").trim();

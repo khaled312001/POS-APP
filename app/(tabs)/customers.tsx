@@ -51,7 +51,13 @@ export default function CustomersScreen() {
   const [showDetail, setShowDetail] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editCustomer, setEditCustomer] = useState<any | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", notes: "", company: "", firstName: "", lastName: "", street: "", streetNr: "", houseNr: "", city: "", postalCode: "", salutation: "" });
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    name: "", email: "", phone: "", address: "", notes: "", company: "",
+    firstName: "", lastName: "", street: "", streetNr: "", houseNr: "",
+    city: "", postalCode: "", salutation: "", zhd: "",
+    howToGo: "", screenInfo: "", customerNr: ""
+  });
 
 
   // Total count query
@@ -126,6 +132,41 @@ export default function CustomersScreen() {
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
+  const handleImportCSV = async () => {
+    try {
+      if (Platform.OS !== "web") {
+        Alert.alert("Available on Web", "This feature is currently only available on the web version.");
+        return;
+      }
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".csv";
+      input.onchange = async (e: any) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (re: any) => {
+          const content = re.target.result;
+          setLoading(true);
+          try {
+            const resRaw = await apiRequest("POST", "/api/customers/import-csv", { csv: content, tenantId: tenant?.id });
+            const res = await resRaw.json();
+            Alert.alert("Import Finished", `Imported ${res.imported} customers successfully!`);
+            invalidateCustomers();
+          } catch (err: any) {
+            Alert.alert("Error", err.message);
+          } finally {
+            setLoading(false);
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    } catch (err: any) {
+      Alert.alert("Error", err.message);
+    }
+  };
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/customers/${id}`),
     onSuccess: () => {
@@ -136,7 +177,12 @@ export default function CustomersScreen() {
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
-  const resetForm = () => setForm({ name: "", email: "", phone: "", address: "", notes: "", company: "", firstName: "", lastName: "", street: "", streetNr: "", houseNr: "", city: "", postalCode: "", salutation: "" });
+  const resetForm = () => setForm({
+    name: "", email: "", phone: "", address: "", notes: "", company: "",
+    firstName: "", lastName: "", street: "", streetNr: "", houseNr: "",
+    city: "", postalCode: "", salutation: "", zhd: "",
+    howToGo: "", screenInfo: "", customerNr: ""
+  });
 
   const openEdit = (c: any) => {
     setEditCustomer(c);
@@ -155,6 +201,10 @@ export default function CustomersScreen() {
       city: c.city || "",
       postalCode: c.postalCode || "",
       salutation: c.salutation || "",
+      zhd: c.zhd || "",
+      howToGo: c.howToGo || "",
+      screenInfo: c.screenInfo || "",
+      customerNr: c.customerNr ? String(c.customerNr) : "",
     });
     setShowForm(true);
   };
@@ -177,6 +227,10 @@ export default function CustomersScreen() {
       city: form.city || undefined,
       postalCode: form.postalCode || undefined,
       salutation: form.salutation || undefined,
+      zhd: form.zhd || undefined,
+      howToGo: form.howToGo || undefined,
+      screenInfo: form.screenInfo || undefined,
+      customerNr: form.customerNr ? parseInt(form.customerNr) : undefined,
       tenantId: tenant?.id,
     });
   };
@@ -203,9 +257,14 @@ export default function CustomersScreen() {
             <Text style={{ color: Colors.white, fontSize: 13, fontWeight: "800" }}>{totalCount} {t("total" as any) || "Total"}</Text>
           </View>
         </View>
-        <Pressable style={styles.addBtn} onPress={() => { playClickSound("medium"); setEditCustomer(null); resetForm(); setShowForm(true); }}>
-          <Ionicons name="add" size={24} color={Colors.white} />
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Pressable style={styles.headerBtn} onPress={() => { playClickSound("medium"); handleImportCSV(); }}>
+            <Ionicons name="cloud-upload" size={20} color={Colors.white} />
+          </Pressable>
+          <Pressable style={styles.headerBtn} onPress={() => { playClickSound("medium"); setEditCustomer(null); resetForm(); setShowForm(true); }}>
+            <Ionicons name="add" size={24} color={Colors.white} />
+          </Pressable>
+        </View>
       </LinearGradient>
 
       <View style={styles.searchRow}>
@@ -240,21 +299,26 @@ export default function CustomersScreen() {
             {allCustomers.map((item: any) => (
               <Pressable key={String(item.id)} style={[styles.card, isRTL && { flexDirection: "row-reverse" }]} onPress={() => { playClickSound("light"); setSelectedCustomer(item); setShowDetail(true); }}>
                 <View style={[styles.avatar, isRTL ? { marginLeft: 12, marginRight: 0 } : { marginRight: 12 }]}>
-                  <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+                  <Text style={styles.avatarText}>{(item.name || "U").charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={styles.cardInfo}>
                   <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     <Text style={[styles.cardName, rtlTextAlign]} numberOfLines={1}>{item.name}</Text>
                     {item.salutation ? <Text style={{ color: Colors.textMuted, fontSize: 11, fontStyle: "italic" }}>({item.salutation})</Text> : null}
+                    {item.customerNr ? (
+                      <View style={{ backgroundColor: Colors.surfaceLight, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: Colors.cardBorder }}>
+                        <Text style={{ color: Colors.accent, fontSize: 10, fontWeight: "700" }}>#{item.customerNr}</Text>
+                      </View>
+                    ) : null}
                   </View>
                   <Text style={[styles.cardMeta, rtlTextAlign]} numberOfLines={1}>{getSubtitle(item)}</Text>
-                  {item.customerNr ? <Text style={{ color: Colors.textMuted, fontSize: 10, marginTop: 1 }}>#{item.customerNr}</Text> : null}
+                  {item.company ? <Text style={[{ color: Colors.accent, fontSize: 11, marginTop: 2 }, rtlTextAlign]}>🏢 {item.company}</Text> : null}
                 </View>
                 <View style={[styles.cardRight, isRTL && { alignItems: "flex-start" }]}>
                   {(item.orderCount > 0 || item.visitCount > 0) && (
-                    <View style={[styles.loyaltyBadge, isRTL && { flexDirection: "row-reverse" }]}>
-                      <Ionicons name="receipt-outline" size={11} color={Colors.accent} />
-                      <Text style={[styles.loyaltyText, { color: Colors.accent }]}>{item.orderCount || item.visitCount || 0}</Text>
+                    <View style={[styles.loyaltyBadge, { backgroundColor: Colors.accent + "15" }, isRTL && { flexDirection: "row-reverse" }]}>
+                      <Ionicons name="receipt-outline" size={12} color={Colors.accent} />
+                      <Text style={[styles.loyaltyText, { color: Colors.accent }]}>{item.orderCount || item.visitCount}</Text>
                     </View>
                   )}
                   {(Number(item.totalSpent || 0) > 0 || Number(item.legacyTotalSpent || 0) > 0) && (
@@ -320,6 +384,24 @@ export default function CustomersScreen() {
 
               <Text style={[styles.label, rtlTextAlign]}>{t("email")}</Text>
               <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.email} onChangeText={(v) => setForm({ ...form, email: v })} keyboardType="email-address" placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" />
+
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.label, rtlTextAlign]}>z.Hd. (Zusatz)</Text>
+                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.zhd} onChangeText={(v) => setForm({ ...form, zhd: v })} placeholderTextColor={Colors.textMuted} placeholder="z.Hd." />
+                </View>
+                <View style={{ width: 100 }}>
+                  <Text style={[styles.label, rtlTextAlign]}>Cust. Nr</Text>
+                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.customerNr} onChangeText={(v) => setForm({ ...form, customerNr: v })} keyboardType="numeric" placeholderTextColor={Colors.textMuted} placeholder="123" />
+                </View>
+              </View>
+
+              <Text style={[styles.sectionLabel, rtlTextAlign]}>🚗 {language === "ar" ? "معلومات التوصيل" : "Delivery Info"}</Text>
+              <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "كيف تصل" : "How to Go"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.howToGo} onChangeText={(v) => setForm({ ...form, howToGo: v })} placeholderTextColor={Colors.textMuted} placeholder="Driving directions..." />
+
+              <Text style={[styles.label, rtlTextAlign]}>Screen Info</Text>
+              <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.screenInfo} onChangeText={(v) => setForm({ ...form, screenInfo: v })} placeholderTextColor={Colors.textMuted} placeholder="Door code, etc..." />
 
               <Text style={[styles.sectionLabel, rtlTextAlign]}>📍 {language === "ar" ? "العنوان" : "Address"}</Text>
 
@@ -460,12 +542,13 @@ export default function CustomersScreen() {
                   </View>
                 )}
 
-                {/* Source */}
-                {selectedCustomer.source && (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: Colors.surfaceLight, borderRadius: 8, padding: 8, marginBottom: 12 }}>
-                    <Ionicons name="cloud-outline" size={14} color={Colors.textMuted} />
-                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>Source: {selectedCustomer.source}</Text>
-                    {selectedCustomer.legacyRef && <Text style={{ color: Colors.textMuted, fontSize: 11 }}>| Ref: {selectedCustomer.legacyRef}</Text>}
+                {/* Source & Legacy Metadata */}
+                {(selectedCustomer.source || selectedCustomer.legacyRef || selectedCustomer.customerNr) && (
+                  <View style={[styles.detailSection, { backgroundColor: Colors.surface + "bb", borderStyle: "dashed", borderWidth: 1, borderColor: Colors.cardBorder }]}>
+                    <Text style={styles.sectionTitle}>ℹ️ {language === "ar" ? "معلومات إضافية" : "Additional Info"}</Text>
+                    {selectedCustomer.customerNr && <InfoRow icon="id-card-outline" label="ID" value={`#${selectedCustomer.customerNr}`} isRTL={isRTL} />}
+                    {selectedCustomer.source && <InfoRow icon="cloud-outline" label="Source" value={selectedCustomer.source} isRTL={isRTL} />}
+                    {selectedCustomer.legacyRef && <InfoRow icon="link-outline" label="Legacy Ref" value={selectedCustomer.legacyRef} isRTL={isRTL} />}
                   </View>
                 )}
 
@@ -544,6 +627,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14 },
   headerTitle: { fontSize: 22, fontWeight: "800", color: Colors.white },
+  headerBtn: { width: 40, height: 40, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
   addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
   searchRow: { paddingHorizontal: 12, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 8 },
   searchBox: { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 42, borderWidth: 1, borderColor: Colors.inputBorder },
