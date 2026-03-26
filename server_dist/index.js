@@ -1,5 +1,11 @@
 var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
+  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
+}) : x)(function(x) {
+  if (typeof require !== "undefined") return require.apply(this, arguments);
+  throw Error('Dynamic require of "' + x + '" is not supported');
+});
 var __esm = (fn, res) => function __init() {
   return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
@@ -204,6 +210,27 @@ var init_schema = __esm({
       notes: text("notes"),
       creditBalance: decimal("credit_balance", { precision: 10, scale: 2 }).default("0"),
       isActive: boolean("is_active").default(true),
+      // ── Extended fields from CSV import ──
+      customerNr: integer("customer_nr"),
+      salutation: text("salutation"),
+      firstName: text("first_name"),
+      lastName: text("last_name"),
+      street: text("street"),
+      streetNr: text("street_nr"),
+      houseNr: text("house_nr"),
+      city: text("city"),
+      postalCode: text("postal_code"),
+      company: text("company"),
+      zhd: text("zhd"),
+      howToGo: text("how_to_go"),
+      screenInfo: text("screen_info"),
+      source: text("source"),
+      firstOrderDate: text("first_order_date"),
+      lastOrderDate: text("last_order_date"),
+      legacyTotalSpent: decimal("legacy_total_spent", { precision: 12, scale: 2 }).default("0"),
+      averageOrderValue: decimal("average_order_value", { precision: 10, scale: 2 }).default("0"),
+      orderCount: integer("order_count").default(0),
+      legacyRef: text("legacy_ref"),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
@@ -817,19 +844,57 @@ __export(db_exports, {
 });
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
-var Pool, connectionString, pool, db;
+var Pool, poolConfig, neonUrl, isNeonUrl, pgHost, pgDatabase, pgUser, pgPassword, pgPort, isNeonHost, pool, db;
 var init_db = __esm({
   "server/db.ts"() {
     "use strict";
     init_schema();
     ({ Pool } = pg);
-    connectionString = process.env.NODE_ENV === "production" ? process.env.DATABASE_URL : process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
-    if (!connectionString) {
-      throw new Error(
-        "DATABASE_URL must be set. Did you forget to provision a database?"
+    neonUrl = process.env.NEON_DATABASE_URL || "";
+    isNeonUrl = neonUrl.includes("neon.tech");
+    pgHost = process.env.PGHOST || "";
+    pgDatabase = process.env.PGDATABASE || "";
+    pgUser = process.env.PGUSER || "";
+    pgPassword = process.env.PGPASSWORD || "";
+    pgPort = process.env.PGPORT ? parseInt(process.env.PGPORT) : 5432;
+    isNeonHost = pgHost.includes("neon.tech");
+    if (isNeonUrl) {
+      const match = neonUrl.match(
+        /^(?:postgresql|postgres):\/\/([^:@]+):([^@]+)@([^/:]+)(?::(\d+))?\/([^?]*)?/
       );
+      const host = match?.[3] || "";
+      const user = match?.[1] ? decodeURIComponent(match[1]) : "";
+      const password = match?.[2] ? decodeURIComponent(match[2]) : "";
+      const port = match?.[4] ? parseInt(match[4]) : 5432;
+      const database = match?.[5] || "neondb";
+      console.log(`[DB] Neon via NEON_DATABASE_URL \u2014 host: ${host}, database: ${database}, user: ${user}`);
+      poolConfig = {
+        host,
+        database,
+        user,
+        password,
+        port,
+        ssl: { rejectUnauthorized: false }
+      };
+    } else if (isNeonHost) {
+      console.log(`[DB] Neon via PG* vars \u2014 host: ${pgHost}, database: ${pgDatabase}, user: ${pgUser}`);
+      poolConfig = {
+        host: pgHost,
+        database: pgDatabase || "neondb",
+        user: pgUser,
+        password: pgPassword,
+        port: pgPort,
+        ssl: { rejectUnauthorized: false }
+      };
+    } else {
+      const connectionString = process.env.DATABASE_URL;
+      if (!connectionString) {
+        throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
+      }
+      console.log(`[DB] Local/Helium \u2014 using DATABASE_URL`);
+      poolConfig = { connectionString };
     }
-    pool = new Pool({ connectionString });
+    pool = new Pool(poolConfig);
     pool.on("connect", (client2) => {
       client2.query("SET client_encoding = 'UTF8'");
     });
@@ -1130,7 +1195,13 @@ var init_storage = __esm({
               or(
                 ilike(customers.name, `%${search}%`),
                 ilike(customers.phone || "", `%${search}%`),
-                ilike(customers.email || "", `%${search}%`)
+                ilike(customers.email || "", `%${search}%`),
+                ilike(customers.company || "", `%${search}%`),
+                ilike(customers.city || "", `%${search}%`),
+                ilike(customers.street || "", `%${search}%`),
+                ilike(customers.postalCode || "", `%${search}%`),
+                ilike(customers.firstName || "", `%${search}%`),
+                ilike(customers.lastName || "", `%${search}%`)
               )
             );
           }
@@ -1156,7 +1227,13 @@ var init_storage = __esm({
               or(
                 ilike(customers.name, `%${search}%`),
                 ilike(customers.phone || "", `%${search}%`),
-                ilike(customers.email || "", `%${search}%`)
+                ilike(customers.email || "", `%${search}%`),
+                ilike(customers.company || "", `%${search}%`),
+                ilike(customers.city || "", `%${search}%`),
+                ilike(customers.street || "", `%${search}%`),
+                ilike(customers.postalCode || "", `%${search}%`),
+                ilike(customers.firstName || "", `%${search}%`),
+                ilike(customers.lastName || "", `%${search}%`)
               )
             );
           }
@@ -1520,6 +1597,18 @@ var init_storage = __esm({
       // Sales Analytics
       async getSalesByDateRange(startDate, endDate) {
         return db.select().from(sales).where(and(gte(sales.createdAt, startDate), lte(sales.createdAt, endDate))).orderBy(desc(sales.createdAt));
+      },
+      async getSalesWithCustomerByDateRange(startDate, endDate) {
+        return db.select({
+          id: sales.id,
+          receiptNumber: sales.receiptNumber,
+          totalAmount: sales.totalAmount,
+          createdAt: sales.createdAt,
+          customerId: sales.customerId,
+          employeeId: sales.employeeId,
+          customerName: customers.name,
+          customerAddress: customers.address
+        }).from(sales).leftJoin(customers, eq(sales.customerId, customers.id)).where(and(gte(sales.createdAt, startDate), lte(sales.createdAt, endDate))).orderBy(sales.createdAt);
       },
       async getTopProducts(limit) {
         const topLimit = limit || 10;
@@ -2270,7 +2359,37 @@ var init_storage = __esm({
       // Bulk Operations
       async bulkCreateCustomers(data) {
         if (data.length === 0) return [];
-        return db.insert(customers).values(data).returning();
+        return db.insert(customers).values(data).onConflictDoUpdate({
+          target: [customers.phone, customers.tenantId],
+          set: {
+            customerNr: sql`EXCLUDED.customer_nr`,
+            salutation: sql`EXCLUDED.salutation`,
+            firstName: sql`EXCLUDED.first_name`,
+            lastName: sql`EXCLUDED.last_name`,
+            name: sql`EXCLUDED.name`,
+            address: sql`EXCLUDED.address`,
+            street: sql`EXCLUDED.street`,
+            streetNr: sql`EXCLUDED.street_nr`,
+            houseNr: sql`EXCLUDED.house_nr`,
+            city: sql`EXCLUDED.city`,
+            postalCode: sql`EXCLUDED.postal_code`,
+            company: sql`EXCLUDED.company`,
+            zhd: sql`EXCLUDED.zhd`,
+            howToGo: sql`EXCLUDED.how_to_go`,
+            screenInfo: sql`EXCLUDED.screen_info`,
+            source: sql`EXCLUDED.source`,
+            firstOrderDate: sql`EXCLUDED.first_order_date`,
+            lastOrderDate: sql`EXCLUDED.last_order_date`,
+            totalSpent: sql`EXCLUDED.total_spent`,
+            legacyTotalSpent: sql`EXCLUDED.legacy_total_spent`,
+            averageOrderValue: sql`EXCLUDED.average_order_value`,
+            orderCount: sql`EXCLUDED.order_count`,
+            visitCount: sql`EXCLUDED.visit_count`,
+            notes: sql`EXCLUDED.notes`,
+            legacyRef: sql`EXCLUDED.legacy_ref`,
+            updatedAt: sql`now()`
+          }
+        }).returning();
       },
       async bulkCreateProducts(data) {
         if (data.length === 0) return [];
@@ -3083,15 +3202,19 @@ var init_seedPizzaLemon = __esm({
       { name: "M\xF6venpick Glace Caramel", description: "M\xF6venpick Premium-Glac\xE9 Caramel (175ml)", price: 6, image: IMG("pizzalemon_96_moevenpick_glace.jpg") }
     ];
     GETRAENKE = [
-      { name: "Coca-Cola", description: "Coca-Cola, 0.5l / 1.5l", price: 4, image: IMG("pizzalemon_97_coca_cola.jpg") },
-      { name: "Coca-Cola Zero", description: "Coca-Cola Zero, 0.5l / 1.5l", price: 4, image: IMG("pizzalemon_97_coca_cola.jpg") },
-      { name: "Fanta", description: "Fanta Orange, 0.5l / 1.5l", price: 6, image: IMG("pizzalemon_98_fanta.jpg") },
-      { name: "Eistee Pfirsich", description: "Eistee Pfirsich, 0.5l / 1.5l", price: 4, image: IMG("pizzalemon_99_eistee.jpg") },
+      { name: "Coca-Cola", description: "Coca-Cola, 0.5l", price: 4, image: IMG("pizzalemon_97_coca_cola.jpg") },
+      { name: "Coca-Cola 1.5l", description: "Coca-Cola, 1.5l Flasche", price: 6, image: IMG("pizzalemon_coca_cola_1500ml.jpg") },
+      { name: "Coca-Cola Zero", description: "Coca-Cola Zero, 0.5l", price: 4, image: IMG("pizzalemon_97_coca_cola.jpg") },
+      { name: "Coca-Cola Zero 1.5l", description: "Coca-Cola Zero, 1.5l Flasche", price: 6, image: IMG("pizzalemon_coca_cola_zero_1500ml.jpg") },
+      { name: "Fanta", description: "Fanta Orange, 0.5l", price: 6, image: IMG("pizzalemon_98_fanta.jpg") },
+      { name: "Fanta 1.5l", description: "Fanta Orange, 1.5l Flasche", price: 6, image: IMG("pizzalemon_fanta_1500ml.jpg") },
+      { name: "Eistee Pfirsich", description: "Eistee Pfirsich, 0.5l", price: 4, image: IMG("pizzalemon_99_eistee.jpg") },
+      { name: "Eistee Pfirsich 1.5l", description: "Eistee Pfirsich, 1.5l Flasche", price: 6, image: IMG("pizzalemon_eistee_1500ml.jpg") },
       { name: "Uludag Gazoz", description: "T\xFCrkische Limonade Uludag, 0.5l", price: 4, image: IMG("pizzalemon_101_uludag_gazoz.jpg") },
       { name: "Rivella Blau", description: "Rivella Blau, 0.5l", price: 4, image: IMG("pizzalemon_102_rivella.jpg") },
       { name: "Rivella Rot", description: "Rivella Rot, 0.5l", price: 4, image: IMG("pizzalemon_102_rivella.jpg") },
-      { name: "Ayran", description: "T\xFCrkisches Joghurtgetr\xE4nk, 0.5l", price: 4, image: IMG("pizzalemon_103_ayran.jpg") },
-      { name: "Red Bull", description: "Red Bull Energy Drink, 250ml", price: 5, image: IMG("pizzalemon_104_red_bull.jpg") }
+      { name: "Ayran", description: "T\xFCrkisches Joghurtgetr\xE4nk, 0.25l", price: 4, image: IMG("pizzalemon_103_ayran.jpg") },
+      { name: "Red Bull", description: "Red Bull Energy Drink, 0.25l", price: 5, image: IMG("pizzalemon_104_red_bull.jpg") }
     ];
     BIER = [
       { name: "Feldschl\xF6sschen", description: "Feldschl\xF6sschen Bier, 0.5l", price: 5, image: IMG("pizzalemon_106_feldschloesschen.jpg") }
@@ -5768,12 +5891,31 @@ async function registerRoutes(app2) {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
       const customers2 = await storage.getCustomers(void 0, tenantId);
       const exportData = customers2.map((c) => ({
+        Nr: c.customerNr || "",
+        Anrede: c.salutation || "",
+        Namen: c.lastName || "",
+        Vorname: c.firstName || "",
         Name: c.name || "",
+        Firma: c.company || "",
         Phone: c.phone || "",
         Email: c.email || "",
+        Strasse: c.street || "",
+        StrassNr: c.streetNr || "",
+        HausNr: c.houseNr || "",
+        PLZ: c.postalCode || "",
+        Ort: c.city || "",
         Address: c.address || "",
+        HowToGo: c.howToGo || "",
+        ZHD: c.zhd || "",
+        ScreenInfo: c.screenInfo || "",
         LoyaltyPoints: c.loyaltyPoints || 0,
-        TotalPurchases: c.totalPurchases || 0,
+        TotalSpent: c.totalSpent || "0",
+        OrderCount: c.orderCount || 0,
+        AvgOrderValue: c.averageOrderValue || "0",
+        FirstOrder: c.firstOrderDate || "",
+        LastOrder: c.lastOrderDate || "",
+        Source: c.source || "",
+        Notes: c.notes || "",
         CreatedAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ""
       }));
       const ws = xlsx.utils.json_to_sheet(exportData);
@@ -5818,6 +5960,122 @@ async function registerRoutes(app2) {
       const results = await storage.bulkCreateCustomers(customersToInsert);
       res.json({ success: true, count: results.length });
     } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/customers/import-csv", async (req, res) => {
+    try {
+      const tenantId = req.body.tenantId ? Number(req.body.tenantId) : void 0;
+      if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+      const csvPath = __require("path").resolve(process.cwd(), "KUNDEN_ALL_fixed.csv");
+      if (!__require("fs").existsSync(csvPath)) {
+        return res.status(404).json({ error: "CSV file not found on server" });
+      }
+      const csvContent = __require("fs").readFileSync(csvPath, "utf-8");
+      const lines = csvContent.split("\n");
+      const headers = lines[0].replace(/\r$/, "").split(",");
+      let imported = 0;
+      let skipped = 0;
+      const batchSize = 100;
+      let batch = [];
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].replace(/\r$/, "").trim();
+        if (!line) {
+          skipped++;
+          continue;
+        }
+        const values = [];
+        let current = "";
+        let inQuotes = false;
+        for (let j = 0; j < line.length; j++) {
+          const ch = line[j];
+          if (ch === '"') {
+            inQuotes = !inQuotes;
+            continue;
+          }
+          if (ch === "," && !inQuotes) {
+            values.push(current.trim());
+            current = "";
+            continue;
+          }
+          current += ch;
+        }
+        values.push(current.trim());
+        const nr = values[0] || "";
+        const anrede = values[1] || "";
+        const namen = values[2] || "";
+        const vorname = values[3] || "";
+        const strasse = values[4] || "";
+        const howToGo = values[5] || "";
+        const firma = values[6] || "";
+        const zhd = values[7] || "";
+        const ort = values[8] || "";
+        const plz = values[9] || "";
+        const tel1 = values[10] || "";
+        const strassNr = values[11] || "";
+        const hausNr = values[12] || "";
+        const quadrat = values[13] || "";
+        const screenInfo = values[14] || "";
+        const r1 = values[15] || "";
+        const r6 = values[20] || "";
+        const r7 = values[21] || "";
+        const r10 = values[24] || "";
+        const r11 = values[25] || "";
+        const r12 = values[26] || "";
+        const _source = values[values.length - 1] || "";
+        const fullName = [namen, vorname].filter((s) => s && s.trim()).join(", ").trim() || tel1 || "Unknown";
+        const addressParts = [strasse, strassNr, hausNr].filter((s) => s && s.trim()).join(" ").trim();
+        const cityParts = [plz, ort].filter((s) => s && s.trim()).join(" ").trim();
+        const address = [addressParts, cityParts].filter((s) => s).join(", ");
+        const noteParts = [];
+        if (screenInfo) noteParts.push(screenInfo);
+        if (howToGo) noteParts.push(`Directions: ${howToGo}`);
+        if (quadrat) noteParts.push(`Quadrat: ${quadrat}`);
+        const notes = noteParts.join(" | ") || void 0;
+        const customerData = {
+          tenantId,
+          name: fullName,
+          phone: tel1 || void 0,
+          address: address || void 0,
+          notes,
+          isActive: true,
+          customerNr: nr ? parseInt(nr) || void 0 : void 0,
+          salutation: anrede || void 0,
+          firstName: vorname || void 0,
+          lastName: namen || void 0,
+          street: strasse || void 0,
+          streetNr: strassNr || void 0,
+          houseNr: hausNr || void 0,
+          city: ort || void 0,
+          postalCode: plz || void 0,
+          company: firma || void 0,
+          zhd: zhd || void 0,
+          howToGo: howToGo || void 0,
+          screenInfo: screenInfo || void 0,
+          source: _source || void 0,
+          firstOrderDate: r6 || void 0,
+          lastOrderDate: r7 || void 0,
+          legacyTotalSpent: r10 ? String(parseFloat(r10) || 0) : "0",
+          averageOrderValue: r11 ? String(parseFloat(r11) || 0) : "0",
+          orderCount: r12 ? parseInt(r12) || 0 : 0,
+          legacyRef: r1 || void 0,
+          totalSpent: r10 ? String(parseFloat(r10) || 0) : "0",
+          visitCount: r12 ? parseInt(r12) || 0 : 0
+        };
+        batch.push(customerData);
+        if (batch.length >= batchSize) {
+          const results = await storage.bulkCreateCustomers(batch);
+          imported += results.length;
+          batch = [];
+        }
+      }
+      if (batch.length > 0) {
+        const results = await storage.bulkCreateCustomers(batch);
+        imported += results.length;
+      }
+      res.json({ success: true, imported, skipped, total: lines.length - 1 });
+    } catch (e) {
+      console.error("[CSV Import Error]", e);
       res.status(500).json({ error: e.message });
     }
   });
@@ -6658,6 +6916,17 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: e.message });
     }
   });
+  app2.get("/api/reports/daily-sales-report", async (req, res) => {
+    try {
+      const date = req.query.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      const startOfDay = /* @__PURE__ */ new Date(date + "T00:00:00.000Z");
+      const endOfDay = /* @__PURE__ */ new Date(date + "T23:59:59.999Z");
+      const salesData = await storage.getSalesWithCustomerByDateRange(startOfDay, endOfDay);
+      res.json(salesData);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
   app2.get("/api/reports/sales-export", async (req, res) => {
     try {
       const startDate = req.query.startDate || "2000-01-01";
@@ -7135,6 +7404,26 @@ async function test(){
         status: "pending"
       });
       try {
+        const { customerName, customerPhone, customerEmail, customerAddress } = orderData;
+        if (customerName) {
+          let existing = [];
+          if (customerPhone) {
+            existing = await storage.findCustomerByPhone(customerPhone, resolvedTenantId);
+          }
+          if (existing.length === 0) {
+            await storage.createCustomer({
+              tenantId: resolvedTenantId,
+              name: customerName,
+              phone: customerPhone || null,
+              email: customerEmail || null,
+              address: customerAddress || null
+            });
+          }
+        }
+      } catch (autoErr) {
+        console.error("[AutoCustomer] Failed to auto-save customer from online order:", autoErr);
+      }
+      try {
         const commissionRate = await storage.getCommissionRate();
         const saleTotal = parseFloat(orderData.totalAmount || "0");
         const commissionAmount = saleTotal * commissionRate / (100 + commissionRate);
@@ -7154,7 +7443,7 @@ async function test(){
       callerIdService.broadcast({
         type: "new_online_order",
         order
-      });
+      }, resolvedTenantId);
       pushService.notifyNewOrder(orderNumber, orderData.totalAmount || "0").catch(() => {
       });
       try {
@@ -8985,6 +9274,18 @@ var WebhookHandlers = class {
 // server/index.ts
 import * as fs5 from "fs";
 import * as path4 from "path";
+if (process.env.PGHOST && process.env.PGHOST.includes("neon.tech")) {
+  const neonUrl2 = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || "neondb"}?sslmode=require`;
+  process.env.DATABASE_URL = neonUrl2;
+  process.env.NEON_DATABASE_URL = neonUrl2;
+} else if (process.env.NEON_DATABASE_URL) {
+  let neonUrl2 = process.env.NEON_DATABASE_URL;
+  if (!neonUrl2.match(/neon\.tech\/\w+/)) {
+    neonUrl2 = neonUrl2.replace(/\/$/, "") + "/neondb?sslmode=require";
+    process.env.NEON_DATABASE_URL = neonUrl2;
+  }
+  process.env.DATABASE_URL = neonUrl2;
+}
 var app = express();
 var log2 = console.log;
 app.use((req, res, next) => {
@@ -9699,6 +10000,29 @@ function setupPaymentGatewayRoutes(app2) {
           FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE;
       END $$;
     `);
+    await pool2.query(`
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS customer_nr integer;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS salutation text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_name text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_name text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS street text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS street_nr text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS house_nr text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS city text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS postal_code text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS company text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS zhd text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS how_to_go text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS screen_info text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS source text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_order_date text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_order_date text;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS legacy_total_spent numeric(12,2) DEFAULT 0;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS average_order_value numeric(10,2) DEFAULT 0;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS order_count integer DEFAULT 0;
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS legacy_ref text;
+    `);
+    log2("Customer extended columns migration complete");
     log2("Schema migration complete");
   } catch (err) {
     log2("Schema migration error (non-fatal):", err);
