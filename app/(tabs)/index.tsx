@@ -109,6 +109,7 @@ export default function POSScreen() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [discountInput, setDiscountInput] = useState("");
   const [discountType, setDiscountType] = useState<"fixed" | "percent">("fixed");
+  const [manualAdjustment, setManualAdjustment] = useState(0);
   const [showScanner, setShowScanner] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -913,7 +914,7 @@ export default function POSScreen() {
         <div style="text-align:center;font-size:11px;margin-top:5px;">Vielen Dank für Ihren Einkauf!</div>
         ${storeAddr ? `<div style="text-align:center;font-size:10px;margin-top:1px;">${storeName} · ${storeAddr}${storePhone ? " · Tel: " + storePhone : ""}</div>` : ""}
         ${printQrDataUrl ? `<div style="text-align:center;margin-top:5px;"><img src="${printQrDataUrl}" style="width:80px;height:80px;"></div>` : ""}
-        ${devFooter}
+        <div style="text-align:center;font-size:9px;color:#000;margin-top:5px;">Developed by Barmagly · www.barmagly.tech</div>
       </body></html>`;
 
       const devFooter = `<div style="text-align:center;font-size:9px;color:#000;margin-top:5px;">Developed by Barmagly · www.barmagly.tech</div>`;
@@ -1073,7 +1074,7 @@ export default function POSScreen() {
       serviceFeeAmount: cart.serviceFee.toFixed(2),
       discountAmount: cart.discount.toFixed(2),
       minimumOrderSurcharge: cart.minimumOrderSurcharge.toFixed(2),
-      totalAmount: cart.total.toFixed(2),
+      totalAmount: (cart.total + manualAdjustment).toFixed(2),
       paymentMethod: pm,
       paymentStatus: "completed",
       status: "completed",
@@ -1081,7 +1082,7 @@ export default function POSScreen() {
       orderType: cart.orderType,
       vehicleId: cart.vehicleId || null,
       changeAmount: paymentMethod === "cash" && cashReceived
-        ? (Number(cashReceived) - cart.total).toFixed(2) : "0",
+        ? (Number(cashReceived) - (cart.total + manualAdjustment)).toFixed(2) : "0",
       items: saleItems,
       callId: activeCallId,
     };
@@ -1869,9 +1870,30 @@ export default function POSScreen() {
               <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("tax")} ({cart.taxRate}%)</Text>
               <Text style={[styles.summaryValue, rtlTextAlign]}>CHF {cart.tax.toFixed(2)}</Text>
             </View>
+            <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }, { alignItems: "center" }]}>
+              <Text style={[styles.summaryLabel, rtlTextAlign]}>Anpassung</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Pressable onPress={() => setManualAdjustment(v => Math.round((v - 1) * 100) / 100)}
+                  style={{ backgroundColor: "#e74c3c", borderRadius: 4, width: 24, height: 24, alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ color: "#fff", fontSize: 16, lineHeight: 22 }}>−</Text>
+                </Pressable>
+                <Text style={{ color: manualAdjustment >= 0 ? Colors.success : "#e74c3c", fontSize: 13, fontWeight: "700", minWidth: 60, textAlign: "center" }}>
+                  {manualAdjustment >= 0 ? "+" : ""}{manualAdjustment.toFixed(2)} Fr
+                </Text>
+                <Pressable onPress={() => setManualAdjustment(v => Math.round((v + 1) * 100) / 100)}
+                  style={{ backgroundColor: Colors.success, borderRadius: 4, width: 24, height: 24, alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ color: "#fff", fontSize: 16, lineHeight: 22 }}>+</Text>
+                </Pressable>
+                {manualAdjustment !== 0 && (
+                  <Pressable onPress={() => setManualAdjustment(0)} style={{ marginLeft: 2 }}>
+                    <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.4)" />
+                  </Pressable>
+                )}
+              </View>
+            </View>
             <View style={[styles.summaryRow, styles.totalRow, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.totalLabel, rtlTextAlign]}>{t("total")}</Text>
-              <Text style={[styles.totalValue, rtlTextAlign]}>CHF {cart.total.toFixed(2)}</Text>
+              <Text style={[styles.totalValue, rtlTextAlign]}>CHF {(cart.total + manualAdjustment).toFixed(2)}</Text>
             </View>
           </View>
 
@@ -1892,7 +1914,7 @@ export default function POSScreen() {
                     <Text style={styles.checkoutBtnText}>{t("checkout")}</Text>
                   </View>
                   <View style={styles.checkoutBtnPrice}>
-                    <Text style={styles.checkoutBtnPriceText}>CHF {cart.total.toFixed(2)}</Text>
+                    <Text style={styles.checkoutBtnPriceText}>CHF {(cart.total + manualAdjustment).toFixed(2)}</Text>
                     {cart.items.length > 0 && (
                       <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 10, textAlign: "center" }}>{cart.itemCount} items</Text>
                     )}

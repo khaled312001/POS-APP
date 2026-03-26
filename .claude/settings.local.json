@@ -120,7 +120,8 @@
       "Bash(head -10 grep -n \"headerContent\\\\|headerGrad\\\\|headerTitle\\\\|headerRow\\\\|styles.header\" \"f:/POS-APP/app/\\(tabs\\)/reports.tsx\")",
       "Bash(sed -n '240,270p' \"f:/POS-APP/app/\\(tabs\\)/products.tsx\")",
       "Bash(sed -n '140,165p' \"f:/POS-APP/app/\\(tabs\\)/customers.tsx\")",
-      "Bash(sed -n '1335,1360p' \"f:/POS-APP/app/\\(tabs\\)/reports.tsx\")"
+      "Bash(sed -n '1335,1360p' \"f:/POS-APP/app/\\(tabs\\)/reports.tsx\")",
+      "Bash(npx expo:*)"
     ]
   }
 }
