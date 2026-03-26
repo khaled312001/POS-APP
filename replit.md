@@ -146,6 +146,17 @@ After schema changes, rebuild `server_dist/` with `npm run server:build`.
 
 ## Environment Variables
 
-- `DATABASE_URL` — PostgreSQL connection string (required)
+- `DATABASE_URL` — PostgreSQL connection string (required; managed as Replit secret — points to Replit-managed Helium PostgreSQL in development)
 - `EXPO_PUBLIC_DOMAIN` — Domain for API requests from frontend
 - `REPLIT_DEV_DOMAIN` — CORS and Expo proxy config (auto-set on Replit)
+- `PORT` — Server port (set to 5000 via Replit env var; must match `.replit` port mapping)
+
+## Replit Migration Notes
+
+- Packages installed via npm (tsx, expo, cross-env, drizzle-kit, esbuild, patch-package)
+- Database schema pushed to Replit-managed PostgreSQL (Helium) via `drizzle-kit push`
+- Demo Pizza Lemon store seeded automatically on first run (admin@pizzalemon.ch / pizzalemon123)
+- Expo CORS patched via `patches/fix-expo-cors.js` to allow `*.replit.dev` domains
+- Backend runs on port 5000 (mapped to external port 80)
+- Frontend Metro bundler runs on port 8080
+- Proxy on port 8081 routes traffic between backend and frontend in development
