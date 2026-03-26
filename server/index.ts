@@ -11,6 +11,11 @@ import { WebhookHandlers } from "./webhookHandlers";
 import * as fs from "fs";
 import * as path from "path";
 
+// Use Neon production database if NEON_DATABASE_URL is set
+if (process.env.NEON_DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.NEON_DATABASE_URL;
+}
+
 const app = express();
 const log = console.log;
 

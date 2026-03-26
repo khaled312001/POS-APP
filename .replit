@@ -15,10 +15,6 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 8080
-externalPort = 8080
-
-[[ports]]
 localPort = 8081
 externalPort = 80
 
@@ -74,13 +70,13 @@ name = "Start Backend"
 author = "agent"
 mode = "sequential"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true && NODE_ENV=development npx tsx --env-file=.env server/index.ts"
-waitForPort = 5000
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true && export DATABASE_URL=\"$NEON_DATABASE_URL\" && NODE_ENV=development npx tsx server/index.ts"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Start Frontend"
