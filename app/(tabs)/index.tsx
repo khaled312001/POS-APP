@@ -858,90 +858,93 @@ export default function POSScreen() {
       const itemCount = fullItems.reduce((s, i) => s + i.quantity, 0);
 
       const css = `<style>
-        @page { size: 80mm auto; margin: 3mm 4mm; }
+        @page { size: 80mm auto; margin: 2mm 4mm; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #000; background: #fff; width: 72mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; line-height: 1.4; }
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #000; background: #fff; width: 72mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; line-height: 1.35; }
         hr { border: none; border-top: 1px solid #000; margin: 3px 0; }
       </style>`;
 
-      const hLeft = `<div style="flex:0 0 auto;min-width:66px;">
-        <div style="font-size:9px;">${receiptNum}</div>
-        <div style="font-size:9px;">Kassierer</div>
-        <div style="font-size:22px;font-weight:700;line-height:1.05;">${timeStr}</div>
-        <div style="font-size:9px;">${dateStr}</div>
+      const hLeft = `<div style="flex:0 0 auto;min-width:72px;">
+        <div style="font-size:10px;">${receiptNum}</div>
+        <div style="font-size:10px;">Kassierer</div>
+        <div style="font-size:26px;font-weight:700;line-height:1.05;">${timeStr}</div>
+        <div style="font-size:10px;">${dateStr}</div>
       </div>`;
 
       const hRight = `<div style="flex:1;padding-left:6px;">
-        ${custName && custName !== "Laufkunde" ? `<div style="font-weight:700;font-size:11px;">${custName}</div>` : ""}
-        ${custAddress ? `<div style="font-size:10px;">${custAddress}</div>` : ""}
-        ${isDelivery ? `<div style="font-size:9px;font-style:italic;">Hauslieferung ohne Service und Zubereitung</div>` : ""}
-        ${custPhone ? `<div style="margin-top:2px;font-size:10px;"><b>Tel</b>&nbsp;&nbsp;${custPhone}</div>` : ""}
+        ${custName && custName !== "Laufkunde" ? `<div style="font-weight:700;font-size:13px;">${custName}</div>` : ""}
+        ${custAddress ? `<div style="font-size:12px;">${custAddress}</div>` : ""}
+        ${isDelivery ? `<div style="font-size:10px;font-style:italic;">Hauslieferung ohne Service und Zubereitung</div>` : ""}
+        ${custPhone ? `<div style="margin-top:2px;font-size:12px;"><b>Tel</b>&nbsp;&nbsp;${custPhone}</div>` : ""}
       </div>`;
 
       const itemRows = (showPrice: boolean) => fullItems.map(i => `
-        <div style="display:flex;padding:2px 0;font-size:11px;">
-          <span style="width:14px;">${i.quantity}</span>
+        <div style="display:flex;padding:2px 0;font-size:13px;">
+          <span style="width:16px;">${i.quantity}</span>
           <span style="flex:1;overflow:hidden;">${i.productName}</span>
-          ${showPrice ? `<span style="width:36px;text-align:right;font-size:10px;">${Number(i.unitPrice).toFixed(2)}</span><span style="width:36px;text-align:right;">${Number(i.total).toFixed(2)}</span>` : ""}
+          ${showPrice ? `<span style="width:40px;text-align:right;font-size:11px;">${Number(i.unitPrice).toFixed(2)}</span><span style="width:40px;text-align:right;">${Number(i.total).toFixed(2)}</span>` : ""}
         </div>`).join("");
 
       const totalBox = `<div style="display:flex;border:1px solid #000;padding:4px 6px;margin:5px 0;">
-        <span style="font-weight:700;">${itemCount}</span>
+        <span style="font-weight:700;font-size:13px;">${itemCount}</span>
         <span style="flex:1;"></span>
-        <span style="font-size:10px;align-self:center;">Fr</span>
-        <span style="font-weight:700;font-size:16px;margin-left:5px;">${Number(cartTotal).toFixed(2)}</span>
+        <span style="font-size:11px;align-self:center;">Fr</span>
+        <span style="font-weight:700;font-size:20px;margin-left:5px;">${Number(cartTotal).toFixed(2)}</span>
       </div>`;
 
       // ── JOB 1: KUNDENBELEG (نسخة العميل / المطعم) ──────────────
       const job1 = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">${css}</head><body>
         ${logoUrl
-          ? `<div style="text-align:center;margin-bottom:5px;"><img src="${logoUrl}" style="max-height:50px;max-width:180px;object-fit:contain;"></div>`
-          : `<div style="font-size:15px;font-weight:700;text-align:center;margin-bottom:3px;">${storeName}</div>`}
-        <div style="text-align:center;font-size:11px;margin-bottom:4px;">Rechnung</div>
+          ? `<div style="text-align:center;margin-bottom:3px;"><img src="${logoUrl}" style="max-height:52px;max-width:180px;object-fit:contain;"></div>`
+          : `<div style="font-size:16px;font-weight:700;text-align:center;margin-bottom:2px;">${storeName}</div>`}
+        <div style="text-align:center;font-size:12px;margin-bottom:3px;">Rechnung</div>
         <div style="display:flex;margin-bottom:3px;">${hLeft}${hRight}</div>
         <hr>
-        <div style="display:flex;font-size:9px;font-weight:700;padding:2px 0;">
-          <span style="width:14px;"></span><span style="flex:1;">Artikel</span>
-          <span style="width:36px;text-align:right;">Preis</span>
-          <span style="width:36px;text-align:right;">Total</span>
+        <div style="display:flex;font-size:10px;font-weight:700;padding:2px 0;">
+          <span style="width:16px;"></span><span style="flex:1;">Artikel</span>
+          <span style="width:40px;text-align:right;">Preis</span>
+          <span style="width:40px;text-align:right;">Total</span>
         </div>
         <hr>
         ${itemRows(true)}
         <hr>
         ${totalBox}
-        ${Number(cartDiscount) > 0 ? `<div style="display:flex;font-size:10px;padding:1px 0;"><span style="flex:1;">Rabatt:</span><span>-CHF ${Number(cartDiscount).toFixed(2)}</span></div>` : ""}
-        ${Number(cartDeliveryFee) > 0 ? `<div style="display:flex;font-size:10px;padding:1px 0;"><span style="flex:1;">Liefergebühr:</span><span>CHF ${Number(cartDeliveryFee).toFixed(2)}</span></div>` : ""}
-        <div style="text-align:center;font-size:10px;margin-top:6px;">Vielen Dank für Ihren Einkauf!</div>
-        ${storeAddr ? `<div style="text-align:center;font-size:9px;margin-top:1px;">${storeName} · ${storeAddr}${storePhone ? " · Tel: " + storePhone : ""}</div>` : ""}
-        ${printQrDataUrl ? `<div style="text-align:center;margin-top:6px;"><img src="${printQrDataUrl}" style="width:72px;height:72px;"></div>` : ""}
+        ${Number(cartDiscount) > 0 ? `<div style="display:flex;font-size:11px;padding:1px 0;"><span style="flex:1;">Rabatt:</span><span>-CHF ${Number(cartDiscount).toFixed(2)}</span></div>` : ""}
+        <div style="text-align:center;font-size:11px;margin-top:5px;">Vielen Dank für Ihren Einkauf!</div>
+        ${storeAddr ? `<div style="text-align:center;font-size:10px;margin-top:1px;">${storeName} · ${storeAddr}${storePhone ? " · Tel: " + storePhone : ""}</div>` : ""}
+        ${printQrDataUrl ? `<div style="text-align:center;margin-top:5px;"><img src="${printQrDataUrl}" style="width:80px;height:80px;"></div>` : ""}
+        ${devFooter}
       </body></html>`;
+
+      const devFooter = `<div style="text-align:center;font-size:9px;color:#000;margin-top:5px;">Developed by Barmagly · www.barmagly.tech</div>`;
 
       // ── JOB 2: FAHRERAUFTRAG (نسخة السائق / التوصيل) ──────────
       const job2 = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">${css}</head><body>
-        <div style="font-size:19px;font-weight:700;margin-bottom:4px;">Fahrerauftrag ${receiptNum}</div>
+        <div style="font-size:20px;font-weight:700;margin-bottom:4px;">Fahrerauftrag ${receiptNum}</div>
         <div style="display:flex;margin-bottom:3px;">${hLeft}${hRight}</div>
         <hr>
-        <div style="display:flex;font-size:9px;font-weight:700;padding:2px 0;">
-          <span style="width:14px;"></span><span style="flex:1;">Artikel</span>
-          <span style="width:36px;text-align:right;">Preis</span>
-          <span style="width:36px;text-align:right;">Total</span>
+        <div style="display:flex;font-size:10px;font-weight:700;padding:2px 0;">
+          <span style="width:16px;"></span><span style="flex:1;">Artikel</span>
+          <span style="width:40px;text-align:right;">Preis</span>
+          <span style="width:40px;text-align:right;">Total</span>
         </div>
         <hr>
         ${itemRows(true)}
         <hr>
         ${totalBox}
         <div style="border:1px solid #000;margin-top:3px;">
-          <div style="display:flex;border-bottom:1px solid #000;padding:7px 8px;">
-            <span style="font-weight:700;width:80px;">FAHRER</span><span style="flex:1;"></span>
+          <div style="display:flex;border-bottom:1px solid #000;padding:8px 8px;">
+            <span style="font-weight:700;font-size:13px;width:85px;">FAHRER</span><span style="flex:1;"></span>
           </div>
-          <div style="display:flex;border-bottom:1px solid #000;padding:7px 8px;">
-            <span style="font-weight:700;width:80px;">LIEFERZEIT</span><span style="flex:1;"></span>
+          <div style="display:flex;border-bottom:1px solid #000;padding:8px 8px;">
+            <span style="font-weight:700;font-size:13px;width:85px;">LIEFERZEIT</span><span style="flex:1;"></span>
           </div>
-          <div style="display:flex;padding:7px 8px;">
-            <span style="font-weight:700;width:80px;">NOTIZ</span>
+          <div style="display:flex;padding:8px 8px;">
+            <span style="font-weight:700;font-size:13px;width:85px;">NOTIZ</span>
             <span style="flex:1;font-style:italic;">${pmLabel}</span>
           </div>
         </div>
+        ${devFooter}
       </body></html>`;
 
       // ── JOB 3: KÜCHENBON (نسخة المطبخ) ─────────────────────────
@@ -953,36 +956,37 @@ export default function POSScreen() {
       const cats = Object.keys(grouped);
       const kitchenItems = (cats.length > 1 || cats[0] !== "ARTIKEL")
         ? cats.map(cat => `
-            <div style="background:#000;color:#fff;font-weight:700;padding:2px 5px;font-size:11px;margin-top:4px;">${cat}</div>
-            ${grouped[cat].map(i => `<div style="display:flex;padding:2px 4px;font-size:13px;font-weight:700;">
-              <span style="width:18px;">${i.quantity}</span>
+            <div style="background:#000;color:#fff;font-weight:700;padding:3px 5px;font-size:12px;margin-top:4px;">${cat}</div>
+            ${grouped[cat].map(i => `<div style="display:flex;padding:3px 4px;font-size:14px;font-weight:700;">
+              <span style="width:20px;">${i.quantity}</span>
               <span style="flex:1;">${i.productName.toUpperCase()}</span>
             </div>`).join("")}`).join("")
-        : fullItems.map(i => `<div style="display:flex;padding:2px 4px;font-size:13px;font-weight:700;">
-            <span style="width:18px;">${i.quantity}</span>
+        : fullItems.map(i => `<div style="display:flex;padding:3px 4px;font-size:14px;font-weight:700;">
+            <span style="width:20px;">${i.quantity}</span>
             <span style="flex:1;">${i.productName.toUpperCase()}</span>
           </div>`).join("");
 
       const job3 = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">${css}</head><body>
-        <div style="font-size:18px;font-weight:700;font-style:italic;text-align:center;margin-bottom:3px;">AENDERUNG</div>
-        <div style="font-size:11px;font-weight:700;">${storeName} ${receiptNum}</div>
-        <div style="font-size:9px;">Kassierer</div>
+        <div style="font-size:20px;font-weight:700;font-style:italic;text-align:center;margin-bottom:3px;">AENDERUNG</div>
+        <div style="font-size:12px;font-weight:700;">${storeName} ${receiptNum}</div>
+        <div style="font-size:10px;">Kassierer</div>
         <hr style="margin:3px 0;">
         <div style="display:flex;margin:3px 0;">
-          <div style="flex:0 0 auto;min-width:66px;">
-            <div style="font-size:22px;font-weight:700;line-height:1.05;">${timeStr}</div>
-            <div style="font-size:9px;">${saleDate.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+          <div style="flex:0 0 auto;min-width:72px;">
+            <div style="font-size:26px;font-weight:700;line-height:1.05;">${timeStr}</div>
+            <div style="font-size:10px;">${saleDate.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
           </div>
           <div style="flex:1;padding-left:6px;">
-            ${custName && custName !== "Laufkunde" ? `<div style="font-weight:700;font-size:11px;">${custName}</div>` : ""}
-            ${custAddress ? `<div style="font-size:10px;">${custAddress}</div>` : ""}
-            ${custPhone ? `<div style="font-size:10px;"><b>Tel</b>&nbsp;${custPhone}</div>` : ""}
+            ${custName && custName !== "Laufkunde" ? `<div style="font-weight:700;font-size:13px;">${custName}</div>` : ""}
+            ${custAddress ? `<div style="font-size:11px;">${custAddress}</div>` : ""}
+            ${custPhone ? `<div style="font-size:11px;"><b>Tel</b>&nbsp;${custPhone}</div>` : ""}
           </div>
         </div>
         <hr>
         ${kitchenItems}
         <hr style="margin-top:5px;">
-        <div style="font-size:13px;font-weight:700;">${itemCount}</div>
+        <div style="font-size:14px;font-weight:700;">${itemCount}</div>
+        ${devFooter}
       </body></html>`;
 
       printHtmlViaIframe(job1, () =>
