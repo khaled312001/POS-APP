@@ -146,17 +146,33 @@ After schema changes, rebuild `server_dist/` with `npm run server:build`.
 
 ## Environment Variables
 
-- `DATABASE_URL` — PostgreSQL connection string (required; managed as Replit secret — points to Replit-managed Helium PostgreSQL in development)
+- `DATABASE_URL` — Auto-managed by Replit (points to Helium/local DB). Overridden at runtime by `server/index.ts` to point to Neon when `NEON_DATABASE_URL` or Neon `PGHOST` is detected.
+- `NEON_DATABASE_URL` — Custom Replit secret containing the Neon connection URL (may omit the database name — code handles this)
+- `PGHOST`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGPORT` — Auto-managed by Replit from the Neon integration. When `PGHOST` contains `neon.tech`, `server/db.ts` uses these directly (most reliable approach).
 - `EXPO_PUBLIC_DOMAIN` — Domain for API requests from frontend
 - `REPLIT_DEV_DOMAIN` — CORS and Expo proxy config (auto-set on Replit)
 - `PORT` — Server port (set to 5000 via Replit env var; must match `.replit` port mapping)
 
-## Replit Migration Notes
+## Neon Database Connection (IMPORTANT)
+
+Replit auto-manages `DATABASE_URL` → Helium local DB and cannot be overridden via secrets. The workaround:
+
+1. **`server/db.ts`** checks in priority order:
+   - If `PGHOST` contains `neon.tech` → uses `PGHOST`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGPORT` directly (no URL parsing)
+   - If `NEON_DATABASE_URL` contains `neon.tech` → parses it with regex (Node's `new URL()` fails on `postgresql://`) and defaults `database` to `neondb` if missing from the URL
+   - Otherwise → uses `DATABASE_URL` (Helium local)
+
+2. **`server/index.ts`** early override block (runs before `initStripe()`):
+   - If `PGHOST` has `neon.tech` → builds full URL from PG* vars and sets both `DATABASE_URL` and `NEON_DATABASE_URL`
+   - Else if `NEON_DATABASE_URL` is set → appends `/neondb?sslmode=require` if the database name is missing
+
+3. **Workflow command** (`Start Backend`): `export DATABASE_URL="$NEON_DATABASE_URL"` sets DATABASE_URL before tsx starts. The `server/db.ts` imports run before `server/index.ts` code, so db.ts must handle the URL independently.
+
+## Replit Setup Notes
 
 - Packages installed via npm (tsx, expo, cross-env, drizzle-kit, esbuild, patch-package)
-- Database schema pushed to Replit-managed PostgreSQL (Helium) via `drizzle-kit push`
-- Demo Pizza Lemon store seeded automatically on first run (admin@pizzalemon.ch / pizzalemon123)
 - Expo CORS patched via `patches/fix-expo-cors.js` to allow `*.replit.dev` domains
 - Backend runs on port 5000 (mapped to external port 80)
 - Frontend Metro bundler runs on port 8080
 - Proxy on port 8081 routes traffic between backend and frontend in development
+- Demo Pizza Lemon store: admin@pizzalemon.ch / pizzalemon123 (PIN: 1234/5678)
