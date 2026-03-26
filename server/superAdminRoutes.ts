@@ -1199,5 +1199,137 @@ export function registerSuperAdminRoutes(app: Express) {
     }
   });
 
+  // ── One-time DB migration: old Neon → Replit Neon ──────────────────────────
+  app.post("/api/super-admin/db-migrate-to-replit-neon", requireSuperAdmin, async (_req: Request, res: Response) => {
+    const pgHost = process.env.PGHOST || "";
+    if (!pgHost.includes("neon.tech")) {
+      return res.status(400).json({ error: "PGHOST is not a Neon host — migration can only run in production", pgHost });
+    }
+
+    const log: string[] = [];
+    const report = (msg: string) => { log.push(msg); console.log("[MIGRATE]", msg); };
+
+    try {
+      const { Pool: PgPool } = await import("pg") as any;
+
+      // Source: old Neon database (current app pool source URL)
+      const srcPool = new PgPool({
+        connectionString: "postgresql://neondb_owner:npg_HFhrVY7sSDp3@ep-polished-sun-amr4cmn7.c-5.us-east-1.aws.neon.tech/neondb",
+        ssl: { rejectUnauthorized: false }, max: 3,
+      });
+
+      // Destination: Replit-managed Neon database
+      const dstPool = new PgPool({
+        host: process.env.PGHOST, database: process.env.PGDATABASE,
+        user: process.env.PGUSER, password: process.env.PGPASSWORD,
+        port: parseInt(process.env.PGPORT || "5432"),
+        ssl: { rejectUnauthorized: false }, max: 3,
+      });
+
+      // Test connections
+      const [srcTest, dstTest] = await Promise.all([
+        srcPool.query("SELECT COUNT(*) as c FROM customers"),
+        dstPool.query("SELECT current_database() as db"),
+      ]);
+      report(`Source: ${srcTest.rows[0].c} customers`);
+      report(`Destination: ${dstTest.rows[0].db} on ${pgHost}`);
+
+      // Clear destination
+      await dstPool.query(`
+        TRUNCATE TABLE
+          stock_count_items, stock_counts, cash_drawer_operations, employee_commissions,
+          platform_commissions, activity_log, notifications, tenant_notifications,
+          calls, online_orders, kitchen_orders, return_items, returns,
+          sale_items, sales, inventory_movements, inventory,
+          purchase_order_items, purchase_orders, warehouse_transfers,
+          warehouses, vehicles, shifts, daily_closings, monthly_closings,
+          expenses, supplier_contracts, suppliers, customers, employees,
+          tables, products, categories, branches,
+          tenant_subscriptions, license_keys,
+          landing_page_config, platform_settings, printer_configs, sync_queue,
+          tenants, super_admins, subscription_plans
+        RESTART IDENTITY CASCADE
+      `);
+      report("Destination cleared");
+
+      function sqlVal(v: any): string {
+        if (v === null || v === undefined) return "NULL";
+        if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+        if (typeof v === "number") return String(v);
+        if (v instanceof Date) return `'${v.toISOString()}'`;
+        return `'${String(v).replace(/'/g, "''")}'`;
+      }
+
+      async function migrate(tbl: string, batchSize = 300) {
+        const rows = await srcPool.query(`SELECT * FROM "${tbl}" ORDER BY id`);
+        if (!rows.rows.length) { report(`  ${tbl}: 0`); return; }
+        const cols = Object.keys(rows.rows[0]);
+        const colsSql = cols.map((c: string) => `"${c}"`).join(",");
+        for (let i = 0; i < rows.rows.length; i += batchSize) {
+          const batch = rows.rows.slice(i, i + batchSize);
+          const vals = batch.map((r: any) => `(${cols.map((c: string) => sqlVal(r[c])).join(",")})`).join(",");
+          await dstPool.query(`INSERT INTO "${tbl}" (${colsSql}) VALUES ${vals} ON CONFLICT (id) DO NOTHING`);
+        }
+        await dstPool.query(`SELECT setval(pg_get_serial_sequence('${tbl}','id'), COALESCE((SELECT MAX(id) FROM "${tbl}"),0)+1, false)`);
+        report(`  ${tbl}: ${rows.rows.length}`);
+      }
+
+      // Migrate in FK order
+      await migrate("super_admins"); await migrate("tenants");
+      await migrate("license_keys"); await migrate("tenant_subscriptions");
+      await migrate("branches"); await migrate("categories");
+      await migrate("warehouses"); await migrate("vehicles");
+      await migrate("employees"); await migrate("suppliers");
+      await migrate("products", 100);
+
+      // Customers in large batches (direct pg is fast)
+      const custRows = await srcPool.query("SELECT * FROM customers ORDER BY id");
+      const custCols = Object.keys(custRows.rows[0]);
+      const custColsSql = custCols.map((c: string) => `"${c}"`).join(",");
+      let custDone = 0;
+      for (let i = 0; i < custRows.rows.length; i += 500) {
+        const batch = custRows.rows.slice(i, i + 500);
+        const vals = batch.map((r: any) => `(${custCols.map((c: string) => sqlVal(r[c])).join(",")})`).join(",");
+        await dstPool.query(`INSERT INTO customers (${custColsSql}) VALUES ${vals} ON CONFLICT (id) DO NOTHING`);
+        custDone += batch.length;
+      }
+      await dstPool.query(`SELECT setval(pg_get_serial_sequence('customers','id'), COALESCE((SELECT MAX(id) FROM customers),0)+1, false)`);
+      report(`  customers: ${custDone}`);
+
+      await migrate("sales", 100); await migrate("sale_items", 100);
+      await migrate("inventory", 100); await migrate("expenses");
+      await migrate("shifts"); await migrate("notifications", 100);
+      await migrate("calls", 100); await migrate("activity_log");
+      await migrate("stock_counts"); await migrate("cash_drawer_operations");
+      await migrate("platform_commissions"); await migrate("tables");
+
+      // Tables without id
+      const noIdTables = ["landing_page_config", "platform_settings"];
+      for (const tbl of noIdTables) {
+        const rows = await srcPool.query(`SELECT * FROM "${tbl}"`);
+        if (!rows.rows.length) continue;
+        const cols = Object.keys(rows.rows[0]);
+        const colsSql = cols.map((c: string) => `"${c}"`).join(",");
+        const vals = rows.rows.map((r: any) => `(${cols.map((c: string) => sqlVal(r[c])).join(",")})`).join(",");
+        await dstPool.query(`INSERT INTO "${tbl}" (${colsSql}) VALUES ${vals} ON CONFLICT DO NOTHING`);
+        report(`  ${tbl}: ${rows.rows.length}`);
+      }
+
+      // Verify
+      const verify = await dstPool.query(`
+        SELECT (SELECT COUNT(*) FROM tenants) t,
+               (SELECT COUNT(*) FROM customers) c,
+               (SELECT id FROM tenants LIMIT 1) tid
+      `);
+      report(`Done — tenant_id=${verify.rows[0].tid}, customers=${verify.rows[0].c}`);
+
+      await Promise.all([srcPool.end(), dstPool.end()]);
+      res.json({ success: true, log });
+    } catch (e: any) {
+      log.push(`ERROR: ${e.message}`);
+      res.status(500).json({ success: false, log, error: e.message });
+    }
+  });
+
   console.log("[SUPER-ADMIN] All super admin routes registered.");
 }
