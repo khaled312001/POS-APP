@@ -59,6 +59,12 @@ export default function CustomersScreen() {
     howToGo: "", screenInfo: "", customerNr: ""
   });
 
+  // Swiss address autocomplete
+  const [streetSuggestions, setStreetSuggestions] = useState<{ label: string }[]>([]);
+  const [showStreetSuggestions, setShowStreetSuggestions] = useState(false);
+  const [addressSearching, setAddressSearching] = useState(false);
+  const streetSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
 
   // Total count query
   const { data: countData } = useQuery<{ count: number }>({
@@ -176,6 +182,61 @@ export default function CustomersScreen() {
     },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
+
+  const searchSwissAddress = async (streetText: string, cityText: string) => {
+    const query = [streetText, cityText].filter(Boolean).join(" ").trim();
+    if (query.length < 3) {
+      setStreetSuggestions([]);
+      setShowStreetSuggestions(false);
+      return;
+    }
+    setAddressSearching(true);
+    try {
+      const url = `https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=${encodeURIComponent(query)}&type=locations&origins=address&limit=12&sr=4326`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const results = (data.results || []).map((r: any) => ({ label: r.attrs.label as string }));
+      setStreetSuggestions(results);
+      setShowStreetSuggestions(results.length > 0);
+    } catch {
+      setStreetSuggestions([]);
+      setShowStreetSuggestions(false);
+    } finally {
+      setAddressSearching(false);
+    }
+  };
+
+  const parseAddressLabel = (label: string) => {
+    const clean = label.replace(/<[^>]+>/g, "").trim();
+    // Format from GeoAdmin: "Streetname [Nr] PLZ City"
+    const m = clean.match(/^(.+?)\s+(\d{4})\s+(.+)$/);
+    if (!m) return { street: clean, streetNr: "", postalCode: "", city: "" };
+    const streetPart = m[1].trim();
+    const postalCode = m[2];
+    const city = m[3].trim();
+    const nrM = streetPart.match(/^(.+?)\s+(\d+[a-zA-Z]?)$/);
+    if (nrM) return { street: nrM[1].trim(), streetNr: nrM[2], postalCode, city };
+    return { street: streetPart, streetNr: "", postalCode, city };
+  };
+
+  const selectStreetSuggestion = (label: string) => {
+    const parsed = parseAddressLabel(label);
+    setForm(prev => ({
+      ...prev,
+      street: parsed.street,
+      streetNr: parsed.streetNr,
+      postalCode: parsed.postalCode,
+      city: parsed.city,
+    }));
+    setShowStreetSuggestions(false);
+    setStreetSuggestions([]);
+  };
+
+  const handleStreetInputChange = (text: string, currentCity: string) => {
+    setForm(prev => ({ ...prev, street: text }));
+    if (streetSearchRef.current) clearTimeout(streetSearchRef.current);
+    streetSearchRef.current = setTimeout(() => searchSwissAddress(text, currentCity), 400);
+  };
 
   const resetForm = () => setForm({
     name: "", email: "", phone: "", address: "", notes: "", company: "",
@@ -405,16 +466,93 @@ export default function CustomersScreen() {
 
               <Text style={[styles.sectionLabel, rtlTextAlign]}>📍 {language === "ar" ? "العنوان" : "Address"}</Text>
 
+              {/* Quick city picker */}
+              <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "اختر المدينة" : "Stadt wählen"}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} keyboardShouldPersistTaps="handled">
+                <View style={{ flexDirection: "row", gap: 6, paddingBottom: 4 }}>
+                  {["Zürich", "Winterthur", "Bern", "Basel", "Genf", "Lausanne", "Luzern", "St. Gallen", "Zug", "Schaffhausen", "Frauenfeld", "Uster"].map((c) => (
+                    <Pressable
+                      key={c}
+                      onPress={() => { playClickSound("light"); setForm(prev => ({ ...prev, city: c })); }}
+                      style={[
+                        { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
+                        form.city === c
+                          ? { backgroundColor: Colors.accent, borderColor: Colors.accent }
+                          : { backgroundColor: Colors.surfaceLight, borderColor: Colors.cardBorder },
+                      ]}
+                    >
+                      <Text style={[{ fontSize: 12, fontWeight: "600" }, form.city === c ? { color: Colors.textDark } : { color: Colors.text }]}>
+                        {c}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+
+              {/* Street input with GeoAdmin autocomplete */}
               <View style={{ flexDirection: "row", gap: 8 }}>
                 <View style={{ flex: 2 }}>
                   <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "الشارع" : "Strasse"}</Text>
-                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.street} onChangeText={(v) => setForm({ ...form, street: v })} placeholderTextColor={Colors.textMuted} placeholder={language === "ar" ? "الشارع" : "Street"} />
+                  <View>
+                    <TextInput
+                      style={[styles.input, rtlTextAlign, rtlText]}
+                      value={form.street}
+                      onChangeText={(v) => handleStreetInputChange(v, form.city)}
+                      onBlur={() => setTimeout(() => setShowStreetSuggestions(false), 200)}
+                      placeholderTextColor={Colors.textMuted}
+                      placeholder={language === "ar" ? "ابدأ الكتابة..." : "Tippen zum Suchen..."}
+                    />
+                    {addressSearching && (
+                      <ActivityIndicator size="small" color={Colors.accent} style={{ position: "absolute", right: 10, top: 10 }} />
+                    )}
+                  </View>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "رقم" : "Nr."}</Text>
                   <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.streetNr} onChangeText={(v) => setForm({ ...form, streetNr: v })} placeholderTextColor={Colors.textMuted} placeholder="Nr." />
                 </View>
               </View>
+
+              {/* Address suggestions dropdown */}
+              {showStreetSuggestions && streetSuggestions.length > 0 && (
+                <View style={{
+                  backgroundColor: Colors.surfaceLight,
+                  borderWidth: 1,
+                  borderColor: Colors.accent + "50",
+                  borderRadius: 8,
+                  marginTop: -4,
+                  marginBottom: 10,
+                  maxHeight: 220,
+                  overflow: "hidden",
+                  elevation: 10,
+                }}>
+                  <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                    {streetSuggestions.map((s, i) => {
+                      const display = s.label.replace(/<[^>]+>/g, "");
+                      return (
+                        <Pressable
+                          key={i}
+                          onPress={() => { playClickSound("light"); selectStreetSuggestion(s.label); }}
+                          style={({ pressed }) => [
+                            { padding: 10, flexDirection: "row", alignItems: "center", gap: 8 },
+                            i < streetSuggestions.length - 1 && { borderBottomWidth: 1, borderBottomColor: Colors.cardBorder },
+                            pressed && { backgroundColor: Colors.accent + "25" },
+                          ]}
+                        >
+                          <Ionicons name="location-outline" size={14} color={Colors.accent} />
+                          <Text style={{ color: Colors.text, fontSize: 13, flex: 1 }} numberOfLines={1}>{display}</Text>
+                        </Pressable>
+                      );
+                    })}
+                    <Pressable
+                      onPress={() => setShowStreetSuggestions(false)}
+                      style={{ padding: 8, alignItems: "center", borderTopWidth: 1, borderTopColor: Colors.cardBorder }}
+                    >
+                      <Text style={{ color: Colors.textMuted, fontSize: 11 }}>✕ {language === "ar" ? "إغلاق" : "Schließen"}</Text>
+                    </Pressable>
+                  </ScrollView>
+                </View>
+              )}
 
               <View style={{ flexDirection: "row", gap: 8 }}>
                 <View style={{ width: 80 }}>

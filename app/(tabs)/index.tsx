@@ -822,7 +822,9 @@ export default function POSScreen() {
     if (Platform.OS !== "web") return;
 
     const pmLabel = pmMethod === "cash" ? "BAR" : pmMethod === "card" ? "KARTE" : pmMethod.toUpperCase();
-    const custAddress = custObj?.address || "";
+    const custAddress = custObj?.address ||
+      [custObj?.street, custObj?.streetNr || custObj?.houseNr, custObj?.postalCode, custObj?.city]
+        .filter(Boolean).join(" ") || "";
     const custPhone = custObj?.phone || "";
     const mapsUrl = custAddress ? `https://maps.google.com/?q=${encodeURIComponent(custAddress)}` : "";
 
@@ -1031,7 +1033,9 @@ export default function POSScreen() {
       date: new Date().toLocaleString(),
       vehicleId: cart.vehicleId || null,
     });
-    const custAddress = selectedCustomer?.address || "";
+    const custAddress = selectedCustomer?.address ||
+      [selectedCustomer?.street, selectedCustomer?.streetNr || selectedCustomer?.houseNr, selectedCustomer?.postalCode, selectedCustomer?.city]
+        .filter(Boolean).join(" ") || "";
     const qrContent = custAddress
       ? `https://maps.google.com/?q=${encodeURIComponent(custAddress)}`
       : `barmagly:receipt:${saleData.receiptNumber || saleData.id}`;
