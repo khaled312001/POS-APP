@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "expo-router";
 import {
   StyleSheet, Text, View, FlatList, Pressable, TextInput,
-  ScrollView, Modal, Alert, Platform, Dimensions, Image, Animated,
+  ScrollView, Modal, Alert, Platform, Dimensions, Image, Animated, ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -159,6 +159,11 @@ export default function POSScreen() {
   }, []);
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [newCustomerForm, setNewCustomerForm] = useState({ name: "", phone: "", address: "", email: "" });
+  const [ncAddrSuggestions, setNcAddrSuggestions] = useState<{ label: string }[]>([]);
+  const [ncAddrSearching, setNcAddrSearching] = useState(false);
+  const [ncShowSuggestions, setNcShowSuggestions] = useState(false);
+  const [ncCityFilter, setNcCityFilter] = useState("Zürich");
+  const ncAddrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showOnlineOrders, setShowOnlineOrders] = useState(false);
   const [showCallHistory, setShowCallHistory] = useState(false);
   const [callHistoryFilter, setCallHistoryFilter] = useState<"all" | "missed" | "answered" | "today">("all");
@@ -788,6 +793,34 @@ export default function POSScreen() {
     } finally {
       setCustomerPhoneLoading(false);
     }
+  };
+
+  const searchNcAddress = async (text: string, city: string) => {
+    const query = [text, city].filter(Boolean).join(" ").trim();
+    if (query.length < 3) { setNcAddrSuggestions([]); setNcShowSuggestions(false); return; }
+    setNcAddrSearching(true);
+    try {
+      const url = `https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=${encodeURIComponent(query)}&type=locations&origins=address&limit=10&sr=4326`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const results = (data.results || []).map((r: any) => ({ label: r.attrs.label as string }));
+      setNcAddrSuggestions(results);
+      setNcShowSuggestions(results.length > 0);
+    } catch { setNcAddrSuggestions([]); setNcShowSuggestions(false); }
+    finally { setNcAddrSearching(false); }
+  };
+
+  const selectNcAddress = (label: string) => {
+    const clean = label.replace(/<[^>]+>/g, "").trim();
+    setNewCustomerForm(f => ({ ...f, address: clean }));
+    setNcShowSuggestions(false);
+    setNcAddrSuggestions([]);
+  };
+
+  const handleNcAddressChange = (text: string) => {
+    setNewCustomerForm(f => ({ ...f, address: text }));
+    if (ncAddrTimerRef.current) clearTimeout(ncAddrTimerRef.current);
+    ncAddrTimerRef.current = setTimeout(() => searchNcAddress(text, ncCityFilter), 400);
   };
 
   const generateQR = async (text: string) => {
@@ -2541,7 +2574,7 @@ export default function POSScreen() {
       {/* ── New Customer Form Modal ── */}
       <Modal visible={showNewCustomerForm} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: 500 }]}>
+          <View style={[styles.modalContent, { maxHeight: 620 }]}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <View style={[{ flexDirection: "row", alignItems: "center", gap: 10 }, isRTL && { flexDirection: "row-reverse" }]}>
                 <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.primary + "33", justifyContent: "center", alignItems: "center" }}>
@@ -2588,20 +2621,79 @@ export default function POSScreen() {
                 />
               </View>
 
-              {/* Address */}
+              {/* Address with Swiss autocomplete */}
               <Text style={styles.newCustLabel}>
                 {language === "ar" ? "العنوان" : language === "de" ? "Adresse" : "Address"}
               </Text>
+
+              {/* Quick city filter */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} keyboardShouldPersistTaps="handled">
+                <View style={{ flexDirection: "row", gap: 5 }}>
+                  {["Zürich", "Winterthur", "Bern", "Basel", "Genf", "Luzern", "Zug", "St. Gallen"].map((c) => (
+                    <Pressable
+                      key={c}
+                      onPress={() => setNcCityFilter(c)}
+                      style={[
+                        { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
+                        ncCityFilter === c
+                          ? { backgroundColor: Colors.accent, borderColor: Colors.accent }
+                          : { backgroundColor: Colors.surfaceLight, borderColor: Colors.cardBorder },
+                      ]}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: ncCityFilter === c ? Colors.textDark : Colors.text }}>{c}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+
               <View style={[styles.newCustInputWrap, isRTL && { flexDirection: "row-reverse" }]}>
                 <Ionicons name="location-outline" size={16} color={Colors.textMuted} />
                 <TextInput
-                  style={[styles.newCustInput, isRTL && { textAlign: "right" }]}
-                  placeholder={language === "ar" ? "أدخل العنوان" : language === "de" ? "Adresse eingeben" : "Enter address"}
+                  style={[styles.newCustInput, isRTL && { textAlign: "right" }, { flex: 1 }]}
+                  placeholder={language === "ar" ? "اكتب اسم الشارع..." : language === "de" ? "Strasse tippen..." : "Type street name..."}
                   placeholderTextColor={Colors.textMuted}
                   value={newCustomerForm.address}
-                  onChangeText={(v) => setNewCustomerForm((f) => ({ ...f, address: v }))}
+                  onChangeText={handleNcAddressChange}
+                  onBlur={() => setTimeout(() => setNcShowSuggestions(false), 200)}
                 />
+                {ncAddrSearching && <ActivityIndicator size="small" color={Colors.accent} style={{ marginLeft: 6 }} />}
               </View>
+
+              {/* Suggestions */}
+              {ncShowSuggestions && ncAddrSuggestions.length > 0 && (
+                <View style={{
+                  backgroundColor: Colors.surfaceLight,
+                  borderWidth: 1,
+                  borderColor: Colors.accent + "50",
+                  borderRadius: 8,
+                  marginTop: 2,
+                  marginBottom: 8,
+                  maxHeight: 200,
+                  overflow: "hidden",
+                }}>
+                  <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                    {ncAddrSuggestions.map((s, i) => (
+                      <Pressable
+                        key={i}
+                        onPress={() => selectNcAddress(s.label)}
+                        style={({ pressed }) => [
+                          { padding: 10, flexDirection: "row", alignItems: "center", gap: 8 },
+                          i < ncAddrSuggestions.length - 1 && { borderBottomWidth: 1, borderBottomColor: Colors.cardBorder },
+                          pressed && { backgroundColor: Colors.accent + "25" },
+                        ]}
+                      >
+                        <Ionicons name="location-outline" size={13} color={Colors.accent} />
+                        <Text style={{ color: Colors.text, fontSize: 12, flex: 1 }} numberOfLines={1}>
+                          {s.label.replace(/<[^>]+>/g, "")}
+                        </Text>
+                      </Pressable>
+                    ))}
+                    <Pressable onPress={() => setNcShowSuggestions(false)} style={{ padding: 7, alignItems: "center", borderTopWidth: 1, borderTopColor: Colors.cardBorder }}>
+                      <Text style={{ color: Colors.textMuted, fontSize: 10 }}>✕ {language === "de" ? "Schließen" : "Close"}</Text>
+                    </Pressable>
+                  </ScrollView>
+                </View>
+              )}
 
               {/* Email */}
               <Text style={styles.newCustLabel}>
