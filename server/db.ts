@@ -6,32 +6,21 @@ const { Pool } = pg;
 
 let poolConfig: pg.PoolConfig;
 
-// PGHOST/PGDATABASE/etc are Replit-managed — they point to Neon only when using Neon integration
+// NEON_DATABASE_URL (user-set secret) always takes priority — points to the main production Neon DB
+// PGHOST/etc are Replit-auto-managed and may point to a different Neon instance
+const neonUrl = process.env.NEON_DATABASE_URL || "";
+const isNeonUrl = neonUrl.includes("neon.tech");
+
 const pgHost     = process.env.PGHOST     || "";
 const pgDatabase = process.env.PGDATABASE || "";
 const pgUser     = process.env.PGUSER     || "";
 const pgPassword = process.env.PGPASSWORD || "";
 const pgPort     = process.env.PGPORT ? parseInt(process.env.PGPORT) : 5432;
-
 const isNeonHost = pgHost.includes("neon.tech");
 
-// The NEON_DATABASE_URL secret (set by the user) or the workflow-overridden DATABASE_URL
-const neonUrl = process.env.NEON_DATABASE_URL || "";
-const isNeonUrl = neonUrl.includes("neon.tech");
-
-if (isNeonHost) {
-  // PG* vars point directly at Neon — most reliable, no URL parsing
-  console.log(`[DB] Neon via PG* vars — host: ${pgHost}, database: ${pgDatabase}, user: ${pgUser}`);
-  poolConfig = {
-    host:     pgHost,
-    database: pgDatabase || "neondb",
-    user:     pgUser,
-    password: pgPassword,
-    port:     pgPort,
-    ssl: { rejectUnauthorized: false },
-  };
-} else if (isNeonUrl) {
-  // Parse the Neon URL — do NOT use local PG* vars (they point to Helium)
+if (isNeonUrl) {
+  // NEON_DATABASE_URL is the authoritative production database — parse with regex
+  // (Node's URL class misparses the postgresql:// scheme)
   const match = neonUrl.match(
     /^(?:postgresql|postgres):\/\/([^:@]+):([^@]+)@([^/:]+)(?::(\d+))?\/([^?]*)?/
   );
@@ -42,13 +31,24 @@ if (isNeonHost) {
   const port     = match?.[4] ? parseInt(match[4]) : 5432;
   const database = match?.[5] || "neondb";  // default to "neondb" when path is empty
 
-  console.log(`[DB] Neon via URL parse — host: ${host}, database: ${database}, user: ${user}`);
+  console.log(`[DB] Neon via NEON_DATABASE_URL — host: ${host}, database: ${database}, user: ${user}`);
   poolConfig = {
     host,
     database,
     user,
     password,
     port,
+    ssl: { rejectUnauthorized: false },
+  };
+} else if (isNeonHost) {
+  // Fallback: use Replit-managed PG* vars (when no NEON_DATABASE_URL is set)
+  console.log(`[DB] Neon via PG* vars — host: ${pgHost}, database: ${pgDatabase}, user: ${pgUser}`);
+  poolConfig = {
+    host:     pgHost,
+    database: pgDatabase || "neondb",
+    user:     pgUser,
+    password: pgPassword,
+    port:     pgPort,
     ssl: { rejectUnauthorized: false },
   };
 } else {

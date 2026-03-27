@@ -648,6 +648,9 @@ export default function CustomersScreen() {
                     {(selectedCustomer.postalCode || selectedCustomer.city) && (
                       <InfoRow icon="business-outline" label={language === "ar" ? "المدينة" : "Ort"} value={`${selectedCustomer.postalCode || ""} ${selectedCustomer.city || ""}`.trim()} isRTL={isRTL} />
                     )}
+                    {selectedCustomer.quadrat && (
+                      <InfoRow icon="grid-outline" label="Quadrat" value={selectedCustomer.quadrat} isRTL={isRTL} />
+                    )}
                     {selectedCustomer.address && !selectedCustomer.street && (
                       <InfoRow icon="location-outline" label={language === "ar" ? "العنوان" : "Adresse"} value={selectedCustomer.address} isRTL={isRTL} />
                     )}
@@ -681,12 +684,24 @@ export default function CustomersScreen() {
                 )}
 
                 {/* Source & Legacy Metadata */}
-                {(selectedCustomer.source || selectedCustomer.legacyRef || selectedCustomer.customerNr) && (
+                {(selectedCustomer.source || selectedCustomer.legacyRef || selectedCustomer.customerNr ||
+                  selectedCustomer.r1 || selectedCustomer.r3 || selectedCustomer.r4 || selectedCustomer.r5 ||
+                  selectedCustomer.r8 || selectedCustomer.r9 || selectedCustomer.r10 ||
+                  Number(selectedCustomer.r14) > 0 || Number(selectedCustomer.r15) > 0) && (
                   <View style={[styles.detailSection, { backgroundColor: Colors.surface + "bb", borderStyle: "dashed", borderWidth: 1, borderColor: Colors.cardBorder }]}>
                     <Text style={styles.sectionTitle}>ℹ️ {language === "ar" ? "معلومات إضافية" : "Additional Info"}</Text>
-                    {selectedCustomer.customerNr && <InfoRow icon="id-card-outline" label="ID" value={`#${selectedCustomer.customerNr}`} isRTL={isRTL} />}
-                    {selectedCustomer.source && <InfoRow icon="cloud-outline" label="Source" value={selectedCustomer.source} isRTL={isRTL} />}
-                    {selectedCustomer.legacyRef && <InfoRow icon="link-outline" label="Legacy Ref" value={selectedCustomer.legacyRef} isRTL={isRTL} />}
+                    {selectedCustomer.customerNr ? <InfoRow icon="id-card-outline" label="Kunden-Nr" value={`#${selectedCustomer.customerNr}`} isRTL={isRTL} /> : null}
+                    {selectedCustomer.source ? <InfoRow icon="cloud-outline" label="Source" value={selectedCustomer.source} isRTL={isRTL} /> : null}
+                    {selectedCustomer.legacyRef ? <InfoRow icon="link-outline" label="Legacy Ref" value={selectedCustomer.legacyRef} isRTL={isRTL} /> : null}
+                    {selectedCustomer.r1 ? <InfoRow icon="code-outline" label="R1" value={selectedCustomer.r1} isRTL={isRTL} /> : null}
+                    {selectedCustomer.r3 ? <InfoRow icon="code-outline" label="R3" value={selectedCustomer.r3} isRTL={isRTL} /> : null}
+                    {selectedCustomer.r4 ? <InfoRow icon="code-outline" label="R4" value={selectedCustomer.r4} isRTL={isRTL} /> : null}
+                    {selectedCustomer.r5 ? <InfoRow icon="code-outline" label="R5" value={selectedCustomer.r5} isRTL={isRTL} /> : null}
+                    {selectedCustomer.r8 ? <InfoRow icon="code-outline" label="R8" value={selectedCustomer.r8} isRTL={isRTL} /> : null}
+                    {selectedCustomer.r9 ? <InfoRow icon="code-outline" label="R9" value={selectedCustomer.r9} isRTL={isRTL} /> : null}
+                    {selectedCustomer.r10 ? <InfoRow icon="code-outline" label="R10" value={selectedCustomer.r10} isRTL={isRTL} /> : null}
+                    {Number(selectedCustomer.r14) > 0 ? <InfoRow icon="stats-chart-outline" label="R14" value={String(selectedCustomer.r14)} isRTL={isRTL} /> : null}
+                    {Number(selectedCustomer.r15) > 0 ? <InfoRow icon="stats-chart-outline" label="R15" value={String(selectedCustomer.r15)} isRTL={isRTL} /> : null}
                   </View>
                 )}
 
