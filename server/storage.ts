@@ -326,6 +326,14 @@ export const storage = {
         sql`RIGHT(REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g'), 8) = ${last8}`
       );
     }
+    // Last-7-digits matching: catches Swiss numbers stored without area code (e.g. "3716640")
+    // when the incoming call arrives as "0443716640" (10 digits)
+    const last7 = lastNDigits(phone, 7);
+    if (last7.length === 7) {
+      phoneConditions.push(
+        sql`REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g') = ${last7}`
+      );
+    }
     const conditions: any[] = [
       eq(customers.isActive, true),
       or(...phoneConditions),

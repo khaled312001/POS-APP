@@ -951,6 +951,12 @@ function digitsOnly(phone) {
 function lastNDigits(phone, n = 8) {
   return digitsOnly(phone).slice(-n);
 }
+function isSwissSubscriberOnly(digits) {
+  return /^\d{7}$/.test(digits) && !digits.startsWith("0");
+}
+function isSwissLandlineWithAreaCode(digits) {
+  return /^0[^7]\d{8}$/.test(digits);
+}
 function getPhoneSearchVariants(search) {
   const cleaned = search.replace(/[\s\-\(\)\.\/]/g, "");
   const variants = /* @__PURE__ */ new Set();
@@ -972,11 +978,49 @@ function getPhoneSearchVariants(search) {
     variants.add("0" + baseNumber);
     variants.add(baseNumber);
   }
+  if (isSwissLandlineWithAreaCode(normalized)) {
+    const subscriberOnly = normalized.slice(3);
+    variants.add(subscriberOnly);
+  }
+  const digitsOnly2 = cleaned.replace(/\D/g, "");
+  if (isSwissSubscriberOnly(digitsOnly2)) {
+    for (const areaCode of SWISS_AREA_CODES) {
+      variants.add(areaCode + digitsOnly2);
+      variants.add("+41" + areaCode.slice(1) + digitsOnly2);
+    }
+  }
   return Array.from(variants).filter((v) => v.length >= 6);
 }
+var SWISS_AREA_CODES;
 var init_phoneUtils = __esm({
   "server/phoneUtils.ts"() {
     "use strict";
+    SWISS_AREA_CODES = [
+      "044",
+      "043",
+      "022",
+      "021",
+      "026",
+      "027",
+      "031",
+      "032",
+      "033",
+      "034",
+      "041",
+      "052",
+      "055",
+      "056",
+      "061",
+      "062",
+      "071",
+      "081",
+      "091",
+      "058",
+      "076",
+      "077",
+      "078",
+      "079"
+    ];
   }
 });
 
@@ -1269,6 +1313,12 @@ var init_storage = __esm({
         if (last8.length >= 7) {
           phoneConditions.push(
             sql`RIGHT(REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g'), 8) = ${last8}`
+          );
+        }
+        const last7 = lastNDigits2(phone, 7);
+        if (last7.length === 7) {
+          phoneConditions.push(
+            sql`REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g') = ${last7}`
           );
         }
         const conditions = [
