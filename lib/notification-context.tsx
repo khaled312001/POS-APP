@@ -168,16 +168,28 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     // Native haptic pulse interval
     const hapticIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    // Unlock AudioContext on first user gesture (browser autoplay policy)
+    // Unlock AudioContext + prime HTMLAudioElement on first user gesture (browser autoplay policy)
     useEffect(() => {
         if (Platform.OS !== "web") return;
         const unlock = () => {
-            if (audioUnlockedRef.current) return;
+            // Unlock Web Audio API context
             const ctx = getAudioContext();
             if (ctx && ctx.state === "suspended") {
-                ctx.resume().then(() => { audioUnlockedRef.current = true; });
-            } else {
+                ctx.resume().catch(() => { });
+            }
+            // Prime HTMLAudioElement so future programmatic play() calls are allowed
+            if (!audioUnlockedRef.current) {
                 audioUnlockedRef.current = true;
+                const audio = getRingAudio();
+                if (audio) {
+                    const origVolume = audio.volume;
+                    audio.volume = 0;
+                    audio.play().then(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                        audio.volume = origVolume;
+                    }).catch(() => { audio.volume = origVolume; });
+                }
             }
         };
         window.addEventListener("click", unlock, { once: false });

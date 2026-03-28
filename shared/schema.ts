@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, boolean, timestamp, jsonb, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, boolean, timestamp, jsonb, serial, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -723,6 +723,17 @@ export const monthlyClosings = pgTable("monthly_closings", {
   status: text("status").default("closed"), // closed, approved
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// ========== Daily Sequential Numbering ==========
+
+export const dailySequences = pgTable("daily_sequences", {
+  id: serial("id").primaryKey(),
+  scopeKey: text("scope_key").notNull(), // "branch-{id}" for POS, "tenant-{id}" for online orders
+  date: text("date").notNull(),          // YYYY-MM-DD in Europe/Zurich timezone
+  counter: integer("counter").default(0).notNull(),
+}, (table) => ({
+  uniqScopeDate: unique("daily_seq_scope_date_unique").on(table.scopeKey, table.date),
+}));
 
 // ========== Insert Schemas ==========
 

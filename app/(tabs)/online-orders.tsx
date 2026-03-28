@@ -11,46 +11,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
 import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
+import { getDisplayNumber } from "@/lib/api-config";
 import { useLanguage } from "@/lib/language-context";
 import { playClickSound } from "@/lib/sound";
-
-// ── Web receipt printing via hidden iframe (no popup-blocking) ──────────────
-function printHtmlViaIframe(html: string, onDone?: () => void) {
-  if (typeof document === "undefined") return;
-  const frameId = `_rp_${Date.now()}`;
-  const iframe = document.createElement("iframe");
-  iframe.id = frameId;
-  Object.assign(iframe.style, {
-    position: "fixed", right: "0", bottom: "0",
-    width: "1px", height: "1px",
-    border: "none", opacity: "0",
-    pointerEvents: "none", zIndex: "-1",
-  });
-  document.body.appendChild(iframe);
-  const cleanup = (url: string) => { URL.revokeObjectURL(url); setTimeout(() => iframe?.remove(), 1000); };
-  try {
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    iframe.src = url;
-    iframe.onload = () => {
-      setTimeout(() => {
-        try {
-          const win = iframe.contentWindow;
-          if (!win) return;
-          win.focus();
-          if (onDone) {
-            win.addEventListener("afterprint", () => { cleanup(url); onDone(); }, { once: true });
-            setTimeout(() => { try { onDone(); } catch (_) {} }, 8000);
-          } else {
-            win.addEventListener("afterprint", () => cleanup(url), { once: true });
-            setTimeout(() => cleanup(url), 8000);
-          }
-          win.print();
-        } catch (_) { onDone?.(); }
-      }, 400);
-    };
-  } catch (_) { iframe.remove(); onDone?.(); }
-}
+import { autoPrint3Copies } from "@/utils/printing";
 
 const STATUS_FLOW = ["pending", "accepted", "preparing", "ready", "delivered"];
 
@@ -386,9 +350,9 @@ export default function OrdersScreen() {
         }));
         const subtotal = items.reduce((s: number, i: any) => s + i.total, 0);
         setEditForm({
-          customerName: order.customerName || "",
-          customerPhone: order.customerPhone || "",
-          customerAddress: "",
+          customerName: order.customerName || full.customerName || "",
+          customerPhone: order.customerPhone || full.customerPhone || "",
+          customerAddress: full.customerAddress || order.customerAddress || "",
           notes: full.notes || "",
           estimatedTime: "",
           items,
@@ -569,7 +533,7 @@ export default function OrdersScreen() {
     const sourceColor = isPOS ? "#F59E0B" : "#6366F1";
     const sourceBg = isPOS ? "rgba(245,158,11,0.12)" : "rgba(99,102,241,0.12)";
     const sourceLabel = isPOS ? (language === "ar" ? "📞 كاشير" : "📞 POS") : (language === "ar" ? "🌐 إلكتروني" : "🌐 Online");
-    const orderId = isPOS ? (item.receiptNumber || `#${item.id}`) : `#${item.orderNumber}`;
+    const orderId = isPOS ? (getDisplayNumber(item.receiptNumber) || `#${item.id}`) : `#${getDisplayNumber(item.orderNumber)}`;
 
     return (
       <Animated.View style={[
@@ -808,161 +772,31 @@ export default function OrdersScreen() {
               lbl("Others", "أخرى", "Sonstiges");
 
   const printEditedOrder = () => {
-    if (Platform.OS !== "web") {
-      Alert.alert("Print", "Printing is only supported on web currently.");
-      return;
-    }
-
-    const orderNum = editingOrder?._type === "pos" ? (editingOrder?.receiptNumber || `#${editingOrder?.id}`) : `#${editingOrder?.orderNumber}`;
-    const dateStr = new Date().toLocaleDateString();
-    const timeStr = new Date().toLocaleTimeString();
-
-    const storeName = storeSettings?.name || "POS System";
-    const storeAddr = storeSettings?.address || "";
-    const storePhone = storeSettings?.phone || "";
-    const storeEmail = storeSettings?.email || "";
-    const logoUrl = storeSettings?.logo || "";
-
-    const generateInnerReceipt = (isKitchen: boolean, title: string) => {
-      const itemsHtml = editForm.items.map((item: any) => `
-        <div style="display:flex;justify-content:space-between;padding:3px 0;${isKitchen ? 'font-size:14px;font-weight:bold;' : ''}">
-          <span style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.name}</span>
-          <span style="width:40px;text-align:center;">x${item.quantity}</span>
-          ${!isKitchen ? `<span style="width:75px;text-align:right;">CHF ${Number(item.total || 0).toFixed(2)}</span>` : ""}
-        </div>
-      `).join("");
-
-      const logoHtml = logoUrl && !isKitchen ? `<div style="text-align:center;margin:8px 0;"><img src="${logoUrl}" style="max-height:55px;max-width:200px;object-fit:contain;" /></div>` : "";
-
-      return `
-        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
-        ${logoHtml}
-        <div class="center bold" style="font-size:18px;margin-bottom:4px;text-transform:uppercase;">${title}</div>
-        <div class="center bold" style="font-size:14px;">${storeName}</div>
-        ${!isKitchen ? `
-          ${storeAddr ? `<div class="center">${storeAddr}</div>` : ""}
-          ${storePhone ? `<div class="center">${storePhone}</div>` : ""}
-          ${storeEmail ? `<div class="center">${storeEmail}</div>` : ""}
-        ` : ""}
-        
-        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
-        
-        <div>${lbl("Date", "التاريخ", "Datum")}: ${dateStr}, ${timeStr}</div>
-        <div>${lbl("Order Number", "رقم الطلب", "Bestellnummer")}: ${orderNum}</div>
-        ${editForm.customerName ? `<div>${lbl("Customer", "العميل", "Kunde")}: ${editForm.customerName}</div>` : ""}
-        ${editForm.customerPhone ? `<div>${lbl("Phone", "الهاتف", "Telefon")}: ${editForm.customerPhone}</div>` : ""}
-        ${editForm.customerAddress ? `<div>${lbl("Address", "العنوان", "Adresse")}: ${editForm.customerAddress}</div>` : ""}
-        
-        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
-        
-        <div class="flex-between bold">
-          <span style="flex:2;">Item</span>
-          <span style="width:40px;text-align:center;">Qty</span>
-          ${!isKitchen ? `<span style="width:75px;text-align:right;">Total</span>` : ""}
-        </div>
-        
-        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
-        
-        ${itemsHtml}
-        
-        ${!isKitchen ? `
-        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
-        
-        <div class="flex-between">
-          <span>${lbl("Subtotal", "المجموع الفرعي", "Zwischensumme")}:</span>
-          <span>CHF ${Number(editForm.subtotal).toFixed(2)}</span>
-        </div>
-        ${editForm.deliveryFee > 0 ?
-            '<div class="flex-between"><span>' + lbl("Delivery Fee", "رسوم التوصيل", "Liefergebühr") + ':</span><span>CHF ' + Number(editForm.deliveryFee).toFixed(2) + '</span></div>'
-            : ""}
-        
-        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
-        
-        <div class="flex-between bold" style="font-size:15px;">
-          <span>TOTAL:</span>
-          <span>CHF ${Number(editForm.totalAmount).toFixed(2)}</span>
-        </div>
-        
-        <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
-        
-        <div class="center bold" style="margin-top:14px;font-size:13px;">${lbl("Thank You", "شكراً لك", "Vielen Dank")}</div>
-        ${storeAddr ? `<div class="center" style="font-size:10px;margin-top:2px;">Visit us: ${storeAddr}</div>` : ""}
-        <div class="center sep" style="margin-top:10px;overflow:hidden;white-space:nowrap;">${"=".repeat(36)}</div>
-        ` : `
-        <div class="center bold" style="margin-top:14px;font-size:13px;">KÜCHENBON</div>
-        <div class="center sep" style="margin-top:10px;overflow:hidden;white-space:nowrap;">${"=".repeat(36)}</div>
-        `}
-      `;
+    if (!editingOrder) return;
+    const saleData = {
+      receiptNumber: editingOrder._type === "pos"
+        ? (getDisplayNumber(editingOrder.receiptNumber) || `#${editingOrder.id}`)
+        : `#${getDisplayNumber(editingOrder.orderNumber)}`,
+      id: editingOrder.id,
+      createdAt: editingOrder.createdAt || new Date().toISOString(),
     };
-
-    const customerInner = generateInnerReceipt(false, lbl("CUSTOMER RECEIPT", "فاتورة العميل", "KUNDENBELEG"));
-    const driverInner = generateInnerReceipt(false, lbl(`DRIVER ORDER ${orderNum}`, `طلب السائق ${orderNum}`, `FAHRERAUFTRAG ${orderNum}`));
-    const kitchenInner = generateInnerReceipt(true, lbl("KITCHEN RECEIPT", "طلبية المطبخ", "KÜCHENBON"));
-
-    const driverFooter = `
-      <div style="border:1px solid #000;margin-top:12px;font-family:'Courier New',monospace;font-size:12px;color:#000;">
-        <div style="display:flex;border-bottom:1px solid #000;padding:10px 10px;">
-          <span style="font-weight:700;width:110px;min-width:110px;">FAHRER</span>
-          <span style="flex:1;">&nbsp;</span>
-        </div>
-        <div style="display:flex;border-bottom:1px solid #000;padding:10px 10px;">
-          <span style="font-weight:700;width:110px;min-width:110px;">LIEFERZEIT</span>
-          <span style="flex:1;">&nbsp;</span>
-        </div>
-        <div style="display:flex;padding:10px 10px;">
-          <span style="font-weight:700;width:110px;min-width:110px;">NOTIZ</span>
-          <span style="flex:1;">&nbsp;</span>
-        </div>
-      </div>`;
-
-    const combinedHtml = `<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <title>Receipt ${orderNum}</title>
-  <style>
-    @page { size: A4; margin: 15mm 20mm; }
-    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 13px; color: #000; line-height: 1.4; background: #fff; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page-break { page-break-after: always; }
-
-    /* Thermal aesthetics for inside A4 wrapper */
-    .thermal-receipt {
-      width: 320px;
-      margin: 0 auto;
-      font-family: 'Courier New', monospace;
-      font-size: 13px;
-      font-weight: 600;
-      color: #000;
-    }
-    .center { text-align: center; }
-    .bold { font-weight: 900; }
-    .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
-    .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
-  </style>
-</head>
-<body>
-  
-  <div class="thermal-receipt">
-    ${customerInner}
-  </div>
-
-  <div class="page-break"></div>
-  
-  <div class="thermal-receipt">
-    ${driverInner}
-    ${driverFooter}
-  </div>
-
-  <div class="page-break"></div>
-
-  <div class="thermal-receipt">
-    ${kitchenInner}
-  </div>
-
-</body>
-</html>`;
-
-    printHtmlViaIframe(combinedHtml);
+    const cartItems = editForm.items.map((it: any) => ({
+      name: it.name,
+      quantity: it.quantity,
+      price: Number(it.unitPrice),
+      categoryId: it.categoryId,
+    }));
+    const custObj = {
+      address: editForm.customerAddress,
+      phone: editForm.customerPhone,
+    };
+    autoPrint3Copies(
+      saleData, cartItems, editForm.subtotal, 0, 0, 0, editForm.totalAmount, editForm.deliveryFee,
+      editingOrder.paymentMethod || "cash", 0,
+      editForm.customerName || "Laufkunde", "",
+      custObj, undefined, 0,
+      storeSettings, tenant, allCategories as any[]
+    );
   };
 
   return (
@@ -975,19 +809,18 @@ export default function OrdersScreen() {
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={styles.modalTitle}>
                 {lbl("Edit Order", "تعديل الطلب", "Bestellung bearbeiten")}{" "}
-                {editingOrder?._type === "pos" ? (editingOrder?.receiptNumber || `#${editingOrder?.id}`) : `#${editingOrder?.orderNumber}`}
+                {editingOrder?._type === "pos" ? (getDisplayNumber(editingOrder?.receiptNumber) || `#${editingOrder?.id}`) : `#${getDisplayNumber(editingOrder?.orderNumber)}`}
               </Text>
               <Pressable onPress={() => setEditingOrder(null)}>
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </Pressable>
             </View>
             <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-              {/* Online-order specific fields */}
-              {editingOrder?._type !== "pos" && [
+              {/* Customer info - shown for all order types */}
+              {[
                 { label: lbl("Customer Name", "اسم العميل", "Kundenname"), key: "customerName", placeholder: "Name" },
                 { label: lbl("Phone", "الهاتف", "Telefon"), key: "customerPhone", placeholder: "+1 234 567" },
                 { label: lbl("Address", "العنوان", "Adresse"), key: "customerAddress", placeholder: "Street, City" },
-                { label: lbl("Estimated Time (min)", "وقت التوصيل (دقيقة)", "Geschätzte Zeit (Min)"), key: "estimatedTime", placeholder: "30" },
               ].map((f: any) => (
                 <View key={f.key} style={styles.editField}>
                   <Text style={[styles.editLabel, isRTL && { textAlign: "right" }]}>{f.label}</Text>
@@ -997,10 +830,23 @@ export default function OrdersScreen() {
                     onChangeText={v => setEditForm(prev => ({ ...prev, [f.key]: v }))}
                     placeholder={f.placeholder}
                     placeholderTextColor={Colors.textMuted}
-                    keyboardType={f.key === "estimatedTime" ? "number-pad" : "default"}
                   />
                 </View>
               ))}
+              {/* Estimated time - only for online orders */}
+              {editingOrder?._type !== "pos" && (
+                <View style={styles.editField}>
+                  <Text style={[styles.editLabel, isRTL && { textAlign: "right" }]}>{lbl("Estimated Time (min)", "وقت التوصيل (دقيقة)", "Geschätzte Zeit (Min)")}</Text>
+                  <TextInput
+                    style={[styles.editInput, isRTL && { textAlign: "right" }]}
+                    value={editForm.estimatedTime}
+                    onChangeText={v => setEditForm(prev => ({ ...prev, estimatedTime: v }))}
+                    placeholder="30"
+                    placeholderTextColor={Colors.textMuted}
+                    keyboardType="number-pad"
+                  />
+                </View>
+              )}
               {/* Notes - for all types */}
               <View style={styles.editField}>
                 <Text style={[styles.editLabel, isRTL && { textAlign: "right" }]}>{lbl("Notes", "ملاحظات", "Notizen")}</Text>

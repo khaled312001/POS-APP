@@ -21,7 +21,7 @@ import {
   type InsertNotification, type InsertCall, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications,
   type InsertSuperAdmin, type InsertTenant, type InsertTenantSubscription, type InsertLicenseKey, type InsertTenantNotification,
   onlineOrders, landingPageConfig, platformSettings, platformCommissions,
-  vehicles, printerConfigs, dailyClosings, monthlyClosings,
+  vehicles, printerConfigs, dailyClosings, monthlyClosings, dailySequences,
   type InsertOnlineOrder, type InsertLandingPageConfig,
   type InsertPlatformSetting, type InsertPlatformCommission,
   type InsertVehicle, type InsertPrinterConfig, type InsertDailyClosing, type InsertMonthlyClosing
@@ -1907,5 +1907,26 @@ export const storage = {
       }
     }
     return { tenants: result, grandTotal };
+  },
+
+  // ── Daily Sequential Numbering (resets at midnight Europe/Zurich) ──────────
+  async getNextSequenceNumber(scopeKey: string): Promise<number> {
+    // Get current date in Swiss timezone (Europe/Zurich = UTC+1/+2)
+    const swissDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Zurich",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date()); // returns YYYY-MM-DD
+    const dateCompact = swissDate.replace(/-/g, ""); // YYYYMMDD
+
+    const result = await db.execute(sql`
+      INSERT INTO daily_sequences (scope_key, date, counter)
+      VALUES (${scopeKey}, ${dateCompact}, 1)
+      ON CONFLICT (scope_key, date)
+      DO UPDATE SET counter = daily_sequences.counter + 1
+      RETURNING counter
+    `);
+    return Number((result as any).rows[0].counter);
   },
 };

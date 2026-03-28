@@ -36,7 +36,7 @@ const PIZZA_LEMON_CATEGORIES = [
     { name: "Getränke", color: "#2C7A7B", icon: "cafe", sortOrder: 9 },
     { name: "Bier", color: "#744210", icon: "beer", sortOrder: 10 },
     { name: "Alkoholische Getränke", color: "#6B46C1", icon: "wine", sortOrder: 11 },
-    { name: "Tabakwaren", color: "#4A5568", icon: "warning", sortOrder: 12 },
+    { name: "Extra", color: "#4A5568", icon: "add-circle", sortOrder: 12 },
 ];
 
 // Per-pizza size modifier with correct 45cm surcharge
@@ -300,9 +300,12 @@ const ALKOHOL: MenuItem[] = [
     { name: "Smirnoff Ice", description: "Smirnoff Ice, 275ml", price: 6.00, image: IMG("pizzalemon_112_smirnoff_ice.jpg") },
 ];
 
-// ─── TABAKWAREN ───────────────────────────────────────────────────────────────
-const TABAK: MenuItem[] = [
-    { name: "Zigaretten", description: "Zigaretten – aktueller Preis. Zählen nicht zum Mindestbestellwert.", price: 0.00, image: IMG("pizzalemon_113_zigaretten.jpg") },
+// ─── EXTRA ────────────────────────────────────────────────────────────────────
+const EXTRAS: MenuItem[] = [
+    { name: "Brot", description: "Frisches Brot", price: 2.00, image: IMG("pizzalemon_extra_brot.jpg") },
+    { name: "Knoblibrot", description: "Knuspriges Brot mit Knoblauchbutter", price: 7.00, image: IMG("pizzalemon_90_knoblibrot.jpg") },
+    { name: "Pommes Extra", description: "Extra Portion Pommes frites", price: 11.00, image: IMG("pizzalemon_58_pommes.jpg") },
+    { name: "Zigaretten", description: "Zigaretten – aktueller Preis. Zählen nicht zum Mindestbestellwert.", price: 17.00, image: IMG("pizzalemon_113_zigaretten.jpg") },
 ];
 
 function slugify(name: string): string {
@@ -480,6 +483,14 @@ export async function seedPizzaLemon() {
         console.log("[PIZZA LEMON] Renamed category Softgetränke → Getränke");
     }
 
+    // Handle legacy rename: Tabakwaren → Extra
+    if (catMap["Tabakwaren"] && !catMap["Extra"]) {
+        await db.update(categories).set({ name: "Extra", icon: "add-circle" }).where(eq(categories.id, catMap["Tabakwaren"]));
+        catMap["Extra"] = catMap["Tabakwaren"];
+        delete catMap["Tabakwaren"];
+        console.log("[PIZZA LEMON] Renamed category Tabakwaren → Extra");
+    }
+
     for (const cat of PIZZA_LEMON_CATEGORIES) {
         if (!catMap[cat.name]) {
             const [ins] = await db.insert(categories).values({
@@ -577,11 +588,11 @@ export async function seedPizzaLemon() {
 
     for (const p of BIER) await insertItem("Bier", p);
     for (const p of ALKOHOL) await insertItem("Alkoholische Getränke", p);
-    for (const p of TABAK) await insertItem("Tabakwaren", p);
+    for (const p of EXTRAS) await insertItem("Extra", p);
 
     const total = PIZZAS.length + CALZONES.length + PIDE.length + LAHMACUN.length +
         TELLERGERICHTE.length + FINGERFOOD.length + SALATE.length + DESSERTS.length +
-        GETRAENKE.length + BIER.length + ALKOHOL.length + TABAK.length;
+        GETRAENKE.length + BIER.length + ALKOHOL.length + EXTRAS.length;
     console.log(`[PIZZA LEMON] ✓ ${total} products inserted with updated images (v4) and prices.`);
 
     // ── Landing page config ────────────────────────────────────────────────────

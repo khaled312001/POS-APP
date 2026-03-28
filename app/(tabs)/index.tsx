@@ -13,65 +13,13 @@ import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
+import { getDisplayNumber } from "@/lib/api-config";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { playClickSound, playAddSound } from "@/lib/sound";
 import RealTimeClock from "@/components/RealTimeClock";
 import { useLanguage } from "@/lib/language-context";
 import { useNotifications } from "@/lib/notification-context";
-
-// ── Web receipt printing via hidden iframe (no popup-blocking) ──────────────
-// onDone fires after the print dialog is dismissed (afterprint event).
-// Use it to chain sequential jobs so each job ends with an auto-cut.
-function printHtmlViaIframe(html: string, onDone?: () => void) {
-  if (typeof document === "undefined") return;
-  // Use a unique id per call so sequential iframes don't collide
-  const frameId = `_rp_${Date.now()}`;
-  const iframe = document.createElement("iframe");
-  iframe.id = frameId;
-  Object.assign(iframe.style, {
-    position: "fixed", right: "0", bottom: "0",
-    width: "1px", height: "1px",
-    border: "none", opacity: "0",
-    pointerEvents: "none", zIndex: "-1",
-  });
-  document.body.appendChild(iframe);
-
-  const cleanup = (url: string) => {
-    URL.revokeObjectURL(url);
-    setTimeout(() => iframe?.remove(), 1000);
-  };
-
-  try {
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    iframe.src = url;
-    iframe.onload = () => {
-      setTimeout(() => {
-        try {
-          const win = iframe.contentWindow;
-          if (!win) return;
-          win.focus();
-          // afterprint fires when print dialog closes → trigger next job
-          if (onDone) {
-            let fired = false;
-            const once = () => { if (fired) return; fired = true; cleanup(url); setTimeout(onDone, 1000); };
-            win.addEventListener("afterprint", once, { once: true });
-            setTimeout(once, 8000);
-          } else {
-            let cleaned = false;
-            const doClean = () => { if (cleaned) return; cleaned = true; cleanup(url); };
-            win.addEventListener("afterprint", doClean, { once: true });
-            setTimeout(doClean, 8000);
-          }
-          win.print();
-        } catch (_) { onDone?.(); }
-      }, 400);
-    };
-  } catch (_) {
-    iframe.remove();
-    onDone?.();
-  }
-}
+import { printHtmlViaIframe, autoPrint3Copies } from "@/utils/printing";
 
 const AnimatedProductImage = ({ uri }: { uri: string }) => {
   return (
@@ -146,6 +94,7 @@ export default function POSScreen() {
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [selectedToppings, setSelectedToppings] = useState<string[]>([]);
   const [showToppingsStep, setShowToppingsStep] = useState(false);
+  const [editingCartItemId, setEditingCartItemId] = useState<number | null>(null);
   const [phoneInput, setPhoneInput] = useState("");
   const [customerPhoneLoading, setCustomerPhoneLoading] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
@@ -171,6 +120,9 @@ export default function POSScreen() {
   const [orderNotes, setOrderNotes] = useState("");
   const [showOrderNotes, setShowOrderNotes] = useState(false);
   const [endOfDayLoading, setEndOfDayLoading] = useState(false);
+  const [showZeroOutPreview, setShowZeroOutPreview] = useState(false);
+  const [zeroOutSalesData, setZeroOutSalesData] = useState<any[]>([]);
+  const [zeroOutLoading, setZeroOutLoading] = useState(false);
   const [lastAddedId, setLastAddedId] = useState<number | null>(null);
   const flashAnim = useRef(new Animated.Value(0)).current;
   const checkoutPulse = useRef(new Animated.Value(1)).current;
@@ -312,16 +264,26 @@ export default function POSScreen() {
   ];
 
   // POS-style color-coded topping grid (matches image 2 layout)
+  const TOPPING_PRICE = 2; // CHF 2.00 per topping
+
   const TOPPING_GRID: { color: string; textColor: string; items: (string | null)[] }[] = [
     { color: "#1455A4", textColor: "#fff", items: ["Tomato Sauce", "Sliced Tomatoes", "Garlic", "Onions", "Capers", "Olives", "Oregano"] },
     { color: "#1976D2", textColor: "#fff", items: ["Vegetables", "Spinach", "Bell Peppers", null, "Corn", "Broccoli", "Artichokes"] },
     { color: "#E8EAF6", textColor: "#1a1a2e", items: ["Egg", "Pineapple", null, null, null, null, "Arugula"] },
     { color: "#E8EAF6", textColor: "#1a1a2e", items: ["Mushrooms", null, null, null, null, null, null] },
     { color: "#B71C1C", textColor: "#fff", items: ["Ham", "Spicy Salami", "Salami", "Bacon", "Prosciutto", null, null] },
-    { color: "#B71C1C", textColor: "#fff", items: ["Lamb", "Chicken", "Kebab", "Minced Meat", null, "Mayonnaise", null] },
-    { color: "#BF360C", textColor: "#fff", items: ["Anchovies", "Shrimp", "Tuna", null, null, "Ketchup", null] },
-    { color: "#1B5E20", textColor: "#fff", items: [null, null, null, null, null, "Cocktail Sauce", "Spicy Sauce"] },
-    { color: "#F9A825", textColor: "#1a1a2e", items: ["Mozzarella", "Gorgonzola", "Parmesan", "Mascarpone", "Kaeserand", "Yogurt Sauce", null] },
+    { color: "#B71C1C", textColor: "#fff", items: ["Lamb", "Chicken", "Kebab", "Minced Meat", null, null, null] },
+    { color: "#BF360C", textColor: "#fff", items: ["Anchovies", "Shrimp", "Tuna", null, null, null, null] },
+    { color: "#1B5E20", textColor: "#fff", items: [null, null, null, null, null, null, "Spicy Sauce"] },
+    { color: "#F9A825", textColor: "#1a1a2e", items: ["Mozzarella", "Gorgonzola", "Parmesan", "Mascarpone", "Kaeserand", null, null] },
+  ];
+
+  // Sauces row — displayed separately below the main grid with a label
+  const SAUCE_ROW: { name: string; color: string; textColor: string }[] = [
+    { name: "Mayonnaise", color: "#B71C1C", textColor: "#fff" },
+    { name: "Ketchup", color: "#BF360C", textColor: "#fff" },
+    { name: "Cocktail Sauce", color: "#1B5E20", textColor: "#fff" },
+    { name: "Yogurt Sauce", color: "#F9A825", textColor: "#1a1a2e" },
   ];
 
   // Localized topping display name
@@ -496,7 +458,7 @@ export default function POSScreen() {
     const logoPath = storeSettings?.logo || "";
     const logoUrl = logoPath ? (logoPath.startsWith("http") || logoPath.startsWith("data:") ? logoPath : `${getApiUrl().replace(/\/$/, "")}${logoPath}`) : "";
 
-    const receiptNum = saleData.receiptNumber || `#${saleData.id}`;
+    const receiptNum = getDisplayNumber(saleData.receiptNumber) || `#${saleData.id}`;
     const saleDate = new Date(saleData.createdAt || saleData.date || Date.now());
     const dateStr = saleDate.toLocaleDateString();
     const timeStr = saleDate.toLocaleTimeString();
@@ -667,14 +629,39 @@ export default function POSScreen() {
       const itemsText = (inv.items || []).map((item: any) =>
         `${item.productName || item.name}  x${item.quantity}  CHF ${Number(item.total || (item.unitPrice * item.quantity)).toFixed(2)}`
       ).join("\n");
-      const receiptText = `${storeSettings?.name || tenant?.name || "POS System"}\n${storeSettings?.address || ""}\n${"─".repeat(30)}\n${t("receiptNumber")}: ${inv.receiptNumber || "#" + inv.id}\n${t("receiptDate")}: ${new Date(inv.createdAt || inv.date).toLocaleString()}\n${"─".repeat(30)}\n${itemsText}\n${"─".repeat(30)}\nTOTAL: CHF ${Number(inv.totalAmount).toFixed(2)}\n${t("paymentMethod")}: ${(inv.paymentMethod || "cash").toUpperCase()}\n${"═".repeat(30)}\n${t("thankYou")}`;
+      const receiptText = `${storeSettings?.name || tenant?.name || "POS System"}\n${storeSettings?.address || ""}\n${"─".repeat(30)}\n${t("receiptNumber")}: ${getDisplayNumber(inv.receiptNumber) || "#" + inv.id}\n${t("receiptDate")}: ${new Date(inv.createdAt || inv.date).toLocaleString()}\n${"─".repeat(30)}\n${itemsText}\n${"─".repeat(30)}\nTOTAL: CHF ${Number(inv.totalAmount).toFixed(2)}\n${t("paymentMethod")}: ${(inv.paymentMethod || "cash").toUpperCase()}\n${"═".repeat(30)}\n${t("thankYou")}`;
       Alert.alert(t("printInvoice"), receiptText);
       return;
     }
-    if (Platform.OS === "web" && selectedInvoice) {
-      const html = generateThermalReceiptHTML(selectedInvoice, reprintQrDataUrl);
-      printHtmlViaIframe(html);
-    }
+    const inv = selectedInvoice;
+    const cartItems = (inv.items || []).map((item: any) => ({
+      name: item.productName || item.name,
+      quantity: item.quantity,
+      price: Number(item.unitPrice || (item.quantity > 0 ? (item.total / item.quantity) : 0) || 0),
+      categoryId: item.categoryId,
+    }));
+    const custObj = { address: inv.customerAddress || "", phone: inv.customerPhone || "" };
+    const vehicleObj = (vehicles as any[]).find((v: any) => v.id == inv.vehicleId);
+    autoPrint3Copies(
+      inv,
+      cartItems,
+      Number(inv.subtotal || inv.totalAmount),
+      Number(inv.tax || 0),
+      Number(inv.discount || 0),
+      Number(inv.serviceFee || inv.serviceFeeAmount || 0),
+      Number(inv.totalAmount),
+      Number(inv.deliveryFee || 0),
+      inv.paymentMethod || "cash",
+      0,
+      inv.customerName || "Laufkunde",
+      inv.employeeName || employee?.name || "Staff",
+      custObj,
+      vehicleObj,
+      Number(inv.minimumOrderSurcharge || 0),
+      storeSettings,
+      tenant,
+      categories as any[]
+    );
   };
 
   const isPizzaProduct = useCallback((product: any) => {
@@ -683,6 +670,24 @@ export default function POSScreen() {
     const catName = (categories as any[]).find((c: any) => c.id === product.categoryId)?.name?.toLowerCase() || "";
     return name.includes("pizza") || catName.includes("pizza");
   }, [categories]);
+
+  const isFingerfoodProduct = useCallback((product: any) => {
+    if (!product) return false;
+    const name = (product.name || "").toLowerCase();
+    const catName = (categories as any[]).find((c: any) => c.id === product.categoryId)?.name?.toLowerCase() || "";
+    return name.includes("fingerfood") || catName.includes("fingerfood");
+  }, [categories]);
+
+  const parseToppingsFromName = (itemName: string): string[] => {
+    const match = itemName.match(/\[(.+?)\]\s*$/);
+    if (!match) return [];
+    const displayNames = match[1].split(", ");
+    const allToppings: string[] = [
+      ...TOPPING_GRID.flatMap(row => row.items).filter(Boolean) as string[],
+      ...SAUCE_ROW.map(s => s.name),
+    ];
+    return allToppings.filter(t => displayNames.includes(toppingDisplayName(t)));
+  };
 
   useEffect(() => {
     if (storeSettings?.taxRate !== undefined) {
@@ -732,6 +737,13 @@ export default function POSScreen() {
   // Use caller's customer directly for immediate display; fall back to loaded customers list
   const selectedCustomer = customers.find((c: any) => c.id === cart.customerId)
     || (callerCustomer && callerCustomer.id === cart.customerId ? callerCustomer : null);
+
+  // Build combined address from address field or separate street/city fields
+  const selectedCustomerAddress = selectedCustomer
+    ? (selectedCustomer.address ||
+        [selectedCustomer.street, selectedCustomer.streetNr || selectedCustomer.houseNr, selectedCustomer.postalCode, selectedCustomer.city]
+          .filter(Boolean).join(" "))
+    : "";
 
   const handlePhoneSearch = useCallback(async (phone: string) => {
     const trimmed = phone.trim();
@@ -851,189 +863,6 @@ export default function POSScreen() {
     return num.length >= 15 && mm && yy && mm.length === 2 && yy.length >= 2 && cardCvc.length >= 3;
   };
 
-  const autoPrint3Copies = (saleData: any, cartItems: typeof cart.items, cartSubtotal: number, cartTax: number, cartDiscount: number, cartServiceFee: number, cartTotal: number, cartDeliveryFee: number, pmMethod: string, cashAmt: number, custName: string, empName: string, custObj?: any, vehicleObj?: any, cartMinOrderSurcharge: number = 0) => {
-    if (Platform.OS !== "web") return;
-
-    const pmLabel = pmMethod === "cash" ? "BAR" : pmMethod === "card" ? "KARTE" : pmMethod.toUpperCase();
-    const custAddress = custObj?.address ||
-      [custObj?.street, custObj?.streetNr || custObj?.houseNr, custObj?.postalCode, custObj?.city]
-        .filter(Boolean).join(" ") || "";
-    const custPhone = custObj?.phone || "";
-    const mapsUrl = custAddress ? `https://maps.google.com/?q=${encodeURIComponent(custAddress)}` : "";
-
-    const fullItems = cartItems.map(i => {
-      const cat = (categories as any[]).find((c: any) => c.id === (i as any).categoryId);
-      return {
-        productName: i.name,
-        quantity: i.quantity,
-        unitPrice: i.price,
-        total: i.price * i.quantity,
-        categoryName: (cat?.name || "ARTIKEL").toUpperCase(),
-      };
-    });
-
-    const buildAndPrint = async () => {
-      let printQrDataUrl: string | null = null;
-      try {
-        const QRCode = require("qrcode");
-        const qrContent = mapsUrl || `barmagly:receipt:${saleData?.receiptNumber || saleData?.id}`;
-        printQrDataUrl = await QRCode.toDataURL(qrContent, { width: 200, margin: 1, color: { dark: "#000000", light: "#ffffff" } });
-      } catch { }
-
-      const storeName = storeSettings?.name || tenant?.name || "POS System";
-      const storeAddr = storeSettings?.address || "";
-      const storePhone = storeSettings?.phone || "";
-      const logoPath = storeSettings?.logo || "";
-      const logoUrl = logoPath ? (logoPath.startsWith("http") || logoPath.startsWith("data:") ? logoPath : `${getApiUrl().replace(/\/$/, "")}${logoPath}`) : "";
-
-      const receiptNum = saleData?.receiptNumber || `#${saleData?.id}`;
-      const saleDate = new Date(saleData?.createdAt || Date.now());
-      const timeStr = saleDate.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
-      const dateStr = saleDate.toLocaleDateString("de-CH");
-      const isDelivery = !!custAddress;
-      const itemCount = fullItems.reduce((s, i) => s + i.quantity, 0);
-
-      const css = `<style>
-        @page { size: 80mm auto; margin: 2mm 4mm; }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #000; background: #fff; width: 72mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; line-height: 1.35; }
-        hr { border: none; border-top: 1px solid #000; margin: 3px 0; }
-      </style>`;
-
-      const hLeft = `<div style="flex:0 0 auto;min-width:72px;">
-        <div style="font-size:10px;">${receiptNum}</div>
-        <div style="font-size:10px;">Kassierer</div>
-        <div style="font-size:26px;font-weight:700;line-height:1.05;">${timeStr}</div>
-        <div style="font-size:10px;">${dateStr}</div>
-      </div>`;
-
-      const hRight = `<div style="flex:1;padding-left:6px;">
-        ${custName && custName !== "Laufkunde" ? `<div style="font-weight:700;font-size:13px;">${custName}</div>` : ""}
-        ${custAddress ? `<div style="font-size:12px;">${custAddress}</div>` : ""}
-        ${isDelivery ? `<div style="font-size:10px;font-style:italic;">Hauslieferung ohne Service und Zubereitung</div>` : ""}
-        ${custPhone ? `<div style="margin-top:2px;font-size:12px;"><b>Tel</b>&nbsp;&nbsp;${custPhone}</div>` : ""}
-      </div>`;
-
-      const itemRows = (showPrice: boolean) => fullItems.map(i => `
-        <div style="display:flex;padding:2px 0;font-size:13px;">
-          <span style="width:16px;">${i.quantity}</span>
-          <span style="flex:1;overflow:hidden;">${i.productName}</span>
-          ${showPrice ? `<span style="width:40px;text-align:right;font-size:11px;">${Number(i.unitPrice).toFixed(2)}</span><span style="width:40px;text-align:right;">${Number(i.total).toFixed(2)}</span>` : ""}
-        </div>`).join("");
-
-      const totalBox = `<div style="display:flex;border:1px solid #000;padding:4px 6px;margin:5px 0;">
-        <span style="font-weight:700;font-size:13px;">${itemCount}</span>
-        <span style="flex:1;"></span>
-        <span style="font-size:11px;align-self:center;">Fr</span>
-        <span style="font-weight:700;font-size:20px;margin-left:5px;">${Number(cartTotal).toFixed(2)}</span>
-      </div>`;
-
-      // ── JOB 1: KUNDENBELEG (نسخة العميل / المطعم) ──────────────
-      const job1 = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">${css}</head><body>
-        ${logoUrl
-          ? `<div style="text-align:center;margin-bottom:3px;"><img src="${logoUrl}" style="max-height:52px;max-width:180px;object-fit:contain;"></div>`
-          : `<div style="font-size:16px;font-weight:700;text-align:center;margin-bottom:2px;">${storeName}</div>`}
-        <div style="text-align:center;font-size:12px;margin-bottom:3px;">Rechnung</div>
-        <div style="display:flex;margin-bottom:3px;">${hLeft}${hRight}</div>
-        <hr>
-        <div style="display:flex;font-size:10px;font-weight:700;padding:2px 0;">
-          <span style="width:16px;"></span><span style="flex:1;">Artikel</span>
-          <span style="width:40px;text-align:right;">Preis</span>
-          <span style="width:40px;text-align:right;">Total</span>
-        </div>
-        <hr>
-        ${itemRows(true)}
-        <hr>
-        ${totalBox}
-        ${Number(cartDiscount) > 0 ? `<div style="display:flex;font-size:11px;padding:1px 0;"><span style="flex:1;">Rabatt:</span><span>-CHF ${Number(cartDiscount).toFixed(2)}</span></div>` : ""}
-        <div style="text-align:center;font-size:11px;margin-top:5px;">Vielen Dank für Ihren Einkauf!</div>
-        ${storeAddr ? `<div style="text-align:center;font-size:10px;margin-top:1px;">${storeName} · ${storeAddr}${storePhone ? " · Tel: " + storePhone : ""}</div>` : ""}
-        ${printQrDataUrl ? `<div style="text-align:center;margin-top:5px;"><img src="${printQrDataUrl}" style="width:80px;height:80px;"></div>` : ""}
-        <div style="text-align:center;font-size:9px;color:#000;margin-top:5px;">Developed by Barmagly · www.barmagly.tech</div>
-      </body></html>`;
-
-      const devFooter = `<div style="text-align:center;font-size:9px;color:#000;margin-top:5px;">Developed by Barmagly · www.barmagly.tech</div>`;
-
-      // ── JOB 2: FAHRERAUFTRAG (نسخة السائق / التوصيل) ──────────
-      const job2 = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">${css}</head><body>
-        <div style="font-size:20px;font-weight:700;margin-bottom:4px;">Fahrerauftrag ${receiptNum}</div>
-        <div style="display:flex;margin-bottom:3px;">${hLeft}${hRight}</div>
-        <hr>
-        <div style="display:flex;font-size:10px;font-weight:700;padding:2px 0;">
-          <span style="width:16px;"></span><span style="flex:1;">Artikel</span>
-          <span style="width:40px;text-align:right;">Preis</span>
-          <span style="width:40px;text-align:right;">Total</span>
-        </div>
-        <hr>
-        ${itemRows(true)}
-        <hr>
-        ${totalBox}
-        <div style="border:1px solid #000;margin-top:3px;">
-          <div style="display:flex;border-bottom:1px solid #000;padding:8px 8px;">
-            <span style="font-weight:700;font-size:13px;width:85px;">FAHRER</span><span style="flex:1;"></span>
-          </div>
-          <div style="display:flex;border-bottom:1px solid #000;padding:8px 8px;">
-            <span style="font-weight:700;font-size:13px;width:85px;">LIEFERZEIT</span><span style="flex:1;"></span>
-          </div>
-          <div style="display:flex;padding:8px 8px;">
-            <span style="font-weight:700;font-size:13px;width:85px;">NOTIZ</span>
-            <span style="flex:1;font-style:italic;">${pmLabel}</span>
-          </div>
-        </div>
-        ${devFooter}
-      </body></html>`;
-
-      // ── JOB 3: KÜCHENBON (نسخة المطبخ) ─────────────────────────
-      const grouped: Record<string, typeof fullItems> = {};
-      fullItems.forEach(i => {
-        if (!grouped[i.categoryName]) grouped[i.categoryName] = [];
-        grouped[i.categoryName].push(i);
-      });
-      const cats = Object.keys(grouped);
-      const kitchenItems = (cats.length > 1 || cats[0] !== "ARTIKEL")
-        ? cats.map(cat => `
-            <div style="background:#000;color:#fff;font-weight:700;padding:3px 5px;font-size:12px;margin-top:4px;">${cat}</div>
-            ${grouped[cat].map(i => `<div style="display:flex;padding:3px 4px;font-size:14px;font-weight:700;">
-              <span style="width:20px;">${i.quantity}</span>
-              <span style="flex:1;">${i.productName.toUpperCase()}</span>
-            </div>`).join("")}`).join("")
-        : fullItems.map(i => `<div style="display:flex;padding:3px 4px;font-size:14px;font-weight:700;">
-            <span style="width:20px;">${i.quantity}</span>
-            <span style="flex:1;">${i.productName.toUpperCase()}</span>
-          </div>`).join("");
-
-      const job3 = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">${css}</head><body>
-        <div style="font-size:20px;font-weight:700;font-style:italic;text-align:center;margin-bottom:3px;">AENDERUNG</div>
-        <div style="font-size:12px;font-weight:700;">${storeName} ${receiptNum}</div>
-        <div style="font-size:10px;">Kassierer</div>
-        <hr style="margin:3px 0;">
-        <div style="display:flex;margin:3px 0;">
-          <div style="flex:0 0 auto;min-width:72px;">
-            <div style="font-size:26px;font-weight:700;line-height:1.05;">${timeStr}</div>
-            <div style="font-size:10px;">${saleDate.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
-          </div>
-          <div style="flex:1;padding-left:6px;">
-            ${custName && custName !== "Laufkunde" ? `<div style="font-weight:700;font-size:13px;">${custName}</div>` : ""}
-            ${custAddress ? `<div style="font-size:11px;">${custAddress}</div>` : ""}
-            ${custPhone ? `<div style="font-size:11px;"><b>Tel</b>&nbsp;${custPhone}</div>` : ""}
-          </div>
-        </div>
-        <hr>
-        ${kitchenItems}
-        <hr style="margin-top:5px;">
-        <div style="font-size:14px;font-weight:700;">${itemCount}</div>
-        ${devFooter}
-      </body></html>`;
-
-      printHtmlViaIframe(job1, () =>
-        printHtmlViaIframe(job2, () =>
-          printHtmlViaIframe(job3)
-        )
-      );
-    };
-
-    buildAndPrint();
-  };
 
   const completeSaleAfterPayment = (saleData: any) => {
     playAddSound();
@@ -1045,7 +874,8 @@ export default function POSScreen() {
     const vehicleObj = cart.vehicleId ? (vehicles as any[]).find((v: any) => v.id === cart.vehicleId) : undefined;
     autoPrint3Copies(
       saleData, cart.items, cart.subtotal, cart.tax, cart.discount, cart.serviceFee, cart.total + manualAdjustment, cart.deliveryFee,
-      paymentMethod, cashAmt, custName, empName, selectedCustomer, vehicleObj, cart.minimumOrderSurcharge
+      paymentMethod, cashAmt, custName, empName, selectedCustomer, vehicleObj, cart.minimumOrderSurcharge,
+      storeSettings, tenant, categories as any[]
     );
     setManualAdjustment(0);
     setLastSale({
@@ -1227,26 +1057,28 @@ export default function POSScreen() {
       }
     }
 
-    // If product has variants, show options modal (size selection + pizza toppings)
+    // If product has variants, show options modal (size selection + toppings)
     if (enrichedProduct.variants && Array.isArray(enrichedProduct.variants) && enrichedProduct.variants.length > 0) {
       setSelectedProductForOptions(enrichedProduct);
       setShowToppingsStep(false);
+      setEditingCartItemId(null);
       playClickSound("light");
       return;
     }
-    // Pizza without variants: skip to toppings directly
-    if (isPizzaProduct(product)) {
+    // Pizza or Fingerfood without variants: skip directly to extras
+    if (isPizzaProduct(product) || isFingerfoodProduct(product)) {
       setSelectedProductForOptions(product);
       setSelectedVariant(null);
       setSelectedToppings([]);
       setShowToppingsStep(true);
+      setEditingCartItemId(null);
       playClickSound("light");
       return;
     }
     cart.addItem({ id: product.id, name: product.name, price: Number(product.price) });
     playAddSound();
     triggerFlash(product.id);
-  }, [cart, isPizzaProduct, triggerFlash]);
+  }, [cart, isPizzaProduct, isFingerfoodProduct, triggerFlash]);
 
   const handleBarcodeScan = useCallback(async (barcode: string) => {
     try {
@@ -1318,74 +1150,67 @@ export default function POSScreen() {
   };
 
   const handleEndOfDay = async () => {
-    const confirmed = await new Promise((resolve) => {
-      if (Platform.OS === "web") {
-        resolve(window.confirm(t("confirmEndOfDay")));
-      } else {
-        Alert.alert(t("endOfDay"), t("confirmEndOfDay"), [
-          { text: t("cancel"), onPress: () => resolve(false), style: "cancel" },
-          { text: t("yes"), onPress: () => resolve(true) }
-        ]);
-      }
-    });
+    try {
+      setZeroOutLoading(true);
+      const todayStr = new Date().toISOString().split("T")[0];
+      const res = await apiRequest("GET", `/api/reports/daily-sales-report?date=${todayStr}`);
+      const salesData: any[] = await res.json();
+      setZeroOutSalesData(salesData || []);
+      setShowZeroOutPreview(true);
+    } catch (err: any) {
+      Alert.alert(t("error"), err.message);
+    } finally {
+      setZeroOutLoading(false);
+    }
+  };
 
-    if (!confirmed) return;
-
+  const handleZeroOutConfirm = async () => {
     try {
       setEndOfDayLoading(true);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
 
-      if (Platform.OS === "web") {
-        try {
-          const todayStr = new Date().toISOString().split("T")[0];
-          const res = await apiRequest("GET", `/api/reports/daily-sales-report?date=${todayStr}`);
-          const salesData: any[] = await res.json();
-          if (salesData && salesData.length > 0) {
-            const storeName = storeSettings?.name || tenant?.name || "POS System";
-            const dateObj = new Date();
-            const dateStr = dateObj.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-            const cashierName = employee?.name || "Kassierer";
-            const total = salesData.reduce((s: number, sale: any) => s + Number(sale.totalAmount || 0), 0);
-            const rowsHtml = salesData.map((sale: any, idx: number) => {
-              const addr = sale.customerAddress || "";
-              const parts = addr.split(",");
-              const street = parts[0]?.trim() || "–";
-              const city = parts[1]?.trim() || parts[0]?.trim() || "–";
-              const timeStr = new Date(sale.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-              const amt = Number(sale.totalAmount || 0).toFixed(2);
-              return `<tr><td>${idx + 1}</td><td>${street}</td><td>${city}</td><td>${timeStr}</td><td style="text-align:right;">${amt}</td></tr>`;
-            }).join("");
-            const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Personalbericht</title><style>
-              body { font-family: 'Courier New', monospace; font-size: 11px; margin: 0; padding: 10px; color: #000; }
-              h2 { text-align: center; font-size: 14px; margin: 4px 0; }
-              .sub { text-align: center; font-size: 11px; margin-bottom: 8px; }
-              table { width: 100%; border-collapse: collapse; }
-              th { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 4px; text-align: left; font-size: 10px; }
-              td { padding: 2px 4px; font-size: 10px; border-bottom: 1px dotted #ccc; }
-              .total-row { border-top: 1px solid #000; font-weight: bold; }
-              .total-row td { padding-top: 4px; }
-            </style></head><body>
-              <h2>Personalbericht</h2>
-              <div class="sub">${dateStr}</div>
-              <div class="sub">${storeName}</div>
-              <br/>
-              <div style="font-weight:bold;margin-bottom:4px;">Nr &nbsp; Kassierer: ${cashierName}</div>
-              <table>
-                <thead><tr><th>Nr</th><th>Adresse</th><th>Gebiet</th><th>Zeit</th><th style="text-align:right;">Total</th></tr></thead>
-                <tbody>${rowsHtml}</tbody>
-                <tfoot>
-                  <tr class="total-row"><td colspan="4">Umsatz Total</td><td style="text-align:right;">${total.toFixed(2)}</td></tr>
-                  <tr><td colspan="4">TAGESAUSGAB</td><td style="text-align:right;">0.00</td></tr>
-                  <tr class="total-row"><td colspan="2">${salesData.length}&nbsp;&nbsp;TOTAL Kassierer</td><td colspan="2"></td><td style="text-align:right;">${total.toFixed(2)}</td></tr>
-                </tfoot>
-              </table>
-              <br/>
-              <div style="text-align:center;font-size:10px;">${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} &nbsp; ${dateStr}</div>
-            </body></html>`;
-            printHtmlViaIframe(html);
-          }
-        } catch (_) { /* print error is non-fatal */ }
+      if (Platform.OS === "web" && zeroOutSalesData.length > 0) {
+        const storeName = storeSettings?.name || tenant?.name || "POS System";
+        const dateObj = new Date();
+        const dateStr = dateObj.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+        const cashierName = employee?.name || "Kassierer";
+        const total = zeroOutSalesData.reduce((s: number, sale: any) => s + Number(sale.totalAmount || 0), 0);
+        const rowsHtml = zeroOutSalesData.map((sale: any, idx: number) => {
+          const addr = sale.customerAddress || "";
+          const parts = addr.split(",");
+          const street = parts[0]?.trim() || "–";
+          const city = parts[1]?.trim() || parts[0]?.trim() || "–";
+          const timeStr = new Date(sale.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+          const amt = Number(sale.totalAmount || 0).toFixed(2);
+          return `<tr><td>${idx + 1}</td><td>${sale.customerName || "–"}</td><td>${street}</td><td>${city}</td><td>${timeStr}</td><td style="text-align:right;">${amt}</td></tr>`;
+        }).join("");
+        const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Personalbericht</title><style>
+          body { font-family: 'Courier New', monospace; font-size: 11px; margin: 0; padding: 10px; color: #000; }
+          h2 { text-align: center; font-size: 14px; margin: 4px 0; }
+          .sub { text-align: center; font-size: 11px; margin-bottom: 8px; }
+          table { width: 100%; border-collapse: collapse; }
+          th { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 4px; text-align: left; font-size: 10px; }
+          td { padding: 2px 4px; font-size: 10px; border-bottom: 1px dotted #ccc; }
+          .total-row { border-top: 1px solid #000; font-weight: bold; }
+          .total-row td { padding-top: 4px; }
+        </style></head><body>
+          <h2>Personalbericht</h2>
+          <div class="sub">${dateStr}</div>
+          <div class="sub">${storeName}</div>
+          <br/>
+          <div style="font-weight:bold;margin-bottom:4px;">Nr &nbsp; Kassierer: ${cashierName}</div>
+          <table>
+            <thead><tr><th>Nr</th><th>Name</th><th>Adresse</th><th>Gebiet</th><th>Zeit</th><th style="text-align:right;">Total</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+            <tfoot>
+              <tr class="total-row"><td colspan="5">Umsatz Total</td><td style="text-align:right;">${total.toFixed(2)}</td></tr>
+              <tr><td colspan="5">TAGESAUSGAB</td><td style="text-align:right;">0.00</td></tr>
+              <tr class="total-row"><td colspan="2">${zeroOutSalesData.length}&nbsp;&nbsp;TOTAL Kassierer</td><td colspan="3"></td><td style="text-align:right;">${total.toFixed(2)}</td></tr>
+            </tfoot>
+          </table>
+          <br/>
+          <div style="text-align:center;font-size:10px;">${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} &nbsp; ${dateStr}</div>
+        </body></html>`;
+        printHtmlViaIframe(html);
       }
 
       // Close active shift for this employee
@@ -1397,6 +1222,7 @@ export default function POSScreen() {
         qc.invalidateQueries({ queryKey: ["/api/shifts"] });
       }
 
+      setShowZeroOutPreview(false);
       Alert.alert(t("success"), t("endOfDaySuccess"));
       qc.invalidateQueries();
     } catch (err: any) {
@@ -1432,16 +1258,12 @@ export default function POSScreen() {
                   <View style={{ position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.danger }} />
                 )}
               </Pressable>
-              <Pressable onPress={() => setShowOnlineOrders(true)} style={[styles.headerInvoiceBtn, { position: "relative" }]}>
-                <Ionicons name="globe-outline" size={20} color={Colors.white} />
-                <Text style={styles.headerInvoiceLabel}>{language === "ar" ? "طلبات" : language === "de" ? "Online" : "Orders"}</Text>
-                {onlineOrderNotification && (
-                  <View style={{ position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.danger }} />
-                )}
-              </Pressable>
-              <Pressable onPress={handleEndOfDay} style={styles.headerInvoiceBtn} disabled={endOfDayLoading}>
-                <Ionicons name="power-outline" size={20} color={endOfDayLoading ? Colors.textMuted : Colors.danger} />
-                <Text style={[styles.headerInvoiceLabel, { color: endOfDayLoading ? Colors.textMuted : Colors.danger }]}>{t("endOfDay")}</Text>
+              <Pressable onPress={handleEndOfDay} style={styles.headerInvoiceBtn} disabled={endOfDayLoading || zeroOutLoading}>
+                {zeroOutLoading
+                  ? <ActivityIndicator size="small" color={Colors.danger} />
+                  : <Ionicons name="sync-outline" size={20} color={(endOfDayLoading || zeroOutLoading) ? Colors.textMuted : Colors.danger} />
+                }
+                <Text style={[styles.headerInvoiceLabel, { color: (endOfDayLoading || zeroOutLoading) ? Colors.textMuted : Colors.danger }]}>{t("endOfDay")}</Text>
               </Pressable>
               <Pressable onPress={() => setShowInvoiceHistory(true)} style={styles.headerInvoiceBtn}>
                 <Ionicons name="receipt-outline" size={20} color={Colors.white} />
@@ -1499,8 +1321,8 @@ export default function POSScreen() {
               <Text style={styles.phoneBarCustomerName} numberOfLines={1}>{selectedCustomer.name}</Text>
               <View style={[styles.phoneBarCustomerMeta, isRTL && { flexDirection: "row-reverse" }]}>
                 {selectedCustomer.phone && <Text style={styles.phoneBarMetaText}>{selectedCustomer.phone}</Text>}
-                {selectedCustomer.address && <Text style={styles.phoneBarMetaDot}>·</Text>}
-                {selectedCustomer.address && <Text style={styles.phoneBarMetaText} numberOfLines={1}>{selectedCustomer.address}</Text>}
+                {selectedCustomerAddress ? <Text style={styles.phoneBarMetaDot}>·</Text> : null}
+                {selectedCustomerAddress ? <Text style={styles.phoneBarMetaText} numberOfLines={1}>{selectedCustomerAddress}</Text> : null}
               </View>
               {selectedCustomer.email && <Text style={[styles.phoneBarMetaText, { color: Colors.info }]} numberOfLines={1}>{selectedCustomer.email}</Text>}
             </View>
@@ -1804,12 +1626,12 @@ export default function POSScreen() {
                     </View>
                   )}
                 </View>
-                {selectedCustomer.address && (
+                {selectedCustomerAddress ? (
                   <View style={[styles.cartCustomerChip, { marginTop: 2 }, isRTL && { flexDirection: "row-reverse" }]}>
                     <Ionicons name="location-outline" size={10} color={Colors.warning} />
-                    <Text style={styles.cartCustomerChipText} numberOfLines={1}>{selectedCustomer.address}</Text>
+                    <Text style={styles.cartCustomerChipText} numberOfLines={1}>{selectedCustomerAddress}</Text>
                   </View>
-                )}
+                ) : null}
               </View>
               <Pressable onPress={() => { cart.setCustomerId(null); setPhoneInput(""); }} style={styles.cartCustomerClear}>
                 <Ionicons name="close-circle" size={26} color={Colors.danger} />
@@ -1849,7 +1671,30 @@ export default function POSScreen() {
                   <Text style={styles.cartItemIndexText}>{index + 1}</Text>
                 </View>
                 <View style={styles.cartItemInfo}>
-                  <Text style={[styles.cartItemName, rtlTextAlign]} numberOfLines={1}>{item.name}</Text>
+                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4, flex: 1 }}>
+                    <Text style={[styles.cartItemName, rtlTextAlign, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
+                    {(() => {
+                      const prod = (products as any[]).find((p: any) => p.id === item.productId);
+                      if (!prod || (!isPizzaProduct(prod) && !isFingerfoodProduct(prod))) return null;
+                      return (
+                        <Pressable
+                          onPress={() => {
+                            const existingToppings = parseToppingsFromName(item.name);
+                            const cleanName = item.name.replace(/\s*\[.+?\]$/, "").replace(/\s*\([^)]*\)$/, "");
+                            setSelectedProductForOptions({ ...prod, name: cleanName });
+                            setSelectedVariant(null);
+                            setSelectedToppings(existingToppings);
+                            setShowToppingsStep(true);
+                            setEditingCartItemId(item.id);
+                            playClickSound("light");
+                          }}
+                          style={{ padding: 3, borderRadius: 5, backgroundColor: Colors.accent + "22" }}
+                        >
+                          <Ionicons name="create-outline" size={13} color={Colors.accent} />
+                        </Pressable>
+                      );
+                    })()}
+                  </View>
                   <Text style={[styles.cartItemUnit, rtlTextAlign]}>CHF {Number(item.price).toFixed(2)} × {item.quantity}</Text>
                 </View>
                 <View style={[styles.cartItemActions, isRTL && { flexDirection: "row-reverse" }]}>
@@ -1971,10 +1816,10 @@ export default function POSScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.modalTitle, rtlTextAlign, { fontSize: 24, fontWeight: "900" }]}>{selectedProductForOptions?.name}</Text>
                 <Text style={[styles.sectionLabel, { marginTop: 4, marginBottom: 0 }, rtlTextAlign]}>
-                  {showToppingsStep ? (language === "ar" ? "اختر الإضافات" : language === "de" ? "Extras wählen" : "Select Extras") : (t("selectSize" as any) || "Select Size")}
+                  {showToppingsStep ? (editingCartItemId !== null ? (language === "ar" ? "تعديل الإضافات" : language === "de" ? "Extras bearbeiten" : "Edit Extras") : (language === "ar" ? "اختر الإضافات" : language === "de" ? "Extras wählen" : "Select Extras")) : (t("selectSize" as any) || "Select Size")}
                 </Text>
               </View>
-              <Pressable onPress={() => { setSelectedProductForOptions(null); setSelectedVariant(null); setSelectedToppings([]); setShowToppingsStep(false); }} style={styles.modalCloseBtn}>
+              <Pressable onPress={() => { setSelectedProductForOptions(null); setSelectedVariant(null); setSelectedToppings([]); setShowToppingsStep(false); setEditingCartItemId(null); }} style={styles.modalCloseBtn}>
                 <Ionicons name="close" size={28} color={Colors.textMuted} />
               </Pressable>
             </View>
@@ -1991,7 +1836,7 @@ export default function POSScreen() {
                       key={idx}
                       style={[styles.sizeCard, { flex: 1, minWidth: isTablet ? 140 : 120 }, selectedVariant?.name === v.name && styles.sizeCardSelected]}
                       onPress={() => {
-                        if (isPizzaProduct(selectedProductForOptions)) {
+                        if (isPizzaProduct(selectedProductForOptions) || isFingerfoodProduct(selectedProductForOptions)) {
                           setSelectedVariant(v);
                           setSelectedToppings([]);
                           setShowToppingsStep(true);
@@ -2015,14 +1860,14 @@ export default function POSScreen() {
                 </View>
               </View>
             ) : (
-              /* ── TOPPINGS: POS-style Color Grid (Image 2 layout) ── */
+              /* ── EXTRAS: POS-style Color Grid ── */
               <ScrollView style={{ marginTop: 8 }} showsVerticalScrollIndicator={false} bounces={false}>
-                {/* Selected size badge */}
+                {/* Selected size badge — shows live price with toppings */}
                 {selectedVariant && (
                   <View style={[styles.selectedSizeBadge, { paddingVertical: 8, paddingHorizontal: 14, backgroundColor: Colors.accent + "18", marginBottom: 8 }]}>
                     <Ionicons name="pizza" size={15} color={Colors.accent} />
                     <Text style={[styles.selectedSizeBadgeText, { fontSize: 14, fontWeight: "700" }]}>
-                      {selectedVariant.name} — CHF {Number(selectedVariant.price).toFixed(2)}
+                      {selectedVariant.name} — CHF {(Number(selectedVariant.price) + selectedToppings.length * TOPPING_PRICE).toFixed(2)}
                     </Text>
                     {selectedToppings.length > 0 && (
                       <View style={{ marginLeft: "auto", backgroundColor: Colors.accent, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 }}>
@@ -2032,17 +1877,23 @@ export default function POSScreen() {
                   </View>
                 )}
 
+                {/* Price note */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 6, paddingHorizontal: 2 }}>
+                  <Ionicons name="pricetag" size={12} color={Colors.accent} />
+                  <Text style={{ color: Colors.accent, fontSize: 11, fontWeight: "700" }}>
+                    {language === "ar" ? "كل إضافة +CHF 2.00" : language === "de" ? "Jedes Extra +CHF 2.00" : "Each extra +CHF 2.00"}
+                  </Text>
+                </View>
+
                 {/* Color-coded POS grid */}
                 <View style={{ flexDirection: "row", flexWrap: "wrap", borderRadius: 8, overflow: "hidden" }}>
                   {(() => {
-                    // Always show full TOPPING_GRID — all toppings visible regardless of product modifiers
                     return TOPPING_GRID.flatMap((row, rowIdx) =>
                       row.items.map((toppingName, colIdx) => {
                         if (!toppingName) return null;
-
                         const isSelected = selectedToppings.includes(toppingName);
                         return (
-                          <View key={`${rowIdx}-${colIdx}`} style={{ width: "14.28%", height: isTablet ? 52 : 46, padding: 1 }}>
+                          <View key={`${rowIdx}-${colIdx}`} style={{ width: "14.28%", height: isTablet ? 56 : 50, padding: 1 }}>
                             <Pressable
                               onPress={() => {
                                 setSelectedToppings((prev: string[]) =>
@@ -2057,13 +1908,14 @@ export default function POSScreen() {
                                 borderWidth: isSelected ? 2 : 0,
                                 borderColor: isSelected ? Colors.accent : "transparent",
                                 borderRadius: 4,
-                                paddingHorizontal: 2, paddingVertical: 2, gap: 1,
+                                paddingHorizontal: 2, paddingVertical: 2, gap: 0,
                               }}
                             >
-                              <Text style={{ fontSize: isTablet ? 16 : 14, lineHeight: 17 }}>{toppingEmoji(toppingName)}</Text>
-                              <Text style={{ fontSize: isTablet ? 10 : 9, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 11 }} numberOfLines={2}>
+                              <Text style={{ fontSize: isTablet ? 15 : 13, lineHeight: 16 }}>{toppingEmoji(toppingName)}</Text>
+                              <Text style={{ fontSize: isTablet ? 9 : 8, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 10 }} numberOfLines={2}>
                                 {toppingDisplayName(toppingName)}
                               </Text>
+                              <Text style={{ fontSize: 8, color: isSelected ? "#000" : row.textColor, opacity: 0.8, lineHeight: 10 }}>+2</Text>
                               {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
                             </Pressable>
                           </View>
@@ -2073,12 +1925,52 @@ export default function POSScreen() {
                   })()}
                 </View>
 
+                {/* Sauces row — separate labeled section */}
+                <View style={{ marginTop: 8 }}>
+                  <Text style={{ color: Colors.textMuted, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4, paddingHorizontal: 2 }}>
+                    {language === "ar" ? "الصوصات" : language === "de" ? "Saucen" : "Sauces"}
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 4 }}>
+                    {SAUCE_ROW.map((sauce) => {
+                      const isSelected = selectedToppings.includes(sauce.name);
+                      return (
+                        <Pressable
+                          key={sauce.name}
+                          style={{
+                            flex: 1, height: isTablet ? 56 : 50, borderRadius: 6,
+                            backgroundColor: isSelected ? Colors.accent : sauce.color,
+                            justifyContent: "center", alignItems: "center", padding: 4,
+                            borderWidth: isSelected ? 2 : 0, borderColor: Colors.accent,
+                          }}
+                          onPress={() => {
+                            setSelectedToppings((prev: string[]) =>
+                              isSelected ? prev.filter((t: string) => t !== sauce.name) : [...prev, sauce.name]
+                            );
+                            playClickSound("light");
+                          }}
+                        >
+                          <Text style={{ fontSize: isTablet ? 15 : 13, lineHeight: 16 }}>{toppingEmoji(sauce.name)}</Text>
+                          <Text style={{ fontSize: isTablet ? 10 : 9, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : sauce.textColor, lineHeight: 11 }} numberOfLines={1}>
+                            {toppingDisplayName(sauce.name)}
+                          </Text>
+                          <Text style={{ fontSize: 8, color: isSelected ? "#000" : sauce.textColor, opacity: 0.8, lineHeight: 10 }}>+2</Text>
+                          {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 4 }}>✓</Text>}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
                 {/* Selected toppings summary */}
                 {selectedToppings.length > 0 && (
                   <View style={{ marginTop: 8, padding: 8, backgroundColor: Colors.surfaceLight, borderRadius: 8, borderWidth: 1, borderColor: Colors.cardBorder }}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                       <Text style={{ color: Colors.accent, fontSize: 11, fontWeight: "700" }}>
-                        {language === "ar" ? `الإضافات المختارة (${selectedToppings.length})` : language === "de" ? `Ausgewählte Extras (${selectedToppings.length})` : `Selected Extras (${selectedToppings.length})`}
+                        {language === "ar"
+                          ? `الإضافات المختارة (${selectedToppings.length}) — +CHF ${(selectedToppings.length * TOPPING_PRICE).toFixed(2)}`
+                          : language === "de"
+                          ? `Ausgewählte Extras (${selectedToppings.length}) — +CHF ${(selectedToppings.length * TOPPING_PRICE).toFixed(2)}`
+                          : `Selected Extras (${selectedToppings.length}) — +CHF ${(selectedToppings.length * TOPPING_PRICE).toFixed(2)}`}
                       </Text>
                       <Pressable onPress={() => setSelectedToppings([])}>
                         <Text style={{ color: Colors.danger, fontSize: 11, fontWeight: "600" }}>
@@ -2092,35 +1984,63 @@ export default function POSScreen() {
                   </View>
                 )}
 
-                {/* Add to Cart */}
+                {/* Add to Cart / Update button */}
                 <View style={{ gap: 8, marginTop: 10 }}>
                   <Pressable
                     style={{ borderRadius: 14, overflow: "hidden" }}
                     onPress={() => {
                       const toppingsSuffix = selectedToppings.length > 0 ? ` [${selectedToppings.map(t => toppingDisplayName(t)).join(", ")}]` : "";
-                      cart.addItem({
-                        id: selectedProductForOptions.id,
-                        name: selectedProductForOptions.name + toppingsSuffix,
-                        price: Number(selectedProductForOptions.price),
-                        variant: selectedVariant,
-                      });
-                      playAddSound();
-                      setSelectedProductForOptions(null);
-                      setSelectedVariant(null);
-                      setSelectedToppings([]);
-                      setShowToppingsStep(false);
+                      const toppingsPrice = selectedToppings.length * TOPPING_PRICE;
+
+                      if (editingCartItemId !== null) {
+                        const cartItem = cart.items.find((i: any) => i.id === editingCartItemId);
+                        if (cartItem) {
+                          const originalToppings = parseToppingsFromName(cartItem.name);
+                          const basePrice = cartItem.price - originalToppings.length * TOPPING_PRICE;
+                          const baseName = cartItem.name.replace(/\s*\[.+?\]$/, "");
+                          cart.updateItem(editingCartItemId, {
+                            name: baseName + toppingsSuffix,
+                            price: basePrice + toppingsPrice,
+                          });
+                        }
+                        playAddSound();
+                        setSelectedProductForOptions(null);
+                        setSelectedVariant(null);
+                        setSelectedToppings([]);
+                        setShowToppingsStep(false);
+                        setEditingCartItemId(null);
+                      } else {
+                        const variantWithToppings = selectedVariant
+                          ? { ...selectedVariant, price: Number(selectedVariant.price) + toppingsPrice }
+                          : undefined;
+                        cart.addItem({
+                          id: selectedProductForOptions.id,
+                          name: selectedProductForOptions.name + toppingsSuffix,
+                          price: Number(selectedProductForOptions.price) + toppingsPrice,
+                          variant: variantWithToppings,
+                        });
+                        playAddSound();
+                        setSelectedProductForOptions(null);
+                        setSelectedVariant(null);
+                        setSelectedToppings([]);
+                        setShowToppingsStep(false);
+                      }
                     }}
                   >
                     <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ paddingVertical: 15, alignItems: "center", borderRadius: 14 }}>
                       <Text style={{ color: Colors.textDark, fontSize: 17, fontWeight: "900" }}>
-                        {language === "ar" ? `إضافة للسلة${selectedToppings.length > 0 ? ` (${selectedToppings.length} إضافة)` : ""}` :
-                          language === "de" ? `In den Warenkorb${selectedToppings.length > 0 ? ` (${selectedToppings.length} Extras)` : ""}` :
-                            `Add to Cart${selectedToppings.length > 0 ? ` (${selectedToppings.length} extras)` : ""}`}
+                        {editingCartItemId !== null
+                          ? (language === "ar" ? "تحديث الإضافات" : language === "de" ? "Extras aktualisieren" : "Update Extras")
+                          : language === "ar"
+                          ? `إضافة للسلة${selectedToppings.length > 0 ? ` (+CHF ${(selectedToppings.length * TOPPING_PRICE).toFixed(2)})` : ""}`
+                          : language === "de"
+                          ? `In den Warenkorb${selectedToppings.length > 0 ? ` (+CHF ${(selectedToppings.length * TOPPING_PRICE).toFixed(2)})` : ""}`
+                          : `Add to Cart${selectedToppings.length > 0 ? ` (+CHF ${(selectedToppings.length * TOPPING_PRICE).toFixed(2)})` : ""}`}
                       </Text>
                     </LinearGradient>
                   </Pressable>
 
-                  {selectedVariant && (
+                  {selectedVariant && editingCartItemId === null && (
                     <Pressable style={{ paddingVertical: 10 }} onPress={() => setShowToppingsStep(false)}>
                       <Text style={{ color: Colors.textMuted, textAlign: "center", fontSize: 13, fontWeight: "600" }}>
                         {language === "ar" ? "← العودة للأحجام" : language === "de" ? "← Zurück zu Größen" : "← Back to sizes"}
@@ -2134,7 +2054,7 @@ export default function POSScreen() {
             {!showToppingsStep && (
               <Pressable
                 style={[styles.modalCancelBtn, { marginTop: 16 }]}
-                onPress={() => { setSelectedProductForOptions(null); setSelectedVariant(null); setSelectedToppings([]); setShowToppingsStep(false); }}
+                onPress={() => { setSelectedProductForOptions(null); setSelectedVariant(null); setSelectedToppings([]); setShowToppingsStep(false); setEditingCartItemId(null); }}
               >
                 <Text style={styles.modalCancelBtnText}>{t("cancel")}</Text>
               </Pressable>
@@ -2388,7 +2308,7 @@ export default function POSScreen() {
 
                 <View style={{ marginVertical: 6 }}>
                   <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptDate")}: {lastSale?.date ? new Date(lastSale.date).toLocaleDateString() : new Date().toLocaleDateString()}, {lastSale?.date ? new Date(lastSale.date).toLocaleTimeString() : new Date().toLocaleTimeString()}</Text>
-                  <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptNumber")}: {lastSale?.receiptNumber || `#${lastSale?.id} `}</Text>
+                  <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptNumber")}: {getDisplayNumber(lastSale?.receiptNumber) || `#${lastSale?.id} `}</Text>
                   <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("servedBy")}: {lastSale?.employeeName || employee?.name}</Text>
                   {lastSale?.customerName && <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("customer")}: {lastSale.customerName}</Text>}
                 </View>
@@ -2927,7 +2847,7 @@ export default function POSScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[{ color: Colors.text, fontSize: 14, fontWeight: "700" }, rtlTextAlign]}>
-                        {item.receiptNumber || `#${item.id} `}
+                        {getDisplayNumber(item.receiptNumber) || `#${item.id} `}
                       </Text>
                       <Text style={[{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }, rtlTextAlign]}>
                         {saleDate.toLocaleDateString()} • {saleDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -2984,7 +2904,7 @@ export default function POSScreen() {
 
                   <View style={{ marginVertical: 4 }}>
                     <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptDate")}: {new Date(selectedInvoice.createdAt || selectedInvoice.date).toLocaleDateString("de-DE")}, {new Date(selectedInvoice.createdAt || selectedInvoice.date).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptNumber")}: {selectedInvoice.receiptNumber || `#${selectedInvoice.id}`}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptNumber")}: {getDisplayNumber(selectedInvoice.receiptNumber) || `#${selectedInvoice.id}`}</Text>
                     <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("servedBy")}: {selectedInvoice.employeeName || selectedInvoice.employee?.name || "Cashier"}</Text>
                     {selectedInvoice.customerName ? <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("customer")}: {selectedInvoice.customerName}</Text> : null}
                   </View>
@@ -3700,6 +3620,169 @@ export default function POSScreen() {
       </Modal>
 
       {/* Online Order Notification moved to _layout.tsx */}
+
+      {/* ── Zero Out Shift Preview Modal ── */}
+      <Modal visible={showZeroOutPreview} animationType="fade" transparent onRequestClose={() => setShowZeroOutPreview(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "88%", width: "92%" }]}>
+            {/* Header */}
+            <LinearGradient
+              colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingVertical: 14, paddingHorizontal: 18 }}
+            >
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+                  <Ionicons name="sync-outline" size={22} color={Colors.white} />
+                  <Text style={{ color: Colors.white, fontSize: 17, fontWeight: "800", letterSpacing: 0.5 }}>
+                    {language === "ar" ? "تصفير الوردية" : language === "de" ? "SCHICHT NULLSTELLEN" : "ZERO OUT SHIFT"}
+                  </Text>
+                </View>
+                <Pressable onPress={() => setShowZeroOutPreview(false)} style={styles.modalCloseBtn}>
+                  <Ionicons name="close" size={22} color={Colors.white} />
+                </Pressable>
+              </View>
+            </LinearGradient>
+
+            {/* Sub-header: store + cashier */}
+            <View style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.cardBorder }}>
+              <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 13 }}>
+                {storeSettings?.name || tenant?.name || "POS System"}
+              </Text>
+              <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                {language === "ar" ? "الكاشير:" : language === "de" ? "Kassierer:" : "Cashier:"} {employee?.name || "–"}
+                {"  ·  "}
+                {new Date().toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+              </Text>
+            </View>
+
+            {/* Table */}
+            <ScrollView style={{ flex: 1 }}>
+              {/* Table header row */}
+              <View style={{
+                flexDirection: isRTL ? "row-reverse" : "row",
+                backgroundColor: Colors.surfaceLight,
+                borderBottomWidth: 1, borderBottomColor: Colors.cardBorder,
+                paddingVertical: 8, paddingHorizontal: 10,
+              }}>
+                {[
+                  { label: "Nr", flex: 0.4, align: "center" as const },
+                  { label: language === "ar" ? "الاسم" : "Name", flex: 1.4, align: "left" as const },
+                  { label: language === "ar" ? "العنوان" : "Adresse", flex: 1.5, align: "left" as const },
+                  { label: language === "ar" ? "المنطقة" : "Gebiet", flex: 1.1, align: "left" as const },
+                  { label: language === "ar" ? "الوقت" : "Zeit", flex: 0.8, align: "center" as const },
+                  { label: language === "ar" ? "المجموع" : "Total", flex: 0.9, align: "right" as const },
+                ].map((col, i) => (
+                  <Text key={i} style={{ flex: col.flex, color: Colors.textMuted, fontSize: 11, fontWeight: "700", textAlign: col.align }}>
+                    {col.label}
+                  </Text>
+                ))}
+              </View>
+
+              {zeroOutSalesData.length === 0 ? (
+                <View style={{ alignItems: "center", paddingVertical: 40 }}>
+                  <Ionicons name="receipt-outline" size={44} color={Colors.textMuted} />
+                  <Text style={{ color: Colors.textMuted, fontSize: 14, marginTop: 10, fontWeight: "600" }}>
+                    {language === "ar" ? "لا توجد مبيعات اليوم" : language === "de" ? "Keine Verkäufe heute" : "No sales today"}
+                  </Text>
+                </View>
+              ) : (
+                zeroOutSalesData.map((sale: any, idx: number) => {
+                  const addr = sale.customerAddress || "";
+                  const parts = addr.split(",");
+                  const street = parts[0]?.trim() || "–";
+                  const city = parts[1]?.trim() || parts[0]?.trim() || "–";
+                  const timeStr = new Date(sale.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+                  const amt = Number(sale.totalAmount || 0).toFixed(2);
+                  const isEven = idx % 2 === 0;
+                  return (
+                    <View key={sale.id} style={{
+                      flexDirection: isRTL ? "row-reverse" : "row",
+                      paddingVertical: 7, paddingHorizontal: 10,
+                      backgroundColor: isEven ? Colors.background : Colors.surface,
+                      borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)",
+                      alignItems: "center",
+                    }}>
+                      <Text style={{ flex: 0.4, color: Colors.textMuted, fontSize: 11, textAlign: "center" }}>{zeroOutSalesData.length - idx}</Text>
+                      <Text style={{ flex: 1.4, color: Colors.text, fontSize: 12, fontWeight: "600" }} numberOfLines={1}>
+                        {sale.customerName || (language === "ar" ? "زائر" : "Walk-in")}
+                      </Text>
+                      <Text style={{ flex: 1.5, color: Colors.textSecondary, fontSize: 11 }} numberOfLines={1}>{street}</Text>
+                      <Text style={{ flex: 1.1, color: Colors.textSecondary, fontSize: 11 }} numberOfLines={1}>{city}</Text>
+                      <Text style={{ flex: 0.8, color: Colors.textMuted, fontSize: 11, textAlign: "center" }}>{timeStr}</Text>
+                      <Text style={{ flex: 0.9, color: Colors.accent, fontSize: 12, fontWeight: "700", textAlign: "right" }}>{amt}</Text>
+                    </View>
+                  );
+                })
+              )}
+
+              {/* Totals footer */}
+              {zeroOutSalesData.length > 0 && (() => {
+                const grandTotal = zeroOutSalesData.reduce((s: number, sale: any) => s + Number(sale.totalAmount || 0), 0);
+                return (
+                  <View style={{ borderTopWidth: 1, borderTopColor: Colors.cardBorder, marginTop: 4, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: Colors.surfaceLight }}>
+                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
+                      <Text style={{ color: Colors.textSecondary, fontSize: 12, fontWeight: "600" }}>
+                        {language === "ar" ? "إجمالي المبيعات" : language === "de" ? "Umsatz Total" : "Total Sales"}
+                      </Text>
+                      <Text style={{ color: Colors.text, fontSize: 12, fontWeight: "700" }}>CHF {grandTotal.toFixed(2)}</Text>
+                    </View>
+                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
+                      <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>
+                        {language === "ar" ? "المصروفات اليومية" : language === "de" ? "TAGESAUSGAB" : "Daily Expenses"}
+                      </Text>
+                      <Text style={{ color: Colors.textMuted, fontSize: 12 }}>0.00</Text>
+                    </View>
+                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: Colors.cardBorder, paddingTop: 6 }}>
+                      <Text style={{ color: Colors.text, fontSize: 13, fontWeight: "800" }}>
+                        {zeroOutSalesData.length} {language === "ar" ? "فاتورة · الإجمالي" : language === "de" ? "TOTAL Kassierer" : "TOTAL Cashier"}
+                      </Text>
+                      <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: "800" }}>CHF {grandTotal.toFixed(2)}</Text>
+                    </View>
+                  </View>
+                );
+              })()}
+            </ScrollView>
+
+            {/* Action buttons */}
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10, padding: 14, borderTopWidth: 1, borderTopColor: Colors.cardBorder }}>
+              <Pressable
+                onPress={handleZeroOutConfirm}
+                disabled={endOfDayLoading}
+                style={{
+                  flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                  paddingVertical: 13, borderRadius: 12,
+                  backgroundColor: endOfDayLoading ? Colors.surfaceLight : Colors.accent,
+                  opacity: endOfDayLoading ? 0.6 : 1,
+                }}
+              >
+                {endOfDayLoading
+                  ? <ActivityIndicator size="small" color={Colors.white} />
+                  : <Ionicons name="print-outline" size={20} color={Colors.textDark || "#111"} />
+                }
+                <Text style={{ color: Colors.textDark || "#111", fontWeight: "800", fontSize: 14 }}>
+                  {endOfDayLoading
+                    ? (language === "ar" ? "جاري المعالجة..." : language === "de" ? "Verarbeitung..." : "Processing...")
+                    : (language === "ar" ? "طباعة وتصفير" : language === "de" ? "Drucken & Nullstellen" : "Print & Zero Out")
+                  }
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setShowZeroOutPreview(false)}
+                style={{
+                  paddingHorizontal: 20, paddingVertical: 13, borderRadius: 12,
+                  backgroundColor: Colors.danger,
+                  alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <Text style={{ color: Colors.white, fontWeight: "800", fontSize: 14 }}>
+                  {language === "ar" ? "إغلاق" : language === "de" ? "STOP" : "STOP"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <View style={{ height: Platform.OS === "web" ? 84 : 60 }} />
     </View>

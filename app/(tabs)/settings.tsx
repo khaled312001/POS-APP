@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
+import { getDisplayNumber } from "@/lib/api-config";
 import { playClickSound } from "@/lib/sound";
 
 function printHtmlViaIframe(html: string, onDone?: () => void) {
@@ -1331,7 +1332,7 @@ export default function SettingsScreen() {
                     onPress={() => setReturnForm({ ...returnForm, originalSaleId: String(item.id) })}
                   >
                     <View style={styles.empInfo}>
-                      <Text style={styles.empName}>{item.receiptNumber}</Text>
+                      <Text style={styles.empName}>{getDisplayNumber(item.receiptNumber)}</Text>
                       <Text style={styles.empMeta}>CHF {Number(item.totalAmount).toFixed(2)} | {new Date(item.createdAt).toLocaleDateString()} | {item.paymentMethod}</Text>
                     </View>
                     {returnForm.originalSaleId === String(item.id) && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}

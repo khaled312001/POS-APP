@@ -1273,7 +1273,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/sales", async (req, res) => {
     try {
       const { items, ...saleData } = sanitizeDates(req.body);
-      const receiptNumber = `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const swissDateRcp = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replace(/-/g, "");
+      const dailySeqRcp = await storage.getNextSequenceNumber(`branch-${saleData.branchId || 0}`);
+      const receiptNumber = `${saleData.branchId || 0}-${swissDateRcp}-${dailySeqRcp}`;
       const sale = await storage.createSale({ ...saleData, receiptNumber });
       if (items && items.length > 0) {
         for (const item of items) {
@@ -2416,7 +2418,9 @@ async function test(){
       }
       if (!resolvedTenantId) return res.status(404).json({ error: "Store not found" });
 
-      const orderNumber = `ONL-${Date.now().toString().slice(-6)}`;
+      const swissDateOnl = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replace(/-/g, "");
+      const dailySeqOnl = await storage.getNextSequenceNumber(`tenant-${resolvedTenantId}`);
+      const orderNumber = `${resolvedTenantId}-${swissDateOnl}-${dailySeqOnl}`;
       const order = await storage.createOnlineOrder({
         ...orderData,
         tenantId: resolvedTenantId,

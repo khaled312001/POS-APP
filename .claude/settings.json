@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l f:/POS-APP/app/\\\\\\(tabs\\\\\\)/online-orders.tsx)",
+      "Bash(wc -l \"f:/POS-APP/app/\\(tabs\\)/index.tsx\")",
+      "Bash(node -e \":*)"
+    ]
+  }
+}

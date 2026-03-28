@@ -23,6 +23,7 @@ interface CartContextValue {
   addItem: (product: AddItemProps) => void;
   removeItem: (itemId: number) => void; // Changed to itemId to be unique
   updateQuantity: (itemId: number, quantity: number) => void;
+  updateItem: (itemId: number, updates: { name?: string; price?: number }) => void;
   clearCart: () => void;
   subtotal: number;
   itemCount: number;
@@ -104,6 +105,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const updateItem = useCallback((itemId: number, updates: { name?: string; price?: number }) => {
+    setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, ...updates } : i)));
+  }, []);
+
   const clearCart = useCallback(() => {
     setItems([]);
     setDiscountRate(0);
@@ -133,12 +138,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({
-      items, addItem, removeItem, updateQuantity, clearCart,
+      items, addItem, removeItem, updateQuantity, updateItem, clearCart,
       subtotal, itemCount, discount, discountRate, setDiscount, taxRate, setTaxRate,
       tax, deliveryFee, setDeliveryFee, serviceFeeRate, setServiceFeeRate, serviceFee, minimumOrderSurcharge, total,
       customerId, setCustomerId, tableNumber, setTableNumber, orderType, setOrderType, vehicleId, setVehicleId,
     }),
-    [items, subtotal, itemCount, discount, discountRate, taxRate, tax, deliveryFee, serviceFeeRate, serviceFee, minimumOrderSurcharge, total, customerId, tableNumber, orderType, vehicleId]
+    [items, addItem, removeItem, updateQuantity, updateItem, clearCart, subtotal, itemCount, discount, discountRate, taxRate, tax, deliveryFee, serviceFeeRate, serviceFee, minimumOrderSurcharge, total, customerId, tableNumber, orderType, vehicleId]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

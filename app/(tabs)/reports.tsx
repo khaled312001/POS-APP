@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
 import { getQueryFn, getApiUrl } from "@/lib/query-client";
+import { getDisplayNumber } from "@/lib/api-config";
 import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { useLicense } from "@/lib/license-context";
@@ -736,7 +737,7 @@ export default function ReportsScreen() {
         <View style={[styles.saleTop, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
           <View style={[styles.saleReceiptWrap, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
             <Ionicons name="receipt-outline" size={16} color={Colors.accent} />
-            <Text style={[styles.saleReceipt, rtlText]}>{item.receiptNumber}</Text>
+            <Text style={[styles.saleReceipt, rtlText]}>{getDisplayNumber(item.receiptNumber)}</Text>
           </View>
           <Text style={styles.saleAmount}>CHF {Number(item.totalAmount).toFixed(2)}</Text>
         </View>

@@ -1,5 +1,13 @@
 import { Platform } from 'react-native';
 
+// Extracts the daily sequential number from stored format "{scopeId}-{YYYYMMDD}-{N}"
+// e.g. "5-20260328-7" -> "7", old format "RCP-xxx" -> "RCP-xxx"
+export function getDisplayNumber(receiptOrOrderNumber: string | undefined | null): string {
+  if (!receiptOrOrderNumber) return "";
+  const match = receiptOrOrderNumber.match(/-(\d+)$/);
+  return match ? match[1] : receiptOrOrderNumber;
+}
+
 export function getApiUrl(): string {
   if (Platform.OS !== 'web') {
     if (process.env.EXPO_PUBLIC_API_URL) {
