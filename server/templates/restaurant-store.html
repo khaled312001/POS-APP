@@ -2970,7 +2970,7 @@
           </div>
         </div>
         <div class="pb-section">
-          <div class="pb-section-title" data-i18n="extraToppings">Extra Toppings (optional)</div>
+          <div class="pb-section-title" data-i18n="extraToppings">Extra Toppings (optional) <span style="font-size:11px;font-weight:400;color:var(--mu)">— +CHF 2.00 each</span></div>
           <div class="pb-addons" id="pb-addons"></div>
         </div>
       </div>
@@ -3189,54 +3189,56 @@
       small: { label: '33 cm', multiplier: 1 },
       large: { label: '45 cm', multiplier: 1.7 }
     };
+    const EXTRA_PRICE = 2.00; // CHF 2.00 per topping (sauces = free)
+    const FREE_ADDON_IDS = ['mayonnaise','ketchup','cocktail-sauce','yogurt-sauce'];
     const PIZZA_ADDONS = [
       // Sauces / Base
-      { id: 'tomato-sauce', name: 'Tomatensauce', price: 0, icon: '🍅' },
-      { id: 'tomatoes', name: 'Tomaten', price: 0, icon: '🍅' },
-      { id: 'sliced-tomatoes', name: 'Tomatenscheiben', price: 0, icon: '🍅' },
+      { id: 'tomato-sauce', name: 'Tomatensauce', price: EXTRA_PRICE, icon: '🍅' },
+      { id: 'tomatoes', name: 'Tomaten', price: EXTRA_PRICE, icon: '🍅' },
+      { id: 'sliced-tomatoes', name: 'Tomatenscheiben', price: EXTRA_PRICE, icon: '🍅' },
       // Vegetables
-      { id: 'garlic', name: 'Knoblauch', price: 0, icon: '🧄' },
-      { id: 'onions', name: 'Zwiebeln', price: 0, icon: '🧅' },
-      { id: 'capers', name: 'Kapern', price: 0, icon: '🫛' },
-      { id: 'olives', name: 'Oliven', price: 0, icon: '🫒' },
-      { id: 'oregano', name: 'Oregano', price: 0, icon: '🌿' },
-      { id: 'vegetables', name: 'Gemüse', price: 0, icon: '🥦' },
-      { id: 'spinach', name: 'Spinat', price: 0, icon: '🥬' },
-      { id: 'bell-peppers', name: 'Peperoni', price: 0, icon: '🫑' },
-      { id: 'corn', name: 'Mais', price: 0, icon: '🌽' },
-      { id: 'broccoli', name: 'Broccoli', price: 0, icon: '🥦' },
-      { id: 'artichokes', name: 'Artischoken', price: 0, icon: '🌿' },
-      { id: 'arugula', name: 'Rukola', price: 0, icon: '🥬' },
-      { id: 'egg', name: 'Ei', price: 0, icon: '🥚' },
-      { id: 'pineapple', name: 'Ananas', price: 0, icon: '🍍' },
-      { id: 'mushrooms', name: 'Champignons', price: 0, icon: '🍄' },
+      { id: 'garlic', name: 'Knoblauch', price: EXTRA_PRICE, icon: '🧄' },
+      { id: 'onions', name: 'Zwiebeln', price: EXTRA_PRICE, icon: '🧅' },
+      { id: 'capers', name: 'Kapern', price: EXTRA_PRICE, icon: '🫛' },
+      { id: 'olives', name: 'Oliven', price: EXTRA_PRICE, icon: '🫒' },
+      { id: 'oregano', name: 'Oregano', price: EXTRA_PRICE, icon: '🌿' },
+      { id: 'vegetables', name: 'Gemüse', price: EXTRA_PRICE, icon: '🥦' },
+      { id: 'spinach', name: 'Spinat', price: EXTRA_PRICE, icon: '🥬' },
+      { id: 'bell-peppers', name: 'Peperoni', price: EXTRA_PRICE, icon: '🫑' },
+      { id: 'corn', name: 'Mais', price: EXTRA_PRICE, icon: '🌽' },
+      { id: 'broccoli', name: 'Broccoli', price: EXTRA_PRICE, icon: '🥦' },
+      { id: 'artichokes', name: 'Artischoken', price: EXTRA_PRICE, icon: '🌿' },
+      { id: 'arugula', name: 'Rukola', price: EXTRA_PRICE, icon: '🥬' },
+      { id: 'egg', name: 'Ei', price: EXTRA_PRICE, icon: '🥚' },
+      { id: 'pineapple', name: 'Ananas', price: EXTRA_PRICE, icon: '🍍' },
+      { id: 'mushrooms', name: 'Champignons', price: EXTRA_PRICE, icon: '🍄' },
       // Meat
-      { id: 'ham', name: 'Schinken', price: 0, icon: '🥩' },
-      { id: 'spicy-salami', name: 'Salami scharf', price: 0, icon: '🌶️' },
-      { id: 'salami', name: 'Salami', price: 0, icon: '🥩' },
-      { id: 'bacon', name: 'Speck', price: 0, icon: '🥓' },
-      { id: 'prosciutto', name: 'Rohschinken', price: 0, icon: '🥩' },
-      { id: 'lamb', name: 'Lammfleisch', price: 0, icon: '🥩' },
-      { id: 'chicken', name: 'Poulet', price: 0, icon: '🍗' },
-      { id: 'kebab', name: 'Kebab', price: 0, icon: '🥙' },
-      { id: 'minced-meat', name: 'Hackfleisch', price: 0, icon: '🥩' },
+      { id: 'ham', name: 'Schinken', price: EXTRA_PRICE, icon: '🥩' },
+      { id: 'spicy-salami', name: 'Salami scharf', price: EXTRA_PRICE, icon: '🌶️' },
+      { id: 'salami', name: 'Salami', price: EXTRA_PRICE, icon: '🥩' },
+      { id: 'bacon', name: 'Speck', price: EXTRA_PRICE, icon: '🥓' },
+      { id: 'prosciutto', name: 'Rohschinken', price: EXTRA_PRICE, icon: '🥩' },
+      { id: 'lamb', name: 'Lammfleisch', price: EXTRA_PRICE, icon: '🥩' },
+      { id: 'chicken', name: 'Poulet', price: EXTRA_PRICE, icon: '🍗' },
+      { id: 'kebab', name: 'Kebab', price: EXTRA_PRICE, icon: '🥙' },
+      { id: 'minced-meat', name: 'Hackfleisch', price: EXTRA_PRICE, icon: '🥩' },
       // Seafood
-      { id: 'anchovies', name: 'Sardellen', price: 0, icon: '🐟' },
-      { id: 'shrimp', name: 'Crevetten', price: 0, icon: '🍤' },
-      { id: 'tuna', name: 'Thon', price: 0, icon: '🐟' },
-      // Sauces
-      { id: 'mayonnaise', name: 'Mayonaise', price: 0, icon: '🫙' },
-      { id: 'ketchup', name: 'Ketchup', price: 0, icon: '🫙' },
-      { id: 'cocktail-sauce', name: 'Cocktail', price: 0, icon: '🫙' },
-      { id: 'spicy-sauce', name: 'SCHARF!', price: 0, icon: '🌶️' },
-      { id: 'garlic-sauce', name: 'Knoblauchsauce', price: 0, icon: '🫙' },
-      { id: 'yogurt-sauce', name: 'Joghurt', price: 0, icon: '🫙' },
+      { id: 'anchovies', name: 'Sardellen', price: EXTRA_PRICE, icon: '🐟' },
+      { id: 'shrimp', name: 'Crevetten', price: EXTRA_PRICE, icon: '🍤' },
+      { id: 'tuna', name: 'Thon', price: EXTRA_PRICE, icon: '🐟' },
       // Cheese
-      { id: 'mozzarella', name: 'Mozzarella', price: 0, icon: '🧀' },
-      { id: 'gorgonzola', name: 'Gorgonzola', price: 0, icon: '🧀' },
-      { id: 'kaese', name: 'Käse', price: 0, icon: '🧀' },
-      { id: 'mascarpone', name: 'Mascarpone', price: 0, icon: '🧀' },
-      { id: 'kaeserand', name: 'Käserand', price: 0, icon: '🧀' },
+      { id: 'mozzarella', name: 'Mozzarella', price: EXTRA_PRICE, icon: '🧀' },
+      { id: 'gorgonzola', name: 'Gorgonzola', price: EXTRA_PRICE, icon: '🧀' },
+      { id: 'kaese', name: 'Käse', price: EXTRA_PRICE, icon: '🧀' },
+      { id: 'mascarpone', name: 'Mascarpone', price: EXTRA_PRICE, icon: '🧀' },
+      { id: 'kaeserand', name: 'Käserand', price: EXTRA_PRICE, icon: '🧀' },
+      { id: 'spicy-sauce', name: 'SCHARF!', price: EXTRA_PRICE, icon: '🌶️' },
+      { id: 'garlic-sauce', name: 'Knoblauchsauce', price: EXTRA_PRICE, icon: '🫙' },
+      // Sauces — always FREE
+      { id: 'mayonnaise', name: 'Mayonaise', price: 0, icon: '🫙', section: 'sauces' },
+      { id: 'ketchup', name: 'Ketchup', price: 0, icon: '🫙', section: 'sauces' },
+      { id: 'cocktail-sauce', name: 'Cocktail', price: 0, icon: '🫙', section: 'sauces' },
+      { id: 'yogurt-sauce', name: 'Joghurt', price: 0, icon: '🫙', section: 'sauces' },
     ];
 
     // ===== STATE =====
@@ -3592,32 +3594,51 @@
     }
 
     // ===== PIZZA BUILDER =====
-    function openPizzaModal(product) {
+    function openPizzaModal(product, noSizes) {
       playClick();
       selectedPizza = product;
       setTxt('pb-pizza-name', product.name);
       setTxt('pb-pizza-desc', product.description || tr('chooseSizeToppings'));
       const imgHtml = product.image
         ? `<img src="${product.image}" style="width:100%;height:100%;object-fit:cover">`
-        : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:var(--mu)"><i class="fa-solid fa-pizza-slice"></i></div>`;
+        : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:var(--mu)"><i class="fa-solid fa-utensils"></i></div>`;
       setHtml('pb-pizza-img', imgHtml);
-      Object.keys(PIZZA_SIZES).forEach(s => {
-        setTxt('price-' + s, fmt(Number(product.price) * PIZZA_SIZES[s].multiplier));
-      });
-      selectedSize = 'small';
-      document.querySelectorAll('.pb-size').forEach(el => el.classList.remove('active'));
-      const smallSize = document.querySelector('[data-size="small"]');
-      if (smallSize) smallSize.classList.add('active');
+      // Show or hide size selector based on product type
+      const sizesSection = document.querySelector('.pb-sizes')?.closest('.pb-section');
+      if (sizesSection) sizesSection.style.display = noSizes ? 'none' : '';
+      if (!noSizes) {
+        Object.keys(PIZZA_SIZES).forEach(s => {
+          setTxt('price-' + s, fmt(Number(product.price) * PIZZA_SIZES[s].multiplier));
+        });
+        selectedSize = 'small';
+        document.querySelectorAll('.pb-size').forEach(el => el.classList.remove('active'));
+        const smallSize = document.querySelector('[data-size="small"]');
+        if (smallSize) smallSize.classList.add('active');
+      } else {
+        selectedSize = null;
+      }
       selectedAddons.clear();
-      setHtml('pb-addons', PIZZA_ADDONS.map(a =>
-        `<div class="pb-addon" onclick="toggleAddon('${a.id}',this)">
-        <span class="pb-addon-icon">${a.icon}</span>
-        <div class="pb-addon-info">
-          <div class="pb-addon-name">${a.name}</div>
-          <div class="pb-addon-price">+${fmt(a.price)}</div>
-        </div>
-        <div class="pb-addon-check"><i class="fa-solid fa-check"></i></div>
-      </div>`).join(''));
+      const mainAddons = PIZZA_ADDONS.filter(a => !a.section);
+      const sauceAddons = PIZZA_ADDONS.filter(a => a.section === 'sauces');
+      const sauceLang = currentLang === 'ar' ? 'الصوصات — مجاناً' : currentLang === 'de' ? 'Saucen — Gratis' : 'Sauces — Free';
+      const renderAddon = a => {
+        const priceLabel = a.price === 0
+          ? `<span style="color:var(--g,#22c55e);font-weight:700">${currentLang === 'ar' ? 'مجاناً' : currentLang === 'de' ? 'Gratis' : 'FREE'}</span>`
+          : `+${fmt(a.price)}`;
+        return `<div class="pb-addon" onclick="toggleAddon('${a.id}',this)">
+          <span class="pb-addon-icon">${a.icon}</span>
+          <div class="pb-addon-info">
+            <div class="pb-addon-name">${a.name}</div>
+            <div class="pb-addon-price">${priceLabel}</div>
+          </div>
+          <div class="pb-addon-check"><i class="fa-solid fa-check"></i></div>
+        </div>`;
+      };
+      setHtml('pb-addons',
+        mainAddons.map(renderAddon).join('') +
+        `<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.8px;color:var(--mu);padding:10px 4px 4px;border-top:1px solid var(--bd,#e5e7eb);margin-top:4px">${sauceLang}</div>` +
+        sauceAddons.map(renderAddon).join('')
+      );
       updatePizzaTotal();
       addCls('pizza-modal', 'open');
     }
@@ -3634,7 +3655,8 @@
     }
     function updatePizzaTotal() {
       if (!selectedPizza) return;
-      const base = Number(selectedPizza.price) * PIZZA_SIZES[selectedSize].multiplier;
+      const sizeMultiplier = selectedSize && PIZZA_SIZES[selectedSize] ? PIZZA_SIZES[selectedSize].multiplier : 1;
+      const base = Number(selectedPizza.price) * sizeMultiplier;
       const addonsTotal = [...selectedAddons].reduce((s, id) => {
         const a = PIZZA_ADDONS.find(x => x.id === id); return s + (a ? a.price : 0);
       }, 0);
@@ -3728,15 +3750,18 @@
       }
       grid.innerHTML = active.map(p => {
         const cat = cats.find(c => c.id === p.categoryId);
-        const isPizza = cat && (cat.name.toLowerCase().includes('pizza') || (cat.icon && cat.icon.includes('pizza')));
+        const catNameLower = cat ? cat.name.toLowerCase() : '';
+        const isPizza = cat && (catNameLower.includes('pizza') || (cat.icon && cat.icon.includes('pizza')));
+        const isFingerfood = cat && (catNameLower.includes('finger') || catNameLower.includes('fingerfood') || catNameLower.includes('snack'));
+        const usePizzaModal = isPizza || isFingerfood;
         const pJson = JSON.stringify(p).replace(/"/g, '&quot;');
-        const action = isPizza
-          ? `_tapCard(this,()=>openPizzaModal(${pJson}))`
+        const action = usePizzaModal
+          ? `_tapCard(this,()=>openPizzaModal(${pJson},${isFingerfood}))`
           : `_tapCard(this,()=>addToCart(${pJson},1,null,[],this))`;
-        const btnAction = isPizza
-          ? `event.stopPropagation();_tapCard(this.closest('.product-card'),()=>openPizzaModal(${pJson}))`
+        const btnAction = usePizzaModal
+          ? `event.stopPropagation();_tapCard(this.closest('.product-card'),()=>openPizzaModal(${pJson},${isFingerfood}))`
           : `event.stopPropagation();_tapCard(this.closest('.product-card'),()=>addToCart(${pJson},1,null,[],this.closest('.product-card')))`;
-        const btnIcon = isPizza ? 'fa-pizza-slice' : 'fa-plus';
+        const btnIcon = usePizzaModal ? 'fa-pizza-slice' : 'fa-plus';
         const catName = cat ? cat.name : '';
         return `<div class="product-card" data-id="${p.id}" data-cat="${p.categoryId}" data-name="${(p.name || '').toLowerCase()}" data-desc="${(p.description || '').toLowerCase()}" onclick="${action}">
         <div class="product-img">
