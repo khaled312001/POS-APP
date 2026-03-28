@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import { getApiUrl } from "@/lib/query-client";
+import { getDisplayNumber } from "@/lib/api-config";
 
 // ── Web receipt printing via hidden iframe (no popup-blocking) ──────────────
 // onDone fires after the print dialog is dismissed (afterprint event).
@@ -108,7 +109,7 @@ export function autoPrint3Copies(
     const logoPath = storeSettings?.logo || "";
     const logoUrl = logoPath ? (logoPath.startsWith("http") || logoPath.startsWith("data:") ? logoPath : `${getApiUrl().replace(/\/$/, "")}${logoPath}`) : "";
 
-    const receiptNum = saleData?.receiptNumber || saleData?.orderNumber || `#${saleData?.id}`;
+    const receiptNum = getDisplayNumber(saleData?.receiptNumber || saleData?.orderNumber) || `#${saleData?.id}`;
     const saleDate = new Date(saleData?.createdAt || Date.now());
     const timeStr = saleDate.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
     const dateStr = saleDate.toLocaleDateString("de-CH");

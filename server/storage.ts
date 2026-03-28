@@ -712,6 +712,11 @@ export const storage = {
       employeeId: sales.employeeId,
       customerName: customers.name,
       customerAddress: customers.address,
+      customerStreet: customers.street,
+      customerStreetNr: customers.streetNr,
+      customerHouseNr: customers.houseNr,
+      customerCity: customers.city,
+      customerPostalCode: customers.postalCode,
     }).from(sales)
       .leftJoin(customers, eq(sales.customerId, customers.id))
       .where(and(gte(sales.createdAt, startDate), lte(sales.createdAt, endDate)))

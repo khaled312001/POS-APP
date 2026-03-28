@@ -78,6 +78,7 @@ export default function POSScreen() {
   const [nfcPulse, setNfcPulse] = useState(0);
   const [showInvoiceHistory, setShowInvoiceHistory] = useState(false);
   const [invoiceFilter24h, setInvoiceFilter24h] = useState(true); // default: last 24h
+  const [invoiceSearch, setInvoiceSearch] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showReprintReceipt, setShowReprintReceipt] = useState(false);
   const [reprintQrDataUrl, setReprintQrDataUrl] = useState<string | null>(null);
@@ -285,6 +286,11 @@ export default function POSScreen() {
     { name: "Cocktail Sauce", color: "#1B5E20", textColor: "#fff" },
     { name: "Yogurt Sauce", color: "#F9A825", textColor: "#1a1a2e" },
   ];
+
+  // Sauces are always FREE — only grid toppings cost CHF 2
+  const SAUCE_NAMES = SAUCE_ROW.map(s => s.name);
+  const calcToppingsPrice = (toppings: string[]) =>
+    toppings.reduce((sum, t) => sum + (SAUCE_NAMES.includes(t) ? 0 : TOPPING_PRICE), 0);
 
   // Localized topping display name
   const toppingDisplayName = (name: string): string => {
@@ -1149,6 +1155,37 @@ export default function POSScreen() {
     }
   };
 
+  const getSaleAddressParts = (sale: any) => {
+    // 1. Use dedicated customer fields first
+    const streetPart = [sale.customerStreet, sale.customerStreetNr || sale.customerHouseNr].filter(Boolean).join(" ").trim();
+    const plzPart = (sale.customerPostalCode || "").trim();
+    const cityPart = (sale.customerCity || "").trim();
+
+    if (streetPart || plzPart || cityPart) {
+      return { street: streetPart || "–", plz: plzPart || "", city: cityPart || "–" };
+    }
+
+    // 2. Fallback: parse full address string using PLZ regex
+    const addr = (sale.customerAddress || "").trim();
+    if (!addr) return { street: "–", plz: "", city: "–" };
+
+    const plzMatch = addr.match(/\b(\d{4,5})\b/);
+    if (plzMatch) {
+      const plzIdx = addr.indexOf(plzMatch[0]);
+      const streetFb = addr.substring(0, plzIdx).replace(/[,\s]+$/, "").trim();
+      const cityFb = addr.substring(plzIdx + plzMatch[0].length).replace(/^[,\s]+/, "").trim();
+      return { street: streetFb || "–", plz: plzMatch[0], city: cityFb || "–" };
+    }
+
+    // 3. Simple comma split
+    const parts = addr.split(",");
+    return {
+      street: parts[0]?.trim() || "–",
+      plz: parts[1]?.trim() || "",
+      city: parts[2]?.trim() || parts[1]?.trim() || "–",
+    };
+  };
+
   const handleEndOfDay = async () => {
     try {
       setZeroOutLoading(true);
@@ -1175,13 +1212,11 @@ export default function POSScreen() {
         const cashierName = employee?.name || "Kassierer";
         const total = zeroOutSalesData.reduce((s: number, sale: any) => s + Number(sale.totalAmount || 0), 0);
         const rowsHtml = zeroOutSalesData.map((sale: any, idx: number) => {
-          const addr = sale.customerAddress || "";
-          const parts = addr.split(",");
-          const street = parts[0]?.trim() || "–";
-          const city = parts[1]?.trim() || parts[0]?.trim() || "–";
+          const { street, plz, city } = getSaleAddressParts(sale);
+          const gebiet = [plz, city !== "–" ? city : ""].filter(Boolean).join(" ") || "–";
           const timeStr = new Date(sale.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
           const amt = Number(sale.totalAmount || 0).toFixed(2);
-          return `<tr><td>${idx + 1}</td><td>${sale.customerName || "–"}</td><td>${street}</td><td>${city}</td><td>${timeStr}</td><td style="text-align:right;">${amt}</td></tr>`;
+          return `<tr><td>${idx + 1}</td><td>${sale.customerName || "–"}</td><td>${street}</td><td>${gebiet}</td><td>${timeStr}</td><td style="text-align:right;">${amt}</td></tr>`;
         }).join("");
         const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Personalbericht</title><style>
           body { font-family: 'Courier New', monospace; font-size: 11px; margin: 0; padding: 10px; color: #000; }
@@ -1265,7 +1300,7 @@ export default function POSScreen() {
                 }
                 <Text style={[styles.headerInvoiceLabel, { color: (endOfDayLoading || zeroOutLoading) ? Colors.textMuted : Colors.danger }]}>{t("endOfDay")}</Text>
               </Pressable>
-              <Pressable onPress={() => setShowInvoiceHistory(true)} style={styles.headerInvoiceBtn}>
+              <Pressable onPress={() => { setInvoiceSearch(""); setShowInvoiceHistory(true); }} style={styles.headerInvoiceBtn}>
                 <Ionicons name="receipt-outline" size={20} color={Colors.white} />
                 <Text style={styles.headerInvoiceLabel}>{t("invoices")}</Text>
               </Pressable>
@@ -1327,7 +1362,7 @@ export default function POSScreen() {
               {selectedCustomer.email && <Text style={[styles.phoneBarMetaText, { color: Colors.info }]} numberOfLines={1}>{selectedCustomer.email}</Text>}
             </View>
             <Pressable onPress={() => { cart.setCustomerId(null); setPhoneInput(""); setCallerCustomer(null); }} style={styles.phoneBarClear}>
-              <Ionicons name="close" size={14} color={Colors.textMuted} />
+              <Ionicons name="close-circle" size={22} color={Colors.danger} />
             </Pressable>
           </Pressable>
         ) : (
@@ -1615,20 +1650,20 @@ export default function POSScreen() {
                 <View style={[styles.cartCustomerRow, isRTL && { flexDirection: "row-reverse" }]}>
                   {selectedCustomer.phone && (
                     <View style={[styles.cartCustomerChip, isRTL && { flexDirection: "row-reverse" }]}>
-                      <Ionicons name="call-outline" size={10} color={Colors.accent} />
+                      <Ionicons name="call-outline" size={12} color={Colors.accent} />
                       <Text style={styles.cartCustomerChipText}>{selectedCustomer.phone}</Text>
                     </View>
                   )}
                   {selectedCustomer.email && (
                     <View style={[styles.cartCustomerChip, isRTL && { flexDirection: "row-reverse" }]}>
-                      <Ionicons name="mail-outline" size={10} color={Colors.info} />
+                      <Ionicons name="mail-outline" size={12} color={Colors.info} />
                       <Text style={styles.cartCustomerChipText}>{selectedCustomer.email}</Text>
                     </View>
                   )}
                 </View>
                 {selectedCustomerAddress ? (
-                  <View style={[styles.cartCustomerChip, { marginTop: 2 }, isRTL && { flexDirection: "row-reverse" }]}>
-                    <Ionicons name="location-outline" size={10} color={Colors.warning} />
+                  <View style={[styles.cartCustomerChip, { marginTop: 4 }, isRTL && { flexDirection: "row-reverse" }]}>
+                    <Ionicons name="location-outline" size={12} color={Colors.warning} />
                     <Text style={styles.cartCustomerChipText} numberOfLines={1}>{selectedCustomerAddress}</Text>
                   </View>
                 ) : null}
@@ -1639,11 +1674,11 @@ export default function POSScreen() {
             </View>
           ) : (
             <Pressable style={[styles.customerSelect, isRTL && { flexDirection: "row-reverse" }]} onPress={() => setShowCustomerPicker(true)}>
-              <Ionicons name="person" size={16} color={Colors.textMuted} />
+              <Ionicons name="person-add" size={18} color={Colors.primary} />
               <Text style={[styles.customerSelectText, rtlTextAlign]}>
                 {`${t("selectCustomer")}(${t("walkIn")})`}
               </Text>
-              <Ionicons name={isRTL ? "chevron-back" : "chevron-down"} size={14} color={Colors.textMuted} />
+              <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color={Colors.primary} />
             </Pressable>
           )}
 
@@ -1867,7 +1902,7 @@ export default function POSScreen() {
                   <View style={[styles.selectedSizeBadge, { paddingVertical: 8, paddingHorizontal: 14, backgroundColor: Colors.accent + "18", marginBottom: 8 }]}>
                     <Ionicons name="pizza" size={15} color={Colors.accent} />
                     <Text style={[styles.selectedSizeBadgeText, { fontSize: 14, fontWeight: "700" }]}>
-                      {selectedVariant.name} — CHF {(Number(selectedVariant.price) + selectedToppings.length * TOPPING_PRICE).toFixed(2)}
+                      {selectedVariant.name} — CHF {(Number(selectedVariant.price) + calcToppingsPrice(selectedToppings)).toFixed(2)}
                     </Text>
                     {selectedToppings.length > 0 && (
                       <View style={{ marginLeft: "auto", backgroundColor: Colors.accent, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 }}>
@@ -1967,10 +2002,10 @@ export default function POSScreen() {
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                       <Text style={{ color: Colors.accent, fontSize: 11, fontWeight: "700" }}>
                         {language === "ar"
-                          ? `الإضافات المختارة (${selectedToppings.length}) — +CHF ${(selectedToppings.length * TOPPING_PRICE).toFixed(2)}`
+                          ? `الإضافات المختارة (${selectedToppings.length}) — +CHF ${(calcToppingsPrice(selectedToppings)).toFixed(2)}`
                           : language === "de"
-                          ? `Ausgewählte Extras (${selectedToppings.length}) — +CHF ${(selectedToppings.length * TOPPING_PRICE).toFixed(2)}`
-                          : `Selected Extras (${selectedToppings.length}) — +CHF ${(selectedToppings.length * TOPPING_PRICE).toFixed(2)}`}
+                          ? `Ausgewählte Extras (${selectedToppings.length}) — +CHF ${(calcToppingsPrice(selectedToppings)).toFixed(2)}`
+                          : `Selected Extras (${selectedToppings.length}) — +CHF ${(calcToppingsPrice(selectedToppings)).toFixed(2)}`}
                       </Text>
                       <Pressable onPress={() => setSelectedToppings([])}>
                         <Text style={{ color: Colors.danger, fontSize: 11, fontWeight: "600" }}>
@@ -1990,13 +2025,13 @@ export default function POSScreen() {
                     style={{ borderRadius: 14, overflow: "hidden" }}
                     onPress={() => {
                       const toppingsSuffix = selectedToppings.length > 0 ? ` [${selectedToppings.map(t => toppingDisplayName(t)).join(", ")}]` : "";
-                      const toppingsPrice = selectedToppings.length * TOPPING_PRICE;
+                      const toppingsPrice = calcToppingsPrice(selectedToppings);
 
                       if (editingCartItemId !== null) {
                         const cartItem = cart.items.find((i: any) => i.id === editingCartItemId);
                         if (cartItem) {
                           const originalToppings = parseToppingsFromName(cartItem.name);
-                          const basePrice = cartItem.price - originalToppings.length * TOPPING_PRICE;
+                          const basePrice = cartItem.price - calcToppingsPrice(originalToppings);
                           const baseName = cartItem.name.replace(/\s*\[.+?\]$/, "");
                           cart.updateItem(editingCartItemId, {
                             name: baseName + toppingsSuffix,
@@ -2032,10 +2067,10 @@ export default function POSScreen() {
                         {editingCartItemId !== null
                           ? (language === "ar" ? "تحديث الإضافات" : language === "de" ? "Extras aktualisieren" : "Update Extras")
                           : language === "ar"
-                          ? `إضافة للسلة${selectedToppings.length > 0 ? ` (+CHF ${(selectedToppings.length * TOPPING_PRICE).toFixed(2)})` : ""}`
+                          ? `إضافة للسلة${selectedToppings.length > 0 ? ` (+CHF ${(calcToppingsPrice(selectedToppings)).toFixed(2)})` : ""}`
                           : language === "de"
-                          ? `In den Warenkorb${selectedToppings.length > 0 ? ` (+CHF ${(selectedToppings.length * TOPPING_PRICE).toFixed(2)})` : ""}`
-                          : `Add to Cart${selectedToppings.length > 0 ? ` (+CHF ${(selectedToppings.length * TOPPING_PRICE).toFixed(2)})` : ""}`}
+                          ? `In den Warenkorb${selectedToppings.length > 0 ? ` (+CHF ${(calcToppingsPrice(selectedToppings)).toFixed(2)})` : ""}`
+                          : `Add to Cart${selectedToppings.length > 0 ? ` (+CHF ${(calcToppingsPrice(selectedToppings)).toFixed(2)})` : ""}`}
                       </Text>
                     </LinearGradient>
                   </Pressable>
@@ -2788,33 +2823,60 @@ export default function POSScreen() {
           <View style={[styles.modalContent, { maxHeight: "85%" }]}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>{t("previousInvoices")}</Text>
-              <Pressable onPress={() => setShowInvoiceHistory(false)}>
+              <Pressable onPress={() => { setShowInvoiceHistory(false); setInvoiceSearch(""); }}>
                 <Ionicons name="close" size={24} color={Colors.text} />
               </Pressable>
             </View>
 
-            {/* 24h filter toggle */}
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, paddingHorizontal: 4, paddingBottom: 10 }}>
-              <Pressable
-                onPress={() => setInvoiceFilter24h(true)}
-                style={{ flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: invoiceFilter24h ? Colors.accent : Colors.surfaceLight, alignItems: "center", borderWidth: 1, borderColor: invoiceFilter24h ? Colors.accent : Colors.cardBorder }}
-              >
-                <Text style={{ color: invoiceFilter24h ? Colors.textDark : Colors.textSecondary, fontSize: 12, fontWeight: "700" }}>
-                  {t("last24Hours" as any)}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setInvoiceFilter24h(false)}
-                style={{ flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: !invoiceFilter24h ? Colors.accent : Colors.surfaceLight, alignItems: "center", borderWidth: 1, borderColor: !invoiceFilter24h ? Colors.accent : Colors.cardBorder }}
-              >
-                <Text style={{ color: !invoiceFilter24h ? Colors.textDark : Colors.textSecondary, fontSize: 12, fontWeight: "700" }}>
-                  {t("allInvoices" as any)}
-                </Text>
-              </Pressable>
+            {/* Search bar */}
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, backgroundColor: Colors.surfaceLight, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10, borderWidth: 1, borderColor: Colors.cardBorder }}>
+              <Ionicons name="search" size={16} color={Colors.textMuted} />
+              <TextInput
+                style={{ flex: 1, color: Colors.text, fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+                placeholder={language === "ar" ? "بحث برقم الفاتورة أو اسم العميل..." : language === "de" ? "Suche nach Rechnungsnr. oder Kundenname..." : "Search by invoice # or customer name..."}
+                placeholderTextColor={Colors.textMuted}
+                value={invoiceSearch}
+                onChangeText={setInvoiceSearch}
+                autoCapitalize="none"
+              />
+              {invoiceSearch.length > 0 && (
+                <Pressable onPress={() => setInvoiceSearch("")}>
+                  <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+                </Pressable>
+              )}
             </View>
+
+            {/* 24h filter toggle — hidden when searching */}
+            {invoiceSearch.length === 0 && (
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, paddingHorizontal: 4, paddingBottom: 10 }}>
+                <Pressable
+                  onPress={() => setInvoiceFilter24h(true)}
+                  style={{ flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: invoiceFilter24h ? Colors.accent : Colors.surfaceLight, alignItems: "center", borderWidth: 1, borderColor: invoiceFilter24h ? Colors.accent : Colors.cardBorder }}
+                >
+                  <Text style={{ color: invoiceFilter24h ? Colors.textDark : Colors.textSecondary, fontSize: 12, fontWeight: "700" }}>
+                    {t("last24Hours" as any)}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setInvoiceFilter24h(false)}
+                  style={{ flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: !invoiceFilter24h ? Colors.accent : Colors.surfaceLight, alignItems: "center", borderWidth: 1, borderColor: !invoiceFilter24h ? Colors.accent : Colors.cardBorder }}
+                >
+                  <Text style={{ color: !invoiceFilter24h ? Colors.textDark : Colors.textSecondary, fontSize: 12, fontWeight: "700" }}>
+                    {t("allInvoices" as any)}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
 
             <FlatList
               data={salesHistory.filter((s: any) => {
+                const q = invoiceSearch.trim().toLowerCase();
+                if (q) {
+                  const receiptNum = String(s.receiptNumber || s.id || "").toLowerCase();
+                  const custName = String(s.customerName || s.customer?.name || "").toLowerCase();
+                  const custId = String(s.customerId || "").toLowerCase();
+                  return receiptNum.includes(q) || custName.includes(q) || custId.includes(q);
+                }
                 if (!invoiceFilter24h) return true;
                 const saleDate = new Date(s.createdAt || s.date);
                 return (Date.now() - saleDate.getTime()) <= 24 * 60 * 60 * 1000;
@@ -2852,6 +2914,11 @@ export default function POSScreen() {
                       <Text style={[{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }, rtlTextAlign]}>
                         {saleDate.toLocaleDateString()} • {saleDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </Text>
+                      {(item.customerName || item.customer?.name) ? (
+                        <Text style={[{ color: Colors.accent + "cc", fontSize: 11, marginTop: 1, fontWeight: "600" }, rtlTextAlign]}>
+                          <Ionicons name="person" size={10} color={Colors.accent} /> {item.customerName || item.customer?.name}
+                        </Text>
+                      ) : null}
                       <Text style={[{ color: Colors.textMuted, fontSize: 11, marginTop: 1 }, rtlTextAlign]}>
                         {(item.paymentMethod || "cash").toUpperCase()}
                       </Text>
@@ -3688,10 +3755,8 @@ export default function POSScreen() {
                 </View>
               ) : (
                 zeroOutSalesData.map((sale: any, idx: number) => {
-                  const addr = sale.customerAddress || "";
-                  const parts = addr.split(",");
-                  const street = parts[0]?.trim() || "–";
-                  const city = parts[1]?.trim() || parts[0]?.trim() || "–";
+                  const { street, plz, city } = getSaleAddressParts(sale);
+                  const gebiet = [plz, city !== "–" ? city : ""].filter(Boolean).join(" ") || "–";
                   const timeStr = new Date(sale.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
                   const amt = Number(sale.totalAmount || 0).toFixed(2);
                   const isEven = idx % 2 === 0;
@@ -3708,7 +3773,7 @@ export default function POSScreen() {
                         {sale.customerName || (language === "ar" ? "زائر" : "Walk-in")}
                       </Text>
                       <Text style={{ flex: 1.5, color: Colors.textSecondary, fontSize: 11 }} numberOfLines={1}>{street}</Text>
-                      <Text style={{ flex: 1.1, color: Colors.textSecondary, fontSize: 11 }} numberOfLines={1}>{city}</Text>
+                      <Text style={{ flex: 1.1, color: Colors.textSecondary, fontSize: 11 }} numberOfLines={1}>{gebiet}</Text>
                       <Text style={{ flex: 0.8, color: Colors.textMuted, fontSize: 11, textAlign: "center" }}>{timeStr}</Text>
                       <Text style={{ flex: 0.9, color: Colors.accent, fontSize: 12, fontWeight: "700", textAlign: "right" }}>{amt}</Text>
                     </View>
@@ -3838,8 +3903,8 @@ const styles = StyleSheet.create({
   cartSectionTablet: { flex: 1.2, borderTopWidth: 0, borderLeftWidth: 1, maxHeight: "100%" as any, display: "flex" as any, flexDirection: "column" as any },
   cartHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderColor: Colors.cardBorder },
   cartTitle: { color: Colors.text, fontSize: 17, fontWeight: "700" },
-  customerSelect: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 6, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
-  customerSelectText: { color: Colors.textMuted, fontSize: 13, flex: 1 },
+  customerSelect: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 10, marginHorizontal: 10, marginVertical: 6, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.primary + "60", borderStyle: "dashed" as const, backgroundColor: Colors.primary + "12" },
+  customerSelectText: { color: Colors.primary, fontSize: 14, fontWeight: "700", flex: 1 },
   cartList: { flex: 1 },
   cartItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 7, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)", gap: 8 },
   cartItemIndexBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", flexShrink: 0 },
@@ -4002,20 +4067,20 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   phoneBarAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: Colors.primary,
     justifyContent: "center",
     alignItems: "center",
     flexShrink: 0,
   },
-  phoneBarAvatarText: { color: Colors.white, fontSize: 13, fontWeight: "700" },
+  phoneBarAvatarText: { color: Colors.white, fontSize: 16, fontWeight: "700" },
   phoneBarCustomerInfo: { flex: 1, minWidth: 0 },
-  phoneBarCustomerName: { color: Colors.white, fontSize: 13, fontWeight: "700" },
+  phoneBarCustomerName: { color: Colors.white, fontSize: 16, fontWeight: "800" },
   phoneBarCustomerMeta: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "nowrap" },
-  phoneBarMetaText: { color: Colors.textMuted, fontSize: 11, flexShrink: 1 },
-  phoneBarMetaDot: { color: Colors.textMuted, fontSize: 11 },
+  phoneBarMetaText: { color: Colors.textSecondary, fontSize: 13, flexShrink: 1 },
+  phoneBarMetaDot: { color: Colors.textSecondary, fontSize: 13 },
   phoneBarClear: { padding: 4, flexShrink: 0 },
   phoneBarWalkIn: {
     flexDirection: "row",
@@ -4043,27 +4108,27 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary + "10",
   },
   cartCustomerAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: "center",
     alignItems: "center",
     flexShrink: 0,
   },
-  cartCustomerAvatarText: { color: Colors.white, fontSize: 14, fontWeight: "800" },
+  cartCustomerAvatarText: { color: Colors.white, fontSize: 17, fontWeight: "800" },
   cartCustomerBody: { flex: 1, minWidth: 0 },
-  cartCustomerName: { color: Colors.white, fontSize: 13, fontWeight: "700", marginBottom: 3 },
-  cartCustomerRow: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
+  cartCustomerName: { color: Colors.white, fontSize: 15, fontWeight: "800", marginBottom: 4 },
+  cartCustomerRow: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
   cartCustomerChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
+    gap: 4,
     backgroundColor: Colors.surface,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  cartCustomerChipText: { color: Colors.textMuted, fontSize: 10 },
+  cartCustomerChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600" },
   cartCustomerClear: { padding: 8 },
 
   // New customer form

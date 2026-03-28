@@ -335,7 +335,7 @@ export default function OrdersScreen() {
 
   const openEditOrder = async (order: any) => {
     if (order._type === "pos") {
-      // Fetch items for POS sale
+      // Fetch full sale + customer info
       try {
         const res = await apiRequest("GET", `/api/sales/${order.id}`);
         const full = await res.json();
@@ -349,15 +349,31 @@ export default function OrdersScreen() {
           modifiers: it.modifiers || [],
         }));
         const subtotal = items.reduce((s: number, i: any) => s + i.total, 0);
+
+        // Fetch customer details if linked via customerId
+        let custName = "";
+        let custPhone = "";
+        let custAddress = "";
+        if (full.customerId) {
+          try {
+            const custRes = await apiRequest("GET", `/api/customers/${full.customerId}`);
+            const cust = await custRes.json();
+            custName = cust.name || "";
+            custPhone = cust.phone || "";
+            custAddress = cust.address ||
+              [cust.street, cust.streetNr || cust.houseNr, cust.postalCode, cust.city].filter(Boolean).join(" ") || "";
+          } catch { }
+        }
+
         setEditForm({
-          customerName: order.customerName || full.customerName || "",
-          customerPhone: order.customerPhone || full.customerPhone || "",
-          customerAddress: full.customerAddress || order.customerAddress || "",
+          customerName: custName,
+          customerPhone: custPhone,
+          customerAddress: custAddress,
           notes: full.notes || "",
           estimatedTime: "",
           items,
           subtotal,
-          deliveryFee: 0,
+          deliveryFee: Number(full.deliveryFee || 0),
           totalAmount: Number(full.totalAmount || subtotal),
         });
       } catch {
@@ -701,10 +717,17 @@ export default function OrdersScreen() {
     { color: "#E8EAF6", textColor: "#1a1a2e", items: ["Egg", "Pineapple", null, null, null, null, "Arugula"] },
     { color: "#E8EAF6", textColor: "#1a1a2e", items: ["Mushrooms", null, null, null, null, null, null] },
     { color: "#B71C1C", textColor: "#fff", items: ["Ham", "Spicy Salami", "Salami", "Bacon", "Prosciutto", null, null] },
-    { color: "#B71C1C", textColor: "#fff", items: ["Lamb", "Chicken", "Kebab", "Minced Meat", null, "Mayonnaise", null] },
-    { color: "#BF360C", textColor: "#fff", items: ["Anchovies", "Shrimp", "Tuna", null, null, "Ketchup", null] },
-    { color: "#1B5E20", textColor: "#fff", items: [null, null, null, null, null, "Cocktail Sauce", "Spicy Sauce"] },
-    { color: "#F9A825", textColor: "#1a1a2e", items: ["Mozzarella", "Gorgonzola", "Parmesan", "Mascarpone", "Kaeserand", "Yogurt Sauce", null] },
+    { color: "#B71C1C", textColor: "#fff", items: ["Lamb", "Chicken", "Kebab", "Minced Meat", null, null, null] },
+    { color: "#BF360C", textColor: "#fff", items: ["Anchovies", "Shrimp", "Tuna", null, null, null, null] },
+    { color: "#1B5E20", textColor: "#fff", items: [null, null, null, null, null, null, "Spicy Sauce"] },
+    { color: "#F9A825", textColor: "#1a1a2e", items: ["Mozzarella", "Gorgonzola", "Parmesan", "Mascarpone", "Kaeserand", null, null] },
+  ];
+
+  const SAUCE_ROW: { name: string; color: string; textColor: string }[] = [
+    { name: "Mayonnaise", color: "#B71C1C", textColor: "#fff" },
+    { name: "Ketchup", color: "#BF360C", textColor: "#fff" },
+    { name: "Cocktail Sauce", color: "#1B5E20", textColor: "#fff" },
+    { name: "Yogurt Sauce", color: "#F9A825", textColor: "#1a1a2e" },
   ];
 
   const toppingDisplayName = (name: string): string => {
@@ -1076,20 +1099,22 @@ export default function OrdersScreen() {
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </Pressable>
             </View>
-            <Text style={{ color: Colors.textMuted, fontSize: 12, marginBottom: 8 }}>
+
+            <Text style={{ color: Colors.textMuted, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 }}>
               {lbl("SELECT EXTRAS", "اختر الإضافات", "EXTRAS AUSWÄHLEN")}
             </Text>
+
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-              {/* POS Topping Grid */}
+              {/* Color-coded topping grid — same as POS */}
               <View style={{ flexDirection: "row", flexWrap: "wrap", borderRadius: 8, overflow: "hidden" }}>
                 {TOPPING_GRID.flatMap((row, rowIdx) =>
                   row.items.map((toppingName, colIdx) => {
                     if (!toppingName) return null;
                     const isSelected = freeExtrasSelected.includes(toppingName);
                     return (
-                      <View key={`${rowIdx}-${colIdx}`} style={{ width: "14.28%", height: 48, padding: 1 }}>
+                      <View key={`${rowIdx}-${colIdx}`} style={{ width: "14.28%", height: 54, padding: 1 }}>
                         <Pressable
-                          onPress={() => setFreeExtrasSelected(prev => isSelected ? prev.filter(t => t !== toppingName) : [...prev, toppingName])}
+                          onPress={() => { playClickSound("light"); setFreeExtrasSelected(prev => isSelected ? prev.filter(t => t !== toppingName) : [...prev, toppingName]); }}
                           style={{
                             flex: 1,
                             backgroundColor: isSelected ? Colors.accent : row.color,
@@ -1097,11 +1122,11 @@ export default function OrdersScreen() {
                             borderWidth: isSelected ? 2 : 0,
                             borderColor: isSelected ? Colors.accent : "transparent",
                             borderRadius: 4,
-                            paddingHorizontal: 2, paddingVertical: 2, gap: 1,
+                            paddingHorizontal: 2, paddingVertical: 2, gap: 0,
                           }}
                         >
-                          <Text style={{ fontSize: 16, lineHeight: 18 }}>{toppingEmoji(toppingName)}</Text>
-                          <Text style={{ fontSize: 10, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 11 }} numberOfLines={2}>
+                          <Text style={{ fontSize: 14, lineHeight: 16 }}>{toppingEmoji(toppingName)}</Text>
+                          <Text style={{ fontSize: 9, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 10 }} numberOfLines={2}>
                             {toppingDisplayName(toppingName)}
                           </Text>
                           {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
@@ -1111,21 +1136,55 @@ export default function OrdersScreen() {
                   })
                 )}
               </View>
+
+              {/* Sauces — separate labeled section, same as POS */}
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ color: Colors.textMuted, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4, paddingHorizontal: 2 }}>
+                  {lbl("Sauces", "الصوصات", "Saucen")}
+                </Text>
+                <View style={{ flexDirection: "row", gap: 4 }}>
+                  {SAUCE_ROW.map((sauce) => {
+                    const isSelected = freeExtrasSelected.includes(sauce.name);
+                    return (
+                      <Pressable
+                        key={sauce.name}
+                        style={{
+                          flex: 1, height: 54, borderRadius: 6,
+                          backgroundColor: isSelected ? Colors.accent : sauce.color,
+                          justifyContent: "center", alignItems: "center", padding: 4,
+                          borderWidth: isSelected ? 2 : 0, borderColor: Colors.accent,
+                        }}
+                        onPress={() => { playClickSound("light"); setFreeExtrasSelected(prev => isSelected ? prev.filter(t => t !== sauce.name) : [...prev, sauce.name]); }}
+                      >
+                        <Text style={{ fontSize: 14, lineHeight: 16 }}>{toppingEmoji(sauce.name)}</Text>
+                        <Text style={{ fontSize: 10, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : sauce.textColor, lineHeight: 11 }} numberOfLines={1}>
+                          {toppingDisplayName(sauce.name)}
+                        </Text>
+                        {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 4 }}>✓</Text>}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
               {/* Selected summary */}
               {freeExtrasSelected.length > 0 && (
-                <View style={{ marginBottom: 10, padding: 8, backgroundColor: Colors.success + "15", borderRadius: 8, borderWidth: 1, borderColor: Colors.success + "40" }}>
+                <View style={{ marginTop: 8, padding: 8, backgroundColor: Colors.success + "15", borderRadius: 8, borderWidth: 1, borderColor: Colors.success + "40" }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                     <Text style={{ color: Colors.success, fontSize: 11, fontWeight: "700" }}>
-                      {lbl(`Selected(${freeExtrasSelected.length})`, `المختار(${freeExtrasSelected.length})`, `Ausgewählt(${freeExtrasSelected.length})`)}
+                      {lbl(`Selected (${freeExtrasSelected.length})`, `المختار (${freeExtrasSelected.length})`, `Ausgewählt (${freeExtrasSelected.length})`)}
                     </Text>
                     <Pressable onPress={() => setFreeExtrasSelected([])}>
                       <Text style={{ color: Colors.danger, fontSize: 11, fontWeight: "600" }}>{lbl("Clear all", "مسح الكل", "Alle löschen")}</Text>
                     </Pressable>
                   </View>
-                  <Text style={{ color: Colors.text, fontSize: 11 }}>{freeExtrasSelected.map(t => toppingDisplayName(t)).join(", ")}</Text>
+                  <Text style={{ color: Colors.text, fontSize: 11 }} numberOfLines={2}>
+                    {freeExtrasSelected.map(t => toppingDisplayName(t)).join(" · ")}
+                  </Text>
                 </View>
               )}
             </ScrollView>
+
             <Pressable
               style={{ paddingVertical: 13, borderRadius: 10, backgroundColor: Colors.accent, alignItems: "center", marginTop: 8 }}
               onPress={() => {
@@ -1134,7 +1193,7 @@ export default function OrdersScreen() {
                     const extrasName = freeExtrasSelected.map(t => toppingDisplayName(t)).join(", ");
                     const nextItems = [
                       ...prev.items,
-                      { productId: 0, name: `[Extras] ${extrasName} `, quantity: 1, unitPrice: 0, total: 0 },
+                      { productId: 0, name: `[Extras] ${extrasName}`, quantity: 1, unitPrice: 0, total: 0 },
                     ];
                     return { ...prev, items: nextItems };
                   });
@@ -1144,7 +1203,9 @@ export default function OrdersScreen() {
               }}
             >
               <Text style={styles.modalSaveText}>
-                {freeExtrasSelected.length > 0 ? lbl(`Add ${freeExtrasSelected.length} Extras`, `إضافة ${freeExtrasSelected.length} إضافة`, `${freeExtrasSelected.length} hinzufügen`) : lbl("Done", "تم", "Fertig")}
+                {freeExtrasSelected.length > 0
+                  ? lbl(`Add ${freeExtrasSelected.length} Extras`, `إضافة ${freeExtrasSelected.length} إضافة`, `${freeExtrasSelected.length} Extras hinzufügen`)
+                  : lbl("Done", "تم", "Fertig")}
               </Text>
             </Pressable>
           </View>
