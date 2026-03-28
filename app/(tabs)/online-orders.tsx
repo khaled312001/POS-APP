@@ -15,6 +15,10 @@ import { getDisplayNumber } from "@/lib/api-config";
 import { useLanguage } from "@/lib/language-context";
 import { playClickSound } from "@/lib/sound";
 import { autoPrint3Copies } from "@/utils/printing";
+import {
+  PIZZA_TOPPINGS, TOPPING_GRID, SAUCE_ROW, SAUCE_NAMES,
+  getToppingDisplayName, getToppingEmoji,
+} from "@/utils/toppingUtils";
 
 const STATUS_FLOW = ["pending", "accepted", "preparing", "ready", "delivered"];
 
@@ -48,49 +52,6 @@ function playNotificationSound() {
   } catch { }
 }
 
-const PIZZA_TOPPINGS = [
-  { name: "Tomato Sauce", names: ["Tomato Sauce", "Tomatensauce", "Extra Tomatensauce"], icon: "🍅", category: "Sauces" },
-  { name: "Tomatoes", names: ["Tomatoes", "Tomaten"], icon: "🍅", category: "Vegetables" },
-  { name: "Sliced Tomatoes", names: ["Sliced Tomatoes", "Tomatenscheiben"], icon: "🍅", category: "Vegetables" },
-  { name: "Garlic", names: ["Garlic", "Knoblauch"], icon: "🧄", category: "Vegetables" },
-  { name: "Onions", names: ["Onions", "Zwiebeln"], icon: "🧅", category: "Vegetables" },
-  { name: "Capers", names: ["Capers", "Kapern"], icon: "🫛", category: "Vegetables" },
-  { name: "Olives", names: ["Olives", "Oliven"], icon: "🫒", category: "Vegetables" },
-  { name: "Oregano", names: ["Oregano"], icon: "🌿", category: "Others" },
-  { name: "Vegetables", names: ["Vegetables", "Gemüse"], icon: "🥦", category: "Vegetables" },
-  { name: "Spinach", names: ["Spinach", "Spinat"], icon: "🥬", category: "Vegetables" },
-  { name: "Bell Peppers", names: ["Bell Peppers", "Peperoni", "Paprika"], icon: "🫑", category: "Vegetables" },
-  { name: "Corn", names: ["Corn", "Mais"], icon: "🌽", category: "Vegetables" },
-  { name: "Broccoli", names: ["Broccoli"], icon: "🥦", category: "Vegetables" },
-  { name: "Artichokes", names: ["Artichokes", "Artischocken"], icon: "🌿", category: "Vegetables" },
-  { name: "Arugula", names: ["Arugula", "Rucola"], icon: "🥬", category: "Vegetables" },
-  { name: "Egg", names: ["Egg", "Ei"], icon: "🥚", category: "Others" },
-  { name: "Pineapple", names: ["Pineapple", "Ananas"], icon: "🍍", category: "Others" },
-  { name: "Mushrooms", names: ["Mushrooms", "Pilze", "Champignons"], icon: "🍄", category: "Vegetables" },
-  { name: "Ham", names: ["Ham", "Schinken"], icon: "🥩", category: "Meat" },
-  { name: "Spicy Salami", names: ["Spicy Salami", "Scharfe Salami", "Diavola"], icon: "🌶️", category: "Meat" },
-  { name: "Salami", names: ["Salami"], icon: "🥩", category: "Meat" },
-  { name: "Bacon", names: ["Bacon", "Speck"], icon: "🥓", category: "Meat" },
-  { name: "Prosciutto", names: ["Prosciutto", "Rohschinken"], icon: "🥩", category: "Meat" },
-  { name: "Lamb", names: ["Lamb", "Lammfleisch"], icon: "🥩", category: "Meat" },
-  { name: "Chicken", names: ["Chicken", "Poulet", "Hähnchen"], icon: "🍗", category: "Meat" },
-  { name: "Kebab", names: ["Kebab", "Kebabfleisch"], icon: "🥙", category: "Meat" },
-  { name: "Minced Meat", names: ["Minced Meat", "Hackfleisch"], icon: "🥩", category: "Meat" },
-  { name: "Anchovies", names: ["Anchovies", "Sardellen"], icon: "🐟", category: "Seafood" },
-  { name: "Shrimp", names: ["Shrimp", "Crevetten", "Garnelen"], icon: "🍤", category: "Seafood" },
-  { name: "Tuna", names: ["Tuna", "Thunfisch"], icon: "🐟", category: "Seafood" },
-  { name: "Mayonnaise", names: ["Mayonnaise", "Mayo"], icon: "🫙", category: "Sauces" },
-  { name: "Ketchup", names: ["Ketchup"], icon: "🫙", category: "Sauces" },
-  { name: "Cocktail Sauce", names: ["Cocktail Sauce", "Cocktailsauce"], icon: "🫙", category: "Sauces" },
-  { name: "Spicy Sauce", names: ["Spicy Sauce", "Scharfe Sauce", "SCHARF"], icon: "🌶️", category: "Sauces" },
-  { name: "Garlic Sauce", names: ["Garlic Sauce", "Knoblauchsauce"], icon: "🫙", category: "Sauces" },
-  { name: "Yogurt Sauce", names: ["Yogurt Sauce", "Joghurtsauce"], icon: "🫙", category: "Sauces" },
-  { name: "Mozzarella", names: ["Mozzarella", "Extra Mozzarella", "Käse"], icon: "🧀", category: "Cheese" },
-  { name: "Gorgonzola", names: ["Gorgonzola"], icon: "🧀", category: "Cheese" },
-  { name: "Parmesan", names: ["Parmesan"], icon: "🧀", category: "Cheese" },
-  { name: "Mascarpone", names: ["Mascarpone"], icon: "🧀", category: "Cheese" },
-  { name: "Kaeserand", names: ["Kaeserand", "Käserand", "Cheese Crust"], icon: "🧀", category: "Cheese" },
-];
 
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
@@ -710,75 +671,8 @@ export default function OrdersScreen() {
     return 0;
   });
 
-  // --- Color-coded topping grid (POS style) ---
-  const TOPPING_GRID: { color: string; textColor: string; items: (string | null)[] }[] = [
-    { color: "#1455A4", textColor: "#fff", items: ["Tomato Sauce", "Sliced Tomatoes", "Garlic", "Onions", "Capers", "Olives", "Oregano"] },
-    { color: "#1976D2", textColor: "#fff", items: ["Vegetables", "Spinach", "Bell Peppers", null, "Corn", "Broccoli", "Artichokes"] },
-    { color: "#E8EAF6", textColor: "#1a1a2e", items: ["Egg", "Pineapple", null, null, null, null, "Arugula"] },
-    { color: "#E8EAF6", textColor: "#1a1a2e", items: ["Mushrooms", null, null, null, null, null, null] },
-    { color: "#B71C1C", textColor: "#fff", items: ["Ham", "Spicy Salami", "Salami", "Bacon", "Prosciutto", null, null] },
-    { color: "#B71C1C", textColor: "#fff", items: ["Lamb", "Chicken", "Kebab", "Minced Meat", null, null, null] },
-    { color: "#BF360C", textColor: "#fff", items: ["Anchovies", "Shrimp", "Tuna", null, null, null, null] },
-    { color: "#1B5E20", textColor: "#fff", items: [null, null, null, null, null, null, "Spicy Sauce"] },
-    { color: "#F9A825", textColor: "#1a1a2e", items: ["Mozzarella", "Gorgonzola", "Parmesan", "Mascarpone", "Kaeserand", null, null] },
-  ];
-
-  const SAUCE_ROW: { name: string; color: string; textColor: string }[] = [
-    { name: "Mayonnaise", color: "#B71C1C", textColor: "#fff" },
-    { name: "Ketchup", color: "#BF360C", textColor: "#fff" },
-    { name: "Cocktail Sauce", color: "#1B5E20", textColor: "#fff" },
-    { name: "Yogurt Sauce", color: "#F9A825", textColor: "#1a1a2e" },
-  ];
-
-  const toppingDisplayName = (name: string): string => {
-    const de: Record<string, string> = {
-      "Tomato Sauce": "Tomatensauce", "Sliced Tomatoes": "Tomatenscheiben", "Garlic": "Knoblauch",
-      "Onions": "Zwiebeln", "Capers": "Kapern", "Olives": "Oliven", "Oregano": "Oregano",
-      "Vegetables": "Gemüse", "Spinach": "Spinat", "Bell Peppers": "Peperoni",
-      "Corn": "Mais", "Broccoli": "Broccoli", "Artichokes": "Artischoken",
-      "Egg": "Ei", "Pineapple": "Ananas", "Arugula": "Rukola", "Mushrooms": "Champignons",
-      "Ham": "Schinken", "Spicy Salami": "Salami scharf", "Salami": "Salami",
-      "Bacon": "Speck", "Prosciutto": "Rohschinken",
-      "Lamb": "Lammfleisch", "Chicken": "Poulet", "Kebab": "Kebab",
-      "Minced Meat": "Hackfleisch", "Mayonnaise": "Mayonaise",
-      "Anchovies": "Sardellen", "Shrimp": "Crevetten", "Tuna": "Thon",
-      "Ketchup": "Ketchup", "Cocktail Sauce": "Cocktail", "Spicy Sauce": "SCHARF",
-      "Mozzarella": "Mozzarella", "Gorgonzola": "Gorgonzola", "Parmesan": "Käse",
-      "Mascarpone": "Mascarpone", "Kaeserand": "Käserand", "Yogurt Sauce": "Joghurt",
-    };
-    const ar: Record<string, string> = {
-      "Tomato Sauce": "صلصة طماطم", "Sliced Tomatoes": "طماطم مقطعة", "Garlic": "ثوم",
-      "Onions": "بصل", "Capers": "كابر", "Olives": "زيتون", "Oregano": "أوريغانو",
-      "Vegetables": "خضار", "Spinach": "سبانخ", "Bell Peppers": "فلفل", "Corn": "ذرة",
-      "Broccoli": "بروكلي", "Artichokes": "أرضي شوكي", "Egg": "بيض", "Pineapple": "أناناس",
-      "Arugula": "جرجير", "Mushrooms": "مشروم", "Ham": "هام", "Spicy Salami": "سلامي حار",
-      "Salami": "سلامي", "Bacon": "لحم مدخن", "Prosciutto": "بروشوتو",
-      "Lamb": "لحم ضأن", "Chicken": "دجاج", "Kebab": "كباب", "Minced Meat": "لحم مفروم",
-      "Mayonnaise": "مايونيز", "Anchovies": "أنشوجة", "Shrimp": "جمبري", "Tuna": "تونة",
-      "Ketchup": "كاتشاب", "Cocktail Sauce": "صلصة كوكتيل", "Spicy Sauce": "حار",
-      "Mozzarella": "موزاريلا", "Gorgonzola": "جورجونزولا", "Parmesan": "جبنة",
-      "Mascarpone": "ماسكاربوني", "Kaeserand": "حافة جبنة", "Yogurt Sauce": "زبادي",
-    };
-    if (language === "de") return de[name] || name;
-    if (language === "ar") return ar[name] || name;
-    return name;
-  };
-
-  const toppingEmoji = (name: string): string => {
-    const map: Record<string, string> = {
-      "Tomato Sauce": "🍅", "Sliced Tomatoes": "🍅", "Garlic": "🧄", "Onions": "🧅",
-      "Capers": "🫛", "Olives": "🫒", "Oregano": "🌿", "Vegetables": "🥦",
-      "Spinach": "🥬", "Bell Peppers": "🫑", "Corn": "🌽", "Broccoli": "🥦",
-      "Artichokes": "🌿", "Arugula": "🥬", "Egg": "🥚", "Pineapple": "🍍",
-      "Mushrooms": "🍄", "Ham": "🥩", "Spicy Salami": "🌶️", "Salami": "🥩",
-      "Bacon": "🥓", "Prosciutto": "🥩", "Lamb": "🐑", "Chicken": "🍗",
-      "Kebab": "🥙", "Minced Meat": "🥩", "Mayonnaise": "🫙", "Anchovies": "🐟",
-      "Shrimp": "🍤", "Tuna": "🐟", "Ketchup": "🍅", "Cocktail Sauce": "🥂",
-      "Spicy Sauce": "🌶️", "Mozzarella": "🧀", "Gorgonzola": "🧀",
-      "Parmesan": "🧀", "Mascarpone": "🧀", "Kaeserand": "🧀", "Yogurt Sauce": "🥛",
-    };
-    return map[name] || "✨";
-  };
+  const toppingDisplayName = (name: string) => getToppingDisplayName(name, language);
+  const toppingEmoji = (name: string) => getToppingEmoji(name);
 
   // --- Topping options for configurator ---
   const getToppingOptions = () => {
