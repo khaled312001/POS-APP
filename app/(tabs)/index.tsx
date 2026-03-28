@@ -1988,7 +1988,9 @@ export default function POSScreen() {
                           <Text style={{ fontSize: isTablet ? 10 : 9, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : sauce.textColor, lineHeight: 11 }} numberOfLines={1}>
                             {toppingDisplayName(sauce.name)}
                           </Text>
-                          <Text style={{ fontSize: 8, color: isSelected ? "#000" : sauce.textColor, opacity: 0.8, lineHeight: 10 }}>+2</Text>
+                          <Text style={{ fontSize: 8, color: isSelected ? "#000" : sauce.textColor, opacity: 0.9, lineHeight: 10, fontWeight: "700" }}>
+                            {language === "ar" ? "مجاناً" : language === "de" ? "GRATIS" : "FREE"}
+                          </Text>
                           {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 4 }}>✓</Text>}
                         </Pressable>
                       );
