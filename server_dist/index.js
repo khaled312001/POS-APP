@@ -24,6 +24,7 @@ __export(schema_exports, {
   categories: () => categories,
   customers: () => customers,
   dailyClosings: () => dailyClosings,
+  dailySequences: () => dailySequences,
   employeeCommissions: () => employeeCommissions,
   employees: () => employees,
   expenses: () => expenses,
@@ -107,15 +108,15 @@ __export(schema_exports, {
   warehouseTransfers: () => warehouseTransfers,
   warehouses: () => warehouses
 });
-import { pgTable, text, integer, decimal, boolean, timestamp, jsonb, serial } from "drizzle-orm/pg-core";
+import { mysqlTable, text, int, decimal, boolean, timestamp, json, serial, unique } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
-var branches, employees, categories, products, inventory, customers, sales, saleItems, calls, suppliers, purchaseOrders, purchaseOrderItems, shifts, notifications, expenses, tables, kitchenOrders, subscriptionPlans, subscriptions, activityLog, returns, returnItems, syncQueue, cashDrawerOperations, warehouses, warehouseTransfers, productBatches, inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications, platformSettings, platformCommissions, onlineOrders, landingPageConfig, vehicles, printerConfigs, dailyClosings, monthlyClosings, insertBranchSchema, insertEmployeeSchema, insertCategorySchema, insertProductSchema, insertInventorySchema, insertCustomerSchema, insertSaleSchema, insertSaleItemSchema, insertSupplierSchema, insertPurchaseOrderSchema, insertPurchaseOrderItemSchema, insertShiftSchema, insertNotificationSchema, insertExpenseSchema, insertCallSchema, insertTableSchema, insertKitchenOrderSchema, insertSubscriptionPlanSchema, insertSubscriptionSchema, insertActivityLogSchema, insertReturnSchema, insertReturnItemSchema, insertCashDrawerOperationSchema, insertWarehouseSchema, insertWarehouseTransferSchema, insertProductBatchSchema, insertInventoryMovementSchema, insertStockCountSchema, insertStockCountItemSchema, insertSupplierContractSchema, insertEmployeeCommissionSchema, insertSuperAdminSchema, insertTenantSchema, insertTenantSubscriptionSchema, insertLicenseKeySchema, insertTenantNotificationSchema, insertOnlineOrderSchema, insertLandingPageConfigSchema, insertPlatformSettingSchema, insertPlatformCommissionSchema, insertVehicleSchema, insertPrinterConfigSchema, insertDailyClosingSchema, insertMonthlyClosingSchema;
+var branches, employees, categories, products, inventory, customers, sales, saleItems, calls, suppliers, purchaseOrders, purchaseOrderItems, shifts, notifications, expenses, tables, kitchenOrders, subscriptionPlans, subscriptions, activityLog, returns, returnItems, syncQueue, cashDrawerOperations, warehouses, warehouseTransfers, productBatches, inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications, platformSettings, platformCommissions, onlineOrders, landingPageConfig, vehicles, printerConfigs, dailyClosings, monthlyClosings, dailySequences, insertBranchSchema, insertEmployeeSchema, insertCategorySchema, insertProductSchema, insertInventorySchema, insertCustomerSchema, insertSaleSchema, insertSaleItemSchema, insertSupplierSchema, insertPurchaseOrderSchema, insertPurchaseOrderItemSchema, insertShiftSchema, insertNotificationSchema, insertExpenseSchema, insertCallSchema, insertTableSchema, insertKitchenOrderSchema, insertSubscriptionPlanSchema, insertSubscriptionSchema, insertActivityLogSchema, insertReturnSchema, insertReturnItemSchema, insertCashDrawerOperationSchema, insertWarehouseSchema, insertWarehouseTransferSchema, insertProductBatchSchema, insertInventoryMovementSchema, insertStockCountSchema, insertStockCountItemSchema, insertSupplierContractSchema, insertEmployeeCommissionSchema, insertSuperAdminSchema, insertTenantSchema, insertTenantSubscriptionSchema, insertLicenseKeySchema, insertTenantNotificationSchema, insertOnlineOrderSchema, insertLandingPageConfigSchema, insertPlatformSettingSchema, insertPlatformCommissionSchema, insertVehicleSchema, insertPrinterConfigSchema, insertDailyClosingSchema, insertMonthlyClosingSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
-    branches = pgTable("branches", {
+    branches = mysqlTable("branches", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       // Added for multi-tenancy
       name: text("name").notNull(),
       address: text("address"),
@@ -130,47 +131,47 @@ var init_schema = __esm({
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    employees = pgTable("employees", {
+    employees = mysqlTable("employees", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       name: text("name").notNull(),
       email: text("email"),
       phone: text("phone"),
       pin: text("pin").notNull(),
       role: text("role").notNull().default("cashier"),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
       isActive: boolean("is_active").default(true),
       hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }),
       commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("0"),
       avatar: text("avatar"),
-      permissions: jsonb("permissions").$type().default([]),
+      permissions: json("permissions").$type().default([]),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    categories = pgTable("categories", {
+    categories = mysqlTable("categories", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       // Added for multi-tenancy
       name: text("name").notNull(),
       nameAr: text("name_ar"),
       color: text("color").default("#7C3AED"),
       icon: text("icon").default("grid"),
       image: text("image"),
-      parentId: integer("parent_id"),
-      sortOrder: integer("sort_order").default(0),
+      parentId: int("parent_id"),
+      sortOrder: int("sort_order").default(0),
       isActive: boolean("is_active").default(true),
       createdAt: timestamp("created_at").defaultNow()
     });
-    products = pgTable("products", {
+    products = mysqlTable("products", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       // Added for multi-tenancy
       name: text("name").notNull(),
       nameAr: text("name_ar"),
       description: text("description"),
       sku: text("sku").unique(),
       barcode: text("barcode"),
-      categoryId: integer("category_id").references(() => categories.id, { onDelete: "cascade" }),
+      categoryId: int("category_id").references(() => categories.id, { onDelete: "cascade" }),
       price: decimal("price", { precision: 10, scale: 2 }).notNull(),
       costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
       image: text("image"),
@@ -179,39 +180,39 @@ var init_schema = __esm({
       trackInventory: boolean("track_inventory").default(true),
       isActive: boolean("is_active").default(true),
       expiryDate: timestamp("expiry_date"),
-      modifiers: jsonb("modifiers").$type().default([]),
-      variants: jsonb("variants").$type().default([]),
+      modifiers: json("modifiers").$type().default([]),
+      variants: json("variants").$type().default([]),
       isAddon: boolean("is_addon").default(false),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    inventory = pgTable("inventory", {
+    inventory = mysqlTable("inventory", {
       id: serial("id").primaryKey(),
-      productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }).notNull(),
-      quantity: integer("quantity").default(0),
-      lowStockThreshold: integer("low_stock_threshold").default(10),
-      reorderPoint: integer("reorder_point").default(5),
-      reorderQuantity: integer("reorder_quantity").default(20),
+      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }).notNull(),
+      quantity: int("quantity").default(0),
+      lowStockThreshold: int("low_stock_threshold").default(10),
+      reorderPoint: int("reorder_point").default(5),
+      reorderQuantity: int("reorder_quantity").default(20),
       lastRestocked: timestamp("last_restocked"),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    customers = pgTable("customers", {
+    customers = mysqlTable("customers", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       // Added for multi-tenancy
       name: text("name").notNull(),
       email: text("email"),
       phone: text("phone"),
       address: text("address"),
-      loyaltyPoints: integer("loyalty_points").default(0),
+      loyaltyPoints: int("loyalty_points").default(0),
       totalSpent: decimal("total_spent", { precision: 12, scale: 2 }).default("0"),
-      visitCount: integer("visit_count").default(0),
+      visitCount: int("visit_count").default(0),
       notes: text("notes"),
       creditBalance: decimal("credit_balance", { precision: 10, scale: 2 }).default("0"),
       isActive: boolean("is_active").default(true),
       // ── Extended fields from CSV import ──
-      customerNr: integer("customer_nr"),
+      customerNr: int("customer_nr"),
       salutation: text("salutation"),
       firstName: text("first_name"),
       lastName: text("last_name"),
@@ -229,7 +230,7 @@ var init_schema = __esm({
       lastOrderDate: text("last_order_date"),
       legacyTotalSpent: decimal("legacy_total_spent", { precision: 12, scale: 2 }).default("0"),
       averageOrderValue: decimal("average_order_value", { precision: 10, scale: 2 }).default("0"),
-      orderCount: integer("order_count").default(0),
+      orderCount: int("order_count").default(0),
       legacyRef: text("legacy_ref"),
       // ── Additional raw fields from KUNDEN CSV ──
       quadrat: text("quadrat"),
@@ -250,12 +251,12 @@ var init_schema = __esm({
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    sales = pgTable("sales", {
+    sales = mysqlTable("sales", {
       id: serial("id").primaryKey(),
       receiptNumber: text("receipt_number").notNull().unique(),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }),
-      customerId: integer("customer_id").references(() => customers.id, { onDelete: "cascade" }),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      customerId: int("customer_id").references(() => customers.id, { onDelete: "cascade" }),
       subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
       taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0"),
       serviceFeeAmount: decimal("service_fee_amount", { precision: 10, scale: 2 }).default("0"),
@@ -269,36 +270,36 @@ var init_schema = __esm({
       changeAmount: decimal("change_amount", { precision: 10, scale: 2 }).default("0"),
       tableNumber: text("table_number"),
       orderType: text("order_type").default("dine_in"),
-      vehicleId: integer("vehicle_id"),
-      paymentDetails: jsonb("payment_details").$type(),
+      vehicleId: int("vehicle_id"),
+      paymentDetails: json("payment_details").$type(),
       createdAt: timestamp("created_at").defaultNow()
     });
-    saleItems = pgTable("sale_items", {
+    saleItems = mysqlTable("sale_items", {
       id: serial("id").primaryKey(),
-      saleId: integer("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
-      productId: integer("product_id").references(() => products.id, { onDelete: "set null" }),
+      saleId: int("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
+      productId: int("product_id").references(() => products.id, { onDelete: "set null" }),
       productName: text("product_name").notNull(),
-      quantity: integer("quantity").notNull(),
+      quantity: int("quantity").notNull(),
       unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
       discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
       total: decimal("total", { precision: 10, scale: 2 }).notNull(),
-      modifiers: jsonb("modifiers").$type().default([]),
+      modifiers: json("modifiers").$type().default([]),
       notes: text("notes")
     });
-    calls = pgTable("calls", {
+    calls = mysqlTable("calls", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
       phoneNumber: text("phone_number").notNull(),
-      customerId: integer("customer_id").references(() => customers.id, { onDelete: "set null" }),
+      customerId: int("customer_id").references(() => customers.id, { onDelete: "set null" }),
       status: text("status").notNull().default("missed"),
       // answered, missed
-      saleId: integer("sale_id").references(() => sales.id, { onDelete: "set null" }),
+      saleId: int("sale_id").references(() => sales.id, { onDelete: "set null" }),
       createdAt: timestamp("created_at").defaultNow()
     });
-    suppliers = pgTable("suppliers", {
+    suppliers = mysqlTable("suppliers", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       // Added for multi-tenancy
       name: text("name").notNull(),
       contactName: text("contact_name"),
@@ -311,11 +312,11 @@ var init_schema = __esm({
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    purchaseOrders = pgTable("purchase_orders", {
+    purchaseOrders = mysqlTable("purchase_orders", {
       id: serial("id").primaryKey(),
       orderNumber: text("order_number").notNull().unique(),
-      supplierId: integer("supplier_id").references(() => suppliers.id, { onDelete: "cascade" }).notNull(),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      supplierId: int("supplier_id").references(() => suppliers.id, { onDelete: "cascade" }).notNull(),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
       status: text("status").default("pending"),
       totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).default("0"),
       notes: text("notes"),
@@ -323,229 +324,229 @@ var init_schema = __esm({
       receivedDate: timestamp("received_date"),
       createdAt: timestamp("created_at").defaultNow()
     });
-    purchaseOrderItems = pgTable("purchase_order_items", {
+    purchaseOrderItems = mysqlTable("purchase_order_items", {
       id: serial("id").primaryKey(),
-      purchaseOrderId: integer("purchase_order_id").references(() => purchaseOrders.id, { onDelete: "cascade" }).notNull(),
-      productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-      quantity: integer("quantity").notNull(),
+      purchaseOrderId: int("purchase_order_id").references(() => purchaseOrders.id, { onDelete: "cascade" }).notNull(),
+      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      quantity: int("quantity").notNull(),
       unitCost: decimal("unit_cost", { precision: 10, scale: 2 }).notNull(),
-      receivedQuantity: integer("received_quantity").default(0),
+      receivedQuantity: int("received_quantity").default(0),
       total: decimal("total", { precision: 10, scale: 2 }).notNull()
     });
-    shifts = pgTable("shifts", {
+    shifts = mysqlTable("shifts", {
       id: serial("id").primaryKey(),
-      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
       startTime: timestamp("start_time").defaultNow(),
       endTime: timestamp("end_time"),
       expectedDurationHours: decimal("expected_duration_hours", { precision: 4, scale: 1 }).default("8"),
       openingCash: decimal("opening_cash", { precision: 10, scale: 2 }).default("0"),
       closingCash: decimal("closing_cash", { precision: 10, scale: 2 }),
       totalSales: decimal("total_sales", { precision: 12, scale: 2 }).default("0"),
-      totalTransactions: integer("total_transactions").default(0),
-      totalReturns: integer("total_returns").default(0),
+      totalTransactions: int("total_transactions").default(0),
+      totalReturns: int("total_returns").default(0),
       totalDiscounts: decimal("total_discounts", { precision: 10, scale: 2 }).default("0"),
       status: text("status").default("open"),
       notes: text("notes"),
-      breakMinutes: integer("break_minutes").default(0),
-      overtimeMinutes: integer("overtime_minutes").default(0)
+      breakMinutes: int("break_minutes").default(0),
+      overtimeMinutes: int("overtime_minutes").default(0)
     });
-    notifications = pgTable("notifications", {
+    notifications = mysqlTable("notifications", {
       id: serial("id").primaryKey(),
-      recipientId: integer("recipient_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
-      senderId: integer("sender_id").references(() => employees.id, { onDelete: "cascade" }),
+      recipientId: int("recipient_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
+      senderId: int("sender_id").references(() => employees.id, { onDelete: "cascade" }),
       type: text("type").notNull(),
       title: text("title").notNull(),
       message: text("message").notNull(),
       entityType: text("entity_type"),
-      entityId: integer("entity_id"),
+      entityId: int("entity_id"),
       isRead: boolean("is_read").default(false),
       priority: text("priority").default("normal"),
       createdAt: timestamp("created_at").defaultNow()
     });
-    expenses = pgTable("expenses", {
+    expenses = mysqlTable("expenses", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       // Added for multi-tenancy
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
       category: text("category").notNull(),
       amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
       description: text("description"),
       date: timestamp("date").defaultNow(),
-      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
       createdAt: timestamp("created_at").defaultNow()
     });
-    tables = pgTable("tables", {
+    tables = mysqlTable("tables", {
       id: serial("id").primaryKey(),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
       name: text("name").notNull(),
-      capacity: integer("capacity").default(4),
+      capacity: int("capacity").default(4),
       status: text("status").default("available"),
-      currentOrderId: integer("current_order_id"),
-      posX: integer("pos_x").default(0),
-      posY: integer("pos_y").default(0),
+      currentOrderId: int("current_order_id"),
+      posX: int("pos_x").default(0),
+      posY: int("pos_y").default(0),
       createdAt: timestamp("created_at").defaultNow()
     });
-    kitchenOrders = pgTable("kitchen_orders", {
+    kitchenOrders = mysqlTable("kitchen_orders", {
       id: serial("id").primaryKey(),
-      saleId: integer("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      saleId: int("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
       tableNumber: text("table_number"),
       status: text("status").default("pending"),
-      items: jsonb("items").$type().default([]),
+      items: json("items").$type().default([]),
       priority: text("priority").default("normal"),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    subscriptionPlans = pgTable("subscription_plans", {
+    subscriptionPlans = mysqlTable("subscription_plans", {
       id: serial("id").primaryKey(),
       name: text("name").notNull(),
       description: text("description"),
       price: decimal("price", { precision: 10, scale: 2 }).notNull(),
       interval: text("interval").default("monthly"),
-      features: jsonb("features").$type().default([]),
+      features: json("features").$type().default([]),
       isActive: boolean("is_active").default(true),
       createdAt: timestamp("created_at").defaultNow()
     });
-    subscriptions = pgTable("subscriptions", {
+    subscriptions = mysqlTable("subscriptions", {
       id: serial("id").primaryKey(),
-      customerId: integer("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
-      planId: integer("plan_id").references(() => subscriptionPlans.id, { onDelete: "cascade" }).notNull(),
+      customerId: int("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
+      planId: int("plan_id").references(() => subscriptionPlans.id, { onDelete: "cascade" }).notNull(),
       status: text("status").default("active"),
       startDate: timestamp("start_date").defaultNow(),
       endDate: timestamp("end_date"),
       nextBillingDate: timestamp("next_billing_date"),
       createdAt: timestamp("created_at").defaultNow()
     });
-    activityLog = pgTable("activity_log", {
+    activityLog = mysqlTable("activity_log", {
       id: serial("id").primaryKey(),
-      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
+      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
       action: text("action").notNull(),
       entityType: text("entity_type"),
-      entityId: integer("entity_id"),
+      entityId: int("entity_id"),
       details: text("details"),
-      metadata: jsonb("metadata").$type(),
+      metadata: json("metadata").$type(),
       createdAt: timestamp("created_at").defaultNow()
     });
-    returns = pgTable("returns", {
+    returns = mysqlTable("returns", {
       id: serial("id").primaryKey(),
-      originalSaleId: integer("original_sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
-      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      originalSaleId: int("original_sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
+      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
       reason: text("reason"),
       type: text("type").default("refund"),
       totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
-      returnGraceDays: integer("return_grace_days").default(30),
+      returnGraceDays: int("return_grace_days").default(30),
       refundMethod: text("refund_method"),
-      approvedBy: integer("approved_by").references(() => employees.id, { onDelete: "cascade" }),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      approvedBy: int("approved_by").references(() => employees.id, { onDelete: "cascade" }),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
       status: text("status").default("completed"),
       createdAt: timestamp("created_at").defaultNow()
     });
-    returnItems = pgTable("return_items", {
+    returnItems = mysqlTable("return_items", {
       id: serial("id").primaryKey(),
-      returnId: integer("return_id").references(() => returns.id, { onDelete: "cascade" }).notNull(),
-      productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      returnId: int("return_id").references(() => returns.id, { onDelete: "cascade" }).notNull(),
+      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
       productName: text("product_name").notNull(),
-      quantity: integer("quantity").notNull(),
+      quantity: int("quantity").notNull(),
       unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
       total: decimal("total", { precision: 10, scale: 2 }).notNull()
     });
-    syncQueue = pgTable("sync_queue", {
+    syncQueue = mysqlTable("sync_queue", {
       id: serial("id").primaryKey(),
       entityType: text("entity_type").notNull(),
-      entityId: integer("entity_id").notNull(),
+      entityId: int("entity_id").notNull(),
       action: text("action").notNull(),
-      data: jsonb("data"),
+      data: json("data"),
       status: text("status").default("pending"),
-      retryCount: integer("retry_count").default(0),
+      retryCount: int("retry_count").default(0),
       createdAt: timestamp("created_at").defaultNow(),
       processedAt: timestamp("processed_at")
     });
-    cashDrawerOperations = pgTable("cash_drawer_operations", {
+    cashDrawerOperations = mysqlTable("cash_drawer_operations", {
       id: serial("id").primaryKey(),
-      shiftId: integer("shift_id").references(() => shifts.id, { onDelete: "set null" }),
-      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
+      shiftId: int("shift_id").references(() => shifts.id, { onDelete: "set null" }),
+      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
       type: text("type").notNull(),
       amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
       expectedAmount: decimal("expected_amount", { precision: 10, scale: 2 }),
       actualAmount: decimal("actual_amount", { precision: 10, scale: 2 }),
       difference: decimal("difference", { precision: 10, scale: 2 }),
       reason: text("reason"),
-      approvedBy: integer("approved_by").references(() => employees.id, { onDelete: "cascade" }),
+      approvedBy: int("approved_by").references(() => employees.id, { onDelete: "cascade" }),
       createdAt: timestamp("created_at").defaultNow()
     });
-    warehouses = pgTable("warehouses", {
+    warehouses = mysqlTable("warehouses", {
       id: serial("id").primaryKey(),
       name: text("name").notNull(),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }).notNull(),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }).notNull(),
       address: text("address"),
       isDefault: boolean("is_default").default(false),
       isActive: boolean("is_active").default(true),
       createdAt: timestamp("created_at").defaultNow()
     });
-    warehouseTransfers = pgTable("warehouse_transfers", {
+    warehouseTransfers = mysqlTable("warehouse_transfers", {
       id: serial("id").primaryKey(),
-      fromWarehouseId: integer("from_warehouse_id").references(() => warehouses.id, { onDelete: "cascade" }).notNull(),
-      toWarehouseId: integer("to_warehouse_id").references(() => warehouses.id, { onDelete: "cascade" }).notNull(),
-      productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-      quantity: integer("quantity").notNull(),
-      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      fromWarehouseId: int("from_warehouse_id").references(() => warehouses.id, { onDelete: "cascade" }).notNull(),
+      toWarehouseId: int("to_warehouse_id").references(() => warehouses.id, { onDelete: "cascade" }).notNull(),
+      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      quantity: int("quantity").notNull(),
+      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
       status: text("status").default("completed"),
       notes: text("notes"),
       createdAt: timestamp("created_at").defaultNow()
     });
-    productBatches = pgTable("product_batches", {
+    productBatches = mysqlTable("product_batches", {
       id: serial("id").primaryKey(),
-      productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
       batchNumber: text("batch_number").notNull(),
-      quantity: integer("quantity").default(0),
+      quantity: int("quantity").default(0),
       expiryDate: timestamp("expiry_date"),
       costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      supplierId: integer("supplier_id").references(() => suppliers.id, { onDelete: "cascade" }),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      supplierId: int("supplier_id").references(() => suppliers.id, { onDelete: "cascade" }),
       receivedDate: timestamp("received_date").defaultNow(),
       isActive: boolean("is_active").default(true),
       createdAt: timestamp("created_at").defaultNow()
     });
-    inventoryMovements = pgTable("inventory_movements", {
+    inventoryMovements = mysqlTable("inventory_movements", {
       id: serial("id").primaryKey(),
-      productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
       type: text("type").notNull(),
-      quantity: integer("quantity").notNull(),
-      previousQuantity: integer("previous_quantity"),
-      newQuantity: integer("new_quantity"),
+      quantity: int("quantity").notNull(),
+      previousQuantity: int("previous_quantity"),
+      newQuantity: int("new_quantity"),
       referenceType: text("reference_type"),
-      referenceId: integer("reference_id"),
+      referenceId: int("reference_id"),
       batchNumber: text("batch_number"),
-      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
       notes: text("notes"),
       createdAt: timestamp("created_at").defaultNow()
     });
-    stockCounts = pgTable("stock_counts", {
+    stockCounts = mysqlTable("stock_counts", {
       id: serial("id").primaryKey(),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }).notNull(),
-      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }).notNull(),
+      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
       status: text("status").default("in_progress"),
-      approvedBy: integer("approved_by").references(() => employees.id, { onDelete: "cascade" }),
-      totalItems: integer("total_items").default(0),
-      discrepancies: integer("discrepancies").default(0),
+      approvedBy: int("approved_by").references(() => employees.id, { onDelete: "cascade" }),
+      totalItems: int("total_items").default(0),
+      discrepancies: int("discrepancies").default(0),
       notes: text("notes"),
       completedAt: timestamp("completed_at"),
       createdAt: timestamp("created_at").defaultNow()
     });
-    stockCountItems = pgTable("stock_count_items", {
+    stockCountItems = mysqlTable("stock_count_items", {
       id: serial("id").primaryKey(),
-      stockCountId: integer("stock_count_id").references(() => stockCounts.id, { onDelete: "cascade" }).notNull(),
-      productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-      systemQuantity: integer("system_quantity").notNull(),
-      actualQuantity: integer("actual_quantity"),
-      difference: integer("difference"),
+      stockCountId: int("stock_count_id").references(() => stockCounts.id, { onDelete: "cascade" }).notNull(),
+      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      systemQuantity: int("system_quantity").notNull(),
+      actualQuantity: int("actual_quantity"),
+      difference: int("difference"),
       notes: text("notes")
     });
-    supplierContracts = pgTable("supplier_contracts", {
+    supplierContracts = mysqlTable("supplier_contracts", {
       id: serial("id").primaryKey(),
-      supplierId: integer("supplier_id").references(() => suppliers.id, { onDelete: "cascade" }).notNull(),
+      supplierId: int("supplier_id").references(() => suppliers.id, { onDelete: "cascade" }).notNull(),
       discountRate: decimal("discount_rate", { precision: 5, scale: 2 }).default("0"),
       paymentTerms: text("payment_terms"),
       minOrderAmount: decimal("min_order_amount", { precision: 10, scale: 2 }),
@@ -555,16 +556,16 @@ var init_schema = __esm({
       notes: text("notes"),
       createdAt: timestamp("created_at").defaultNow()
     });
-    employeeCommissions = pgTable("employee_commissions", {
+    employeeCommissions = mysqlTable("employee_commissions", {
       id: serial("id").primaryKey(),
-      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
-      saleId: integer("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
+      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
+      saleId: int("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
       commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull(),
       commissionAmount: decimal("commission_amount", { precision: 10, scale: 2 }).notNull(),
       status: text("status").default("pending"),
       createdAt: timestamp("created_at").defaultNow()
     });
-    superAdmins = pgTable("super_admins", {
+    superAdmins = mysqlTable("super_admins", {
       id: serial("id").primaryKey(),
       name: text("name").notNull(),
       email: text("email").notNull().unique(),
@@ -575,7 +576,7 @@ var init_schema = __esm({
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    tenants = pgTable("tenants", {
+    tenants = mysqlTable("tenants", {
       id: serial("id").primaryKey(),
       businessName: text("business_name").notNull(),
       ownerName: text("owner_name").notNull(),
@@ -586,18 +587,18 @@ var init_schema = __esm({
       logo: text("logo"),
       status: text("status").default("active"),
       // active, suspended, expired, trial
-      maxBranches: integer("max_branches").default(1),
-      maxEmployees: integer("max_employees").default(5),
+      maxBranches: int("max_branches").default(1),
+      maxEmployees: int("max_employees").default(5),
       storeType: text("store_type").default("supermarket"),
       // supermarket, restaurant, pharmacy, others
-      metadata: jsonb("metadata").$type(),
+      metadata: json("metadata").$type(),
       setupCompleted: boolean("setup_completed").default(false),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    tenantSubscriptions = pgTable("tenant_subscriptions", {
+    tenantSubscriptions = mysqlTable("tenant_subscriptions", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
       planType: text("plan_type").notNull().default("trial"),
       // trial, monthly, yearly
       planName: text("plan_name").notNull(),
@@ -613,30 +614,30 @@ var init_schema = __esm({
       nextPaymentDate: timestamp("next_payment_date"),
       cancelledAt: timestamp("cancelled_at"),
       cancellationReason: text("cancellation_reason"),
-      features: jsonb("features").$type().default([]),
+      features: json("features").$type().default([]),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    licenseKeys = pgTable("license_keys", {
+    licenseKeys = mysqlTable("license_keys", {
       id: serial("id").primaryKey(),
       licenseKey: text("license_key").notNull().unique(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-      subscriptionId: integer("subscription_id").references(() => tenantSubscriptions.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      subscriptionId: int("subscription_id").references(() => tenantSubscriptions.id, { onDelete: "cascade" }),
       status: text("status").default("active"),
       // active, expired, revoked, pending
       activatedAt: timestamp("activated_at"),
       expiresAt: timestamp("expires_at"),
       lastValidatedAt: timestamp("last_validated_at"),
       deviceInfo: text("device_info"),
-      maxActivations: integer("max_activations").default(3),
-      currentActivations: integer("current_activations").default(0),
+      maxActivations: int("max_activations").default(3),
+      currentActivations: int("current_activations").default(0),
       notes: text("notes"),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    tenantNotifications = pgTable("tenant_notifications", {
+    tenantNotifications = mysqlTable("tenant_notifications", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       type: text("type").notNull(),
       // warning, promotion, info, expiry_alert, upgrade_offer
       title: text("title").notNull(),
@@ -648,34 +649,34 @@ var init_schema = __esm({
       actionUrl: text("action_url"),
       actionLabel: text("action_label"),
       expiresAt: timestamp("expires_at"),
-      sentBy: integer("sent_by").references(() => superAdmins.id, { onDelete: "cascade" }),
+      sentBy: int("sent_by").references(() => superAdmins.id, { onDelete: "cascade" }),
       createdAt: timestamp("created_at").defaultNow()
     });
-    platformSettings = pgTable("platform_settings", {
+    platformSettings = mysqlTable("platform_settings", {
       id: serial("id").primaryKey(),
       key: text("key").notNull().unique(),
       value: text("value").notNull(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    platformCommissions = pgTable("platform_commissions", {
+    platformCommissions = mysqlTable("platform_commissions", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-      orderId: integer("order_id"),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      orderId: int("order_id"),
       saleTotal: decimal("sale_total", { precision: 12, scale: 2 }).notNull(),
       commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull(),
       commissionAmount: decimal("commission_amount", { precision: 12, scale: 2 }).notNull(),
       status: text("status").default("pending"),
       createdAt: timestamp("created_at").defaultNow()
     });
-    onlineOrders = pgTable("online_orders", {
+    onlineOrders = mysqlTable("online_orders", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
       orderNumber: text("order_number").notNull(),
       customerName: text("customer_name").notNull(),
       customerPhone: text("customer_phone").notNull(),
       customerAddress: text("customer_address"),
       customerEmail: text("customer_email"),
-      items: jsonb("items").$type().notNull().default([]),
+      items: json("items").$type().notNull().default([]),
       subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
       taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0"),
       deliveryFee: decimal("delivery_fee", { precision: 10, scale: 2 }).default("0"),
@@ -690,15 +691,15 @@ var init_schema = __esm({
       orderType: text("order_type").notNull().default("delivery"),
       // delivery, pickup
       notes: text("notes"),
-      estimatedTime: integer("estimated_time"),
+      estimatedTime: int("estimated_time"),
       // minutes
       language: text("language").default("en"),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    landingPageConfig = pgTable("landing_page_config", {
+    landingPageConfig = mysqlTable("landing_page_config", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull().unique(),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull().unique(),
       slug: text("slug").notNull().unique(),
       // URL slug e.g. "pizza-lemon"
       heroTitle: text("hero_title"),
@@ -715,7 +716,7 @@ var init_schema = __esm({
       acceptMobile: boolean("accept_mobile").default(true),
       acceptCash: boolean("accept_cash").default(true),
       minOrderAmount: decimal("min_order_amount", { precision: 10, scale: 2 }).default("0"),
-      estimatedDeliveryTime: integer("estimated_delivery_time").default(30),
+      estimatedDeliveryTime: int("estimated_delivery_time").default(30),
       // minutes
       footerText: text("footer_text"),
       socialFacebook: text("social_facebook"),
@@ -735,10 +736,10 @@ var init_schema = __esm({
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    vehicles = pgTable("vehicles", {
+    vehicles = mysqlTable("vehicles", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
       licensePlate: text("license_plate").notNull(),
       make: text("make"),
       model: text("model"),
@@ -749,10 +750,10 @@ var init_schema = __esm({
       notes: text("notes"),
       createdAt: timestamp("created_at").defaultNow()
     });
-    printerConfigs = pgTable("printer_configs", {
+    printerConfigs = mysqlTable("printer_configs", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
       receiptType: text("receipt_type").notNull(),
       // kitchen, home_delivery, take_away, restaurant, driver_order, check_out, lists, daily_close, monthly_close, accounts_receivable
       printer1: text("printer_1"),
@@ -763,18 +764,18 @@ var init_schema = __esm({
       isActive: boolean("is_active").default(true),
       updatedAt: timestamp("updated_at").defaultNow()
     });
-    dailyClosings = pgTable("daily_closings", {
+    dailyClosings = mysqlTable("daily_closings", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
       closingDate: text("closing_date").notNull(),
       // YYYY-MM-DD
       totalSales: decimal("total_sales", { precision: 12, scale: 2 }).default("0"),
       totalCash: decimal("total_cash", { precision: 12, scale: 2 }).default("0"),
       totalCard: decimal("total_card", { precision: 12, scale: 2 }).default("0"),
       totalMobile: decimal("total_mobile", { precision: 12, scale: 2 }).default("0"),
-      totalTransactions: integer("total_transactions").default(0),
+      totalTransactions: int("total_transactions").default(0),
       totalReturns: decimal("total_returns", { precision: 12, scale: 2 }).default("0"),
       totalDiscounts: decimal("total_discounts", { precision: 12, scale: 2 }).default("0"),
       openingCash: decimal("opening_cash", { precision: 12, scale: 2 }).default("0"),
@@ -784,18 +785,18 @@ var init_schema = __esm({
       // closed, approved
       createdAt: timestamp("created_at").defaultNow()
     });
-    monthlyClosings = pgTable("monthly_closings", {
+    monthlyClosings = mysqlTable("monthly_closings", {
       id: serial("id").primaryKey(),
-      tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-      branchId: integer("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      employeeId: integer("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
       closingMonth: text("closing_month").notNull(),
       // YYYY-MM
       totalSales: decimal("total_sales", { precision: 12, scale: 2 }).default("0"),
       totalCash: decimal("total_cash", { precision: 12, scale: 2 }).default("0"),
       totalCard: decimal("total_card", { precision: 12, scale: 2 }).default("0"),
       totalMobile: decimal("total_mobile", { precision: 12, scale: 2 }).default("0"),
-      totalTransactions: integer("total_transactions").default(0),
+      totalTransactions: int("total_transactions").default(0),
       totalReturns: decimal("total_returns", { precision: 12, scale: 2 }).default("0"),
       totalDiscounts: decimal("total_discounts", { precision: 12, scale: 2 }).default("0"),
       totalExpenses: decimal("total_expenses", { precision: 12, scale: 2 }).default("0"),
@@ -805,6 +806,16 @@ var init_schema = __esm({
       // closed, approved
       createdAt: timestamp("created_at").defaultNow()
     });
+    dailySequences = mysqlTable("daily_sequences", {
+      id: serial("id").primaryKey(),
+      scopeKey: text("scope_key").notNull(),
+      // "branch-{id}" for POS, "tenant-{id}" for online orders
+      date: text("date").notNull(),
+      // YYYY-MM-DD in Europe/Zurich timezone
+      counter: int("counter").default(0).notNull()
+    }, (table) => ({
+      uniqScopeDate: unique("daily_seq_scope_date_unique").on(table.scopeKey, table.date)
+    }));
     insertBranchSchema = createInsertSchema(branches).omit({ id: true, createdAt: true, updatedAt: true });
     insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, updatedAt: true });
     insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true });
@@ -855,66 +866,27 @@ var init_schema = __esm({
 // server/db.ts
 var db_exports = {};
 __export(db_exports, {
-  db: () => db,
-  pool: () => pool
+  db: () => db
 });
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
-var Pool, poolConfig, neonUrl, isNeonUrl, pgHost, pgDatabase, pgUser, pgPassword, pgPort, isNeonHost, pool, db;
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
+var connection, db;
 var init_db = __esm({
-  "server/db.ts"() {
+  async "server/db.ts"() {
     "use strict";
     init_schema();
-    ({ Pool } = pg);
-    neonUrl = process.env.NEON_DATABASE_URL || "";
-    isNeonUrl = neonUrl.includes("neon.tech");
-    pgHost = process.env.PGHOST || "";
-    pgDatabase = process.env.PGDATABASE || "";
-    pgUser = process.env.PGUSER || "";
-    pgPassword = process.env.PGPASSWORD || "";
-    pgPort = process.env.PGPORT ? parseInt(process.env.PGPORT) : 5432;
-    isNeonHost = pgHost.includes("neon.tech");
-    if (isNeonUrl) {
-      const match = neonUrl.match(
-        /^(?:postgresql|postgres):\/\/([^:@]+):([^@]+)@([^/:]+)(?::(\d+))?\/([^?]*)?/
-      );
-      const host = match?.[3] || "";
-      const user = match?.[1] ? decodeURIComponent(match[1]) : "";
-      const password = match?.[2] ? decodeURIComponent(match[2]) : "";
-      const port = match?.[4] ? parseInt(match[4]) : 5432;
-      const database = match?.[5] || "neondb";
-      console.log(`[DB] Neon via NEON_DATABASE_URL \u2014 host: ${host}, database: ${database}, user: ${user}`);
-      poolConfig = {
-        host,
-        database,
-        user,
-        password,
-        port,
-        ssl: { rejectUnauthorized: false }
-      };
-    } else if (isNeonHost) {
-      console.log(`[DB] Neon via PG* vars \u2014 host: ${pgHost}, database: ${pgDatabase}, user: ${pgUser}`);
-      poolConfig = {
-        host: pgHost,
-        database: pgDatabase || "neondb",
-        user: pgUser,
-        password: pgPassword,
-        port: pgPort,
-        ssl: { rejectUnauthorized: false }
-      };
-    } else {
-      const connectionString = process.env.DATABASE_URL;
-      if (!connectionString) {
-        throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
-      }
-      console.log(`[DB] Local/Helium \u2014 using DATABASE_URL`);
-      poolConfig = { connectionString };
-    }
-    pool = new Pool(poolConfig);
-    pool.on("connect", (client2) => {
-      client2.query("SET client_encoding = 'UTF8'");
+    connection = await mysql.createPool({
+      host: process.env.MYSQL_HOST || "localhost",
+      user: process.env.MYSQL_USER || "",
+      password: process.env.MYSQL_PASSWORD || "",
+      database: process.env.MYSQL_DATABASE || "",
+      waitForConnections: true,
+      connectionLimit: 10,
+      charset: "utf8mb4",
+      connectTimeout: 3e4
     });
-    db = drizzle(pool, { schema: schema_exports });
+    console.log(`[DB] MySQL \u2014 host: ${process.env.MYSQL_HOST || "localhost"}, database: ${process.env.MYSQL_DATABASE}`);
+    db = drizzle(connection, { schema: schema_exports, mode: "default" });
   }
 });
 
@@ -1033,9 +1005,9 @@ import { eq, desc, sql, and, gte, lte, ilike, or, isNull } from "drizzle-orm";
 import * as fs from "fs";
 var storage;
 var init_storage = __esm({
-  "server/storage.ts"() {
+  async "server/storage.ts"() {
     "use strict";
-    init_db();
+    await init_db();
     init_schema();
     storage = {
       seedLog(msg) {
@@ -1673,7 +1645,12 @@ var init_storage = __esm({
           customerId: sales.customerId,
           employeeId: sales.employeeId,
           customerName: customers.name,
-          customerAddress: customers.address
+          customerAddress: customers.address,
+          customerStreet: customers.street,
+          customerStreetNr: customers.streetNr,
+          customerHouseNr: customers.houseNr,
+          customerCity: customers.city,
+          customerPostalCode: customers.postalCode
         }).from(sales).leftJoin(customers, eq(sales.customerId, customers.id)).where(and(gte(sales.createdAt, startDate), lte(sales.createdAt, endDate))).orderBy(sales.createdAt);
       },
       async getTopProducts(limit) {
@@ -2730,6 +2707,24 @@ var init_storage = __esm({
           }
         }
         return { tenants: result, grandTotal };
+      },
+      // ── Daily Sequential Numbering (resets at midnight Europe/Zurich) ──────────
+      async getNextSequenceNumber(scopeKey) {
+        const swissDate = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Europe/Zurich",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit"
+        }).format(/* @__PURE__ */ new Date());
+        const dateCompact = swissDate.replace(/-/g, "");
+        const result = await db.execute(sql`
+      INSERT INTO daily_sequences (scope_key, date, counter)
+      VALUES (${scopeKey}, ${dateCompact}, 1)
+      ON CONFLICT (scope_key, date)
+      DO UPDATE SET counter = daily_sequences.counter + 1
+      RETURNING counter
+    `);
+        return Number(result.rows[0].counter);
       }
     };
   }
@@ -2740,7 +2735,7 @@ var seedPizzaLemon_exports = {};
 __export(seedPizzaLemon_exports, {
   seedPizzaLemon: () => seedPizzaLemon
 });
-import { eq as eq2, sql as sql2, inArray } from "drizzle-orm";
+import { eq as eq2, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { addYears } from "date-fns";
 function pizzaModifier(price33, price45) {
@@ -2824,6 +2819,10 @@ function dressingModifier() {
     }
   ];
 }
+function emojiImg(emoji) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="85" font-size="80" text-anchor="middle" x="50">${emoji}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
 function slugify(name) {
   return name.toLowerCase().replace(/[äÄ]/g, "ae").replace(/[öÖ]/g, "oe").replace(/[üÜ]/g, "ue").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
@@ -2835,23 +2834,25 @@ async function seedPizzaLemon() {
     console.log("[PIZZA LEMON] License key already present \u2013 running full catalog update...");
   }
   let tenant;
-  const pizzaLemonTenants = await db.select().from(tenants).where(sql2`LOWER(${tenants.businessName}) = 'pizza lemon'`);
+  const pizzaLemonTenants = await db.select().from(tenants).where(eq2(tenants.id, 24));
   if (pizzaLemonTenants.length > 0) {
     tenant = pizzaLemonTenants[0];
-    console.log(`[PIZZA LEMON] Found existing store (ID ${tenant.id}). Upgrading credentials...`);
+    console.log(`[PIZZA LEMON] Found existing store (ID ${tenant.id}). Upgrading credentials and data...`);
     const hash3 = await bcrypt.hash(STORE_PASSWORD, 10);
     await db.update(tenants).set({
+      businessName: BUSINESS_NAME,
       ownerEmail: STORE_EMAIL,
       passwordHash: hash3,
       status: "active",
       storeType: "restaurant",
       maxBranches: 3,
       maxEmployees: 20
-    }).where(eq2(tenants.id, tenant.id));
+    }).where(eq2(tenants.id, 24));
   } else {
-    console.log("[PIZZA LEMON] No Pizza Lemon store found. Creating new store...");
+    console.log("[PIZZA LEMON] No Tenant ID 24 found. Creating new store with ID 24...");
     const hash3 = await bcrypt.hash(STORE_PASSWORD, 10);
     const [newTenant] = await db.insert(tenants).values({
+      id: 24,
       businessName: BUSINESS_NAME,
       ownerName: "Pizza Lemon Owner",
       ownerEmail: STORE_EMAIL,
@@ -2951,6 +2952,12 @@ async function seedPizzaLemon() {
     catMap["Getr\xE4nke"] = catMap["Softgetr\xE4nke"];
     delete catMap["Softgetr\xE4nke"];
     console.log("[PIZZA LEMON] Renamed category Softgetr\xE4nke \u2192 Getr\xE4nke");
+  }
+  if (catMap["Tabakwaren"] && !catMap["Extra"]) {
+    await db.update(categories).set({ name: "Extra", icon: "add-circle" }).where(eq2(categories.id, catMap["Tabakwaren"]));
+    catMap["Extra"] = catMap["Tabakwaren"];
+    delete catMap["Tabakwaren"];
+    console.log("[PIZZA LEMON] Renamed category Tabakwaren \u2192 Extra");
   }
   for (const cat of PIZZA_LEMON_CATEGORIES) {
     if (!catMap[cat.name]) {
@@ -3052,8 +3059,8 @@ async function seedPizzaLemon() {
   }
   for (const p of BIER) await insertItem("Bier", p);
   for (const p of ALKOHOL) await insertItem("Alkoholische Getr\xE4nke", p);
-  for (const p of TABAK) await insertItem("Tabakwaren", p);
-  const total = PIZZAS.length + CALZONES.length + PIDE.length + LAHMACUN.length + TELLERGERICHTE.length + FINGERFOOD.length + SALATE.length + DESSERTS.length + GETRAENKE.length + BIER.length + ALKOHOL.length + TABAK.length;
+  for (const p of EXTRAS) await insertItem("Extra", p);
+  const total = PIZZAS.length + CALZONES.length + PIDE.length + LAHMACUN.length + TELLERGERICHTE.length + FINGERFOOD.length + SALATE.length + DESSERTS.length + GETRAENKE.length + BIER.length + ALKOHOL.length + EXTRAS.length;
   console.log(`[PIZZA LEMON] \u2713 ${total} products inserted with updated images (v4) and prices.`);
   const [existingConfig] = await db.select().from(landingPageConfig).where(eq2(landingPageConfig.tenantId, tenant.id));
   const heroImage = IMG("pizzalemon_hero.png");
@@ -3122,11 +3129,11 @@ async function seedPizzaLemon() {
   console.log(`[PIZZA LEMON]    Admin PIN: 1234  |  Cashier PIN: 5678`);
   console.log(`[PIZZA LEMON]    Menu: 35 Pizza, 3 Calzone, 10 Pide, 2 Lahmacun, 13 Tellergerichte, 24 Fingerfood, 8 Salat, 9 Dessert, 9 Getr\xE4nke, 1 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
 }
-var STORE_EMAIL, STORE_PASSWORD, LICENSE_KEY, BUSINESS_NAME, IMG, PIZZA_LEMON_CATEGORIES, PIZZAS, CALZONES, PIDE, LAHMACUN, TELLERGERICHTE, FINGERFOOD, SALATE, DESSERTS, GETRAENKE, BIER, ALKOHOL, TABAK;
+var STORE_EMAIL, STORE_PASSWORD, LICENSE_KEY, BUSINESS_NAME, IMG, PIZZA_LEMON_CATEGORIES, PIZZAS, CALZONES, PIDE, LAHMACUN, TELLERGERICHTE, FINGERFOOD, SALATE, DESSERTS, GETRAENKE, BIER, ALKOHOL, EXTRAS;
 var init_seedPizzaLemon = __esm({
-  "server/seedPizzaLemon.ts"() {
+  async "server/seedPizzaLemon.ts"() {
     "use strict";
-    init_db();
+    await init_db();
     init_schema();
     STORE_EMAIL = "admin@pizzalemon.ch";
     STORE_PASSWORD = "pizzalemon123";
@@ -3145,7 +3152,7 @@ var init_seedPizzaLemon = __esm({
       { name: "Getr\xE4nke", color: "#2C7A7B", icon: "cafe", sortOrder: 9 },
       { name: "Bier", color: "#744210", icon: "beer", sortOrder: 10 },
       { name: "Alkoholische Getr\xE4nke", color: "#6B46C1", icon: "wine", sortOrder: 11 },
-      { name: "Tabakwaren", color: "#4A5568", icon: "warning", sortOrder: 12 }
+      { name: "Extra", color: "#4A5568", icon: "add-circle", sortOrder: 12 }
     ];
     PIZZAS = [
       { name: "Wunschpizza", description: "Ihre Wunschpizza \u2013 w\xE4hlen Sie Ihre Zutaten", price: 14, price45: 27, image: IMG("pizzalemon_wunschpizza.jpg") },
@@ -3293,8 +3300,53 @@ var init_seedPizzaLemon = __esm({
       { name: "Champagner", description: "Champagner, 70cl Flasche", price: 30, image: IMG("pizzalemon_111_champagner.jpg") },
       { name: "Smirnoff Ice", description: "Smirnoff Ice, 275ml", price: 6, image: IMG("pizzalemon_112_smirnoff_ice.jpg") }
     ];
-    TABAK = [
-      { name: "Zigaretten", description: "Zigaretten \u2013 aktueller Preis. Z\xE4hlen nicht zum Mindestbestellwert.", price: 0, image: IMG("pizzalemon_113_zigaretten.jpg") }
+    EXTRAS = [
+      // ── Existing extras ──────────────────────────────────────────────────────
+      { name: "Brot", description: "Frisches Brot", price: 2, image: IMG("pizzalemon_extra_brot.jpg") },
+      { name: "Knoblibrot", description: "Knuspriges Brot mit Knoblauchbutter", price: 7, image: IMG("pizzalemon_90_knoblibrot.jpg") },
+      { name: "Pommes Extra", description: "Extra Portion Pommes frites", price: 11, image: IMG("pizzalemon_58_pommes.jpg") },
+      { name: "Zigaretten", description: "Zigaretten \u2013 aktueller Preis. Z\xE4hlen nicht zum Mindestbestellwert.", price: 17, image: IMG("pizzalemon_113_zigaretten.jpg") },
+      // ── Pizza toppings (+CHF 2.00 each) ──────────────────────────────────────
+      { name: "Tomato Sauce", description: "Tomatensauce", price: 2, image: emojiImg("\u{1F345}") },
+      { name: "Sliced Tomatoes", description: "Tomatenscheiben", price: 2, image: emojiImg("\u{1F345}") },
+      { name: "Garlic", description: "Knoblauch", price: 2, image: emojiImg("\u{1F9C4}") },
+      { name: "Onions", description: "Zwiebeln", price: 2, image: emojiImg("\u{1F9C5}") },
+      { name: "Capers", description: "Kapern", price: 2, image: emojiImg("\u{1FAD9}") },
+      { name: "Olivas", description: "Oliven", price: 2, image: emojiImg("\u{1FAD2}") },
+      { name: "Oregano", description: "Oregano", price: 2, image: emojiImg("\u{1F33F}") },
+      { name: "Vegetables", description: "Gem\xFCse", price: 2, image: emojiImg("\u{1F957}") },
+      { name: "Spinach", description: "Spinat", price: 2, image: emojiImg("\u{1F96C}") },
+      { name: "Bell Peppers", description: "Paprika", price: 2, image: emojiImg("\u{1FAD1}") },
+      { name: "Corn", description: "Mais", price: 2, image: emojiImg("\u{1F33D}") },
+      { name: "Broccoli", description: "Brokkoli", price: 2, image: emojiImg("\u{1F966}") },
+      { name: "Artichokes", description: "Artischocken", price: 2, image: emojiImg("\u{1F331}") },
+      { name: "Egg", description: "Ei", price: 2, image: emojiImg("\u{1F95A}") },
+      { name: "Pineapple", description: "Ananas", price: 2, image: emojiImg("\u{1F34D}") },
+      { name: "Arugula", description: "Rucola", price: 2, image: emojiImg("\u{1F33F}") },
+      { name: "Mushrooms", description: "Pilze", price: 2, image: emojiImg("\u{1F344}") },
+      { name: "Ham", description: "Schinken", price: 2, image: emojiImg("\u{1F356}") },
+      { name: "Spicy Salami", description: "Scharfe Salami", price: 2, image: emojiImg("\u{1F336}\uFE0F") },
+      { name: "Salami", description: "Salami", price: 2, image: emojiImg("\u{1F969}") },
+      { name: "Basami", description: "Basilikum", price: 2, image: emojiImg("\u{1F33F}") },
+      { name: "Prosciutto", description: "Rohschinken", price: 2, image: emojiImg("\u{1F969}") },
+      { name: "Lardons", description: "Speckw\xFCrfel", price: 2, image: emojiImg("\u{1F953}") },
+      { name: "Chicken", description: "H\xFChnerfleisch", price: 2, image: emojiImg("\u{1F357}") },
+      { name: "Kebab", description: "Kebabfleisch", price: 2, image: emojiImg("\u{1F959}") },
+      { name: "Minced Meat", description: "Hackfleisch", price: 2, image: emojiImg("\u{1F969}") },
+      { name: "Anchovies", description: "Sardellen", price: 2, image: emojiImg("\u{1F41F}") },
+      { name: "Sardinen", description: "Sardinen", price: 2, image: emojiImg("\u{1F41F}") },
+      { name: "Tuna", description: "Thunfisch", price: 2, image: emojiImg("\u{1F41F}") },
+      { name: "Spicy Sauce", description: "Scharfe Sauce", price: 2, image: emojiImg("\u{1F336}\uFE0F") },
+      { name: "Mozzarella", description: "Mozzarella", price: 2, image: emojiImg("\u{1F9C0}") },
+      { name: "Gorgonzola", description: "Gorgonzola", price: 2, image: emojiImg("\u{1F9C0}") },
+      { name: "Parmesan", description: "Parmesan", price: 2, image: emojiImg("\u{1F9C0}") },
+      { name: "Mascarpone", description: "Mascarpone", price: 2, image: emojiImg("\u{1F9C0}") },
+      { name: "Kaesarand", description: "K\xE4serand", price: 2, image: emojiImg("\u{1F9C0}") },
+      // ── Sauces (FREE) ─────────────────────────────────────────────────────────
+      { name: "Mayonnaise", description: "Mayonnaise", price: 0, image: emojiImg("\u{1F96B}") },
+      { name: "Ketchup", description: "Ketchup", price: 0, image: emojiImg("\u{1F345}") },
+      { name: "Cocktail Sauce", description: "Cocktailsauce", price: 0, image: emojiImg("\u{1F96B}") },
+      { name: "Yogurt Sauce", description: "Joghurtsauce", price: 0, image: emojiImg("\u{1F95B}") }
     ];
   }
 });
@@ -3695,9 +3747,9 @@ async function seedAllDemoData() {
 }
 var DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
 var init_seedAllDemoData = __esm({
-  "server/seedAllDemoData.ts"() {
+  async "server/seedAllDemoData.ts"() {
     "use strict";
-    init_db();
+    await init_db();
     init_schema();
     DEMO_STORES = [
       { biz: "Glow Beauty Salon", owner: "Sara Ahmed", email: "sara@glow.com", phone: "+201001234567" },
@@ -3770,7 +3822,7 @@ var init_seedAllDemoData = __esm({
 import express from "express";
 
 // server/routes.ts
-init_storage();
+await init_storage();
 import { createServer } from "node:http";
 import * as xlsx from "xlsx";
 import path2 from "node:path";
@@ -3976,7 +4028,7 @@ var CallerIDService = class extends EventEmitter {
               const key = `${tenantId}-${slot}`;
               const call = this.activeCallSlots.get(key);
               if (call?.dbCallId) {
-                Promise.resolve().then(() => (init_storage(), storage_exports)).then(({ storage: storage2 }) => {
+                init_storage().then(() => storage_exports).then(({ storage: storage2 }) => {
                   storage2.updateCall(call.dbCallId, { status: "answered" }).catch(() => {
                   });
                 });
@@ -4072,7 +4124,7 @@ var CallerIDService = class extends EventEmitter {
     }, SLOT_EXPIRY_MS);
     this.slotTimeouts.set(key, timeout);
     try {
-      const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+      const { storage: storage2 } = await init_storage().then(() => storage_exports);
       const customers2 = await storage2.findCustomerByPhone(normalized, resolvedTenantId);
       if (customers2 && customers2.length > 0) {
         callInfo.customer = customers2[0];
@@ -4082,7 +4134,7 @@ var CallerIDService = class extends EventEmitter {
       console.error("[CallerID] Customer lookup error:", e);
     }
     try {
-      const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+      const { storage: storage2 } = await init_storage().then(() => storage_exports);
       const dbCall = await storage2.createCall({
         tenantId: resolvedTenantId,
         phoneNumber,
@@ -4233,7 +4285,7 @@ var pushService = {
 };
 
 // server/superAdminAuth.ts
-init_storage();
+await init_storage();
 import jwt from "jsonwebtoken";
 var JWT_SECRET = process.env.JWT_SECRET || "barmagly-super-admin-secret-key-2024";
 function generateToken(adminId, email, role) {
@@ -5039,9 +5091,35 @@ function sanitizeDates(data) {
 }
 var googleClient = new OAuth2Client("852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com");
 async function registerRoutes(app2) {
+  app2.get("/api/store/:slug", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const config = await storage.getLandingPageConfigBySlug(slug);
+      if (!config) {
+        return res.status(404).send("<h1>Store not found</h1>");
+      }
+      const tenant = await storage.getTenant(config.tenantId);
+      if (!tenant) {
+        return res.status(404).send("<h1>Store not found</h1>");
+      }
+      const storePath = path2.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
+      let html = fs3.readFileSync(storePath, "utf-8");
+      html = html.replace(/\{\{SLUG\}\}/g, slug);
+      html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
+      html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
+      html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
+      html = html.replace(/\{\{CURRENCY\}\}/g, tenant.currency || "CHF");
+      html = html.replace(/\{\{LANGUAGE\}\}/g, config.language || "en");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(html);
+    } catch (err) {
+      console.error("[store/:slug] Error:", err);
+      return res.status(500).send("<h1>Server error</h1>");
+    }
+  });
   app2.post("/api/admin/seed-pizza-lemon", async (_req, res) => {
     try {
-      const { seedPizzaLemon: seedPizzaLemon2 } = await Promise.resolve().then(() => (init_seedPizzaLemon(), seedPizzaLemon_exports));
+      const { seedPizzaLemon: seedPizzaLemon2 } = await init_seedPizzaLemon().then(() => seedPizzaLemon_exports);
       await seedPizzaLemon2();
       res.json({ success: true, message: "Pizza Lemon store seeded (or already existed)." });
     } catch (e) {
@@ -5051,7 +5129,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/admin/check-pizza-lemon", async (_req, res) => {
     try {
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { db: db2 } = await init_db().then(() => db_exports);
       const { tenants: tenants2, licenseKeys: licenseKeys2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
       const { eq: eq5 } = await import("drizzle-orm");
       const [tenant] = await db2.select().from(tenants2).where(eq5(tenants2.ownerEmail, "admin@pizzalemon.ch"));
@@ -5383,7 +5461,7 @@ async function registerRoutes(app2) {
       });
       const config = await storage.getLandingPageConfig(tenantId);
       if (!config) {
-        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+        const { db: db2 } = await init_db().then(() => db_exports);
         const { landingPageConfig: landingConfig } = await Promise.resolve().then(() => (init_schema(), schema_exports));
         await db2.insert(landingConfig).values({
           tenantId,
@@ -5393,7 +5471,7 @@ async function registerRoutes(app2) {
           socialWhatsapp: ownerPhone
         });
       } else {
-        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+        const { db: db2 } = await init_db().then(() => db_exports);
         const { landingPageConfig: landingConfig } = await Promise.resolve().then(() => (init_schema(), schema_exports));
         const { eq: eq5 } = await import("drizzle-orm");
         await db2.update(landingConfig).set({
@@ -6240,7 +6318,9 @@ async function registerRoutes(app2) {
   app2.post("/api/sales", async (req, res) => {
     try {
       const { items, ...saleData } = sanitizeDates(req.body);
-      const receiptNumber = `RCP-${Date.now()}-${Math.floor(Math.random() * 1e3)}`;
+      const swissDateRcp = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit" }).format(/* @__PURE__ */ new Date()).replace(/-/g, "");
+      const dailySeqRcp = await storage.getNextSequenceNumber(`branch-${saleData.branchId || 0}`);
+      const receiptNumber = `${saleData.branchId || 0}-${swissDateRcp}-${dailySeqRcp}`;
       const sale = await storage.createSale({ ...saleData, receiptNumber });
       if (items && items.length > 0) {
         for (const item of items) {
@@ -6675,7 +6755,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/fix-schema-and-seed", async (_req, res) => {
     try {
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { db: db2 } = await init_db().then(() => db_exports);
       const { sql: sql5 } = await import("drizzle-orm");
       console.log("[API-SEED] Fixing schema...");
       const tables2 = ["branches", "products", "employees", "sales", "inventory", "customers", "suppliers"];
@@ -6687,7 +6767,7 @@ async function registerRoutes(app2) {
           console.log(`[API-SEED] Table ${table} skip: ${e.message}`);
         }
       }
-      const { seedAllDemoData: seedAllDemoData2 } = await Promise.resolve().then(() => (init_seedAllDemoData(), seedAllDemoData_exports));
+      const { seedAllDemoData: seedAllDemoData2 } = await init_seedAllDemoData().then(() => seedAllDemoData_exports);
       await seedAllDemoData2();
       res.json({ success: true, message: "Schema fixed and comprehensive demo data seeded." });
     } catch (e) {
@@ -6697,7 +6777,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/force-full-seed", async (_req, res) => {
     try {
-      const { seedAllDemoData: seedAllDemoData2 } = await Promise.resolve().then(() => (init_seedAllDemoData(), seedAllDemoData_exports));
+      const { seedAllDemoData: seedAllDemoData2 } = await init_seedAllDemoData().then(() => seedAllDemoData_exports);
       await seedAllDemoData2();
       res.json({ success: true, message: "Comprehensive demo data seeded successfully" });
     } catch (e) {
@@ -7478,7 +7558,9 @@ async function test(){
         resolvedTenantId = Number(bodyTenantId);
       }
       if (!resolvedTenantId) return res.status(404).json({ error: "Store not found" });
-      const orderNumber = `ONL-${Date.now().toString().slice(-6)}`;
+      const swissDateOnl = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit" }).format(/* @__PURE__ */ new Date()).replace(/-/g, "");
+      const dailySeqOnl = await storage.getNextSequenceNumber(`tenant-${resolvedTenantId}`);
+      const orderNumber = `${resolvedTenantId}-${swissDateOnl}-${dailySeqOnl}`;
       const order = await storage.createOnlineOrder({
         ...orderData,
         tenantId: resolvedTenantId,
@@ -8086,12 +8168,12 @@ async function test(){
 }
 
 // server/superAdminRoutes.ts
-init_storage();
+await init_storage();
 import * as bcrypt4 from "bcrypt";
 import * as crypto3 from "crypto";
 import * as fs4 from "fs";
 import * as path3 from "path";
-init_db();
+await init_db();
 import { addMonths as addMonths3, addYears as addYears3, addDays as addDays3 } from "date-fns";
 import { eq as eq4, desc as desc2, sql as sql4, and as and2, gte as gte2, lte as lte2 } from "drizzle-orm";
 var BACKUP_DIR = path3.resolve(process.cwd(), "backups");
@@ -9226,9 +9308,9 @@ function registerSuperAdminRoutes(app2) {
     }
   });
   app2.post("/api/super-admin/db-migrate-to-replit-neon", requireSuperAdmin, async (_req, res) => {
-    const pgHost2 = process.env.PGHOST || "";
-    if (!pgHost2.includes("neon.tech")) {
-      return res.status(400).json({ error: "PGHOST is not a Neon host \u2014 migration can only run in production", pgHost: pgHost2 });
+    const pgHost = process.env.PGHOST || "";
+    if (!pgHost.includes("neon.tech")) {
+      return res.status(400).json({ error: "PGHOST is not a Neon host \u2014 migration can only run in production", pgHost });
     }
     const log3 = [];
     const report = (msg) => {
@@ -9264,7 +9346,7 @@ function registerSuperAdminRoutes(app2) {
         dstPool.query("SELECT current_database() as db")
       ]);
       report(`Source: ${srcTest.rows[0].c} customers`);
-      report(`Destination: ${dstTest.rows[0].db} on ${pgHost2}`);
+      report(`Destination: ${dstTest.rows[0].db} on ${pgHost}`);
       await dstPool.query(`
         TRUNCATE TABLE
           stock_count_items, stock_counts, cash_drawer_operations, employee_commissions,
@@ -9359,7 +9441,7 @@ function registerSuperAdminRoutes(app2) {
 }
 
 // server/tenantAuth.ts
-init_storage();
+await init_storage();
 import jwt2 from "jsonwebtoken";
 var JWT_SECRET2 = process.env.JWT_SECRET || "barmagly-super-admin-secret-key-2024";
 var PUBLIC_ROUTES = [
@@ -9367,6 +9449,7 @@ var PUBLIC_ROUTES = [
   "/api/auth/google",
   "/api/landing/subscribe",
   "/api/landing-page-config",
+  "/api/store/",
   "/api/store-public/",
   "/api/online-orders/public",
   "/api/stripe/webhook",
@@ -9488,16 +9571,16 @@ var WebhookHandlers = class {
 import * as fs5 from "fs";
 import * as path4 from "path";
 if (process.env.PGHOST && process.env.PGHOST.includes("neon.tech")) {
-  const neonUrl2 = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || "neondb"}?sslmode=require`;
-  process.env.DATABASE_URL = neonUrl2;
-  process.env.NEON_DATABASE_URL = neonUrl2;
+  const neonUrl = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || "neondb"}?sslmode=require`;
+  process.env.DATABASE_URL = neonUrl;
+  process.env.NEON_DATABASE_URL = neonUrl;
 } else if (process.env.NEON_DATABASE_URL) {
-  let neonUrl2 = process.env.NEON_DATABASE_URL;
-  if (!neonUrl2.match(/neon\.tech\/\w+/)) {
-    neonUrl2 = neonUrl2.replace(/\/$/, "") + "/neondb?sslmode=require";
-    process.env.NEON_DATABASE_URL = neonUrl2;
+  let neonUrl = process.env.NEON_DATABASE_URL;
+  if (!neonUrl.match(/neon\.tech\/\w+/)) {
+    neonUrl = neonUrl.replace(/\/$/, "") + "/neondb?sslmode=require";
+    process.env.NEON_DATABASE_URL = neonUrl;
   }
-  process.env.DATABASE_URL = neonUrl2;
+  process.env.DATABASE_URL = neonUrl;
 }
 var app = express();
 var log2 = console.log;
@@ -9655,7 +9738,9 @@ function configureExpoAndLanding(app2) {
       return serveLandingPage({ req, res, appName });
     }
     if (req.path === "/app" || req.path === "/app/" || req.path === "/app/index.html") {
-      const indexPath = path4.resolve(process.cwd(), "dist", "index.html");
+      const appIndexPath = path4.resolve(process.cwd(), "dist", "app", "index.html");
+      const fallbackPath = path4.resolve(process.cwd(), "dist", "index.html");
+      const indexPath = fs5.existsSync(appIndexPath) ? appIndexPath : fallbackPath;
       if (fs5.existsSync(indexPath)) {
         const html = fs5.readFileSync(indexPath, "utf-8");
         res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -9663,7 +9748,7 @@ function configureExpoAndLanding(app2) {
       }
     }
     if (req.path === "/app/sw.js") {
-      const swPath = path4.resolve(process.cwd(), "dist", "sw.js");
+      const swPath = fs5.existsSync(path4.resolve(process.cwd(), "dist", "app", "sw.js")) ? path4.resolve(process.cwd(), "dist", "app", "sw.js") : path4.resolve(process.cwd(), "dist", "sw.js");
       if (fs5.existsSync(swPath)) {
         res.setHeader("Content-Type", "application/javascript");
         res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -9671,15 +9756,13 @@ function configureExpoAndLanding(app2) {
         return res.sendFile(swPath);
       }
     }
-    if (req.path.startsWith("/super_admin")) {
-      return res.redirect(301, req.url.replace("/super_admin", "/super-admin"));
-    }
-    if (req.path.startsWith("/super-admin")) {
+    if (req.path.startsWith("/super_admin") || req.path.startsWith("/super-admin")) {
+      const isLogin = req.path === "/super_admin/login" || req.path === "/super-admin/login" || req.path === "/super_admin" || req.path === "/super-admin";
       const superAdminTemplatePath = path4.resolve(
         process.cwd(),
         "server",
         "templates",
-        req.path === "/super-admin/login" ? "super-admin-login.html" : "super-admin-dashboard.html"
+        isLogin ? "super-admin-login.html" : "super-admin-dashboard.html"
       );
       try {
         const superAdminTemplate = fs5.readFileSync(superAdminTemplatePath, "utf-8");
@@ -9694,27 +9777,38 @@ function configureExpoAndLanding(app2) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(dbTemplate);
     }
-    const storeByIdMatch = req.path.match(/^\/store\/(\d+)$/);
-    if (storeByIdMatch) {
+    const storeMatch = req.path.match(/^\/store\/(.+)$/);
+    if (storeMatch) {
       try {
-        const tenantId = parseInt(storeByIdMatch[1], 10);
-        const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
-        const tenant = await storage2.getTenant(tenantId);
-        if (!tenant) {
-          return res.status(404).send("<h1>Store not found</h1>");
+        const storeParam = storeMatch[1];
+        const { storage: storage2 } = await init_storage().then(() => storage_exports);
+        let tenantId;
+        let slug;
+        if (/^\d+$/.test(storeParam)) {
+          tenantId = parseInt(storeParam, 10);
+          const config2 = await storage2.getLandingPageConfig(tenantId);
+          slug = config2?.slug || `tenant-${tenantId}`;
+        } else {
+          slug = storeParam;
+          const config2 = await storage2.getLandingPageConfigBySlug(slug);
+          if (!config2) return res.status(404).send("<h1>Store not found</h1>");
+          tenantId = config2.tenantId;
         }
+        const tenant = await storage2.getTenant(tenantId);
+        if (!tenant) return res.status(404).send("<h1>Store not found</h1>");
         const config = await storage2.getLandingPageConfig(tenantId);
         const storePath = path4.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
         let html = fs5.readFileSync(storePath, "utf-8");
-        const slug = config?.slug || `tenant-${tenantId}`;
         html = html.replace(/\{\{SLUG\}\}/g, slug);
         html = html.replace(/\{\{TENANT_ID\}\}/g, String(tenantId));
         html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config?.primaryColor || "#2FD3C6");
         html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config?.accentColor || "#6366F1");
+        html = html.replace(/\{\{CURRENCY\}\}/g, tenant.currency || "CHF");
+        html = html.replace(/\{\{LANGUAGE\}\}/g, config?.language || "en");
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         return res.status(200).send(html);
       } catch (err) {
-        console.error("[store/:tenantId] Error:", err);
+        console.error("[store/:param] Error:", err);
         return res.status(500).send("<h1>Server error</h1>");
       }
     }
@@ -9739,7 +9833,8 @@ function configureExpoAndLanding(app2) {
   app2.use("/objects", express.static(path4.resolve(process.cwd(), "uploads")));
   app2.use("/sounds", express.static(path4.resolve(process.cwd(), "public", "sounds")));
   app2.use("/app/assets/images", express.static(path4.resolve(process.cwd(), "assets", "images")));
-  app2.use("/app", express.static(path4.resolve(process.cwd(), "dist"), {
+  const appDistDir = fs5.existsSync(path4.resolve(process.cwd(), "dist", "app")) ? path4.resolve(process.cwd(), "dist", "app") : path4.resolve(process.cwd(), "dist");
+  app2.use("/app", express.static(appDistDir, {
     setHeaders(res, filePath) {
       if (filePath.endsWith(".webmanifest")) {
         res.setHeader("Content-Type", "application/manifest+json");
@@ -9747,7 +9842,7 @@ function configureExpoAndLanding(app2) {
     }
   }));
   app2.use(express.static(path4.resolve(process.cwd(), "static-build")));
-  const staticIndexPath = path4.resolve(process.cwd(), "dist", "index.html");
+  const staticIndexPath = fs5.existsSync(path4.resolve(process.cwd(), "dist", "app", "index.html")) ? path4.resolve(process.cwd(), "dist", "app", "index.html") : path4.resolve(process.cwd(), "dist", "index.html");
   app2.get("/app/{*splat}", (req, res, next) => {
     if (req.path.includes(".")) {
       return next();
@@ -9997,7 +10092,7 @@ function setupPaymentGatewayRoutes(app2) {
 }
 (async () => {
   try {
-    const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const { db: db2 } = await init_db().then(() => db_exports);
     const { sql: sql5 } = await import("drizzle-orm");
     await db2.execute(sql5.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS language text DEFAULT 'en'`));
   } catch (e) {
@@ -10033,8 +10128,8 @@ function setupPaymentGatewayRoutes(app2) {
   whatsappService.connect().catch((err) => log2("WhatsApp auto-connect error:", err));
   initStripe().catch((err) => log2("Stripe init error (non-fatal):", err));
   try {
-    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    await pool2.query(`
+    const { pool } = await init_db().then(() => db_exports);
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS platform_settings (
         id SERIAL PRIMARY KEY,
         key TEXT NOT NULL UNIQUE,
@@ -10057,13 +10152,13 @@ function setupPaymentGatewayRoutes(app2) {
     log2("Error ensuring platform tables:", err);
   }
   try {
-    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    await pool2.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_addon boolean NOT NULL DEFAULT false;`);
-    const callsCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='calls'`);
+    const { pool } = await init_db().then(() => db_exports);
+    await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_addon boolean NOT NULL DEFAULT false;`);
+    const callsCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='calls'`);
     const callsHasPhone = callsCols.rows.some((r) => r.column_name === "phone_number");
     if (!callsHasPhone) {
-      await pool2.query(`DROP TABLE IF EXISTS calls CASCADE;`);
-      await pool2.query(`
+      await pool.query(`DROP TABLE IF EXISTS calls CASCADE;`);
+      await pool.query(`
         CREATE TABLE calls (
           id serial PRIMARY KEY,
           tenant_id integer,
@@ -10076,18 +10171,18 @@ function setupPaymentGatewayRoutes(app2) {
         );
       `);
     } else {
-      await pool2.query(`
+      await pool.query(`
         ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_tenant_id_fkey;
         ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_branch_id_fkey;
         ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_customer_id_fkey;
         ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_sale_id_fkey;
       `);
     }
-    const vehiclesCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='vehicles'`);
+    const vehiclesCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='vehicles'`);
     const vehiclesHasPlate = vehiclesCols.rows.some((r) => r.column_name === "license_plate");
     if (!vehiclesHasPlate) {
-      await pool2.query(`DROP TABLE IF EXISTS vehicles CASCADE;`);
-      await pool2.query(`
+      await pool.query(`DROP TABLE IF EXISTS vehicles CASCADE;`);
+      await pool.query(`
         CREATE TABLE vehicles (
           id serial PRIMARY KEY,
           tenant_id integer REFERENCES tenants(id) ON DELETE CASCADE,
@@ -10104,11 +10199,11 @@ function setupPaymentGatewayRoutes(app2) {
         );
       `);
     }
-    const printerCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='printer_configs'`);
+    const printerCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='printer_configs'`);
     const printerHasReceiptType = printerCols.rows.some((r) => r.column_name === "receipt_type");
     if (!printerHasReceiptType) {
-      await pool2.query(`DROP TABLE IF EXISTS printer_configs CASCADE;`);
-      await pool2.query(`
+      await pool.query(`DROP TABLE IF EXISTS printer_configs CASCADE;`);
+      await pool.query(`
         CREATE TABLE printer_configs (
           id serial PRIMARY KEY,
           tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -10124,11 +10219,11 @@ function setupPaymentGatewayRoutes(app2) {
         );
       `);
     }
-    const dailyCols = await pool2.query(`SELECT column_name, data_type FROM information_schema.columns WHERE table_name='daily_closings'`);
+    const dailyCols = await pool.query(`SELECT column_name, data_type FROM information_schema.columns WHERE table_name='daily_closings'`);
     const dailyHasBranchId = dailyCols.rows.some((r) => r.column_name === "branch_id");
     if (!dailyHasBranchId) {
-      await pool2.query(`DROP TABLE IF EXISTS daily_closings CASCADE;`);
-      await pool2.query(`
+      await pool.query(`DROP TABLE IF EXISTS daily_closings CASCADE;`);
+      await pool.query(`
         CREATE TABLE daily_closings (
           id serial PRIMARY KEY,
           tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -10150,11 +10245,11 @@ function setupPaymentGatewayRoutes(app2) {
         );
       `);
     }
-    const monthlyCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='monthly_closings'`);
+    const monthlyCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='monthly_closings'`);
     const monthlyHasBranchId = monthlyCols.rows.some((r) => r.column_name === "branch_id");
     if (!monthlyHasBranchId) {
-      await pool2.query(`DROP TABLE IF EXISTS monthly_closings CASCADE;`);
-      await pool2.query(`
+      await pool.query(`DROP TABLE IF EXISTS monthly_closings CASCADE;`);
+      await pool.query(`
         CREATE TABLE monthly_closings (
           id serial PRIMARY KEY,
           tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -10176,8 +10271,8 @@ function setupPaymentGatewayRoutes(app2) {
         );
       `);
     }
-    await pool2.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL;`);
-    await pool2.query(`
+    await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL;`);
+    await pool.query(`
       ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL;
       DO $$
       BEGIN
@@ -10193,7 +10288,7 @@ function setupPaymentGatewayRoutes(app2) {
           FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
       END $$;
     `);
-    await pool2.query(`
+    await pool.query(`
       DO $$
       BEGIN
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_product_id_products_id_fk') THEN
@@ -10203,7 +10298,7 @@ function setupPaymentGatewayRoutes(app2) {
           FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
       END $$;
     `);
-    await pool2.query(`
+    await pool.query(`
       DO $$
       BEGIN
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_branch_id_branches_id_fk') THEN
@@ -10213,7 +10308,7 @@ function setupPaymentGatewayRoutes(app2) {
           FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE;
       END $$;
     `);
-    await pool2.query(`
+    await pool.query(`
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS customer_nr integer;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS salutation text;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_name text;
@@ -10241,7 +10336,7 @@ function setupPaymentGatewayRoutes(app2) {
     log2("Schema migration error (non-fatal):", err);
   }
   try {
-    const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+    const { storage: storage2 } = await init_storage().then(() => storage_exports);
     const adminEmail = "admin@barmagly.com";
     const existingAdmin = await storage2.getSuperAdminByEmail(adminEmail);
     if (!existingAdmin) {
@@ -10258,7 +10353,7 @@ function setupPaymentGatewayRoutes(app2) {
     log2("Error creating super admin:", err);
   }
   try {
-    const { seedPizzaLemon: seedPizzaLemon2 } = await Promise.resolve().then(() => (init_seedPizzaLemon(), seedPizzaLemon_exports));
+    const { seedPizzaLemon: seedPizzaLemon2 } = await init_seedPizzaLemon().then(() => seedPizzaLemon_exports);
     await seedPizzaLemon2();
   } catch (err) {
     log2("Error seeding Pizza Lemon data:", err);
