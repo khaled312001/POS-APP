@@ -7,7 +7,7 @@ packages = ["chromium", "nss", "atk", "cups", "libdrm", "libxkbcommon", "xorg.li
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["sh", "-c", "rm -rf node_modules/drizzle-kit && npm install --legacy-peer-deps && npm run expo:static:build && npm run server:build"]
+build = ["sh", "-c", "npm run expo:static:build && npm run server:build"]
 run = ["npm", "run", "server:prod"]
 
 [[ports]]
