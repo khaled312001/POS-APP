@@ -125,7 +125,15 @@
       "Bash(find f:/POS-APP/app -name *.tsx -o -name *.ts)",
       "Bash(find f:/POS-APP -name *.html -not -path */node_modules/* -not -path */dist/*)",
       "Bash(find f:/POS-APP/server -name *.ts)",
-      "Bash(find f:/POS-APP -name .env* -not -path */node_modules/*)"
+      "Bash(find f:/POS-APP -name .env* -not -path */node_modules/*)",
+      "Bash(sshpass -p 'support@Passord123' ssh -p 65002 -o StrictHostKeyChecking=no u492425110@82.198.227.175 \"echo connected && ls ~/domains/barmagly.tech/nodejs/app/server_dist/\")",
+      "Bash(where ssh:*)",
+      "Bash(where scp:*)",
+      "Bash(ssh-keygen -t ed25519 -f ~/.ssh/hostinger_pos -N \"\")",
+      "Read(//c/Users/AIA/.ssh/**)",
+      "Bash(pip install:*)",
+      "Bash(python -c \":*)",
+      "Bash(head -5 grep -r \"Sliced Tomatoes\\\\|Arugula\\\\|Prosciutto\" f:/POS-APP/scripts/ --include=*.json -l)"
     ]
   }
 }
