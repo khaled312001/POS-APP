@@ -301,11 +301,60 @@ const ALKOHOL: MenuItem[] = [
 ];
 
 // ─── EXTRA ────────────────────────────────────────────────────────────────────
+function emojiImg(emoji: string): string {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="85" font-size="80" text-anchor="middle" x="50">${emoji}</text></svg>`;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 const EXTRAS: MenuItem[] = [
+    // ── Existing extras ──────────────────────────────────────────────────────
     { name: "Brot", description: "Frisches Brot", price: 2.00, image: IMG("pizzalemon_extra_brot.jpg") },
     { name: "Knoblibrot", description: "Knuspriges Brot mit Knoblauchbutter", price: 7.00, image: IMG("pizzalemon_90_knoblibrot.jpg") },
     { name: "Pommes Extra", description: "Extra Portion Pommes frites", price: 11.00, image: IMG("pizzalemon_58_pommes.jpg") },
     { name: "Zigaretten", description: "Zigaretten – aktueller Preis. Zählen nicht zum Mindestbestellwert.", price: 17.00, image: IMG("pizzalemon_113_zigaretten.jpg") },
+
+    // ── Pizza toppings (+CHF 2.00 each) ──────────────────────────────────────
+    { name: "Tomato Sauce",    description: "Tomatensauce",          price: 2.00, image: emojiImg("🍅") },
+    { name: "Sliced Tomatoes", description: "Tomatenscheiben",       price: 2.00, image: emojiImg("🍅") },
+    { name: "Garlic",          description: "Knoblauch",             price: 2.00, image: emojiImg("🧄") },
+    { name: "Onions",          description: "Zwiebeln",              price: 2.00, image: emojiImg("🧅") },
+    { name: "Capers",          description: "Kapern",                price: 2.00, image: emojiImg("🫙") },
+    { name: "Olivas",          description: "Oliven",                price: 2.00, image: emojiImg("🫒") },
+    { name: "Oregano",         description: "Oregano",               price: 2.00, image: emojiImg("🌿") },
+    { name: "Vegetables",      description: "Gemüse",                price: 2.00, image: emojiImg("🥗") },
+    { name: "Spinach",         description: "Spinat",                price: 2.00, image: emojiImg("🥬") },
+    { name: "Bell Peppers",    description: "Paprika",               price: 2.00, image: emojiImg("🫑") },
+    { name: "Corn",            description: "Mais",                  price: 2.00, image: emojiImg("🌽") },
+    { name: "Broccoli",        description: "Brokkoli",              price: 2.00, image: emojiImg("🥦") },
+    { name: "Artichokes",      description: "Artischocken",          price: 2.00, image: emojiImg("🌱") },
+    { name: "Egg",             description: "Ei",                   price: 2.00, image: emojiImg("🥚") },
+    { name: "Pineapple",       description: "Ananas",                price: 2.00, image: emojiImg("🍍") },
+    { name: "Arugula",         description: "Rucola",                price: 2.00, image: emojiImg("🌿") },
+    { name: "Mushrooms",       description: "Pilze",                 price: 2.00, image: emojiImg("🍄") },
+    { name: "Ham",             description: "Schinken",              price: 2.00, image: emojiImg("🍖") },
+    { name: "Spicy Salami",    description: "Scharfe Salami",        price: 2.00, image: emojiImg("🌶️") },
+    { name: "Salami",          description: "Salami",                price: 2.00, image: emojiImg("🥩") },
+    { name: "Basami",          description: "Basilikum",             price: 2.00, image: emojiImg("🌿") },
+    { name: "Prosciutto",      description: "Rohschinken",           price: 2.00, image: emojiImg("🥩") },
+    { name: "Lardons",         description: "Speckwürfel",           price: 2.00, image: emojiImg("🥓") },
+    { name: "Chicken",         description: "Hühnerfleisch",         price: 2.00, image: emojiImg("🍗") },
+    { name: "Kebab",           description: "Kebabfleisch",          price: 2.00, image: emojiImg("🥙") },
+    { name: "Minced Meat",     description: "Hackfleisch",           price: 2.00, image: emojiImg("🥩") },
+    { name: "Anchovies",       description: "Sardellen",             price: 2.00, image: emojiImg("🐟") },
+    { name: "Sardinen",        description: "Sardinen",              price: 2.00, image: emojiImg("🐟") },
+    { name: "Tuna",            description: "Thunfisch",             price: 2.00, image: emojiImg("🐟") },
+    { name: "Spicy Sauce",     description: "Scharfe Sauce",         price: 2.00, image: emojiImg("🌶️") },
+    { name: "Mozzarella",      description: "Mozzarella",            price: 2.00, image: emojiImg("🧀") },
+    { name: "Gorgonzola",      description: "Gorgonzola",            price: 2.00, image: emojiImg("🧀") },
+    { name: "Parmesan",        description: "Parmesan",              price: 2.00, image: emojiImg("🧀") },
+    { name: "Mascarpone",      description: "Mascarpone",            price: 2.00, image: emojiImg("🧀") },
+    { name: "Kaesarand",       description: "Käserand",              price: 2.00, image: emojiImg("🧀") },
+
+    // ── Sauces (FREE) ─────────────────────────────────────────────────────────
+    { name: "Mayonnaise",      description: "Mayonnaise",            price: 0.00, image: emojiImg("🥫") },
+    { name: "Ketchup",         description: "Ketchup",               price: 0.00, image: emojiImg("🍅") },
+    { name: "Cocktail Sauce",  description: "Cocktailsauce",         price: 0.00, image: emojiImg("🥫") },
+    { name: "Yogurt Sauce",    description: "Joghurtsauce",          price: 0.00, image: emojiImg("🥛") },
 ];
 
 function slugify(name: string): string {
