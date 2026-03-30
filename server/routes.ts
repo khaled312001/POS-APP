@@ -61,6 +61,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
       html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
       html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
+      html = html.replace(/\{\{CURRENCY\}\}/g, (tenant as any).currency || "CHF");
+      html = html.replace(/\{\{LANGUAGE\}\}/g, (config as any).language || "en");
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(html);
     } catch (err) {

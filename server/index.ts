@@ -261,18 +261,16 @@ function configureExpoAndLanding(app: express.Application) {
       }
     }
 
-    if (req.path.startsWith("/super_admin")) {
-      return res.redirect(301, req.url.replace("/super_admin", "/super-admin"));
-    }
-
-    if (req.path.startsWith("/super-admin")) {
+    // Handle both /super_admin and /super-admin (serve directly, no redirect)
+    if (req.path.startsWith("/super_admin") || req.path.startsWith("/super-admin")) {
+      const isLogin = req.path === "/super_admin/login" || req.path === "/super-admin/login"
+        || req.path === "/super_admin" || req.path === "/super-admin";
       const superAdminTemplatePath = path.resolve(
         process.cwd(),
         "server",
         "templates",
-        req.path === "/super-admin/login" ? "super-admin-login.html" : "super-admin-dashboard.html"
+        isLogin ? "super-admin-login.html" : "super-admin-dashboard.html"
       );
-
       try {
         const superAdminTemplate = fs.readFileSync(superAdminTemplatePath, "utf-8");
         res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -288,27 +286,43 @@ function configureExpoAndLanding(app: express.Application) {
       return res.status(200).send(dbTemplate);
     }
 
-    const storeByIdMatch = req.path.match(/^\/store\/(\d+)$/);
-    if (storeByIdMatch) {
+    const storeMatch = req.path.match(/^\/store\/(.+)$/);
+    if (storeMatch) {
       try {
-        const tenantId = parseInt(storeByIdMatch[1], 10);
+        const storeParam = storeMatch[1];
         const { storage } = await import("./storage");
-        const tenant = await storage.getTenant(tenantId);
-        if (!tenant) {
-          return res.status(404).send("<h1>Store not found</h1>");
+        let tenantId: number | undefined;
+        let slug: string | undefined;
+
+        // Numeric ID → look up tenant directly
+        if (/^\d+$/.test(storeParam)) {
+          tenantId = parseInt(storeParam, 10);
+          const config = await storage.getLandingPageConfig(tenantId);
+          slug = config?.slug || `tenant-${tenantId}`;
+        } else {
+          // Slug → look up by slug
+          slug = storeParam;
+          const config = await storage.getLandingPageConfigBySlug(slug);
+          if (!config) return res.status(404).send("<h1>Store not found</h1>");
+          tenantId = config.tenantId;
         }
+
+        const tenant = await storage.getTenant(tenantId);
+        if (!tenant) return res.status(404).send("<h1>Store not found</h1>");
+
         const config = await storage.getLandingPageConfig(tenantId);
         const storePath = path.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
         let html = fs.readFileSync(storePath, "utf-8");
-        const slug = config?.slug || `tenant-${tenantId}`;
-        html = html.replace(/\{\{SLUG\}\}/g, slug);
+        html = html.replace(/\{\{SLUG\}\}/g, slug!);
         html = html.replace(/\{\{TENANT_ID\}\}/g, String(tenantId));
         html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config?.primaryColor || "#2FD3C6");
         html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config?.accentColor || "#6366F1");
+        html = html.replace(/\{\{CURRENCY\}\}/g, (tenant as any).currency || "CHF");
+        html = html.replace(/\{\{LANGUAGE\}\}/g, config?.language || "en");
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         return res.status(200).send(html);
       } catch (err) {
-        console.error("[store/:tenantId] Error:", err);
+        console.error("[store/:param] Error:", err);
         return res.status(500).send("<h1>Server error</h1>");
       }
     }
