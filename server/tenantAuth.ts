@@ -14,6 +14,7 @@ const PUBLIC_ROUTES = [
   "/api/auth/google",
   "/api/landing/subscribe",
   "/api/landing-page-config",
+  "/api/store/",
   "/api/store-public/",
   "/api/online-orders/public",
   "/api/stripe/webhook",

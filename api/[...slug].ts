@@ -8,6 +8,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
+import { tenantAuthMiddleware } from "../server/tenantAuth";
+import { registerSuperAdminRoutes } from "../server/superAdminRoutes";
+import { registerRoutes } from "../server/routes";
 
 // ── Build DATABASE_URL from Vercel/Neon env vars if not already set ───────────
 if (!process.env.DATABASE_URL) {
@@ -22,7 +25,7 @@ if (!process.env.DATABASE_URL) {
   }
 }
 
-// ── Express app (created once, reused across warm invocations) ────────────────
+// ── Express app ───────────────────────────────────────────────────────────────
 const app = express();
 
 // CORS
@@ -50,39 +53,23 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// ── Lazy bootstrap (routes registered once on first request) ──────────────────
-let bootstrapped = false;
-let bootstrapPromise: Promise<void> | null = null;
+// ── Bootstrap: register routes once at module load (runs on cold start) ───────
+const ready: Promise<void> = (async () => {
+  app.use(tenantAuthMiddleware());
+  registerSuperAdminRoutes(app);
+  await registerRoutes(app);
 
-async function bootstrap() {
-  if (bootstrapped) return;
-  if (bootstrapPromise) return bootstrapPromise;
-
-  bootstrapPromise = (async () => {
-    const { tenantAuthMiddleware } = await import("../server/tenantAuth");
-    const { registerSuperAdminRoutes } = await import("../server/superAdminRoutes");
-    const { registerRoutes } = await import("../server/routes");
-
-    app.use(tenantAuthMiddleware());
-    registerSuperAdminRoutes(app);
-    await registerRoutes(app);
-
-    // Error handler
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-      if (!res.headersSent) res.status(status).json({ message });
-    });
-
-    bootstrapped = true;
-  })();
-
-  return bootstrapPromise;
-}
+  // Error handler
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+    if (!res.headersSent) res.status(status).json({ message });
+  });
+})();
 
 // ── Vercel handler ────────────────────────────────────────────────────────────
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  await bootstrap();
+  await ready;
   // @ts-ignore — express accepts the Vercel req/res shapes
   return app(req, res);
 }

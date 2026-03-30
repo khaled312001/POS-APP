@@ -42,6 +42,33 @@ const googleClient = new OAuth2Client("852311970344-8q8a01gm3jip4k9vooljk8ttjpd3
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
+  // ── Public store page by slug (e.g. /api/store/pizza-lemon) ───────────────
+  // Vercel rewrites /store/:slug → /api/store/:slug so this serves the HTML.
+  app.get("/api/store/:slug", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const config = await storage.getLandingPageConfigBySlug(slug);
+      if (!config) {
+        return res.status(404).send("<h1>Store not found</h1>");
+      }
+      const tenant = await storage.getTenant(config.tenantId);
+      if (!tenant) {
+        return res.status(404).send("<h1>Store not found</h1>");
+      }
+      const storePath = path.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
+      let html = fs.readFileSync(storePath, "utf-8");
+      html = html.replace(/\{\{SLUG\}\}/g, slug);
+      html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
+      html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
+      html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(html);
+    } catch (err) {
+      console.error("[store/:slug] Error:", err);
+      return res.status(500).send("<h1>Server error</h1>");
+    }
+  });
+
   // ── One-time production seed endpoint ─────────────────────────────────────
   // Ensures Pizza Lemon store exists in whatever DB this server is connected to.
   // Safe to call multiple times – seedPizzaLemon() is idempotent.
