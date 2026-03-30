@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "installCommand": "npm install",
+  "buildCommand": "npx expo export && node scripts/post-export.js",
+  "outputDirectory": "dist",
   "redirects": [
     {
       "source": "/",

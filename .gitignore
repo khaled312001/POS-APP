@@ -36,7 +36,7 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
-.vercel
+
 
 # WhatsApp session data
 .wppconnect/
