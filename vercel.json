@@ -1,10 +1,10 @@
 {
   "version": 2,
   "installCommand": "npm install",
-  "buildCommand": "npx expo export && node scripts/post-export.js",
+  "buildCommand": "npx expo export && node scripts/post-export.js && node scripts/build-api.js",
   "outputDirectory": "dist",
   "functions": {
-    "api/[...slug].ts": {
+    "api/[...slug].js": {
       "includeFiles": "server/templates/**"
     }
   },

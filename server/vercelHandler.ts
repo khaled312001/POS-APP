@@ -8,9 +8,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
-import { tenantAuthMiddleware } from "../server/tenantAuth";
-import { registerSuperAdminRoutes } from "../server/superAdminRoutes";
-import { registerRoutes } from "../server/routes";
+import { tenantAuthMiddleware } from "./tenantAuth";
+import { registerSuperAdminRoutes } from "./superAdminRoutes";
+import { registerRoutes } from "./routes";
 
 // ── Build DATABASE_URL from Vercel/Neon env vars if not already set ───────────
 if (!process.env.DATABASE_URL) {
