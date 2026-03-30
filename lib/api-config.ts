@@ -9,39 +9,31 @@ export function getDisplayNumber(receiptOrOrderNumber: string | undefined | null
 }
 
 export function getApiUrl(): string {
-  // Always respect an explicitly set API URL across all platforms
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-
-  // Handle mobile platform logic
-  if (Platform.OS !== 'web') {
-    if (process.env.EXPO_PUBLIC_DOMAIN) {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN;
-      const protocol = domain.includes('localhost') ? 'http' : 'https';
-      return `${protocol}://${domain}`;
-    }
-    return 'http://localhost:5000';
-  }
-
-  // Handle web platform logic
-  if (typeof window !== 'undefined') {
+  // Web platform: determine API URL at runtime to avoid stale build-time env vars
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    
+
     // Local dev
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:5000';
+      return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
     }
     // Replit dev
     if (hostname.includes('.replit.dev')) {
       return `https://${hostname}:5000`;
     }
-    // For production where the frontend is static (e.g. Vercel), 
-    // window.location.origin would point back to Vercel (which returns index.html on API routes).
-    // So if process.env.EXPO_PUBLIC_API_URL wasn't set, we fall back to the origin.
-    // Ensure you add EXPO_PUBLIC_API_URL in your Vercel Environment Variables pointing to your backend!
+    // Production web: use same origin so the request goes to the correct backend
+    // (EXPO_PUBLIC_API_URL may point to an old/different server and should not override this)
     return window.location.origin;
   }
 
+  // Native (iOS/Android): rely on build-time env vars
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  if (process.env.EXPO_PUBLIC_DOMAIN) {
+    const domain = process.env.EXPO_PUBLIC_DOMAIN;
+    const protocol = domain.includes('localhost') ? 'http' : 'https';
+    return `${protocol}://${domain}`;
+  }
   return 'http://localhost:5000';
 }

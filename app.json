@@ -52,7 +52,8 @@
       [
         "expo-router",
         {
-          "origin": "https://pos.barmagly.tech/"
+          "origin": "https://pos.barmagly.tech/",
+          "baseUrl": "/app"
         }
       ],
       "expo-font",
@@ -80,7 +81,8 @@
     },
     "extra": {
       "router": {
-        "origin": "https://pos.barmagly.tech/"
+        "origin": "https://pos.barmagly.tech/",
+        "baseUrl": "/app"
       },
       "eas": {
         "projectId": "70016573-6c3a-4410-bb4e-c32ba66ee6d5"

@@ -4,9 +4,9 @@
   "buildCommand": "npx expo export && node scripts/post-export.js",
   "outputDirectory": "dist",
   "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/app", "destination": "/app/index.html" },
+    { "source": "/app/(.*)", "destination": "/app/index.html" },
+    { "source": "/super_admin", "destination": "/super_admin/index.html" },
+    { "source": "/super_admin/(.*)", "destination": "/super_admin/index.html" }
   ]
 }

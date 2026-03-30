@@ -121,7 +121,11 @@
       "Bash(sed -n '240,270p' \"f:/POS-APP/app/\\(tabs\\)/products.tsx\")",
       "Bash(sed -n '140,165p' \"f:/POS-APP/app/\\(tabs\\)/customers.tsx\")",
       "Bash(sed -n '1335,1360p' \"f:/POS-APP/app/\\(tabs\\)/reports.tsx\")",
-      "Bash(npx expo:*)"
+      "Bash(npx expo:*)",
+      "Bash(find f:/POS-APP/app -name *.tsx -o -name *.ts)",
+      "Bash(find f:/POS-APP -name *.html -not -path */node_modules/* -not -path */dist/*)",
+      "Bash(find f:/POS-APP/server -name *.ts)",
+      "Bash(find f:/POS-APP -name .env* -not -path */node_modules/*)"
     ]
   }
 }
