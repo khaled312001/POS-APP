@@ -9,7 +9,7 @@ export function getDisplayNumber(receiptOrOrderNumber: string | undefined | null
 }
 
 export function getApiUrl(): string {
-  // Web platform: determine API URL at runtime to avoid stale build-time env vars
+  // Web platform: determine API URL at runtime
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     const hostname = window.location.hostname;
 
@@ -21,9 +21,10 @@ export function getApiUrl(): string {
     if (hostname.includes('.replit.dev')) {
       return `https://${hostname}:5000`;
     }
-    // Production web: use same origin so the request goes to the correct backend
-    // (EXPO_PUBLIC_API_URL may point to an old/different server and should not override this)
-    return window.location.origin;
+    // Production web: use the same origin so API calls reach the backend at the same domain.
+    // If your backend is on a different domain, set EXPO_PUBLIC_API_URL in
+    // Vercel Dashboard → Settings → Environment Variables (it's baked in at build time).
+    return process.env.EXPO_PUBLIC_API_URL || window.location.origin;
   }
 
   // Native (iOS/Android): rely on build-time env vars

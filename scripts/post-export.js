@@ -178,7 +178,7 @@ const manifestContent = JSON.stringify({
   name: "Barmagly POS",
   short_name: "Barmagly",
   description: "Point of Sale system for modern restaurants and stores",
-  start_url: "/app",
+  start_url: "/app/",
   scope: "/app/",
   display: "standalone",
   orientation: "any",
@@ -224,7 +224,20 @@ if (fs.existsSync(indexSrc)) {
   console.log("[post-export] Moved index.html → app/index.html");
 }
 
-// ── 5. Landing page at dist/index.html ───────────────────────────────────────
+// ── 5. Copy icon image (expo export omits it; needed by PWA manifest) ────────
+const srcIconDir = path.resolve(__dirname, "../assets/images");
+const destIconDir = path.join(appDir, "assets", "images");
+fs.mkdirSync(destIconDir, { recursive: true });
+for (const img of ["icon.png", "splash-icon.png", "favicon.png"]) {
+  const s = path.join(srcIconDir, img);
+  const d = path.join(destIconDir, img);
+  if (fs.existsSync(s) && !fs.existsSync(d)) {
+    fs.copyFileSync(s, d);
+    console.log(`[post-export] Copied assets/images/${img} → app/assets/images/${img}`);
+  }
+}
+
+// ── 6. Landing page at dist/index.html ───────────────────────────────────────
 const landingTemplatePath = path.resolve(__dirname, "../server/templates/landing-page.html");
 if (fs.existsSync(landingTemplatePath)) {
   let landingHtml = fs.readFileSync(landingTemplatePath, "utf-8");
@@ -242,7 +255,7 @@ if (fs.existsSync(landingTemplatePath)) {
   console.warn("[post-export] WARNING: landing-page.html template not found, root will be empty");
 }
 
-// ── 6. Super Admin pages ──────────────────────────────────────────────────────
+// ── 7. Super Admin pages ──────────────────────────────────────────────────────
 fs.mkdirSync(superAdminDir, { recursive: true });
 fs.mkdirSync(superAdminLoginDir, { recursive: true });
 

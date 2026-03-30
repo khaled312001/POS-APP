@@ -3,10 +3,14 @@
   "installCommand": "npm install",
   "buildCommand": "npx expo export && node scripts/post-export.js",
   "outputDirectory": "dist",
+  "redirects": [
+    { "source": "/super-admin",      "destination": "/super_admin",    "permanent": true },
+    { "source": "/super-admin/(.*)", "destination": "/super_admin/$1", "permanent": true }
+  ],
   "rewrites": [
-    { "source": "/app", "destination": "/app/index.html" },
-    { "source": "/app/(.*)", "destination": "/app/index.html" },
-    { "source": "/super_admin", "destination": "/super_admin/index.html" },
+    { "source": "/app",              "destination": "/app/index.html" },
+    { "source": "/app/(.*)",         "destination": "/app/index.html" },
+    { "source": "/super_admin",      "destination": "/super_admin/index.html" },
     { "source": "/super_admin/(.*)", "destination": "/super_admin/index.html" }
   ]
 }
