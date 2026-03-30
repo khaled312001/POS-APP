@@ -242,7 +242,10 @@ function configureExpoAndLanding(app: express.Application) {
     }
 
     if (req.path === "/app" || req.path === "/app/" || req.path === "/app/index.html") {
-      const indexPath = path.resolve(process.cwd(), "dist", "index.html");
+      // post-export.js places the Expo app at dist/app/index.html
+      const appIndexPath = path.resolve(process.cwd(), "dist", "app", "index.html");
+      const fallbackPath = path.resolve(process.cwd(), "dist", "index.html");
+      const indexPath = fs.existsSync(appIndexPath) ? appIndexPath : fallbackPath;
       if (fs.existsSync(indexPath)) {
         const html = fs.readFileSync(indexPath, "utf-8");
         res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -252,7 +255,10 @@ function configureExpoAndLanding(app: express.Application) {
 
     // Serve service worker with no-cache headers so updates propagate immediately
     if (req.path === "/app/sw.js") {
-      const swPath = path.resolve(process.cwd(), "dist", "sw.js");
+      // post-export.js places sw.js at dist/app/sw.js
+      const swPath = fs.existsSync(path.resolve(process.cwd(), "dist", "app", "sw.js"))
+        ? path.resolve(process.cwd(), "dist", "app", "sw.js")
+        : path.resolve(process.cwd(), "dist", "sw.js");
       if (fs.existsSync(swPath)) {
         res.setHeader("Content-Type", "application/javascript");
         res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -353,7 +359,13 @@ function configureExpoAndLanding(app: express.Application) {
   app.use("/sounds", express.static(path.resolve(process.cwd(), "public", "sounds")));
   // Serve project icon assets at the /app/assets/images path so the PWA manifest icons resolve
   app.use("/app/assets/images", express.static(path.resolve(process.cwd(), "assets", "images")));
-  app.use("/app", express.static(path.resolve(process.cwd(), "dist"), {
+
+  // post-export.js places the Expo app bundle at dist/app/, so serve /app from dist/app/
+  // Fall back to dist/ root for dev builds that haven't run post-export
+  const appDistDir = fs.existsSync(path.resolve(process.cwd(), "dist", "app"))
+    ? path.resolve(process.cwd(), "dist", "app")
+    : path.resolve(process.cwd(), "dist");
+  app.use("/app", express.static(appDistDir, {
     setHeaders(res, filePath) {
       if (filePath.endsWith(".webmanifest")) {
         res.setHeader("Content-Type", "application/manifest+json");
@@ -363,7 +375,9 @@ function configureExpoAndLanding(app: express.Application) {
   app.use(express.static(path.resolve(process.cwd(), "static-build")));
 
   // SPA catch-all: serve index.html for any unmatched route under /app
-  const staticIndexPath = path.resolve(process.cwd(), "dist", "index.html");
+  const staticIndexPath = fs.existsSync(path.resolve(process.cwd(), "dist", "app", "index.html"))
+    ? path.resolve(process.cwd(), "dist", "app", "index.html")
+    : path.resolve(process.cwd(), "dist", "index.html");
   app.get("/app/{*splat}", (req: Request, res: Response, next: NextFunction) => {
     if (req.path.includes(".")) {
       return next();
