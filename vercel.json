@@ -3,40 +3,9 @@
   "installCommand": "npm install",
   "buildCommand": "npx expo export && node scripts/post-export.js",
   "outputDirectory": "dist",
-  "redirects": [
-    {
-      "source": "/",
-      "destination": "/app",
-      "permanent": false
-    }
-  ],
   "rewrites": [
     {
-      "source": "/app/_expo/:match*",
-      "destination": "/_expo/:match*"
-    },
-    {
-      "source": "/app/assets/:match*",
-      "destination": "/assets/:match*"
-    },
-    {
-      "source": "/app/favicon.ico",
-      "destination": "/favicon.ico"
-    },
-    {
-      "source": "/app/sw.js",
-      "destination": "/sw.js"
-    },
-    {
-      "source": "/app/manifest.webmanifest",
-      "destination": "/manifest.webmanifest"
-    },
-    {
-      "source": "/app/:match*",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/:match*",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]

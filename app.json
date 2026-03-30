@@ -45,8 +45,6 @@
       "themeColor": "#2FD3C6",
       "backgroundColor": "#0A0E17",
       "lang": "en",
-      "scope": "/app",
-      "startUrl": "/app",
       "display": "standalone",
       "bundler": "metro"
     },
@@ -78,8 +76,7 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true,
-      "baseUrl": "/app"
+      "reactCompiler": true
     },
     "extra": {
       "router": {

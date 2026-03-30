@@ -331,25 +331,27 @@ export async function seedPizzaLemon() {
     let tenant: typeof tenants.$inferSelect | undefined;
 
     const pizzaLemonTenants = await db.select().from(tenants)
-        .where(sql`LOWER(${tenants.businessName}) = 'pizza lemon'`);
+        .where(eq(tenants.id, 24));
 
     if (pizzaLemonTenants.length > 0) {
         tenant = pizzaLemonTenants[0];
-        console.log(`[PIZZA LEMON] Found existing store (ID ${tenant.id}). Upgrading credentials...`);
+        console.log(`[PIZZA LEMON] Found existing store (ID ${tenant.id}). Upgrading credentials and data...`);
 
         const hash = await bcrypt.hash(STORE_PASSWORD, 10);
         await db.update(tenants).set({
+            businessName: BUSINESS_NAME,
             ownerEmail: STORE_EMAIL,
             passwordHash: hash,
             status: "active",
             storeType: "restaurant",
             maxBranches: 3,
             maxEmployees: 20,
-        }).where(eq(tenants.id, tenant.id));
+        }).where(eq(tenants.id, 24));
     } else {
-        console.log("[PIZZA LEMON] No Pizza Lemon store found. Creating new store...");
+        console.log("[PIZZA LEMON] No Tenant ID 24 found. Creating new store with ID 24...");
         const hash = await bcrypt.hash(STORE_PASSWORD, 10);
         const [newTenant] = await db.insert(tenants).values({
+            id: 24,
             businessName: BUSINESS_NAME,
             ownerName: "Pizza Lemon Owner",
             ownerEmail: STORE_EMAIL,

@@ -9,10 +9,13 @@ export function getDisplayNumber(receiptOrOrderNumber: string | undefined | null
 }
 
 export function getApiUrl(): string {
+  // Always respect an explicitly set API URL across all platforms
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+
+  // Handle mobile platform logic
   if (Platform.OS !== 'web') {
-    if (process.env.EXPO_PUBLIC_API_URL) {
-      return process.env.EXPO_PUBLIC_API_URL;
-    }
     if (process.env.EXPO_PUBLIC_DOMAIN) {
       const domain = process.env.EXPO_PUBLIC_DOMAIN;
       const protocol = domain.includes('localhost') ? 'http' : 'https';
@@ -21,18 +24,22 @@ export function getApiUrl(): string {
     return 'http://localhost:5000';
   }
 
+  // Handle web platform logic
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
+    
+    // Local dev
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:5000';
     }
-    // On Replit dev, Expo Metro sometimes opens on a .replit.dev subdomain directly
+    // Replit dev
     if (hostname.includes('.replit.dev')) {
       return `https://${hostname}:5000`;
     }
-    // For all other web environments (production domain, workspace URL, etc.)
-    // always use the current page origin so API calls go to the same server
-    // that served the page — this works correctly for both dev and production.
+    // For production where the frontend is static (e.g. Vercel), 
+    // window.location.origin would point back to Vercel (which returns index.html on API routes).
+    // So if process.env.EXPO_PUBLIC_API_URL wasn't set, we fall back to the origin.
+    // Ensure you add EXPO_PUBLIC_API_URL in your Vercel Environment Variables pointing to your backend!
     return window.location.origin;
   }
 
