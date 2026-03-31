@@ -8233,6 +8233,67 @@ async function test(){
       res.status(500).json({ error: e.message });
     }
   });
+  app2.post("/api/maintenance/fix-tenant-ids", async (req, res) => {
+    const secret = req.headers["x-maintenance-secret"] || req.query.secret;
+    if (secret !== "fix-tenant-2024-barmagly") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    try {
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { sql: sql5 } = await import("drizzle-orm");
+      const tenants2 = await db2.execute(sql5`SELECT id, name FROM tenants LIMIT 1`);
+      const rows = tenants2[0];
+      if (!rows || rows.length === 0) {
+        return res.status(404).json({ error: "No tenants found" });
+      }
+      const tid = rows[0].id;
+      const tables2 = [
+        "products",
+        "categories",
+        "employees",
+        "customers",
+        "branches",
+        "inventory",
+        "sales",
+        "sale_items",
+        "expenses",
+        "shifts",
+        "notifications",
+        "calls",
+        "purchase_orders",
+        "purchase_order_items",
+        "suppliers",
+        "tables",
+        "kitchen_orders",
+        "returns",
+        "return_items",
+        "cash_drawer_operations",
+        "warehouses",
+        "warehouse_transfers",
+        "product_batches",
+        "inventory_movements",
+        "stock_counts",
+        "stock_count_items",
+        "employee_commissions",
+        "daily_closings",
+        "monthly_closings"
+      ];
+      const results = {};
+      for (const table of tables2) {
+        try {
+          const r = await db2.execute(
+            sql5.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`)
+          );
+          results[table] = r[0]?.affectedRows ?? 0;
+        } catch (e) {
+          results[table] = -1;
+        }
+      }
+      res.json({ success: true, tenant: { id: tid, name: rows[0].name }, updates: results });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
   const httpServer = (0, import_node_http.createServer)(app2);
   return httpServer;
 }
@@ -10427,6 +10488,62 @@ function setupPaymentGatewayRoutes(app2) {
     await seedPizzaLemon2();
   } catch (err) {
     log2("Error seeding Pizza Lemon data:", err);
+  }
+  try {
+    const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const { sql: sql5 } = await import("drizzle-orm");
+    const tenantsResult = await db2.execute(sql5`SELECT id FROM tenants LIMIT 1`);
+    const tenantRows = tenantsResult[0];
+    if (tenantRows && tenantRows.length > 0) {
+      const tid = tenantRows[0].id;
+      const tenantTables = [
+        "products",
+        "categories",
+        "employees",
+        "customers",
+        "branches",
+        "inventory",
+        "sales",
+        "sale_items",
+        "expenses",
+        "shifts",
+        "notifications",
+        "calls",
+        "purchase_orders",
+        "purchase_order_items",
+        "suppliers",
+        "tables",
+        "kitchen_orders",
+        "returns",
+        "return_items",
+        "cash_drawer_operations",
+        "warehouses",
+        "warehouse_transfers",
+        "product_batches",
+        "inventory_movements",
+        "stock_counts",
+        "stock_count_items",
+        "employee_commissions",
+        "daily_closings",
+        "monthly_closings"
+      ];
+      let totalFixed = 0;
+      for (const table of tenantTables) {
+        try {
+          const r = await db2.execute(sql5.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`));
+          const affected = r[0]?.affectedRows ?? 0;
+          if (affected > 0) {
+            log2(`[migration] Fixed ${affected} rows in ${table}`);
+            totalFixed += affected;
+          }
+        } catch {
+        }
+      }
+      if (totalFixed > 0) log2(`[migration] Total tenant_id backfill: ${totalFixed} rows \u2192 tenant ${tid}`);
+      else log2(`[migration] tenant_id backfill: nothing to fix`);
+    }
+  } catch (err) {
+    log2("Error during tenant_id backfill:", err);
   }
   if (!isProduction) {
     const http = await import("http");
