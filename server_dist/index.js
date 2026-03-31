@@ -9594,8 +9594,10 @@ var PUBLIC_ROUTES = [
   // HTTP polling fallback — tenantId required in query string
   "/api/push/vapid-public-key",
   // Public — needed for SW push subscription before auth
-  "/api/push/subscribe"
+  "/api/push/subscribe",
   // Public — SW registers subscription before full auth
+  "/api/maintenance/fix-tenant-ids"
+  // One-time migration fix (secured by secret header)
 ];
 var PUBLIC_ROUTE_PATTERNS = [
   /^\/api\/store\/\d+\/menu$/

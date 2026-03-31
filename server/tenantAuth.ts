@@ -26,6 +26,7 @@ const PUBLIC_ROUTES = [
   "/api/caller-id/active-calls", // HTTP polling fallback — tenantId required in query string
   "/api/push/vapid-public-key", // Public — needed for SW push subscription before auth
   "/api/push/subscribe", // Public — SW registers subscription before full auth
+  "/api/maintenance/fix-tenant-ids", // One-time migration fix (secured by secret header)
 ];
 
 const PUBLIC_ROUTE_PATTERNS = [
