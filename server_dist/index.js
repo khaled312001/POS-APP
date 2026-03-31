@@ -1046,11 +1046,13 @@ var init_storage = __esm({
         return branch;
       },
       async createBranch(data) {
-        const [branch] = await db.insert(branches).values(data).returning();
+        const _ins_branch = await db.insert(branches).values(data).$returningId();
+        const [branch] = await db.select().from(branches).where((0, import_drizzle_orm.eq)(branches.id, _ins_branch[0]?.id ?? 0));
         return branch;
       },
       async updateBranch(id, data) {
-        const [branch] = await db.update(branches).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(branches.id, id)).returning();
+        await db.update(branches).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(branches.id, id));
+        const [branch] = await db.select().from(branches).where((0, import_drizzle_orm.eq)(branches.id, id));
         return branch;
       },
       async deleteBranch(id) {
@@ -1078,11 +1080,13 @@ var init_storage = __esm({
         return emp;
       },
       async createEmployee(data) {
-        const [emp] = await db.insert(employees).values(data).returning();
+        const _ins_emp = await db.insert(employees).values(data).$returningId();
+        const [emp] = await db.select().from(employees).where((0, import_drizzle_orm.eq)(employees.id, _ins_emp[0]?.id ?? 0));
         return emp;
       },
       async updateEmployee(id, data) {
-        const [emp] = await db.update(employees).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(employees.id, id)).returning();
+        await db.update(employees).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(employees.id, id));
+        const [emp] = await db.select().from(employees).where((0, import_drizzle_orm.eq)(employees.id, id));
         return emp;
       },
       async deleteEmployee(id) {
@@ -1096,7 +1100,8 @@ var init_storage = __esm({
         return db.select().from(categories).where((0, import_drizzle_orm.eq)(categories.isActive, true)).orderBy(categories.sortOrder);
       },
       async createCategory(data) {
-        const [cat] = await db.insert(categories).values(data).returning();
+        const _ins_cat = await db.insert(categories).values(data).$returningId();
+        const [cat] = await db.select().from(categories).where((0, import_drizzle_orm.eq)(categories.id, _ins_cat[0]?.id ?? 0));
         return cat;
       },
       async getCategory(id) {
@@ -1104,7 +1109,7 @@ var init_storage = __esm({
         return category;
       },
       async updateCategory(id, data) {
-        const [cat] = await db.update(categories).set(data).where((0, import_drizzle_orm.eq)(categories.id, id)).returning();
+        const [cat] = await db.update(categories).set(data).where((0, import_drizzle_orm.eq)(categories.id, id));
         return cat;
       },
       async deleteCategory(id) {
@@ -1117,9 +1122,9 @@ var init_storage = __esm({
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                (0, import_drizzle_orm.ilike)(products.name, `%${search}%`),
-                (0, import_drizzle_orm.ilike)(products.sku, `%${search}%`),
-                (0, import_drizzle_orm.ilike)(products.barcode, `%${search}%`)
+                (0, import_drizzle_orm.like)(products.name, `%${search}%`),
+                (0, import_drizzle_orm.like)(products.sku, `%${search}%`),
+                (0, import_drizzle_orm.like)(products.barcode, `%${search}%`)
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -1133,9 +1138,9 @@ var init_storage = __esm({
               (0, import_drizzle_orm.eq)(products.tenantId, tenantId),
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                (0, import_drizzle_orm.ilike)(products.name, `%${search}%`),
-                (0, import_drizzle_orm.ilike)(products.sku, `%${search}%`),
-                (0, import_drizzle_orm.ilike)(products.barcode, `%${search}%`)
+                (0, import_drizzle_orm.like)(products.name, `%${search}%`),
+                (0, import_drizzle_orm.like)(products.sku, `%${search}%`),
+                (0, import_drizzle_orm.like)(products.barcode, `%${search}%`)
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -1151,11 +1156,13 @@ var init_storage = __esm({
         return prod;
       },
       async createProduct(data) {
-        const [prod] = await db.insert(products).values(data).returning();
+        const _ins_prod = await db.insert(products).values(data).$returningId();
+        const [prod] = await db.select().from(products).where((0, import_drizzle_orm.eq)(products.id, _ins_prod[0]?.id ?? 0));
         return prod;
       },
       async updateProduct(id, data) {
-        const [prod] = await db.update(products).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(products.id, id)).returning();
+        await db.update(products).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(products.id, id));
+        const [prod] = await db.select().from(products).where((0, import_drizzle_orm.eq)(products.id, id));
         return prod;
       },
       async deleteProduct(id) {
@@ -1186,20 +1193,21 @@ var init_storage = __esm({
       async upsertInventory(data) {
         const existing = await this.getProductInventory(data.productId, data.branchId);
         if (existing) {
-          const [inv2] = await db.update(inventory).set({ quantity: data.quantity, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(inventory.id, existing.id)).returning();
+          const [inv2] = await db.update(inventory).set({ quantity: data.quantity, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(inventory.id, existing.id));
           return inv2;
         }
-        const [inv] = await db.insert(inventory).values(data).returning();
+        const _ins_inv = await db.insert(inventory).values(data).$returningId();
+        const [inv] = await db.select().from(inventory).where((0, import_drizzle_orm.eq)(inventory.id, _ins_inv[0]?.id ?? 0));
         return inv;
       },
       async adjustInventory(productId, branchId, adjustment) {
         const existing = await this.getProductInventory(productId, branchId);
         if (existing) {
           const newQty = (existing.quantity || 0) + adjustment;
-          const [inv2] = await db.update(inventory).set({ quantity: newQty, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(inventory.id, existing.id)).returning();
+          const [inv2] = await db.update(inventory).set({ quantity: newQty, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(inventory.id, existing.id));
           return inv2;
         }
-        const [inv] = await db.insert(inventory).values({ productId, branchId, quantity: adjustment }).returning();
+        const [inv] = await db.insert(inventory).values({ productId, branchId, quantity: adjustment });
         return inv;
       },
       async getLowStockItems(branchId) {
@@ -1231,7 +1239,7 @@ var init_storage = __esm({
           if (looksLikePhone) {
             const { getPhoneSearchVariants: getPhoneSearchVariants2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
             const variants = getPhoneSearchVariants2(search.trim());
-            const phoneConditions = variants.map((v) => (0, import_drizzle_orm.ilike)(customers.phone || "", `%${v}%`));
+            const phoneConditions = variants.map((v) => (0, import_drizzle_orm.like)(customers.phone || "", `%${v}%`));
             const strippedCol = import_drizzle_orm.sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
             for (const v of variants) {
               phoneConditions.push(import_drizzle_orm.sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
@@ -1240,15 +1248,15 @@ var init_storage = __esm({
           } else {
             conditions.push(
               (0, import_drizzle_orm.or)(
-                (0, import_drizzle_orm.ilike)(customers.name, `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.phone || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.email || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.company || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.city || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.street || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.postalCode || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.firstName || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.lastName || "", `%${search}%`)
+                (0, import_drizzle_orm.like)(customers.name, `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.phone || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.email || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.company || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.city || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.street || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.postalCode || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.firstName || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.lastName || "", `%${search}%`)
               )
             );
           }
@@ -1263,7 +1271,7 @@ var init_storage = __esm({
           if (looksLikePhone) {
             const { getPhoneSearchVariants: getPhoneSearchVariants2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
             const variants = getPhoneSearchVariants2(search.trim());
-            const phoneConditions = variants.map((v) => (0, import_drizzle_orm.ilike)(customers.phone || "", `%${v}%`));
+            const phoneConditions = variants.map((v) => (0, import_drizzle_orm.like)(customers.phone || "", `%${v}%`));
             const strippedCol = import_drizzle_orm.sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
             for (const v of variants) {
               phoneConditions.push(import_drizzle_orm.sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
@@ -1272,15 +1280,15 @@ var init_storage = __esm({
           } else {
             conditions.push(
               (0, import_drizzle_orm.or)(
-                (0, import_drizzle_orm.ilike)(customers.name, `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.phone || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.email || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.company || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.city || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.street || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.postalCode || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.firstName || "", `%${search}%`),
-                (0, import_drizzle_orm.ilike)(customers.lastName || "", `%${search}%`)
+                (0, import_drizzle_orm.like)(customers.name, `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.phone || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.email || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.company || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.city || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.street || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.postalCode || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.firstName || "", `%${search}%`),
+                (0, import_drizzle_orm.like)(customers.lastName || "", `%${search}%`)
               )
             );
           }
@@ -1292,7 +1300,7 @@ var init_storage = __esm({
         const { getPhoneSearchVariants: getPhoneSearchVariants2, normalizePhone: normalizePhone2, lastNDigits: lastNDigits2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
         const variants = getPhoneSearchVariants2(phone);
         const strippedCol = import_drizzle_orm.sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
-        const phoneConditions = variants.map((v) => (0, import_drizzle_orm.ilike)(customers.phone, `%${v}%`));
+        const phoneConditions = variants.map((v) => (0, import_drizzle_orm.like)(customers.phone, `%${v}%`));
         for (const v of variants) {
           phoneConditions.push(import_drizzle_orm.sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
         }
@@ -1331,15 +1339,17 @@ var init_storage = __esm({
         return cust;
       },
       async createCustomer(data) {
-        const [cust] = await db.insert(customers).values(data).returning();
+        const _ins_cust = await db.insert(customers).values(data).$returningId();
+        const [cust] = await db.select().from(customers).where((0, import_drizzle_orm.eq)(customers.id, _ins_cust[0]?.id ?? 0));
         return cust;
       },
       async updateCustomer(id, data) {
-        const [cust] = await db.update(customers).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(customers.id, id)).returning();
+        await db.update(customers).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(customers.id, id));
+        const [cust] = await db.select().from(customers).where((0, import_drizzle_orm.eq)(customers.id, id));
         return cust;
       },
       async deleteCustomer(id) {
-        const [cust] = await db.delete(customers).where((0, import_drizzle_orm.eq)(customers.id, id)).returning();
+        const [cust] = await db.delete(customers).where((0, import_drizzle_orm.eq)(customers.id, id));
         return cust;
       },
       async addLoyaltyPoints(id, points) {
@@ -1375,7 +1385,8 @@ var init_storage = __esm({
         return sale;
       },
       async createSale(data) {
-        const [sale] = await db.insert(sales).values(data).returning();
+        const _ins_sale = await db.insert(sales).values(data).$returningId();
+        const [sale] = await db.select().from(sales).where((0, import_drizzle_orm.eq)(sales.id, _ins_sale[0]?.id ?? 0));
         return sale;
       },
       async getSaleItems(saleId) {
@@ -1385,11 +1396,12 @@ var init_storage = __esm({
         await db.delete(saleItems).where((0, import_drizzle_orm.eq)(saleItems.saleId, saleId));
       },
       async createSaleItem(data) {
-        const [item] = await db.insert(saleItems).values(data).returning();
+        const _ins_item = await db.insert(saleItems).values(data).$returningId();
+        const [item] = await db.select().from(saleItems).where((0, import_drizzle_orm.eq)(saleItems.id, _ins_item[0]?.id ?? 0));
         return item;
       },
       async updateSale(id, data) {
-        const [sale] = await db.update(sales).set(data).where((0, import_drizzle_orm.eq)(sales.id, id)).returning();
+        const [sale] = await db.update(sales).set(data).where((0, import_drizzle_orm.eq)(sales.id, id));
         return sale;
       },
       async deleteSale(id) {
@@ -1408,11 +1420,13 @@ var init_storage = __esm({
         return sup;
       },
       async createSupplier(data) {
-        const [sup] = await db.insert(suppliers).values(data).returning();
+        const _ins_sup = await db.insert(suppliers).values(data).$returningId();
+        const [sup] = await db.select().from(suppliers).where((0, import_drizzle_orm.eq)(suppliers.id, _ins_sup[0]?.id ?? 0));
         return sup;
       },
       async updateSupplier(id, data) {
-        const [sup] = await db.update(suppliers).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(suppliers.id, id)).returning();
+        await db.update(suppliers).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(suppliers.id, id));
+        const [sup] = await db.select().from(suppliers).where((0, import_drizzle_orm.eq)(suppliers.id, id));
         return sup;
       },
       // Purchase Orders
@@ -1429,11 +1443,12 @@ var init_storage = __esm({
         return db.select().from(purchaseOrders).orderBy((0, import_drizzle_orm.desc)(purchaseOrders.createdAt));
       },
       async createPurchaseOrder(data) {
-        const [po] = await db.insert(purchaseOrders).values(data).returning();
+        const _ins_po = await db.insert(purchaseOrders).values(data).$returningId();
+        const [po] = await db.select().from(purchaseOrders).where((0, import_drizzle_orm.eq)(purchaseOrders.id, _ins_po[0]?.id ?? 0));
         return po;
       },
       async updatePurchaseOrder(id, data) {
-        const [po] = await db.update(purchaseOrders).set(data).where((0, import_drizzle_orm.eq)(purchaseOrders.id, id)).returning();
+        const [po] = await db.update(purchaseOrders).set(data).where((0, import_drizzle_orm.eq)(purchaseOrders.id, id));
         return po;
       },
       async getPurchaseOrder(id) {
@@ -1444,7 +1459,8 @@ var init_storage = __esm({
         return db.select().from(purchaseOrderItems).where((0, import_drizzle_orm.eq)(purchaseOrderItems.purchaseOrderId, poId));
       },
       async createPurchaseOrderItem(data) {
-        const [item] = await db.insert(purchaseOrderItems).values(data).returning();
+        const _ins_item = await db.insert(purchaseOrderItems).values(data).$returningId();
+        const [item] = await db.select().from(purchaseOrderItems).where((0, import_drizzle_orm.eq)(purchaseOrderItems.id, _ins_item[0]?.id ?? 0));
         return item;
       },
       async receivePurchaseOrder(id, items) {
@@ -1456,7 +1472,8 @@ var init_storage = __esm({
             await this.adjustInventory(item.productId, po.branchId, item.receivedQuantity);
           }
         }
-        const [updated] = await db.update(purchaseOrders).set({ status: "received", receivedDate: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(purchaseOrders.id, id)).returning();
+        await db.update(purchaseOrders).set({ status: "received", receivedDate: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(purchaseOrders.id, id));
+        const [updated] = await db.select().from(purchaseOrders).where((0, import_drizzle_orm.eq)(purchaseOrders.id, id));
         return updated;
       },
       // Shifts
@@ -1491,7 +1508,8 @@ var init_storage = __esm({
         return shift;
       },
       async createShift(data) {
-        const [shift] = await db.insert(shifts).values(data).returning();
+        const _ins_shift = await db.insert(shifts).values(data).$returningId();
+        const [shift] = await db.select().from(shifts).where((0, import_drizzle_orm.eq)(shifts.id, _ins_shift[0]?.id ?? 0));
         return shift;
       },
       async closeShift(id, data) {
@@ -1499,7 +1517,7 @@ var init_storage = __esm({
           ...data,
           endTime: /* @__PURE__ */ new Date(),
           status: "closed"
-        }).where((0, import_drizzle_orm.eq)(shifts.id, id)).returning();
+        }).where((0, import_drizzle_orm.eq)(shifts.id, id));
         return shift;
       },
       async getEmployeeAttendance(employeeId) {
@@ -1513,7 +1531,8 @@ var init_storage = __esm({
         return db.select().from(expenses).orderBy((0, import_drizzle_orm.desc)(expenses.createdAt));
       },
       async createExpense(data) {
-        const [exp] = await db.insert(expenses).values(data).returning();
+        const _ins_exp = await db.insert(expenses).values(data).$returningId();
+        const [exp] = await db.select().from(expenses).where((0, import_drizzle_orm.eq)(expenses.id, _ins_exp[0]?.id ?? 0));
         return exp;
       },
       async getExpensesByDateRange(startDate, endDate) {
@@ -1536,11 +1555,12 @@ var init_storage = __esm({
         return db.select().from(tables);
       },
       async createTable(data) {
-        const [table] = await db.insert(tables).values(data).returning();
+        const _ins_table = await db.insert(tables).values(data).$returningId();
+        const [table] = await db.select().from(tables).where((0, import_drizzle_orm.eq)(tables.id, _ins_table[0]?.id ?? 0));
         return table;
       },
       async updateTable(id, data) {
-        const [table] = await db.update(tables).set(data).where((0, import_drizzle_orm.eq)(tables.id, id)).returning();
+        const [table] = await db.update(tables).set(data).where((0, import_drizzle_orm.eq)(tables.id, id));
         return table;
       },
       // Kitchen Orders
@@ -1553,11 +1573,13 @@ var init_storage = __esm({
         return db.select().from(kitchenOrders).where((0, import_drizzle_orm.eq)(kitchenOrders.status, "pending")).orderBy(kitchenOrders.createdAt);
       },
       async createKitchenOrder(data) {
-        const [order] = await db.insert(kitchenOrders).values(data).returning();
+        const _ins_order = await db.insert(kitchenOrders).values(data).$returningId();
+        const [order] = await db.select().from(kitchenOrders).where((0, import_drizzle_orm.eq)(kitchenOrders.id, _ins_order[0]?.id ?? 0));
         return order;
       },
       async updateKitchenOrder(id, data) {
-        const [order] = await db.update(kitchenOrders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(kitchenOrders.id, id)).returning();
+        await db.update(kitchenOrders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(kitchenOrders.id, id));
+        const [order] = await db.select().from(kitchenOrders).where((0, import_drizzle_orm.eq)(kitchenOrders.id, id));
         return order;
       },
       // Subscriptions
@@ -1565,14 +1587,16 @@ var init_storage = __esm({
         return db.select().from(subscriptionPlans).where((0, import_drizzle_orm.eq)(subscriptionPlans.isActive, true));
       },
       async createSubscriptionPlan(data) {
-        const [plan] = await db.insert(subscriptionPlans).values(data).returning();
+        const _ins_plan = await db.insert(subscriptionPlans).values(data).$returningId();
+        const [plan] = await db.select().from(subscriptionPlans).where((0, import_drizzle_orm.eq)(subscriptionPlans.id, _ins_plan[0]?.id ?? 0));
         return plan;
       },
       async getSubscriptions() {
         return db.select().from(subscriptions).orderBy((0, import_drizzle_orm.desc)(subscriptions.createdAt));
       },
       async createSubscription(data) {
-        const [sub] = await db.insert(subscriptions).values(data).returning();
+        const _ins_sub = await db.insert(subscriptions).values(data).$returningId();
+        const [sub] = await db.select().from(subscriptions).where((0, import_drizzle_orm.eq)(subscriptions.id, _ins_sub[0]?.id ?? 0));
         return sub;
       },
       async getActivityLog(limit, tenantId) {
@@ -1589,7 +1613,8 @@ var init_storage = __esm({
         return db.select().from(activityLog).orderBy((0, import_drizzle_orm.desc)(activityLog.createdAt)).limit(l);
       },
       async createActivityLog(data) {
-        const [log3] = await db.insert(activityLog).values(data).returning();
+        const _ins_log = await db.insert(activityLog).values(data).$returningId();
+        const [log3] = await db.select().from(activityLog).where((0, import_drizzle_orm.eq)(activityLog.id, _ins_log[0]?.id ?? 0));
         return log3;
       },
       // Calls
@@ -1612,11 +1637,12 @@ var init_storage = __esm({
         return withWhere.orderBy((0, import_drizzle_orm.desc)(calls.createdAt)).limit(limit);
       },
       async createCall(data) {
-        const [call] = await db.insert(calls).values(data).returning();
+        const _ins_call = await db.insert(calls).values(data).$returningId();
+        const [call] = await db.select().from(calls).where((0, import_drizzle_orm.eq)(calls.id, _ins_call[0]?.id ?? 0));
         return call;
       },
       async updateCall(id, data) {
-        const [call] = await db.update(calls).set(data).where((0, import_drizzle_orm.eq)(calls.id, id)).returning();
+        const [call] = await db.update(calls).set(data).where((0, import_drizzle_orm.eq)(calls.id, id));
         return call;
       },
       // Returns
@@ -1637,14 +1663,16 @@ var init_storage = __esm({
         return ret;
       },
       async createReturn(data) {
-        const [ret] = await db.insert(returns).values(data).returning();
+        const _ins_ret = await db.insert(returns).values(data).$returningId();
+        const [ret] = await db.select().from(returns).where((0, import_drizzle_orm.eq)(returns.id, _ins_ret[0]?.id ?? 0));
         return ret;
       },
       async getReturnItems(returnId) {
         return db.select().from(returnItems).where((0, import_drizzle_orm.eq)(returnItems.returnId, returnId));
       },
       async createReturnItem(data) {
-        const [item] = await db.insert(returnItems).values(data).returning();
+        const _ins_item = await db.insert(returnItems).values(data).$returningId();
+        const [item] = await db.select().from(returnItems).where((0, import_drizzle_orm.eq)(returnItems.id, _ins_item[0]?.id ?? 0));
         return item;
       },
       // Sales Analytics
@@ -1674,7 +1702,7 @@ var init_storage = __esm({
           productId: saleItems.productId,
           name: saleItems.productName,
           totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`,
-          revenue: import_drizzle_orm.sql`sum(${saleItems.total}::numeric)`
+          revenue: import_drizzle_orm.sql`sum(${saleItems.total})`
         }).from(saleItems).groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
         return result.map((r) => ({ ...r, totalSold: Number(r.totalSold), revenue: Number(r.revenue) }));
       },
@@ -1682,21 +1710,21 @@ var init_storage = __esm({
         const result = await db.select({
           method: sales.paymentMethod,
           count: import_drizzle_orm.sql`count(*)`,
-          total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`
+          total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}), 0)`
         }).from(sales).groupBy(sales.paymentMethod);
         return result.map((r) => ({ method: r.method, count: Number(r.count), total: Number(r.total) }));
       },
       // Dashboard Stats
       async getDashboardStats(tenantId) {
         let salesCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(sales);
-        let totalRevenueQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)` }).from(sales);
+        let totalRevenueQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)` }).from(sales);
         let customerCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(customers);
         let productCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(products).where((0, import_drizzle_orm.eq)(products.isActive, true));
         let lowStockQuery;
         let todaySalesQuery;
         let weekSalesQuery;
         let monthSalesQuery;
-        let totalExpensesQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}::numeric), 0)` }).from(expenses);
+        let totalExpensesQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}), 0)` }).from(expenses);
         let todayExpensesQuery;
         let topProductsQuery;
         let salesByPaymentMethodQuery;
@@ -1716,7 +1744,7 @@ var init_storage = __esm({
           if (branchIds.length > 0) {
             const { inArray: inArray2 } = await import("drizzle-orm");
             salesCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(sales).where(inArray2(sales.branchId, branchIds));
-            totalRevenueQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)` }).from(sales).where(inArray2(sales.branchId, branchIds));
+            totalRevenueQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)` }).from(sales).where(inArray2(sales.branchId, branchIds));
             customerCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(customers).where((0, import_drizzle_orm.eq)(customers.tenantId, tenantId));
             productCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(products).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(products.tenantId, tenantId), (0, import_drizzle_orm.eq)(products.isActive, true)));
             const [tenant] = await db.select().from(tenants).where((0, import_drizzle_orm.eq)(tenants.id, tenantId));
@@ -1724,33 +1752,33 @@ var init_storage = __esm({
             lowStockQuery = isRestaurant ? db.select({ count: import_drizzle_orm.sql`cast(0 as integer)` }).from(branches).limit(1) : db.select({ count: import_drizzle_orm.sql`count(*)` }).from(inventory).where((0, import_drizzle_orm.and)(import_drizzle_orm.sql`quantity <= low_stock_threshold`, inArray2(inventory.branchId, branchIds)));
             todaySalesQuery = db.select({
               count: import_drizzle_orm.sql`count(*)`,
-              total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+              total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
             }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray2(sales.branchId, branchIds)));
             weekSalesQuery = db.select({
-              total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+              total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
             }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, weekStart), inArray2(sales.branchId, branchIds)));
             monthSalesQuery = db.select({
-              total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+              total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
             }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, monthStart), inArray2(sales.branchId, branchIds)));
-            totalExpensesQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}::numeric), 0)` }).from(expenses).where((0, import_drizzle_orm.eq)(expenses.tenantId, tenantId));
+            totalExpensesQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}), 0)` }).from(expenses).where((0, import_drizzle_orm.eq)(expenses.tenantId, tenantId));
             todayExpensesQuery = db.select({
-              total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}::numeric), 0)`
+              total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}), 0)`
             }).from(expenses).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(expenses.date, todayStart), (0, import_drizzle_orm.eq)(expenses.tenantId, tenantId)));
             const topLimit = 5;
             topProductsQuery = db.select({
               productId: saleItems.productId,
               name: saleItems.productName,
               totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`,
-              revenue: import_drizzle_orm.sql`sum(${saleItems.total}::numeric)`
+              revenue: import_drizzle_orm.sql`sum(${saleItems.total})`
             }).from(saleItems).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray2(sales.branchId, branchIds)).groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
             salesByPaymentMethodQuery = db.select({
               method: sales.paymentMethod,
               count: import_drizzle_orm.sql`count(*)`,
-              total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`
+              total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}), 0)`
             }).from(sales).where(inArray2(sales.branchId, branchIds)).groupBy(sales.paymentMethod);
             recentSalesQuery = db.select().from(sales).where(inArray2(sales.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(sales.createdAt)).limit(5);
             profitRowQuery = db.select({
-              totalCost: import_drizzle_orm.sql`coalesce(sum(${products.costPrice}::numeric * ${saleItems.quantity}), 0)`
+              totalCost: import_drizzle_orm.sql`coalesce(sum(${products.costPrice} * ${saleItems.quantity}), 0)`
             }).from(saleItems).innerJoin(products, (0, import_drizzle_orm.eq)(saleItems.productId, products.id)).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray2(sales.branchId, branchIds));
           } else {
             return {
@@ -1776,31 +1804,31 @@ var init_storage = __esm({
           lowStockQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(inventory).where(import_drizzle_orm.sql`quantity <= low_stock_threshold`);
           todaySalesQuery = db.select({
             count: import_drizzle_orm.sql`count(*)`,
-            total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+            total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
           }).from(sales).where((0, import_drizzle_orm.gte)(sales.createdAt, todayStart));
           weekSalesQuery = db.select({
-            total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+            total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
           }).from(sales).where((0, import_drizzle_orm.gte)(sales.createdAt, weekStart));
           monthSalesQuery = db.select({
-            total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+            total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
           }).from(sales).where((0, import_drizzle_orm.gte)(sales.createdAt, monthStart));
           todayExpensesQuery = db.select({
-            total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}::numeric), 0)`
+            total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}), 0)`
           }).from(expenses).where((0, import_drizzle_orm.gte)(expenses.date, todayStart));
           topProductsQuery = db.select({
             productId: saleItems.productId,
             name: saleItems.productName,
             totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`,
-            revenue: import_drizzle_orm.sql`sum(${saleItems.total}::numeric)`
+            revenue: import_drizzle_orm.sql`sum(${saleItems.total})`
           }).from(saleItems).groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(5);
           salesByPaymentMethodQuery = db.select({
             method: sales.paymentMethod,
             count: import_drizzle_orm.sql`count(*)`,
-            total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`
+            total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}), 0)`
           }).from(sales).groupBy(sales.paymentMethod);
           recentSalesQuery = db.select().from(sales).orderBy((0, import_drizzle_orm.desc)(sales.createdAt)).limit(5);
           profitRowQuery = db.select({
-            totalCost: import_drizzle_orm.sql`coalesce(sum(${products.costPrice}::numeric * ${saleItems.quantity}), 0)`
+            totalCost: import_drizzle_orm.sql`coalesce(sum(${products.costPrice} * ${saleItems.quantity}), 0)`
           }).from(saleItems).innerJoin(products, (0, import_drizzle_orm.eq)(saleItems.productId, products.id));
         }
         const [salesCount] = await salesCountQuery;
@@ -1914,7 +1942,8 @@ var init_storage = __esm({
         return db.select().from(cashDrawerOperations).where((0, import_drizzle_orm.eq)(cashDrawerOperations.shiftId, shiftId)).orderBy((0, import_drizzle_orm.desc)(cashDrawerOperations.createdAt));
       },
       async createCashDrawerOperation(data) {
-        const [op] = await db.insert(cashDrawerOperations).values(data).returning();
+        const _ins_op = await db.insert(cashDrawerOperations).values(data).$returningId();
+        const [op] = await db.select().from(cashDrawerOperations).where((0, import_drizzle_orm.eq)(cashDrawerOperations.id, _ins_op[0]?.id ?? 0));
         return op;
       },
       // Warehouses
@@ -1932,11 +1961,12 @@ var init_storage = __esm({
         return db.select().from(warehouses).where((0, import_drizzle_orm.eq)(warehouses.isActive, true));
       },
       async createWarehouse(data) {
-        const [wh] = await db.insert(warehouses).values(data).returning();
+        const _ins_wh = await db.insert(warehouses).values(data).$returningId();
+        const [wh] = await db.select().from(warehouses).where((0, import_drizzle_orm.eq)(warehouses.id, _ins_wh[0]?.id ?? 0));
         return wh;
       },
       async updateWarehouse(id, data) {
-        const [wh] = await db.update(warehouses).set(data).where((0, import_drizzle_orm.eq)(warehouses.id, id)).returning();
+        const [wh] = await db.update(warehouses).set(data).where((0, import_drizzle_orm.eq)(warehouses.id, id));
         return wh;
       },
       // Warehouse Transfers
@@ -1944,7 +1974,8 @@ var init_storage = __esm({
         return db.select().from(warehouseTransfers).orderBy((0, import_drizzle_orm.desc)(warehouseTransfers.createdAt));
       },
       async createWarehouseTransfer(data) {
-        const [transfer] = await db.insert(warehouseTransfers).values(data).returning();
+        const _ins_transfer = await db.insert(warehouseTransfers).values(data).$returningId();
+        const [transfer] = await db.select().from(warehouseTransfers).where((0, import_drizzle_orm.eq)(warehouseTransfers.id, _ins_transfer[0]?.id ?? 0));
         return transfer;
       },
       // Product Batches
@@ -1965,11 +1996,12 @@ var init_storage = __esm({
         return db.select().from(productBatches).where(and3(...conditions)).orderBy(productBatches.expiryDate);
       },
       async createProductBatch(data) {
-        const [batch] = await db.insert(productBatches).values(data).returning();
+        const _ins_batch = await db.insert(productBatches).values(data).$returningId();
+        const [batch] = await db.select().from(productBatches).where((0, import_drizzle_orm.eq)(productBatches.id, _ins_batch[0]?.id ?? 0));
         return batch;
       },
       async updateProductBatch(id, data) {
-        const [batch] = await db.update(productBatches).set(data).where((0, import_drizzle_orm.eq)(productBatches.id, id)).returning();
+        const [batch] = await db.update(productBatches).set(data).where((0, import_drizzle_orm.eq)(productBatches.id, id));
         return batch;
       },
       // Inventory Movements
@@ -1979,7 +2011,8 @@ var init_storage = __esm({
         return db.select().from(inventoryMovements).orderBy((0, import_drizzle_orm.desc)(inventoryMovements.createdAt)).limit(l);
       },
       async createInventoryMovement(data) {
-        const [mov] = await db.insert(inventoryMovements).values(data).returning();
+        const _ins_mov = await db.insert(inventoryMovements).values(data).$returningId();
+        const [mov] = await db.select().from(inventoryMovements).where((0, import_drizzle_orm.eq)(inventoryMovements.id, _ins_mov[0]?.id ?? 0));
         return mov;
       },
       // Stock Counts
@@ -1991,22 +2024,24 @@ var init_storage = __esm({
         return sc;
       },
       async createStockCount(data) {
-        const [sc] = await db.insert(stockCounts).values(data).returning();
+        const _ins_sc = await db.insert(stockCounts).values(data).$returningId();
+        const [sc] = await db.select().from(stockCounts).where((0, import_drizzle_orm.eq)(stockCounts.id, _ins_sc[0]?.id ?? 0));
         return sc;
       },
       async updateStockCount(id, data) {
-        const [sc] = await db.update(stockCounts).set(data).where((0, import_drizzle_orm.eq)(stockCounts.id, id)).returning();
+        const [sc] = await db.update(stockCounts).set(data).where((0, import_drizzle_orm.eq)(stockCounts.id, id));
         return sc;
       },
       async getStockCountItems(stockCountId) {
         return db.select().from(stockCountItems).where((0, import_drizzle_orm.eq)(stockCountItems.stockCountId, stockCountId));
       },
       async createStockCountItem(data) {
-        const [item] = await db.insert(stockCountItems).values(data).returning();
+        const _ins_item = await db.insert(stockCountItems).values(data).$returningId();
+        const [item] = await db.select().from(stockCountItems).where((0, import_drizzle_orm.eq)(stockCountItems.id, _ins_item[0]?.id ?? 0));
         return item;
       },
       async updateStockCountItem(id, data) {
-        const [item] = await db.update(stockCountItems).set(data).where((0, import_drizzle_orm.eq)(stockCountItems.id, id)).returning();
+        const [item] = await db.update(stockCountItems).set(data).where((0, import_drizzle_orm.eq)(stockCountItems.id, id));
         return item;
       },
       // Supplier Contracts
@@ -2015,11 +2050,12 @@ var init_storage = __esm({
         return db.select().from(supplierContracts).where((0, import_drizzle_orm.eq)(supplierContracts.isActive, true));
       },
       async createSupplierContract(data) {
-        const [contract] = await db.insert(supplierContracts).values(data).returning();
+        const _ins_contract = await db.insert(supplierContracts).values(data).$returningId();
+        const [contract] = await db.select().from(supplierContracts).where((0, import_drizzle_orm.eq)(supplierContracts.id, _ins_contract[0]?.id ?? 0));
         return contract;
       },
       async updateSupplierContract(id, data) {
-        const [contract] = await db.update(supplierContracts).set(data).where((0, import_drizzle_orm.eq)(supplierContracts.id, id)).returning();
+        const [contract] = await db.update(supplierContracts).set(data).where((0, import_drizzle_orm.eq)(supplierContracts.id, id));
         return contract;
       },
       // Employee Commissions
@@ -2028,14 +2064,15 @@ var init_storage = __esm({
         return db.select().from(employeeCommissions).orderBy((0, import_drizzle_orm.desc)(employeeCommissions.createdAt));
       },
       async createEmployeeCommission(data) {
-        const [comm] = await db.insert(employeeCommissions).values(data).returning();
+        const _ins_comm = await db.insert(employeeCommissions).values(data).$returningId();
+        const [comm] = await db.select().from(employeeCommissions).where((0, import_drizzle_orm.eq)(employeeCommissions.id, _ins_comm[0]?.id ?? 0));
         return comm;
       },
       // Advanced Analytics
       async getEmployeeSalesReport(employeeId) {
         const result = await db.select({
           count: import_drizzle_orm.sql`count(*)`,
-          total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`
+          total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}), 0)`
         }).from(sales).where((0, import_drizzle_orm.eq)(sales.employeeId, employeeId));
         return { salesCount: Number(result[0]?.count || 0), totalRevenue: Number(result[0]?.total || 0) };
       },
@@ -2057,7 +2094,7 @@ var init_storage = __esm({
         const result = await db.select({
           productId: saleItems.productId,
           productName: saleItems.productName,
-          totalRevenue: import_drizzle_orm.sql`sum(${saleItems.total}::numeric)`,
+          totalRevenue: import_drizzle_orm.sql`sum(${saleItems.total})`,
           totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`
         }).from(saleItems).groupBy(saleItems.productId, saleItems.productName);
         const prodList = await db.select().from(products);
@@ -2082,8 +2119,8 @@ var init_storage = __esm({
         const result = await db.select({
           employeeId: sales.employeeId,
           count: import_drizzle_orm.sql`count(*)`,
-          total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`,
-          avgSale: import_drizzle_orm.sql`coalesce(avg(${sales.totalAmount}::numeric), 0)`
+          total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}), 0)`,
+          avgSale: import_drizzle_orm.sql`coalesce(avg(${sales.totalAmount}), 0)`
         }).from(sales).groupBy(sales.employeeId);
         const empList = await db.select().from(employees);
         const empMap = new Map(empList.map((e) => [e.id, e]));
@@ -2099,7 +2136,7 @@ var init_storage = __esm({
       async getReturnsReport() {
         const result = await db.select({
           count: import_drizzle_orm.sql`count(*)`,
-          total: import_drizzle_orm.sql`coalesce(sum(${returns.totalAmount}::numeric), 0)`
+          total: import_drizzle_orm.sql`coalesce(sum(${returns.totalAmount}), 0)`
         }).from(returns);
         const returnsList = await db.select().from(returns).orderBy((0, import_drizzle_orm.desc)(returns.createdAt)).limit(20);
         return {
@@ -2117,11 +2154,13 @@ var init_storage = __esm({
         return Number(result?.count || 0);
       },
       async createNotification(data) {
-        const [notif] = await db.insert(notifications).values(data).returning();
+        const _ins_notif = await db.insert(notifications).values(data).$returningId();
+        const [notif] = await db.select().from(notifications).where((0, import_drizzle_orm.eq)(notifications.id, _ins_notif[0]?.id ?? 0));
         return notif;
       },
       async markNotificationRead(id) {
-        const [notif] = await db.update(notifications).set({ isRead: true }).where((0, import_drizzle_orm.eq)(notifications.id, id)).returning();
+        await db.update(notifications).set({ isRead: true }).where((0, import_drizzle_orm.eq)(notifications.id, id));
+        const [notif] = await db.select().from(notifications).where((0, import_drizzle_orm.eq)(notifications.id, id));
         return notif;
       },
       async markAllNotificationsRead(recipientId) {
@@ -2143,7 +2182,7 @@ var init_storage = __esm({
             entityType,
             entityId,
             priority: priority || "normal"
-          }).returning();
+          });
           notifs.push(notif);
         }
         return notifs;
@@ -2211,7 +2250,7 @@ var init_storage = __esm({
         };
       },
       async updateShift(id, data) {
-        const [shift] = await db.update(shifts).set(data).where((0, import_drizzle_orm.eq)(shifts.id, id)).returning();
+        const [shift] = await db.update(shifts).set(data).where((0, import_drizzle_orm.eq)(shifts.id, id));
         return shift;
       },
       // ========== Super Admin System ==========
@@ -2222,11 +2261,12 @@ var init_storage = __esm({
         return db.select().from(vehicles).where((0, import_drizzle_orm.eq)(vehicles.isActive, true)).orderBy((0, import_drizzle_orm.desc)(vehicles.createdAt));
       },
       async createVehicle(data) {
-        const [v] = await db.insert(vehicles).values(data).returning();
+        const _ins_v = await db.insert(vehicles).values(data).$returningId();
+        const [v] = await db.select().from(vehicles).where((0, import_drizzle_orm.eq)(vehicles.id, _ins_v[0]?.id ?? 0));
         return v;
       },
       async updateVehicle(id, data) {
-        const [v] = await db.update(vehicles).set(data).where((0, import_drizzle_orm.eq)(vehicles.id, id)).returning();
+        const [v] = await db.update(vehicles).set(data).where((0, import_drizzle_orm.eq)(vehicles.id, id));
         return v;
       },
       async deleteVehicle(id) {
@@ -2240,10 +2280,11 @@ var init_storage = __esm({
       async upsertPrinterConfig(data) {
         const existing = await db.select().from(printerConfigs).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(printerConfigs.tenantId, data.tenantId), (0, import_drizzle_orm.eq)(printerConfigs.receiptType, data.receiptType)));
         if (existing.length > 0) {
-          const [c2] = await db.update(printerConfigs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(printerConfigs.id, existing[0].id)).returning();
+          const [c2] = await db.update(printerConfigs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(printerConfigs.id, existing[0].id));
           return c2;
         }
-        const [c] = await db.insert(printerConfigs).values(data).returning();
+        const _ins_c = await db.insert(printerConfigs).values(data).$returningId();
+        const [c] = await db.select().from(printerConfigs).where((0, import_drizzle_orm.eq)(printerConfigs.id, _ins_c[0]?.id ?? 0));
         return c;
       },
       // Daily Closings
@@ -2252,7 +2293,8 @@ var init_storage = __esm({
         return db.select().from(dailyClosings).where((0, import_drizzle_orm.eq)(dailyClosings.tenantId, tenantId)).orderBy((0, import_drizzle_orm.desc)(dailyClosings.createdAt));
       },
       async createDailyClosing(data) {
-        const [dc] = await db.insert(dailyClosings).values(data).returning();
+        const _ins_dc = await db.insert(dailyClosings).values(data).$returningId();
+        const [dc] = await db.select().from(dailyClosings).where((0, import_drizzle_orm.eq)(dailyClosings.id, _ins_dc[0]?.id ?? 0));
         return dc;
       },
       async getDailyClosingByDate(tenantId, closingDate, branchId) {
@@ -2269,7 +2311,8 @@ var init_storage = __esm({
         return db.select().from(monthlyClosings).where((0, import_drizzle_orm.eq)(monthlyClosings.tenantId, tenantId)).orderBy((0, import_drizzle_orm.desc)(monthlyClosings.createdAt));
       },
       async createMonthlyClosing(data) {
-        const [mc] = await db.insert(monthlyClosings).values(data).returning();
+        const _ins_mc = await db.insert(monthlyClosings).values(data).$returningId();
+        const [mc] = await db.select().from(monthlyClosings).where((0, import_drizzle_orm.eq)(monthlyClosings.id, _ins_mc[0]?.id ?? 0));
         return mc;
       },
       async getMonthlyClosingByMonth(tenantId, closingMonth, branchId) {
@@ -2293,11 +2336,13 @@ var init_storage = __esm({
         return admin;
       },
       async createSuperAdmin(data) {
-        const [admin] = await db.insert(superAdmins).values(data).returning();
+        const _ins_admin = await db.insert(superAdmins).values(data).$returningId();
+        const [admin] = await db.select().from(superAdmins).where((0, import_drizzle_orm.eq)(superAdmins.id, _ins_admin[0]?.id ?? 0));
         return admin;
       },
       async updateSuperAdmin(id, data) {
-        const [admin] = await db.update(superAdmins).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(superAdmins.id, id)).returning();
+        await db.update(superAdmins).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(superAdmins.id, id));
+        const [admin] = await db.select().from(superAdmins).where((0, import_drizzle_orm.eq)(superAdmins.id, id));
         return admin;
       },
       // Tenants
@@ -2317,7 +2362,7 @@ var init_storage = __esm({
             const todayStart = /* @__PURE__ */ new Date();
             todayStart.setHours(0, 0, 0, 0);
             const [todaySales] = await db.select({
-              total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+              total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
             }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray2(sales.branchId, branchIds)));
             salesToday = Number(todaySales?.total || 0).toFixed(2);
           }
@@ -2339,11 +2384,13 @@ var init_storage = __esm({
         return tenant;
       },
       async createTenant(data) {
-        const [tenant] = await db.insert(tenants).values(data).returning();
+        const _ins_tenant = await db.insert(tenants).values(data).$returningId();
+        const [tenant] = await db.select().from(tenants).where((0, import_drizzle_orm.eq)(tenants.id, _ins_tenant[0]?.id ?? 0));
         return tenant;
       },
       async updateTenant(id, data) {
-        const [tenant] = await db.update(tenants).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(tenants.id, id)).returning();
+        await db.update(tenants).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(tenants.id, id));
+        const [tenant] = await db.select().from(tenants).where((0, import_drizzle_orm.eq)(tenants.id, id));
         return tenant;
       },
       async deleteTenant(id) {
@@ -2364,11 +2411,13 @@ var init_storage = __esm({
         return sub;
       },
       async createTenantSubscription(data) {
-        const [sub] = await db.insert(tenantSubscriptions).values(data).returning();
+        const _ins_sub = await db.insert(tenantSubscriptions).values(data).$returningId();
+        const [sub] = await db.select().from(tenantSubscriptions).where((0, import_drizzle_orm.eq)(tenantSubscriptions.id, _ins_sub[0]?.id ?? 0));
         return sub;
       },
       async updateTenantSubscription(id, data) {
-        const [sub] = await db.update(tenantSubscriptions).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(tenantSubscriptions.id, id)).returning();
+        await db.update(tenantSubscriptions).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(tenantSubscriptions.id, id));
+        const [sub] = await db.select().from(tenantSubscriptions).where((0, import_drizzle_orm.eq)(tenantSubscriptions.id, id));
         return sub;
       },
       async deleteTenantSubscription(id) {
@@ -2390,11 +2439,13 @@ var init_storage = __esm({
         return key;
       },
       async createLicenseKey(data) {
-        const [key] = await db.insert(licenseKeys).values(data).returning();
+        const _ins_key = await db.insert(licenseKeys).values(data).$returningId();
+        const [key] = await db.select().from(licenseKeys).where((0, import_drizzle_orm.eq)(licenseKeys.id, _ins_key[0]?.id ?? 0));
         return key;
       },
       async updateLicenseKey(id, data) {
-        const [key] = await db.update(licenseKeys).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(licenseKeys.id, id)).returning();
+        await db.update(licenseKeys).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(licenseKeys.id, id));
+        const [key] = await db.select().from(licenseKeys).where((0, import_drizzle_orm.eq)(licenseKeys.id, id));
         return key;
       },
       // Tenant Notifications
@@ -2405,11 +2456,12 @@ var init_storage = __esm({
         return db.select().from(tenantNotifications).orderBy((0, import_drizzle_orm.desc)(tenantNotifications.createdAt));
       },
       async createTenantNotification(data) {
-        const [notif] = await db.insert(tenantNotifications).values(data).returning();
+        const _ins_notif = await db.insert(tenantNotifications).values(data).$returningId();
+        const [notif] = await db.select().from(tenantNotifications).where((0, import_drizzle_orm.eq)(tenantNotifications.id, _ins_notif[0]?.id ?? 0));
         return notif;
       },
       async updateTenantNotification(id, data) {
-        const [notif] = await db.update(tenantNotifications).set(data).where((0, import_drizzle_orm.eq)(tenantNotifications.id, id)).returning();
+        const [notif] = await db.update(tenantNotifications).set(data).where((0, import_drizzle_orm.eq)(tenantNotifications.id, id));
         return notif;
       },
       // Tenants & Store Config
@@ -2447,11 +2499,11 @@ var init_storage = __esm({
             legacyRef: import_drizzle_orm.sql`EXCLUDED.legacy_ref`,
             updatedAt: import_drizzle_orm.sql`now()`
           }
-        }).returning();
+        });
       },
       async bulkCreateProducts(data) {
         if (data.length === 0) return [];
-        return db.insert(products).values(data).returning();
+        return db.insert(products).values(data);
       },
       // System Wide Analytics
       async getSuperAdminDashboardStats() {
@@ -2464,7 +2516,7 @@ var init_storage = __esm({
           in7Days.setDate(in7Days.getDate() + 7);
           const now = /* @__PURE__ */ new Date();
           const [expiringSubs] = await db.select({ count: import_drizzle_orm.sql`count(*)` }).from(tenantSubscriptions).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(tenantSubscriptions.status, "active"), (0, import_drizzle_orm.lte)(tenantSubscriptions.endDate, in7Days), (0, import_drizzle_orm.gte)(tenantSubscriptions.endDate, now)));
-          const [revenueRow] = await db.select({ total: import_drizzle_orm.sql`coalesce(sum(price), 0)::text` }).from(tenantSubscriptions).where((0, import_drizzle_orm.eq)(tenantSubscriptions.status, "active"));
+          const [revenueRow] = await db.select({ total: import_drizzle_orm.sql`coalesce(sum(price), 0)` }).from(tenantSubscriptions).where((0, import_drizzle_orm.eq)(tenantSubscriptions.status, "active"));
           const recentTenants = await db.select().from(tenants).orderBy((0, import_drizzle_orm.desc)(tenants.createdAt)).limit(5);
           const recentSubs = await db.select().from(tenantSubscriptions).orderBy((0, import_drizzle_orm.desc)(tenantSubscriptions.createdAt)).limit(5);
           return {
@@ -2496,11 +2548,13 @@ var init_storage = __esm({
         return order;
       },
       async createOnlineOrder(data) {
-        const [order] = await db.insert(onlineOrders).values(data).returning();
+        const _ins_order = await db.insert(onlineOrders).values(data).$returningId();
+        const [order] = await db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.id, _ins_order[0]?.id ?? 0));
         return order;
       },
       async updateOnlineOrder(id, data) {
-        const [order] = await db.update(onlineOrders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(onlineOrders.id, id)).returning();
+        await db.update(onlineOrders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(onlineOrders.id, id));
+        const [order] = await db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.id, id));
         return order;
       },
       async deleteOnlineOrder(id) {
@@ -2534,10 +2588,10 @@ var init_storage = __esm({
         }
         const existing = await this.getLandingPageConfig(tenantId);
         if (existing) {
-          const [updated] = await db.update(landingPageConfig).set({ ...data, tenantId, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(landingPageConfig.tenantId, tenantId)).returning();
+          const [updated] = await db.update(landingPageConfig).set({ ...data, tenantId, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(landingPageConfig.tenantId, tenantId));
           return updated;
         } else {
-          const [created] = await db.insert(landingPageConfig).values({ tenantId, ...data }).returning();
+          const [created] = await db.insert(landingPageConfig).values({ tenantId, ...data });
           return created;
         }
       },
@@ -2658,7 +2712,7 @@ var init_storage = __esm({
             isMain: true,
             currency: "CHF",
             taxRate: "10"
-          }).returning();
+          });
           branchId = newBranch.id;
         } else {
           branchId = tenantBranches[0].id;
@@ -2695,7 +2749,8 @@ var init_storage = __esm({
       },
       // ── Platform Commissions ───────────────────────────────────────────────────
       async createPlatformCommission(data) {
-        const [row] = await db.insert(platformCommissions).values(data).returning();
+        const _ins_row = await db.insert(platformCommissions).values(data).$returningId();
+        const [row] = await db.select().from(platformCommissions).where((0, import_drizzle_orm.eq)(platformCommissions.id, _ins_row[0]?.id ?? 0));
         return row;
       },
       async getPlatformCommissions(tenantId) {
@@ -2711,7 +2766,7 @@ var init_storage = __esm({
         for (const t of allTenants) {
           try {
             const [row] = await db.select({
-              total: import_drizzle_orm.sql`coalesce(sum(commission_amount::numeric), 0)::text`,
+              total: import_drizzle_orm.sql`coalesce(sum(commission_amount), 0)`,
               count: import_drizzle_orm.sql`count(*)`
             }).from(platformCommissions).where((0, import_drizzle_orm.eq)(platformCommissions.tenantId, t.id));
             const total = parseFloat(row?.total || "0");
@@ -8320,8 +8375,8 @@ function registerSuperAdminRoutes(app2) {
       const [totalProducts] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(products2);
       const [totalSales] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(sales2);
       const [totalCustomers] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(customers2);
-      const [revenueRow] = await db.select({ total: import_drizzle_orm4.sql`coalesce(sum(cast(price as decimal)), 0)::text` }).from(tenantSubscriptions2).where((0, import_drizzle_orm4.eq)(tenantSubscriptions2.status, "active"));
-      const [salesRevenue] = await db.select({ total: import_drizzle_orm4.sql`coalesce(sum(cast(total_amount as decimal)), 0)::text` }).from(sales2);
+      const [revenueRow] = await db.select({ total: import_drizzle_orm4.sql`cast(coalesce(sum(cast(price as decimal(10,2))), 0) as char)` }).from(tenantSubscriptions2).where((0, import_drizzle_orm4.eq)(tenantSubscriptions2.status, "active"));
+      const [salesRevenue] = await db.select({ total: import_drizzle_orm4.sql`cast(coalesce(sum(cast(total_amount as decimal(12,2))), 0) as char)` }).from(sales2);
       const in7Days = /* @__PURE__ */ new Date();
       in7Days.setDate(in7Days.getDate() + 7);
       const now = /* @__PURE__ */ new Date();

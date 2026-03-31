@@ -144,8 +144,8 @@ export function registerSuperAdminRoutes(app: Express) {
       const [totalProducts] = await db.select({ count: sql<number>`count(*)` }).from(products);
       const [totalSales] = await db.select({ count: sql<number>`count(*)` }).from(sales);
       const [totalCustomers] = await db.select({ count: sql<number>`count(*)` }).from(customers);
-      const [revenueRow] = await db.select({ total: sql<string>`coalesce(sum(cast(price as decimal)), 0)::text` }).from(tenantSubscriptions).where(eq(tenantSubscriptions.status, "active"));
-      const [salesRevenue] = await db.select({ total: sql<string>`coalesce(sum(cast(total_amount as decimal)), 0)::text` }).from(sales);
+      const [revenueRow] = await db.select({ total: sql<string>`cast(coalesce(sum(cast(price as decimal(10,2))), 0) as char)` }).from(tenantSubscriptions).where(eq(tenantSubscriptions.status, "active"));
+      const [salesRevenue] = await db.select({ total: sql<string>`cast(coalesce(sum(cast(total_amount as decimal(12,2))), 0) as char)` }).from(sales);
 
       // Expiring subs within 7 days
       const in7Days = new Date(); in7Days.setDate(in7Days.getDate() + 7);

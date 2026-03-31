@@ -47,11 +47,13 @@ export const storage = {
     return branch;
   },
   async createBranch(data: InsertBranch) {
-    const [branch] = await db.insert(branches).values(data).returning();
+    const _ins_branch = await db.insert(branches).values(data).$returningId();
+    const [branch] = await db.select().from(branches).where(eq(branches.id, _ins_branch[0]?.id ?? 0));
     return branch;
   },
   async updateBranch(id: number, data: Partial<InsertBranch>) {
-    const [branch] = await db.update(branches).set({ ...data, updatedAt: new Date() }).where(eq(branches.id, id)).returning();
+    await db.update(branches).set({ ...data, updatedAt: new Date() }).where(eq(branches.id, id));
+    const [branch] = await db.select().from(branches).where(eq(branches.id, id));
     return branch;
   },
   async deleteBranch(id: number) {
@@ -86,11 +88,13 @@ export const storage = {
     return emp;
   },
   async createEmployee(data: InsertEmployee) {
-    const [emp] = await db.insert(employees).values(data).returning();
+    const _ins_emp = await db.insert(employees).values(data).$returningId();
+    const [emp] = await db.select().from(employees).where(eq(employees.id, _ins_emp[0]?.id ?? 0));
     return emp;
   },
   async updateEmployee(id: number, data: Partial<InsertEmployee>) {
-    const [emp] = await db.update(employees).set({ ...data, updatedAt: new Date() }).where(eq(employees.id, id)).returning();
+    await db.update(employees).set({ ...data, updatedAt: new Date() }).where(eq(employees.id, id));
+    const [emp] = await db.select().from(employees).where(eq(employees.id, id));
     return emp;
   },
   async deleteEmployee(id: number) {
@@ -105,7 +109,8 @@ export const storage = {
     return db.select().from(categories).where(eq(categories.isActive, true)).orderBy(categories.sortOrder);
   },
   async createCategory(data: InsertCategory) {
-    const [cat] = await db.insert(categories).values(data).returning();
+    const _ins_cat = await db.insert(categories).values(data).$returningId();
+    const [cat] = await db.select().from(categories).where(eq(categories.id, _ins_cat[0]?.id ?? 0));
     return cat;
   },
   async getCategory(id: number) {
@@ -113,7 +118,7 @@ export const storage = {
     return category;
   },
   async updateCategory(id: number, data: Partial<InsertCategory>) {
-    const [cat] = await db.update(categories).set(data).where(eq(categories.id, id)).returning();
+    const [cat] = await db.update(categories).set(data).where(eq(categories.id, id));
     return cat;
   },
   async deleteCategory(id: number) {
@@ -127,9 +132,9 @@ export const storage = {
         and(
           eq(products.isActive, true),
           or(
-            ilike(products.name, `%${search}%`),
-            ilike(products.sku, `%${search}%`),
-            ilike(products.barcode, `%${search}%`)
+            like(products.name, `%${search}%`),
+            like(products.sku, `%${search}%`),
+            like(products.barcode, `%${search}%`)
           )
         )
       ).orderBy(desc(products.createdAt));
@@ -143,9 +148,9 @@ export const storage = {
           eq(products.tenantId, tenantId),
           eq(products.isActive, true),
           or(
-            ilike(products.name, `%${search}%`),
-            ilike(products.sku, `%${search}%`),
-            ilike(products.barcode, `%${search}%`)
+            like(products.name, `%${search}%`),
+            like(products.sku, `%${search}%`),
+            like(products.barcode, `%${search}%`)
           )
         )
       ).orderBy(desc(products.createdAt));
@@ -161,11 +166,13 @@ export const storage = {
     return prod;
   },
   async createProduct(data: InsertProduct) {
-    const [prod] = await db.insert(products).values(data).returning();
+    const _ins_prod = await db.insert(products).values(data).$returningId();
+    const [prod] = await db.select().from(products).where(eq(products.id, _ins_prod[0]?.id ?? 0));
     return prod;
   },
   async updateProduct(id: number, data: Partial<InsertProduct>) {
-    const [prod] = await db.update(products).set({ ...data, updatedAt: new Date() }).where(eq(products.id, id)).returning();
+    await db.update(products).set({ ...data, updatedAt: new Date() }).where(eq(products.id, id));
+    const [prod] = await db.select().from(products).where(eq(products.id, id));
     return prod;
   },
   async deleteProduct(id: number) {
@@ -199,10 +206,11 @@ export const storage = {
     if (existing) {
       const [inv] = await db.update(inventory)
         .set({ quantity: data.quantity, updatedAt: new Date() })
-        .where(eq(inventory.id, existing.id)).returning();
+        .where(eq(inventory.id, existing.id));
       return inv;
     }
-    const [inv] = await db.insert(inventory).values(data).returning();
+    const _ins_inv = await db.insert(inventory).values(data).$returningId();
+    const [inv] = await db.select().from(inventory).where(eq(inventory.id, _ins_inv[0]?.id ?? 0));
     return inv;
   },
   async adjustInventory(productId: number, branchId: number, adjustment: number) {
@@ -211,10 +219,10 @@ export const storage = {
       const newQty = (existing.quantity || 0) + adjustment;
       const [inv] = await db.update(inventory)
         .set({ quantity: newQty, updatedAt: new Date() })
-        .where(eq(inventory.id, existing.id)).returning();
+        .where(eq(inventory.id, existing.id));
       return inv;
     }
-    const [inv] = await db.insert(inventory).values({ productId, branchId, quantity: adjustment }).returning();
+    const [inv] = await db.insert(inventory).values({ productId, branchId, quantity: adjustment });
     return inv;
   },
   async getLowStockItems(branchId?: number) {
@@ -253,7 +261,7 @@ export const storage = {
       if (looksLikePhone) {
         const { getPhoneSearchVariants } = await import("./phoneUtils");
         const variants = getPhoneSearchVariants(search.trim());
-        const phoneConditions = variants.map(v => ilike(customers.phone || "", `%${v}%`));
+        const phoneConditions = variants.map(v => like(customers.phone || "", `%${v}%`));
         const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
         for (const v of variants) {
           phoneConditions.push(sql`${strippedCol} ILIKE ${'%' + v + '%'}`);
@@ -262,15 +270,15 @@ export const storage = {
       } else {
         conditions.push(
           or(
-            ilike(customers.name, `%${search}%`),
-            ilike(customers.phone || "", `%${search}%`),
-            ilike(customers.email || "", `%${search}%`),
-            ilike(customers.company || "", `%${search}%`),
-            ilike(customers.city || "", `%${search}%`),
-            ilike(customers.street || "", `%${search}%`),
-            ilike(customers.postalCode || "", `%${search}%`),
-            ilike(customers.firstName || "", `%${search}%`),
-            ilike(customers.lastName || "", `%${search}%`)
+            like(customers.name, `%${search}%`),
+            like(customers.phone || "", `%${search}%`),
+            like(customers.email || "", `%${search}%`),
+            like(customers.company || "", `%${search}%`),
+            like(customers.city || "", `%${search}%`),
+            like(customers.street || "", `%${search}%`),
+            like(customers.postalCode || "", `%${search}%`),
+            like(customers.firstName || "", `%${search}%`),
+            like(customers.lastName || "", `%${search}%`)
           )
         );
       }
@@ -285,7 +293,7 @@ export const storage = {
       if (looksLikePhone) {
         const { getPhoneSearchVariants } = await import("./phoneUtils");
         const variants = getPhoneSearchVariants(search.trim());
-        const phoneConditions = variants.map(v => ilike(customers.phone || "", `%${v}%`));
+        const phoneConditions = variants.map(v => like(customers.phone || "", `%${v}%`));
         const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
         for (const v of variants) {
           phoneConditions.push(sql`${strippedCol} ILIKE ${'%' + v + '%'}`);
@@ -294,15 +302,15 @@ export const storage = {
       } else {
         conditions.push(
           or(
-            ilike(customers.name, `%${search}%`),
-            ilike(customers.phone || "", `%${search}%`),
-            ilike(customers.email || "", `%${search}%`),
-            ilike(customers.company || "", `%${search}%`),
-            ilike(customers.city || "", `%${search}%`),
-            ilike(customers.street || "", `%${search}%`),
-            ilike(customers.postalCode || "", `%${search}%`),
-            ilike(customers.firstName || "", `%${search}%`),
-            ilike(customers.lastName || "", `%${search}%`)
+            like(customers.name, `%${search}%`),
+            like(customers.phone || "", `%${search}%`),
+            like(customers.email || "", `%${search}%`),
+            like(customers.company || "", `%${search}%`),
+            like(customers.city || "", `%${search}%`),
+            like(customers.street || "", `%${search}%`),
+            like(customers.postalCode || "", `%${search}%`),
+            like(customers.firstName || "", `%${search}%`),
+            like(customers.lastName || "", `%${search}%`)
           )
         );
       }
@@ -315,7 +323,7 @@ export const storage = {
     const { getPhoneSearchVariants, normalizePhone, lastNDigits } = await import("./phoneUtils");
     const variants = getPhoneSearchVariants(phone);
     const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
-    const phoneConditions = variants.map(v => ilike(customers.phone, `%${v}%`));
+    const phoneConditions = variants.map(v => like(customers.phone, `%${v}%`));
     for (const v of variants) {
       phoneConditions.push(sql`${strippedCol} ILIKE ${'%' + v + '%'}`);
     }
@@ -357,15 +365,17 @@ export const storage = {
     return cust;
   },
   async createCustomer(data: InsertCustomer) {
-    const [cust] = await db.insert(customers).values(data).returning();
+    const _ins_cust = await db.insert(customers).values(data).$returningId();
+    const [cust] = await db.select().from(customers).where(eq(customers.id, _ins_cust[0]?.id ?? 0));
     return cust;
   },
   async updateCustomer(id: number, data: Partial<InsertCustomer>) {
-    const [cust] = await db.update(customers).set({ ...data, updatedAt: new Date() }).where(eq(customers.id, id)).returning();
+    await db.update(customers).set({ ...data, updatedAt: new Date() }).where(eq(customers.id, id));
+    const [cust] = await db.select().from(customers).where(eq(customers.id, id));
     return cust;
   },
   async deleteCustomer(id: number) {
-    const [cust] = await db.delete(customers).where(eq(customers.id, id)).returning();
+    const [cust] = await db.delete(customers).where(eq(customers.id, id));
     return cust;
   },
   async addLoyaltyPoints(id: number, points: number) {
@@ -406,7 +416,8 @@ export const storage = {
     return sale;
   },
   async createSale(data: InsertSale) {
-    const [sale] = await db.insert(sales).values(data).returning();
+    const _ins_sale = await db.insert(sales).values(data).$returningId();
+    const [sale] = await db.select().from(sales).where(eq(sales.id, _ins_sale[0]?.id ?? 0));
     return sale;
   },
   async getSaleItems(saleId: number) {
@@ -416,11 +427,12 @@ export const storage = {
     await db.delete(saleItems).where(eq(saleItems.saleId, saleId));
   },
   async createSaleItem(data: InsertSaleItem) {
-    const [item] = await db.insert(saleItems).values(data).returning();
+    const _ins_item = await db.insert(saleItems).values(data).$returningId();
+    const [item] = await db.select().from(saleItems).where(eq(saleItems.id, _ins_item[0]?.id ?? 0));
     return item;
   },
   async updateSale(id: number, data: Partial<InsertSale>) {
-    const [sale] = await db.update(sales).set(data).where(eq(sales.id, id)).returning();
+    const [sale] = await db.update(sales).set(data).where(eq(sales.id, id));
     return sale;
   },
   async deleteSale(id: number) {
@@ -440,11 +452,13 @@ export const storage = {
     return sup;
   },
   async createSupplier(data: InsertSupplier) {
-    const [sup] = await db.insert(suppliers).values(data).returning();
+    const _ins_sup = await db.insert(suppliers).values(data).$returningId();
+    const [sup] = await db.select().from(suppliers).where(eq(suppliers.id, _ins_sup[0]?.id ?? 0));
     return sup;
   },
   async updateSupplier(id: number, data: Partial<InsertSupplier>) {
-    const [sup] = await db.update(suppliers).set({ ...data, updatedAt: new Date() }).where(eq(suppliers.id, id)).returning();
+    await db.update(suppliers).set({ ...data, updatedAt: new Date() }).where(eq(suppliers.id, id));
+    const [sup] = await db.select().from(suppliers).where(eq(suppliers.id, id));
     return sup;
   },
 
@@ -462,11 +476,12 @@ export const storage = {
     return db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt));
   },
   async createPurchaseOrder(data: InsertPurchaseOrder) {
-    const [po] = await db.insert(purchaseOrders).values(data).returning();
+    const _ins_po = await db.insert(purchaseOrders).values(data).$returningId();
+    const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, _ins_po[0]?.id ?? 0));
     return po;
   },
   async updatePurchaseOrder(id: number, data: Partial<InsertPurchaseOrder>) {
-    const [po] = await db.update(purchaseOrders).set(data).where(eq(purchaseOrders.id, id)).returning();
+    const [po] = await db.update(purchaseOrders).set(data).where(eq(purchaseOrders.id, id));
     return po;
   },
   async getPurchaseOrder(id: number) {
@@ -477,7 +492,8 @@ export const storage = {
     return db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, poId));
   },
   async createPurchaseOrderItem(data: InsertPurchaseOrderItem) {
-    const [item] = await db.insert(purchaseOrderItems).values(data).returning();
+    const _ins_item = await db.insert(purchaseOrderItems).values(data).$returningId();
+    const [item] = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.id, _ins_item[0]?.id ?? 0));
     return item;
   },
   async receivePurchaseOrder(id: number, items: { productId: number; receivedQuantity: number }[]) {
@@ -490,7 +506,8 @@ export const storage = {
         await this.adjustInventory(item.productId, po.branchId, item.receivedQuantity);
       }
     }
-    const [updated] = await db.update(purchaseOrders).set({ status: "received", receivedDate: new Date() }).where(eq(purchaseOrders.id, id)).returning();
+    await db.update(purchaseOrders).set({ status: "received", receivedDate: new Date() }).where(eq(purchaseOrders.id, id));
+    const [updated] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
     return updated;
   },
 
@@ -526,7 +543,8 @@ export const storage = {
     return shift;
   },
   async createShift(data: InsertShift) {
-    const [shift] = await db.insert(shifts).values(data).returning();
+    const _ins_shift = await db.insert(shifts).values(data).$returningId();
+    const [shift] = await db.select().from(shifts).where(eq(shifts.id, _ins_shift[0]?.id ?? 0));
     return shift;
   },
   async closeShift(id: number, data: { closingCash?: string; totalSales?: string; totalTransactions?: number }) {
@@ -534,7 +552,7 @@ export const storage = {
       ...data,
       endTime: new Date(),
       status: "closed",
-    }).where(eq(shifts.id, id)).returning();
+    }).where(eq(shifts.id, id));
     return shift;
   },
   async getEmployeeAttendance(employeeId: number) {
@@ -549,7 +567,8 @@ export const storage = {
     return db.select().from(expenses).orderBy(desc(expenses.createdAt));
   },
   async createExpense(data: InsertExpense) {
-    const [exp] = await db.insert(expenses).values(data).returning();
+    const _ins_exp = await db.insert(expenses).values(data).$returningId();
+    const [exp] = await db.select().from(expenses).where(eq(expenses.id, _ins_exp[0]?.id ?? 0));
     return exp;
   },
   async getExpensesByDateRange(startDate?: Date, endDate?: Date) {
@@ -573,11 +592,12 @@ export const storage = {
     return db.select().from(tables);
   },
   async createTable(data: InsertTable) {
-    const [table] = await db.insert(tables).values(data).returning();
+    const _ins_table = await db.insert(tables).values(data).$returningId();
+    const [table] = await db.select().from(tables).where(eq(tables.id, _ins_table[0]?.id ?? 0));
     return table;
   },
   async updateTable(id: number, data: Partial<InsertTable>) {
-    const [table] = await db.update(tables).set(data).where(eq(tables.id, id)).returning();
+    const [table] = await db.update(tables).set(data).where(eq(tables.id, id));
     return table;
   },
 
@@ -591,11 +611,13 @@ export const storage = {
     return db.select().from(kitchenOrders).where(eq(kitchenOrders.status, "pending")).orderBy(kitchenOrders.createdAt);
   },
   async createKitchenOrder(data: InsertKitchenOrder) {
-    const [order] = await db.insert(kitchenOrders).values(data).returning();
+    const _ins_order = await db.insert(kitchenOrders).values(data).$returningId();
+    const [order] = await db.select().from(kitchenOrders).where(eq(kitchenOrders.id, _ins_order[0]?.id ?? 0));
     return order;
   },
   async updateKitchenOrder(id: number, data: Partial<InsertKitchenOrder>) {
-    const [order] = await db.update(kitchenOrders).set({ ...data, updatedAt: new Date() }).where(eq(kitchenOrders.id, id)).returning();
+    await db.update(kitchenOrders).set({ ...data, updatedAt: new Date() }).where(eq(kitchenOrders.id, id));
+    const [order] = await db.select().from(kitchenOrders).where(eq(kitchenOrders.id, id));
     return order;
   },
 
@@ -604,14 +626,16 @@ export const storage = {
     return db.select().from(subscriptionPlans).where(eq(subscriptionPlans.isActive, true));
   },
   async createSubscriptionPlan(data: InsertSubscriptionPlan) {
-    const [plan] = await db.insert(subscriptionPlans).values(data).returning();
+    const _ins_plan = await db.insert(subscriptionPlans).values(data).$returningId();
+    const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, _ins_plan[0]?.id ?? 0));
     return plan;
   },
   async getSubscriptions() {
     return db.select().from(subscriptions).orderBy(desc(subscriptions.createdAt));
   },
   async createSubscription(data: InsertSubscription) {
-    const [sub] = await db.insert(subscriptions).values(data).returning();
+    const _ins_sub = await db.insert(subscriptions).values(data).$returningId();
+    const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.id, _ins_sub[0]?.id ?? 0));
     return sub;
   },
 
@@ -629,7 +653,8 @@ export const storage = {
     return db.select().from(activityLog).orderBy(desc(activityLog.createdAt)).limit(l);
   },
   async createActivityLog(data: InsertActivityLog) {
-    const [log] = await db.insert(activityLog).values(data).returning();
+    const _ins_log = await db.insert(activityLog).values(data).$returningId();
+    const [log] = await db.select().from(activityLog).where(eq(activityLog.id, _ins_log[0]?.id ?? 0));
     return log;
   },
 
@@ -661,11 +686,12 @@ export const storage = {
     return withWhere.orderBy(desc(calls.createdAt)).limit(limit);
   },
   async createCall(data: InsertCall) {
-    const [call] = await db.insert(calls).values(data).returning();
+    const _ins_call = await db.insert(calls).values(data).$returningId();
+    const [call] = await db.select().from(calls).where(eq(calls.id, _ins_call[0]?.id ?? 0));
     return call;
   },
   async updateCall(id: number, data: Partial<InsertCall>) {
-    const [call] = await db.update(calls).set(data).where(eq(calls.id, id)).returning();
+    const [call] = await db.update(calls).set(data).where(eq(calls.id, id));
     return call;
   },
 
@@ -687,14 +713,16 @@ export const storage = {
     return ret;
   },
   async createReturn(data: InsertReturn) {
-    const [ret] = await db.insert(returns).values(data).returning();
+    const _ins_ret = await db.insert(returns).values(data).$returningId();
+    const [ret] = await db.select().from(returns).where(eq(returns.id, _ins_ret[0]?.id ?? 0));
     return ret;
   },
   async getReturnItems(returnId: number) {
     return db.select().from(returnItems).where(eq(returnItems.returnId, returnId));
   },
   async createReturnItem(data: InsertReturnItem) {
-    const [item] = await db.insert(returnItems).values(data).returning();
+    const _ins_item = await db.insert(returnItems).values(data).$returningId();
+    const [item] = await db.select().from(returnItems).where(eq(returnItems.id, _ins_item[0]?.id ?? 0));
     return item;
   },
 
@@ -728,7 +756,7 @@ export const storage = {
       productId: saleItems.productId,
       name: saleItems.productName,
       totalSold: sql<number>`sum(${saleItems.quantity})`,
-      revenue: sql<string>`sum(${saleItems.total}::numeric)`,
+      revenue: sql<string>`sum(${saleItems.total})`,
     }).from(saleItems).groupBy(saleItems.productId, saleItems.productName).orderBy(sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
     return result.map(r => ({ ...r, totalSold: Number(r.totalSold), revenue: Number(r.revenue) }));
   },
@@ -736,7 +764,7 @@ export const storage = {
     const result = await db.select({
       method: sales.paymentMethod,
       count: sql<number>`count(*)`,
-      total: sql<string>`coalesce(sum(${sales.totalAmount}::numeric), 0)`,
+      total: sql<string>`coalesce(sum(${sales.totalAmount}), 0)`,
     }).from(sales).groupBy(sales.paymentMethod);
     return result.map(r => ({ method: r.method, count: Number(r.count), total: Number(r.total) }));
   },
@@ -744,7 +772,7 @@ export const storage = {
   // Dashboard Stats
   async getDashboardStats(tenantId?: number) {
     let salesCountQuery: any = db.select({ count: sql<number>`count(*)` }).from(sales);
-    let totalRevenueQuery: any = db.select({ total: sql<string>`coalesce(sum(total_amount::numeric), 0)` }).from(sales);
+    let totalRevenueQuery: any = db.select({ total: sql<string>`coalesce(sum(total_amount), 0)` }).from(sales);
     let customerCountQuery: any = db.select({ count: sql<number>`count(*)` }).from(customers);
     let productCountQuery: any = db.select({ count: sql<number>`count(*)` }).from(products).where(eq(products.isActive, true));
 
@@ -752,7 +780,7 @@ export const storage = {
     let todaySalesQuery: any;
     let weekSalesQuery: any;
     let monthSalesQuery: any;
-    let totalExpensesQuery: any = db.select({ total: sql<string>`coalesce(sum(${expenses.amount}::numeric), 0)` }).from(expenses);
+    let totalExpensesQuery: any = db.select({ total: sql<string>`coalesce(sum(${expenses.amount}), 0)` }).from(expenses);
     let todayExpensesQuery: any;
     let topProductsQuery: any;
     let salesByPaymentMethodQuery: any;
@@ -778,7 +806,7 @@ export const storage = {
         const { inArray } = await import('drizzle-orm');
 
         salesCountQuery = db.select({ count: sql<number>`count(*)` }).from(sales).where(inArray(sales.branchId, branchIds));
-        totalRevenueQuery = db.select({ total: sql<string>`coalesce(sum(total_amount::numeric), 0)` }).from(sales).where(inArray(sales.branchId, branchIds));
+        totalRevenueQuery = db.select({ total: sql<string>`coalesce(sum(total_amount), 0)` }).from(sales).where(inArray(sales.branchId, branchIds));
 
         // Customers don't have direct branchId, use tenantId
         customerCountQuery = db.select({ count: sql<number>`count(*)` }).from(customers).where(eq(customers.tenantId, tenantId));
@@ -793,21 +821,21 @@ export const storage = {
 
         todaySalesQuery = db.select({
           count: sql<number>`count(*)`,
-          total: sql<string>`coalesce(sum(total_amount::numeric), 0)`,
+          total: sql<string>`coalesce(sum(total_amount), 0)`,
         }).from(sales).where(and(gte(sales.createdAt, todayStart), inArray(sales.branchId, branchIds)));
 
         weekSalesQuery = db.select({
-          total: sql<string>`coalesce(sum(total_amount::numeric), 0)`,
+          total: sql<string>`coalesce(sum(total_amount), 0)`,
         }).from(sales).where(and(gte(sales.createdAt, weekStart), inArray(sales.branchId, branchIds)));
 
         monthSalesQuery = db.select({
-          total: sql<string>`coalesce(sum(total_amount::numeric), 0)`,
+          total: sql<string>`coalesce(sum(total_amount), 0)`,
         }).from(sales).where(and(gte(sales.createdAt, monthStart), inArray(sales.branchId, branchIds)));
 
-        totalExpensesQuery = db.select({ total: sql<string>`coalesce(sum(${expenses.amount}::numeric), 0)` }).from(expenses).where(eq(expenses.tenantId, tenantId));
+        totalExpensesQuery = db.select({ total: sql<string>`coalesce(sum(${expenses.amount}), 0)` }).from(expenses).where(eq(expenses.tenantId, tenantId));
 
         todayExpensesQuery = db.select({
-          total: sql<string>`coalesce(sum(${expenses.amount}::numeric), 0)`,
+          total: sql<string>`coalesce(sum(${expenses.amount}), 0)`,
         }).from(expenses).where(and(gte(expenses.date, todayStart), eq(expenses.tenantId, tenantId)));
 
         const topLimit = 5;
@@ -815,7 +843,7 @@ export const storage = {
           productId: saleItems.productId,
           name: saleItems.productName,
           totalSold: sql<number>`sum(${saleItems.quantity})`,
-          revenue: sql<string>`sum(${saleItems.total}::numeric)`,
+          revenue: sql<string>`sum(${saleItems.total})`,
         }).from(saleItems)
           .innerJoin(sales, eq(saleItems.saleId, sales.id))
           .where(inArray(sales.branchId, branchIds))
@@ -826,13 +854,13 @@ export const storage = {
         salesByPaymentMethodQuery = db.select({
           method: sales.paymentMethod,
           count: sql<number>`count(*)`,
-          total: sql<string>`coalesce(sum(${sales.totalAmount}::numeric), 0)`,
+          total: sql<string>`coalesce(sum(${sales.totalAmount}), 0)`,
         }).from(sales).where(inArray(sales.branchId, branchIds)).groupBy(sales.paymentMethod);
 
         recentSalesQuery = db.select().from(sales).where(inArray(sales.branchId, branchIds)).orderBy(desc(sales.createdAt)).limit(5);
 
         profitRowQuery = db.select({
-          totalCost: sql<string>`coalesce(sum(${products.costPrice}::numeric * ${saleItems.quantity}), 0)`,
+          totalCost: sql<string>`coalesce(sum(${products.costPrice} * ${saleItems.quantity}), 0)`,
         }).from(saleItems)
           .innerJoin(products, eq(saleItems.productId, products.id))
           .innerJoin(sales, eq(saleItems.saleId, sales.id))
@@ -851,38 +879,38 @@ export const storage = {
 
       todaySalesQuery = db.select({
         count: sql<number>`count(*)`,
-        total: sql<string>`coalesce(sum(total_amount::numeric), 0)`,
+        total: sql<string>`coalesce(sum(total_amount), 0)`,
       }).from(sales).where(gte(sales.createdAt, todayStart));
 
       weekSalesQuery = db.select({
-        total: sql<string>`coalesce(sum(total_amount::numeric), 0)`,
+        total: sql<string>`coalesce(sum(total_amount), 0)`,
       }).from(sales).where(gte(sales.createdAt, weekStart));
 
       monthSalesQuery = db.select({
-        total: sql<string>`coalesce(sum(total_amount::numeric), 0)`,
+        total: sql<string>`coalesce(sum(total_amount), 0)`,
       }).from(sales).where(gte(sales.createdAt, monthStart));
 
       todayExpensesQuery = db.select({
-        total: sql<string>`coalesce(sum(${expenses.amount}::numeric), 0)`,
+        total: sql<string>`coalesce(sum(${expenses.amount}), 0)`,
       }).from(expenses).where(gte(expenses.date, todayStart));
 
       topProductsQuery = db.select({
         productId: saleItems.productId,
         name: saleItems.productName,
         totalSold: sql<number>`sum(${saleItems.quantity})`,
-        revenue: sql<string>`sum(${saleItems.total}::numeric)`,
+        revenue: sql<string>`sum(${saleItems.total})`,
       }).from(saleItems).groupBy(saleItems.productId, saleItems.productName).orderBy(sql`sum(${saleItems.quantity}) desc`).limit(5);
 
       salesByPaymentMethodQuery = db.select({
         method: sales.paymentMethod,
         count: sql<number>`count(*)`,
-        total: sql<string>`coalesce(sum(${sales.totalAmount}::numeric), 0)`,
+        total: sql<string>`coalesce(sum(${sales.totalAmount}), 0)`,
       }).from(sales).groupBy(sales.paymentMethod);
 
       recentSalesQuery = db.select().from(sales).orderBy(desc(sales.createdAt)).limit(5);
 
       profitRowQuery = db.select({
-        totalCost: sql<string>`coalesce(sum(${products.costPrice}::numeric * ${saleItems.quantity}), 0)`,
+        totalCost: sql<string>`coalesce(sum(${products.costPrice} * ${saleItems.quantity}), 0)`,
       }).from(saleItems)
         .innerJoin(products, eq(saleItems.productId, products.id));
     }
@@ -1017,7 +1045,8 @@ export const storage = {
     return db.select().from(cashDrawerOperations).where(eq(cashDrawerOperations.shiftId, shiftId)).orderBy(desc(cashDrawerOperations.createdAt));
   },
   async createCashDrawerOperation(data: InsertCashDrawerOperation) {
-    const [op] = await db.insert(cashDrawerOperations).values(data).returning();
+    const _ins_op = await db.insert(cashDrawerOperations).values(data).$returningId();
+    const [op] = await db.select().from(cashDrawerOperations).where(eq(cashDrawerOperations.id, _ins_op[0]?.id ?? 0));
     return op;
   },
 
@@ -1036,11 +1065,12 @@ export const storage = {
     return db.select().from(warehouses).where(eq(warehouses.isActive, true));
   },
   async createWarehouse(data: InsertWarehouse) {
-    const [wh] = await db.insert(warehouses).values(data).returning();
+    const _ins_wh = await db.insert(warehouses).values(data).$returningId();
+    const [wh] = await db.select().from(warehouses).where(eq(warehouses.id, _ins_wh[0]?.id ?? 0));
     return wh;
   },
   async updateWarehouse(id: number, data: Partial<InsertWarehouse>) {
-    const [wh] = await db.update(warehouses).set(data).where(eq(warehouses.id, id)).returning();
+    const [wh] = await db.update(warehouses).set(data).where(eq(warehouses.id, id));
     return wh;
   },
 
@@ -1049,7 +1079,8 @@ export const storage = {
     return db.select().from(warehouseTransfers).orderBy(desc(warehouseTransfers.createdAt));
   },
   async createWarehouseTransfer(data: InsertWarehouseTransfer) {
-    const [transfer] = await db.insert(warehouseTransfers).values(data).returning();
+    const _ins_transfer = await db.insert(warehouseTransfers).values(data).$returningId();
+    const [transfer] = await db.select().from(warehouseTransfers).where(eq(warehouseTransfers.id, _ins_transfer[0]?.id ?? 0));
     return transfer;
   },
 
@@ -1069,11 +1100,12 @@ export const storage = {
     return db.select().from(productBatches).where(and(...conditions)).orderBy(productBatches.expiryDate);
   },
   async createProductBatch(data: InsertProductBatch) {
-    const [batch] = await db.insert(productBatches).values(data).returning();
+    const _ins_batch = await db.insert(productBatches).values(data).$returningId();
+    const [batch] = await db.select().from(productBatches).where(eq(productBatches.id, _ins_batch[0]?.id ?? 0));
     return batch;
   },
   async updateProductBatch(id: number, data: Partial<InsertProductBatch>) {
-    const [batch] = await db.update(productBatches).set(data).where(eq(productBatches.id, id)).returning();
+    const [batch] = await db.update(productBatches).set(data).where(eq(productBatches.id, id));
     return batch;
   },
 
@@ -1084,7 +1116,8 @@ export const storage = {
     return db.select().from(inventoryMovements).orderBy(desc(inventoryMovements.createdAt)).limit(l);
   },
   async createInventoryMovement(data: InsertInventoryMovement) {
-    const [mov] = await db.insert(inventoryMovements).values(data).returning();
+    const _ins_mov = await db.insert(inventoryMovements).values(data).$returningId();
+    const [mov] = await db.select().from(inventoryMovements).where(eq(inventoryMovements.id, _ins_mov[0]?.id ?? 0));
     return mov;
   },
 
@@ -1097,22 +1130,24 @@ export const storage = {
     return sc;
   },
   async createStockCount(data: InsertStockCount) {
-    const [sc] = await db.insert(stockCounts).values(data).returning();
+    const _ins_sc = await db.insert(stockCounts).values(data).$returningId();
+    const [sc] = await db.select().from(stockCounts).where(eq(stockCounts.id, _ins_sc[0]?.id ?? 0));
     return sc;
   },
   async updateStockCount(id: number, data: Partial<InsertStockCount>) {
-    const [sc] = await db.update(stockCounts).set(data).where(eq(stockCounts.id, id)).returning();
+    const [sc] = await db.update(stockCounts).set(data).where(eq(stockCounts.id, id));
     return sc;
   },
   async getStockCountItems(stockCountId: number) {
     return db.select().from(stockCountItems).where(eq(stockCountItems.stockCountId, stockCountId));
   },
   async createStockCountItem(data: InsertStockCountItem) {
-    const [item] = await db.insert(stockCountItems).values(data).returning();
+    const _ins_item = await db.insert(stockCountItems).values(data).$returningId();
+    const [item] = await db.select().from(stockCountItems).where(eq(stockCountItems.id, _ins_item[0]?.id ?? 0));
     return item;
   },
   async updateStockCountItem(id: number, data: Partial<InsertStockCountItem>) {
-    const [item] = await db.update(stockCountItems).set(data).where(eq(stockCountItems.id, id)).returning();
+    const [item] = await db.update(stockCountItems).set(data).where(eq(stockCountItems.id, id));
     return item;
   },
 
@@ -1122,11 +1157,12 @@ export const storage = {
     return db.select().from(supplierContracts).where(eq(supplierContracts.isActive, true));
   },
   async createSupplierContract(data: InsertSupplierContract) {
-    const [contract] = await db.insert(supplierContracts).values(data).returning();
+    const _ins_contract = await db.insert(supplierContracts).values(data).$returningId();
+    const [contract] = await db.select().from(supplierContracts).where(eq(supplierContracts.id, _ins_contract[0]?.id ?? 0));
     return contract;
   },
   async updateSupplierContract(id: number, data: Partial<InsertSupplierContract>) {
-    const [contract] = await db.update(supplierContracts).set(data).where(eq(supplierContracts.id, id)).returning();
+    const [contract] = await db.update(supplierContracts).set(data).where(eq(supplierContracts.id, id));
     return contract;
   },
 
@@ -1136,7 +1172,8 @@ export const storage = {
     return db.select().from(employeeCommissions).orderBy(desc(employeeCommissions.createdAt));
   },
   async createEmployeeCommission(data: InsertEmployeeCommission) {
-    const [comm] = await db.insert(employeeCommissions).values(data).returning();
+    const _ins_comm = await db.insert(employeeCommissions).values(data).$returningId();
+    const [comm] = await db.select().from(employeeCommissions).where(eq(employeeCommissions.id, _ins_comm[0]?.id ?? 0));
     return comm;
   },
 
@@ -1144,7 +1181,7 @@ export const storage = {
   async getEmployeeSalesReport(employeeId: number) {
     const result = await db.select({
       count: sql<number>`count(*)`,
-      total: sql<string>`coalesce(sum(${sales.totalAmount}::numeric), 0)`,
+      total: sql<string>`coalesce(sum(${sales.totalAmount}), 0)`,
     }).from(sales).where(eq(sales.employeeId, employeeId));
     return { salesCount: Number(result[0]?.count || 0), totalRevenue: Number(result[0]?.total || 0) };
   },
@@ -1169,7 +1206,7 @@ export const storage = {
     const result = await db.select({
       productId: saleItems.productId,
       productName: saleItems.productName,
-      totalRevenue: sql<string>`sum(${saleItems.total}::numeric)`,
+      totalRevenue: sql<string>`sum(${saleItems.total})`,
       totalSold: sql<number>`sum(${saleItems.quantity})`,
     }).from(saleItems).groupBy(saleItems.productId, saleItems.productName);
     const prodList = await db.select().from(products);
@@ -1194,8 +1231,8 @@ export const storage = {
     const result = await db.select({
       employeeId: sales.employeeId,
       count: sql<number>`count(*)`,
-      total: sql<string>`coalesce(sum(${sales.totalAmount}::numeric), 0)`,
-      avgSale: sql<string>`coalesce(avg(${sales.totalAmount}::numeric), 0)`,
+      total: sql<string>`coalesce(sum(${sales.totalAmount}), 0)`,
+      avgSale: sql<string>`coalesce(avg(${sales.totalAmount}), 0)`,
     }).from(sales).groupBy(sales.employeeId);
     const empList = await db.select().from(employees);
     const empMap = new Map(empList.map(e => [e.id, e]));
@@ -1211,7 +1248,7 @@ export const storage = {
   async getReturnsReport() {
     const result = await db.select({
       count: sql<number>`count(*)`,
-      total: sql<string>`coalesce(sum(${returns.totalAmount}::numeric), 0)`,
+      total: sql<string>`coalesce(sum(${returns.totalAmount}), 0)`,
     }).from(returns);
     const returnsList = await db.select().from(returns).orderBy(desc(returns.createdAt)).limit(20);
     return {
@@ -1230,11 +1267,13 @@ export const storage = {
     return Number(result?.count || 0);
   },
   async createNotification(data: InsertNotification) {
-    const [notif] = await db.insert(notifications).values(data).returning();
+    const _ins_notif = await db.insert(notifications).values(data).$returningId();
+    const [notif] = await db.select().from(notifications).where(eq(notifications.id, _ins_notif[0]?.id ?? 0));
     return notif;
   },
   async markNotificationRead(id: number) {
-    const [notif] = await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id)).returning();
+    await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
+    const [notif] = await db.select().from(notifications).where(eq(notifications.id, id));
     return notif;
   },
   async markAllNotificationsRead(recipientId: number) {
@@ -1256,7 +1295,7 @@ export const storage = {
         entityType,
         entityId,
         priority: priority || "normal",
-      }).returning();
+      });
       notifs.push(notif);
     }
     return notifs;
@@ -1325,7 +1364,7 @@ export const storage = {
     };
   },
   async updateShift(id: number, data: Partial<typeof shifts.$inferInsert>) {
-    const [shift] = await db.update(shifts).set(data).where(eq(shifts.id, id)).returning();
+    const [shift] = await db.update(shifts).set(data).where(eq(shifts.id, id));
     return shift;
   },
 
@@ -1338,11 +1377,12 @@ export const storage = {
     return db.select().from(vehicles).where(eq(vehicles.isActive, true)).orderBy(desc(vehicles.createdAt));
   },
   async createVehicle(data: InsertVehicle) {
-    const [v] = await db.insert(vehicles).values(data).returning();
+    const _ins_v = await db.insert(vehicles).values(data).$returningId();
+    const [v] = await db.select().from(vehicles).where(eq(vehicles.id, _ins_v[0]?.id ?? 0));
     return v;
   },
   async updateVehicle(id: number, data: Partial<InsertVehicle>) {
-    const [v] = await db.update(vehicles).set(data).where(eq(vehicles.id, id)).returning();
+    const [v] = await db.update(vehicles).set(data).where(eq(vehicles.id, id));
     return v;
   },
   async deleteVehicle(id: number) {
@@ -1357,10 +1397,11 @@ export const storage = {
   async upsertPrinterConfig(data: InsertPrinterConfig) {
     const existing = await db.select().from(printerConfigs).where(and(eq(printerConfigs.tenantId, data.tenantId), eq(printerConfigs.receiptType, data.receiptType)));
     if (existing.length > 0) {
-      const [c] = await db.update(printerConfigs).set({ ...data, updatedAt: new Date() }).where(eq(printerConfigs.id, existing[0].id)).returning();
+      const [c] = await db.update(printerConfigs).set({ ...data, updatedAt: new Date() }).where(eq(printerConfigs.id, existing[0].id));
       return c;
     }
-    const [c] = await db.insert(printerConfigs).values(data).returning();
+    const _ins_c = await db.insert(printerConfigs).values(data).$returningId();
+    const [c] = await db.select().from(printerConfigs).where(eq(printerConfigs.id, _ins_c[0]?.id ?? 0));
     return c;
   },
 
@@ -1370,7 +1411,8 @@ export const storage = {
     return db.select().from(dailyClosings).where(eq(dailyClosings.tenantId, tenantId)).orderBy(desc(dailyClosings.createdAt));
   },
   async createDailyClosing(data: InsertDailyClosing) {
-    const [dc] = await db.insert(dailyClosings).values(data).returning();
+    const _ins_dc = await db.insert(dailyClosings).values(data).$returningId();
+    const [dc] = await db.select().from(dailyClosings).where(eq(dailyClosings.id, _ins_dc[0]?.id ?? 0));
     return dc;
   },
   async getDailyClosingByDate(tenantId: number, closingDate: string, branchId?: number) {
@@ -1388,7 +1430,8 @@ export const storage = {
     return db.select().from(monthlyClosings).where(eq(monthlyClosings.tenantId, tenantId)).orderBy(desc(monthlyClosings.createdAt));
   },
   async createMonthlyClosing(data: InsertMonthlyClosing) {
-    const [mc] = await db.insert(monthlyClosings).values(data).returning();
+    const _ins_mc = await db.insert(monthlyClosings).values(data).$returningId();
+    const [mc] = await db.select().from(monthlyClosings).where(eq(monthlyClosings.id, _ins_mc[0]?.id ?? 0));
     return mc;
   },
   async getMonthlyClosingByMonth(tenantId: number, closingMonth: string, branchId?: number) {
@@ -1413,11 +1456,13 @@ export const storage = {
     return admin;
   },
   async createSuperAdmin(data: InsertSuperAdmin) {
-    const [admin] = await db.insert(superAdmins).values(data).returning();
+    const _ins_admin = await db.insert(superAdmins).values(data).$returningId();
+    const [admin] = await db.select().from(superAdmins).where(eq(superAdmins.id, _ins_admin[0]?.id ?? 0));
     return admin;
   },
   async updateSuperAdmin(id: number, data: Partial<InsertSuperAdmin>) {
-    const [admin] = await db.update(superAdmins).set({ ...data, updatedAt: new Date() }).where(eq(superAdmins.id, id)).returning();
+    await db.update(superAdmins).set({ ...data, updatedAt: new Date() }).where(eq(superAdmins.id, id));
+    const [admin] = await db.select().from(superAdmins).where(eq(superAdmins.id, id));
     return admin;
   },
 
@@ -1440,7 +1485,7 @@ export const storage = {
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
         const [todaySales] = await db.select({
-          total: sql<string>`coalesce(sum(total_amount::numeric), 0)`,
+          total: sql<string>`coalesce(sum(total_amount), 0)`,
         }).from(sales).where(and(gte(sales.createdAt, todayStart), inArray(sales.branchId, branchIds)));
         salesToday = Number(todaySales?.total || 0).toFixed(2);
       }
@@ -1463,11 +1508,13 @@ export const storage = {
     return tenant;
   },
   async createTenant(data: InsertTenant) {
-    const [tenant] = await db.insert(tenants).values(data).returning();
+    const _ins_tenant = await db.insert(tenants).values(data).$returningId();
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, _ins_tenant[0]?.id ?? 0));
     return tenant;
   },
   async updateTenant(id: number, data: Partial<InsertTenant>) {
-    const [tenant] = await db.update(tenants).set({ ...data, updatedAt: new Date() }).where(eq(tenants.id, id)).returning();
+    await db.update(tenants).set({ ...data, updatedAt: new Date() }).where(eq(tenants.id, id));
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id));
     return tenant;
   },
   async deleteTenant(id: number) {
@@ -1489,11 +1536,13 @@ export const storage = {
     return sub;
   },
   async createTenantSubscription(data: InsertTenantSubscription) {
-    const [sub] = await db.insert(tenantSubscriptions).values(data).returning();
+    const _ins_sub = await db.insert(tenantSubscriptions).values(data).$returningId();
+    const [sub] = await db.select().from(tenantSubscriptions).where(eq(tenantSubscriptions.id, _ins_sub[0]?.id ?? 0));
     return sub;
   },
   async updateTenantSubscription(id: number, data: Partial<InsertTenantSubscription>) {
-    const [sub] = await db.update(tenantSubscriptions).set({ ...data, updatedAt: new Date() }).where(eq(tenantSubscriptions.id, id)).returning();
+    await db.update(tenantSubscriptions).set({ ...data, updatedAt: new Date() }).where(eq(tenantSubscriptions.id, id));
+    const [sub] = await db.select().from(tenantSubscriptions).where(eq(tenantSubscriptions.id, id));
     return sub;
   },
   async deleteTenantSubscription(id: number) {
@@ -1516,11 +1565,13 @@ export const storage = {
     return key;
   },
   async createLicenseKey(data: InsertLicenseKey) {
-    const [key] = await db.insert(licenseKeys).values(data).returning();
+    const _ins_key = await db.insert(licenseKeys).values(data).$returningId();
+    const [key] = await db.select().from(licenseKeys).where(eq(licenseKeys.id, _ins_key[0]?.id ?? 0));
     return key;
   },
   async updateLicenseKey(id: number, data: Partial<InsertLicenseKey>) {
-    const [key] = await db.update(licenseKeys).set({ ...data, updatedAt: new Date() }).where(eq(licenseKeys.id, id)).returning();
+    await db.update(licenseKeys).set({ ...data, updatedAt: new Date() }).where(eq(licenseKeys.id, id));
+    const [key] = await db.select().from(licenseKeys).where(eq(licenseKeys.id, id));
     return key;
   },
 
@@ -1532,11 +1583,12 @@ export const storage = {
     return db.select().from(tenantNotifications).orderBy(desc(tenantNotifications.createdAt));
   },
   async createTenantNotification(data: InsertTenantNotification) {
-    const [notif] = await db.insert(tenantNotifications).values(data).returning();
+    const _ins_notif = await db.insert(tenantNotifications).values(data).$returningId();
+    const [notif] = await db.select().from(tenantNotifications).where(eq(tenantNotifications.id, _ins_notif[0]?.id ?? 0));
     return notif;
   },
   async updateTenantNotification(id: number, data: Partial<InsertTenantNotification>) {
-    const [notif] = await db.update(tenantNotifications).set(data).where(eq(tenantNotifications.id, id)).returning();
+    const [notif] = await db.update(tenantNotifications).set(data).where(eq(tenantNotifications.id, id));
     return notif;
   },
 
@@ -1578,11 +1630,11 @@ export const storage = {
           updatedAt: sql`now()`
         }
       })
-      .returning();
+      ;
   },
   async bulkCreateProducts(data: InsertProduct[]) {
     if (data.length === 0) return [];
-    return db.insert(products).values(data).returning();
+    return db.insert(products).values(data);
   },
 
   // System Wide Analytics
@@ -1604,7 +1656,7 @@ export const storage = {
         .where(and(eq(tenantSubscriptions.status, "active"), lte(tenantSubscriptions.endDate, in7Days), gte(tenantSubscriptions.endDate, now)));
 
       // Safer revenue aggregation
-      const [revenueRow] = await db.select({ total: sql<string>`coalesce(sum(price), 0)::text` }).from(tenantSubscriptions).where(eq(tenantSubscriptions.status, "active"));
+      const [revenueRow] = await db.select({ total: sql<string>`coalesce(sum(price), 0)` }).from(tenantSubscriptions).where(eq(tenantSubscriptions.status, "active"));
 
       // Recent activity
       const recentTenants = await db.select().from(tenants).orderBy(desc(tenants.createdAt)).limit(5);
@@ -1642,12 +1694,14 @@ export const storage = {
   },
 
   async createOnlineOrder(data: InsertOnlineOrder) {
-    const [order] = await db.insert(onlineOrders).values(data).returning();
+    const _ins_order = await db.insert(onlineOrders).values(data).$returningId();
+    const [order] = await db.select().from(onlineOrders).where(eq(onlineOrders.id, _ins_order[0]?.id ?? 0));
     return order;
   },
 
   async updateOnlineOrder(id: number, data: Partial<InsertOnlineOrder>) {
-    const [order] = await db.update(onlineOrders).set({ ...data, updatedAt: new Date() }).where(eq(onlineOrders.id, id)).returning();
+    await db.update(onlineOrders).set({ ...data, updatedAt: new Date() }).where(eq(onlineOrders.id, id));
+    const [order] = await db.select().from(onlineOrders).where(eq(onlineOrders.id, id));
     return order;
   },
 
@@ -1692,12 +1746,12 @@ export const storage = {
       const [updated] = await db.update(landingPageConfig)
         .set({ ...data, tenantId, updatedAt: new Date() })
         .where(eq(landingPageConfig.tenantId, tenantId))
-        .returning();
+        ;
       return updated;
     } else {
       const [created] = await db.insert(landingPageConfig)
         .values({ tenantId, ...data } as InsertLandingPageConfig)
-        .returning();
+        ;
       return created;
     }
   },
@@ -1839,7 +1893,7 @@ export const storage = {
         isMain: true,
         currency: "CHF",
         taxRate: "10",
-      }).returning();
+      });
 
       branchId = newBranch.id;
     } else {
@@ -1885,7 +1939,8 @@ export const storage = {
 
   // ── Platform Commissions ───────────────────────────────────────────────────
   async createPlatformCommission(data: InsertPlatformCommission) {
-    const [row] = await db.insert(platformCommissions).values(data).returning();
+    const _ins_row = await db.insert(platformCommissions).values(data).$returningId();
+    const [row] = await db.select().from(platformCommissions).where(eq(platformCommissions.id, _ins_row[0]?.id ?? 0));
     return row;
   },
   async getPlatformCommissions(tenantId?: number) {
@@ -1901,7 +1956,7 @@ export const storage = {
     for (const t of allTenants) {
       try {
         const [row] = await db.select({
-          total: sql<string>`coalesce(sum(commission_amount::numeric), 0)::text`,
+          total: sql<string>`coalesce(sum(commission_amount), 0)`,
           count: sql<number>`count(*)`
         }).from(platformCommissions).where(eq(platformCommissions.tenantId, t.id));
         const total = parseFloat(row?.total || "0");
