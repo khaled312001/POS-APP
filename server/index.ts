@@ -973,6 +973,39 @@ function setupPaymentGatewayRoutes(app: express.Application) {
     log("Error seeding Pizza Lemon data:", err);
   }
 
+  // ── One-time migration fix: backfill NULL tenant_ids ─────────────────────
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    const tenantsResult = await db.execute(sql`SELECT id FROM tenants LIMIT 1`);
+    const tenantRows = (tenantsResult as any)[0] as any[];
+    if (tenantRows && tenantRows.length > 0) {
+      const tid = tenantRows[0].id;
+      const tenantTables = [
+        "products", "categories", "employees", "customers", "branches",
+        "inventory", "sales", "sale_items", "expenses", "shifts",
+        "notifications", "calls", "purchase_orders", "purchase_order_items",
+        "suppliers", "tables", "kitchen_orders", "returns", "return_items",
+        "cash_drawer_operations", "warehouses", "warehouse_transfers",
+        "product_batches", "inventory_movements", "stock_counts",
+        "stock_count_items", "employee_commissions", "daily_closings",
+        "monthly_closings",
+      ];
+      let totalFixed = 0;
+      for (const table of tenantTables) {
+        try {
+          const r = await db.execute(sql.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`));
+          const affected = (r as any)[0]?.affectedRows ?? 0;
+          if (affected > 0) { log(`[migration] Fixed ${affected} rows in ${table}`); totalFixed += affected; }
+        } catch { /* table may not have tenant_id column */ }
+      }
+      if (totalFixed > 0) log(`[migration] Total tenant_id backfill: ${totalFixed} rows → tenant ${tid}`);
+      else log(`[migration] tenant_id backfill: nothing to fix`);
+    }
+  } catch (err) {
+    log("Error during tenant_id backfill:", err);
+  }
+
   if (!isProduction) {
     const http = await import('http');
     const expoPort = 8080;
