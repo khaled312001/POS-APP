@@ -3045,6 +3045,53 @@ async function test(){
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── Temporary maintenance: fix NULL tenant_ids (one-time migration fix) ───
+  app.post("/api/maintenance/fix-tenant-ids", async (req: any, res: any) => {
+    const secret = req.headers["x-maintenance-secret"] || req.query.secret;
+    if (secret !== "fix-tenant-2024-barmagly") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    try {
+      const { db } = await import("./db");
+      const { sql } = await import("drizzle-orm");
+
+      // Get first tenant
+      const tenants = await db.execute(sql`SELECT id, name FROM tenants LIMIT 1`);
+      const rows = (tenants as any)[0] as any[];
+      if (!rows || rows.length === 0) {
+        return res.status(404).json({ error: "No tenants found" });
+      }
+      const tid = rows[0].id;
+
+      const tables = [
+        "products", "categories", "employees", "customers", "branches",
+        "inventory", "sales", "sale_items", "expenses", "shifts",
+        "notifications", "calls", "purchase_orders", "purchase_order_items",
+        "suppliers", "tables", "kitchen_orders", "returns", "return_items",
+        "cash_drawer_operations", "warehouses", "warehouse_transfers",
+        "product_batches", "inventory_movements", "stock_counts",
+        "stock_count_items", "employee_commissions", "daily_closings",
+        "monthly_closings",
+      ];
+
+      const results: Record<string, number> = {};
+      for (const table of tables) {
+        try {
+          const r = await db.execute(
+            sql.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`)
+          );
+          results[table] = (r as any)[0]?.affectedRows ?? 0;
+        } catch (e: any) {
+          results[table] = -1; // table may not have tenant_id
+        }
+      }
+
+      res.json({ success: true, tenant: { id: tid, name: rows[0].name }, updates: results });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Auto-seeding removed – only Pizza Lemon is seeded from index.ts
