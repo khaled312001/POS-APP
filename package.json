@@ -11,7 +11,7 @@
     "server:dev": "cross-env NODE_ENV=development tsx --env-file=.env server/index.ts",
     "expo:start:static:build": "npx expo start --no-dev --minify --localhost",
     "expo:static:build": "node scripts/build.js && npx cross-env EXPO_PUBLIC_DOMAIN=pos.barmagly.tech npx expo export -p web && node scripts/post-export.js",
-    "server:build": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=server_dist",
+    "server:build": "esbuild server/index.ts --platform=node --packages=external --bundle --format=cjs --outdir=server_dist",
     "server:prod": "cross-env NODE_ENV=production node --env-file-if-exists=.env server_dist/index.js",
     "db:push": "npx drizzle-kit push",
     "start": "npx expo start",

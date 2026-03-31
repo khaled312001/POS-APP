@@ -1,11 +1,10 @@
+"use strict";
+var __create = Object.create;
 var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
-  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
-}) : x)(function(x) {
-  if (typeof require !== "undefined") return require.apply(this, arguments);
-  throw Error('Dynamic require of "' + x + '" is not supported');
-});
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __esm = (fn, res) => function __init() {
   return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
@@ -13,6 +12,22 @@ var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
+var __copyProps = (to, from, except, desc3) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc3 = __getOwnPropDesc(from, key)) || desc3.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 
 // shared/schema.ts
 var schema_exports = {};
@@ -108,758 +123,758 @@ __export(schema_exports, {
   warehouseTransfers: () => warehouseTransfers,
   warehouses: () => warehouses
 });
-import { mysqlTable, text, int, decimal, boolean, timestamp, json, serial, unique } from "drizzle-orm/mysql-core";
-import { createInsertSchema } from "drizzle-zod";
-var branches, employees, categories, products, inventory, customers, sales, saleItems, calls, suppliers, purchaseOrders, purchaseOrderItems, shifts, notifications, expenses, tables, kitchenOrders, subscriptionPlans, subscriptions, activityLog, returns, returnItems, syncQueue, cashDrawerOperations, warehouses, warehouseTransfers, productBatches, inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications, platformSettings, platformCommissions, onlineOrders, landingPageConfig, vehicles, printerConfigs, dailyClosings, monthlyClosings, dailySequences, insertBranchSchema, insertEmployeeSchema, insertCategorySchema, insertProductSchema, insertInventorySchema, insertCustomerSchema, insertSaleSchema, insertSaleItemSchema, insertSupplierSchema, insertPurchaseOrderSchema, insertPurchaseOrderItemSchema, insertShiftSchema, insertNotificationSchema, insertExpenseSchema, insertCallSchema, insertTableSchema, insertKitchenOrderSchema, insertSubscriptionPlanSchema, insertSubscriptionSchema, insertActivityLogSchema, insertReturnSchema, insertReturnItemSchema, insertCashDrawerOperationSchema, insertWarehouseSchema, insertWarehouseTransferSchema, insertProductBatchSchema, insertInventoryMovementSchema, insertStockCountSchema, insertStockCountItemSchema, insertSupplierContractSchema, insertEmployeeCommissionSchema, insertSuperAdminSchema, insertTenantSchema, insertTenantSubscriptionSchema, insertLicenseKeySchema, insertTenantNotificationSchema, insertOnlineOrderSchema, insertLandingPageConfigSchema, insertPlatformSettingSchema, insertPlatformCommissionSchema, insertVehicleSchema, insertPrinterConfigSchema, insertDailyClosingSchema, insertMonthlyClosingSchema;
+var import_mysql_core, import_drizzle_zod, branches, employees, categories, products, inventory, customers, sales, saleItems, calls, suppliers, purchaseOrders, purchaseOrderItems, shifts, notifications, expenses, tables, kitchenOrders, subscriptionPlans, subscriptions, activityLog, returns, returnItems, syncQueue, cashDrawerOperations, warehouses, warehouseTransfers, productBatches, inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications, platformSettings, platformCommissions, onlineOrders, landingPageConfig, vehicles, printerConfigs, dailyClosings, monthlyClosings, dailySequences, insertBranchSchema, insertEmployeeSchema, insertCategorySchema, insertProductSchema, insertInventorySchema, insertCustomerSchema, insertSaleSchema, insertSaleItemSchema, insertSupplierSchema, insertPurchaseOrderSchema, insertPurchaseOrderItemSchema, insertShiftSchema, insertNotificationSchema, insertExpenseSchema, insertCallSchema, insertTableSchema, insertKitchenOrderSchema, insertSubscriptionPlanSchema, insertSubscriptionSchema, insertActivityLogSchema, insertReturnSchema, insertReturnItemSchema, insertCashDrawerOperationSchema, insertWarehouseSchema, insertWarehouseTransferSchema, insertProductBatchSchema, insertInventoryMovementSchema, insertStockCountSchema, insertStockCountItemSchema, insertSupplierContractSchema, insertEmployeeCommissionSchema, insertSuperAdminSchema, insertTenantSchema, insertTenantSubscriptionSchema, insertLicenseKeySchema, insertTenantNotificationSchema, insertOnlineOrderSchema, insertLandingPageConfigSchema, insertPlatformSettingSchema, insertPlatformCommissionSchema, insertVehicleSchema, insertPrinterConfigSchema, insertDailyClosingSchema, insertMonthlyClosingSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
-    branches = mysqlTable("branches", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+    import_mysql_core = require("drizzle-orm/mysql-core");
+    import_drizzle_zod = require("drizzle-zod");
+    branches = (0, import_mysql_core.mysqlTable)("branches", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       // Added for multi-tenancy
-      name: text("name").notNull(),
-      address: text("address"),
-      phone: text("phone"),
-      email: text("email"),
-      logo: text("logo"),
-      isActive: boolean("is_active").default(true),
-      isMain: boolean("is_main").default(false),
-      currency: text("currency").default("CHF"),
-      taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0"),
-      deliveryFee: decimal("delivery_fee", { precision: 10, scale: 2 }).default("0"),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+      name: (0, import_mysql_core.text)("name").notNull(),
+      address: (0, import_mysql_core.text)("address"),
+      phone: (0, import_mysql_core.text)("phone"),
+      email: (0, import_mysql_core.text)("email"),
+      logo: (0, import_mysql_core.text)("logo"),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      isMain: (0, import_mysql_core.boolean)("is_main").default(false),
+      currency: (0, import_mysql_core.text)("currency").default("CHF"),
+      taxRate: (0, import_mysql_core.decimal)("tax_rate", { precision: 5, scale: 2 }).default("0"),
+      deliveryFee: (0, import_mysql_core.decimal)("delivery_fee", { precision: 10, scale: 2 }).default("0"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    employees = mysqlTable("employees", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
-      name: text("name").notNull(),
-      email: text("email"),
-      phone: text("phone"),
-      pin: text("pin").notNull(),
-      role: text("role").notNull().default("cashier"),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      isActive: boolean("is_active").default(true),
-      hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }),
-      commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("0"),
-      avatar: text("avatar"),
-      permissions: json("permissions").$type().default([]),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+    employees = (0, import_mysql_core.mysqlTable)("employees", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      name: (0, import_mysql_core.text)("name").notNull(),
+      email: (0, import_mysql_core.text)("email"),
+      phone: (0, import_mysql_core.text)("phone"),
+      pin: (0, import_mysql_core.text)("pin").notNull(),
+      role: (0, import_mysql_core.text)("role").notNull().default("cashier"),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      hourlyRate: (0, import_mysql_core.decimal)("hourly_rate", { precision: 10, scale: 2 }),
+      commissionRate: (0, import_mysql_core.decimal)("commission_rate", { precision: 5, scale: 2 }).default("0"),
+      avatar: (0, import_mysql_core.text)("avatar"),
+      permissions: (0, import_mysql_core.json)("permissions").$type().default([]),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    categories = mysqlTable("categories", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+    categories = (0, import_mysql_core.mysqlTable)("categories", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       // Added for multi-tenancy
-      name: text("name").notNull(),
-      nameAr: text("name_ar"),
-      color: text("color").default("#7C3AED"),
-      icon: text("icon").default("grid"),
-      image: text("image"),
-      parentId: int("parent_id"),
-      sortOrder: int("sort_order").default(0),
-      isActive: boolean("is_active").default(true),
-      createdAt: timestamp("created_at").defaultNow()
+      name: (0, import_mysql_core.text)("name").notNull(),
+      nameAr: (0, import_mysql_core.text)("name_ar"),
+      color: (0, import_mysql_core.text)("color").default("#7C3AED"),
+      icon: (0, import_mysql_core.text)("icon").default("grid"),
+      image: (0, import_mysql_core.text)("image"),
+      parentId: (0, import_mysql_core.int)("parent_id"),
+      sortOrder: (0, import_mysql_core.int)("sort_order").default(0),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    products = mysqlTable("products", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+    products = (0, import_mysql_core.mysqlTable)("products", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       // Added for multi-tenancy
-      name: text("name").notNull(),
-      nameAr: text("name_ar"),
-      description: text("description"),
-      sku: text("sku").unique(),
-      barcode: text("barcode"),
-      categoryId: int("category_id").references(() => categories.id, { onDelete: "cascade" }),
-      price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-      costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
-      image: text("image"),
-      unit: text("unit").default("piece"),
-      taxable: boolean("taxable").default(true),
-      trackInventory: boolean("track_inventory").default(true),
-      isActive: boolean("is_active").default(true),
-      expiryDate: timestamp("expiry_date"),
-      modifiers: json("modifiers").$type().default([]),
-      variants: json("variants").$type().default([]),
-      isAddon: boolean("is_addon").default(false),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+      name: (0, import_mysql_core.text)("name").notNull(),
+      nameAr: (0, import_mysql_core.text)("name_ar"),
+      description: (0, import_mysql_core.text)("description"),
+      sku: (0, import_mysql_core.text)("sku").unique(),
+      barcode: (0, import_mysql_core.text)("barcode"),
+      categoryId: (0, import_mysql_core.int)("category_id").references(() => categories.id, { onDelete: "cascade" }),
+      price: (0, import_mysql_core.decimal)("price", { precision: 10, scale: 2 }).notNull(),
+      costPrice: (0, import_mysql_core.decimal)("cost_price", { precision: 10, scale: 2 }),
+      image: (0, import_mysql_core.text)("image"),
+      unit: (0, import_mysql_core.text)("unit").default("piece"),
+      taxable: (0, import_mysql_core.boolean)("taxable").default(true),
+      trackInventory: (0, import_mysql_core.boolean)("track_inventory").default(true),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      expiryDate: (0, import_mysql_core.timestamp)("expiry_date"),
+      modifiers: (0, import_mysql_core.json)("modifiers").$type().default([]),
+      variants: (0, import_mysql_core.json)("variants").$type().default([]),
+      isAddon: (0, import_mysql_core.boolean)("is_addon").default(false),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    inventory = mysqlTable("inventory", {
-      id: serial("id").primaryKey(),
-      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }).notNull(),
-      quantity: int("quantity").default(0),
-      lowStockThreshold: int("low_stock_threshold").default(10),
-      reorderPoint: int("reorder_point").default(5),
-      reorderQuantity: int("reorder_quantity").default(20),
-      lastRestocked: timestamp("last_restocked"),
-      updatedAt: timestamp("updated_at").defaultNow()
+    inventory = (0, import_mysql_core.mysqlTable)("inventory", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      productId: (0, import_mysql_core.int)("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }).notNull(),
+      quantity: (0, import_mysql_core.int)("quantity").default(0),
+      lowStockThreshold: (0, import_mysql_core.int)("low_stock_threshold").default(10),
+      reorderPoint: (0, import_mysql_core.int)("reorder_point").default(5),
+      reorderQuantity: (0, import_mysql_core.int)("reorder_quantity").default(20),
+      lastRestocked: (0, import_mysql_core.timestamp)("last_restocked"),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    customers = mysqlTable("customers", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+    customers = (0, import_mysql_core.mysqlTable)("customers", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       // Added for multi-tenancy
-      name: text("name").notNull(),
-      email: text("email"),
-      phone: text("phone"),
-      address: text("address"),
-      loyaltyPoints: int("loyalty_points").default(0),
-      totalSpent: decimal("total_spent", { precision: 12, scale: 2 }).default("0"),
-      visitCount: int("visit_count").default(0),
-      notes: text("notes"),
-      creditBalance: decimal("credit_balance", { precision: 10, scale: 2 }).default("0"),
-      isActive: boolean("is_active").default(true),
+      name: (0, import_mysql_core.text)("name").notNull(),
+      email: (0, import_mysql_core.text)("email"),
+      phone: (0, import_mysql_core.text)("phone"),
+      address: (0, import_mysql_core.text)("address"),
+      loyaltyPoints: (0, import_mysql_core.int)("loyalty_points").default(0),
+      totalSpent: (0, import_mysql_core.decimal)("total_spent", { precision: 12, scale: 2 }).default("0"),
+      visitCount: (0, import_mysql_core.int)("visit_count").default(0),
+      notes: (0, import_mysql_core.text)("notes"),
+      creditBalance: (0, import_mysql_core.decimal)("credit_balance", { precision: 10, scale: 2 }).default("0"),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
       // ── Extended fields from CSV import ──
-      customerNr: int("customer_nr"),
-      salutation: text("salutation"),
-      firstName: text("first_name"),
-      lastName: text("last_name"),
-      street: text("street"),
-      streetNr: text("street_nr"),
-      houseNr: text("house_nr"),
-      city: text("city"),
-      postalCode: text("postal_code"),
-      company: text("company"),
-      zhd: text("zhd"),
-      howToGo: text("how_to_go"),
-      screenInfo: text("screen_info"),
-      source: text("source"),
-      firstOrderDate: text("first_order_date"),
-      lastOrderDate: text("last_order_date"),
-      legacyTotalSpent: decimal("legacy_total_spent", { precision: 12, scale: 2 }).default("0"),
-      averageOrderValue: decimal("average_order_value", { precision: 10, scale: 2 }).default("0"),
-      orderCount: int("order_count").default(0),
-      legacyRef: text("legacy_ref"),
+      customerNr: (0, import_mysql_core.int)("customer_nr"),
+      salutation: (0, import_mysql_core.text)("salutation"),
+      firstName: (0, import_mysql_core.text)("first_name"),
+      lastName: (0, import_mysql_core.text)("last_name"),
+      street: (0, import_mysql_core.text)("street"),
+      streetNr: (0, import_mysql_core.text)("street_nr"),
+      houseNr: (0, import_mysql_core.text)("house_nr"),
+      city: (0, import_mysql_core.text)("city"),
+      postalCode: (0, import_mysql_core.text)("postal_code"),
+      company: (0, import_mysql_core.text)("company"),
+      zhd: (0, import_mysql_core.text)("zhd"),
+      howToGo: (0, import_mysql_core.text)("how_to_go"),
+      screenInfo: (0, import_mysql_core.text)("screen_info"),
+      source: (0, import_mysql_core.text)("source"),
+      firstOrderDate: (0, import_mysql_core.text)("first_order_date"),
+      lastOrderDate: (0, import_mysql_core.text)("last_order_date"),
+      legacyTotalSpent: (0, import_mysql_core.decimal)("legacy_total_spent", { precision: 12, scale: 2 }).default("0"),
+      averageOrderValue: (0, import_mysql_core.decimal)("average_order_value", { precision: 10, scale: 2 }).default("0"),
+      orderCount: (0, import_mysql_core.int)("order_count").default(0),
+      legacyRef: (0, import_mysql_core.text)("legacy_ref"),
       // ── Additional raw fields from KUNDEN CSV ──
-      quadrat: text("quadrat"),
-      r1: text("r1"),
-      r3: text("r3"),
-      r4: text("r4"),
-      r5: text("r5"),
-      r8: text("r8"),
-      r9: text("r9"),
-      r10: text("r10"),
-      r14: decimal("r14", { precision: 12, scale: 2 }),
-      r15: decimal("r15", { precision: 12, scale: 2 }),
-      r16: boolean("r16").default(false),
-      r17: boolean("r17").default(false),
-      r18: boolean("r18").default(false),
-      r19: boolean("r19").default(false),
-      r20: boolean("r20").default(false),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+      quadrat: (0, import_mysql_core.text)("quadrat"),
+      r1: (0, import_mysql_core.text)("r1"),
+      r3: (0, import_mysql_core.text)("r3"),
+      r4: (0, import_mysql_core.text)("r4"),
+      r5: (0, import_mysql_core.text)("r5"),
+      r8: (0, import_mysql_core.text)("r8"),
+      r9: (0, import_mysql_core.text)("r9"),
+      r10: (0, import_mysql_core.text)("r10"),
+      r14: (0, import_mysql_core.decimal)("r14", { precision: 12, scale: 2 }),
+      r15: (0, import_mysql_core.decimal)("r15", { precision: 12, scale: 2 }),
+      r16: (0, import_mysql_core.boolean)("r16").default(false),
+      r17: (0, import_mysql_core.boolean)("r17").default(false),
+      r18: (0, import_mysql_core.boolean)("r18").default(false),
+      r19: (0, import_mysql_core.boolean)("r19").default(false),
+      r20: (0, import_mysql_core.boolean)("r20").default(false),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    sales = mysqlTable("sales", {
-      id: serial("id").primaryKey(),
-      receiptNumber: text("receipt_number").notNull().unique(),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
-      customerId: int("customer_id").references(() => customers.id, { onDelete: "cascade" }),
-      subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
-      taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0"),
-      serviceFeeAmount: decimal("service_fee_amount", { precision: 10, scale: 2 }).default("0"),
-      discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
-      totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
-      paymentMethod: text("payment_method").notNull().default("cash"),
-      paymentStatus: text("payment_status").default("completed"),
-      status: text("status").default("completed"),
-      notes: text("notes"),
-      tipAmount: decimal("tip_amount", { precision: 10, scale: 2 }).default("0"),
-      changeAmount: decimal("change_amount", { precision: 10, scale: 2 }).default("0"),
-      tableNumber: text("table_number"),
-      orderType: text("order_type").default("dine_in"),
-      vehicleId: int("vehicle_id"),
-      paymentDetails: json("payment_details").$type(),
-      createdAt: timestamp("created_at").defaultNow()
+    sales = (0, import_mysql_core.mysqlTable)("sales", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      receiptNumber: (0, import_mysql_core.text)("receipt_number").notNull().unique(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      employeeId: (0, import_mysql_core.int)("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "cascade" }),
+      subtotal: (0, import_mysql_core.decimal)("subtotal", { precision: 12, scale: 2 }).notNull(),
+      taxAmount: (0, import_mysql_core.decimal)("tax_amount", { precision: 10, scale: 2 }).default("0"),
+      serviceFeeAmount: (0, import_mysql_core.decimal)("service_fee_amount", { precision: 10, scale: 2 }).default("0"),
+      discountAmount: (0, import_mysql_core.decimal)("discount_amount", { precision: 10, scale: 2 }).default("0"),
+      totalAmount: (0, import_mysql_core.decimal)("total_amount", { precision: 12, scale: 2 }).notNull(),
+      paymentMethod: (0, import_mysql_core.text)("payment_method").notNull().default("cash"),
+      paymentStatus: (0, import_mysql_core.text)("payment_status").default("completed"),
+      status: (0, import_mysql_core.text)("status").default("completed"),
+      notes: (0, import_mysql_core.text)("notes"),
+      tipAmount: (0, import_mysql_core.decimal)("tip_amount", { precision: 10, scale: 2 }).default("0"),
+      changeAmount: (0, import_mysql_core.decimal)("change_amount", { precision: 10, scale: 2 }).default("0"),
+      tableNumber: (0, import_mysql_core.text)("table_number"),
+      orderType: (0, import_mysql_core.text)("order_type").default("dine_in"),
+      vehicleId: (0, import_mysql_core.int)("vehicle_id"),
+      paymentDetails: (0, import_mysql_core.json)("payment_details").$type(),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    saleItems = mysqlTable("sale_items", {
-      id: serial("id").primaryKey(),
-      saleId: int("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
-      productId: int("product_id").references(() => products.id, { onDelete: "set null" }),
-      productName: text("product_name").notNull(),
-      quantity: int("quantity").notNull(),
-      unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
-      discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
-      total: decimal("total", { precision: 10, scale: 2 }).notNull(),
-      modifiers: json("modifiers").$type().default([]),
-      notes: text("notes")
+    saleItems = (0, import_mysql_core.mysqlTable)("sale_items", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      saleId: (0, import_mysql_core.int)("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
+      productId: (0, import_mysql_core.int)("product_id").references(() => products.id, { onDelete: "set null" }),
+      productName: (0, import_mysql_core.text)("product_name").notNull(),
+      quantity: (0, import_mysql_core.int)("quantity").notNull(),
+      unitPrice: (0, import_mysql_core.decimal)("unit_price", { precision: 10, scale: 2 }).notNull(),
+      discount: (0, import_mysql_core.decimal)("discount", { precision: 10, scale: 2 }).default("0"),
+      total: (0, import_mysql_core.decimal)("total", { precision: 10, scale: 2 }).notNull(),
+      modifiers: (0, import_mysql_core.json)("modifiers").$type().default([]),
+      notes: (0, import_mysql_core.text)("notes")
     });
-    calls = mysqlTable("calls", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      phoneNumber: text("phone_number").notNull(),
-      customerId: int("customer_id").references(() => customers.id, { onDelete: "set null" }),
-      status: text("status").notNull().default("missed"),
+    calls = (0, import_mysql_core.mysqlTable)("calls", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      phoneNumber: (0, import_mysql_core.text)("phone_number").notNull(),
+      customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "set null" }),
+      status: (0, import_mysql_core.text)("status").notNull().default("missed"),
       // answered, missed
-      saleId: int("sale_id").references(() => sales.id, { onDelete: "set null" }),
-      createdAt: timestamp("created_at").defaultNow()
+      saleId: (0, import_mysql_core.int)("sale_id").references(() => sales.id, { onDelete: "set null" }),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    suppliers = mysqlTable("suppliers", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+    suppliers = (0, import_mysql_core.mysqlTable)("suppliers", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       // Added for multi-tenancy
-      name: text("name").notNull(),
-      contactName: text("contact_name"),
-      email: text("email"),
-      phone: text("phone"),
-      address: text("address"),
-      paymentTerms: text("payment_terms"),
-      balance: decimal("balance", { precision: 12, scale: 2 }).default("0"),
-      isActive: boolean("is_active").default(true),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+      name: (0, import_mysql_core.text)("name").notNull(),
+      contactName: (0, import_mysql_core.text)("contact_name"),
+      email: (0, import_mysql_core.text)("email"),
+      phone: (0, import_mysql_core.text)("phone"),
+      address: (0, import_mysql_core.text)("address"),
+      paymentTerms: (0, import_mysql_core.text)("payment_terms"),
+      balance: (0, import_mysql_core.decimal)("balance", { precision: 12, scale: 2 }).default("0"),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    purchaseOrders = mysqlTable("purchase_orders", {
-      id: serial("id").primaryKey(),
-      orderNumber: text("order_number").notNull().unique(),
-      supplierId: int("supplier_id").references(() => suppliers.id, { onDelete: "cascade" }).notNull(),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      status: text("status").default("pending"),
-      totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).default("0"),
-      notes: text("notes"),
-      expectedDate: timestamp("expected_date"),
-      receivedDate: timestamp("received_date"),
-      createdAt: timestamp("created_at").defaultNow()
+    purchaseOrders = (0, import_mysql_core.mysqlTable)("purchase_orders", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      orderNumber: (0, import_mysql_core.text)("order_number").notNull().unique(),
+      supplierId: (0, import_mysql_core.int)("supplier_id").references(() => suppliers.id, { onDelete: "cascade" }).notNull(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      status: (0, import_mysql_core.text)("status").default("pending"),
+      totalAmount: (0, import_mysql_core.decimal)("total_amount", { precision: 12, scale: 2 }).default("0"),
+      notes: (0, import_mysql_core.text)("notes"),
+      expectedDate: (0, import_mysql_core.timestamp)("expected_date"),
+      receivedDate: (0, import_mysql_core.timestamp)("received_date"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    purchaseOrderItems = mysqlTable("purchase_order_items", {
-      id: serial("id").primaryKey(),
-      purchaseOrderId: int("purchase_order_id").references(() => purchaseOrders.id, { onDelete: "cascade" }).notNull(),
-      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-      quantity: int("quantity").notNull(),
-      unitCost: decimal("unit_cost", { precision: 10, scale: 2 }).notNull(),
-      receivedQuantity: int("received_quantity").default(0),
-      total: decimal("total", { precision: 10, scale: 2 }).notNull()
+    purchaseOrderItems = (0, import_mysql_core.mysqlTable)("purchase_order_items", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      purchaseOrderId: (0, import_mysql_core.int)("purchase_order_id").references(() => purchaseOrders.id, { onDelete: "cascade" }).notNull(),
+      productId: (0, import_mysql_core.int)("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      quantity: (0, import_mysql_core.int)("quantity").notNull(),
+      unitCost: (0, import_mysql_core.decimal)("unit_cost", { precision: 10, scale: 2 }).notNull(),
+      receivedQuantity: (0, import_mysql_core.int)("received_quantity").default(0),
+      total: (0, import_mysql_core.decimal)("total", { precision: 10, scale: 2 }).notNull()
     });
-    shifts = mysqlTable("shifts", {
-      id: serial("id").primaryKey(),
-      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      startTime: timestamp("start_time").defaultNow(),
-      endTime: timestamp("end_time"),
-      expectedDurationHours: decimal("expected_duration_hours", { precision: 4, scale: 1 }).default("8"),
-      openingCash: decimal("opening_cash", { precision: 10, scale: 2 }).default("0"),
-      closingCash: decimal("closing_cash", { precision: 10, scale: 2 }),
-      totalSales: decimal("total_sales", { precision: 12, scale: 2 }).default("0"),
-      totalTransactions: int("total_transactions").default(0),
-      totalReturns: int("total_returns").default(0),
-      totalDiscounts: decimal("total_discounts", { precision: 10, scale: 2 }).default("0"),
-      status: text("status").default("open"),
-      notes: text("notes"),
-      breakMinutes: int("break_minutes").default(0),
-      overtimeMinutes: int("overtime_minutes").default(0)
+    shifts = (0, import_mysql_core.mysqlTable)("shifts", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      employeeId: (0, import_mysql_core.int)("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      startTime: (0, import_mysql_core.timestamp)("start_time").defaultNow(),
+      endTime: (0, import_mysql_core.timestamp)("end_time"),
+      expectedDurationHours: (0, import_mysql_core.decimal)("expected_duration_hours", { precision: 4, scale: 1 }).default("8"),
+      openingCash: (0, import_mysql_core.decimal)("opening_cash", { precision: 10, scale: 2 }).default("0"),
+      closingCash: (0, import_mysql_core.decimal)("closing_cash", { precision: 10, scale: 2 }),
+      totalSales: (0, import_mysql_core.decimal)("total_sales", { precision: 12, scale: 2 }).default("0"),
+      totalTransactions: (0, import_mysql_core.int)("total_transactions").default(0),
+      totalReturns: (0, import_mysql_core.int)("total_returns").default(0),
+      totalDiscounts: (0, import_mysql_core.decimal)("total_discounts", { precision: 10, scale: 2 }).default("0"),
+      status: (0, import_mysql_core.text)("status").default("open"),
+      notes: (0, import_mysql_core.text)("notes"),
+      breakMinutes: (0, import_mysql_core.int)("break_minutes").default(0),
+      overtimeMinutes: (0, import_mysql_core.int)("overtime_minutes").default(0)
     });
-    notifications = mysqlTable("notifications", {
-      id: serial("id").primaryKey(),
-      recipientId: int("recipient_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
-      senderId: int("sender_id").references(() => employees.id, { onDelete: "cascade" }),
-      type: text("type").notNull(),
-      title: text("title").notNull(),
-      message: text("message").notNull(),
-      entityType: text("entity_type"),
-      entityId: int("entity_id"),
-      isRead: boolean("is_read").default(false),
-      priority: text("priority").default("normal"),
-      createdAt: timestamp("created_at").defaultNow()
+    notifications = (0, import_mysql_core.mysqlTable)("notifications", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      recipientId: (0, import_mysql_core.int)("recipient_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
+      senderId: (0, import_mysql_core.int)("sender_id").references(() => employees.id, { onDelete: "cascade" }),
+      type: (0, import_mysql_core.text)("type").notNull(),
+      title: (0, import_mysql_core.text)("title").notNull(),
+      message: (0, import_mysql_core.text)("message").notNull(),
+      entityType: (0, import_mysql_core.text)("entity_type"),
+      entityId: (0, import_mysql_core.int)("entity_id"),
+      isRead: (0, import_mysql_core.boolean)("is_read").default(false),
+      priority: (0, import_mysql_core.text)("priority").default("normal"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    expenses = mysqlTable("expenses", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+    expenses = (0, import_mysql_core.mysqlTable)("expenses", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
       // Added for multi-tenancy
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      category: text("category").notNull(),
-      amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-      description: text("description"),
-      date: timestamp("date").defaultNow(),
-      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
-      createdAt: timestamp("created_at").defaultNow()
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      category: (0, import_mysql_core.text)("category").notNull(),
+      amount: (0, import_mysql_core.decimal)("amount", { precision: 10, scale: 2 }).notNull(),
+      description: (0, import_mysql_core.text)("description"),
+      date: (0, import_mysql_core.timestamp)("date").defaultNow(),
+      employeeId: (0, import_mysql_core.int)("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    tables = mysqlTable("tables", {
-      id: serial("id").primaryKey(),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      name: text("name").notNull(),
-      capacity: int("capacity").default(4),
-      status: text("status").default("available"),
-      currentOrderId: int("current_order_id"),
-      posX: int("pos_x").default(0),
-      posY: int("pos_y").default(0),
-      createdAt: timestamp("created_at").defaultNow()
+    tables = (0, import_mysql_core.mysqlTable)("tables", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      name: (0, import_mysql_core.text)("name").notNull(),
+      capacity: (0, import_mysql_core.int)("capacity").default(4),
+      status: (0, import_mysql_core.text)("status").default("available"),
+      currentOrderId: (0, import_mysql_core.int)("current_order_id"),
+      posX: (0, import_mysql_core.int)("pos_x").default(0),
+      posY: (0, import_mysql_core.int)("pos_y").default(0),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    kitchenOrders = mysqlTable("kitchen_orders", {
-      id: serial("id").primaryKey(),
-      saleId: int("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      tableNumber: text("table_number"),
-      status: text("status").default("pending"),
-      items: json("items").$type().default([]),
-      priority: text("priority").default("normal"),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+    kitchenOrders = (0, import_mysql_core.mysqlTable)("kitchen_orders", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      saleId: (0, import_mysql_core.int)("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      tableNumber: (0, import_mysql_core.text)("table_number"),
+      status: (0, import_mysql_core.text)("status").default("pending"),
+      items: (0, import_mysql_core.json)("items").$type().default([]),
+      priority: (0, import_mysql_core.text)("priority").default("normal"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    subscriptionPlans = mysqlTable("subscription_plans", {
-      id: serial("id").primaryKey(),
-      name: text("name").notNull(),
-      description: text("description"),
-      price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-      interval: text("interval").default("monthly"),
-      features: json("features").$type().default([]),
-      isActive: boolean("is_active").default(true),
-      createdAt: timestamp("created_at").defaultNow()
+    subscriptionPlans = (0, import_mysql_core.mysqlTable)("subscription_plans", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      name: (0, import_mysql_core.text)("name").notNull(),
+      description: (0, import_mysql_core.text)("description"),
+      price: (0, import_mysql_core.decimal)("price", { precision: 10, scale: 2 }).notNull(),
+      interval: (0, import_mysql_core.text)("interval").default("monthly"),
+      features: (0, import_mysql_core.json)("features").$type().default([]),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    subscriptions = mysqlTable("subscriptions", {
-      id: serial("id").primaryKey(),
-      customerId: int("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
-      planId: int("plan_id").references(() => subscriptionPlans.id, { onDelete: "cascade" }).notNull(),
-      status: text("status").default("active"),
-      startDate: timestamp("start_date").defaultNow(),
-      endDate: timestamp("end_date"),
-      nextBillingDate: timestamp("next_billing_date"),
-      createdAt: timestamp("created_at").defaultNow()
+    subscriptions = (0, import_mysql_core.mysqlTable)("subscriptions", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
+      planId: (0, import_mysql_core.int)("plan_id").references(() => subscriptionPlans.id, { onDelete: "cascade" }).notNull(),
+      status: (0, import_mysql_core.text)("status").default("active"),
+      startDate: (0, import_mysql_core.timestamp)("start_date").defaultNow(),
+      endDate: (0, import_mysql_core.timestamp)("end_date"),
+      nextBillingDate: (0, import_mysql_core.timestamp)("next_billing_date"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    activityLog = mysqlTable("activity_log", {
-      id: serial("id").primaryKey(),
-      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
-      action: text("action").notNull(),
-      entityType: text("entity_type"),
-      entityId: int("entity_id"),
-      details: text("details"),
-      metadata: json("metadata").$type(),
-      createdAt: timestamp("created_at").defaultNow()
+    activityLog = (0, import_mysql_core.mysqlTable)("activity_log", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      employeeId: (0, import_mysql_core.int)("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
+      action: (0, import_mysql_core.text)("action").notNull(),
+      entityType: (0, import_mysql_core.text)("entity_type"),
+      entityId: (0, import_mysql_core.int)("entity_id"),
+      details: (0, import_mysql_core.text)("details"),
+      metadata: (0, import_mysql_core.json)("metadata").$type(),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    returns = mysqlTable("returns", {
-      id: serial("id").primaryKey(),
-      originalSaleId: int("original_sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
-      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
-      reason: text("reason"),
-      type: text("type").default("refund"),
-      totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
-      returnGraceDays: int("return_grace_days").default(30),
-      refundMethod: text("refund_method"),
-      approvedBy: int("approved_by").references(() => employees.id, { onDelete: "cascade" }),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      status: text("status").default("completed"),
-      createdAt: timestamp("created_at").defaultNow()
+    returns = (0, import_mysql_core.mysqlTable)("returns", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      originalSaleId: (0, import_mysql_core.int)("original_sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
+      employeeId: (0, import_mysql_core.int)("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      reason: (0, import_mysql_core.text)("reason"),
+      type: (0, import_mysql_core.text)("type").default("refund"),
+      totalAmount: (0, import_mysql_core.decimal)("total_amount", { precision: 12, scale: 2 }).notNull(),
+      returnGraceDays: (0, import_mysql_core.int)("return_grace_days").default(30),
+      refundMethod: (0, import_mysql_core.text)("refund_method"),
+      approvedBy: (0, import_mysql_core.int)("approved_by").references(() => employees.id, { onDelete: "cascade" }),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      status: (0, import_mysql_core.text)("status").default("completed"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    returnItems = mysqlTable("return_items", {
-      id: serial("id").primaryKey(),
-      returnId: int("return_id").references(() => returns.id, { onDelete: "cascade" }).notNull(),
-      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-      productName: text("product_name").notNull(),
-      quantity: int("quantity").notNull(),
-      unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
-      total: decimal("total", { precision: 10, scale: 2 }).notNull()
+    returnItems = (0, import_mysql_core.mysqlTable)("return_items", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      returnId: (0, import_mysql_core.int)("return_id").references(() => returns.id, { onDelete: "cascade" }).notNull(),
+      productId: (0, import_mysql_core.int)("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      productName: (0, import_mysql_core.text)("product_name").notNull(),
+      quantity: (0, import_mysql_core.int)("quantity").notNull(),
+      unitPrice: (0, import_mysql_core.decimal)("unit_price", { precision: 10, scale: 2 }).notNull(),
+      total: (0, import_mysql_core.decimal)("total", { precision: 10, scale: 2 }).notNull()
     });
-    syncQueue = mysqlTable("sync_queue", {
-      id: serial("id").primaryKey(),
-      entityType: text("entity_type").notNull(),
-      entityId: int("entity_id").notNull(),
-      action: text("action").notNull(),
-      data: json("data"),
-      status: text("status").default("pending"),
-      retryCount: int("retry_count").default(0),
-      createdAt: timestamp("created_at").defaultNow(),
-      processedAt: timestamp("processed_at")
+    syncQueue = (0, import_mysql_core.mysqlTable)("sync_queue", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      entityType: (0, import_mysql_core.text)("entity_type").notNull(),
+      entityId: (0, import_mysql_core.int)("entity_id").notNull(),
+      action: (0, import_mysql_core.text)("action").notNull(),
+      data: (0, import_mysql_core.json)("data"),
+      status: (0, import_mysql_core.text)("status").default("pending"),
+      retryCount: (0, import_mysql_core.int)("retry_count").default(0),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      processedAt: (0, import_mysql_core.timestamp)("processed_at")
     });
-    cashDrawerOperations = mysqlTable("cash_drawer_operations", {
-      id: serial("id").primaryKey(),
-      shiftId: int("shift_id").references(() => shifts.id, { onDelete: "set null" }),
-      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
-      type: text("type").notNull(),
-      amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-      expectedAmount: decimal("expected_amount", { precision: 10, scale: 2 }),
-      actualAmount: decimal("actual_amount", { precision: 10, scale: 2 }),
-      difference: decimal("difference", { precision: 10, scale: 2 }),
-      reason: text("reason"),
-      approvedBy: int("approved_by").references(() => employees.id, { onDelete: "cascade" }),
-      createdAt: timestamp("created_at").defaultNow()
+    cashDrawerOperations = (0, import_mysql_core.mysqlTable)("cash_drawer_operations", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      shiftId: (0, import_mysql_core.int)("shift_id").references(() => shifts.id, { onDelete: "set null" }),
+      employeeId: (0, import_mysql_core.int)("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
+      type: (0, import_mysql_core.text)("type").notNull(),
+      amount: (0, import_mysql_core.decimal)("amount", { precision: 10, scale: 2 }).notNull(),
+      expectedAmount: (0, import_mysql_core.decimal)("expected_amount", { precision: 10, scale: 2 }),
+      actualAmount: (0, import_mysql_core.decimal)("actual_amount", { precision: 10, scale: 2 }),
+      difference: (0, import_mysql_core.decimal)("difference", { precision: 10, scale: 2 }),
+      reason: (0, import_mysql_core.text)("reason"),
+      approvedBy: (0, import_mysql_core.int)("approved_by").references(() => employees.id, { onDelete: "cascade" }),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    warehouses = mysqlTable("warehouses", {
-      id: serial("id").primaryKey(),
-      name: text("name").notNull(),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }).notNull(),
-      address: text("address"),
-      isDefault: boolean("is_default").default(false),
-      isActive: boolean("is_active").default(true),
-      createdAt: timestamp("created_at").defaultNow()
+    warehouses = (0, import_mysql_core.mysqlTable)("warehouses", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      name: (0, import_mysql_core.text)("name").notNull(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }).notNull(),
+      address: (0, import_mysql_core.text)("address"),
+      isDefault: (0, import_mysql_core.boolean)("is_default").default(false),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    warehouseTransfers = mysqlTable("warehouse_transfers", {
-      id: serial("id").primaryKey(),
-      fromWarehouseId: int("from_warehouse_id").references(() => warehouses.id, { onDelete: "cascade" }).notNull(),
-      toWarehouseId: int("to_warehouse_id").references(() => warehouses.id, { onDelete: "cascade" }).notNull(),
-      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-      quantity: int("quantity").notNull(),
-      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
-      status: text("status").default("completed"),
-      notes: text("notes"),
-      createdAt: timestamp("created_at").defaultNow()
+    warehouseTransfers = (0, import_mysql_core.mysqlTable)("warehouse_transfers", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      fromWarehouseId: (0, import_mysql_core.int)("from_warehouse_id").references(() => warehouses.id, { onDelete: "cascade" }).notNull(),
+      toWarehouseId: (0, import_mysql_core.int)("to_warehouse_id").references(() => warehouses.id, { onDelete: "cascade" }).notNull(),
+      productId: (0, import_mysql_core.int)("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      quantity: (0, import_mysql_core.int)("quantity").notNull(),
+      employeeId: (0, import_mysql_core.int)("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      status: (0, import_mysql_core.text)("status").default("completed"),
+      notes: (0, import_mysql_core.text)("notes"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    productBatches = mysqlTable("product_batches", {
-      id: serial("id").primaryKey(),
-      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-      batchNumber: text("batch_number").notNull(),
-      quantity: int("quantity").default(0),
-      expiryDate: timestamp("expiry_date"),
-      costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      supplierId: int("supplier_id").references(() => suppliers.id, { onDelete: "cascade" }),
-      receivedDate: timestamp("received_date").defaultNow(),
-      isActive: boolean("is_active").default(true),
-      createdAt: timestamp("created_at").defaultNow()
+    productBatches = (0, import_mysql_core.mysqlTable)("product_batches", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      productId: (0, import_mysql_core.int)("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      batchNumber: (0, import_mysql_core.text)("batch_number").notNull(),
+      quantity: (0, import_mysql_core.int)("quantity").default(0),
+      expiryDate: (0, import_mysql_core.timestamp)("expiry_date"),
+      costPrice: (0, import_mysql_core.decimal)("cost_price", { precision: 10, scale: 2 }),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      supplierId: (0, import_mysql_core.int)("supplier_id").references(() => suppliers.id, { onDelete: "cascade" }),
+      receivedDate: (0, import_mysql_core.timestamp)("received_date").defaultNow(),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    inventoryMovements = mysqlTable("inventory_movements", {
-      id: serial("id").primaryKey(),
-      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      type: text("type").notNull(),
-      quantity: int("quantity").notNull(),
-      previousQuantity: int("previous_quantity"),
-      newQuantity: int("new_quantity"),
-      referenceType: text("reference_type"),
-      referenceId: int("reference_id"),
-      batchNumber: text("batch_number"),
-      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
-      notes: text("notes"),
-      createdAt: timestamp("created_at").defaultNow()
+    inventoryMovements = (0, import_mysql_core.mysqlTable)("inventory_movements", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      productId: (0, import_mysql_core.int)("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      type: (0, import_mysql_core.text)("type").notNull(),
+      quantity: (0, import_mysql_core.int)("quantity").notNull(),
+      previousQuantity: (0, import_mysql_core.int)("previous_quantity"),
+      newQuantity: (0, import_mysql_core.int)("new_quantity"),
+      referenceType: (0, import_mysql_core.text)("reference_type"),
+      referenceId: (0, import_mysql_core.int)("reference_id"),
+      batchNumber: (0, import_mysql_core.text)("batch_number"),
+      employeeId: (0, import_mysql_core.int)("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      notes: (0, import_mysql_core.text)("notes"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    stockCounts = mysqlTable("stock_counts", {
-      id: serial("id").primaryKey(),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }).notNull(),
-      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
-      status: text("status").default("in_progress"),
-      approvedBy: int("approved_by").references(() => employees.id, { onDelete: "cascade" }),
-      totalItems: int("total_items").default(0),
-      discrepancies: int("discrepancies").default(0),
-      notes: text("notes"),
-      completedAt: timestamp("completed_at"),
-      createdAt: timestamp("created_at").defaultNow()
+    stockCounts = (0, import_mysql_core.mysqlTable)("stock_counts", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }).notNull(),
+      employeeId: (0, import_mysql_core.int)("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
+      status: (0, import_mysql_core.text)("status").default("in_progress"),
+      approvedBy: (0, import_mysql_core.int)("approved_by").references(() => employees.id, { onDelete: "cascade" }),
+      totalItems: (0, import_mysql_core.int)("total_items").default(0),
+      discrepancies: (0, import_mysql_core.int)("discrepancies").default(0),
+      notes: (0, import_mysql_core.text)("notes"),
+      completedAt: (0, import_mysql_core.timestamp)("completed_at"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    stockCountItems = mysqlTable("stock_count_items", {
-      id: serial("id").primaryKey(),
-      stockCountId: int("stock_count_id").references(() => stockCounts.id, { onDelete: "cascade" }).notNull(),
-      productId: int("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-      systemQuantity: int("system_quantity").notNull(),
-      actualQuantity: int("actual_quantity"),
-      difference: int("difference"),
-      notes: text("notes")
+    stockCountItems = (0, import_mysql_core.mysqlTable)("stock_count_items", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      stockCountId: (0, import_mysql_core.int)("stock_count_id").references(() => stockCounts.id, { onDelete: "cascade" }).notNull(),
+      productId: (0, import_mysql_core.int)("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      systemQuantity: (0, import_mysql_core.int)("system_quantity").notNull(),
+      actualQuantity: (0, import_mysql_core.int)("actual_quantity"),
+      difference: (0, import_mysql_core.int)("difference"),
+      notes: (0, import_mysql_core.text)("notes")
     });
-    supplierContracts = mysqlTable("supplier_contracts", {
-      id: serial("id").primaryKey(),
-      supplierId: int("supplier_id").references(() => suppliers.id, { onDelete: "cascade" }).notNull(),
-      discountRate: decimal("discount_rate", { precision: 5, scale: 2 }).default("0"),
-      paymentTerms: text("payment_terms"),
-      minOrderAmount: decimal("min_order_amount", { precision: 10, scale: 2 }),
-      startDate: timestamp("start_date"),
-      endDate: timestamp("end_date"),
-      isActive: boolean("is_active").default(true),
-      notes: text("notes"),
-      createdAt: timestamp("created_at").defaultNow()
+    supplierContracts = (0, import_mysql_core.mysqlTable)("supplier_contracts", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      supplierId: (0, import_mysql_core.int)("supplier_id").references(() => suppliers.id, { onDelete: "cascade" }).notNull(),
+      discountRate: (0, import_mysql_core.decimal)("discount_rate", { precision: 5, scale: 2 }).default("0"),
+      paymentTerms: (0, import_mysql_core.text)("payment_terms"),
+      minOrderAmount: (0, import_mysql_core.decimal)("min_order_amount", { precision: 10, scale: 2 }),
+      startDate: (0, import_mysql_core.timestamp)("start_date"),
+      endDate: (0, import_mysql_core.timestamp)("end_date"),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      notes: (0, import_mysql_core.text)("notes"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    employeeCommissions = mysqlTable("employee_commissions", {
-      id: serial("id").primaryKey(),
-      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
-      saleId: int("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
-      commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull(),
-      commissionAmount: decimal("commission_amount", { precision: 10, scale: 2 }).notNull(),
-      status: text("status").default("pending"),
-      createdAt: timestamp("created_at").defaultNow()
+    employeeCommissions = (0, import_mysql_core.mysqlTable)("employee_commissions", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      employeeId: (0, import_mysql_core.int)("employee_id").references(() => employees.id, { onDelete: "cascade" }).notNull(),
+      saleId: (0, import_mysql_core.int)("sale_id").references(() => sales.id, { onDelete: "cascade" }).notNull(),
+      commissionRate: (0, import_mysql_core.decimal)("commission_rate", { precision: 5, scale: 2 }).notNull(),
+      commissionAmount: (0, import_mysql_core.decimal)("commission_amount", { precision: 10, scale: 2 }).notNull(),
+      status: (0, import_mysql_core.text)("status").default("pending"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    superAdmins = mysqlTable("super_admins", {
-      id: serial("id").primaryKey(),
-      name: text("name").notNull(),
-      email: text("email").notNull().unique(),
-      passwordHash: text("password_hash").notNull(),
-      role: text("role").default("super_admin"),
-      isActive: boolean("is_active").default(true),
-      lastLogin: timestamp("last_login"),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+    superAdmins = (0, import_mysql_core.mysqlTable)("super_admins", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      name: (0, import_mysql_core.text)("name").notNull(),
+      email: (0, import_mysql_core.text)("email").notNull().unique(),
+      passwordHash: (0, import_mysql_core.text)("password_hash").notNull(),
+      role: (0, import_mysql_core.text)("role").default("super_admin"),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      lastLogin: (0, import_mysql_core.timestamp)("last_login"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    tenants = mysqlTable("tenants", {
-      id: serial("id").primaryKey(),
-      businessName: text("business_name").notNull(),
-      ownerName: text("owner_name").notNull(),
-      ownerEmail: text("owner_email").notNull().unique(),
-      ownerPhone: text("owner_phone"),
-      passwordHash: text("password_hash"),
-      address: text("address"),
-      logo: text("logo"),
-      status: text("status").default("active"),
+    tenants = (0, import_mysql_core.mysqlTable)("tenants", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      businessName: (0, import_mysql_core.text)("business_name").notNull(),
+      ownerName: (0, import_mysql_core.text)("owner_name").notNull(),
+      ownerEmail: (0, import_mysql_core.text)("owner_email").notNull().unique(),
+      ownerPhone: (0, import_mysql_core.text)("owner_phone"),
+      passwordHash: (0, import_mysql_core.text)("password_hash"),
+      address: (0, import_mysql_core.text)("address"),
+      logo: (0, import_mysql_core.text)("logo"),
+      status: (0, import_mysql_core.text)("status").default("active"),
       // active, suspended, expired, trial
-      maxBranches: int("max_branches").default(1),
-      maxEmployees: int("max_employees").default(5),
-      storeType: text("store_type").default("supermarket"),
+      maxBranches: (0, import_mysql_core.int)("max_branches").default(1),
+      maxEmployees: (0, import_mysql_core.int)("max_employees").default(5),
+      storeType: (0, import_mysql_core.text)("store_type").default("supermarket"),
       // supermarket, restaurant, pharmacy, others
-      metadata: json("metadata").$type(),
-      setupCompleted: boolean("setup_completed").default(false),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+      metadata: (0, import_mysql_core.json)("metadata").$type(),
+      setupCompleted: (0, import_mysql_core.boolean)("setup_completed").default(false),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    tenantSubscriptions = mysqlTable("tenant_subscriptions", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-      planType: text("plan_type").notNull().default("trial"),
+    tenantSubscriptions = (0, import_mysql_core.mysqlTable)("tenant_subscriptions", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      planType: (0, import_mysql_core.text)("plan_type").notNull().default("trial"),
       // trial, monthly, yearly
-      planName: text("plan_name").notNull(),
-      price: decimal("price", { precision: 10, scale: 2 }).default("0"),
-      status: text("status").default("active"),
+      planName: (0, import_mysql_core.text)("plan_name").notNull(),
+      price: (0, import_mysql_core.decimal)("price", { precision: 10, scale: 2 }).default("0"),
+      status: (0, import_mysql_core.text)("status").default("active"),
       // active, expired, cancelled, pending
-      startDate: timestamp("start_date").defaultNow(),
-      endDate: timestamp("end_date"),
-      trialEndsAt: timestamp("trial_ends_at"),
-      autoRenew: boolean("auto_renew").default(false),
-      paymentMethod: text("payment_method"),
-      lastPaymentDate: timestamp("last_payment_date"),
-      nextPaymentDate: timestamp("next_payment_date"),
-      cancelledAt: timestamp("cancelled_at"),
-      cancellationReason: text("cancellation_reason"),
-      features: json("features").$type().default([]),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+      startDate: (0, import_mysql_core.timestamp)("start_date").defaultNow(),
+      endDate: (0, import_mysql_core.timestamp)("end_date"),
+      trialEndsAt: (0, import_mysql_core.timestamp)("trial_ends_at"),
+      autoRenew: (0, import_mysql_core.boolean)("auto_renew").default(false),
+      paymentMethod: (0, import_mysql_core.text)("payment_method"),
+      lastPaymentDate: (0, import_mysql_core.timestamp)("last_payment_date"),
+      nextPaymentDate: (0, import_mysql_core.timestamp)("next_payment_date"),
+      cancelledAt: (0, import_mysql_core.timestamp)("cancelled_at"),
+      cancellationReason: (0, import_mysql_core.text)("cancellation_reason"),
+      features: (0, import_mysql_core.json)("features").$type().default([]),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    licenseKeys = mysqlTable("license_keys", {
-      id: serial("id").primaryKey(),
-      licenseKey: text("license_key").notNull().unique(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-      subscriptionId: int("subscription_id").references(() => tenantSubscriptions.id, { onDelete: "cascade" }),
-      status: text("status").default("active"),
+    licenseKeys = (0, import_mysql_core.mysqlTable)("license_keys", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      licenseKey: (0, import_mysql_core.text)("license_key").notNull().unique(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      subscriptionId: (0, import_mysql_core.int)("subscription_id").references(() => tenantSubscriptions.id, { onDelete: "cascade" }),
+      status: (0, import_mysql_core.text)("status").default("active"),
       // active, expired, revoked, pending
-      activatedAt: timestamp("activated_at"),
-      expiresAt: timestamp("expires_at"),
-      lastValidatedAt: timestamp("last_validated_at"),
-      deviceInfo: text("device_info"),
-      maxActivations: int("max_activations").default(3),
-      currentActivations: int("current_activations").default(0),
-      notes: text("notes"),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+      activatedAt: (0, import_mysql_core.timestamp)("activated_at"),
+      expiresAt: (0, import_mysql_core.timestamp)("expires_at"),
+      lastValidatedAt: (0, import_mysql_core.timestamp)("last_validated_at"),
+      deviceInfo: (0, import_mysql_core.text)("device_info"),
+      maxActivations: (0, import_mysql_core.int)("max_activations").default(3),
+      currentActivations: (0, import_mysql_core.int)("current_activations").default(0),
+      notes: (0, import_mysql_core.text)("notes"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    tenantNotifications = mysqlTable("tenant_notifications", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
-      type: text("type").notNull(),
+    tenantNotifications = (0, import_mysql_core.mysqlTable)("tenant_notifications", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      type: (0, import_mysql_core.text)("type").notNull(),
       // warning, promotion, info, expiry_alert, upgrade_offer
-      title: text("title").notNull(),
-      message: text("message").notNull(),
-      priority: text("priority").default("normal"),
+      title: (0, import_mysql_core.text)("title").notNull(),
+      message: (0, import_mysql_core.text)("message").notNull(),
+      priority: (0, import_mysql_core.text)("priority").default("normal"),
       // low, normal, high, urgent
-      isRead: boolean("is_read").default(false),
-      isDismissed: boolean("is_dismissed").default(false),
-      actionUrl: text("action_url"),
-      actionLabel: text("action_label"),
-      expiresAt: timestamp("expires_at"),
-      sentBy: int("sent_by").references(() => superAdmins.id, { onDelete: "cascade" }),
-      createdAt: timestamp("created_at").defaultNow()
+      isRead: (0, import_mysql_core.boolean)("is_read").default(false),
+      isDismissed: (0, import_mysql_core.boolean)("is_dismissed").default(false),
+      actionUrl: (0, import_mysql_core.text)("action_url"),
+      actionLabel: (0, import_mysql_core.text)("action_label"),
+      expiresAt: (0, import_mysql_core.timestamp)("expires_at"),
+      sentBy: (0, import_mysql_core.int)("sent_by").references(() => superAdmins.id, { onDelete: "cascade" }),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    platformSettings = mysqlTable("platform_settings", {
-      id: serial("id").primaryKey(),
-      key: text("key").notNull().unique(),
-      value: text("value").notNull(),
-      updatedAt: timestamp("updated_at").defaultNow()
+    platformSettings = (0, import_mysql_core.mysqlTable)("platform_settings", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      key: (0, import_mysql_core.text)("key").notNull().unique(),
+      value: (0, import_mysql_core.text)("value").notNull(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    platformCommissions = mysqlTable("platform_commissions", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-      orderId: int("order_id"),
-      saleTotal: decimal("sale_total", { precision: 12, scale: 2 }).notNull(),
-      commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull(),
-      commissionAmount: decimal("commission_amount", { precision: 12, scale: 2 }).notNull(),
-      status: text("status").default("pending"),
-      createdAt: timestamp("created_at").defaultNow()
+    platformCommissions = (0, import_mysql_core.mysqlTable)("platform_commissions", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      orderId: (0, import_mysql_core.int)("order_id"),
+      saleTotal: (0, import_mysql_core.decimal)("sale_total", { precision: 12, scale: 2 }).notNull(),
+      commissionRate: (0, import_mysql_core.decimal)("commission_rate", { precision: 5, scale: 2 }).notNull(),
+      commissionAmount: (0, import_mysql_core.decimal)("commission_amount", { precision: 12, scale: 2 }).notNull(),
+      status: (0, import_mysql_core.text)("status").default("pending"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    onlineOrders = mysqlTable("online_orders", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-      orderNumber: text("order_number").notNull(),
-      customerName: text("customer_name").notNull(),
-      customerPhone: text("customer_phone").notNull(),
-      customerAddress: text("customer_address"),
-      customerEmail: text("customer_email"),
-      items: json("items").$type().notNull().default([]),
-      subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
-      taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0"),
-      deliveryFee: decimal("delivery_fee", { precision: 10, scale: 2 }).default("0"),
-      totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
-      paymentMethod: text("payment_method").notNull().default("cash"),
+    onlineOrders = (0, import_mysql_core.mysqlTable)("online_orders", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      orderNumber: (0, import_mysql_core.text)("order_number").notNull(),
+      customerName: (0, import_mysql_core.text)("customer_name").notNull(),
+      customerPhone: (0, import_mysql_core.text)("customer_phone").notNull(),
+      customerAddress: (0, import_mysql_core.text)("customer_address"),
+      customerEmail: (0, import_mysql_core.text)("customer_email"),
+      items: (0, import_mysql_core.json)("items").$type().notNull().default([]),
+      subtotal: (0, import_mysql_core.decimal)("subtotal", { precision: 10, scale: 2 }).notNull(),
+      taxAmount: (0, import_mysql_core.decimal)("tax_amount", { precision: 10, scale: 2 }).default("0"),
+      deliveryFee: (0, import_mysql_core.decimal)("delivery_fee", { precision: 10, scale: 2 }).default("0"),
+      totalAmount: (0, import_mysql_core.decimal)("total_amount", { precision: 10, scale: 2 }).notNull(),
+      paymentMethod: (0, import_mysql_core.text)("payment_method").notNull().default("cash"),
       // cash, card, mobile
-      paymentStatus: text("payment_status").notNull().default("pending"),
+      paymentStatus: (0, import_mysql_core.text)("payment_status").notNull().default("pending"),
       // pending, paid, failed
-      stripePaymentIntentId: text("stripe_payment_intent_id"),
-      status: text("status").notNull().default("pending"),
+      stripePaymentIntentId: (0, import_mysql_core.text)("stripe_payment_intent_id"),
+      status: (0, import_mysql_core.text)("status").notNull().default("pending"),
       // pending, accepted, preparing, ready, delivered, cancelled
-      orderType: text("order_type").notNull().default("delivery"),
+      orderType: (0, import_mysql_core.text)("order_type").notNull().default("delivery"),
       // delivery, pickup
-      notes: text("notes"),
-      estimatedTime: int("estimated_time"),
+      notes: (0, import_mysql_core.text)("notes"),
+      estimatedTime: (0, import_mysql_core.int)("estimated_time"),
       // minutes
-      language: text("language").default("en"),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+      language: (0, import_mysql_core.text)("language").default("en"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    landingPageConfig = mysqlTable("landing_page_config", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull().unique(),
-      slug: text("slug").notNull().unique(),
+    landingPageConfig = (0, import_mysql_core.mysqlTable)("landing_page_config", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull().unique(),
+      slug: (0, import_mysql_core.text)("slug").notNull().unique(),
       // URL slug e.g. "pizza-lemon"
-      heroTitle: text("hero_title"),
-      heroSubtitle: text("hero_subtitle"),
-      heroImage: text("hero_image"),
-      aboutText: text("about_text"),
-      aboutImage: text("about_image"),
-      primaryColor: text("primary_color").default("#2FD3C6"),
-      accentColor: text("accent_color").default("#6366F1"),
-      enableOnlineOrdering: boolean("enable_online_ordering").default(true),
-      enableDelivery: boolean("enable_delivery").default(true),
-      enablePickup: boolean("enable_pickup").default(true),
-      acceptCard: boolean("accept_card").default(true),
-      acceptMobile: boolean("accept_mobile").default(true),
-      acceptCash: boolean("accept_cash").default(true),
-      minOrderAmount: decimal("min_order_amount", { precision: 10, scale: 2 }).default("0"),
-      estimatedDeliveryTime: int("estimated_delivery_time").default(30),
+      heroTitle: (0, import_mysql_core.text)("hero_title"),
+      heroSubtitle: (0, import_mysql_core.text)("hero_subtitle"),
+      heroImage: (0, import_mysql_core.text)("hero_image"),
+      aboutText: (0, import_mysql_core.text)("about_text"),
+      aboutImage: (0, import_mysql_core.text)("about_image"),
+      primaryColor: (0, import_mysql_core.text)("primary_color").default("#2FD3C6"),
+      accentColor: (0, import_mysql_core.text)("accent_color").default("#6366F1"),
+      enableOnlineOrdering: (0, import_mysql_core.boolean)("enable_online_ordering").default(true),
+      enableDelivery: (0, import_mysql_core.boolean)("enable_delivery").default(true),
+      enablePickup: (0, import_mysql_core.boolean)("enable_pickup").default(true),
+      acceptCard: (0, import_mysql_core.boolean)("accept_card").default(true),
+      acceptMobile: (0, import_mysql_core.boolean)("accept_mobile").default(true),
+      acceptCash: (0, import_mysql_core.boolean)("accept_cash").default(true),
+      minOrderAmount: (0, import_mysql_core.decimal)("min_order_amount", { precision: 10, scale: 2 }).default("0"),
+      estimatedDeliveryTime: (0, import_mysql_core.int)("estimated_delivery_time").default(30),
       // minutes
-      footerText: text("footer_text"),
-      socialFacebook: text("social_facebook"),
-      socialInstagram: text("social_instagram"),
-      socialWhatsapp: text("social_whatsapp"),
-      phone: text("phone"),
-      email: text("email"),
-      address: text("address"),
-      openingHours: text("opening_hours"),
+      footerText: (0, import_mysql_core.text)("footer_text"),
+      socialFacebook: (0, import_mysql_core.text)("social_facebook"),
+      socialInstagram: (0, import_mysql_core.text)("social_instagram"),
+      socialWhatsapp: (0, import_mysql_core.text)("social_whatsapp"),
+      phone: (0, import_mysql_core.text)("phone"),
+      email: (0, import_mysql_core.text)("email"),
+      address: (0, import_mysql_core.text)("address"),
+      openingHours: (0, import_mysql_core.text)("opening_hours"),
       // e.g. "Mon-Sun 11:00–22:00"
-      deliveryRadius: text("delivery_radius"),
+      deliveryRadius: (0, import_mysql_core.text)("delivery_radius"),
       // e.g. "within 10km"
-      customCss: text("custom_css"),
-      isPublished: boolean("is_published").default(true),
-      language: text("language").default("en"),
+      customCss: (0, import_mysql_core.text)("custom_css"),
+      isPublished: (0, import_mysql_core.boolean)("is_published").default(true),
+      language: (0, import_mysql_core.text)("language").default("en"),
       // System language: en | ar | de
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    vehicles = mysqlTable("vehicles", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      licensePlate: text("license_plate").notNull(),
-      make: text("make"),
-      model: text("model"),
-      color: text("color"),
-      driverName: text("driver_name"),
-      driverPhone: text("driver_phone"),
-      isActive: boolean("is_active").default(true),
-      notes: text("notes"),
-      createdAt: timestamp("created_at").defaultNow()
+    vehicles = (0, import_mysql_core.mysqlTable)("vehicles", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      licensePlate: (0, import_mysql_core.text)("license_plate").notNull(),
+      make: (0, import_mysql_core.text)("make"),
+      model: (0, import_mysql_core.text)("model"),
+      color: (0, import_mysql_core.text)("color"),
+      driverName: (0, import_mysql_core.text)("driver_name"),
+      driverPhone: (0, import_mysql_core.text)("driver_phone"),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      notes: (0, import_mysql_core.text)("notes"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    printerConfigs = mysqlTable("printer_configs", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      receiptType: text("receipt_type").notNull(),
+    printerConfigs = (0, import_mysql_core.mysqlTable)("printer_configs", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      receiptType: (0, import_mysql_core.text)("receipt_type").notNull(),
       // kitchen, home_delivery, take_away, restaurant, driver_order, check_out, lists, daily_close, monthly_close, accounts_receivable
-      printer1: text("printer_1"),
-      printer1Copy: boolean("printer_1_copy").default(false),
-      printer2: text("printer_2"),
-      printer2Copy: boolean("printer_2_copy").default(false),
-      paperSize: text("paper_size").default("80mm"),
-      isActive: boolean("is_active").default(true),
-      updatedAt: timestamp("updated_at").defaultNow()
+      printer1: (0, import_mysql_core.text)("printer_1"),
+      printer1Copy: (0, import_mysql_core.boolean)("printer_1_copy").default(false),
+      printer2: (0, import_mysql_core.text)("printer_2"),
+      printer2Copy: (0, import_mysql_core.boolean)("printer_2_copy").default(false),
+      paperSize: (0, import_mysql_core.text)("paper_size").default("80mm"),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
-    dailyClosings = mysqlTable("daily_closings", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
-      closingDate: text("closing_date").notNull(),
+    dailyClosings = (0, import_mysql_core.mysqlTable)("daily_closings", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      employeeId: (0, import_mysql_core.int)("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      closingDate: (0, import_mysql_core.text)("closing_date").notNull(),
       // YYYY-MM-DD
-      totalSales: decimal("total_sales", { precision: 12, scale: 2 }).default("0"),
-      totalCash: decimal("total_cash", { precision: 12, scale: 2 }).default("0"),
-      totalCard: decimal("total_card", { precision: 12, scale: 2 }).default("0"),
-      totalMobile: decimal("total_mobile", { precision: 12, scale: 2 }).default("0"),
-      totalTransactions: int("total_transactions").default(0),
-      totalReturns: decimal("total_returns", { precision: 12, scale: 2 }).default("0"),
-      totalDiscounts: decimal("total_discounts", { precision: 12, scale: 2 }).default("0"),
-      openingCash: decimal("opening_cash", { precision: 12, scale: 2 }).default("0"),
-      closingCash: decimal("closing_cash", { precision: 12, scale: 2 }).default("0"),
-      notes: text("notes"),
-      status: text("status").default("closed"),
+      totalSales: (0, import_mysql_core.decimal)("total_sales", { precision: 12, scale: 2 }).default("0"),
+      totalCash: (0, import_mysql_core.decimal)("total_cash", { precision: 12, scale: 2 }).default("0"),
+      totalCard: (0, import_mysql_core.decimal)("total_card", { precision: 12, scale: 2 }).default("0"),
+      totalMobile: (0, import_mysql_core.decimal)("total_mobile", { precision: 12, scale: 2 }).default("0"),
+      totalTransactions: (0, import_mysql_core.int)("total_transactions").default(0),
+      totalReturns: (0, import_mysql_core.decimal)("total_returns", { precision: 12, scale: 2 }).default("0"),
+      totalDiscounts: (0, import_mysql_core.decimal)("total_discounts", { precision: 12, scale: 2 }).default("0"),
+      openingCash: (0, import_mysql_core.decimal)("opening_cash", { precision: 12, scale: 2 }).default("0"),
+      closingCash: (0, import_mysql_core.decimal)("closing_cash", { precision: 12, scale: 2 }).default("0"),
+      notes: (0, import_mysql_core.text)("notes"),
+      status: (0, import_mysql_core.text)("status").default("closed"),
       // closed, approved
-      createdAt: timestamp("created_at").defaultNow()
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    monthlyClosings = mysqlTable("monthly_closings", {
-      id: serial("id").primaryKey(),
-      tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-      branchId: int("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-      employeeId: int("employee_id").references(() => employees.id, { onDelete: "cascade" }),
-      closingMonth: text("closing_month").notNull(),
+    monthlyClosings = (0, import_mysql_core.mysqlTable)("monthly_closings", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      employeeId: (0, import_mysql_core.int)("employee_id").references(() => employees.id, { onDelete: "cascade" }),
+      closingMonth: (0, import_mysql_core.text)("closing_month").notNull(),
       // YYYY-MM
-      totalSales: decimal("total_sales", { precision: 12, scale: 2 }).default("0"),
-      totalCash: decimal("total_cash", { precision: 12, scale: 2 }).default("0"),
-      totalCard: decimal("total_card", { precision: 12, scale: 2 }).default("0"),
-      totalMobile: decimal("total_mobile", { precision: 12, scale: 2 }).default("0"),
-      totalTransactions: int("total_transactions").default(0),
-      totalReturns: decimal("total_returns", { precision: 12, scale: 2 }).default("0"),
-      totalDiscounts: decimal("total_discounts", { precision: 12, scale: 2 }).default("0"),
-      totalExpenses: decimal("total_expenses", { precision: 12, scale: 2 }).default("0"),
-      netRevenue: decimal("net_revenue", { precision: 12, scale: 2 }).default("0"),
-      notes: text("notes"),
-      status: text("status").default("closed"),
+      totalSales: (0, import_mysql_core.decimal)("total_sales", { precision: 12, scale: 2 }).default("0"),
+      totalCash: (0, import_mysql_core.decimal)("total_cash", { precision: 12, scale: 2 }).default("0"),
+      totalCard: (0, import_mysql_core.decimal)("total_card", { precision: 12, scale: 2 }).default("0"),
+      totalMobile: (0, import_mysql_core.decimal)("total_mobile", { precision: 12, scale: 2 }).default("0"),
+      totalTransactions: (0, import_mysql_core.int)("total_transactions").default(0),
+      totalReturns: (0, import_mysql_core.decimal)("total_returns", { precision: 12, scale: 2 }).default("0"),
+      totalDiscounts: (0, import_mysql_core.decimal)("total_discounts", { precision: 12, scale: 2 }).default("0"),
+      totalExpenses: (0, import_mysql_core.decimal)("total_expenses", { precision: 12, scale: 2 }).default("0"),
+      netRevenue: (0, import_mysql_core.decimal)("net_revenue", { precision: 12, scale: 2 }).default("0"),
+      notes: (0, import_mysql_core.text)("notes"),
+      status: (0, import_mysql_core.text)("status").default("closed"),
       // closed, approved
-      createdAt: timestamp("created_at").defaultNow()
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
-    dailySequences = mysqlTable("daily_sequences", {
-      id: serial("id").primaryKey(),
-      scopeKey: text("scope_key").notNull(),
+    dailySequences = (0, import_mysql_core.mysqlTable)("daily_sequences", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      scopeKey: (0, import_mysql_core.text)("scope_key").notNull(),
       // "branch-{id}" for POS, "tenant-{id}" for online orders
-      date: text("date").notNull(),
+      date: (0, import_mysql_core.text)("date").notNull(),
       // YYYY-MM-DD in Europe/Zurich timezone
-      counter: int("counter").default(0).notNull()
+      counter: (0, import_mysql_core.int)("counter").default(0).notNull()
     }, (table) => ({
-      uniqScopeDate: unique("daily_seq_scope_date_unique").on(table.scopeKey, table.date)
+      uniqScopeDate: (0, import_mysql_core.unique)("daily_seq_scope_date_unique").on(table.scopeKey, table.date)
     }));
-    insertBranchSchema = createInsertSchema(branches).omit({ id: true, createdAt: true, updatedAt: true });
-    insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, updatedAt: true });
-    insertCategorySchema = createInsertSchema(categories).omit({ id: true, createdAt: true });
-    insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true, updatedAt: true });
-    insertInventorySchema = createInsertSchema(inventory).omit({ id: true, updatedAt: true });
-    insertCustomerSchema = createInsertSchema(customers).omit({ id: true, createdAt: true, updatedAt: true });
-    insertSaleSchema = createInsertSchema(sales).omit({ id: true, createdAt: true });
-    insertSaleItemSchema = createInsertSchema(saleItems).omit({ id: true });
-    insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, createdAt: true, updatedAt: true });
-    insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({ id: true, createdAt: true });
-    insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({ id: true });
-    insertShiftSchema = createInsertSchema(shifts).omit({ id: true });
-    insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
-    insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
-    insertCallSchema = createInsertSchema(calls).omit({ id: true, createdAt: true });
-    insertTableSchema = createInsertSchema(tables).omit({ id: true, createdAt: true });
-    insertKitchenOrderSchema = createInsertSchema(kitchenOrders).omit({ id: true, createdAt: true, updatedAt: true });
-    insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true, createdAt: true });
-    insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ id: true, createdAt: true });
-    insertActivityLogSchema = createInsertSchema(activityLog).omit({ id: true, createdAt: true });
-    insertReturnSchema = createInsertSchema(returns).omit({ id: true, createdAt: true });
-    insertReturnItemSchema = createInsertSchema(returnItems).omit({ id: true });
-    insertCashDrawerOperationSchema = createInsertSchema(cashDrawerOperations).omit({ id: true, createdAt: true });
-    insertWarehouseSchema = createInsertSchema(warehouses).omit({ id: true, createdAt: true });
-    insertWarehouseTransferSchema = createInsertSchema(warehouseTransfers).omit({ id: true, createdAt: true });
-    insertProductBatchSchema = createInsertSchema(productBatches).omit({ id: true, createdAt: true });
-    insertInventoryMovementSchema = createInsertSchema(inventoryMovements).omit({ id: true, createdAt: true });
-    insertStockCountSchema = createInsertSchema(stockCounts).omit({ id: true, createdAt: true });
-    insertStockCountItemSchema = createInsertSchema(stockCountItems).omit({ id: true });
-    insertSupplierContractSchema = createInsertSchema(supplierContracts).omit({ id: true, createdAt: true });
-    insertEmployeeCommissionSchema = createInsertSchema(employeeCommissions).omit({ id: true, createdAt: true });
-    insertSuperAdminSchema = createInsertSchema(superAdmins).omit({ id: true, createdAt: true, updatedAt: true });
-    insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true, updatedAt: true });
-    insertTenantSubscriptionSchema = createInsertSchema(tenantSubscriptions).omit({ id: true, createdAt: true, updatedAt: true });
-    insertLicenseKeySchema = createInsertSchema(licenseKeys).omit({ id: true, createdAt: true, updatedAt: true });
-    insertTenantNotificationSchema = createInsertSchema(tenantNotifications).omit({ id: true, createdAt: true });
-    insertOnlineOrderSchema = createInsertSchema(onlineOrders).omit({ id: true, createdAt: true, updatedAt: true });
-    insertLandingPageConfigSchema = createInsertSchema(landingPageConfig).omit({ id: true, createdAt: true, updatedAt: true });
-    insertPlatformSettingSchema = createInsertSchema(platformSettings).omit({ id: true, updatedAt: true });
-    insertPlatformCommissionSchema = createInsertSchema(platformCommissions).omit({ id: true, createdAt: true });
-    insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true, createdAt: true });
-    insertPrinterConfigSchema = createInsertSchema(printerConfigs).omit({ id: true, updatedAt: true });
-    insertDailyClosingSchema = createInsertSchema(dailyClosings).omit({ id: true, createdAt: true });
-    insertMonthlyClosingSchema = createInsertSchema(monthlyClosings).omit({ id: true, createdAt: true });
+    insertBranchSchema = (0, import_drizzle_zod.createInsertSchema)(branches).omit({ id: true, createdAt: true, updatedAt: true });
+    insertEmployeeSchema = (0, import_drizzle_zod.createInsertSchema)(employees).omit({ id: true, createdAt: true, updatedAt: true });
+    insertCategorySchema = (0, import_drizzle_zod.createInsertSchema)(categories).omit({ id: true, createdAt: true });
+    insertProductSchema = (0, import_drizzle_zod.createInsertSchema)(products).omit({ id: true, createdAt: true, updatedAt: true });
+    insertInventorySchema = (0, import_drizzle_zod.createInsertSchema)(inventory).omit({ id: true, updatedAt: true });
+    insertCustomerSchema = (0, import_drizzle_zod.createInsertSchema)(customers).omit({ id: true, createdAt: true, updatedAt: true });
+    insertSaleSchema = (0, import_drizzle_zod.createInsertSchema)(sales).omit({ id: true, createdAt: true });
+    insertSaleItemSchema = (0, import_drizzle_zod.createInsertSchema)(saleItems).omit({ id: true });
+    insertSupplierSchema = (0, import_drizzle_zod.createInsertSchema)(suppliers).omit({ id: true, createdAt: true, updatedAt: true });
+    insertPurchaseOrderSchema = (0, import_drizzle_zod.createInsertSchema)(purchaseOrders).omit({ id: true, createdAt: true });
+    insertPurchaseOrderItemSchema = (0, import_drizzle_zod.createInsertSchema)(purchaseOrderItems).omit({ id: true });
+    insertShiftSchema = (0, import_drizzle_zod.createInsertSchema)(shifts).omit({ id: true });
+    insertNotificationSchema = (0, import_drizzle_zod.createInsertSchema)(notifications).omit({ id: true, createdAt: true });
+    insertExpenseSchema = (0, import_drizzle_zod.createInsertSchema)(expenses).omit({ id: true, createdAt: true });
+    insertCallSchema = (0, import_drizzle_zod.createInsertSchema)(calls).omit({ id: true, createdAt: true });
+    insertTableSchema = (0, import_drizzle_zod.createInsertSchema)(tables).omit({ id: true, createdAt: true });
+    insertKitchenOrderSchema = (0, import_drizzle_zod.createInsertSchema)(kitchenOrders).omit({ id: true, createdAt: true, updatedAt: true });
+    insertSubscriptionPlanSchema = (0, import_drizzle_zod.createInsertSchema)(subscriptionPlans).omit({ id: true, createdAt: true });
+    insertSubscriptionSchema = (0, import_drizzle_zod.createInsertSchema)(subscriptions).omit({ id: true, createdAt: true });
+    insertActivityLogSchema = (0, import_drizzle_zod.createInsertSchema)(activityLog).omit({ id: true, createdAt: true });
+    insertReturnSchema = (0, import_drizzle_zod.createInsertSchema)(returns).omit({ id: true, createdAt: true });
+    insertReturnItemSchema = (0, import_drizzle_zod.createInsertSchema)(returnItems).omit({ id: true });
+    insertCashDrawerOperationSchema = (0, import_drizzle_zod.createInsertSchema)(cashDrawerOperations).omit({ id: true, createdAt: true });
+    insertWarehouseSchema = (0, import_drizzle_zod.createInsertSchema)(warehouses).omit({ id: true, createdAt: true });
+    insertWarehouseTransferSchema = (0, import_drizzle_zod.createInsertSchema)(warehouseTransfers).omit({ id: true, createdAt: true });
+    insertProductBatchSchema = (0, import_drizzle_zod.createInsertSchema)(productBatches).omit({ id: true, createdAt: true });
+    insertInventoryMovementSchema = (0, import_drizzle_zod.createInsertSchema)(inventoryMovements).omit({ id: true, createdAt: true });
+    insertStockCountSchema = (0, import_drizzle_zod.createInsertSchema)(stockCounts).omit({ id: true, createdAt: true });
+    insertStockCountItemSchema = (0, import_drizzle_zod.createInsertSchema)(stockCountItems).omit({ id: true });
+    insertSupplierContractSchema = (0, import_drizzle_zod.createInsertSchema)(supplierContracts).omit({ id: true, createdAt: true });
+    insertEmployeeCommissionSchema = (0, import_drizzle_zod.createInsertSchema)(employeeCommissions).omit({ id: true, createdAt: true });
+    insertSuperAdminSchema = (0, import_drizzle_zod.createInsertSchema)(superAdmins).omit({ id: true, createdAt: true, updatedAt: true });
+    insertTenantSchema = (0, import_drizzle_zod.createInsertSchema)(tenants).omit({ id: true, createdAt: true, updatedAt: true });
+    insertTenantSubscriptionSchema = (0, import_drizzle_zod.createInsertSchema)(tenantSubscriptions).omit({ id: true, createdAt: true, updatedAt: true });
+    insertLicenseKeySchema = (0, import_drizzle_zod.createInsertSchema)(licenseKeys).omit({ id: true, createdAt: true, updatedAt: true });
+    insertTenantNotificationSchema = (0, import_drizzle_zod.createInsertSchema)(tenantNotifications).omit({ id: true, createdAt: true });
+    insertOnlineOrderSchema = (0, import_drizzle_zod.createInsertSchema)(onlineOrders).omit({ id: true, createdAt: true, updatedAt: true });
+    insertLandingPageConfigSchema = (0, import_drizzle_zod.createInsertSchema)(landingPageConfig).omit({ id: true, createdAt: true, updatedAt: true });
+    insertPlatformSettingSchema = (0, import_drizzle_zod.createInsertSchema)(platformSettings).omit({ id: true, updatedAt: true });
+    insertPlatformCommissionSchema = (0, import_drizzle_zod.createInsertSchema)(platformCommissions).omit({ id: true, createdAt: true });
+    insertVehicleSchema = (0, import_drizzle_zod.createInsertSchema)(vehicles).omit({ id: true, createdAt: true });
+    insertPrinterConfigSchema = (0, import_drizzle_zod.createInsertSchema)(printerConfigs).omit({ id: true, updatedAt: true });
+    insertDailyClosingSchema = (0, import_drizzle_zod.createInsertSchema)(dailyClosings).omit({ id: true, createdAt: true });
+    insertMonthlyClosingSchema = (0, import_drizzle_zod.createInsertSchema)(monthlyClosings).omit({ id: true, createdAt: true });
   }
 });
 
@@ -868,15 +883,15 @@ var db_exports = {};
 __export(db_exports, {
   db: () => db
 });
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
-var connection, db;
+var import_mysql2, import_promise, pool, db;
 var init_db = __esm({
-  async "server/db.ts"() {
+  "server/db.ts"() {
     "use strict";
+    import_mysql2 = require("drizzle-orm/mysql2");
+    import_promise = __toESM(require("mysql2/promise"));
     init_schema();
-    connection = await mysql.createPool({
-      host: process.env.MYSQL_HOST || "localhost",
+    pool = import_promise.default.createPool({
+      host: process.env.MYSQL_HOST || "127.0.0.1",
       user: process.env.MYSQL_USER || "",
       password: process.env.MYSQL_PASSWORD || "",
       database: process.env.MYSQL_DATABASE || "",
@@ -885,8 +900,8 @@ var init_db = __esm({
       charset: "utf8mb4",
       connectTimeout: 3e4
     });
-    console.log(`[DB] MySQL \u2014 host: ${process.env.MYSQL_HOST || "localhost"}, database: ${process.env.MYSQL_DATABASE}`);
-    db = drizzle(connection, { schema: schema_exports, mode: "default" });
+    console.log(`[DB] MySQL \u2014 host: ${process.env.MYSQL_HOST || "127.0.0.1"}, database: ${process.env.MYSQL_DATABASE}`);
+    db = (0, import_mysql2.drizzle)(pool, { schema: schema_exports, mode: "default" });
   }
 });
 
@@ -1001,13 +1016,13 @@ var storage_exports = {};
 __export(storage_exports, {
   storage: () => storage
 });
-import { eq, desc, sql, and, gte, lte, ilike, or, isNull } from "drizzle-orm";
-import * as fs from "fs";
-var storage;
+var import_drizzle_orm, fs, storage;
 var init_storage = __esm({
-  async "server/storage.ts"() {
+  "server/storage.ts"() {
     "use strict";
-    await init_db();
+    init_db();
+    import_drizzle_orm = require("drizzle-orm");
+    fs = __toESM(require("fs"));
     init_schema();
     storage = {
       seedLog(msg) {
@@ -1021,13 +1036,13 @@ var init_storage = __esm({
       },
       // Branches
       async getBranches() {
-        return db.select().from(branches).orderBy(desc(branches.createdAt));
+        return db.select().from(branches).orderBy((0, import_drizzle_orm.desc)(branches.createdAt));
       },
       async getBranchesByTenant(tenantId) {
-        return db.select().from(branches).where(eq(branches.tenantId, tenantId)).orderBy(desc(branches.createdAt));
+        return db.select().from(branches).where((0, import_drizzle_orm.eq)(branches.tenantId, tenantId)).orderBy((0, import_drizzle_orm.desc)(branches.createdAt));
       },
       async getBranch(id) {
-        const [branch] = await db.select().from(branches).where(eq(branches.id, id));
+        const [branch] = await db.select().from(branches).where((0, import_drizzle_orm.eq)(branches.id, id));
         return branch;
       },
       async createBranch(data) {
@@ -1035,31 +1050,31 @@ var init_storage = __esm({
         return branch;
       },
       async updateBranch(id, data) {
-        const [branch] = await db.update(branches).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(branches.id, id)).returning();
+        const [branch] = await db.update(branches).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(branches.id, id)).returning();
         return branch;
       },
       async deleteBranch(id) {
-        await db.delete(branches).where(eq(branches.id, id));
+        await db.delete(branches).where((0, import_drizzle_orm.eq)(branches.id, id));
       },
       // Employees
       async getEmployees() {
-        return db.select().from(employees).where(eq(employees.isActive, true)).orderBy(desc(employees.createdAt));
+        return db.select().from(employees).where((0, import_drizzle_orm.eq)(employees.isActive, true)).orderBy((0, import_drizzle_orm.desc)(employees.createdAt));
       },
       async getEmployeesByTenant(tenantId) {
         const tenantBranches = await this.getBranchesByTenant(tenantId);
         const branchIds = tenantBranches.map((b) => b.id);
         const { inArray: inArray2 } = await import("drizzle-orm");
         if (branchIds.length > 0) {
-          return db.select().from(employees).where(and(eq(employees.isActive, true), or(eq(employees.tenantId, tenantId), inArray2(employees.branchId, branchIds)))).orderBy(desc(employees.createdAt));
+          return db.select().from(employees).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(employees.isActive, true), (0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(employees.tenantId, tenantId), inArray2(employees.branchId, branchIds)))).orderBy((0, import_drizzle_orm.desc)(employees.createdAt));
         }
-        return db.select().from(employees).where(and(eq(employees.isActive, true), eq(employees.tenantId, tenantId))).orderBy(desc(employees.createdAt));
+        return db.select().from(employees).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(employees.isActive, true), (0, import_drizzle_orm.eq)(employees.tenantId, tenantId))).orderBy((0, import_drizzle_orm.desc)(employees.createdAt));
       },
       async getEmployee(id) {
-        const [emp] = await db.select().from(employees).where(eq(employees.id, id));
+        const [emp] = await db.select().from(employees).where((0, import_drizzle_orm.eq)(employees.id, id));
         return emp;
       },
       async getEmployeeByPin(pin) {
-        const [emp] = await db.select().from(employees).where(eq(employees.pin, pin));
+        const [emp] = await db.select().from(employees).where((0, import_drizzle_orm.eq)(employees.pin, pin));
         return emp;
       },
       async createEmployee(data) {
@@ -1067,72 +1082,72 @@ var init_storage = __esm({
         return emp;
       },
       async updateEmployee(id, data) {
-        const [emp] = await db.update(employees).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(employees.id, id)).returning();
+        const [emp] = await db.update(employees).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(employees.id, id)).returning();
         return emp;
       },
       async deleteEmployee(id) {
-        await db.update(employees).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq(employees.id, id));
+        await db.update(employees).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(employees.id, id));
       },
       // Categories
       async getCategories(tenantId) {
         if (tenantId) {
-          return db.select().from(categories).where(and(eq(categories.tenantId, tenantId), eq(categories.isActive, true))).orderBy(categories.sortOrder);
+          return db.select().from(categories).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(categories.tenantId, tenantId), (0, import_drizzle_orm.eq)(categories.isActive, true))).orderBy(categories.sortOrder);
         }
-        return db.select().from(categories).where(eq(categories.isActive, true)).orderBy(categories.sortOrder);
+        return db.select().from(categories).where((0, import_drizzle_orm.eq)(categories.isActive, true)).orderBy(categories.sortOrder);
       },
       async createCategory(data) {
         const [cat] = await db.insert(categories).values(data).returning();
         return cat;
       },
       async getCategory(id) {
-        const [category] = await db.select().from(categories).where(eq(categories.id, id));
+        const [category] = await db.select().from(categories).where((0, import_drizzle_orm.eq)(categories.id, id));
         return category;
       },
       async updateCategory(id, data) {
-        const [cat] = await db.update(categories).set(data).where(eq(categories.id, id)).returning();
+        const [cat] = await db.update(categories).set(data).where((0, import_drizzle_orm.eq)(categories.id, id)).returning();
         return cat;
       },
       async deleteCategory(id) {
-        await db.update(categories).set({ isActive: false }).where(eq(categories.id, id));
+        await db.update(categories).set({ isActive: false }).where((0, import_drizzle_orm.eq)(categories.id, id));
       },
       // Products
       async getProducts(search) {
         if (search) {
           return db.select().from(products).where(
-            and(
-              eq(products.isActive, true),
-              or(
-                ilike(products.name, `%${search}%`),
-                ilike(products.sku, `%${search}%`),
-                ilike(products.barcode, `%${search}%`)
+            (0, import_drizzle_orm.and)(
+              (0, import_drizzle_orm.eq)(products.isActive, true),
+              (0, import_drizzle_orm.or)(
+                (0, import_drizzle_orm.ilike)(products.name, `%${search}%`),
+                (0, import_drizzle_orm.ilike)(products.sku, `%${search}%`),
+                (0, import_drizzle_orm.ilike)(products.barcode, `%${search}%`)
               )
             )
-          ).orderBy(desc(products.createdAt));
+          ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
         }
-        return db.select().from(products).where(eq(products.isActive, true)).orderBy(desc(products.createdAt));
+        return db.select().from(products).where((0, import_drizzle_orm.eq)(products.isActive, true)).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
       },
       async getProductsByTenant(tenantId, search) {
         if (search) {
           return db.select().from(products).where(
-            and(
-              eq(products.tenantId, tenantId),
-              eq(products.isActive, true),
-              or(
-                ilike(products.name, `%${search}%`),
-                ilike(products.sku, `%${search}%`),
-                ilike(products.barcode, `%${search}%`)
+            (0, import_drizzle_orm.and)(
+              (0, import_drizzle_orm.eq)(products.tenantId, tenantId),
+              (0, import_drizzle_orm.eq)(products.isActive, true),
+              (0, import_drizzle_orm.or)(
+                (0, import_drizzle_orm.ilike)(products.name, `%${search}%`),
+                (0, import_drizzle_orm.ilike)(products.sku, `%${search}%`),
+                (0, import_drizzle_orm.ilike)(products.barcode, `%${search}%`)
               )
             )
-          ).orderBy(desc(products.createdAt));
+          ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
         }
-        return db.select().from(products).where(and(eq(products.tenantId, tenantId), eq(products.isActive, true))).orderBy(desc(products.createdAt));
+        return db.select().from(products).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(products.tenantId, tenantId), (0, import_drizzle_orm.eq)(products.isActive, true))).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
       },
       async getProduct(id) {
-        const [prod] = await db.select().from(products).where(eq(products.id, id));
+        const [prod] = await db.select().from(products).where((0, import_drizzle_orm.eq)(products.id, id));
         return prod;
       },
       async getProductByBarcode(barcode) {
-        const [prod] = await db.select().from(products).where(eq(products.barcode, barcode));
+        const [prod] = await db.select().from(products).where((0, import_drizzle_orm.eq)(products.barcode, barcode));
         return prod;
       },
       async createProduct(data) {
@@ -1140,16 +1155,16 @@ var init_storage = __esm({
         return prod;
       },
       async updateProduct(id, data) {
-        const [prod] = await db.update(products).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(products.id, id)).returning();
+        const [prod] = await db.update(products).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(products.id, id)).returning();
         return prod;
       },
       async deleteProduct(id) {
-        await db.update(products).set({ isActive: false }).where(eq(products.id, id));
+        await db.update(products).set({ isActive: false }).where((0, import_drizzle_orm.eq)(products.id, id));
       },
       // Inventory
       async getInventory(branchId, tenantId) {
         if (branchId) {
-          return db.select().from(inventory).where(eq(inventory.branchId, branchId));
+          return db.select().from(inventory).where((0, import_drizzle_orm.eq)(inventory.branchId, branchId));
         }
         if (tenantId) {
           const tenantBranches = await this.getBranchesByTenant(tenantId);
@@ -1164,14 +1179,14 @@ var init_storage = __esm({
       },
       async getProductInventory(productId, branchId) {
         const [inv] = await db.select().from(inventory).where(
-          and(eq(inventory.productId, productId), eq(inventory.branchId, branchId))
+          (0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(inventory.productId, productId), (0, import_drizzle_orm.eq)(inventory.branchId, branchId))
         );
         return inv;
       },
       async upsertInventory(data) {
         const existing = await this.getProductInventory(data.productId, data.branchId);
         if (existing) {
-          const [inv2] = await db.update(inventory).set({ quantity: data.quantity, updatedAt: /* @__PURE__ */ new Date() }).where(eq(inventory.id, existing.id)).returning();
+          const [inv2] = await db.update(inventory).set({ quantity: data.quantity, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(inventory.id, existing.id)).returning();
           return inv2;
         }
         const [inv] = await db.insert(inventory).values(data).returning();
@@ -1181,7 +1196,7 @@ var init_storage = __esm({
         const existing = await this.getProductInventory(productId, branchId);
         if (existing) {
           const newQty = (existing.quantity || 0) + adjustment;
-          const [inv2] = await db.update(inventory).set({ quantity: newQty, updatedAt: /* @__PURE__ */ new Date() }).where(eq(inventory.id, existing.id)).returning();
+          const [inv2] = await db.update(inventory).set({ quantity: newQty, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(inventory.id, existing.id)).returning();
           return inv2;
         }
         const [inv] = await db.insert(inventory).values({ productId, branchId, quantity: adjustment }).returning();
@@ -1189,7 +1204,7 @@ var init_storage = __esm({
       },
       async getLowStockItems(branchId) {
         const { inArray: inArray2, notInArray, lte: ltEq } = await import("drizzle-orm");
-        const restaurantTenants = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.storeType, "restaurant"));
+        const restaurantTenants = await db.select({ id: tenants.id }).from(tenants).where((0, import_drizzle_orm.eq)(tenants.storeType, "restaurant"));
         const restaurantTenantIds = restaurantTenants.map((t) => t.id);
         let excludedBranchIds = [];
         if (restaurantTenantIds.length > 0) {
@@ -1197,111 +1212,111 @@ var init_storage = __esm({
           excludedBranchIds = restaurantBranches.map((b) => b.id);
         }
         const conditions = [
-          sql`${inventory.quantity} <= ${inventory.lowStockThreshold}`
+          import_drizzle_orm.sql`${inventory.quantity} <= ${inventory.lowStockThreshold}`
         ];
         if (branchId) {
-          conditions.push(eq(inventory.branchId, branchId));
+          conditions.push((0, import_drizzle_orm.eq)(inventory.branchId, branchId));
         }
         if (excludedBranchIds.length > 0) {
           conditions.push(notInArray(inventory.branchId, excludedBranchIds));
         }
-        return db.select().from(inventory).where(and(...conditions));
+        return db.select().from(inventory).where((0, import_drizzle_orm.and)(...conditions));
       },
       // Customers
       async getCustomers(search, tenantId, limit = 50, offset = 0) {
-        const conditions = [or(eq(customers.isActive, true), isNull(customers.isActive))];
-        if (tenantId) conditions.push(eq(customers.tenantId, tenantId));
+        const conditions = [(0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(customers.isActive, true), (0, import_drizzle_orm.isNull)(customers.isActive))];
+        if (tenantId) conditions.push((0, import_drizzle_orm.eq)(customers.tenantId, tenantId));
         if (search) {
           const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(search.trim());
           if (looksLikePhone) {
             const { getPhoneSearchVariants: getPhoneSearchVariants2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
             const variants = getPhoneSearchVariants2(search.trim());
-            const phoneConditions = variants.map((v) => ilike(customers.phone || "", `%${v}%`));
-            const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
+            const phoneConditions = variants.map((v) => (0, import_drizzle_orm.ilike)(customers.phone || "", `%${v}%`));
+            const strippedCol = import_drizzle_orm.sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
             for (const v of variants) {
-              phoneConditions.push(sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
+              phoneConditions.push(import_drizzle_orm.sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
             }
-            conditions.push(or(...phoneConditions));
+            conditions.push((0, import_drizzle_orm.or)(...phoneConditions));
           } else {
             conditions.push(
-              or(
-                ilike(customers.name, `%${search}%`),
-                ilike(customers.phone || "", `%${search}%`),
-                ilike(customers.email || "", `%${search}%`),
-                ilike(customers.company || "", `%${search}%`),
-                ilike(customers.city || "", `%${search}%`),
-                ilike(customers.street || "", `%${search}%`),
-                ilike(customers.postalCode || "", `%${search}%`),
-                ilike(customers.firstName || "", `%${search}%`),
-                ilike(customers.lastName || "", `%${search}%`)
+              (0, import_drizzle_orm.or)(
+                (0, import_drizzle_orm.ilike)(customers.name, `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.phone || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.email || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.company || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.city || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.street || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.postalCode || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.firstName || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.lastName || "", `%${search}%`)
               )
             );
           }
         }
-        return db.select().from(customers).where(and(...conditions)).orderBy(desc(customers.createdAt)).limit(limit).offset(offset);
+        return db.select().from(customers).where((0, import_drizzle_orm.and)(...conditions)).orderBy((0, import_drizzle_orm.desc)(customers.createdAt)).limit(limit).offset(offset);
       },
       async getCustomerCount(search, tenantId) {
-        const conditions = [or(eq(customers.isActive, true), isNull(customers.isActive))];
-        if (tenantId) conditions.push(eq(customers.tenantId, tenantId));
+        const conditions = [(0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(customers.isActive, true), (0, import_drizzle_orm.isNull)(customers.isActive))];
+        if (tenantId) conditions.push((0, import_drizzle_orm.eq)(customers.tenantId, tenantId));
         if (search) {
           const looksLikePhone = /^[\d\s\+\-\(\)\.]{4,}$/.test(search.trim());
           if (looksLikePhone) {
             const { getPhoneSearchVariants: getPhoneSearchVariants2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
             const variants = getPhoneSearchVariants2(search.trim());
-            const phoneConditions = variants.map((v) => ilike(customers.phone || "", `%${v}%`));
-            const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
+            const phoneConditions = variants.map((v) => (0, import_drizzle_orm.ilike)(customers.phone || "", `%${v}%`));
+            const strippedCol = import_drizzle_orm.sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
             for (const v of variants) {
-              phoneConditions.push(sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
+              phoneConditions.push(import_drizzle_orm.sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
             }
-            conditions.push(or(...phoneConditions));
+            conditions.push((0, import_drizzle_orm.or)(...phoneConditions));
           } else {
             conditions.push(
-              or(
-                ilike(customers.name, `%${search}%`),
-                ilike(customers.phone || "", `%${search}%`),
-                ilike(customers.email || "", `%${search}%`),
-                ilike(customers.company || "", `%${search}%`),
-                ilike(customers.city || "", `%${search}%`),
-                ilike(customers.street || "", `%${search}%`),
-                ilike(customers.postalCode || "", `%${search}%`),
-                ilike(customers.firstName || "", `%${search}%`),
-                ilike(customers.lastName || "", `%${search}%`)
+              (0, import_drizzle_orm.or)(
+                (0, import_drizzle_orm.ilike)(customers.name, `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.phone || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.email || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.company || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.city || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.street || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.postalCode || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.firstName || "", `%${search}%`),
+                (0, import_drizzle_orm.ilike)(customers.lastName || "", `%${search}%`)
               )
             );
           }
         }
-        const [result] = await db.select({ count: sql`count(*)` }).from(customers).where(and(...conditions));
+        const [result] = await db.select({ count: import_drizzle_orm.sql`count(*)` }).from(customers).where((0, import_drizzle_orm.and)(...conditions));
         return Number(result?.count || 0);
       },
       async findCustomerByPhone(phone, tenantId) {
         const { getPhoneSearchVariants: getPhoneSearchVariants2, normalizePhone: normalizePhone2, lastNDigits: lastNDigits2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
         const variants = getPhoneSearchVariants2(phone);
-        const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
-        const phoneConditions = variants.map((v) => ilike(customers.phone, `%${v}%`));
+        const strippedCol = import_drizzle_orm.sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
+        const phoneConditions = variants.map((v) => (0, import_drizzle_orm.ilike)(customers.phone, `%${v}%`));
         for (const v of variants) {
-          phoneConditions.push(sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
+          phoneConditions.push(import_drizzle_orm.sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
         }
         const last8 = lastNDigits2(phone, 8);
         if (last8.length >= 7) {
           phoneConditions.push(
-            sql`RIGHT(REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g'), 8) = ${last8}`
+            import_drizzle_orm.sql`RIGHT(REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g'), 8) = ${last8}`
           );
         }
         const last7 = lastNDigits2(phone, 7);
         if (last7.length === 7) {
           phoneConditions.push(
-            sql`REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g') = ${last7}`
+            import_drizzle_orm.sql`REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g') = ${last7}`
           );
         }
         const conditions = [
-          eq(customers.isActive, true),
-          or(...phoneConditions)
+          (0, import_drizzle_orm.eq)(customers.isActive, true),
+          (0, import_drizzle_orm.or)(...phoneConditions)
         ];
         if (tenantId) {
-          conditions.push(eq(customers.tenantId, tenantId));
+          conditions.push((0, import_drizzle_orm.eq)(customers.tenantId, tenantId));
         }
         const normalized = normalizePhone2(phone);
-        const results = await db.select().from(customers).where(and(...conditions)).limit(5);
+        const results = await db.select().from(customers).where((0, import_drizzle_orm.and)(...conditions)).limit(5);
         results.sort((a, b) => {
           const aNorm = a.phone ? normalizePhone2(a.phone) : "";
           const bNorm = b.phone ? normalizePhone2(b.phone) : "";
@@ -1312,7 +1327,7 @@ var init_storage = __esm({
         return results;
       },
       async getCustomer(id) {
-        const [cust] = await db.select().from(customers).where(eq(customers.id, id));
+        const [cust] = await db.select().from(customers).where((0, import_drizzle_orm.eq)(customers.id, id));
         return cust;
       },
       async createCustomer(data) {
@@ -1320,11 +1335,11 @@ var init_storage = __esm({
         return cust;
       },
       async updateCustomer(id, data) {
-        const [cust] = await db.update(customers).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(customers.id, id)).returning();
+        const [cust] = await db.update(customers).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(customers.id, id)).returning();
         return cust;
       },
       async deleteCustomer(id) {
-        const [cust] = await db.delete(customers).where(eq(customers.id, id)).returning();
+        const [cust] = await db.delete(customers).where((0, import_drizzle_orm.eq)(customers.id, id)).returning();
         return cust;
       },
       async addLoyaltyPoints(id, points) {
@@ -1334,11 +1349,11 @@ var init_storage = __esm({
       },
       // Sales
       async getCustomerSales(customerId) {
-        return db.select().from(sales).where(eq(sales.customerId, customerId)).orderBy(desc(sales.createdAt)).limit(50);
+        return db.select().from(sales).where((0, import_drizzle_orm.eq)(sales.customerId, customerId)).orderBy((0, import_drizzle_orm.desc)(sales.createdAt)).limit(50);
       },
       async getSales(filters) {
         let conditions = [];
-        if (filters?.branchId) conditions.push(eq(sales.branchId, filters.branchId));
+        if (filters?.branchId) conditions.push((0, import_drizzle_orm.eq)(sales.branchId, filters.branchId));
         if (filters?.tenantId) {
           const tenantBranches = await this.getBranchesByTenant(filters.tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
@@ -1349,14 +1364,14 @@ var init_storage = __esm({
             return [];
           }
         }
-        let query = conditions.length > 0 ? db.select().from(sales).where(and(...conditions)) : db.select().from(sales);
+        let query = conditions.length > 0 ? db.select().from(sales).where((0, import_drizzle_orm.and)(...conditions)) : db.select().from(sales);
         if (filters?.limit) {
-          return query.orderBy(desc(sales.createdAt)).limit(filters.limit);
+          return query.orderBy((0, import_drizzle_orm.desc)(sales.createdAt)).limit(filters.limit);
         }
-        return query.orderBy(desc(sales.createdAt));
+        return query.orderBy((0, import_drizzle_orm.desc)(sales.createdAt));
       },
       async getSale(id) {
-        const [sale] = await db.select().from(sales).where(eq(sales.id, id));
+        const [sale] = await db.select().from(sales).where((0, import_drizzle_orm.eq)(sales.id, id));
         return sale;
       },
       async createSale(data) {
@@ -1364,32 +1379,32 @@ var init_storage = __esm({
         return sale;
       },
       async getSaleItems(saleId) {
-        return db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
+        return db.select().from(saleItems).where((0, import_drizzle_orm.eq)(saleItems.saleId, saleId));
       },
       async deleteSaleItems(saleId) {
-        await db.delete(saleItems).where(eq(saleItems.saleId, saleId));
+        await db.delete(saleItems).where((0, import_drizzle_orm.eq)(saleItems.saleId, saleId));
       },
       async createSaleItem(data) {
         const [item] = await db.insert(saleItems).values(data).returning();
         return item;
       },
       async updateSale(id, data) {
-        const [sale] = await db.update(sales).set(data).where(eq(sales.id, id)).returning();
+        const [sale] = await db.update(sales).set(data).where((0, import_drizzle_orm.eq)(sales.id, id)).returning();
         return sale;
       },
       async deleteSale(id) {
-        await db.delete(saleItems).where(eq(saleItems.saleId, id));
-        await db.delete(sales).where(eq(sales.id, id));
+        await db.delete(saleItems).where((0, import_drizzle_orm.eq)(saleItems.saleId, id));
+        await db.delete(sales).where((0, import_drizzle_orm.eq)(sales.id, id));
       },
       // Suppliers
       async getSuppliers(tenantId) {
         if (tenantId) {
-          return db.select().from(suppliers).where(and(eq(suppliers.tenantId, tenantId), eq(suppliers.isActive, true))).orderBy(desc(suppliers.createdAt));
+          return db.select().from(suppliers).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(suppliers.tenantId, tenantId), (0, import_drizzle_orm.eq)(suppliers.isActive, true))).orderBy((0, import_drizzle_orm.desc)(suppliers.createdAt));
         }
-        return db.select().from(suppliers).where(eq(suppliers.isActive, true)).orderBy(desc(suppliers.createdAt));
+        return db.select().from(suppliers).where((0, import_drizzle_orm.eq)(suppliers.isActive, true)).orderBy((0, import_drizzle_orm.desc)(suppliers.createdAt));
       },
       async getSupplier(id) {
-        const [sup] = await db.select().from(suppliers).where(eq(suppliers.id, id));
+        const [sup] = await db.select().from(suppliers).where((0, import_drizzle_orm.eq)(suppliers.id, id));
         return sup;
       },
       async createSupplier(data) {
@@ -1397,7 +1412,7 @@ var init_storage = __esm({
         return sup;
       },
       async updateSupplier(id, data) {
-        const [sup] = await db.update(suppliers).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(suppliers.id, id)).returning();
+        const [sup] = await db.update(suppliers).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(suppliers.id, id)).returning();
         return sup;
       },
       // Purchase Orders
@@ -1407,26 +1422,26 @@ var init_storage = __esm({
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
             const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(purchaseOrders).where(inArray2(purchaseOrders.branchId, branchIds)).orderBy(desc(purchaseOrders.createdAt));
+            return db.select().from(purchaseOrders).where(inArray2(purchaseOrders.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(purchaseOrders.createdAt));
           }
           return [];
         }
-        return db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt));
+        return db.select().from(purchaseOrders).orderBy((0, import_drizzle_orm.desc)(purchaseOrders.createdAt));
       },
       async createPurchaseOrder(data) {
         const [po] = await db.insert(purchaseOrders).values(data).returning();
         return po;
       },
       async updatePurchaseOrder(id, data) {
-        const [po] = await db.update(purchaseOrders).set(data).where(eq(purchaseOrders.id, id)).returning();
+        const [po] = await db.update(purchaseOrders).set(data).where((0, import_drizzle_orm.eq)(purchaseOrders.id, id)).returning();
         return po;
       },
       async getPurchaseOrder(id) {
-        const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
+        const [po] = await db.select().from(purchaseOrders).where((0, import_drizzle_orm.eq)(purchaseOrders.id, id));
         return po;
       },
       async getPurchaseOrderItems(poId) {
-        return db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, poId));
+        return db.select().from(purchaseOrderItems).where((0, import_drizzle_orm.eq)(purchaseOrderItems.purchaseOrderId, poId));
       },
       async createPurchaseOrderItem(data) {
         const [item] = await db.insert(purchaseOrderItems).values(data).returning();
@@ -1436,12 +1451,12 @@ var init_storage = __esm({
         const po = await this.getPurchaseOrder(id);
         if (!po) return null;
         for (const item of items) {
-          await db.update(purchaseOrderItems).set({ receivedQuantity: item.receivedQuantity }).where(and(eq(purchaseOrderItems.purchaseOrderId, id), eq(purchaseOrderItems.productId, item.productId)));
+          await db.update(purchaseOrderItems).set({ receivedQuantity: item.receivedQuantity }).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(purchaseOrderItems.purchaseOrderId, id), (0, import_drizzle_orm.eq)(purchaseOrderItems.productId, item.productId)));
           if (po.branchId) {
             await this.adjustInventory(item.productId, po.branchId, item.receivedQuantity);
           }
         }
-        const [updated] = await db.update(purchaseOrders).set({ status: "received", receivedDate: /* @__PURE__ */ new Date() }).where(eq(purchaseOrders.id, id)).returning();
+        const [updated] = await db.update(purchaseOrders).set({ status: "received", receivedDate: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(purchaseOrders.id, id)).returning();
         return updated;
       },
       // Shifts
@@ -1451,11 +1466,11 @@ var init_storage = __esm({
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
             const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(shifts).where(inArray2(shifts.branchId, branchIds)).orderBy(desc(shifts.startTime));
+            return db.select().from(shifts).where(inArray2(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
           }
           return [];
         }
-        return db.select().from(shifts).orderBy(desc(shifts.startTime));
+        return db.select().from(shifts).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
       },
       async getActiveShiftsGlobal(tenantId) {
         if (tenantId) {
@@ -1463,15 +1478,15 @@ var init_storage = __esm({
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
             const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(shifts).where(and(eq(shifts.status, "open"), inArray2(shifts.branchId, branchIds))).orderBy(desc(shifts.startTime));
+            return db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray2(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
           }
           return [];
         }
-        return db.select().from(shifts).where(eq(shifts.status, "open")).orderBy(desc(shifts.startTime));
+        return db.select().from(shifts).where((0, import_drizzle_orm.eq)(shifts.status, "open")).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
       },
       async getActiveShift(employeeId) {
         const [shift] = await db.select().from(shifts).where(
-          and(eq(shifts.employeeId, employeeId), eq(shifts.status, "open"))
+          (0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.employeeId, employeeId), (0, import_drizzle_orm.eq)(shifts.status, "open"))
         );
         return shift;
       },
@@ -1484,18 +1499,18 @@ var init_storage = __esm({
           ...data,
           endTime: /* @__PURE__ */ new Date(),
           status: "closed"
-        }).where(eq(shifts.id, id)).returning();
+        }).where((0, import_drizzle_orm.eq)(shifts.id, id)).returning();
         return shift;
       },
       async getEmployeeAttendance(employeeId) {
-        return db.select().from(shifts).where(eq(shifts.employeeId, employeeId)).orderBy(desc(shifts.startTime));
+        return db.select().from(shifts).where((0, import_drizzle_orm.eq)(shifts.employeeId, employeeId)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
       },
       // Expenses
       async getExpenses(tenantId) {
         if (tenantId) {
-          return db.select().from(expenses).where(eq(expenses.tenantId, tenantId)).orderBy(desc(expenses.createdAt));
+          return db.select().from(expenses).where((0, import_drizzle_orm.eq)(expenses.tenantId, tenantId)).orderBy((0, import_drizzle_orm.desc)(expenses.createdAt));
         }
-        return db.select().from(expenses).orderBy(desc(expenses.createdAt));
+        return db.select().from(expenses).orderBy((0, import_drizzle_orm.desc)(expenses.createdAt));
       },
       async createExpense(data) {
         const [exp] = await db.insert(expenses).values(data).returning();
@@ -1503,20 +1518,20 @@ var init_storage = __esm({
       },
       async getExpensesByDateRange(startDate, endDate) {
         const conditions = [];
-        if (startDate) conditions.push(gte(expenses.date, startDate));
-        if (endDate) conditions.push(lte(expenses.date, endDate));
+        if (startDate) conditions.push((0, import_drizzle_orm.gte)(expenses.date, startDate));
+        if (endDate) conditions.push((0, import_drizzle_orm.lte)(expenses.date, endDate));
         if (conditions.length > 0) {
-          return db.select().from(expenses).where(and(...conditions)).orderBy(desc(expenses.createdAt));
+          return db.select().from(expenses).where((0, import_drizzle_orm.and)(...conditions)).orderBy((0, import_drizzle_orm.desc)(expenses.createdAt));
         }
-        return db.select().from(expenses).orderBy(desc(expenses.createdAt));
+        return db.select().from(expenses).orderBy((0, import_drizzle_orm.desc)(expenses.createdAt));
       },
       async deleteExpense(id) {
-        await db.delete(expenses).where(eq(expenses.id, id));
+        await db.delete(expenses).where((0, import_drizzle_orm.eq)(expenses.id, id));
       },
       // Tables
       async getTables(branchId) {
         if (branchId) {
-          return db.select().from(tables).where(eq(tables.branchId, branchId));
+          return db.select().from(tables).where((0, import_drizzle_orm.eq)(tables.branchId, branchId));
         }
         return db.select().from(tables);
       },
@@ -1525,36 +1540,36 @@ var init_storage = __esm({
         return table;
       },
       async updateTable(id, data) {
-        const [table] = await db.update(tables).set(data).where(eq(tables.id, id)).returning();
+        const [table] = await db.update(tables).set(data).where((0, import_drizzle_orm.eq)(tables.id, id)).returning();
         return table;
       },
       // Kitchen Orders
       async getKitchenOrders(branchId) {
         if (branchId) {
           return db.select().from(kitchenOrders).where(
-            and(eq(kitchenOrders.branchId, branchId), eq(kitchenOrders.status, "pending"))
+            (0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(kitchenOrders.branchId, branchId), (0, import_drizzle_orm.eq)(kitchenOrders.status, "pending"))
           ).orderBy(kitchenOrders.createdAt);
         }
-        return db.select().from(kitchenOrders).where(eq(kitchenOrders.status, "pending")).orderBy(kitchenOrders.createdAt);
+        return db.select().from(kitchenOrders).where((0, import_drizzle_orm.eq)(kitchenOrders.status, "pending")).orderBy(kitchenOrders.createdAt);
       },
       async createKitchenOrder(data) {
         const [order] = await db.insert(kitchenOrders).values(data).returning();
         return order;
       },
       async updateKitchenOrder(id, data) {
-        const [order] = await db.update(kitchenOrders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(kitchenOrders.id, id)).returning();
+        const [order] = await db.update(kitchenOrders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(kitchenOrders.id, id)).returning();
         return order;
       },
       // Subscriptions
       async getSubscriptionPlans() {
-        return db.select().from(subscriptionPlans).where(eq(subscriptionPlans.isActive, true));
+        return db.select().from(subscriptionPlans).where((0, import_drizzle_orm.eq)(subscriptionPlans.isActive, true));
       },
       async createSubscriptionPlan(data) {
         const [plan] = await db.insert(subscriptionPlans).values(data).returning();
         return plan;
       },
       async getSubscriptions() {
-        return db.select().from(subscriptions).orderBy(desc(subscriptions.createdAt));
+        return db.select().from(subscriptions).orderBy((0, import_drizzle_orm.desc)(subscriptions.createdAt));
       },
       async createSubscription(data) {
         const [sub] = await db.insert(subscriptions).values(data).returning();
@@ -1567,11 +1582,11 @@ var init_storage = __esm({
           const empIds = emps.map((e) => e.id);
           if (empIds.length > 0) {
             const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(activityLog).where(inArray2(activityLog.employeeId, empIds)).orderBy(desc(activityLog.createdAt)).limit(l);
+            return db.select().from(activityLog).where(inArray2(activityLog.employeeId, empIds)).orderBy((0, import_drizzle_orm.desc)(activityLog.createdAt)).limit(l);
           }
           return [];
         }
-        return db.select().from(activityLog).orderBy(desc(activityLog.createdAt)).limit(l);
+        return db.select().from(activityLog).orderBy((0, import_drizzle_orm.desc)(activityLog.createdAt)).limit(l);
       },
       async createActivityLog(data) {
         const [log3] = await db.insert(activityLog).values(data).returning();
@@ -1580,7 +1595,7 @@ var init_storage = __esm({
       // Calls
       async getCalls(tenantId, limit = 500) {
         const conditions = [];
-        if (tenantId) conditions.push(eq(calls.tenantId, tenantId));
+        if (tenantId) conditions.push((0, import_drizzle_orm.eq)(calls.tenantId, tenantId));
         const baseQuery = db.select({
           id: calls.id,
           tenantId: calls.tenantId,
@@ -1592,16 +1607,16 @@ var init_storage = __esm({
           createdAt: calls.createdAt,
           customerName: customers.name,
           customerAddress: customers.address
-        }).from(calls).leftJoin(customers, eq(calls.customerId, customers.id));
-        const withWhere = conditions.length > 0 ? baseQuery.where(and(...conditions)) : baseQuery;
-        return withWhere.orderBy(desc(calls.createdAt)).limit(limit);
+        }).from(calls).leftJoin(customers, (0, import_drizzle_orm.eq)(calls.customerId, customers.id));
+        const withWhere = conditions.length > 0 ? baseQuery.where((0, import_drizzle_orm.and)(...conditions)) : baseQuery;
+        return withWhere.orderBy((0, import_drizzle_orm.desc)(calls.createdAt)).limit(limit);
       },
       async createCall(data) {
         const [call] = await db.insert(calls).values(data).returning();
         return call;
       },
       async updateCall(id, data) {
-        const [call] = await db.update(calls).set(data).where(eq(calls.id, id)).returning();
+        const [call] = await db.update(calls).set(data).where((0, import_drizzle_orm.eq)(calls.id, id)).returning();
         return call;
       },
       // Returns
@@ -1611,14 +1626,14 @@ var init_storage = __esm({
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
             const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(returns).where(inArray2(returns.branchId, branchIds)).orderBy(desc(returns.createdAt));
+            return db.select().from(returns).where(inArray2(returns.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(returns.createdAt));
           }
           return [];
         }
-        return db.select().from(returns).orderBy(desc(returns.createdAt));
+        return db.select().from(returns).orderBy((0, import_drizzle_orm.desc)(returns.createdAt));
       },
       async getReturn(id) {
-        const [ret] = await db.select().from(returns).where(eq(returns.id, id));
+        const [ret] = await db.select().from(returns).where((0, import_drizzle_orm.eq)(returns.id, id));
         return ret;
       },
       async createReturn(data) {
@@ -1626,7 +1641,7 @@ var init_storage = __esm({
         return ret;
       },
       async getReturnItems(returnId) {
-        return db.select().from(returnItems).where(eq(returnItems.returnId, returnId));
+        return db.select().from(returnItems).where((0, import_drizzle_orm.eq)(returnItems.returnId, returnId));
       },
       async createReturnItem(data) {
         const [item] = await db.insert(returnItems).values(data).returning();
@@ -1634,7 +1649,7 @@ var init_storage = __esm({
       },
       // Sales Analytics
       async getSalesByDateRange(startDate, endDate) {
-        return db.select().from(sales).where(and(gte(sales.createdAt, startDate), lte(sales.createdAt, endDate))).orderBy(desc(sales.createdAt));
+        return db.select().from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, startDate), (0, import_drizzle_orm.lte)(sales.createdAt, endDate))).orderBy((0, import_drizzle_orm.desc)(sales.createdAt));
       },
       async getSalesWithCustomerByDateRange(startDate, endDate) {
         return db.select({
@@ -1651,37 +1666,37 @@ var init_storage = __esm({
           customerHouseNr: customers.houseNr,
           customerCity: customers.city,
           customerPostalCode: customers.postalCode
-        }).from(sales).leftJoin(customers, eq(sales.customerId, customers.id)).where(and(gte(sales.createdAt, startDate), lte(sales.createdAt, endDate))).orderBy(sales.createdAt);
+        }).from(sales).leftJoin(customers, (0, import_drizzle_orm.eq)(sales.customerId, customers.id)).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, startDate), (0, import_drizzle_orm.lte)(sales.createdAt, endDate))).orderBy(sales.createdAt);
       },
       async getTopProducts(limit) {
         const topLimit = limit || 10;
         const result = await db.select({
           productId: saleItems.productId,
           name: saleItems.productName,
-          totalSold: sql`sum(${saleItems.quantity})`,
-          revenue: sql`sum(${saleItems.total}::numeric)`
-        }).from(saleItems).groupBy(saleItems.productId, saleItems.productName).orderBy(sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
+          totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`,
+          revenue: import_drizzle_orm.sql`sum(${saleItems.total}::numeric)`
+        }).from(saleItems).groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
         return result.map((r) => ({ ...r, totalSold: Number(r.totalSold), revenue: Number(r.revenue) }));
       },
       async getSalesByPaymentMethod() {
         const result = await db.select({
           method: sales.paymentMethod,
-          count: sql`count(*)`,
-          total: sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`
+          count: import_drizzle_orm.sql`count(*)`,
+          total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`
         }).from(sales).groupBy(sales.paymentMethod);
         return result.map((r) => ({ method: r.method, count: Number(r.count), total: Number(r.total) }));
       },
       // Dashboard Stats
       async getDashboardStats(tenantId) {
-        let salesCountQuery = db.select({ count: sql`count(*)` }).from(sales);
-        let totalRevenueQuery = db.select({ total: sql`coalesce(sum(total_amount::numeric), 0)` }).from(sales);
-        let customerCountQuery = db.select({ count: sql`count(*)` }).from(customers);
-        let productCountQuery = db.select({ count: sql`count(*)` }).from(products).where(eq(products.isActive, true));
+        let salesCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(sales);
+        let totalRevenueQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)` }).from(sales);
+        let customerCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(customers);
+        let productCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(products).where((0, import_drizzle_orm.eq)(products.isActive, true));
         let lowStockQuery;
         let todaySalesQuery;
         let weekSalesQuery;
         let monthSalesQuery;
-        let totalExpensesQuery = db.select({ total: sql`coalesce(sum(${expenses.amount}::numeric), 0)` }).from(expenses);
+        let totalExpensesQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}::numeric), 0)` }).from(expenses);
         let todayExpensesQuery;
         let topProductsQuery;
         let salesByPaymentMethodQuery;
@@ -1700,43 +1715,43 @@ var init_storage = __esm({
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
             const { inArray: inArray2 } = await import("drizzle-orm");
-            salesCountQuery = db.select({ count: sql`count(*)` }).from(sales).where(inArray2(sales.branchId, branchIds));
-            totalRevenueQuery = db.select({ total: sql`coalesce(sum(total_amount::numeric), 0)` }).from(sales).where(inArray2(sales.branchId, branchIds));
-            customerCountQuery = db.select({ count: sql`count(*)` }).from(customers).where(eq(customers.tenantId, tenantId));
-            productCountQuery = db.select({ count: sql`count(*)` }).from(products).where(and(eq(products.tenantId, tenantId), eq(products.isActive, true)));
-            const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId));
+            salesCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(sales).where(inArray2(sales.branchId, branchIds));
+            totalRevenueQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)` }).from(sales).where(inArray2(sales.branchId, branchIds));
+            customerCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(customers).where((0, import_drizzle_orm.eq)(customers.tenantId, tenantId));
+            productCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(products).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(products.tenantId, tenantId), (0, import_drizzle_orm.eq)(products.isActive, true)));
+            const [tenant] = await db.select().from(tenants).where((0, import_drizzle_orm.eq)(tenants.id, tenantId));
             const isRestaurant = tenant?.storeType === "restaurant";
-            lowStockQuery = isRestaurant ? db.select({ count: sql`cast(0 as integer)` }).from(branches).limit(1) : db.select({ count: sql`count(*)` }).from(inventory).where(and(sql`quantity <= low_stock_threshold`, inArray2(inventory.branchId, branchIds)));
+            lowStockQuery = isRestaurant ? db.select({ count: import_drizzle_orm.sql`cast(0 as integer)` }).from(branches).limit(1) : db.select({ count: import_drizzle_orm.sql`count(*)` }).from(inventory).where((0, import_drizzle_orm.and)(import_drizzle_orm.sql`quantity <= low_stock_threshold`, inArray2(inventory.branchId, branchIds)));
             todaySalesQuery = db.select({
-              count: sql`count(*)`,
-              total: sql`coalesce(sum(total_amount::numeric), 0)`
-            }).from(sales).where(and(gte(sales.createdAt, todayStart), inArray2(sales.branchId, branchIds)));
+              count: import_drizzle_orm.sql`count(*)`,
+              total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray2(sales.branchId, branchIds)));
             weekSalesQuery = db.select({
-              total: sql`coalesce(sum(total_amount::numeric), 0)`
-            }).from(sales).where(and(gte(sales.createdAt, weekStart), inArray2(sales.branchId, branchIds)));
+              total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, weekStart), inArray2(sales.branchId, branchIds)));
             monthSalesQuery = db.select({
-              total: sql`coalesce(sum(total_amount::numeric), 0)`
-            }).from(sales).where(and(gte(sales.createdAt, monthStart), inArray2(sales.branchId, branchIds)));
-            totalExpensesQuery = db.select({ total: sql`coalesce(sum(${expenses.amount}::numeric), 0)` }).from(expenses).where(eq(expenses.tenantId, tenantId));
+              total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, monthStart), inArray2(sales.branchId, branchIds)));
+            totalExpensesQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}::numeric), 0)` }).from(expenses).where((0, import_drizzle_orm.eq)(expenses.tenantId, tenantId));
             todayExpensesQuery = db.select({
-              total: sql`coalesce(sum(${expenses.amount}::numeric), 0)`
-            }).from(expenses).where(and(gte(expenses.date, todayStart), eq(expenses.tenantId, tenantId)));
+              total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}::numeric), 0)`
+            }).from(expenses).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(expenses.date, todayStart), (0, import_drizzle_orm.eq)(expenses.tenantId, tenantId)));
             const topLimit = 5;
             topProductsQuery = db.select({
               productId: saleItems.productId,
               name: saleItems.productName,
-              totalSold: sql`sum(${saleItems.quantity})`,
-              revenue: sql`sum(${saleItems.total}::numeric)`
-            }).from(saleItems).innerJoin(sales, eq(saleItems.saleId, sales.id)).where(inArray2(sales.branchId, branchIds)).groupBy(saleItems.productId, saleItems.productName).orderBy(sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
+              totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`,
+              revenue: import_drizzle_orm.sql`sum(${saleItems.total}::numeric)`
+            }).from(saleItems).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray2(sales.branchId, branchIds)).groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
             salesByPaymentMethodQuery = db.select({
               method: sales.paymentMethod,
-              count: sql`count(*)`,
-              total: sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`
+              count: import_drizzle_orm.sql`count(*)`,
+              total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`
             }).from(sales).where(inArray2(sales.branchId, branchIds)).groupBy(sales.paymentMethod);
-            recentSalesQuery = db.select().from(sales).where(inArray2(sales.branchId, branchIds)).orderBy(desc(sales.createdAt)).limit(5);
+            recentSalesQuery = db.select().from(sales).where(inArray2(sales.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(sales.createdAt)).limit(5);
             profitRowQuery = db.select({
-              totalCost: sql`coalesce(sum(${products.costPrice}::numeric * ${saleItems.quantity}), 0)`
-            }).from(saleItems).innerJoin(products, eq(saleItems.productId, products.id)).innerJoin(sales, eq(saleItems.saleId, sales.id)).where(inArray2(sales.branchId, branchIds));
+              totalCost: import_drizzle_orm.sql`coalesce(sum(${products.costPrice}::numeric * ${saleItems.quantity}), 0)`
+            }).from(saleItems).innerJoin(products, (0, import_drizzle_orm.eq)(saleItems.productId, products.id)).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray2(sales.branchId, branchIds));
           } else {
             return {
               totalSales: 0,
@@ -1758,35 +1773,35 @@ var init_storage = __esm({
             };
           }
         } else {
-          lowStockQuery = db.select({ count: sql`count(*)` }).from(inventory).where(sql`quantity <= low_stock_threshold`);
+          lowStockQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(inventory).where(import_drizzle_orm.sql`quantity <= low_stock_threshold`);
           todaySalesQuery = db.select({
-            count: sql`count(*)`,
-            total: sql`coalesce(sum(total_amount::numeric), 0)`
-          }).from(sales).where(gte(sales.createdAt, todayStart));
+            count: import_drizzle_orm.sql`count(*)`,
+            total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+          }).from(sales).where((0, import_drizzle_orm.gte)(sales.createdAt, todayStart));
           weekSalesQuery = db.select({
-            total: sql`coalesce(sum(total_amount::numeric), 0)`
-          }).from(sales).where(gte(sales.createdAt, weekStart));
+            total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+          }).from(sales).where((0, import_drizzle_orm.gte)(sales.createdAt, weekStart));
           monthSalesQuery = db.select({
-            total: sql`coalesce(sum(total_amount::numeric), 0)`
-          }).from(sales).where(gte(sales.createdAt, monthStart));
+            total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+          }).from(sales).where((0, import_drizzle_orm.gte)(sales.createdAt, monthStart));
           todayExpensesQuery = db.select({
-            total: sql`coalesce(sum(${expenses.amount}::numeric), 0)`
-          }).from(expenses).where(gte(expenses.date, todayStart));
+            total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}::numeric), 0)`
+          }).from(expenses).where((0, import_drizzle_orm.gte)(expenses.date, todayStart));
           topProductsQuery = db.select({
             productId: saleItems.productId,
             name: saleItems.productName,
-            totalSold: sql`sum(${saleItems.quantity})`,
-            revenue: sql`sum(${saleItems.total}::numeric)`
-          }).from(saleItems).groupBy(saleItems.productId, saleItems.productName).orderBy(sql`sum(${saleItems.quantity}) desc`).limit(5);
+            totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`,
+            revenue: import_drizzle_orm.sql`sum(${saleItems.total}::numeric)`
+          }).from(saleItems).groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(5);
           salesByPaymentMethodQuery = db.select({
             method: sales.paymentMethod,
-            count: sql`count(*)`,
-            total: sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`
+            count: import_drizzle_orm.sql`count(*)`,
+            total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`
           }).from(sales).groupBy(sales.paymentMethod);
-          recentSalesQuery = db.select().from(sales).orderBy(desc(sales.createdAt)).limit(5);
+          recentSalesQuery = db.select().from(sales).orderBy((0, import_drizzle_orm.desc)(sales.createdAt)).limit(5);
           profitRowQuery = db.select({
-            totalCost: sql`coalesce(sum(${products.costPrice}::numeric * ${saleItems.quantity}), 0)`
-          }).from(saleItems).innerJoin(products, eq(saleItems.productId, products.id));
+            totalCost: import_drizzle_orm.sql`coalesce(sum(${products.costPrice}::numeric * ${saleItems.quantity}), 0)`
+          }).from(saleItems).innerJoin(products, (0, import_drizzle_orm.eq)(saleItems.productId, products.id));
         }
         const [salesCount] = await salesCountQuery;
         const [totalRevenueRow] = await totalRevenueQuery;
@@ -1896,7 +1911,7 @@ var init_storage = __esm({
       },
       // Cash Drawer Operations
       async getCashDrawerOperations(shiftId) {
-        return db.select().from(cashDrawerOperations).where(eq(cashDrawerOperations.shiftId, shiftId)).orderBy(desc(cashDrawerOperations.createdAt));
+        return db.select().from(cashDrawerOperations).where((0, import_drizzle_orm.eq)(cashDrawerOperations.shiftId, shiftId)).orderBy((0, import_drizzle_orm.desc)(cashDrawerOperations.createdAt));
       },
       async createCashDrawerOperation(data) {
         const [op] = await db.insert(cashDrawerOperations).values(data).returning();
@@ -1904,29 +1919,29 @@ var init_storage = __esm({
       },
       // Warehouses
       async getWarehouses(branchId, tenantId) {
-        if (branchId) return db.select().from(warehouses).where(and(eq(warehouses.branchId, branchId), eq(warehouses.isActive, true)));
+        if (branchId) return db.select().from(warehouses).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(warehouses.branchId, branchId), (0, import_drizzle_orm.eq)(warehouses.isActive, true)));
         if (tenantId) {
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
             const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(warehouses).where(and(inArray2(warehouses.branchId, branchIds), eq(warehouses.isActive, true)));
+            return db.select().from(warehouses).where((0, import_drizzle_orm.and)(inArray2(warehouses.branchId, branchIds), (0, import_drizzle_orm.eq)(warehouses.isActive, true)));
           }
           return [];
         }
-        return db.select().from(warehouses).where(eq(warehouses.isActive, true));
+        return db.select().from(warehouses).where((0, import_drizzle_orm.eq)(warehouses.isActive, true));
       },
       async createWarehouse(data) {
         const [wh] = await db.insert(warehouses).values(data).returning();
         return wh;
       },
       async updateWarehouse(id, data) {
-        const [wh] = await db.update(warehouses).set(data).where(eq(warehouses.id, id)).returning();
+        const [wh] = await db.update(warehouses).set(data).where((0, import_drizzle_orm.eq)(warehouses.id, id)).returning();
         return wh;
       },
       // Warehouse Transfers
       async getWarehouseTransfers() {
-        return db.select().from(warehouseTransfers).orderBy(desc(warehouseTransfers.createdAt));
+        return db.select().from(warehouseTransfers).orderBy((0, import_drizzle_orm.desc)(warehouseTransfers.createdAt));
       },
       async createWarehouseTransfer(data) {
         const [transfer] = await db.insert(warehouseTransfers).values(data).returning();
@@ -1934,8 +1949,8 @@ var init_storage = __esm({
       },
       // Product Batches
       async getProductBatches(productId, tenantId) {
-        const conditions = [eq(productBatches.isActive, true)];
-        if (productId) conditions.push(eq(productBatches.productId, productId));
+        const conditions = [(0, import_drizzle_orm.eq)(productBatches.isActive, true)];
+        if (productId) conditions.push((0, import_drizzle_orm.eq)(productBatches.productId, productId));
         if (tenantId) {
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
@@ -1954,14 +1969,14 @@ var init_storage = __esm({
         return batch;
       },
       async updateProductBatch(id, data) {
-        const [batch] = await db.update(productBatches).set(data).where(eq(productBatches.id, id)).returning();
+        const [batch] = await db.update(productBatches).set(data).where((0, import_drizzle_orm.eq)(productBatches.id, id)).returning();
         return batch;
       },
       // Inventory Movements
       async getInventoryMovements(productId, limit) {
         const l = limit || 100;
-        if (productId) return db.select().from(inventoryMovements).where(eq(inventoryMovements.productId, productId)).orderBy(desc(inventoryMovements.createdAt)).limit(l);
-        return db.select().from(inventoryMovements).orderBy(desc(inventoryMovements.createdAt)).limit(l);
+        if (productId) return db.select().from(inventoryMovements).where((0, import_drizzle_orm.eq)(inventoryMovements.productId, productId)).orderBy((0, import_drizzle_orm.desc)(inventoryMovements.createdAt)).limit(l);
+        return db.select().from(inventoryMovements).orderBy((0, import_drizzle_orm.desc)(inventoryMovements.createdAt)).limit(l);
       },
       async createInventoryMovement(data) {
         const [mov] = await db.insert(inventoryMovements).values(data).returning();
@@ -1969,10 +1984,10 @@ var init_storage = __esm({
       },
       // Stock Counts
       async getStockCounts() {
-        return db.select().from(stockCounts).orderBy(desc(stockCounts.createdAt));
+        return db.select().from(stockCounts).orderBy((0, import_drizzle_orm.desc)(stockCounts.createdAt));
       },
       async getStockCount(id) {
-        const [sc] = await db.select().from(stockCounts).where(eq(stockCounts.id, id));
+        const [sc] = await db.select().from(stockCounts).where((0, import_drizzle_orm.eq)(stockCounts.id, id));
         return sc;
       },
       async createStockCount(data) {
@@ -1980,37 +1995,37 @@ var init_storage = __esm({
         return sc;
       },
       async updateStockCount(id, data) {
-        const [sc] = await db.update(stockCounts).set(data).where(eq(stockCounts.id, id)).returning();
+        const [sc] = await db.update(stockCounts).set(data).where((0, import_drizzle_orm.eq)(stockCounts.id, id)).returning();
         return sc;
       },
       async getStockCountItems(stockCountId) {
-        return db.select().from(stockCountItems).where(eq(stockCountItems.stockCountId, stockCountId));
+        return db.select().from(stockCountItems).where((0, import_drizzle_orm.eq)(stockCountItems.stockCountId, stockCountId));
       },
       async createStockCountItem(data) {
         const [item] = await db.insert(stockCountItems).values(data).returning();
         return item;
       },
       async updateStockCountItem(id, data) {
-        const [item] = await db.update(stockCountItems).set(data).where(eq(stockCountItems.id, id)).returning();
+        const [item] = await db.update(stockCountItems).set(data).where((0, import_drizzle_orm.eq)(stockCountItems.id, id)).returning();
         return item;
       },
       // Supplier Contracts
       async getSupplierContracts(supplierId) {
-        if (supplierId) return db.select().from(supplierContracts).where(and(eq(supplierContracts.supplierId, supplierId), eq(supplierContracts.isActive, true)));
-        return db.select().from(supplierContracts).where(eq(supplierContracts.isActive, true));
+        if (supplierId) return db.select().from(supplierContracts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(supplierContracts.supplierId, supplierId), (0, import_drizzle_orm.eq)(supplierContracts.isActive, true)));
+        return db.select().from(supplierContracts).where((0, import_drizzle_orm.eq)(supplierContracts.isActive, true));
       },
       async createSupplierContract(data) {
         const [contract] = await db.insert(supplierContracts).values(data).returning();
         return contract;
       },
       async updateSupplierContract(id, data) {
-        const [contract] = await db.update(supplierContracts).set(data).where(eq(supplierContracts.id, id)).returning();
+        const [contract] = await db.update(supplierContracts).set(data).where((0, import_drizzle_orm.eq)(supplierContracts.id, id)).returning();
         return contract;
       },
       // Employee Commissions
       async getEmployeeCommissions(employeeId) {
-        if (employeeId) return db.select().from(employeeCommissions).where(eq(employeeCommissions.employeeId, employeeId)).orderBy(desc(employeeCommissions.createdAt));
-        return db.select().from(employeeCommissions).orderBy(desc(employeeCommissions.createdAt));
+        if (employeeId) return db.select().from(employeeCommissions).where((0, import_drizzle_orm.eq)(employeeCommissions.employeeId, employeeId)).orderBy((0, import_drizzle_orm.desc)(employeeCommissions.createdAt));
+        return db.select().from(employeeCommissions).orderBy((0, import_drizzle_orm.desc)(employeeCommissions.createdAt));
       },
       async createEmployeeCommission(data) {
         const [comm] = await db.insert(employeeCommissions).values(data).returning();
@@ -2019,19 +2034,19 @@ var init_storage = __esm({
       // Advanced Analytics
       async getEmployeeSalesReport(employeeId) {
         const result = await db.select({
-          count: sql`count(*)`,
-          total: sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`
-        }).from(sales).where(eq(sales.employeeId, employeeId));
+          count: import_drizzle_orm.sql`count(*)`,
+          total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`
+        }).from(sales).where((0, import_drizzle_orm.eq)(sales.employeeId, employeeId));
         return { salesCount: Number(result[0]?.count || 0), totalRevenue: Number(result[0]?.total || 0) };
       },
       async getSlowMovingProducts(days = 30) {
         const cutoffDate = /* @__PURE__ */ new Date();
         cutoffDate.setDate(cutoffDate.getDate() - days);
-        const allProds = await db.select().from(products).where(eq(products.isActive, true));
+        const allProds = await db.select().from(products).where((0, import_drizzle_orm.eq)(products.isActive, true));
         const recentSaleItems = await db.select({
           productId: saleItems.productId,
-          totalSold: sql`sum(${saleItems.quantity})`
-        }).from(saleItems).innerJoin(sales, eq(saleItems.saleId, sales.id)).where(gte(sales.createdAt, cutoffDate)).groupBy(saleItems.productId);
+          totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`
+        }).from(saleItems).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where((0, import_drizzle_orm.gte)(sales.createdAt, cutoffDate)).groupBy(saleItems.productId);
         const soldMap = new Map(recentSaleItems.map((r) => [r.productId, Number(r.totalSold)]));
         return allProds.filter((p) => !soldMap.has(p.id) || (soldMap.get(p.id) || 0) < 3).map((p) => ({
           ...p,
@@ -2042,8 +2057,8 @@ var init_storage = __esm({
         const result = await db.select({
           productId: saleItems.productId,
           productName: saleItems.productName,
-          totalRevenue: sql`sum(${saleItems.total}::numeric)`,
-          totalSold: sql`sum(${saleItems.quantity})`
+          totalRevenue: import_drizzle_orm.sql`sum(${saleItems.total}::numeric)`,
+          totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`
         }).from(saleItems).groupBy(saleItems.productId, saleItems.productName);
         const prodList = await db.select().from(products);
         const prodMap = new Map(prodList.map((p) => [p.id, p]));
@@ -2066,9 +2081,9 @@ var init_storage = __esm({
       async getCashierPerformance() {
         const result = await db.select({
           employeeId: sales.employeeId,
-          count: sql`count(*)`,
-          total: sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`,
-          avgSale: sql`coalesce(avg(${sales.totalAmount}::numeric), 0)`
+          count: import_drizzle_orm.sql`count(*)`,
+          total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}::numeric), 0)`,
+          avgSale: import_drizzle_orm.sql`coalesce(avg(${sales.totalAmount}::numeric), 0)`
         }).from(sales).groupBy(sales.employeeId);
         const empList = await db.select().from(employees);
         const empMap = new Map(empList.map((e) => [e.id, e]));
@@ -2083,10 +2098,10 @@ var init_storage = __esm({
       },
       async getReturnsReport() {
         const result = await db.select({
-          count: sql`count(*)`,
-          total: sql`coalesce(sum(${returns.totalAmount}::numeric), 0)`
+          count: import_drizzle_orm.sql`count(*)`,
+          total: import_drizzle_orm.sql`coalesce(sum(${returns.totalAmount}::numeric), 0)`
         }).from(returns);
-        const returnsList = await db.select().from(returns).orderBy(desc(returns.createdAt)).limit(20);
+        const returnsList = await db.select().from(returns).orderBy((0, import_drizzle_orm.desc)(returns.createdAt)).limit(20);
         return {
           totalReturns: Number(result[0]?.count || 0),
           totalRefundAmount: Number(result[0]?.total || 0),
@@ -2095,10 +2110,10 @@ var init_storage = __esm({
       },
       // Notifications
       async getNotifications(recipientId) {
-        return db.select().from(notifications).where(eq(notifications.recipientId, recipientId)).orderBy(desc(notifications.createdAt)).limit(50);
+        return db.select().from(notifications).where((0, import_drizzle_orm.eq)(notifications.recipientId, recipientId)).orderBy((0, import_drizzle_orm.desc)(notifications.createdAt)).limit(50);
       },
       async getUnreadNotificationCount(recipientId) {
-        const [result] = await db.select({ count: sql`count(*)` }).from(notifications).where(and(eq(notifications.recipientId, recipientId), eq(notifications.isRead, false)));
+        const [result] = await db.select({ count: import_drizzle_orm.sql`count(*)` }).from(notifications).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(notifications.recipientId, recipientId), (0, import_drizzle_orm.eq)(notifications.isRead, false)));
         return Number(result?.count || 0);
       },
       async createNotification(data) {
@@ -2106,15 +2121,15 @@ var init_storage = __esm({
         return notif;
       },
       async markNotificationRead(id) {
-        const [notif] = await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id)).returning();
+        const [notif] = await db.update(notifications).set({ isRead: true }).where((0, import_drizzle_orm.eq)(notifications.id, id)).returning();
         return notif;
       },
       async markAllNotificationsRead(recipientId) {
-        await db.update(notifications).set({ isRead: true }).where(eq(notifications.recipientId, recipientId));
+        await db.update(notifications).set({ isRead: true }).where((0, import_drizzle_orm.eq)(notifications.recipientId, recipientId));
       },
       async notifyAdmins(senderId, type, title, message, entityType, entityId, priority) {
         const admins = await db.select().from(employees).where(
-          or(eq(employees.role, "admin"), eq(employees.role, "owner"))
+          (0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(employees.role, "admin"), (0, import_drizzle_orm.eq)(employees.role, "owner"))
         );
         const notifs = [];
         for (const admin of admins) {
@@ -2135,9 +2150,9 @@ var init_storage = __esm({
       },
       // Enhanced shift operations
       async getShiftWithEmployee(shiftId) {
-        const [shift] = await db.select().from(shifts).where(eq(shifts.id, shiftId));
+        const [shift] = await db.select().from(shifts).where((0, import_drizzle_orm.eq)(shifts.id, shiftId));
         if (!shift) return null;
-        const [emp] = await db.select().from(employees).where(eq(employees.id, shift.employeeId));
+        const [emp] = await db.select().from(employees).where((0, import_drizzle_orm.eq)(employees.id, shift.employeeId));
         return { ...shift, employee: emp };
       },
       async getAllActiveShifts(tenantId) {
@@ -2147,12 +2162,12 @@ var init_storage = __esm({
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
             const { inArray: inArray2 } = await import("drizzle-orm");
-            activeShifts = await db.select().from(shifts).where(and(eq(shifts.status, "open"), inArray2(shifts.branchId, branchIds))).orderBy(desc(shifts.startTime));
+            activeShifts = await db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray2(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
           } else {
             activeShifts = [];
           }
         } else {
-          activeShifts = await db.select().from(shifts).where(eq(shifts.status, "open")).orderBy(desc(shifts.startTime));
+          activeShifts = await db.select().from(shifts).where((0, import_drizzle_orm.eq)(shifts.status, "open")).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
         }
         const empList = await db.select().from(employees);
         const empMap = new Map(empList.map((e) => [e.id, e]));
@@ -2169,12 +2184,12 @@ var init_storage = __esm({
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
             const { inArray: inArray2 } = await import("drizzle-orm");
-            allShifts = await db.select().from(shifts).where(inArray2(shifts.branchId, branchIds)).orderBy(desc(shifts.startTime)).limit(100);
+            allShifts = await db.select().from(shifts).where(inArray2(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime)).limit(100);
           } else {
             allShifts = [];
           }
         } else {
-          allShifts = await db.select().from(shifts).orderBy(desc(shifts.startTime)).limit(100);
+          allShifts = await db.select().from(shifts).orderBy((0, import_drizzle_orm.desc)(shifts.startTime)).limit(100);
         }
         const empList = await db.select().from(employees);
         const empMap = new Map(empList.map((e) => [e.id, e]));
@@ -2196,36 +2211,36 @@ var init_storage = __esm({
         };
       },
       async updateShift(id, data) {
-        const [shift] = await db.update(shifts).set(data).where(eq(shifts.id, id)).returning();
+        const [shift] = await db.update(shifts).set(data).where((0, import_drizzle_orm.eq)(shifts.id, id)).returning();
         return shift;
       },
       // ========== Super Admin System ==========
       // Vehicles / Fleet Management
       async getVehicles(tenantId, branchId) {
-        if (tenantId && branchId) return db.select().from(vehicles).where(and(eq(vehicles.tenantId, tenantId), eq(vehicles.branchId, branchId), eq(vehicles.isActive, true))).orderBy(desc(vehicles.createdAt));
-        if (tenantId) return db.select().from(vehicles).where(and(eq(vehicles.tenantId, tenantId), eq(vehicles.isActive, true))).orderBy(desc(vehicles.createdAt));
-        return db.select().from(vehicles).where(eq(vehicles.isActive, true)).orderBy(desc(vehicles.createdAt));
+        if (tenantId && branchId) return db.select().from(vehicles).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(vehicles.tenantId, tenantId), (0, import_drizzle_orm.eq)(vehicles.branchId, branchId), (0, import_drizzle_orm.eq)(vehicles.isActive, true))).orderBy((0, import_drizzle_orm.desc)(vehicles.createdAt));
+        if (tenantId) return db.select().from(vehicles).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(vehicles.tenantId, tenantId), (0, import_drizzle_orm.eq)(vehicles.isActive, true))).orderBy((0, import_drizzle_orm.desc)(vehicles.createdAt));
+        return db.select().from(vehicles).where((0, import_drizzle_orm.eq)(vehicles.isActive, true)).orderBy((0, import_drizzle_orm.desc)(vehicles.createdAt));
       },
       async createVehicle(data) {
         const [v] = await db.insert(vehicles).values(data).returning();
         return v;
       },
       async updateVehicle(id, data) {
-        const [v] = await db.update(vehicles).set(data).where(eq(vehicles.id, id)).returning();
+        const [v] = await db.update(vehicles).set(data).where((0, import_drizzle_orm.eq)(vehicles.id, id)).returning();
         return v;
       },
       async deleteVehicle(id) {
-        await db.update(vehicles).set({ isActive: false }).where(eq(vehicles.id, id));
+        await db.update(vehicles).set({ isActive: false }).where((0, import_drizzle_orm.eq)(vehicles.id, id));
       },
       // Printer Configurations
       async getPrinterConfigs(tenantId, branchId) {
-        if (branchId) return db.select().from(printerConfigs).where(and(eq(printerConfigs.tenantId, tenantId), eq(printerConfigs.branchId, branchId)));
-        return db.select().from(printerConfigs).where(eq(printerConfigs.tenantId, tenantId));
+        if (branchId) return db.select().from(printerConfigs).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(printerConfigs.tenantId, tenantId), (0, import_drizzle_orm.eq)(printerConfigs.branchId, branchId)));
+        return db.select().from(printerConfigs).where((0, import_drizzle_orm.eq)(printerConfigs.tenantId, tenantId));
       },
       async upsertPrinterConfig(data) {
-        const existing = await db.select().from(printerConfigs).where(and(eq(printerConfigs.tenantId, data.tenantId), eq(printerConfigs.receiptType, data.receiptType)));
+        const existing = await db.select().from(printerConfigs).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(printerConfigs.tenantId, data.tenantId), (0, import_drizzle_orm.eq)(printerConfigs.receiptType, data.receiptType)));
         if (existing.length > 0) {
-          const [c2] = await db.update(printerConfigs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(printerConfigs.id, existing[0].id)).returning();
+          const [c2] = await db.update(printerConfigs).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(printerConfigs.id, existing[0].id)).returning();
           return c2;
         }
         const [c] = await db.insert(printerConfigs).values(data).returning();
@@ -2233,8 +2248,8 @@ var init_storage = __esm({
       },
       // Daily Closings
       async getDailyClosings(tenantId, branchId) {
-        if (branchId) return db.select().from(dailyClosings).where(and(eq(dailyClosings.tenantId, tenantId), eq(dailyClosings.branchId, branchId))).orderBy(desc(dailyClosings.createdAt));
-        return db.select().from(dailyClosings).where(eq(dailyClosings.tenantId, tenantId)).orderBy(desc(dailyClosings.createdAt));
+        if (branchId) return db.select().from(dailyClosings).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(dailyClosings.tenantId, tenantId), (0, import_drizzle_orm.eq)(dailyClosings.branchId, branchId))).orderBy((0, import_drizzle_orm.desc)(dailyClosings.createdAt));
+        return db.select().from(dailyClosings).where((0, import_drizzle_orm.eq)(dailyClosings.tenantId, tenantId)).orderBy((0, import_drizzle_orm.desc)(dailyClosings.createdAt));
       },
       async createDailyClosing(data) {
         const [dc] = await db.insert(dailyClosings).values(data).returning();
@@ -2242,16 +2257,16 @@ var init_storage = __esm({
       },
       async getDailyClosingByDate(tenantId, closingDate, branchId) {
         if (branchId) {
-          const [dc2] = await db.select().from(dailyClosings).where(and(eq(dailyClosings.tenantId, tenantId), eq(dailyClosings.closingDate, closingDate), eq(dailyClosings.branchId, branchId)));
+          const [dc2] = await db.select().from(dailyClosings).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(dailyClosings.tenantId, tenantId), (0, import_drizzle_orm.eq)(dailyClosings.closingDate, closingDate), (0, import_drizzle_orm.eq)(dailyClosings.branchId, branchId)));
           return dc2;
         }
-        const [dc] = await db.select().from(dailyClosings).where(and(eq(dailyClosings.tenantId, tenantId), eq(dailyClosings.closingDate, closingDate)));
+        const [dc] = await db.select().from(dailyClosings).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(dailyClosings.tenantId, tenantId), (0, import_drizzle_orm.eq)(dailyClosings.closingDate, closingDate)));
         return dc;
       },
       // Monthly Closings
       async getMonthlyClosings(tenantId, branchId) {
-        if (branchId) return db.select().from(monthlyClosings).where(and(eq(monthlyClosings.tenantId, tenantId), eq(monthlyClosings.branchId, branchId))).orderBy(desc(monthlyClosings.createdAt));
-        return db.select().from(monthlyClosings).where(eq(monthlyClosings.tenantId, tenantId)).orderBy(desc(monthlyClosings.createdAt));
+        if (branchId) return db.select().from(monthlyClosings).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(monthlyClosings.tenantId, tenantId), (0, import_drizzle_orm.eq)(monthlyClosings.branchId, branchId))).orderBy((0, import_drizzle_orm.desc)(monthlyClosings.createdAt));
+        return db.select().from(monthlyClosings).where((0, import_drizzle_orm.eq)(monthlyClosings.tenantId, tenantId)).orderBy((0, import_drizzle_orm.desc)(monthlyClosings.createdAt));
       },
       async createMonthlyClosing(data) {
         const [mc] = await db.insert(monthlyClosings).values(data).returning();
@@ -2259,22 +2274,22 @@ var init_storage = __esm({
       },
       async getMonthlyClosingByMonth(tenantId, closingMonth, branchId) {
         if (branchId) {
-          const [mc2] = await db.select().from(monthlyClosings).where(and(eq(monthlyClosings.tenantId, tenantId), eq(monthlyClosings.closingMonth, closingMonth), eq(monthlyClosings.branchId, branchId)));
+          const [mc2] = await db.select().from(monthlyClosings).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(monthlyClosings.tenantId, tenantId), (0, import_drizzle_orm.eq)(monthlyClosings.closingMonth, closingMonth), (0, import_drizzle_orm.eq)(monthlyClosings.branchId, branchId)));
           return mc2;
         }
-        const [mc] = await db.select().from(monthlyClosings).where(and(eq(monthlyClosings.tenantId, tenantId), eq(monthlyClosings.closingMonth, closingMonth)));
+        const [mc] = await db.select().from(monthlyClosings).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(monthlyClosings.tenantId, tenantId), (0, import_drizzle_orm.eq)(monthlyClosings.closingMonth, closingMonth)));
         return mc;
       },
       // Super Admins
       async getSuperAdmins() {
-        return db.select().from(superAdmins).orderBy(desc(superAdmins.createdAt));
+        return db.select().from(superAdmins).orderBy((0, import_drizzle_orm.desc)(superAdmins.createdAt));
       },
       async getSuperAdmin(id) {
-        const [admin] = await db.select().from(superAdmins).where(eq(superAdmins.id, id));
+        const [admin] = await db.select().from(superAdmins).where((0, import_drizzle_orm.eq)(superAdmins.id, id));
         return admin;
       },
       async getSuperAdminByEmail(email) {
-        const [admin] = await db.select().from(superAdmins).where(eq(superAdmins.email, email));
+        const [admin] = await db.select().from(superAdmins).where((0, import_drizzle_orm.eq)(superAdmins.email, email));
         return admin;
       },
       async createSuperAdmin(data) {
@@ -2282,12 +2297,12 @@ var init_storage = __esm({
         return admin;
       },
       async updateSuperAdmin(id, data) {
-        const [admin] = await db.update(superAdmins).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(superAdmins.id, id)).returning();
+        const [admin] = await db.update(superAdmins).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(superAdmins.id, id)).returning();
         return admin;
       },
       // Tenants
       async getTenants() {
-        return db.select().from(tenants).orderBy(desc(tenants.createdAt));
+        return db.select().from(tenants).orderBy((0, import_drizzle_orm.desc)(tenants.createdAt));
       },
       async getTenantsWithStats() {
         const allTenants = await this.getTenants();
@@ -2302,8 +2317,8 @@ var init_storage = __esm({
             const todayStart = /* @__PURE__ */ new Date();
             todayStart.setHours(0, 0, 0, 0);
             const [todaySales] = await db.select({
-              total: sql`coalesce(sum(total_amount::numeric), 0)`
-            }).from(sales).where(and(gte(sales.createdAt, todayStart), inArray2(sales.branchId, branchIds)));
+              total: import_drizzle_orm.sql`coalesce(sum(total_amount::numeric), 0)`
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray2(sales.branchId, branchIds)));
             salesToday = Number(todaySales?.total || 0).toFixed(2);
           }
           results.push({
@@ -2316,11 +2331,11 @@ var init_storage = __esm({
         return results;
       },
       async getTenant(id) {
-        const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id));
+        const [tenant] = await db.select().from(tenants).where((0, import_drizzle_orm.eq)(tenants.id, id));
         return tenant;
       },
       async getTenantByEmail(email) {
-        const [tenant] = await db.select().from(tenants).where(eq(tenants.ownerEmail, email));
+        const [tenant] = await db.select().from(tenants).where((0, import_drizzle_orm.eq)(tenants.ownerEmail, email));
         return tenant;
       },
       async createTenant(data) {
@@ -2328,24 +2343,24 @@ var init_storage = __esm({
         return tenant;
       },
       async updateTenant(id, data) {
-        const [tenant] = await db.update(tenants).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(tenants.id, id)).returning();
+        const [tenant] = await db.update(tenants).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(tenants.id, id)).returning();
         return tenant;
       },
       async deleteTenant(id) {
-        await db.delete(licenseKeys).where(eq(licenseKeys.tenantId, id));
-        await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, id));
-        await db.delete(tenantNotifications).where(eq(tenantNotifications.tenantId, id));
-        await db.delete(tenants).where(eq(tenants.id, id));
+        await db.delete(licenseKeys).where((0, import_drizzle_orm.eq)(licenseKeys.tenantId, id));
+        await db.delete(tenantSubscriptions).where((0, import_drizzle_orm.eq)(tenantSubscriptions.tenantId, id));
+        await db.delete(tenantNotifications).where((0, import_drizzle_orm.eq)(tenantNotifications.tenantId, id));
+        await db.delete(tenants).where((0, import_drizzle_orm.eq)(tenants.id, id));
       },
       // Tenant Subscriptions
       async getTenantSubscriptions(tenantId) {
         if (tenantId) {
-          return db.select().from(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, tenantId)).orderBy(desc(tenantSubscriptions.createdAt));
+          return db.select().from(tenantSubscriptions).where((0, import_drizzle_orm.eq)(tenantSubscriptions.tenantId, tenantId)).orderBy((0, import_drizzle_orm.desc)(tenantSubscriptions.createdAt));
         }
-        return db.select().from(tenantSubscriptions).orderBy(desc(tenantSubscriptions.createdAt));
+        return db.select().from(tenantSubscriptions).orderBy((0, import_drizzle_orm.desc)(tenantSubscriptions.createdAt));
       },
       async getTenantSubscription(id) {
-        const [sub] = await db.select().from(tenantSubscriptions).where(eq(tenantSubscriptions.id, id));
+        const [sub] = await db.select().from(tenantSubscriptions).where((0, import_drizzle_orm.eq)(tenantSubscriptions.id, id));
         return sub;
       },
       async createTenantSubscription(data) {
@@ -2353,25 +2368,25 @@ var init_storage = __esm({
         return sub;
       },
       async updateTenantSubscription(id, data) {
-        const [sub] = await db.update(tenantSubscriptions).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(tenantSubscriptions.id, id)).returning();
+        const [sub] = await db.update(tenantSubscriptions).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(tenantSubscriptions.id, id)).returning();
         return sub;
       },
       async deleteTenantSubscription(id) {
-        await db.delete(tenantSubscriptions).where(eq(tenantSubscriptions.id, id));
+        await db.delete(tenantSubscriptions).where((0, import_drizzle_orm.eq)(tenantSubscriptions.id, id));
       },
       // License Keys
       async getLicenseKeys(tenantId) {
         if (tenantId) {
-          return db.select().from(licenseKeys).where(eq(licenseKeys.tenantId, tenantId)).orderBy(desc(licenseKeys.createdAt));
+          return db.select().from(licenseKeys).where((0, import_drizzle_orm.eq)(licenseKeys.tenantId, tenantId)).orderBy((0, import_drizzle_orm.desc)(licenseKeys.createdAt));
         }
-        return db.select().from(licenseKeys).orderBy(desc(licenseKeys.createdAt));
+        return db.select().from(licenseKeys).orderBy((0, import_drizzle_orm.desc)(licenseKeys.createdAt));
       },
       async getLicenseKey(id) {
-        const [key] = await db.select().from(licenseKeys).where(eq(licenseKeys.id, id));
+        const [key] = await db.select().from(licenseKeys).where((0, import_drizzle_orm.eq)(licenseKeys.id, id));
         return key;
       },
       async getLicenseByKey(keyString) {
-        const [key] = await db.select().from(licenseKeys).where(eq(licenseKeys.licenseKey, keyString));
+        const [key] = await db.select().from(licenseKeys).where((0, import_drizzle_orm.eq)(licenseKeys.licenseKey, keyString));
         return key;
       },
       async createLicenseKey(data) {
@@ -2379,22 +2394,22 @@ var init_storage = __esm({
         return key;
       },
       async updateLicenseKey(id, data) {
-        const [key] = await db.update(licenseKeys).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(licenseKeys.id, id)).returning();
+        const [key] = await db.update(licenseKeys).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(licenseKeys.id, id)).returning();
         return key;
       },
       // Tenant Notifications
       async getTenantNotifications(tenantId) {
         if (tenantId) {
-          return db.select().from(tenantNotifications).where(eq(tenantNotifications.tenantId, tenantId)).orderBy(desc(tenantNotifications.createdAt));
+          return db.select().from(tenantNotifications).where((0, import_drizzle_orm.eq)(tenantNotifications.tenantId, tenantId)).orderBy((0, import_drizzle_orm.desc)(tenantNotifications.createdAt));
         }
-        return db.select().from(tenantNotifications).orderBy(desc(tenantNotifications.createdAt));
+        return db.select().from(tenantNotifications).orderBy((0, import_drizzle_orm.desc)(tenantNotifications.createdAt));
       },
       async createTenantNotification(data) {
         const [notif] = await db.insert(tenantNotifications).values(data).returning();
         return notif;
       },
       async updateTenantNotification(id, data) {
-        const [notif] = await db.update(tenantNotifications).set(data).where(eq(tenantNotifications.id, id)).returning();
+        const [notif] = await db.update(tenantNotifications).set(data).where((0, import_drizzle_orm.eq)(tenantNotifications.id, id)).returning();
         return notif;
       },
       // Tenants & Store Config
@@ -2405,32 +2420,32 @@ var init_storage = __esm({
         return db.insert(customers).values(data).onConflictDoUpdate({
           target: [customers.phone, customers.tenantId],
           set: {
-            customerNr: sql`EXCLUDED.customer_nr`,
-            salutation: sql`EXCLUDED.salutation`,
-            firstName: sql`EXCLUDED.first_name`,
-            lastName: sql`EXCLUDED.last_name`,
-            name: sql`EXCLUDED.name`,
-            address: sql`EXCLUDED.address`,
-            street: sql`EXCLUDED.street`,
-            streetNr: sql`EXCLUDED.street_nr`,
-            houseNr: sql`EXCLUDED.house_nr`,
-            city: sql`EXCLUDED.city`,
-            postalCode: sql`EXCLUDED.postal_code`,
-            company: sql`EXCLUDED.company`,
-            zhd: sql`EXCLUDED.zhd`,
-            howToGo: sql`EXCLUDED.how_to_go`,
-            screenInfo: sql`EXCLUDED.screen_info`,
-            source: sql`EXCLUDED.source`,
-            firstOrderDate: sql`EXCLUDED.first_order_date`,
-            lastOrderDate: sql`EXCLUDED.last_order_date`,
-            totalSpent: sql`EXCLUDED.total_spent`,
-            legacyTotalSpent: sql`EXCLUDED.legacy_total_spent`,
-            averageOrderValue: sql`EXCLUDED.average_order_value`,
-            orderCount: sql`EXCLUDED.order_count`,
-            visitCount: sql`EXCLUDED.visit_count`,
-            notes: sql`EXCLUDED.notes`,
-            legacyRef: sql`EXCLUDED.legacy_ref`,
-            updatedAt: sql`now()`
+            customerNr: import_drizzle_orm.sql`EXCLUDED.customer_nr`,
+            salutation: import_drizzle_orm.sql`EXCLUDED.salutation`,
+            firstName: import_drizzle_orm.sql`EXCLUDED.first_name`,
+            lastName: import_drizzle_orm.sql`EXCLUDED.last_name`,
+            name: import_drizzle_orm.sql`EXCLUDED.name`,
+            address: import_drizzle_orm.sql`EXCLUDED.address`,
+            street: import_drizzle_orm.sql`EXCLUDED.street`,
+            streetNr: import_drizzle_orm.sql`EXCLUDED.street_nr`,
+            houseNr: import_drizzle_orm.sql`EXCLUDED.house_nr`,
+            city: import_drizzle_orm.sql`EXCLUDED.city`,
+            postalCode: import_drizzle_orm.sql`EXCLUDED.postal_code`,
+            company: import_drizzle_orm.sql`EXCLUDED.company`,
+            zhd: import_drizzle_orm.sql`EXCLUDED.zhd`,
+            howToGo: import_drizzle_orm.sql`EXCLUDED.how_to_go`,
+            screenInfo: import_drizzle_orm.sql`EXCLUDED.screen_info`,
+            source: import_drizzle_orm.sql`EXCLUDED.source`,
+            firstOrderDate: import_drizzle_orm.sql`EXCLUDED.first_order_date`,
+            lastOrderDate: import_drizzle_orm.sql`EXCLUDED.last_order_date`,
+            totalSpent: import_drizzle_orm.sql`EXCLUDED.total_spent`,
+            legacyTotalSpent: import_drizzle_orm.sql`EXCLUDED.legacy_total_spent`,
+            averageOrderValue: import_drizzle_orm.sql`EXCLUDED.average_order_value`,
+            orderCount: import_drizzle_orm.sql`EXCLUDED.order_count`,
+            visitCount: import_drizzle_orm.sql`EXCLUDED.visit_count`,
+            notes: import_drizzle_orm.sql`EXCLUDED.notes`,
+            legacyRef: import_drizzle_orm.sql`EXCLUDED.legacy_ref`,
+            updatedAt: import_drizzle_orm.sql`now()`
           }
         }).returning();
       },
@@ -2442,16 +2457,16 @@ var init_storage = __esm({
       async getSuperAdminDashboardStats() {
         try {
           this.seedLog("Fetching Super Admin dashboard stats...");
-          const [tenantCount] = await db.select({ count: sql`count(*)` }).from(tenants);
-          const [activeTenants] = await db.select({ count: sql`count(*)` }).from(tenants).where(eq(tenants.status, "active"));
-          const [activeSubs] = await db.select({ count: sql`count(*)` }).from(tenantSubscriptions).where(eq(tenantSubscriptions.status, "active"));
+          const [tenantCount] = await db.select({ count: import_drizzle_orm.sql`count(*)` }).from(tenants);
+          const [activeTenants] = await db.select({ count: import_drizzle_orm.sql`count(*)` }).from(tenants).where((0, import_drizzle_orm.eq)(tenants.status, "active"));
+          const [activeSubs] = await db.select({ count: import_drizzle_orm.sql`count(*)` }).from(tenantSubscriptions).where((0, import_drizzle_orm.eq)(tenantSubscriptions.status, "active"));
           const in7Days = /* @__PURE__ */ new Date();
           in7Days.setDate(in7Days.getDate() + 7);
           const now = /* @__PURE__ */ new Date();
-          const [expiringSubs] = await db.select({ count: sql`count(*)` }).from(tenantSubscriptions).where(and(eq(tenantSubscriptions.status, "active"), lte(tenantSubscriptions.endDate, in7Days), gte(tenantSubscriptions.endDate, now)));
-          const [revenueRow] = await db.select({ total: sql`coalesce(sum(price), 0)::text` }).from(tenantSubscriptions).where(eq(tenantSubscriptions.status, "active"));
-          const recentTenants = await db.select().from(tenants).orderBy(desc(tenants.createdAt)).limit(5);
-          const recentSubs = await db.select().from(tenantSubscriptions).orderBy(desc(tenantSubscriptions.createdAt)).limit(5);
+          const [expiringSubs] = await db.select({ count: import_drizzle_orm.sql`count(*)` }).from(tenantSubscriptions).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(tenantSubscriptions.status, "active"), (0, import_drizzle_orm.lte)(tenantSubscriptions.endDate, in7Days), (0, import_drizzle_orm.gte)(tenantSubscriptions.endDate, now)));
+          const [revenueRow] = await db.select({ total: import_drizzle_orm.sql`coalesce(sum(price), 0)::text` }).from(tenantSubscriptions).where((0, import_drizzle_orm.eq)(tenantSubscriptions.status, "active"));
+          const recentTenants = await db.select().from(tenants).orderBy((0, import_drizzle_orm.desc)(tenants.createdAt)).limit(5);
+          const recentSubs = await db.select().from(tenantSubscriptions).orderBy((0, import_drizzle_orm.desc)(tenantSubscriptions.createdAt)).limit(5);
           return {
             totalTenants: Number(tenantCount?.count || 0),
             activeTenants: Number(activeTenants?.count || 0),
@@ -2469,15 +2484,15 @@ var init_storage = __esm({
       // ── Online Orders ──────────────────────────────────────────────────────────
       async getOnlineOrders(tenantId, status2) {
         const conditions = [];
-        if (tenantId) conditions.push(eq(onlineOrders.tenantId, tenantId));
-        if (status2) conditions.push(eq(onlineOrders.status, status2));
+        if (tenantId) conditions.push((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId));
+        if (status2) conditions.push((0, import_drizzle_orm.eq)(onlineOrders.status, status2));
         if (conditions.length > 0) {
-          return db.select().from(onlineOrders).where(and(...conditions)).orderBy(desc(onlineOrders.createdAt));
+          return db.select().from(onlineOrders).where((0, import_drizzle_orm.and)(...conditions)).orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
         }
-        return db.select().from(onlineOrders).orderBy(desc(onlineOrders.createdAt));
+        return db.select().from(onlineOrders).orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
       },
       async getOnlineOrder(id) {
-        const [order] = await db.select().from(onlineOrders).where(eq(onlineOrders.id, id));
+        const [order] = await db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.id, id));
         return order;
       },
       async createOnlineOrder(data) {
@@ -2485,11 +2500,11 @@ var init_storage = __esm({
         return order;
       },
       async updateOnlineOrder(id, data) {
-        const [order] = await db.update(onlineOrders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(onlineOrders.id, id)).returning();
+        const [order] = await db.update(onlineOrders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(onlineOrders.id, id)).returning();
         return order;
       },
       async deleteOnlineOrder(id) {
-        await db.delete(onlineOrders).where(eq(onlineOrders.id, id));
+        await db.delete(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.id, id));
       },
       // ── Landing Page Config ────────────────────────────────────────────────────
       async getOnboardingStatus(tenantId) {
@@ -2503,23 +2518,23 @@ var init_storage = __esm({
         };
       },
       async getLandingPageConfig(tenantId) {
-        const [config] = await db.select().from(landingPageConfig).where(eq(landingPageConfig.tenantId, tenantId));
+        const [config] = await db.select().from(landingPageConfig).where((0, import_drizzle_orm.eq)(landingPageConfig.tenantId, tenantId));
         return config;
       },
       async getLandingPageConfigBySlug(slug) {
-        const [config] = await db.select().from(landingPageConfig).where(eq(landingPageConfig.slug, slug));
+        const [config] = await db.select().from(landingPageConfig).where((0, import_drizzle_orm.eq)(landingPageConfig.slug, slug));
         return config;
       },
       async upsertLandingPageConfig(tenantId, data) {
         if (!data.slug) {
-          const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId));
+          const [tenant] = await db.select().from(tenants).where((0, import_drizzle_orm.eq)(tenants.id, tenantId));
           if (tenant) {
             data.slug = tenant.businessName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
           }
         }
         const existing = await this.getLandingPageConfig(tenantId);
         if (existing) {
-          const [updated] = await db.update(landingPageConfig).set({ ...data, tenantId, updatedAt: /* @__PURE__ */ new Date() }).where(eq(landingPageConfig.tenantId, tenantId)).returning();
+          const [updated] = await db.update(landingPageConfig).set({ ...data, tenantId, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(landingPageConfig.tenantId, tenantId)).returning();
           return updated;
         } else {
           const [created] = await db.insert(landingPageConfig).values({ tenantId, ...data }).returning();
@@ -2631,7 +2646,7 @@ var init_storage = __esm({
       async ensureTenantData(tenantId) {
         const tenant = await this.getTenant(tenantId);
         if (!tenant) return;
-        const tenantBranches = await db.select().from(branches).where(eq(branches.tenantId, tenantId)).limit(1);
+        const tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm.eq)(branches.tenantId, tenantId)).limit(1);
         let branchId;
         if (tenantBranches.length === 0) {
           this.seedLog(`Creating default branch for tenant ${tenantId}`);
@@ -2648,7 +2663,7 @@ var init_storage = __esm({
         } else {
           branchId = tenantBranches[0].id;
         }
-        const tenantEmployees = await db.select({ id: employees.id }).from(employees).innerJoin(branches, eq(employees.branchId, branches.id)).where(eq(branches.tenantId, tenantId)).limit(1);
+        const tenantEmployees = await db.select({ id: employees.id }).from(employees).innerJoin(branches, (0, import_drizzle_orm.eq)(employees.branchId, branches.id)).where((0, import_drizzle_orm.eq)(branches.tenantId, tenantId)).limit(1);
         if (tenantEmployees.length === 0) {
           this.seedLog(`Creating default admin for tenant ${tenantId}`);
           await this.createEmployee({
@@ -2663,13 +2678,13 @@ var init_storage = __esm({
       },
       // ── Platform Settings ──────────────────────────────────────────────────────
       async getPlatformSetting(key) {
-        const [row] = await db.select().from(platformSettings).where(eq(platformSettings.key, key));
+        const [row] = await db.select().from(platformSettings).where((0, import_drizzle_orm.eq)(platformSettings.key, key));
         return row?.value ?? null;
       },
       async setPlatformSetting(key, value) {
-        const existing = await db.select().from(platformSettings).where(eq(platformSettings.key, key));
+        const existing = await db.select().from(platformSettings).where((0, import_drizzle_orm.eq)(platformSettings.key, key));
         if (existing.length > 0) {
-          await db.update(platformSettings).set({ value, updatedAt: /* @__PURE__ */ new Date() }).where(eq(platformSettings.key, key));
+          await db.update(platformSettings).set({ value, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(platformSettings.key, key));
         } else {
           await db.insert(platformSettings).values({ key, value });
         }
@@ -2685,9 +2700,9 @@ var init_storage = __esm({
       },
       async getPlatformCommissions(tenantId) {
         if (tenantId) {
-          return db.select().from(platformCommissions).where(eq(platformCommissions.tenantId, tenantId)).orderBy(desc(platformCommissions.createdAt));
+          return db.select().from(platformCommissions).where((0, import_drizzle_orm.eq)(platformCommissions.tenantId, tenantId)).orderBy((0, import_drizzle_orm.desc)(platformCommissions.createdAt));
         }
-        return db.select().from(platformCommissions).orderBy(desc(platformCommissions.createdAt));
+        return db.select().from(platformCommissions).orderBy((0, import_drizzle_orm.desc)(platformCommissions.createdAt));
       },
       async getCommissionSummary() {
         const allTenants = await this.getTenants();
@@ -2696,9 +2711,9 @@ var init_storage = __esm({
         for (const t of allTenants) {
           try {
             const [row] = await db.select({
-              total: sql`coalesce(sum(commission_amount::numeric), 0)::text`,
-              count: sql`count(*)`
-            }).from(platformCommissions).where(eq(platformCommissions.tenantId, t.id));
+              total: import_drizzle_orm.sql`coalesce(sum(commission_amount::numeric), 0)::text`,
+              count: import_drizzle_orm.sql`count(*)`
+            }).from(platformCommissions).where((0, import_drizzle_orm.eq)(platformCommissions.tenantId, t.id));
             const total = parseFloat(row?.total || "0");
             grandTotal += total;
             result.push({ tenantId: t.id, businessName: t.businessName, commissionTotal: total, count: Number(row?.count || 0) });
@@ -2717,7 +2732,7 @@ var init_storage = __esm({
           day: "2-digit"
         }).format(/* @__PURE__ */ new Date());
         const dateCompact = swissDate.replace(/-/g, "");
-        const result = await db.execute(sql`
+        const result = await db.execute(import_drizzle_orm.sql`
       INSERT INTO daily_sequences (scope_key, date, counter)
       VALUES (${scopeKey}, ${dateCompact}, 1)
       ON CONFLICT (scope_key, date)
@@ -2735,9 +2750,6 @@ var seedPizzaLemon_exports = {};
 __export(seedPizzaLemon_exports, {
   seedPizzaLemon: () => seedPizzaLemon
 });
-import { eq as eq2, inArray } from "drizzle-orm";
-import bcrypt from "bcrypt";
-import { addYears } from "date-fns";
 function pizzaModifier(price33, price45) {
   const surcharge = (price45 - price33).toFixed(2);
   return [
@@ -2828,17 +2840,17 @@ function slugify(name) {
 }
 async function seedPizzaLemon() {
   console.log("[PIZZA LEMON] Checking if Pizza Lemon store is properly configured...");
-  const [existingKey] = await db.select().from(licenseKeys).where(eq2(licenseKeys.licenseKey, LICENSE_KEY));
+  const [existingKey] = await db.select().from(licenseKeys).where((0, import_drizzle_orm2.eq)(licenseKeys.licenseKey, LICENSE_KEY));
   const isAlreadySeeded = !!existingKey;
   if (isAlreadySeeded) {
     console.log("[PIZZA LEMON] License key already present \u2013 running full catalog update...");
   }
   let tenant;
-  const pizzaLemonTenants = await db.select().from(tenants).where(eq2(tenants.id, 24));
+  const pizzaLemonTenants = await db.select().from(tenants).where((0, import_drizzle_orm2.eq)(tenants.id, 24));
   if (pizzaLemonTenants.length > 0) {
     tenant = pizzaLemonTenants[0];
     console.log(`[PIZZA LEMON] Found existing store (ID ${tenant.id}). Upgrading credentials and data...`);
-    const hash3 = await bcrypt.hash(STORE_PASSWORD, 10);
+    const hash3 = await import_bcrypt.default.hash(STORE_PASSWORD, 10);
     await db.update(tenants).set({
       businessName: BUSINESS_NAME,
       ownerEmail: STORE_EMAIL,
@@ -2847,10 +2859,10 @@ async function seedPizzaLemon() {
       storeType: "restaurant",
       maxBranches: 3,
       maxEmployees: 20
-    }).where(eq2(tenants.id, 24));
+    }).where((0, import_drizzle_orm2.eq)(tenants.id, 24));
   } else {
     console.log("[PIZZA LEMON] No Tenant ID 24 found. Creating new store with ID 24...");
-    const hash3 = await bcrypt.hash(STORE_PASSWORD, 10);
+    const hash3 = await import_bcrypt.default.hash(STORE_PASSWORD, 10);
     const [newTenant] = await db.insert(tenants).values({
       id: 24,
       businessName: BUSINESS_NAME,
@@ -2865,13 +2877,13 @@ async function seedPizzaLemon() {
     }).returning();
     tenant = newTenant;
   }
-  const subs = await db.select().from(tenantSubscriptions).where(eq2(tenantSubscriptions.tenantId, tenant.id));
+  const subs = await db.select().from(tenantSubscriptions).where((0, import_drizzle_orm2.eq)(tenantSubscriptions.tenantId, tenant.id));
   const activeSub = subs.find((s) => s.status === "active");
   let subId;
   if (activeSub) {
     subId = activeSub.id;
   } else {
-    const endDate = addYears(/* @__PURE__ */ new Date(), 2);
+    const endDate = (0, import_date_fns.addYears)(/* @__PURE__ */ new Date(), 2);
     const [newSub] = await db.insert(tenantSubscriptions).values({
       tenantId: tenant.id,
       planType: "yearly",
@@ -2885,7 +2897,7 @@ async function seedPizzaLemon() {
     subId = newSub.id;
   }
   if (!isAlreadySeeded) {
-    const endDate = addYears(/* @__PURE__ */ new Date(), 2);
+    const endDate = (0, import_date_fns.addYears)(/* @__PURE__ */ new Date(), 2);
     await db.insert(licenseKeys).values({
       licenseKey: LICENSE_KEY,
       tenantId: tenant.id,
@@ -2898,7 +2910,7 @@ async function seedPizzaLemon() {
     });
     console.log(`[PIZZA LEMON] License key added: ${LICENSE_KEY}`);
   }
-  let tenantBranches = await db.select().from(branches).where(eq2(branches.tenantId, tenant.id));
+  let tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm2.eq)(branches.tenantId, tenant.id));
   let branchId;
   if (tenantBranches.length > 0) {
     branchId = tenantBranches[0].id;
@@ -2921,7 +2933,7 @@ async function seedPizzaLemon() {
     }
     console.log(`[PIZZA LEMON] Created branch, warehouse, 8 tables.`);
   }
-  const existingEmps = await db.select().from(employees).where(eq2(employees.branchId, branchId));
+  const existingEmps = await db.select().from(employees).where((0, import_drizzle_orm2.eq)(employees.branchId, branchId));
   const hasAdmin = existingEmps.some((e) => e.role === "admin" && e.pin === "1234");
   const hasCashier = existingEmps.some((e) => e.role === "cashier" && e.pin === "5678");
   if (!hasAdmin) {
@@ -2931,7 +2943,7 @@ async function seedPizzaLemon() {
     await db.insert(employees).values({ name: "Cashier", email: "cashier@pizzalemon.ch", pin: "5678", role: "cashier", branchId, isActive: true });
   }
   const isProductionEnv = process.env.NODE_ENV === "production";
-  const existingProds = await db.select().from(products).where(eq2(products.tenantId, tenant.id));
+  const existingProds = await db.select().from(products).where((0, import_drizzle_orm2.eq)(products.tenantId, tenant.id));
   if (existingProds.length > 0 && !isProductionEnv) {
     console.log(`[PIZZA LEMON] Dev mode: ${existingProds.length} products already exist \u2014 skipping catalog reset to protect shared DB.`);
     return;
@@ -2939,22 +2951,22 @@ async function seedPizzaLemon() {
   if (existingProds.length > 0) {
     console.log(`[PIZZA LEMON] Deleting ${existingProds.length} existing products and re-inserting updated catalog...`);
     const prodIds = existingProds.map((p) => p.id);
-    await db.delete(inventory).where(inArray(inventory.productId, prodIds));
-    await db.delete(products).where(eq2(products.tenantId, tenant.id));
+    await db.delete(inventory).where((0, import_drizzle_orm2.inArray)(inventory.productId, prodIds));
+    await db.delete(products).where((0, import_drizzle_orm2.eq)(products.tenantId, tenant.id));
   } else {
     console.log("[PIZZA LEMON] Creating fresh product catalog...");
   }
-  const allCats = await db.select({ id: categories.id, name: categories.name }).from(categories).where(eq2(categories.tenantId, tenant.id));
+  const allCats = await db.select({ id: categories.id, name: categories.name }).from(categories).where((0, import_drizzle_orm2.eq)(categories.tenantId, tenant.id));
   const catMap = {};
   for (const c of allCats) catMap[c.name] = c.id;
   if (catMap["Softgetr\xE4nke"] && !catMap["Getr\xE4nke"]) {
-    await db.update(categories).set({ name: "Getr\xE4nke" }).where(eq2(categories.id, catMap["Softgetr\xE4nke"]));
+    await db.update(categories).set({ name: "Getr\xE4nke" }).where((0, import_drizzle_orm2.eq)(categories.id, catMap["Softgetr\xE4nke"]));
     catMap["Getr\xE4nke"] = catMap["Softgetr\xE4nke"];
     delete catMap["Softgetr\xE4nke"];
     console.log("[PIZZA LEMON] Renamed category Softgetr\xE4nke \u2192 Getr\xE4nke");
   }
   if (catMap["Tabakwaren"] && !catMap["Extra"]) {
-    await db.update(categories).set({ name: "Extra", icon: "add-circle" }).where(eq2(categories.id, catMap["Tabakwaren"]));
+    await db.update(categories).set({ name: "Extra", icon: "add-circle" }).where((0, import_drizzle_orm2.eq)(categories.id, catMap["Tabakwaren"]));
     catMap["Extra"] = catMap["Tabakwaren"];
     delete catMap["Tabakwaren"];
     console.log("[PIZZA LEMON] Renamed category Tabakwaren \u2192 Extra");
@@ -2976,7 +2988,7 @@ async function seedPizzaLemon() {
         sortOrder: cat.sortOrder,
         color: cat.color,
         icon: cat.icon
-      }).where(eq2(categories.id, catMap[cat.name]));
+      }).where((0, import_drizzle_orm2.eq)(categories.id, catMap[cat.name]));
     }
   }
   let idx = 0;
@@ -3062,7 +3074,7 @@ async function seedPizzaLemon() {
   for (const p of EXTRAS) await insertItem("Extra", p);
   const total = PIZZAS.length + CALZONES.length + PIDE.length + LAHMACUN.length + TELLERGERICHTE.length + FINGERFOOD.length + SALATE.length + DESSERTS.length + GETRAENKE.length + BIER.length + ALKOHOL.length + EXTRAS.length;
   console.log(`[PIZZA LEMON] \u2713 ${total} products inserted with updated images (v4) and prices.`);
-  const [existingConfig] = await db.select().from(landingPageConfig).where(eq2(landingPageConfig.tenantId, tenant.id));
+  const [existingConfig] = await db.select().from(landingPageConfig).where((0, import_drizzle_orm2.eq)(landingPageConfig.tenantId, tenant.id));
   const heroImage = IMG("pizzalemon_hero.png");
   if (!existingConfig) {
     await db.insert(landingPageConfig).values({
@@ -3103,7 +3115,7 @@ async function seedPizzaLemon() {
       openingHours: "Mo\u2013So: 10:00\u201323:00 | Lieferzeiten: 11:00\u201323:00",
       address: existingConfig.address || "Birchstrasse 120, CH-8050 Z\xFCrich-Oerlikon",
       deliveryRadius: "Zone 1 (ab 20.-): Affoltern, Seebach, Oerlikon | Zone 2 (ab 30.-): Kloten, Wallisellen | Zone 3 (ab 40.-): Regensdorf"
-    }).where(eq2(landingPageConfig.tenantId, tenant.id));
+    }).where((0, import_drizzle_orm2.eq)(landingPageConfig.tenantId, tenant.id));
     console.log("[PIZZA LEMON] Landing page config updated.");
   }
   await db.insert(tenantNotifications).values({
@@ -3113,7 +3125,7 @@ async function seedPizzaLemon() {
     message: `+M\xF6venpick Glace Erdbeer/Schokolade/Vanille/Caramel (je einzeln), Bilder f\xFCr Wunschpide+Extra Kebap hinzugef\xFCgt. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
     priority: "high"
   }).onConflictDoNothing();
-  const existingVehicles = await db.select().from(vehicles).where(eq2(vehicles.tenantId, tenant.id));
+  const existingVehicles = await db.select().from(vehicles).where((0, import_drizzle_orm2.eq)(vehicles.tenantId, tenant.id));
   if (existingVehicles.length === 0) {
     await db.insert(vehicles).values([
       { tenantId: tenant.id, branchId: null, licensePlate: "ZH 123456", make: "Mercedes", model: "Vito", color: "Wei\xDF", driverName: "Ahmed Ali", driverPhone: "+41791234567", isActive: true },
@@ -3129,12 +3141,15 @@ async function seedPizzaLemon() {
   console.log(`[PIZZA LEMON]    Admin PIN: 1234  |  Cashier PIN: 5678`);
   console.log(`[PIZZA LEMON]    Menu: 35 Pizza, 3 Calzone, 10 Pide, 2 Lahmacun, 13 Tellergerichte, 24 Fingerfood, 8 Salat, 9 Dessert, 9 Getr\xE4nke, 1 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
 }
-var STORE_EMAIL, STORE_PASSWORD, LICENSE_KEY, BUSINESS_NAME, IMG, PIZZA_LEMON_CATEGORIES, PIZZAS, CALZONES, PIDE, LAHMACUN, TELLERGERICHTE, FINGERFOOD, SALATE, DESSERTS, GETRAENKE, BIER, ALKOHOL, EXTRAS;
+var import_drizzle_orm2, import_bcrypt, import_date_fns, STORE_EMAIL, STORE_PASSWORD, LICENSE_KEY, BUSINESS_NAME, IMG, PIZZA_LEMON_CATEGORIES, PIZZAS, CALZONES, PIDE, LAHMACUN, TELLERGERICHTE, FINGERFOOD, SALATE, DESSERTS, GETRAENKE, BIER, ALKOHOL, EXTRAS;
 var init_seedPizzaLemon = __esm({
-  async "server/seedPizzaLemon.ts"() {
+  "server/seedPizzaLemon.ts"() {
     "use strict";
-    await init_db();
+    init_db();
+    import_drizzle_orm2 = require("drizzle-orm");
     init_schema();
+    import_bcrypt = __toESM(require("bcrypt"));
+    import_date_fns = require("date-fns");
     STORE_EMAIL = "admin@pizzalemon.ch";
     STORE_PASSWORD = "pizzalemon123";
     LICENSE_KEY = "PIZZALEMON-MAIN-2024-LMNA-B001";
@@ -3356,10 +3371,6 @@ var seedAllDemoData_exports = {};
 __export(seedAllDemoData_exports, {
   seedAllDemoData: () => seedAllDemoData
 });
-import { eq as eq3, sql as sql3 } from "drizzle-orm";
-import * as crypto from "crypto";
-import bcrypt2 from "bcrypt";
-import { addDays, addMonths } from "date-fns";
 function rand(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -3371,9 +3382,9 @@ function uuid() {
 }
 async function seedAllDemoData() {
   console.log("[SEED] Starting comprehensive demo data seeding...");
-  const [saCount] = await db.select({ count: sql3`count(*)` }).from(superAdmins);
+  const [saCount] = await db.select({ count: import_drizzle_orm3.sql`count(*)` }).from(superAdmins);
   if (Number(saCount.count) === 0) {
-    const hash3 = await bcrypt2.hash("admin123", 10);
+    const hash3 = await import_bcrypt2.default.hash("admin123", 10);
     await db.insert(superAdmins).values({
       name: "System Admin",
       email: "admin@barmagly.com",
@@ -3383,10 +3394,10 @@ async function seedAllDemoData() {
     });
     console.log("[SEED] Created super admin: admin@barmagly.com / admin123");
   }
-  const [tenantCount] = await db.select({ count: sql3`count(*)` }).from(tenants);
+  const [tenantCount] = await db.select({ count: import_drizzle_orm3.sql`count(*)` }).from(tenants);
   if (Number(tenantCount.count) < 3) {
     for (const store of DEMO_STORES) {
-      const hash3 = await bcrypt2.hash("store123", 10);
+      const hash3 = await import_bcrypt2.default.hash("store123", 10);
       const [tenant] = await db.insert(tenants).values({
         businessName: store.biz,
         ownerName: store.owner,
@@ -3397,7 +3408,7 @@ async function seedAllDemoData() {
         maxBranches: 5,
         maxEmployees: 20
       }).returning();
-      const endDate = addMonths(/* @__PURE__ */ new Date(), 12);
+      const endDate = (0, import_date_fns2.addMonths)(/* @__PURE__ */ new Date(), 12);
       const [sub] = await db.insert(tenantSubscriptions).values({
         tenantId: tenant.id,
         planType: pick(["monthly", "yearly", "trial"]),
@@ -3445,7 +3456,7 @@ async function seedAllDemoData() {
       }
     }
     const currentCategories = await db.select().from(categories);
-    let tenantBranches = await db.select().from(branches).where(eq3(branches.tenantId, t.id));
+    let tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm3.eq)(branches.tenantId, t.id));
     if (tenantBranches.length === 0) {
       const branchNames = ["Main Branch", "Downtown Branch", "Mall Branch"];
       for (let i = 0; i < rand(1, 3); i++) {
@@ -3461,12 +3472,12 @@ async function seedAllDemoData() {
           taxRate: "5.00"
         });
       }
-      tenantBranches = await db.select().from(branches).where(eq3(branches.tenantId, t.id));
+      tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm3.eq)(branches.tenantId, t.id));
     }
     const branchIds = tenantBranches.map((b) => b.id);
     if (branchIds.length === 0) continue;
     for (const bId of branchIds) {
-      const [existingWH] = await db.select().from(warehouses).where(eq3(warehouses.branchId, bId)).limit(1);
+      const [existingWH] = await db.select().from(warehouses).where((0, import_drizzle_orm3.eq)(warehouses.branchId, bId)).limit(1);
       if (!existingWH) {
         await db.insert(warehouses).values({
           name: `Warehouse - Branch ${bId}`,
@@ -3476,7 +3487,7 @@ async function seedAllDemoData() {
         });
       }
     }
-    let tenantEmployees = await db.select().from(employees).where(sql3`${employees.branchId} IN (${sql3.join(branchIds, sql3`, `)})`);
+    let tenantEmployees = await db.select().from(employees).where(import_drizzle_orm3.sql`${employees.branchId} IN (${import_drizzle_orm3.sql.join(branchIds, import_drizzle_orm3.sql`, `)})`);
     if (tenantEmployees.length === 0) {
       const roles = ["admin", "manager", "cashier", "cashier"];
       const empNames = ["Ahmed Manager", "Fatima Cashier", "Omar Staff", "Sara Admin"];
@@ -3493,10 +3504,10 @@ async function seedAllDemoData() {
           commissionRate: "2.50"
         });
       }
-      tenantEmployees = await db.select().from(employees).where(sql3`${employees.branchId} IN (${sql3.join(branchIds, sql3`, `)})`);
+      tenantEmployees = await db.select().from(employees).where(import_drizzle_orm3.sql`${employees.branchId} IN (${import_drizzle_orm3.sql.join(branchIds, import_drizzle_orm3.sql`, `)})`);
     }
     const employeeIds = tenantEmployees.map((e) => e.id);
-    let tenantProducts = await db.select().from(products).where(eq3(products.tenantId, t.id));
+    let tenantProducts = await db.select().from(products).where((0, import_drizzle_orm3.eq)(products.tenantId, t.id));
     if (tenantProducts.length === 0) {
       for (const cat of currentCategories) {
         const prods = PRODUCT_NAMES[cat.name] || [];
@@ -3517,12 +3528,12 @@ async function seedAllDemoData() {
           });
         }
       }
-      tenantProducts = await db.select().from(products).where(eq3(products.tenantId, t.id));
+      tenantProducts = await db.select().from(products).where((0, import_drizzle_orm3.eq)(products.tenantId, t.id));
     }
     const productIds = tenantProducts.map((p) => p.id);
     for (const pId of productIds) {
       for (const bId of branchIds) {
-        const [existingInv] = await db.select().from(inventory).where(sql3`${inventory.productId} = ${pId} AND ${inventory.branchId} = ${bId}`);
+        const [existingInv] = await db.select().from(inventory).where(import_drizzle_orm3.sql`${inventory.productId} = ${pId} AND ${inventory.branchId} = ${bId}`);
         if (!existingInv) {
           await db.insert(inventory).values({
             productId: pId,
@@ -3535,7 +3546,7 @@ async function seedAllDemoData() {
         }
       }
     }
-    const [custCount] = await db.select({ count: sql3`count(*)` }).from(customers);
+    const [custCount] = await db.select({ count: import_drizzle_orm3.sql`count(*)` }).from(customers);
     if (Number(custCount.count) < 10) {
       for (const cust of CUSTOMER_NAMES) {
         await db.insert(customers).values({
@@ -3550,7 +3561,7 @@ async function seedAllDemoData() {
       }
     }
     const customerIds = (await db.select().from(customers)).map((c) => c.id);
-    const [supCount] = await db.select({ count: sql3`count(*)` }).from(suppliers);
+    const [supCount] = await db.select({ count: import_drizzle_orm3.sql`count(*)` }).from(suppliers);
     if (Number(supCount.count) < 5) {
       for (const sup of SUPPLIER_NAMES) {
         await db.insert(suppliers).values({
@@ -3563,7 +3574,7 @@ async function seedAllDemoData() {
       }
     }
     const supplierIds = (await db.select().from(suppliers)).map((s) => s.id);
-    const [saleCount] = await db.select({ count: sql3`count(*)` }).from(sales).where(sql3`${sales.branchId} IN (${sql3.join(branchIds, sql3`, `)})`);
+    const [saleCount] = await db.select({ count: import_drizzle_orm3.sql`count(*)` }).from(sales).where(import_drizzle_orm3.sql`${sales.branchId} IN (${import_drizzle_orm3.sql.join(branchIds, import_drizzle_orm3.sql`, `)})`);
     if (Number(saleCount.count) < 10) {
       for (let i = 0; i < rand(5, 15); i++) {
         const bId = pick(branchIds);
@@ -3586,7 +3597,7 @@ async function seedAllDemoData() {
           paymentMethod: pick(["cash", "card", "mobile"]),
           paymentStatus: "completed",
           status: "completed",
-          createdAt: addDays(/* @__PURE__ */ new Date(), -rand(0, 30))
+          createdAt: (0, import_date_fns2.addDays)(/* @__PURE__ */ new Date(), -rand(0, 30))
         }).returning();
         await db.insert(saleItems).values({
           saleId: sale.id,
@@ -3633,13 +3644,13 @@ async function seedAllDemoData() {
       }
     }
     for (const eId of employeeIds) {
-      const [existingShift] = await db.select().from(shifts).where(eq3(shifts.employeeId, eId)).limit(1);
+      const [existingShift] = await db.select().from(shifts).where((0, import_drizzle_orm3.eq)(shifts.employeeId, eId)).limit(1);
       if (!existingShift) {
         const bId = pick(branchIds);
         const [shift] = await db.insert(shifts).values({
           employeeId: eId,
           branchId: bId,
-          startTime: addDays(/* @__PURE__ */ new Date(), -1),
+          startTime: (0, import_date_fns2.addDays)(/* @__PURE__ */ new Date(), -1),
           endTime: /* @__PURE__ */ new Date(),
           openingCash: "500.00",
           closingCash: "1200.00",
@@ -3657,7 +3668,7 @@ async function seedAllDemoData() {
       }
     }
     for (const bId of branchIds) {
-      const [existingTable] = await db.select().from(tables).where(eq3(tables.branchId, bId)).limit(1);
+      const [existingTable] = await db.select().from(tables).where((0, import_drizzle_orm3.eq)(tables.branchId, bId)).limit(1);
       if (!existingTable) {
         for (let i = 1; i <= 5; i++) {
           await db.insert(tables).values({
@@ -3669,7 +3680,7 @@ async function seedAllDemoData() {
         }
       }
     }
-    const [expCount] = await db.select({ count: sql3`count(*)` }).from(expenses).where(sql3`${expenses.branchId} IN (${sql3.join(branchIds, sql3`, `)})`);
+    const [expCount] = await db.select({ count: import_drizzle_orm3.sql`count(*)` }).from(expenses).where(import_drizzle_orm3.sql`${expenses.branchId} IN (${import_drizzle_orm3.sql.join(branchIds, import_drizzle_orm3.sql`, `)})`);
     if (Number(expCount.count) < 3) {
       for (let i = 0; i < 3; i++) {
         await db.insert(expenses).values({
@@ -3677,13 +3688,13 @@ async function seedAllDemoData() {
           category: pick(["Rent", "Utilities", "Supplies"]),
           amount: String(rand(100, 500)),
           description: "Demo expense",
-          date: addDays(/* @__PURE__ */ new Date(), -rand(0, 30)),
+          date: (0, import_date_fns2.addDays)(/* @__PURE__ */ new Date(), -rand(0, 30)),
           employeeId: pick(employeeIds)
         });
       }
     }
     for (const pId of productIds) {
-      const [existingBatch] = await db.select().from(productBatches).where(eq3(productBatches.productId, pId)).limit(1);
+      const [existingBatch] = await db.select().from(productBatches).where((0, import_drizzle_orm3.eq)(productBatches.productId, pId)).limit(1);
       if (!existingBatch) {
         const bId = pick(branchIds);
         await db.insert(productBatches).values({
@@ -3707,7 +3718,7 @@ async function seedAllDemoData() {
       }
     }
     for (const bId of branchIds) {
-      const [existingSC] = await db.select().from(stockCounts).where(eq3(stockCounts.branchId, bId)).limit(1);
+      const [existingSC] = await db.select().from(stockCounts).where((0, import_drizzle_orm3.eq)(stockCounts.branchId, bId)).limit(1);
       if (!existingSC) {
         const [sc] = await db.insert(stockCounts).values({
           branchId: bId,
@@ -3745,12 +3756,16 @@ async function seedAllDemoData() {
   }
   console.log("[SEED] \u2705 All demo data seeded successfully!");
 }
-var DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
+var import_drizzle_orm3, crypto, import_bcrypt2, import_date_fns2, DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
 var init_seedAllDemoData = __esm({
-  async "server/seedAllDemoData.ts"() {
+  "server/seedAllDemoData.ts"() {
     "use strict";
-    await init_db();
+    init_db();
+    import_drizzle_orm3 = require("drizzle-orm");
     init_schema();
+    crypto = __toESM(require("crypto"));
+    import_bcrypt2 = __toESM(require("bcrypt"));
+    import_date_fns2 = require("date-fns");
     DEMO_STORES = [
       { biz: "Glow Beauty Salon", owner: "Sara Ahmed", email: "sara@glow.com", phone: "+201001234567" },
       { biz: "The Gentlemen's Barber", owner: "Mohamed Ali", email: "mohamed@barber.com", phone: "+201009876543" },
@@ -3819,21 +3834,21 @@ var init_seedAllDemoData = __esm({
 });
 
 // server/index.ts
-import express from "express";
+var import_express = __toESM(require("express"));
 
 // server/routes.ts
-await init_storage();
-import { createServer } from "node:http";
-import * as xlsx from "xlsx";
-import path2 from "node:path";
-import fs3 from "node:fs";
-import { randomUUID as randomUUID3 } from "node:crypto";
+var import_node_http = require("node:http");
+var xlsx = __toESM(require("xlsx"));
+var import_node_path = __toESM(require("node:path"));
+var import_node_fs = __toESM(require("node:fs"));
+var import_node_crypto = require("node:crypto");
+init_storage();
 
 // server/objectStorage.ts
-import { Storage } from "@google-cloud/storage";
-import { randomUUID } from "crypto";
+var import_storage = require("@google-cloud/storage");
+var import_crypto = require("crypto");
 var REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
-var objectStorageClient = new Storage({
+var objectStorageClient = new import_storage.Storage({
   credentials: {
     audience: "replit",
     subject_token_type: "access_token",
@@ -3917,7 +3932,7 @@ var ObjectStorageService = class {
   }
   async getObjectEntityUploadURL() {
     const privateObjectDir = this.getPrivateObjectDir();
-    const objectId = randomUUID();
+    const objectId = (0, import_crypto.randomUUID)();
     const fullPath = `${privateObjectDir}/uploads/${objectId}`;
     const { bucketName, objectName } = parseObjectPath(fullPath);
     return signObjectURL({ bucketName, objectName, method: "PUT", ttlSec: 900 });
@@ -3978,11 +3993,11 @@ async function signObjectURL({ bucketName, objectName, method, ttlSec }) {
 }
 
 // server/callerIdService.ts
+var import_events = require("events");
+var import_ws = require("ws");
 init_phoneUtils();
-import { EventEmitter } from "events";
-import { WebSocketServer, WebSocket } from "ws";
 var SLOT_EXPIRY_MS = 5 * 60 * 1e3;
-var CallerIDService = class extends EventEmitter {
+var CallerIDService = class extends import_events.EventEmitter {
   wss = null;
   isSimulation = true;
   // Key: "tenantId-slot"
@@ -4001,7 +4016,7 @@ var CallerIDService = class extends EventEmitter {
    */
   async init(server) {
     console.log("[CallerID] Initializing Service...");
-    this.wss = new WebSocketServer({ server, path: "/api/ws/caller-id" });
+    this.wss = new import_ws.WebSocketServer({ server, path: "/api/ws/caller-id" });
     this.wss.on("connection", (ws) => {
       console.log("[CallerID] Client connected to WebSocket");
       ws.send(JSON.stringify({ type: "connected", status: "ready", mode: this.isSimulation ? "simulation" : "hardware" }));
@@ -4028,7 +4043,7 @@ var CallerIDService = class extends EventEmitter {
               const key = `${tenantId}-${slot}`;
               const call = this.activeCallSlots.get(key);
               if (call?.dbCallId) {
-                init_storage().then(() => storage_exports).then(({ storage: storage2 }) => {
+                Promise.resolve().then(() => (init_storage(), storage_exports)).then(({ storage: storage2 }) => {
                   storage2.updateCall(call.dbCallId, { status: "answered" }).catch(() => {
                   });
                 });
@@ -4060,11 +4075,11 @@ var CallerIDService = class extends EventEmitter {
     let resolvedTenantId = tenantId || null;
     if (this.wss && resolvedTenantId) {
       const hasClientForTenant = Array.from(this.wss.clients).some(
-        (c) => c.readyState === WebSocket.OPEN && c.tenantId === resolvedTenantId
+        (c) => c.readyState === import_ws.WebSocket.OPEN && c.tenantId === resolvedTenantId
       );
       if (!hasClientForTenant) {
         const firstRegistered = Array.from(this.wss.clients).find(
-          (c) => c.readyState === WebSocket.OPEN && c.tenantId
+          (c) => c.readyState === import_ws.WebSocket.OPEN && c.tenantId
         );
         if (firstRegistered?.tenantId) {
           console.log(`[CallerID] Bridge tenantId=${resolvedTenantId} has no clients. Remapping to tenant=${firstRegistered.tenantId}`);
@@ -4124,7 +4139,7 @@ var CallerIDService = class extends EventEmitter {
     }, SLOT_EXPIRY_MS);
     this.slotTimeouts.set(key, timeout);
     try {
-      const { storage: storage2 } = await init_storage().then(() => storage_exports);
+      const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
       const customers2 = await storage2.findCustomerByPhone(normalized, resolvedTenantId);
       if (customers2 && customers2.length > 0) {
         callInfo.customer = customers2[0];
@@ -4134,7 +4149,7 @@ var CallerIDService = class extends EventEmitter {
       console.error("[CallerID] Customer lookup error:", e);
     }
     try {
-      const { storage: storage2 } = await init_storage().then(() => storage_exports);
+      const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
       const dbCall = await storage2.createCall({
         tenantId: resolvedTenantId,
         phoneNumber,
@@ -4166,7 +4181,7 @@ var CallerIDService = class extends EventEmitter {
     let total = 0, matched = 0;
     const allOpen = [];
     this.wss.clients.forEach((client2) => {
-      if (client2.readyState === WebSocket.OPEN) {
+      if (client2.readyState === import_ws.WebSocket.OPEN) {
         total++;
         allOpen.push(client2);
         if (!tenantId || !client2.tenantId || client2.tenantId === tenantId) {
@@ -4217,11 +4232,11 @@ var CallerIDService = class extends EventEmitter {
 var callerIdService = new CallerIDService();
 
 // server/pushService.ts
-import webpush from "web-push";
+var import_web_push = __toESM(require("web-push"));
 var VAPID_PUBLIC = "BN_VRMNof7tvLBE3u4-dJdq7ZBSOHUqrexcuD2Tf81rQe4t1GSkbUNzRGU9DyoXObqFwUa2ef1w4AWhteWalk08";
 var VAPID_PRIVATE = "SYAn5KRDjhIDKcIb7WJr3kgr_LDsLKQYWEIHmcgfnjY";
 var VAPID_EMAIL = "mailto:admin@barmagly.tech";
-webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
+import_web_push.default.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
 var subscriptions2 = /* @__PURE__ */ new Map();
 var pushService = {
   /** Public VAPID key for the browser to use when subscribing */
@@ -4248,7 +4263,7 @@ var pushService = {
     await Promise.allSettled(
       recipients.map(async (record) => {
         try {
-          await webpush.sendNotification(record.sub, msg);
+          await import_web_push.default.sendNotification(record.sub, msg);
         } catch (err) {
           if (err.statusCode === 410 || err.statusCode === 404) {
             failed.push(record.sub.endpoint);
@@ -4285,11 +4300,11 @@ var pushService = {
 };
 
 // server/superAdminAuth.ts
-await init_storage();
-import jwt from "jsonwebtoken";
+var import_jsonwebtoken = __toESM(require("jsonwebtoken"));
+init_storage();
 var JWT_SECRET = process.env.JWT_SECRET || "barmagly-super-admin-secret-key-2024";
 function generateToken(adminId, email, role) {
-  return jwt.sign({ id: adminId, email, role }, JWT_SECRET, { expiresIn: "24h" });
+  return import_jsonwebtoken.default.sign({ id: adminId, email, role }, JWT_SECRET, { expiresIn: "24h" });
 }
 var requireSuperAdmin = async (req, res, next) => {
   try {
@@ -4298,7 +4313,7 @@ var requireSuperAdmin = async (req, res, next) => {
       return res.status(401).json({ error: "Unauthorized: Missing or invalid token" });
     }
     const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = import_jsonwebtoken.default.verify(token, JWT_SECRET);
     const admin = await storage.getSuperAdmin(decoded.id);
     if (!admin || !admin.isActive) {
       return res.status(401).json({ error: "Unauthorized: Admin account disabled or not found" });
@@ -4315,7 +4330,7 @@ var requireSuperAdmin = async (req, res, next) => {
 };
 
 // server/stripeClient.ts
-import Stripe from "stripe";
+var import_stripe = __toESM(require("stripe"));
 var connectionSettings;
 async function getCredentials() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
@@ -4355,7 +4370,7 @@ async function getCredentials() {
 }
 async function getUncachableStripeClient() {
   const { secretKey } = await getCredentials();
-  return new Stripe(secretKey, {
+  return new import_stripe.default(secretKey, {
     apiVersion: "2025-08-27.basil"
   });
 }
@@ -4384,13 +4399,13 @@ async function getStripeSync() {
 }
 
 // server/emailService.ts
-import nodemailer from "nodemailer";
+var import_nodemailer = __toESM(require("nodemailer"));
 var SMTP_HOST = process.env.SMTP_HOST || "smtp.hostinger.com";
 var SMTP_PORT = parseInt(process.env.SMTP_PORT || "465");
 var SMTP_USER = process.env.SMTP_USER || "info@barmagly.tech";
 var SMTP_PASS = process.env.SMTP_PASS || "Khaled312001*Khaled312001*";
 var FROM_NAME = "Barmagly POS";
-var transporter = nodemailer.createTransport({
+var transporter = import_nodemailer.default.createTransport({
   host: SMTP_HOST,
   port: SMTP_PORT,
   secure: true,
@@ -4533,9 +4548,9 @@ Questions? Email us at info@barmagly.tech`
 }
 
 // server/whatsappService.ts
-import os from "os";
-import path from "path";
-import fs2 from "fs";
+var import_os = __toESM(require("os"));
+var import_path = __toESM(require("path"));
+var import_fs = __toESM(require("fs"));
 var wppconnect = null;
 async function loadWppConnect() {
   if (!wppconnect) {
@@ -4552,9 +4567,9 @@ async function loadWppConnect() {
   return wppconnect;
 }
 var SESSION_NAME = "barmagly-pos";
-var STORAGE_DIR = path.resolve(process.cwd(), ".wppconnect");
-var CHROME_DATA_DIR = path.join(STORAGE_DIR, "chrome-data");
-var TOKEN_DIR = path.join(STORAGE_DIR, "tokens");
+var STORAGE_DIR = import_path.default.resolve(process.cwd(), ".wppconnect");
+var CHROME_DATA_DIR = import_path.default.join(STORAGE_DIR, "chrome-data");
+var TOKEN_DIR = import_path.default.join(STORAGE_DIR, "tokens");
 var client = null;
 var clientReady = false;
 var status = "disconnected";
@@ -4587,7 +4602,7 @@ function toChatId(phone) {
 async function cleanupProcesses() {
   try {
     const { execSync } = await import("child_process");
-    const isWindows = os.platform() === "win32";
+    const isWindows = import_os.default.platform() === "win32";
     if (isWindows) {
       execSync(`wmic process where "name='chrome.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: "ignore" });
       execSync(`wmic process where "name='chromium.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: "ignore" });
@@ -4601,13 +4616,13 @@ async function cleanupProcesses() {
   } catch {
   }
   try {
-    if (fs2.existsSync(CHROME_DATA_DIR)) {
-      fs2.rmSync(CHROME_DATA_DIR, { recursive: true, force: true });
+    if (import_fs.default.existsSync(CHROME_DATA_DIR)) {
+      import_fs.default.rmSync(CHROME_DATA_DIR, { recursive: true, force: true });
     }
   } catch {
   }
-  fs2.mkdirSync(CHROME_DATA_DIR, { recursive: true });
-  if (!fs2.existsSync(TOKEN_DIR)) fs2.mkdirSync(TOKEN_DIR, { recursive: true });
+  import_fs.default.mkdirSync(CHROME_DATA_DIR, { recursive: true });
+  if (!import_fs.default.existsSync(TOKEN_DIR)) import_fs.default.mkdirSync(TOKEN_DIR, { recursive: true });
 }
 async function isClientAlive() {
   if (!client) return false;
@@ -4662,9 +4677,9 @@ function scheduleAutoReconnect() {
       }
       try {
         const fsMod = await import("fs");
-        const lockFile = path.join(CHROME_DATA_DIR, "SingletonLock");
+        const lockFile = import_path.default.join(CHROME_DATA_DIR, "SingletonLock");
         if (fsMod.existsSync(lockFile)) fsMod.unlinkSync(lockFile);
-        const cookieLock = path.join(CHROME_DATA_DIR, "Default", "Cookies-journal");
+        const cookieLock = import_path.default.join(CHROME_DATA_DIR, "Default", "Cookies-journal");
         if (fsMod.existsSync(cookieLock)) fsMod.unlinkSync(cookieLock);
       } catch {
       }
@@ -4700,7 +4715,7 @@ async function _connectBackground(wpp) {
       browserPath = envChrome;
       log(`Using env override: ${browserPath}`);
     }
-    const isWindows = os.platform() === "win32";
+    const isWindows = import_os.default.platform() === "win32";
     if (!browserPath && !isWindows) {
       try {
         const found = execSync(
@@ -4726,7 +4741,7 @@ async function _connectBackground(wpp) {
       }
     }
     if (!browserPath && isWindows) {
-      const username = os.userInfo().username;
+      const username = import_os.default.userInfo().username;
       const windowsPaths = [
         "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
         "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
@@ -5056,10 +5071,10 @@ ${text2}`;
 };
 
 // server/routes.ts
-import * as bcrypt3 from "bcrypt";
-import * as crypto2 from "crypto";
-import { addDays as addDays2, addMonths as addMonths2, addYears as addYears2 } from "date-fns";
-import { OAuth2Client } from "google-auth-library";
+var bcrypt3 = __toESM(require("bcrypt"));
+var crypto2 = __toESM(require("crypto"));
+var import_date_fns3 = require("date-fns");
+var import_google_auth_library = require("google-auth-library");
 var TIMESTAMP_FIELDS = [
   "createdAt",
   "updatedAt",
@@ -5089,7 +5104,7 @@ function sanitizeDates(data) {
   }
   return result;
 }
-var googleClient = new OAuth2Client("852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com");
+var googleClient = new import_google_auth_library.OAuth2Client("852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com");
 async function registerRoutes(app2) {
   app2.get("/api/store/:slug", async (req, res) => {
     try {
@@ -5102,8 +5117,8 @@ async function registerRoutes(app2) {
       if (!tenant) {
         return res.status(404).send("<h1>Store not found</h1>");
       }
-      const storePath = path2.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
-      let html = fs3.readFileSync(storePath, "utf-8");
+      const storePath = import_node_path.default.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
+      let html = import_node_fs.default.readFileSync(storePath, "utf-8");
       html = html.replace(/\{\{SLUG\}\}/g, slug);
       html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
       html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
@@ -5119,7 +5134,7 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/admin/seed-pizza-lemon", async (_req, res) => {
     try {
-      const { seedPizzaLemon: seedPizzaLemon2 } = await init_seedPizzaLemon().then(() => seedPizzaLemon_exports);
+      const { seedPizzaLemon: seedPizzaLemon2 } = await Promise.resolve().then(() => (init_seedPizzaLemon(), seedPizzaLemon_exports));
       await seedPizzaLemon2();
       res.json({ success: true, message: "Pizza Lemon store seeded (or already existed)." });
     } catch (e) {
@@ -5129,7 +5144,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/admin/check-pizza-lemon", async (_req, res) => {
     try {
-      const { db: db2 } = await init_db().then(() => db_exports);
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { tenants: tenants2, licenseKeys: licenseKeys2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
       const { eq: eq5 } = await import("drizzle-orm");
       const [tenant] = await db2.select().from(tenants2).where(eq5(tenants2.ownerEmail, "admin@pizzalemon.ch"));
@@ -5229,9 +5244,9 @@ async function registerRoutes(app2) {
       const startDate = /* @__PURE__ */ new Date();
       let endDate = /* @__PURE__ */ new Date();
       if (isYearly) {
-        endDate = addYears2(startDate, 1);
+        endDate = (0, import_date_fns3.addYears)(startDate, 1);
       } else {
-        endDate = addMonths2(startDate, 1);
+        endDate = (0, import_date_fns3.addMonths)(startDate, 1);
       }
       const subscription = await storage.createTenantSubscription({
         tenantId: tenant.id,
@@ -5323,7 +5338,7 @@ async function registerRoutes(app2) {
         metadata: { stripeChargeId: paymentIntentId }
       });
       const startDate = /* @__PURE__ */ new Date();
-      const endDate = isYearly ? addYears2(startDate, 1) : addMonths2(startDate, 1);
+      const endDate = isYearly ? (0, import_date_fns3.addYears)(startDate, 1) : (0, import_date_fns3.addMonths)(startDate, 1);
       const subscription = await storage.createTenantSubscription({
         tenantId: tenant.id,
         planType,
@@ -5382,7 +5397,7 @@ async function registerRoutes(app2) {
           metadata: { signupMethod: "google", signupDate: (/* @__PURE__ */ new Date()).toISOString() }
         });
         const startDate = /* @__PURE__ */ new Date();
-        const endDate = addDays2(startDate, 14);
+        const endDate = (0, import_date_fns3.addDays)(startDate, 14);
         const sub = await storage.createTenantSubscription({
           tenantId: tenant.id,
           planType: "trial",
@@ -5461,7 +5476,7 @@ async function registerRoutes(app2) {
       });
       const config = await storage.getLandingPageConfig(tenantId);
       if (!config) {
-        const { db: db2 } = await init_db().then(() => db_exports);
+        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { landingPageConfig: landingConfig } = await Promise.resolve().then(() => (init_schema(), schema_exports));
         await db2.insert(landingConfig).values({
           tenantId,
@@ -5471,7 +5486,7 @@ async function registerRoutes(app2) {
           socialWhatsapp: ownerPhone
         });
       } else {
-        const { db: db2 } = await init_db().then(() => db_exports);
+        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { landingPageConfig: landingConfig } = await Promise.resolve().then(() => (init_schema(), schema_exports));
         const { eq: eq5 } = await import("drizzle-orm");
         await db2.update(landingConfig).set({
@@ -6128,11 +6143,11 @@ async function registerRoutes(app2) {
     try {
       const tenantId = req.body.tenantId ? Number(req.body.tenantId) : void 0;
       if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      const csvPath = __require("path").resolve(process.cwd(), "KUNDEN_ALL_fixed.csv");
-      if (!__require("fs").existsSync(csvPath)) {
+      const csvPath = require("path").resolve(process.cwd(), "KUNDEN_ALL_fixed.csv");
+      if (!require("fs").existsSync(csvPath)) {
         return res.status(404).json({ error: "CSV file not found on server" });
       }
-      const csvContent = __require("fs").readFileSync(csvPath, "utf-8");
+      const csvContent = require("fs").readFileSync(csvPath, "utf-8");
       const lines = csvContent.split("\n");
       const headers = lines[0].replace(/\r$/, "").split(",");
       let imported = 0;
@@ -6755,7 +6770,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/fix-schema-and-seed", async (_req, res) => {
     try {
-      const { db: db2 } = await init_db().then(() => db_exports);
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sql: sql5 } = await import("drizzle-orm");
       console.log("[API-SEED] Fixing schema...");
       const tables2 = ["branches", "products", "employees", "sales", "inventory", "customers", "suppliers"];
@@ -6767,7 +6782,7 @@ async function registerRoutes(app2) {
           console.log(`[API-SEED] Table ${table} skip: ${e.message}`);
         }
       }
-      const { seedAllDemoData: seedAllDemoData2 } = await init_seedAllDemoData().then(() => seedAllDemoData_exports);
+      const { seedAllDemoData: seedAllDemoData2 } = await Promise.resolve().then(() => (init_seedAllDemoData(), seedAllDemoData_exports));
       await seedAllDemoData2();
       res.json({ success: true, message: "Schema fixed and comprehensive demo data seeded." });
     } catch (e) {
@@ -6777,7 +6792,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/force-full-seed", async (_req, res) => {
     try {
-      const { seedAllDemoData: seedAllDemoData2 } = await init_seedAllDemoData().then(() => seedAllDemoData_exports);
+      const { seedAllDemoData: seedAllDemoData2 } = await Promise.resolve().then(() => (init_seedAllDemoData(), seedAllDemoData_exports));
       await seedAllDemoData2();
       res.json({ success: true, message: "Comprehensive demo data seeded successfully" });
     } catch (e) {
@@ -7255,10 +7270,10 @@ async function registerRoutes(app2) {
     }
   });
   app2.get("/objects/*objectPath", async (req, res) => {
-    const uploadsDir = path2.resolve(process.cwd(), "uploads");
+    const uploadsDir = import_node_path.default.resolve(process.cwd(), "uploads");
     const filename = req.path.replace(/^\/objects\//, "");
-    const localPath = path2.join(uploadsDir, filename);
-    if (fs3.existsSync(localPath)) {
+    const localPath = import_node_path.default.join(uploadsDir, filename);
+    if (import_node_fs.default.existsSync(localPath)) {
       return res.sendFile(localPath);
     }
     const objectStorageService = new ObjectStorageService();
@@ -7275,13 +7290,13 @@ async function registerRoutes(app2) {
       if (!imageData) {
         return res.status(400).json({ error: "imageData is required" });
       }
-      const uploadsDir = path2.resolve(process.cwd(), "uploads");
-      if (!fs3.existsSync(uploadsDir)) fs3.mkdirSync(uploadsDir, { recursive: true });
+      const uploadsDir = import_node_path.default.resolve(process.cwd(), "uploads");
+      if (!import_node_fs.default.existsSync(uploadsDir)) import_node_fs.default.mkdirSync(uploadsDir, { recursive: true });
       const ext = (contentType.split("/")[1] || "jpg").split(";")[0];
-      const filename = `${randomUUID3()}.${ext}`;
-      const filePath = path2.join(uploadsDir, filename);
+      const filename = `${(0, import_node_crypto.randomUUID)()}.${ext}`;
+      const filePath = import_node_path.default.join(uploadsDir, filename);
       const buffer = Buffer.from(imageData, "base64");
-      fs3.writeFileSync(filePath, buffer);
+      import_node_fs.default.writeFileSync(filePath, buffer);
       const objectPath = `/objects/${filename}`;
       res.json({ objectPath });
     } catch (error) {
@@ -7866,8 +7881,8 @@ async function test(){
       if (!config || !config.isPublished) {
         return res.status(404).send("<h1>Store not found</h1>");
       }
-      const templatePath = path2.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
-      let html = fs3.readFileSync(templatePath, "utf8");
+      const templatePath = import_node_path.default.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
+      let html = import_node_fs.default.readFileSync(templatePath, "utf8");
       const branches2 = await storage.getBranchesByTenant(config.tenantId);
       const currency = branches2?.[0]?.currency || "CHF";
       html = html.replace(/\{\{SLUG\}\}/g, slug);
@@ -7883,14 +7898,14 @@ async function test(){
       res.status(500).send("<h1>Server error</h1>");
     }
   });
-  const TENANT_BACKUP_DIR = path2.resolve(process.cwd(), "backups");
-  if (!fs3.existsSync(TENANT_BACKUP_DIR)) fs3.mkdirSync(TENANT_BACKUP_DIR, { recursive: true });
+  const TENANT_BACKUP_DIR = import_node_path.default.resolve(process.cwd(), "backups");
+  if (!import_node_fs.default.existsSync(TENANT_BACKUP_DIR)) import_node_fs.default.mkdirSync(TENANT_BACKUP_DIR, { recursive: true });
   app2.get("/api/backup/list", async (req, res) => {
     try {
       const tenantId = req.tenantId;
       if (!tenantId) return res.status(401).json({ error: "Not authorized" });
-      const files = fs3.readdirSync(TENANT_BACKUP_DIR).filter((f) => f.startsWith(`backup_tenant_${tenantId}_`) && f.endsWith(".json")).map((f) => {
-        const stat = fs3.statSync(path2.join(TENANT_BACKUP_DIR, f));
+      const files = import_node_fs.default.readdirSync(TENANT_BACKUP_DIR).filter((f) => f.startsWith(`backup_tenant_${tenantId}_`) && f.endsWith(".json")).map((f) => {
+        const stat = import_node_fs.default.statSync(import_node_path.default.join(TENANT_BACKUP_DIR, f));
         return { filename: f, size: stat.size, createdAt: stat.mtime.toISOString() };
       }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       res.json(files);
@@ -7940,9 +7955,9 @@ async function test(){
         sales: sales2.slice(0, 5e3)
       };
       const filename = `backup_tenant_${tenantId}_${Date.now()}.json`;
-      const filepath = path2.join(TENANT_BACKUP_DIR, filename);
-      fs3.writeFileSync(filepath, JSON.stringify(snapshot));
-      const stat = fs3.statSync(filepath);
+      const filepath = import_node_path.default.join(TENANT_BACKUP_DIR, filename);
+      import_node_fs.default.writeFileSync(filepath, JSON.stringify(snapshot));
+      const stat = import_node_fs.default.statSync(filepath);
       console.log(`[BACKUP] Manual by tenant ${tenantId}: ${filename} (${Math.round(stat.size / 1024)}KB)`);
       res.json({ success: true, filename, size: stat.size, createdAt: stat.mtime.toISOString() });
     } catch (e) {
@@ -7953,13 +7968,13 @@ async function test(){
     try {
       const tenantId = req.tenantId;
       if (!tenantId) return res.status(401).json({ error: "Not authorized" });
-      const filename = path2.basename(req.params.filename);
+      const filename = import_node_path.default.basename(req.params.filename);
       if (!filename.startsWith(`backup_tenant_${tenantId}_`)) {
         return res.status(403).json({ error: "Not authorized to restore this backup" });
       }
-      const filepath = path2.join(TENANT_BACKUP_DIR, filename);
-      if (!fs3.existsSync(filepath)) return res.status(404).json({ error: "Backup not found" });
-      const snapshot = JSON.parse(fs3.readFileSync(filepath, "utf-8"));
+      const filepath = import_node_path.default.join(TENANT_BACKUP_DIR, filename);
+      if (!import_node_fs.default.existsSync(filepath)) return res.status(404).json({ error: "Backup not found" });
+      const snapshot = JSON.parse(import_node_fs.default.readFileSync(filepath, "utf-8"));
       const restored = { branches: 0, categories: 0, products: 0, customers: 0, expenses: 0 };
       if (snapshot.categories?.length) {
         const existingCats = await storage.getCategories(tenantId);
@@ -8017,12 +8032,12 @@ async function test(){
     try {
       const tenantId = req.tenantId;
       if (!tenantId) return res.status(401).json({ error: "Not authorized" });
-      const filename = path2.basename(req.params.filename);
+      const filename = import_node_path.default.basename(req.params.filename);
       if (!filename.startsWith(`backup_tenant_${tenantId}_`)) {
         return res.status(403).json({ error: "Not authorized" });
       }
-      const filepath = path2.join(TENANT_BACKUP_DIR, filename);
-      if (fs3.existsSync(filepath)) fs3.unlinkSync(filepath);
+      const filepath = import_node_path.default.join(TENANT_BACKUP_DIR, filename);
+      if (import_node_fs.default.existsSync(filepath)) import_node_fs.default.unlinkSync(filepath);
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -8163,19 +8178,19 @@ async function test(){
       res.status(500).json({ error: e.message });
     }
   });
-  const httpServer = createServer(app2);
+  const httpServer = (0, import_node_http.createServer)(app2);
   return httpServer;
 }
 
 // server/superAdminRoutes.ts
-await init_storage();
-import * as bcrypt4 from "bcrypt";
-import * as crypto3 from "crypto";
-import * as fs4 from "fs";
-import * as path3 from "path";
-await init_db();
-import { addMonths as addMonths3, addYears as addYears3, addDays as addDays3 } from "date-fns";
-import { eq as eq4, desc as desc2, sql as sql4, and as and2, gte as gte2, lte as lte2 } from "drizzle-orm";
+var bcrypt4 = __toESM(require("bcrypt"));
+var crypto3 = __toESM(require("crypto"));
+var fs4 = __toESM(require("fs"));
+var path3 = __toESM(require("path"));
+init_storage();
+var import_date_fns4 = require("date-fns");
+init_db();
+var import_drizzle_orm4 = require("drizzle-orm");
 var BACKUP_DIR = path3.resolve(process.cwd(), "backups");
 if (!fs4.existsSync(BACKUP_DIR)) fs4.mkdirSync(BACKUP_DIR, { recursive: true });
 async function createTenantBackup(tenantId) {
@@ -8294,23 +8309,23 @@ function registerSuperAdminRoutes(app2) {
   app2.get("/api/super-admin/analytics/overview", requireSuperAdmin, async (_req, res) => {
     try {
       const { tenants: tenants2, tenantSubscriptions: tenantSubscriptions2, licenseKeys: licenseKeys2, branches: branches2, employees: employees2, products: products2, sales: sales2, customers: customers2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const [totalTenants] = await db.select({ count: sql4`count(*)` }).from(tenants2);
-      const [activeTenants] = await db.select({ count: sql4`count(*)` }).from(tenants2).where(eq4(tenants2.status, "active"));
-      const [totalSubs] = await db.select({ count: sql4`count(*)` }).from(tenantSubscriptions2);
-      const [activeSubs] = await db.select({ count: sql4`count(*)` }).from(tenantSubscriptions2).where(eq4(tenantSubscriptions2.status, "active"));
-      const [totalLicenses] = await db.select({ count: sql4`count(*)` }).from(licenseKeys2);
-      const [activeLicenses] = await db.select({ count: sql4`count(*)` }).from(licenseKeys2).where(eq4(licenseKeys2.status, "active"));
-      const [totalBranches] = await db.select({ count: sql4`count(*)` }).from(branches2);
-      const [totalEmployees] = await db.select({ count: sql4`count(*)` }).from(employees2);
-      const [totalProducts] = await db.select({ count: sql4`count(*)` }).from(products2);
-      const [totalSales] = await db.select({ count: sql4`count(*)` }).from(sales2);
-      const [totalCustomers] = await db.select({ count: sql4`count(*)` }).from(customers2);
-      const [revenueRow] = await db.select({ total: sql4`coalesce(sum(cast(price as decimal)), 0)::text` }).from(tenantSubscriptions2).where(eq4(tenantSubscriptions2.status, "active"));
-      const [salesRevenue] = await db.select({ total: sql4`coalesce(sum(cast(total_amount as decimal)), 0)::text` }).from(sales2);
+      const [totalTenants] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(tenants2);
+      const [activeTenants] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(tenants2).where((0, import_drizzle_orm4.eq)(tenants2.status, "active"));
+      const [totalSubs] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(tenantSubscriptions2);
+      const [activeSubs] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(tenantSubscriptions2).where((0, import_drizzle_orm4.eq)(tenantSubscriptions2.status, "active"));
+      const [totalLicenses] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(licenseKeys2);
+      const [activeLicenses] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(licenseKeys2).where((0, import_drizzle_orm4.eq)(licenseKeys2.status, "active"));
+      const [totalBranches] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(branches2);
+      const [totalEmployees] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(employees2);
+      const [totalProducts] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(products2);
+      const [totalSales] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(sales2);
+      const [totalCustomers] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(customers2);
+      const [revenueRow] = await db.select({ total: import_drizzle_orm4.sql`coalesce(sum(cast(price as decimal)), 0)::text` }).from(tenantSubscriptions2).where((0, import_drizzle_orm4.eq)(tenantSubscriptions2.status, "active"));
+      const [salesRevenue] = await db.select({ total: import_drizzle_orm4.sql`coalesce(sum(cast(total_amount as decimal)), 0)::text` }).from(sales2);
       const in7Days = /* @__PURE__ */ new Date();
       in7Days.setDate(in7Days.getDate() + 7);
       const now = /* @__PURE__ */ new Date();
-      const [expiringSubs] = await db.select({ count: sql4`count(*)` }).from(tenantSubscriptions2).where(and2(eq4(tenantSubscriptions2.status, "active"), lte2(tenantSubscriptions2.endDate, in7Days), gte2(tenantSubscriptions2.endDate, now)));
+      const [expiringSubs] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(tenantSubscriptions2).where((0, import_drizzle_orm4.and)((0, import_drizzle_orm4.eq)(tenantSubscriptions2.status, "active"), (0, import_drizzle_orm4.lte)(tenantSubscriptions2.endDate, in7Days), (0, import_drizzle_orm4.gte)(tenantSubscriptions2.endDate, now)));
       res.json({
         totalTenants: Number(totalTenants?.count || 0),
         activeTenants: Number(activeTenants?.count || 0),
@@ -8509,7 +8524,7 @@ function registerSuperAdminRoutes(app2) {
         storeType: storeType || "supermarket"
       });
       const startDate = /* @__PURE__ */ new Date();
-      const endDate = addDays3(startDate, 14);
+      const endDate = (0, import_date_fns4.addDays)(startDate, 14);
       const sub = await storage.createTenantSubscription({
         tenantId: tenant.id,
         planType: "trial",
@@ -8585,9 +8600,9 @@ function registerSuperAdminRoutes(app2) {
       const { tenantId, planType, planName, price, status: status2, autoRenew, paymentMethod } = req.body;
       const startDate = /* @__PURE__ */ new Date();
       let endDate = /* @__PURE__ */ new Date();
-      if (planType === "monthly") endDate = addMonths3(startDate, 1);
-      else if (planType === "yearly") endDate = addYears3(startDate, 1);
-      else endDate = addDays3(startDate, 30);
+      if (planType === "monthly") endDate = (0, import_date_fns4.addMonths)(startDate, 1);
+      else if (planType === "yearly") endDate = (0, import_date_fns4.addYears)(startDate, 1);
+      else endDate = (0, import_date_fns4.addDays)(startDate, 30);
       const sub = await storage.createTenantSubscription({
         tenantId,
         planType: planType || "trial",
@@ -8630,8 +8645,8 @@ function registerSuperAdminRoutes(app2) {
       if (!sub) return res.status(404).json({ error: "Subscription not found" });
       const currentEnd = sub.endDate ? new Date(sub.endDate) : /* @__PURE__ */ new Date();
       let newEnd = currentEnd;
-      if (months) newEnd = addMonths3(currentEnd, months);
-      else if (days) newEnd = addDays3(currentEnd, days);
+      if (months) newEnd = (0, import_date_fns4.addMonths)(currentEnd, months);
+      else if (days) newEnd = (0, import_date_fns4.addDays)(currentEnd, days);
       const updated = await storage.updateTenantSubscription(id, { endDate: newEnd, status: "active" });
       res.json(updated);
     } catch (e) {
@@ -8660,7 +8675,7 @@ function registerSuperAdminRoutes(app2) {
         subscriptionId: subscriptionId || null,
         status: "active",
         maxActivations: maxActivations || 3,
-        expiresAt: expiresAt ? new Date(expiresAt) : addYears3(/* @__PURE__ */ new Date(), 1),
+        expiresAt: expiresAt ? new Date(expiresAt) : (0, import_date_fns4.addYears)(/* @__PURE__ */ new Date(), 1),
         notes: notes || null
       });
       res.json(key);
@@ -8690,7 +8705,7 @@ function registerSuperAdminRoutes(app2) {
     try {
       const id = parseInt(req.params.id);
       const { licenseKeys: licenseKeys2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      await db.delete(licenseKeys2).where(eq4(licenseKeys2.id, id));
+      await db.delete(licenseKeys2).where((0, import_drizzle_orm4.eq)(licenseKeys2.id, id));
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -9078,7 +9093,7 @@ function registerSuperAdminRoutes(app2) {
   app2.get("/api/super-admin/expenses", requireSuperAdmin, async (_req, res) => {
     try {
       const { expenses: expenses2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const rows = await db.select().from(expenses2).orderBy(desc2(expenses2.createdAt)).limit(500);
+      const rows = await db.select().from(expenses2).orderBy((0, import_drizzle_orm4.desc)(expenses2.createdAt)).limit(500);
       res.json(rows);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -9108,7 +9123,7 @@ function registerSuperAdminRoutes(app2) {
   app2.get("/api/super-admin/shifts/all", requireSuperAdmin, async (_req, res) => {
     try {
       const { shifts: shifts2, employees: employees2, branches: branches2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const rows = await db.select().from(shifts2).orderBy(desc2(shifts2.startTime)).limit(200);
+      const rows = await db.select().from(shifts2).orderBy((0, import_drizzle_orm4.desc)(shifts2.startTime)).limit(200);
       res.json(rows);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -9441,8 +9456,8 @@ function registerSuperAdminRoutes(app2) {
 }
 
 // server/tenantAuth.ts
-await init_storage();
-import jwt2 from "jsonwebtoken";
+var import_jsonwebtoken2 = __toESM(require("jsonwebtoken"));
+init_storage();
 var JWT_SECRET2 = process.env.JWT_SECRET || "barmagly-super-admin-secret-key-2024";
 var PUBLIC_ROUTES = [
   "/api/license/validate",
@@ -9504,7 +9519,7 @@ function tenantAuthMiddleware() {
     if (authHeader && authHeader.startsWith("Bearer ")) {
       try {
         const token = authHeader.split(" ")[1];
-        const decoded = jwt2.verify(token, JWT_SECRET2);
+        const decoded = import_jsonwebtoken2.default.verify(token, JWT_SECRET2);
         const admin = await storage.getSuperAdmin(decoded.id);
         if (admin && admin.isActive) {
           const tenantId2 = req.query.tenantId ? Number(req.query.tenantId) : req.body?.tenantId ? Number(req.body.tenantId) : void 0;
@@ -9552,7 +9567,7 @@ function tenantAuthMiddleware() {
 }
 
 // server/index.ts
-import { runMigrations } from "stripe-replit-sync";
+var import_stripe_replit_sync = require("stripe-replit-sync");
 
 // server/webhookHandlers.ts
 var WebhookHandlers = class {
@@ -9568,8 +9583,8 @@ var WebhookHandlers = class {
 };
 
 // server/index.ts
-import * as fs5 from "fs";
-import * as path4 from "path";
+var fs5 = __toESM(require("fs"));
+var path4 = __toESM(require("path"));
 if (process.env.PGHOST && process.env.PGHOST.includes("neon.tech")) {
   const neonUrl = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || "neondb"}?sslmode=require`;
   process.env.DATABASE_URL = neonUrl;
@@ -9582,7 +9597,7 @@ if (process.env.PGHOST && process.env.PGHOST.includes("neon.tech")) {
   }
   process.env.DATABASE_URL = neonUrl;
 }
-var app = express();
+var app = (0, import_express.default)();
 var log2 = console.log;
 app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
@@ -9623,14 +9638,14 @@ function setupCors(app2) {
 }
 function setupBodyParsing(app2) {
   app2.use(
-    express.json({
+    import_express.default.json({
       limit: "10mb",
       verify: (req, _res, buf) => {
         req.rawBody = buf;
       }
     })
   );
-  app2.use(express.urlencoded({ extended: false }));
+  app2.use(import_express.default.urlencoded({ extended: false }));
 }
 function setupRequestLogging(app2) {
   app2.use((req, res, next) => {
@@ -9781,7 +9796,7 @@ function configureExpoAndLanding(app2) {
     if (storeMatch) {
       try {
         const storeParam = storeMatch[1];
-        const { storage: storage2 } = await init_storage().then(() => storage_exports);
+        const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
         let tenantId;
         let slug;
         if (/^\d+$/.test(storeParam)) {
@@ -9828,20 +9843,20 @@ function configureExpoAndLanding(app2) {
     }
     next();
   });
-  app2.use("/assets", express.static(path4.resolve(process.cwd(), "assets")));
-  app2.use("/uploads", express.static(path4.resolve(process.cwd(), "uploads")));
-  app2.use("/objects", express.static(path4.resolve(process.cwd(), "uploads")));
-  app2.use("/sounds", express.static(path4.resolve(process.cwd(), "public", "sounds")));
-  app2.use("/app/assets/images", express.static(path4.resolve(process.cwd(), "assets", "images")));
+  app2.use("/assets", import_express.default.static(path4.resolve(process.cwd(), "assets")));
+  app2.use("/uploads", import_express.default.static(path4.resolve(process.cwd(), "uploads")));
+  app2.use("/objects", import_express.default.static(path4.resolve(process.cwd(), "uploads")));
+  app2.use("/sounds", import_express.default.static(path4.resolve(process.cwd(), "public", "sounds")));
+  app2.use("/app/assets/images", import_express.default.static(path4.resolve(process.cwd(), "assets", "images")));
   const appDistDir = fs5.existsSync(path4.resolve(process.cwd(), "dist", "app")) ? path4.resolve(process.cwd(), "dist", "app") : path4.resolve(process.cwd(), "dist");
-  app2.use("/app", express.static(appDistDir, {
+  app2.use("/app", import_express.default.static(appDistDir, {
     setHeaders(res, filePath) {
       if (filePath.endsWith(".webmanifest")) {
         res.setHeader("Content-Type", "application/manifest+json");
       }
     }
   }));
-  app2.use(express.static(path4.resolve(process.cwd(), "static-build")));
+  app2.use(import_express.default.static(path4.resolve(process.cwd(), "static-build")));
   const staticIndexPath = fs5.existsSync(path4.resolve(process.cwd(), "dist", "app", "index.html")) ? path4.resolve(process.cwd(), "dist", "app", "index.html") : path4.resolve(process.cwd(), "dist", "index.html");
   app2.get("/app/{*splat}", (req, res, next) => {
     if (req.path.includes(".")) {
@@ -9876,7 +9891,7 @@ async function initStripe() {
   }
   try {
     log2("Initializing Stripe schema...");
-    await runMigrations({ databaseUrl });
+    await (0, import_stripe_replit_sync.runMigrations)({ databaseUrl });
     log2("Stripe schema ready");
     let stripeSync2, secretKey;
     try {
@@ -9905,7 +9920,7 @@ async function initStripe() {
 function setupStripeWebhook(app2) {
   app2.post(
     "/api/stripe/webhook",
-    express.raw({ type: "application/json" }),
+    import_express.default.raw({ type: "application/json" }),
     async (req, res) => {
       const signature = req.headers["stripe-signature"];
       if (!signature) {
@@ -10092,7 +10107,7 @@ function setupPaymentGatewayRoutes(app2) {
 }
 (async () => {
   try {
-    const { db: db2 } = await init_db().then(() => db_exports);
+    const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sql: sql5 } = await import("drizzle-orm");
     await db2.execute(sql5.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS language text DEFAULT 'en'`));
   } catch (e) {
@@ -10128,8 +10143,8 @@ function setupPaymentGatewayRoutes(app2) {
   whatsappService.connect().catch((err) => log2("WhatsApp auto-connect error:", err));
   initStripe().catch((err) => log2("Stripe init error (non-fatal):", err));
   try {
-    const { pool } = await init_db().then(() => db_exports);
-    await pool.query(`
+    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    await pool2.query(`
       CREATE TABLE IF NOT EXISTS platform_settings (
         id SERIAL PRIMARY KEY,
         key TEXT NOT NULL UNIQUE,
@@ -10152,13 +10167,13 @@ function setupPaymentGatewayRoutes(app2) {
     log2("Error ensuring platform tables:", err);
   }
   try {
-    const { pool } = await init_db().then(() => db_exports);
-    await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_addon boolean NOT NULL DEFAULT false;`);
-    const callsCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='calls'`);
+    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    await pool2.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_addon boolean NOT NULL DEFAULT false;`);
+    const callsCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='calls'`);
     const callsHasPhone = callsCols.rows.some((r) => r.column_name === "phone_number");
     if (!callsHasPhone) {
-      await pool.query(`DROP TABLE IF EXISTS calls CASCADE;`);
-      await pool.query(`
+      await pool2.query(`DROP TABLE IF EXISTS calls CASCADE;`);
+      await pool2.query(`
         CREATE TABLE calls (
           id serial PRIMARY KEY,
           tenant_id integer,
@@ -10171,18 +10186,18 @@ function setupPaymentGatewayRoutes(app2) {
         );
       `);
     } else {
-      await pool.query(`
+      await pool2.query(`
         ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_tenant_id_fkey;
         ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_branch_id_fkey;
         ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_customer_id_fkey;
         ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_sale_id_fkey;
       `);
     }
-    const vehiclesCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='vehicles'`);
+    const vehiclesCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='vehicles'`);
     const vehiclesHasPlate = vehiclesCols.rows.some((r) => r.column_name === "license_plate");
     if (!vehiclesHasPlate) {
-      await pool.query(`DROP TABLE IF EXISTS vehicles CASCADE;`);
-      await pool.query(`
+      await pool2.query(`DROP TABLE IF EXISTS vehicles CASCADE;`);
+      await pool2.query(`
         CREATE TABLE vehicles (
           id serial PRIMARY KEY,
           tenant_id integer REFERENCES tenants(id) ON DELETE CASCADE,
@@ -10199,11 +10214,11 @@ function setupPaymentGatewayRoutes(app2) {
         );
       `);
     }
-    const printerCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='printer_configs'`);
+    const printerCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='printer_configs'`);
     const printerHasReceiptType = printerCols.rows.some((r) => r.column_name === "receipt_type");
     if (!printerHasReceiptType) {
-      await pool.query(`DROP TABLE IF EXISTS printer_configs CASCADE;`);
-      await pool.query(`
+      await pool2.query(`DROP TABLE IF EXISTS printer_configs CASCADE;`);
+      await pool2.query(`
         CREATE TABLE printer_configs (
           id serial PRIMARY KEY,
           tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -10219,11 +10234,11 @@ function setupPaymentGatewayRoutes(app2) {
         );
       `);
     }
-    const dailyCols = await pool.query(`SELECT column_name, data_type FROM information_schema.columns WHERE table_name='daily_closings'`);
+    const dailyCols = await pool2.query(`SELECT column_name, data_type FROM information_schema.columns WHERE table_name='daily_closings'`);
     const dailyHasBranchId = dailyCols.rows.some((r) => r.column_name === "branch_id");
     if (!dailyHasBranchId) {
-      await pool.query(`DROP TABLE IF EXISTS daily_closings CASCADE;`);
-      await pool.query(`
+      await pool2.query(`DROP TABLE IF EXISTS daily_closings CASCADE;`);
+      await pool2.query(`
         CREATE TABLE daily_closings (
           id serial PRIMARY KEY,
           tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -10245,11 +10260,11 @@ function setupPaymentGatewayRoutes(app2) {
         );
       `);
     }
-    const monthlyCols = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='monthly_closings'`);
+    const monthlyCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='monthly_closings'`);
     const monthlyHasBranchId = monthlyCols.rows.some((r) => r.column_name === "branch_id");
     if (!monthlyHasBranchId) {
-      await pool.query(`DROP TABLE IF EXISTS monthly_closings CASCADE;`);
-      await pool.query(`
+      await pool2.query(`DROP TABLE IF EXISTS monthly_closings CASCADE;`);
+      await pool2.query(`
         CREATE TABLE monthly_closings (
           id serial PRIMARY KEY,
           tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -10271,8 +10286,8 @@ function setupPaymentGatewayRoutes(app2) {
         );
       `);
     }
-    await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL;`);
-    await pool.query(`
+    await pool2.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL;`);
+    await pool2.query(`
       ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL;
       DO $$
       BEGIN
@@ -10288,7 +10303,7 @@ function setupPaymentGatewayRoutes(app2) {
           FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
       END $$;
     `);
-    await pool.query(`
+    await pool2.query(`
       DO $$
       BEGIN
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_product_id_products_id_fk') THEN
@@ -10298,7 +10313,7 @@ function setupPaymentGatewayRoutes(app2) {
           FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
       END $$;
     `);
-    await pool.query(`
+    await pool2.query(`
       DO $$
       BEGIN
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_branch_id_branches_id_fk') THEN
@@ -10308,7 +10323,7 @@ function setupPaymentGatewayRoutes(app2) {
           FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE;
       END $$;
     `);
-    await pool.query(`
+    await pool2.query(`
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS customer_nr integer;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS salutation text;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_name text;
@@ -10336,7 +10351,7 @@ function setupPaymentGatewayRoutes(app2) {
     log2("Schema migration error (non-fatal):", err);
   }
   try {
-    const { storage: storage2 } = await init_storage().then(() => storage_exports);
+    const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
     const adminEmail = "admin@barmagly.com";
     const existingAdmin = await storage2.getSuperAdminByEmail(adminEmail);
     if (!existingAdmin) {
@@ -10353,7 +10368,7 @@ function setupPaymentGatewayRoutes(app2) {
     log2("Error creating super admin:", err);
   }
   try {
-    const { seedPizzaLemon: seedPizzaLemon2 } = await init_seedPizzaLemon().then(() => seedPizzaLemon_exports);
+    const { seedPizzaLemon: seedPizzaLemon2 } = await Promise.resolve().then(() => (init_seedPizzaLemon(), seedPizzaLemon_exports));
     await seedPizzaLemon2();
   } catch (err) {
     log2("Error seeding Pizza Lemon data:", err);
