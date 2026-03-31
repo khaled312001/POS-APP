@@ -11,6 +11,13 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   charset: "utf8mb4",
   connectTimeout: 30000,
+  typeCast(field, next) {
+    if (field.type === "JSON") {
+      const val = field.string();
+      try { return val ? JSON.parse(val) : null; } catch { return val; }
+    }
+    return next();
+  },
 });
 
 console.log(`[DB] MySQL — host: ${process.env.MYSQL_HOST || "127.0.0.1"}, database: ${process.env.MYSQL_DATABASE}`);

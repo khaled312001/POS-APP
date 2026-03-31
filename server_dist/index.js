@@ -898,7 +898,18 @@ var init_db = __esm({
       waitForConnections: true,
       connectionLimit: 10,
       charset: "utf8mb4",
-      connectTimeout: 3e4
+      connectTimeout: 3e4,
+      typeCast(field, next) {
+        if (field.type === "JSON") {
+          const val = field.string();
+          try {
+            return val ? JSON.parse(val) : null;
+          } catch {
+            return val;
+          }
+        }
+        return next();
+      }
     });
     console.log(`[DB] MySQL \u2014 host: ${process.env.MYSQL_HOST || "127.0.0.1"}, database: ${process.env.MYSQL_DATABASE}`);
     db = (0, import_mysql2.drizzle)(pool, { schema: schema_exports, mode: "default" });
