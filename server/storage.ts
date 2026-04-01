@@ -1,5 +1,5 @@
-import { db } from "./db";
-import { eq, desc, sql, and, gte, lte, like, ilike, or, isNull } from "drizzle-orm";
+import { db, pool } from "./db";
+import { eq, desc, sql, and, gte, lte, like, or, isNull } from "drizzle-orm";
 import * as fs from "fs";
 import {
   branches, employees, categories, products, inventory,
@@ -26,6 +26,60 @@ import {
   type InsertPlatformSetting, type InsertPlatformCommission,
   type InsertVehicle, type InsertPrinterConfig, type InsertDailyClosing, type InsertMonthlyClosing
 } from "@shared/schema";
+
+function getStrippedPhoneSql(column: any) {
+  return sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(${column}, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '.', ''), '/', ''), '+', '')`;
+}
+
+function getPhoneSearchConditions(column: any, variants: string[]) {
+  const strippedColumn = getStrippedPhoneSql(column);
+  const conditions: any[] = [];
+  const digitVariants = new Set<string>();
+
+  for (const variant of variants) {
+    if (!variant) continue;
+    conditions.push(like(column, `%${variant}%`));
+
+    const digits = variant.replace(/\D/g, "");
+    if (digits.length >= 6) {
+      digitVariants.add(digits);
+    }
+  }
+
+  for (const digits of digitVariants) {
+    conditions.push(sql`${strippedColumn} like ${"%" + digits + "%"}`);
+  }
+
+  return conditions;
+}
+
+function normalizeArrayLikeJson(value: unknown) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function normalizeOnlineOrderRecord<T extends Record<string, any> | undefined>(order: T): T {
+  if (!order) {
+    return order;
+  }
+
+  return {
+    ...order,
+    items: normalizeArrayLikeJson(order.items),
+  };
+}
 
 export const storage = {
   seedLog(msg: string) {
@@ -128,13 +182,16 @@ export const storage = {
   // Products
   async getProducts(search?: string) {
     if (search) {
+      const q = `%${search.toLowerCase()}%`;
       return db.select().from(products).where(
         and(
           eq(products.isActive, true),
           or(
-            like(products.name, `%${search}%`),
-            like(products.sku, `%${search}%`),
-            like(products.barcode, `%${search}%`)
+            sql`LOWER(${products.name}) LIKE ${q}`,
+            sql`LOWER(${products.nameAr}) LIKE ${q}`,
+            sql`LOWER(${products.sku}) LIKE ${q}`,
+            sql`LOWER(${products.barcode}) LIKE ${q}`,
+            sql`LOWER(${products.description}) LIKE ${q}`
           )
         )
       ).orderBy(desc(products.createdAt));
@@ -143,14 +200,17 @@ export const storage = {
   },
   async getProductsByTenant(tenantId: number, search?: string) {
     if (search) {
+      const q = `%${search.toLowerCase()}%`;
       return db.select().from(products).where(
         and(
           eq(products.tenantId, tenantId),
           eq(products.isActive, true),
           or(
-            like(products.name, `%${search}%`),
-            like(products.sku, `%${search}%`),
-            like(products.barcode, `%${search}%`)
+            sql`LOWER(${products.name}) LIKE ${q}`,
+            sql`LOWER(${products.nameAr}) LIKE ${q}`,
+            sql`LOWER(${products.sku}) LIKE ${q}`,
+            sql`LOWER(${products.barcode}) LIKE ${q}`,
+            sql`LOWER(${products.description}) LIKE ${q}`
           )
         )
       ).orderBy(desc(products.createdAt));
@@ -261,12 +321,7 @@ export const storage = {
       if (looksLikePhone) {
         const { getPhoneSearchVariants } = await import("./phoneUtils");
         const variants = getPhoneSearchVariants(search.trim());
-        const phoneConditions = variants.map(v => like(customers.phone || "", `%${v}%`));
-        const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
-        for (const v of variants) {
-          phoneConditions.push(sql`${strippedCol} ILIKE ${'%' + v + '%'}`);
-        }
-        conditions.push(or(...phoneConditions));
+        conditions.push(or(...getPhoneSearchConditions(customers.phone, variants)));
       } else {
         conditions.push(
           or(
@@ -293,12 +348,7 @@ export const storage = {
       if (looksLikePhone) {
         const { getPhoneSearchVariants } = await import("./phoneUtils");
         const variants = getPhoneSearchVariants(search.trim());
-        const phoneConditions = variants.map(v => like(customers.phone || "", `%${v}%`));
-        const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
-        for (const v of variants) {
-          phoneConditions.push(sql`${strippedCol} ILIKE ${'%' + v + '%'}`);
-        }
-        conditions.push(or(...phoneConditions));
+        conditions.push(or(...getPhoneSearchConditions(customers.phone, variants)));
       } else {
         conditions.push(
           or(
@@ -322,16 +372,13 @@ export const storage = {
   async findCustomerByPhone(phone: string, tenantId: number) {
     const { getPhoneSearchVariants, normalizePhone, lastNDigits } = await import("./phoneUtils");
     const variants = getPhoneSearchVariants(phone);
-    const strippedCol = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
-    const phoneConditions = variants.map(v => like(customers.phone, `%${v}%`));
-    for (const v of variants) {
-      phoneConditions.push(sql`${strippedCol} ILIKE ${'%' + v + '%'}`);
-    }
+    const strippedCol = getStrippedPhoneSql(customers.phone);
+    const phoneConditions = getPhoneSearchConditions(customers.phone, variants);
     // Robust last-8-digits matching: strips ALL non-digit chars and compares tail (format-agnostic)
     const last8 = lastNDigits(phone, 8);
     if (last8.length >= 7) {
       phoneConditions.push(
-        sql`RIGHT(REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g'), 8) = ${last8}`
+        sql`RIGHT(${strippedCol}, 8) = ${last8}`
       );
     }
     // Last-7-digits matching: catches Swiss numbers stored without area code (e.g. "3716640")
@@ -339,7 +386,7 @@ export const storage = {
     const last7 = lastNDigits(phone, 7);
     if (last7.length === 7) {
       phoneConditions.push(
-        sql`REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g') = ${last7}`
+        sql`${strippedCol} = ${last7}`
       );
     }
     const conditions: any[] = [
@@ -1598,39 +1645,72 @@ export const storage = {
   // Bulk Operations
   async bulkCreateCustomers(data: any[]) {
     if (data.length === 0) return [];
-    return db.insert(customers).values(data)
-      .onConflictDoUpdate({
-        target: [customers.phone, customers.tenantId],
-        set: {
-          customerNr: sql`EXCLUDED.customer_nr`,
-          salutation: sql`EXCLUDED.salutation`,
-          firstName: sql`EXCLUDED.first_name`,
-          lastName: sql`EXCLUDED.last_name`,
-          name: sql`EXCLUDED.name`,
-          address: sql`EXCLUDED.address`,
-          street: sql`EXCLUDED.street`,
-          streetNr: sql`EXCLUDED.street_nr`,
-          houseNr: sql`EXCLUDED.house_nr`,
-          city: sql`EXCLUDED.city`,
-          postalCode: sql`EXCLUDED.postal_code`,
-          company: sql`EXCLUDED.company`,
-          zhd: sql`EXCLUDED.zhd`,
-          howToGo: sql`EXCLUDED.how_to_go`,
-          screenInfo: sql`EXCLUDED.screen_info`,
-          source: sql`EXCLUDED.source`,
-          firstOrderDate: sql`EXCLUDED.first_order_date`,
-          lastOrderDate: sql`EXCLUDED.last_order_date`,
-          totalSpent: sql`EXCLUDED.total_spent`,
-          legacyTotalSpent: sql`EXCLUDED.legacy_total_spent`,
-          averageOrderValue: sql`EXCLUDED.average_order_value`,
-          orderCount: sql`EXCLUDED.order_count`,
-          visitCount: sql`EXCLUDED.visit_count`,
-          notes: sql`EXCLUDED.notes`,
-          legacyRef: sql`EXCLUDED.legacy_ref`,
-          updatedAt: sql`now()`
+    const { inArray } = await import("drizzle-orm");
+
+    const sanitizedRows = data.map((row) => {
+      const { id, createdAt, updatedAt, ...payload } = row;
+      return payload;
+    });
+
+    const tenantPhoneGroups = new Map<string, string[]>();
+    for (const row of sanitizedRows) {
+      const tenantId = row.tenantId;
+      const phone = typeof row.phone === "string" ? row.phone.trim() : "";
+      if (!tenantId || !phone) continue;
+
+      const groupKey = String(tenantId);
+      const phones = tenantPhoneGroups.get(groupKey) || [];
+      if (!phones.includes(phone)) {
+        phones.push(phone);
+        tenantPhoneGroups.set(groupKey, phones);
+      }
+    }
+
+    const existingByTenantPhone = new Map<string, any>();
+    for (const [tenantId, phones] of tenantPhoneGroups.entries()) {
+      if (phones.length === 0) continue;
+      const existingCustomers = await db.select().from(customers).where(
+        and(
+          eq(customers.tenantId, Number(tenantId)),
+          inArray(customers.phone, phones),
+        ),
+      );
+      for (const existing of existingCustomers) {
+        existingByTenantPhone.set(`${existing.tenantId}::${existing.phone}`, existing);
+      }
+    }
+
+    const results: any[] = [];
+    for (const row of sanitizedRows) {
+      const tenantId = row.tenantId;
+      const phone = typeof row.phone === "string" ? row.phone.trim() : "";
+      const lookupKey = tenantId && phone ? `${tenantId}::${phone}` : "";
+      const basePayload = {
+        ...row,
+        phone: phone || null,
+      };
+
+      const existing = lookupKey ? existingByTenantPhone.get(lookupKey) : undefined;
+      if (existing) {
+        await db.update(customers).set({ ...basePayload, updatedAt: new Date() }).where(eq(customers.id, existing.id));
+        const updated = await this.getCustomer(existing.id);
+        if (updated) {
+          existingByTenantPhone.set(lookupKey, updated);
+          results.push(updated);
         }
-      })
-      ;
+        continue;
+      }
+
+      const created = await this.createCustomer(basePayload);
+      if (created) {
+        if (lookupKey) {
+          existingByTenantPhone.set(lookupKey, created);
+        }
+        results.push(created);
+      }
+    }
+
+    return results;
   },
   async bulkCreateProducts(data: InsertProduct[]) {
     if (data.length === 0) return [];
@@ -1683,26 +1763,28 @@ export const storage = {
     if (tenantId) conditions.push(eq(onlineOrders.tenantId, tenantId));
     if (status) conditions.push(eq(onlineOrders.status, status));
     if (conditions.length > 0) {
-      return db.select().from(onlineOrders).where(and(...conditions)).orderBy(desc(onlineOrders.createdAt));
+      const orders = await db.select().from(onlineOrders).where(and(...conditions)).orderBy(desc(onlineOrders.createdAt));
+      return orders.map((order) => normalizeOnlineOrderRecord(order));
     }
-    return db.select().from(onlineOrders).orderBy(desc(onlineOrders.createdAt));
+    const orders = await db.select().from(onlineOrders).orderBy(desc(onlineOrders.createdAt));
+    return orders.map((order) => normalizeOnlineOrderRecord(order));
   },
 
   async getOnlineOrder(id: number) {
     const [order] = await db.select().from(onlineOrders).where(eq(onlineOrders.id, id));
-    return order;
+    return normalizeOnlineOrderRecord(order);
   },
 
   async createOnlineOrder(data: InsertOnlineOrder) {
     const _ins_order = await db.insert(onlineOrders).values(data).$returningId();
     const [order] = await db.select().from(onlineOrders).where(eq(onlineOrders.id, _ins_order[0]?.id ?? 0));
-    return order;
+    return normalizeOnlineOrderRecord(order);
   },
 
   async updateOnlineOrder(id: number, data: Partial<InsertOnlineOrder>) {
     await db.update(onlineOrders).set({ ...data, updatedAt: new Date() }).where(eq(onlineOrders.id, id));
     const [order] = await db.select().from(onlineOrders).where(eq(onlineOrders.id, id));
-    return order;
+    return normalizeOnlineOrderRecord(order);
   },
 
   async deleteOnlineOrder(id: number) {
@@ -1980,13 +2062,19 @@ export const storage = {
     }).format(new Date()); // returns YYYY-MM-DD
     const dateCompact = swissDate.replace(/-/g, ""); // YYYYMMDD
 
-    const result = await db.execute(sql`
-      INSERT INTO daily_sequences (scope_key, date, counter)
-      VALUES (${scopeKey}, ${dateCompact}, 1)
-      ON CONFLICT (scope_key, date)
-      DO UPDATE SET counter = daily_sequences.counter + 1
-      RETURNING counter
-    `);
-    return Number((result as any).rows[0].counter);
+    const [result] = await pool.query(
+      `
+        INSERT INTO daily_sequences (\`scope_key\`, \`date\`, \`counter\`)
+        VALUES (?, ?, 1)
+        ON DUPLICATE KEY UPDATE \`counter\` = LAST_INSERT_ID(\`counter\` + 1)
+      `,
+      [scopeKey, dateCompact],
+    ) as any;
+
+    if (result?.affectedRows === 1) {
+      return 1;
+    }
+
+    return Number(result?.insertId || 1);
   },
 };

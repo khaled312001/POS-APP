@@ -11,20 +11,24 @@ import { WebhookHandlers } from "./webhookHandlers";
 import * as fs from "fs";
 import * as path from "path";
 
-// Use Neon production database — prefer explicit PG* vars, fall back to NEON_DATABASE_URL
-if (process.env.PGHOST && process.env.PGHOST.includes("neon.tech")) {
-  // Build a complete, reliable Neon connection string from individual PG vars
-  const neonUrl = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || "neondb"}?sslmode=require`;
-  process.env.DATABASE_URL = neonUrl;
-  process.env.NEON_DATABASE_URL = neonUrl;
-} else if (process.env.NEON_DATABASE_URL) {
-  // NEON_DATABASE_URL may be missing the database name — append "neondb" if needed
-  let neonUrl = process.env.NEON_DATABASE_URL;
-  if (!neonUrl.match(/neon\.tech\/\w+/)) {
-    neonUrl = neonUrl.replace(/\/$/, "") + "/neondb?sslmode=require";
+const usingMySql = Boolean(process.env.MYSQL_HOST || process.env.MYSQL_DATABASE);
+
+// Only synthesize Neon/Postgres settings when the app is not running in MySQL mode.
+if (!usingMySql) {
+  if (process.env.PGHOST && process.env.PGHOST.includes("neon.tech")) {
+    // Build a complete, reliable Neon connection string from individual PG vars
+    const neonUrl = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || "neondb"}?sslmode=require`;
+    process.env.DATABASE_URL = neonUrl;
     process.env.NEON_DATABASE_URL = neonUrl;
+  } else if (process.env.NEON_DATABASE_URL) {
+    // NEON_DATABASE_URL may be missing the database name — append "neondb" if needed
+    let neonUrl = process.env.NEON_DATABASE_URL;
+    if (!neonUrl.match(/neon\.tech\/\w+/)) {
+      neonUrl = neonUrl.replace(/\/$/, "") + "/neondb?sslmode=require";
+      process.env.NEON_DATABASE_URL = neonUrl;
+    }
+    process.env.DATABASE_URL = neonUrl;
   }
-  process.env.DATABASE_URL = neonUrl;
 }
 
 const app = express();
@@ -415,6 +419,11 @@ function setupErrorHandler(app: express.Application) {
 }
 
 async function initStripe() {
+  if (usingMySql) {
+    log("MySQL mode detected, skipping Stripe schema sync");
+    return;
+  }
+
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     log('DATABASE_URL not set, skipping Stripe init');
@@ -711,7 +720,10 @@ function setupPaymentGatewayRoutes(app: express.Application) {
 
   initStripe().catch(err => log('Stripe init error (non-fatal):', err));
 
-  try {
+  if (usingMySql) {
+    log("MySQL mode active; skipping legacy Postgres-only startup migrations");
+  } else {
+    try {
     const { pool } = await import("./db");
     await pool.query(`
       CREATE TABLE IF NOT EXISTS platform_settings (
@@ -944,8 +956,9 @@ function setupPaymentGatewayRoutes(app: express.Application) {
     log("Customer extended columns migration complete");
 
     log("Schema migration complete");
-  } catch (err) {
-    log("Schema migration error (non-fatal):", err);
+    } catch (err) {
+      log("Schema migration error (non-fatal):", err);
+    }
   }
 
   try {

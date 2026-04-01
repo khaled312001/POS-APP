@@ -13,6 +13,7 @@ import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { getDisplayNumber } from "@/lib/api-config";
 import { useLanguage } from "@/lib/language-context";
+import { cloneOrderItems, normalizeOrderItems } from "@/lib/order-items";
 import { playClickSound } from "@/lib/sound";
 import { autoPrint3Copies } from "@/utils/printing";
 import {
@@ -162,9 +163,14 @@ export default function OrdersScreen() {
     };
   });
 
+  const normalizedOnlineOrders = (onlineOrders as any[]).map((order) => ({
+    ...order,
+    items: normalizeOrderItems(order?.items),
+  }));
+
   // Normalize both sources into unified list
   const unifiedOrders = [
-    ...(onlineOrders as any[]).map(o => ({ ...o, _type: "online" as const, _sortTime: new Date(o.createdAt).getTime() })),
+    ...normalizedOnlineOrders.map(o => ({ ...o, _type: "online" as const, _sortTime: new Date(o.createdAt).getTime() })),
     ...(posOrders as any[]).map(s => ({ ...s, _type: "pos" as const, _sortTime: new Date(s.createdAt).getTime(), status: s.status || "completed" })),
   ].sort((a, b) => b._sortTime - a._sortTime);
 
@@ -177,12 +183,12 @@ export default function OrdersScreen() {
     return true;
   });
 
-  const pendingCount = (onlineOrders as any[]).filter((o: any) => o.status === "pending").length;
+  const pendingCount = normalizedOnlineOrders.filter((o: any) => o.status === "pending").length;
 
   // New order notification
   useEffect(() => {
-    if (!onlineOrders.length) return;
-    const incoming = (onlineOrders as any[]).filter(o => !knownOrderIds.current.has(`online-${o.id}`) && o.status === "pending");
+    if (!normalizedOnlineOrders.length) return;
+    const incoming = normalizedOnlineOrders.filter(o => !knownOrderIds.current.has(`online-${o.id}`) && o.status === "pending");
     if (incoming.length > 0) {
       playNotificationSound();
       playClickSound("medium");
@@ -198,8 +204,8 @@ export default function OrdersScreen() {
         Animated.timing(pulseAnim, { toValue: 1, duration: 150, useNativeDriver: Platform.OS !== 'web' }),
       ]).start();
     }
-    (onlineOrders as any[]).forEach(o => knownOrderIds.current.add(`online-${o.id}`));
-  }, [onlineOrders]);
+    normalizedOnlineOrders.forEach(o => knownOrderIds.current.add(`online-${o.id}`));
+  }, [normalizedOnlineOrders]);
 
   // WebSocket for instant notifications
   useEffect(() => {
@@ -300,7 +306,7 @@ export default function OrdersScreen() {
       try {
         const res = await apiRequest("GET", `/api/sales/${order.id}`);
         const full = await res.json();
-        const items = (full.items || []).map((it: any) => ({
+        const items = normalizeOrderItems(full.items).map((it: any) => ({
           productId: it.productId,
           name: it.productName,
           quantity: it.quantity,
@@ -351,7 +357,7 @@ export default function OrdersScreen() {
         customerAddress: order.customerAddress || "",
         notes: order.notes || "",
         estimatedTime: order.estimatedTime ? String(order.estimatedTime) : "",
-        items: order.items ? JSON.parse(JSON.stringify(order.items)) : [],
+        items: cloneOrderItems(order.items),
         subtotal: Number(order.subtotal || 0),
         deliveryFee: Number(order.deliveryFee || 0),
         totalAmount: Number(order.totalAmount || 0),
@@ -499,6 +505,7 @@ export default function OrdersScreen() {
     const orderDate = new Date(item.createdAt);
     const next = meta.next;
     const isPOS = item._type === "pos";
+    const orderItems = normalizeOrderItems(item.items);
 
     const nextBtnColor: Record<string, string[]> = {
       accepted: ["#3B82F6", "#1D4ED8"],
@@ -566,9 +573,9 @@ export default function OrdersScreen() {
         ) : null}
 
         {/* Items - for online orders with full items data */}
-        {item.items && item.items.length > 0 ? (
+        {orderItems.length > 0 ? (
           <View style={styles.itemsList}>
-            {(item.items || []).slice(0, 4).map((it: any, idx: number) => (
+            {orderItems.slice(0, 4).map((it: any, idx: number) => (
               <View key={idx} style={{ marginBottom: 4 }}>
                 <View style={[styles.itemRow, isRTL && { flexDirection: "row-reverse" }]}>
                   <Text style={styles.itemQty}>{it.quantity}×</Text>
@@ -578,7 +585,7 @@ export default function OrdersScreen() {
                 {it.notes ? <Text style={[styles.itemAddons, isRTL && { textAlign: "right" }]}>↳ {it.notes}</Text> : null}
               </View>
             ))}
-            {item.items.length > 4 && <Text style={styles.itemAddons}>+{item.items.length - 4} {lbl("more items", "عناصر أخرى", "weitere Artikel")}</Text>}
+            {orderItems.length > 4 && <Text style={styles.itemAddons}>+{orderItems.length - 4} {lbl("more items", "عناصر أخرى", "weitere Artikel")}</Text>}
             {item.notes ? <Text style={[styles.orderNotes, isRTL && { textAlign: "right" }]}>📝 {item.notes}</Text> : null}
           </View>
         ) : item.notes ? (

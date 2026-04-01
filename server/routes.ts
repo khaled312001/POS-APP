@@ -100,6 +100,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/health", async (_req, res) => {
+    try {
+      const { pool } = await import("./db");
+      await pool.query("SELECT 1");
+      res.json({
+        ok: true,
+        status: "healthy",
+        database: "mysql",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (e: any) {
+      res.status(500).json({
+        ok: false,
+        status: "unhealthy",
+        database: "mysql",
+        error: e.message,
+      });
+    }
+  });
+
   // Landing Page Subscription
   app.post("/api/landing/subscribe", async (req, res) => {
     try {
@@ -3055,13 +3075,11 @@ async function test(){
       const { db } = await import("./db");
       const { sql } = await import("drizzle-orm");
 
-      // Get first tenant
-      const tenants = await db.execute(sql`SELECT id, name FROM tenants LIMIT 1`);
-      const rows = (tenants as any)[0] as any[];
-      if (!rows || rows.length === 0) {
+      const firstTenant = (await storage.getTenants())[0];
+      if (!firstTenant) {
         return res.status(404).json({ error: "No tenants found" });
       }
-      const tid = rows[0].id;
+      const tid = firstTenant.id;
 
       const tables = [
         "products", "categories", "employees", "customers", "branches",
@@ -3086,7 +3104,11 @@ async function test(){
         }
       }
 
-      res.json({ success: true, tenant: { id: tid, name: rows[0].name }, updates: results });
+      res.json({
+        success: true,
+        tenant: { id: tid, name: firstTenant.businessName },
+        updates: results,
+      });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }

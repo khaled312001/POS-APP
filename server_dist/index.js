@@ -881,7 +881,8 @@ var init_schema = __esm({
 // server/db.ts
 var db_exports = {};
 __export(db_exports, {
-  db: () => db
+  db: () => db,
+  pool: () => pool
 });
 var import_mysql2, import_promise, pool, db;
 var init_db = __esm({
@@ -892,6 +893,7 @@ var init_db = __esm({
     init_schema();
     pool = import_promise.default.createPool({
       host: process.env.MYSQL_HOST || "127.0.0.1",
+      port: Number(process.env.MYSQL_PORT || 3306),
       user: process.env.MYSQL_USER || "",
       password: process.env.MYSQL_PASSWORD || "",
       database: process.env.MYSQL_DATABASE || "",
@@ -911,7 +913,9 @@ var init_db = __esm({
         return next();
       }
     });
-    console.log(`[DB] MySQL \u2014 host: ${process.env.MYSQL_HOST || "127.0.0.1"}, database: ${process.env.MYSQL_DATABASE}`);
+    console.log(
+      `[DB] MySQL \u2014 host: ${process.env.MYSQL_HOST || "127.0.0.1"}, port: ${process.env.MYSQL_PORT || 3306}, database: ${process.env.MYSQL_DATABASE}`
+    );
     db = (0, import_mysql2.drizzle)(pool, { schema: schema_exports, mode: "default" });
   }
 });
@@ -1027,6 +1031,49 @@ var storage_exports = {};
 __export(storage_exports, {
   storage: () => storage
 });
+function getStrippedPhoneSql(column) {
+  return import_drizzle_orm.sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(${column}, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '.', ''), '/', ''), '+', '')`;
+}
+function getPhoneSearchConditions(column, variants) {
+  const strippedColumn = getStrippedPhoneSql(column);
+  const conditions = [];
+  const digitVariants = /* @__PURE__ */ new Set();
+  for (const variant of variants) {
+    if (!variant) continue;
+    conditions.push((0, import_drizzle_orm.like)(column, `%${variant}%`));
+    const digits = variant.replace(/\D/g, "");
+    if (digits.length >= 6) {
+      digitVariants.add(digits);
+    }
+  }
+  for (const digits of digitVariants) {
+    conditions.push(import_drizzle_orm.sql`${strippedColumn} like ${"%" + digits + "%"}`);
+  }
+  return conditions;
+}
+function normalizeArrayLikeJson(value) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+function normalizeOnlineOrderRecord(order) {
+  if (!order) {
+    return order;
+  }
+  return {
+    ...order,
+    items: normalizeArrayLikeJson(order.items)
+  };
+}
 var import_drizzle_orm, fs, storage;
 var init_storage = __esm({
   "server/storage.ts"() {
@@ -1076,9 +1123,9 @@ var init_storage = __esm({
       async getEmployeesByTenant(tenantId) {
         const tenantBranches = await this.getBranchesByTenant(tenantId);
         const branchIds = tenantBranches.map((b) => b.id);
-        const { inArray: inArray2 } = await import("drizzle-orm");
+        const { inArray } = await import("drizzle-orm");
         if (branchIds.length > 0) {
-          return db.select().from(employees).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(employees.isActive, true), (0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(employees.tenantId, tenantId), inArray2(employees.branchId, branchIds)))).orderBy((0, import_drizzle_orm.desc)(employees.createdAt));
+          return db.select().from(employees).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(employees.isActive, true), (0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(employees.tenantId, tenantId), inArray(employees.branchId, branchIds)))).orderBy((0, import_drizzle_orm.desc)(employees.createdAt));
         }
         return db.select().from(employees).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(employees.isActive, true), (0, import_drizzle_orm.eq)(employees.tenantId, tenantId))).orderBy((0, import_drizzle_orm.desc)(employees.createdAt));
       },
@@ -1129,13 +1176,16 @@ var init_storage = __esm({
       // Products
       async getProducts(search) {
         if (search) {
+          const q = `%${search.toLowerCase()}%`;
           return db.select().from(products).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                (0, import_drizzle_orm.like)(products.name, `%${search}%`),
-                (0, import_drizzle_orm.like)(products.sku, `%${search}%`),
-                (0, import_drizzle_orm.like)(products.barcode, `%${search}%`)
+                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q}`,
+                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q}`,
+                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q}`,
+                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q}`,
+                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q}`
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -1144,14 +1194,17 @@ var init_storage = __esm({
       },
       async getProductsByTenant(tenantId, search) {
         if (search) {
+          const q = `%${search.toLowerCase()}%`;
           return db.select().from(products).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(products.tenantId, tenantId),
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                (0, import_drizzle_orm.like)(products.name, `%${search}%`),
-                (0, import_drizzle_orm.like)(products.sku, `%${search}%`),
-                (0, import_drizzle_orm.like)(products.barcode, `%${search}%`)
+                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q}`,
+                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q}`,
+                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q}`,
+                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q}`,
+                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q}`
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -1188,8 +1241,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(inventory).where(inArray2(inventory.branchId, branchIds));
+            const { inArray } = await import("drizzle-orm");
+            return db.select().from(inventory).where(inArray(inventory.branchId, branchIds));
           }
           return [];
         }
@@ -1222,12 +1275,12 @@ var init_storage = __esm({
         return inv;
       },
       async getLowStockItems(branchId) {
-        const { inArray: inArray2, notInArray, lte: ltEq } = await import("drizzle-orm");
+        const { inArray, notInArray, lte: ltEq } = await import("drizzle-orm");
         const restaurantTenants = await db.select({ id: tenants.id }).from(tenants).where((0, import_drizzle_orm.eq)(tenants.storeType, "restaurant"));
         const restaurantTenantIds = restaurantTenants.map((t) => t.id);
         let excludedBranchIds = [];
         if (restaurantTenantIds.length > 0) {
-          const restaurantBranches = await db.select({ id: branches.id }).from(branches).where(inArray2(branches.tenantId, restaurantTenantIds));
+          const restaurantBranches = await db.select({ id: branches.id }).from(branches).where(inArray(branches.tenantId, restaurantTenantIds));
           excludedBranchIds = restaurantBranches.map((b) => b.id);
         }
         const conditions = [
@@ -1250,12 +1303,7 @@ var init_storage = __esm({
           if (looksLikePhone) {
             const { getPhoneSearchVariants: getPhoneSearchVariants2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
             const variants = getPhoneSearchVariants2(search.trim());
-            const phoneConditions = variants.map((v) => (0, import_drizzle_orm.like)(customers.phone || "", `%${v}%`));
-            const strippedCol = import_drizzle_orm.sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
-            for (const v of variants) {
-              phoneConditions.push(import_drizzle_orm.sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
-            }
-            conditions.push((0, import_drizzle_orm.or)(...phoneConditions));
+            conditions.push((0, import_drizzle_orm.or)(...getPhoneSearchConditions(customers.phone, variants)));
           } else {
             conditions.push(
               (0, import_drizzle_orm.or)(
@@ -1282,12 +1330,7 @@ var init_storage = __esm({
           if (looksLikePhone) {
             const { getPhoneSearchVariants: getPhoneSearchVariants2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
             const variants = getPhoneSearchVariants2(search.trim());
-            const phoneConditions = variants.map((v) => (0, import_drizzle_orm.like)(customers.phone || "", `%${v}%`));
-            const strippedCol = import_drizzle_orm.sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
-            for (const v of variants) {
-              phoneConditions.push(import_drizzle_orm.sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
-            }
-            conditions.push((0, import_drizzle_orm.or)(...phoneConditions));
+            conditions.push((0, import_drizzle_orm.or)(...getPhoneSearchConditions(customers.phone, variants)));
           } else {
             conditions.push(
               (0, import_drizzle_orm.or)(
@@ -1310,21 +1353,18 @@ var init_storage = __esm({
       async findCustomerByPhone(phone, tenantId) {
         const { getPhoneSearchVariants: getPhoneSearchVariants2, normalizePhone: normalizePhone2, lastNDigits: lastNDigits2 } = await Promise.resolve().then(() => (init_phoneUtils(), phoneUtils_exports));
         const variants = getPhoneSearchVariants2(phone);
-        const strippedCol = import_drizzle_orm.sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${customers.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
-        const phoneConditions = variants.map((v) => (0, import_drizzle_orm.like)(customers.phone, `%${v}%`));
-        for (const v of variants) {
-          phoneConditions.push(import_drizzle_orm.sql`${strippedCol} ILIKE ${"%" + v + "%"}`);
-        }
+        const strippedCol = getStrippedPhoneSql(customers.phone);
+        const phoneConditions = getPhoneSearchConditions(customers.phone, variants);
         const last8 = lastNDigits2(phone, 8);
         if (last8.length >= 7) {
           phoneConditions.push(
-            import_drizzle_orm.sql`RIGHT(REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g'), 8) = ${last8}`
+            import_drizzle_orm.sql`RIGHT(${strippedCol}, 8) = ${last8}`
           );
         }
         const last7 = lastNDigits2(phone, 7);
         if (last7.length === 7) {
           phoneConditions.push(
-            import_drizzle_orm.sql`REGEXP_REPLACE(${customers.phone}, '[^0-9]', '', 'g') = ${last7}`
+            import_drizzle_orm.sql`${strippedCol} = ${last7}`
           );
         }
         const conditions = [
@@ -1379,8 +1419,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(filters.tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            conditions.push(inArray2(sales.branchId, branchIds));
+            const { inArray } = await import("drizzle-orm");
+            conditions.push(inArray(sales.branchId, branchIds));
           } else {
             return [];
           }
@@ -1446,8 +1486,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(purchaseOrders).where(inArray2(purchaseOrders.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(purchaseOrders.createdAt));
+            const { inArray } = await import("drizzle-orm");
+            return db.select().from(purchaseOrders).where(inArray(purchaseOrders.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(purchaseOrders.createdAt));
           }
           return [];
         }
@@ -1493,8 +1533,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(shifts).where(inArray2(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
+            const { inArray } = await import("drizzle-orm");
+            return db.select().from(shifts).where(inArray(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
           }
           return [];
         }
@@ -1505,8 +1545,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray2(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
+            const { inArray } = await import("drizzle-orm");
+            return db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
           }
           return [];
         }
@@ -1616,8 +1656,8 @@ var init_storage = __esm({
           const emps = await this.getEmployeesByTenant(tenantId);
           const empIds = emps.map((e) => e.id);
           if (empIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(activityLog).where(inArray2(activityLog.employeeId, empIds)).orderBy((0, import_drizzle_orm.desc)(activityLog.createdAt)).limit(l);
+            const { inArray } = await import("drizzle-orm");
+            return db.select().from(activityLog).where(inArray(activityLog.employeeId, empIds)).orderBy((0, import_drizzle_orm.desc)(activityLog.createdAt)).limit(l);
           }
           return [];
         }
@@ -1662,8 +1702,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(returns).where(inArray2(returns.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(returns.createdAt));
+            const { inArray } = await import("drizzle-orm");
+            return db.select().from(returns).where(inArray(returns.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(returns.createdAt));
           }
           return [];
         }
@@ -1753,24 +1793,24 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            salesCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(sales).where(inArray2(sales.branchId, branchIds));
-            totalRevenueQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)` }).from(sales).where(inArray2(sales.branchId, branchIds));
+            const { inArray } = await import("drizzle-orm");
+            salesCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(sales).where(inArray(sales.branchId, branchIds));
+            totalRevenueQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)` }).from(sales).where(inArray(sales.branchId, branchIds));
             customerCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(customers).where((0, import_drizzle_orm.eq)(customers.tenantId, tenantId));
             productCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(products).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(products.tenantId, tenantId), (0, import_drizzle_orm.eq)(products.isActive, true)));
             const [tenant] = await db.select().from(tenants).where((0, import_drizzle_orm.eq)(tenants.id, tenantId));
             const isRestaurant = tenant?.storeType === "restaurant";
-            lowStockQuery = isRestaurant ? db.select({ count: import_drizzle_orm.sql`cast(0 as integer)` }).from(branches).limit(1) : db.select({ count: import_drizzle_orm.sql`count(*)` }).from(inventory).where((0, import_drizzle_orm.and)(import_drizzle_orm.sql`quantity <= low_stock_threshold`, inArray2(inventory.branchId, branchIds)));
+            lowStockQuery = isRestaurant ? db.select({ count: import_drizzle_orm.sql`cast(0 as integer)` }).from(branches).limit(1) : db.select({ count: import_drizzle_orm.sql`count(*)` }).from(inventory).where((0, import_drizzle_orm.and)(import_drizzle_orm.sql`quantity <= low_stock_threshold`, inArray(inventory.branchId, branchIds)));
             todaySalesQuery = db.select({
               count: import_drizzle_orm.sql`count(*)`,
               total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
-            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray2(sales.branchId, branchIds)));
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray(sales.branchId, branchIds)));
             weekSalesQuery = db.select({
               total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
-            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, weekStart), inArray2(sales.branchId, branchIds)));
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, weekStart), inArray(sales.branchId, branchIds)));
             monthSalesQuery = db.select({
               total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
-            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, monthStart), inArray2(sales.branchId, branchIds)));
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, monthStart), inArray(sales.branchId, branchIds)));
             totalExpensesQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}), 0)` }).from(expenses).where((0, import_drizzle_orm.eq)(expenses.tenantId, tenantId));
             todayExpensesQuery = db.select({
               total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}), 0)`
@@ -1781,16 +1821,16 @@ var init_storage = __esm({
               name: saleItems.productName,
               totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`,
               revenue: import_drizzle_orm.sql`sum(${saleItems.total})`
-            }).from(saleItems).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray2(sales.branchId, branchIds)).groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
+            }).from(saleItems).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray(sales.branchId, branchIds)).groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
             salesByPaymentMethodQuery = db.select({
               method: sales.paymentMethod,
               count: import_drizzle_orm.sql`count(*)`,
               total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}), 0)`
-            }).from(sales).where(inArray2(sales.branchId, branchIds)).groupBy(sales.paymentMethod);
-            recentSalesQuery = db.select().from(sales).where(inArray2(sales.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(sales.createdAt)).limit(5);
+            }).from(sales).where(inArray(sales.branchId, branchIds)).groupBy(sales.paymentMethod);
+            recentSalesQuery = db.select().from(sales).where(inArray(sales.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(sales.createdAt)).limit(5);
             profitRowQuery = db.select({
               totalCost: import_drizzle_orm.sql`coalesce(sum(${products.costPrice} * ${saleItems.quantity}), 0)`
-            }).from(saleItems).innerJoin(products, (0, import_drizzle_orm.eq)(saleItems.productId, products.id)).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray2(sales.branchId, branchIds));
+            }).from(saleItems).innerJoin(products, (0, import_drizzle_orm.eq)(saleItems.productId, products.id)).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray(sales.branchId, branchIds));
           } else {
             return {
               totalSales: 0,
@@ -1964,8 +2004,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(warehouses).where((0, import_drizzle_orm.and)(inArray2(warehouses.branchId, branchIds), (0, import_drizzle_orm.eq)(warehouses.isActive, true)));
+            const { inArray } = await import("drizzle-orm");
+            return db.select().from(warehouses).where((0, import_drizzle_orm.and)(inArray(warehouses.branchId, branchIds), (0, import_drizzle_orm.eq)(warehouses.isActive, true)));
           }
           return [];
         }
@@ -1997,8 +2037,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            conditions.push(inArray2(productBatches.branchId, branchIds));
+            const { inArray } = await import("drizzle-orm");
+            conditions.push(inArray(productBatches.branchId, branchIds));
           } else {
             return [];
           }
@@ -2211,8 +2251,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            activeShifts = await db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray2(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
+            const { inArray } = await import("drizzle-orm");
+            activeShifts = await db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
           } else {
             activeShifts = [];
           }
@@ -2233,8 +2273,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            allShifts = await db.select().from(shifts).where(inArray2(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime)).limit(100);
+            const { inArray } = await import("drizzle-orm");
+            allShifts = await db.select().from(shifts).where(inArray(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime)).limit(100);
           } else {
             allShifts = [];
           }
@@ -2369,12 +2409,12 @@ var init_storage = __esm({
           const tenantEmployees = await this.getEmployeesByTenant(tenant.id);
           let salesToday = "0.00";
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
+            const { inArray } = await import("drizzle-orm");
             const todayStart = /* @__PURE__ */ new Date();
             todayStart.setHours(0, 0, 0, 0);
             const [todaySales] = await db.select({
               total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
-            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray2(sales.branchId, branchIds)));
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray(sales.branchId, branchIds)));
             salesToday = Number(todaySales?.total || 0).toFixed(2);
           }
           results.push({
@@ -2480,37 +2520,64 @@ var init_storage = __esm({
       // Bulk Operations
       async bulkCreateCustomers(data) {
         if (data.length === 0) return [];
-        return db.insert(customers).values(data).onConflictDoUpdate({
-          target: [customers.phone, customers.tenantId],
-          set: {
-            customerNr: import_drizzle_orm.sql`EXCLUDED.customer_nr`,
-            salutation: import_drizzle_orm.sql`EXCLUDED.salutation`,
-            firstName: import_drizzle_orm.sql`EXCLUDED.first_name`,
-            lastName: import_drizzle_orm.sql`EXCLUDED.last_name`,
-            name: import_drizzle_orm.sql`EXCLUDED.name`,
-            address: import_drizzle_orm.sql`EXCLUDED.address`,
-            street: import_drizzle_orm.sql`EXCLUDED.street`,
-            streetNr: import_drizzle_orm.sql`EXCLUDED.street_nr`,
-            houseNr: import_drizzle_orm.sql`EXCLUDED.house_nr`,
-            city: import_drizzle_orm.sql`EXCLUDED.city`,
-            postalCode: import_drizzle_orm.sql`EXCLUDED.postal_code`,
-            company: import_drizzle_orm.sql`EXCLUDED.company`,
-            zhd: import_drizzle_orm.sql`EXCLUDED.zhd`,
-            howToGo: import_drizzle_orm.sql`EXCLUDED.how_to_go`,
-            screenInfo: import_drizzle_orm.sql`EXCLUDED.screen_info`,
-            source: import_drizzle_orm.sql`EXCLUDED.source`,
-            firstOrderDate: import_drizzle_orm.sql`EXCLUDED.first_order_date`,
-            lastOrderDate: import_drizzle_orm.sql`EXCLUDED.last_order_date`,
-            totalSpent: import_drizzle_orm.sql`EXCLUDED.total_spent`,
-            legacyTotalSpent: import_drizzle_orm.sql`EXCLUDED.legacy_total_spent`,
-            averageOrderValue: import_drizzle_orm.sql`EXCLUDED.average_order_value`,
-            orderCount: import_drizzle_orm.sql`EXCLUDED.order_count`,
-            visitCount: import_drizzle_orm.sql`EXCLUDED.visit_count`,
-            notes: import_drizzle_orm.sql`EXCLUDED.notes`,
-            legacyRef: import_drizzle_orm.sql`EXCLUDED.legacy_ref`,
-            updatedAt: import_drizzle_orm.sql`now()`
-          }
+        const { inArray } = await import("drizzle-orm");
+        const sanitizedRows = data.map((row) => {
+          const { id, createdAt, updatedAt, ...payload } = row;
+          return payload;
         });
+        const tenantPhoneGroups = /* @__PURE__ */ new Map();
+        for (const row of sanitizedRows) {
+          const tenantId = row.tenantId;
+          const phone = typeof row.phone === "string" ? row.phone.trim() : "";
+          if (!tenantId || !phone) continue;
+          const groupKey = String(tenantId);
+          const phones = tenantPhoneGroups.get(groupKey) || [];
+          if (!phones.includes(phone)) {
+            phones.push(phone);
+            tenantPhoneGroups.set(groupKey, phones);
+          }
+        }
+        const existingByTenantPhone = /* @__PURE__ */ new Map();
+        for (const [tenantId, phones] of tenantPhoneGroups.entries()) {
+          if (phones.length === 0) continue;
+          const existingCustomers = await db.select().from(customers).where(
+            (0, import_drizzle_orm.and)(
+              (0, import_drizzle_orm.eq)(customers.tenantId, Number(tenantId)),
+              inArray(customers.phone, phones)
+            )
+          );
+          for (const existing of existingCustomers) {
+            existingByTenantPhone.set(`${existing.tenantId}::${existing.phone}`, existing);
+          }
+        }
+        const results = [];
+        for (const row of sanitizedRows) {
+          const tenantId = row.tenantId;
+          const phone = typeof row.phone === "string" ? row.phone.trim() : "";
+          const lookupKey = tenantId && phone ? `${tenantId}::${phone}` : "";
+          const basePayload = {
+            ...row,
+            phone: phone || null
+          };
+          const existing = lookupKey ? existingByTenantPhone.get(lookupKey) : void 0;
+          if (existing) {
+            await db.update(customers).set({ ...basePayload, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(customers.id, existing.id));
+            const updated = await this.getCustomer(existing.id);
+            if (updated) {
+              existingByTenantPhone.set(lookupKey, updated);
+              results.push(updated);
+            }
+            continue;
+          }
+          const created = await this.createCustomer(basePayload);
+          if (created) {
+            if (lookupKey) {
+              existingByTenantPhone.set(lookupKey, created);
+            }
+            results.push(created);
+          }
+        }
+        return results;
       },
       async bulkCreateProducts(data) {
         if (data.length === 0) return [];
@@ -2550,23 +2617,25 @@ var init_storage = __esm({
         if (tenantId) conditions.push((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId));
         if (status2) conditions.push((0, import_drizzle_orm.eq)(onlineOrders.status, status2));
         if (conditions.length > 0) {
-          return db.select().from(onlineOrders).where((0, import_drizzle_orm.and)(...conditions)).orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
+          const orders2 = await db.select().from(onlineOrders).where((0, import_drizzle_orm.and)(...conditions)).orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
+          return orders2.map((order) => normalizeOnlineOrderRecord(order));
         }
-        return db.select().from(onlineOrders).orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
+        const orders = await db.select().from(onlineOrders).orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
+        return orders.map((order) => normalizeOnlineOrderRecord(order));
       },
       async getOnlineOrder(id) {
         const [order] = await db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.id, id));
-        return order;
+        return normalizeOnlineOrderRecord(order);
       },
       async createOnlineOrder(data) {
         const _ins_order = await db.insert(onlineOrders).values(data).$returningId();
         const [order] = await db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.id, _ins_order[0]?.id ?? 0));
-        return order;
+        return normalizeOnlineOrderRecord(order);
       },
       async updateOnlineOrder(id, data) {
         await db.update(onlineOrders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(onlineOrders.id, id));
         const [order] = await db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.id, id));
-        return order;
+        return normalizeOnlineOrderRecord(order);
       },
       async deleteOnlineOrder(id) {
         await db.delete(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.id, id));
@@ -2798,14 +2867,18 @@ var init_storage = __esm({
           day: "2-digit"
         }).format(/* @__PURE__ */ new Date());
         const dateCompact = swissDate.replace(/-/g, "");
-        const result = await db.execute(import_drizzle_orm.sql`
-      INSERT INTO daily_sequences (scope_key, date, counter)
-      VALUES (${scopeKey}, ${dateCompact}, 1)
-      ON CONFLICT (scope_key, date)
-      DO UPDATE SET counter = daily_sequences.counter + 1
-      RETURNING counter
-    `);
-        return Number(result.rows[0].counter);
+        const [result] = await pool.query(
+          `
+        INSERT INTO daily_sequences (\`scope_key\`, \`date\`, \`counter\`)
+        VALUES (?, ?, 1)
+        ON DUPLICATE KEY UPDATE \`counter\` = LAST_INSERT_ID(\`counter\` + 1)
+      `,
+          [scopeKey, dateCompact]
+        );
+        if (result?.affectedRows === 1) {
+          return 1;
+        }
+        return Number(result?.insertId || 1);
       }
     };
   }
@@ -2823,8 +2896,8 @@ function pizzaModifier(price33, price45) {
       name: "Gr\xF6sse",
       required: true,
       options: [
-        { label: "33cm Normal", price: "0.00" },
-        { label: `45cm Gross (+${surcharge})`, price: surcharge }
+        { label: "33cm", price: "0.00" },
+        { label: "45cm", price: surcharge }
       ]
     },
     {
@@ -2851,10 +2924,10 @@ function drinkSizeModifier(largeExtra) {
   return [
     {
       name: "Gr\xF6sse",
-      required: false,
+      required: true,
       options: [
-        { label: "0.5l Klein", price: "0.00" },
-        { label: `1.5l Gross (+${largeExtra.toFixed(2)})`, price: largeExtra.toFixed(2) }
+        { label: "50cl", price: "0.00" },
+        { label: "1.5 L", price: largeExtra.toFixed(2) }
       ]
     }
   ];
@@ -2940,8 +3013,8 @@ async function seedPizzaLemon() {
       maxBranches: 3,
       maxEmployees: 20,
       storeType: "restaurant"
-    }).returning();
-    tenant = newTenant;
+    }).$returningId();
+    tenant = { id: newTenant.id };
   }
   const subs = await db.select().from(tenantSubscriptions).where((0, import_drizzle_orm2.eq)(tenantSubscriptions.tenantId, tenant.id));
   const activeSub = subs.find((s) => s.status === "active");
@@ -2959,7 +3032,7 @@ async function seedPizzaLemon() {
       startDate: /* @__PURE__ */ new Date(),
       endDate,
       autoRenew: true
-    }).returning();
+    }).$returningId();
     subId = newSub.id;
   }
   if (!isAlreadySeeded) {
@@ -2991,7 +3064,7 @@ async function seedPizzaLemon() {
       isMain: true,
       currency: "CHF",
       taxRate: "7.70"
-    }).returning();
+    }).$returningId();
     branchId = branch.id;
     await db.insert(warehouses).values({ name: "Hauptlager", branchId, isDefault: true, isActive: true });
     for (let i = 1; i <= 8; i++) {
@@ -3008,19 +3081,27 @@ async function seedPizzaLemon() {
   if (!hasCashier) {
     await db.insert(employees).values({ name: "Cashier", email: "cashier@pizzalemon.ch", pin: "5678", role: "cashier", branchId, isActive: true });
   }
-  const isProductionEnv = process.env.NODE_ENV === "production";
+  const shouldForceCatalogReset = ["1", "true", "yes"].includes(
+    (process.env.PIZZA_LEMON_FORCE_RESET || "").toLowerCase()
+  );
   const existingProds = await db.select().from(products).where((0, import_drizzle_orm2.eq)(products.tenantId, tenant.id));
-  if (existingProds.length > 0 && !isProductionEnv) {
-    console.log(`[PIZZA LEMON] Dev mode: ${existingProds.length} products already exist \u2014 skipping catalog reset to protect shared DB.`);
+  if (existingProds.length > 0 && !shouldForceCatalogReset) {
+    console.log(`[PIZZA LEMON] ${existingProds.length} products already exist \u2014 skipping catalog reset to protect existing data.`);
     return;
   }
-  if (existingProds.length > 0) {
-    console.log(`[PIZZA LEMON] Deleting ${existingProds.length} existing products and re-inserting updated catalog...`);
-    const prodIds = existingProds.map((p) => p.id);
-    await db.delete(inventory).where((0, import_drizzle_orm2.inArray)(inventory.productId, prodIds));
-    await db.delete(products).where((0, import_drizzle_orm2.eq)(products.tenantId, tenant.id));
+  if (shouldForceCatalogReset) {
+    const existingCats = await db.select({ id: categories.id, name: categories.name }).from(categories).where((0, import_drizzle_orm2.eq)(categories.tenantId, tenant.id));
+    if (existingProds.length > 0) {
+      await db.delete(products).where((0, import_drizzle_orm2.eq)(products.tenantId, tenant.id));
+    }
+    if (existingCats.length > 0) {
+      await db.delete(categories).where((0, import_drizzle_orm2.eq)(categories.tenantId, tenant.id));
+    }
+    console.log(
+      `[PIZZA LEMON] Force reset enabled \u2014 cleared ${existingProds.length} products and ${existingCats.length} categories.`
+    );
   } else {
-    console.log("[PIZZA LEMON] Creating fresh product catalog...");
+    console.log("[PIZZA LEMON] No products found \u2014 creating fresh product catalog...");
   }
   const allCats = await db.select({ id: categories.id, name: categories.name }).from(categories).where((0, import_drizzle_orm2.eq)(categories.tenantId, tenant.id));
   const catMap = {};
@@ -3046,7 +3127,7 @@ async function seedPizzaLemon() {
         icon: cat.icon,
         isActive: true,
         sortOrder: cat.sortOrder
-      }).returning();
+      }).$returningId();
       catMap[cat.name] = ins.id;
       console.log(`[PIZZA LEMON] Created category: ${cat.name}`);
     } else {
@@ -3074,8 +3155,14 @@ async function seedPizzaLemon() {
       isActive: true,
       modifiers: mods,
       ...item.image ? { image: item.image } : {}
-    }).returning();
-    await db.insert(inventory).values({ productId: prod.id, branchId, quantity: 999, lowStockThreshold: 0, reorderPoint: 0 }).onConflictDoNothing();
+    }).$returningId();
+    await db.insert(inventory).values({
+      productId: prod.id,
+      branchId,
+      quantity: 999,
+      lowStockThreshold: 0,
+      reorderPoint: 0
+    });
   }
   for (const p of PIZZAS) {
     const price45 = p.price45 ?? p.price + 14;
@@ -3085,32 +3172,35 @@ async function seedPizzaLemon() {
   for (const p of PIDE) await insertItem("Pide", p);
   for (const p of LAHMACUN) await insertItem("Lahmacun", p);
   const TELLER_WITH_SIDE = /* @__PURE__ */ new Set([
-    "Chicken Nuggets 8Stk",
+    "Chicken Nuggets 8 Stk.",
     "Pouletschnitzel",
-    "Pouletfl\xFCgeli 12Stk",
+    "Pouletfl\xFCgeli 12 Stk.",
     "Poulet Kebab Teller",
-    "Lamm Kebab Teller",
+    "Lamm Kebab Teller / Sac Kavurma",
     "K\xF6fte Teller",
-    "Cevapcici Teller",
+    "Cevapcici",
     "Falafel Teller"
   ]);
   for (const p of TELLERGERICHTE) {
     await insertItem("Tellergerichte", p, TELLER_WITH_SIDE.has(p.name) ? sideModifier() : []);
   }
   const FINGER_WITH_SAUCE = /* @__PURE__ */ new Set([
-    "D\xF6ner Kebab Tasche",
-    "D\xFCr\xFCm Kebab",
-    "D\xF6ner Box",
-    "Poulet Kebab Tasche",
-    "Poulet Kebab Fladen",
-    "Lamm Kebab Tasche",
-    "Lamm Kebab Fladen",
-    "K\xF6fte Taschenbrot",
-    "Cevapcici Taschenbrot",
-    "Kebab Fladen+Raclette",
-    "Kebab Tasche+Raclette",
-    "Kebab Fladen+Speck",
-    "Kebab Tasche+Speck"
+    "D\xF6ner Kebab Im Taschenbrot",
+    "D\xFCr\xFCm Kebab Im Fladenbrot",
+    "Falafel Im Taschenbrot",
+    "Falafel D\xFCr\xFCm Im Fladenbrot",
+    "Poulet Pepito",
+    "Lamm Pepito",
+    "Poulet Kebab Mit Gem\xFCse Im Taschenbrot",
+    "Poulet Kebab Mit Gem\xFCse Im Fladenbrot",
+    "Lamm Kebab Mit Gem\xFCse Im Taschenbrot",
+    "Lamm Kebab Mit Gem\xFCse Im Fladenbrot",
+    "K\xF6fte Im Taschenbrot",
+    "Cevapcici Im Taschenbrot",
+    "Kebab Im Fladenbrot mit Raclette",
+    "Kebab Im Taschenbrot mit Raclette",
+    "Kebab Im Fladenbrot mit Speck",
+    "Kebab Im Taschenbrot mit Speck"
   ]);
   for (const p of FINGERFOOD) {
     await insertItem("Fingerfood", p, FINGER_WITH_SAUCE.has(p.name) ? sauceModifier() : []);
@@ -3118,28 +3208,36 @@ async function seedPizzaLemon() {
   const SALAT_WITH_DRESSING = /* @__PURE__ */ new Set([
     "Gr\xFCner Salat",
     "Gemischter Salat",
+    "Griechischer Salat",
+    "Lemon Salat",
     "Thon Salat",
-    "Lemon Salat"
+    "Tomaten Salat",
+    "Tomaten Mozzarella Salat",
+    "Crevettencocktail Salat"
   ]);
   for (const p of SALATE) {
     await insertItem("Salat", p, SALAT_WITH_DRESSING.has(p.name) ? dressingModifier() : []);
   }
   for (const p of DESSERTS) await insertItem("Dessert", p);
-  const DRINKS_WITH_2EUR_SIZE = /* @__PURE__ */ new Set(["Coca-Cola", "Coca-Cola Zero", "Eistee Pfirsich"]);
+  const DRINKS_WITH_SIZE = /* @__PURE__ */ new Set([
+    "Coca-Cola",
+    "Coca-Cola Light",
+    "Coca-Cola Zero",
+    "Fanta",
+    "Eistee",
+    "Mineralwasser"
+  ]);
   for (const p of GETRAENKE) {
-    let sizeMod = [];
-    if (DRINKS_WITH_2EUR_SIZE.has(p.name)) {
-      sizeMod = drinkSizeModifier(2);
-    } else if (p.name === "Fanta") {
-      sizeMod = drinkSizeModifier(0);
-    }
+    const sizeMod = DRINKS_WITH_SIZE.has(p.name) ? drinkSizeModifier(4) : [];
     await insertItem("Getr\xE4nke", p, sizeMod);
   }
   for (const p of BIER) await insertItem("Bier", p);
   for (const p of ALKOHOL) await insertItem("Alkoholische Getr\xE4nke", p);
   for (const p of EXTRAS) await insertItem("Extra", p);
   const total = PIZZAS.length + CALZONES.length + PIDE.length + LAHMACUN.length + TELLERGERICHTE.length + FINGERFOOD.length + SALATE.length + DESSERTS.length + GETRAENKE.length + BIER.length + ALKOHOL.length + EXTRAS.length;
-  console.log(`[PIZZA LEMON] \u2713 ${total} products inserted with updated images (v4) and prices.`);
+  console.log(
+    `[PIZZA LEMON] \u2713 ${total} products inserted. Pizza ${PIZZAS.length}, Calzone ${CALZONES.length}, Pide ${PIDE.length}, Lahmacun ${LAHMACUN.length}, Tellergerichte ${TELLERGERICHTE.length}, Fingerfood ${FINGERFOOD.length}, Salat ${SALATE.length}, Dessert ${DESSERTS.length}, Getr\xE4nke ${GETRAENKE.length}, Bier ${BIER.length}, Alkohol ${ALKOHOL.length}, Extra ${EXTRAS.length}.`
+  );
   const [existingConfig] = await db.select().from(landingPageConfig).where((0, import_drizzle_orm2.eq)(landingPageConfig.tenantId, tenant.id));
   const heroImage = IMG("pizzalemon_hero.png");
   if (!existingConfig) {
@@ -3187,10 +3285,10 @@ async function seedPizzaLemon() {
   await db.insert(tenantNotifications).values({
     tenantId: tenant.id,
     type: "info",
-    title: "Pizza Lemon Katalog aktualisiert (v6)!",
-    message: `+M\xF6venpick Glace Erdbeer/Schokolade/Vanille/Caramel (je einzeln), Bilder f\xFCr Wunschpide+Extra Kebap hinzugef\xFCgt. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
+    title: "Pizza Lemon Katalog aktualisiert (v7)!",
+    message: `Men\xFCpreise, Gr\xF6\xDFen und Getr\xE4nkemengen mit dem aktuellen Foto-Men\xFC abgeglichen. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
     priority: "high"
-  }).onConflictDoNothing();
+  });
   const existingVehicles = await db.select().from(vehicles).where((0, import_drizzle_orm2.eq)(vehicles.tenantId, tenant.id));
   if (existingVehicles.length === 0) {
     await db.insert(vehicles).values([
@@ -3205,7 +3303,9 @@ async function seedPizzaLemon() {
   console.log(`[PIZZA LEMON]    Pass:    ${STORE_PASSWORD}`);
   console.log(`[PIZZA LEMON]    License: ${LICENSE_KEY}`);
   console.log(`[PIZZA LEMON]    Admin PIN: 1234  |  Cashier PIN: 5678`);
-  console.log(`[PIZZA LEMON]    Menu: 35 Pizza, 3 Calzone, 10 Pide, 2 Lahmacun, 13 Tellergerichte, 24 Fingerfood, 8 Salat, 9 Dessert, 9 Getr\xE4nke, 1 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
+  console.log(
+    `[PIZZA LEMON]    Menu: ${PIZZAS.length} Pizza, ${CALZONES.length} Calzone, ${PIDE.length} Pide, ${LAHMACUN.length} Lahmacun, ${TELLERGERICHTE.length} Tellergerichte, ${FINGERFOOD.length} Fingerfood, ${SALATE.length} Salat, ${DESSERTS.length} Dessert, ${GETRAENKE.length} Getr\xE4nke, ${BIER.length} Bier, ${ALKOHOL.length} Alkohol, ${EXTRAS.length} Extra = ${total} total`
+  );
 }
 var import_drizzle_orm2, import_bcrypt, import_date_fns, STORE_EMAIL, STORE_PASSWORD, LICENSE_KEY, BUSINESS_NAME, IMG, PIZZA_LEMON_CATEGORIES, PIZZAS, CALZONES, PIDE, LAHMACUN, TELLERGERICHTE, FINGERFOOD, SALATE, DESSERTS, GETRAENKE, BIER, ALKOHOL, EXTRAS;
 var init_seedPizzaLemon = __esm({
@@ -3236,157 +3336,145 @@ var init_seedPizzaLemon = __esm({
       { name: "Extra", color: "#4A5568", icon: "add-circle", sortOrder: 12 }
     ];
     PIZZAS = [
-      { name: "Wunschpizza", description: "Ihre Wunschpizza \u2013 w\xE4hlen Sie Ihre Zutaten", price: 14, price45: 27, image: IMG("pizzalemon_wunschpizza.jpg") },
-      { name: "Margherita", description: "Tomaten, Mozzarella, Oregano", price: 14, price45: 25, image: IMG("pizzalemon_01_margherita.jpg") },
-      { name: "Profumata", description: "Tomaten, Mozzarella, Knoblauch, Petersilie, Oregano", price: 14, price45: 27, image: IMG("pizzalemon_02_profumata.jpg") },
-      { name: "Funghi", description: "Tomaten, Mozzarella, Pilze", price: 15, price45: 28, image: IMG("pizzalemon_03_funghi.jpg") },
-      { name: "Spinat", description: "Tomaten, Mozzarella, Spinat", price: 15, price45: 28, image: IMG("pizzalemon_04_spinat.jpg") },
-      { name: "Gorgonzola", description: "Tomaten, Mozzarella, Gorgonzola", price: 16, price45: 29, image: IMG("pizzalemon_05_gorgonzola.jpg") },
-      { name: "Prosciutto", description: "Tomaten, Mozzarella, Schinken", price: 16, price45: 30, image: IMG("pizzalemon_06_prosciutto.jpg") },
-      { name: "Salami", description: "Tomaten, Mozzarella, Salami", price: 16, price45: 30, image: IMG("pizzalemon_07_salami.jpg") },
-      { name: "Diavola", description: "Tomaten, Mozzarella, scharfe Salami, Oliven, Peperoncini", price: 17, price45: 31, image: IMG("pizzalemon_08_diavola.jpg") },
-      { name: "Arrabbiata", description: "Tomaten, Mozzarella, Speck, Peperoncini, Knoblauch, Zwiebeln", price: 17, price45: 31, image: IMG("pizzalemon_09_arrabbiata.jpg") },
-      { name: "Siciliana", description: "Tomaten, Mozzarella, Schinken, Sardellen, Kapern", price: 17, price45: 31, image: IMG("pizzalemon_10_siciliana.jpg") },
-      { name: "Prosciutto e Funghi", description: "Tomaten, Mozzarella, Schinken, Pilze", price: 17, price45: 31, image: IMG("pizzalemon_11_prosciutto_e_funghi.jpg") },
-      { name: "Hawaii", description: "Tomaten, Mozzarella, Schinken, Ananas", price: 17, price45: 31, image: IMG("pizzalemon_12_hawaii.jpg") },
-      { name: "Tonno", description: "Tomaten, Mozzarella, Thunfisch, Zwiebeln", price: 17, price45: 31, image: IMG("pizzalemon_13_tonno.jpg") },
-      { name: "Piccante", description: "Tomaten, Mozzarella, Peperoni, Peperoncini, Zwiebeln, Knoblauch, Oregano", price: 18, price45: 32, image: IMG("pizzalemon_14_piccante.jpg") },
-      { name: "Raclette", description: "Tomaten, Mozzarella, Rohschinken", price: 18, price45: 32, image: IMG("pizzalemon_15_raclette.jpg") },
-      { name: "Fiorentina", description: "Tomaten, Mozzarella, Spinat, Gorgonzola, Knoblauch", price: 18, price45: 32, image: IMG("pizzalemon_16_fiorentina.jpg") },
-      { name: "Kebab Pizza", description: "Tomaten, Mozzarella, Kebabfleisch", price: 19, price45: 33, image: IMG("pizzalemon_17_kebab_pizza.jpg") },
-      { name: "Poulet", description: "Tomaten, Mozzarella, Poulet", price: 19, price45: 33, image: IMG("pizzalemon_18_poulet.jpg") },
-      { name: "Carbonara", description: "Tomaten, Mozzarella, Speck, Ei, Rahm", price: 19, price45: 33, image: IMG("pizzalemon_19_carbonara.jpg") },
-      { name: "Gamberetti", description: "Tomaten, Mozzarella, Crevetten, Knoblauch", price: 19, price45: 33, image: IMG("pizzalemon_20_gamberetti.jpg") },
-      { name: "Quattro Formaggi", description: "Tomaten, Mozzarella, 4 verschiedene K\xE4sesorten", price: 19, price45: 33, image: IMG("pizzalemon_21_quattro_formaggi.jpg") },
-      { name: "Quattro Stagioni", description: "Tomaten, Mozzarella, Schinken, Pilze, Peperoni, Artischocken", price: 19, price45: 33, image: IMG("pizzalemon_22_quattro_stagioni.jpg") },
-      { name: "Frutti di Mare", description: "Tomaten, Mozzarella, Meeresfr\xFCchte", price: 19, price45: 33, image: IMG("pizzalemon_23_frutti_di_mare.jpg") },
-      { name: "Verdura", description: "Tomaten, Mozzarella, verschiedenes Gem\xFCse", price: 19, price45: 33, image: IMG("pizzalemon_24_verdura.jpg") },
-      { name: "Napoli", description: "Tomaten, Mozzarella, Sardellen, Kapern, Oliven", price: 18, price45: 32, image: IMG("pizzalemon_25_napoli.jpg") },
-      { name: "Pizzaiolo", description: "Tomaten, Mozzarella, Speck, Knoblauch, Pilze", price: 18, price45: 32, image: IMG("pizzalemon_26_pizzaiolo.jpg") },
-      { name: "A'Casa", description: "Tomaten, Mozzarella, Gorgonzola, Peperoni, Pilze, Knoblauch, Zwiebeln", price: 19, price45: 34, image: IMG("pizzalemon_27_a_casa.jpg") },
-      { name: "Porcini", description: "Tomaten, Mozzarella, Steinpilze, Zwiebeln, Oregano", price: 19, price45: 34, image: IMG("pizzalemon_28_porcini.jpg") },
-      { name: "Spezial", description: "Tomaten, Mozzarella, Kalbfleisch, Knoblauch, Kr\xE4uterbutter, Zwiebeln, Oregano", price: 19, price45: 34, image: IMG("pizzalemon_29_spezial.jpg") },
-      { name: "Padrone", description: "Tomaten, Mozzarella, Gorgonzola, Pilze", price: 20, price45: 33, image: IMG("pizzalemon_30_padrone.jpg") },
-      { name: "Schloss Pizza", description: "Tomaten, Mozzarella, Kalbfleisch, Speck, scharfe Salami", price: 20, price45: 34, image: IMG("pizzalemon_31_schloss_pizza.jpg") },
-      { name: "Italiano", description: "Tomaten, Mozzarella, Rohschinken, Mascarpone, Rucola", price: 20, price45: 34, image: IMG("pizzalemon_32_italiano.jpg") },
-      { name: "Americano", description: "Tomaten, Mozzarella, Speck, Mais, Zwiebeln", price: 21, price45: 36, image: IMG("pizzalemon_33_americano.jpg") },
-      { name: "Lemon Pizza", description: "Tomaten, Mozzarella, Lammfleisch, Knoblauch, Peperoncini, Scharf", price: 20, price45: 34, image: IMG("pizzalemon_34_lemon_pizza.jpg") }
+      { name: "Margherita", description: "Tomatensauce, Mozzarella, Oregano", price: 15, price45: 27, image: IMG("pizzalemon_01_margherita.jpg") },
+      { name: "Profumata", description: "Zwiebeln, Knoblauch", price: 16, price45: 29, image: IMG("pizzalemon_02_profumata.jpg") },
+      { name: "Funghi", description: "Frische Champignons", price: 16, price45: 30, image: IMG("pizzalemon_03_funghi.jpg") },
+      { name: "Spinat", description: "Spinat", price: 16, price45: 30, image: IMG("pizzalemon_04_spinat.jpg") },
+      { name: "Gorgonzola", description: "Gorgonzola", price: 16, price45: 31, image: IMG("pizzalemon_05_gorgonzola.jpg") },
+      { name: "Prosciutto", description: "Schinken", price: 17, price45: 32, image: IMG("pizzalemon_06_prosciutto.jpg") },
+      { name: "Salami", description: "Scharfe Salami", price: 17, price45: 32, image: IMG("pizzalemon_07_salami.jpg") },
+      { name: "Arrabbiata", description: "Oliven, frische Champignons, scharf", price: 17, price45: 33, image: IMG("pizzalemon_09_arrabbiata.jpg") },
+      { name: "Diavola", description: "Scharfe Salami, Oliven, Zwiebeln", price: 18, price45: 33, image: IMG("pizzalemon_08_diavola.jpg") },
+      { name: "Siciliana", description: "Schinken, Sardellen, Kapern", price: 18, price45: 33, image: IMG("pizzalemon_10_siciliana.jpg") },
+      { name: "Prosciutto E Funghi", description: "Frische Champignons, Schinken", price: 18, price45: 33, image: IMG("pizzalemon_11_prosciutto_e_funghi.jpg") },
+      { name: "Hawaii", description: "Schinken, Ananas", price: 18, price45: 33, image: IMG("pizzalemon_12_hawaii.jpg") },
+      { name: "Tonno", description: "Thon, Zwiebeln", price: 18, price45: 33, image: IMG("pizzalemon_13_tonno.jpg") },
+      { name: "Piccante", description: "Peperoni, Peperoncini, Zwiebeln, Knoblauch", price: 18, price45: 34, image: IMG("pizzalemon_14_piccante.jpg") },
+      { name: "Raclette", description: "Raclettek\xE4se", price: 18, price45: 34, image: IMG("pizzalemon_15_raclette.jpg") },
+      { name: "Fiorentina", description: "Spinat, Parmesan, Ei, Oregano", price: 19, price45: 34, image: IMG("pizzalemon_16_fiorentina.jpg") },
+      { name: "Kebab Pizza", description: "Kebabfleisch", price: 20, price45: 35, image: IMG("pizzalemon_17_kebab_pizza.jpg") },
+      { name: "Poulet", description: "Poulet", price: 20, price45: 35, image: IMG("pizzalemon_18_poulet.jpg") },
+      { name: "Carbonara", description: "Speck, Ei, Zwiebeln", price: 20, price45: 35, image: IMG("pizzalemon_19_carbonara.jpg") },
+      { name: "Gamberetti", description: "Crevetten, Knoblauch", price: 20, price45: 35, image: IMG("pizzalemon_20_gamberetti.jpg") },
+      { name: "Quattro Formaggi", description: "4 K\xE4sesorten, Mascarpone", price: 20, price45: 35, image: IMG("pizzalemon_21_quattro_formaggi.jpg") },
+      { name: "Quattro Stagioni", description: "Schinken, Champignons, Artischocken, Peperoni", price: 20, price45: 35, image: IMG("pizzalemon_22_quattro_stagioni.jpg") },
+      { name: "Frutti Di Mare", description: "Meeresfr\xFCchte", price: 20, price45: 35, image: IMG("pizzalemon_23_frutti_di_mare.jpg") },
+      { name: "Verdura", description: "Gem\xFCse", price: 20, price45: 35, image: IMG("pizzalemon_24_verdura.jpg") },
+      { name: "Napoli", description: "Sardellen, Oliven, Kapern", price: 18, price45: 34, image: IMG("pizzalemon_25_napoli.jpg") },
+      { name: "Pizzaiolo", description: "Speck, Knoblauch, frische Champignons", price: 18, price45: 34, image: IMG("pizzalemon_26_pizzaiolo.jpg") },
+      { name: "Acasa", description: "Gefl\xFCgelgeschnetzeltes, Peperoni, Ei", price: 20, price45: 36, image: IMG("pizzalemon_27_a_casa.jpg") },
+      { name: "Porcini", description: "Steinpilze, Zwiebeln", price: 20, price45: 36, image: IMG("pizzalemon_28_porcini.jpg") },
+      { name: "Spezial", description: "Kalbfleisch, Knoblauch, scharf, Kr\xE4uterbutter", price: 21, price45: 36, image: IMG("pizzalemon_29_spezial.jpg") },
+      { name: "Padrone", description: "Gorgonzola, frische Champignons", price: 21, price45: 35, image: IMG("pizzalemon_30_padrone.jpg") },
+      { name: "Schloss Pizza", description: "Schinken, Speck, scharfe Salami", price: 21, price45: 36, image: IMG("pizzalemon_31_schloss_pizza.jpg") },
+      { name: "Italiano", description: "Rohschinken, Mascarpone, Rucola", price: 21, price45: 36, image: IMG("pizzalemon_32_italiano.jpg") },
+      { name: "Americano", description: "Speck, Mais, Zwiebeln", price: 21, price45: 36, image: IMG("pizzalemon_33_americano.jpg") },
+      { name: "Lemon Pizza", description: "Lammfleisch, Knoblauch, Zwiebeln, Peperoncini, scharf", price: 21, price45: 36, image: IMG("pizzalemon_34_lemon_pizza.jpg") }
     ];
     CALZONES = [
       { name: "Calzone", description: "Tomaten, Mozzarella, Schinken, Pilze, Ei", price: 20, image: IMG("pizzalemon_c1_calzone.jpg") },
-      { name: "Calzone Kebab", description: "Tomaten, Mozzarella, Kebabfleisch", price: 20, image: IMG("pizzalemon_c2_calzone_kebab.jpg") },
+      { name: "Calzone Kebab", description: "Tomaten, Mozzarella, Kebabfleisch, Ei", price: 20, image: IMG("pizzalemon_c2_calzone_kebab.jpg") },
       { name: "Calzone Verdura", description: "Tomaten, Mozzarella, Saisongem\xFCse", price: 20, image: IMG("pizzalemon_c3_calzone_verdura.jpg") }
     ];
     PIDE = [
-      { name: "Wunschpide", description: "Ihre Wunschpide \u2013 w\xE4hlen Sie Ihre Zutaten", price: 15, image: IMG("pizzalemon_wunschpide.jpg") },
       { name: "Pide mit K\xE4se", description: "Pide mit Schafsk\xE4se", price: 15, image: IMG("pizzalemon_36_pide_mit_kaese.jpg") },
-      { name: "Pide mit Hackfleisch", description: "Pide mit Hackfleisch und Tomaten", price: 17, image: IMG("pizzalemon_37_pide_mit_hackfleisch.jpg") },
+      { name: "Pide mit Hackfleisch", description: "Pide mit Hackfleisch", price: 17, image: IMG("pizzalemon_37_pide_mit_hackfleisch.jpg") },
       { name: "Pide mit K\xE4se und Hackfleisch", description: "Pide mit Schafsk\xE4se und Hackfleisch", price: 18, image: IMG("pizzalemon_38_pide_kaese_hackfleisch.jpg") },
       { name: "Pide mit K\xE4se und Spinat", description: "Pide mit Schafsk\xE4se und Spinat", price: 18, image: IMG("pizzalemon_39_pide_kaese_spinat.jpg") },
       { name: "Pide mit K\xE4se und Ei", description: "Pide mit Schafsk\xE4se und Ei", price: 18, image: IMG("pizzalemon_40_pide_kaese_ei.jpg") },
-      { name: "Lemon Pide", description: "Hausgemachte Pide mit gew\xFCrztem Hackfleisch und K\xE4se", price: 18, image: IMG("pizzalemon_41_lemon_pide.jpg") },
-      { name: "Lemon Pide Spezial", description: "Fein gehacktes Fleisch mit dem Messer gehackt", price: 20, image: IMG("pizzalemon_42_lemon_pide_spezial.jpg") },
-      { name: "Pide mit Sucuk", description: "Pide mit t\xFCrkischer Knoblauchwurst", price: 18, image: IMG("pizzalemon_43_pide_mit_sucuk.jpg") },
+      { name: "Lemon Pide / Eti Ekmek", description: "Gew\xFCrztes Hackfleisch und K\xE4se", price: 18, image: IMG("pizzalemon_41_lemon_pide.jpg") },
+      { name: "Lemon Pide Spezial / Bicak Arasi", description: "Gew\xFCrztes, fein gehacktes Fleisch", price: 20, image: IMG("pizzalemon_42_lemon_pide_spezial.jpg") },
+      { name: "Pide mit Sucuk", description: "Knoblauchwurst", price: 18, image: IMG("pizzalemon_43_pide_mit_sucuk.jpg") },
       { name: "Pide mit Kebabfleisch", description: "Pide mit Kebabfleisch", price: 20, image: IMG("pizzalemon_44_pide_mit_kebabfleisch.jpg") }
     ];
     LAHMACUN = [
       { name: "Lahmacun mit Salat", description: "T\xFCrkische Minipizza mit Hackfleisch und frischem Salat", price: 15, image: IMG("pizzalemon_45_lahmacun_mit_salat.jpg") },
-      { name: "Lahmacun mit Salat und Kebab", description: "Lahmacun mit frischem Salat und Kebabfleisch", price: 18, image: IMG("pizzalemon_46_lahmacun_salat_kebab.jpg") }
+      { name: "Lahmacun mit Salat und Kebab", description: "Lahmacun mit frischem Salat und Kebabfleisch", price: 20, image: IMG("pizzalemon_46_lahmacun_salat_kebab.jpg") }
     ];
     TELLERGERICHTE = [
-      { name: "D\xF6ner Teller+Pommes", description: "D\xF6ner Kebab auf dem Teller mit Pommes frites", price: 18, image: IMG("pizzalemon_47_doener_teller_pommes.jpg") },
-      { name: "D\xF6ner Teller+Salat", description: "D\xF6ner Kebab auf dem Teller mit frischem Salat", price: 18, image: IMG("pizzalemon_48_doener_teller_salat.jpg") },
-      { name: "D\xF6ner Teller Komplett", description: "D\xF6ner Kebab auf dem Teller mit Salat und Pommes", price: 20, image: IMG("pizzalemon_49_doener_teller_komplett.jpg") },
-      { name: "Chicken Nuggets 8Stk", description: "8 knusprige Chicken Nuggets mit Pommes oder Salat", price: 17, image: IMG("pizzalemon_50_chicken_nuggets_8stk.jpg") },
-      { name: "Pouletschnitzel", description: "Zartes Pouletschnitzel mit Pommes oder Salat und Brot", price: 17, image: IMG("pizzalemon_51_pouletschnitzel.jpg") },
-      { name: "Pouletfl\xFCgeli 12Stk", description: "12 knusprige Pouletfl\xFCgeli mit Pommes oder Salat", price: 18, image: IMG("pizzalemon_52_pouletfluegeli_12stk.jpg") },
-      { name: "Poulet Kebab Teller", description: "Poulet Kebab auf dem Teller mit Pommes oder Salat", price: 18, image: IMG("pizzalemon_53_poulet_kebab_teller.jpg") },
-      { name: "Lamm Kebab Teller", description: "Lamm Kebab (Sac Kavurma) mit Pommes oder Salat", price: 22, image: IMG("pizzalemon_54_lamm_kebab_teller.jpg") },
-      { name: "K\xF6fte Teller", description: "T\xFCrkische Hackfleischb\xE4llchen mit Pommes oder Salat", price: 18, image: IMG("pizzalemon_55_koefte_teller.jpg") },
-      { name: "Cevapcici Teller", description: "Gegrillte Cevapcici mit Pommes oder Salat und Brot", price: 18, image: IMG("pizzalemon_56_cevapcici_teller.jpg") },
-      { name: "Falafel Teller", description: "Knusprige Falafel mit Pommes oder Salat und Brot", price: 16, image: IMG("pizzalemon_57_falafel_teller.jpg") },
+      { name: "D\xF6ner Teller Mit Pommes", description: "D\xF6ner Teller mit Pommes", price: 20, image: IMG("pizzalemon_47_doener_teller_pommes.jpg") },
+      { name: "D\xF6ner Teller Mit Salat", description: "D\xF6ner Teller mit Salat", price: 20, image: IMG("pizzalemon_48_doener_teller_salat.jpg") },
+      { name: "D\xF6ner Teller Mit Salat Und Pommes", description: "D\xF6ner Teller mit Salat und Pommes", price: 22, image: IMG("pizzalemon_49_doener_teller_komplett.jpg") },
+      { name: "Chicken Nuggets 8 Stk.", description: "Mit Pommes oder Salat", price: 19, image: IMG("pizzalemon_50_chicken_nuggets_8stk.jpg") },
+      { name: "Pouletschnitzel", description: "Mit Pommes oder Salat und Brot", price: 19, image: IMG("pizzalemon_51_pouletschnitzel.jpg") },
+      { name: "Pouletfl\xFCgeli 12 Stk.", description: "Mit Pommes oder Salat und Brot", price: 20, image: IMG("pizzalemon_52_pouletfluegeli_12stk.jpg") },
+      { name: "Poulet Kebab Teller", description: "Mit Pommes oder Salat und Brot", price: 20, image: IMG("pizzalemon_53_poulet_kebab_teller.jpg") },
+      { name: "Lamm Kebab Teller / Sac Kavurma", description: "Mit Pommes oder Salat und Brot", price: 22, image: IMG("pizzalemon_54_lamm_kebab_teller.jpg") },
+      { name: "K\xF6fte Teller", description: "Mit Pommes oder Salat und Brot", price: 21, image: IMG("pizzalemon_55_koefte_teller.jpg") },
+      { name: "Cevapcici", description: "Mit Pommes oder Salat und Brot", price: 19, image: IMG("pizzalemon_56_cevapcici_teller.jpg") },
+      { name: "Falafel Teller", description: "Mit Pommes oder Salat und Brot", price: 18, image: IMG("pizzalemon_57_falafel_teller.jpg") },
       { name: "Pommes", description: "Pommes frites, knusprig frittiert", price: 10, image: IMG("pizzalemon_58_pommes.jpg") },
-      { name: "Original Schweins Cordon Bleu", description: "Original Schweins Cordon Bleu mit Gem\xFCse, Salat, Pommes", price: 23, image: IMG("pizzalemon_59_cordon_bleu.jpg") }
+      { name: "Original Schweins Cordon Bleu", description: "Mit frischem Gem\xFCse, Salat, Pommes", price: 23, image: IMG("pizzalemon_59_cordon_bleu.jpg") }
     ];
     FINGERFOOD = [
-      { name: "D\xF6ner Kebab Tasche", description: "D\xF6ner Kebab im Taschenbrot", price: 13, image: IMG("pizzalemon_60_doener_kebab_tasche.jpg") },
-      { name: "D\xFCr\xFCm Kebab", description: "D\xF6ner Kebab im Fladenbrot", price: 14, image: IMG("pizzalemon_61_dueruem_kebab.jpg") },
-      { name: "D\xF6ner Box", description: "D\xF6ner Kebab in der Box mit Salat und Pommes", price: 13, image: IMG("pizzalemon_62_doener_box.jpg") },
-      { name: "Falafel", description: "Knusprige Falafel im Taschenbrot", price: 12, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
-      { name: "Falafel D\xFCr\xFCm", description: "Falafel im Fladenbrot", price: 12, image: IMG("pizzalemon_64_falafel_dueruem.jpg") },
-      { name: "Poulet Pepito", description: "Gegrilltes Poulet im Fladenbrot", price: 12, image: IMG("pizzalemon_65_poulet_pepito.jpg") },
-      { name: "Lamm Pepito", description: "Gegrilltes Lammfleisch im Fladenbrot", price: 14, image: IMG("pizzalemon_66_lamm_pepito.jpg") },
-      { name: "Hamburger", description: "Klassischer Hamburger mit Salat und Sauce", price: 11, image: IMG("pizzalemon_67_hamburger.jpg") },
+      { name: "D\xF6ner Kebab Im Taschenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 14, image: IMG("pizzalemon_60_doener_kebab_tasche.jpg") },
+      { name: "D\xFCr\xFCm Kebab Im Fladenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 14, image: IMG("pizzalemon_61_dueruem_kebab.jpg") },
+      { name: "D\xF6ner Box Mit Salat Und Pommes", description: "D\xF6ner Box mit Salat und Pommes", price: 14, image: IMG("pizzalemon_62_doener_box.jpg") },
+      { name: "Falafel Im Taschenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 13, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
+      { name: "Falafel D\xFCr\xFCm Im Fladenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 13, image: IMG("pizzalemon_64_falafel_dueruem.jpg") },
+      { name: "Poulet Pepito", description: "Poulet im Fladenbrot", price: 13, image: IMG("pizzalemon_65_poulet_pepito.jpg") },
+      { name: "Lamm Pepito", description: "Lamm im Fladenbrot", price: 15, image: IMG("pizzalemon_66_lamm_pepito.jpg") },
       { name: "Lemon Burger", description: "Lemon Burger mit Rindfleisch, Raclettek\xE4se und Ei", price: 17, image: IMG("pizzalemon_68_lemon_burger.jpg") },
-      { name: "Cheeseburger", description: "Cheeseburger mit Rindfleisch und K\xE4se", price: 13, image: IMG("pizzalemon_69_cheeseburger.jpg") },
-      { name: "Hamburger Rindfleisch", description: "Hamburger mit 100% Rindfleisch", price: 12, image: IMG("pizzalemon_70_hamburger_rindfleisch.jpg") },
-      { name: "Poulet Kebab Tasche", description: "Poulet Kebab mit Gem\xFCse im Taschenbrot", price: 13, image: IMG("pizzalemon_71_poulet_kebab_tasche.jpg") },
-      { name: "Poulet Kebab Fladen", description: "Poulet Kebab mit Gem\xFCse im Fladenbrot", price: 13, image: IMG("pizzalemon_72_poulet_kebab_fladen.jpg") },
-      { name: "Lamm Kebab Tasche", description: "Lamm Kebab mit Gem\xFCse im Taschenbrot", price: 14, image: IMG("pizzalemon_73_lamm_kebab_tasche.jpg") },
-      { name: "Lamm Kebab Fladen", description: "Lamm Kebab mit Gem\xFCse im Fladenbrot", price: 14, image: IMG("pizzalemon_74_lamm_kebab_fladen.jpg") },
-      { name: "K\xF6fte Taschenbrot", description: "T\xFCrkische Hackfleischb\xE4llchen im Taschenbrot", price: 13, image: IMG("pizzalemon_75_koefte_taschenbrot.jpg") },
-      { name: "Cevapcici Taschenbrot", description: "Gegrillte Cevapcici im Taschenbrot", price: 13, image: IMG("pizzalemon_76_cevapcici_taschenbrot.jpg") },
-      { name: "Falafel Box", description: "Knusprige Falafel in der Box mit Salat und Pommes", price: 12, image: IMG("pizzalemon_77_falafel_box.jpg") },
-      { name: "Chicken Nuggets Box", description: "Chicken Nuggets in der Box mit Dip", price: 12, image: IMG("pizzalemon_78_chicken_nuggets_box.jpg") },
-      { name: "Kebab Fladen+Raclette", description: "Kebab im Fladenbrot mit Raclettek\xE4se \xFCberbacken", price: 15, image: IMG("pizzalemon_79_kebab_fladen_raclette.jpg") },
-      { name: "Kebab Tasche+Raclette", description: "Kebab im Taschenbrot mit Raclettek\xE4se \xFCberbacken", price: 15, image: IMG("pizzalemon_80_kebab_tasche_raclette.jpg") },
-      { name: "Kebab Fladen+Speck", description: "Kebab im Fladenbrot mit Speck", price: 15, image: IMG("pizzalemon_81_kebab_fladen_speck.jpg") },
-      { name: "Kebab Tasche+Speck", description: "Kebab im Taschenbrot mit Speck", price: 15, image: IMG("pizzalemon_82_kebab_tasche_speck.jpg") },
-      { name: "Extra Kebap", description: "Extra Portion Kebabfleisch", price: 5, image: IMG("pizzalemon_ex_kebap.jpg") }
+      { name: "Cheeseburger", description: "Mit Rindfleisch und K\xE4se", price: 14, image: IMG("pizzalemon_69_cheeseburger.jpg") },
+      { name: "Hamburger Mit Rindfleisch", description: "Hamburger mit Rindfleisch", price: 13, image: IMG("pizzalemon_70_hamburger_rindfleisch.jpg") },
+      { name: "Poulet Kebab Mit Gem\xFCse Im Taschenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 14, image: IMG("pizzalemon_71_poulet_kebab_tasche.jpg") },
+      { name: "Poulet Kebab Mit Gem\xFCse Im Fladenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 14, image: IMG("pizzalemon_72_poulet_kebab_fladen.jpg") },
+      { name: "Lamm Kebab Mit Gem\xFCse Im Taschenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 15, image: IMG("pizzalemon_73_lamm_kebab_tasche.jpg") },
+      { name: "Lamm Kebab Mit Gem\xFCse Im Fladenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 15, image: IMG("pizzalemon_74_lamm_kebab_fladen.jpg") },
+      { name: "K\xF6fte Im Taschenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 14, image: IMG("pizzalemon_75_koefte_taschenbrot.jpg") },
+      { name: "Cevapcici Im Taschenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 14, image: IMG("pizzalemon_76_cevapcici_taschenbrot.jpg") },
+      { name: "Falafel Box Mit Salat Und Pommes", description: "Falafel Box mit Salat und Pommes", price: 13, image: IMG("pizzalemon_77_falafel_box.jpg") },
+      { name: "Chicken Nuggets Box", description: "Chicken Nuggets Box", price: 13, image: IMG("pizzalemon_78_chicken_nuggets_box.jpg") },
+      { name: "Kebab Im Fladenbrot mit Raclette", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 16, image: IMG("pizzalemon_79_kebab_fladen_raclette.jpg") },
+      { name: "Kebab Im Taschenbrot mit Raclette", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 16, image: IMG("pizzalemon_80_kebab_tasche_raclette.jpg") },
+      { name: "Kebab Im Fladenbrot mit Speck", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 16, image: IMG("pizzalemon_81_kebab_fladen_speck.jpg") },
+      { name: "Kebab Im Taschenbrot mit Speck", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 16, image: IMG("pizzalemon_82_kebab_tasche_speck.jpg") }
     ];
     SALATE = [
-      { name: "Gr\xFCner Salat", description: "Frischer Blattsalat, Sauce: Italienisch oder Franz\xF6sisch", price: 8, image: IMG("pizzalemon_83_gruener_salat.jpg") },
-      { name: "Gemischter Salat", description: "Frischer gemischter Salat, Sauce: Italienisch oder Franz\xF6sisch", price: 9, image: IMG("pizzalemon_84_gemischter_salat.jpg") },
-      { name: "Griechischer Salat", description: "Tomaten, Gurken, Oliven, Feta", price: 12, image: IMG("pizzalemon_85_griechischer_salat.jpg") },
-      { name: "Lemon Salat", description: "Tomaten, Gurken, gegrilliertes Pouletfleisch", price: 13, image: IMG("pizzalemon_86_lemon_salat.jpg") },
-      { name: "Thon Salat", description: "Thunfisch, gemischter Salat", price: 10, image: IMG("pizzalemon_87_thon_salat.jpg") },
-      { name: "Tomaten Salat", description: "Tomaten, Zwiebeln", price: 9, image: IMG("pizzalemon_88_tomaten_salat.jpg") },
-      { name: "Tomaten Mozzarella", description: "Tomaten mit Mozzarella und Basilikum", price: 12, image: IMG("pizzalemon_89_tomaten_mozzarella.jpg") },
-      { name: "Knoblibrot", description: "Knuspriges Brot mit Knoblauchbutter", price: 5, image: IMG("pizzalemon_90_knoblibrot.jpg") }
+      { name: "Gr\xFCner Salat", description: "Sauce nach Wahl: Italienisch oder Franz\xF6sisch", price: 9, image: IMG("pizzalemon_83_gruener_salat.jpg") },
+      { name: "Gemischter Salat", description: "Sauce nach Wahl: Italienisch oder Franz\xF6sisch", price: 12, image: IMG("pizzalemon_84_gemischter_salat.jpg") },
+      { name: "Griechischer Salat", description: "Sauce nach Wahl: Italienisch oder Franz\xF6sisch", price: 14, image: IMG("pizzalemon_85_griechischer_salat.jpg") },
+      { name: "Lemon Salat", description: "Tomaten, Gurken und grilliertes Pouletfleisch", price: 15, image: IMG("pizzalemon_86_lemon_salat.jpg") },
+      { name: "Thon Salat", description: "Thunfisch, gemischter Salat", price: 13, image: IMG("pizzalemon_87_thon_salat.jpg") },
+      { name: "Tomaten Salat", description: "Tomaten, Zwiebeln", price: 12, image: IMG("pizzalemon_88_tomaten_salat.jpg") },
+      { name: "Tomaten Mozzarella Salat", description: "Tomaten, Mozzarella", price: 14, image: IMG("pizzalemon_89_tomaten_mozzarella.jpg") },
+      { name: "Knoblibrot", description: "Knoblauchbrot", price: 7, image: IMG("pizzalemon_90_knoblibrot.jpg") },
+      { name: "Crevettencocktail Salat", description: "Crevettencocktail Salat", price: 15, image: IMG("pizzalemon_91_crevettencocktail.jpg") }
     ];
     DESSERTS = [
-      { name: "Tiramisu", description: "Klassisches italienisches Tiramisu", price: 6, image: IMG("pizzalemon_92_tiramisu.jpg") },
-      { name: "Baklava", description: "T\xFCrkisches Baklava mit Honig und N\xFCssen \u2013 Portion 4 Stk.", price: 8, image: IMG("pizzalemon_93_baklava.jpg") },
-      { name: "Marlenke mit Honig", description: "Tschechischer Honigkuchen (Marlenka) mit Honig", price: 6, image: IMG("pizzalemon_94_marlenke.jpg") },
-      { name: "Marlenke mit Schokolade", description: "Tschechischer Honigkuchen (Marlenka) mit Schokolade", price: 6, image: IMG("pizzalemon_94_marlenke.jpg") },
-      { name: "Choco-Mousse", description: "Cremige Schokoladenmousse", price: 7, image: IMG("pizzalemon_95_choco_mousse.jpg") },
-      { name: "M\xF6venpick Glace Erdbeer", description: "M\xF6venpick Premium-Glac\xE9 Erdbeer (175ml)", price: 6, image: IMG("pizzalemon_96_moevenpick_glace.jpg") },
-      { name: "M\xF6venpick Glace Schokolade", description: "M\xF6venpick Premium-Glac\xE9 Schokolade (175ml)", price: 6, image: IMG("pizzalemon_96_moevenpick_glace.jpg") },
-      { name: "M\xF6venpick Glace Vanille", description: "M\xF6venpick Premium-Glac\xE9 Vanille (175ml)", price: 6, image: IMG("pizzalemon_96_moevenpick_glace.jpg") },
-      { name: "M\xF6venpick Glace Caramel", description: "M\xF6venpick Premium-Glac\xE9 Caramel (175ml)", price: 6, image: IMG("pizzalemon_96_moevenpick_glace.jpg") }
+      { name: "Tiramis\xF9", description: "Klassisches italienisches Tiramis\xF9", price: 7, image: IMG("pizzalemon_92_tiramisu.jpg") },
+      { name: "Baklava", description: "Portion 4 Stk.", price: 8, image: IMG("pizzalemon_93_baklava.jpg") },
+      { name: "Marlenke mit Honig oder Schokolade", description: "Marlenke mit Honig oder Schokolade", price: 7, image: IMG("pizzalemon_94_marlenke.jpg") },
+      { name: "Choco-Mousse", description: "Cremige Schokoladenmousse", price: 7, image: IMG("pizzalemon_95_choco_mousse.jpg") }
     ];
     GETRAENKE = [
-      { name: "Coca-Cola", description: "Coca-Cola, 0.5l", price: 4, image: IMG("pizzalemon_97_coca_cola.jpg") },
-      { name: "Coca-Cola 1.5l", description: "Coca-Cola, 1.5l Flasche", price: 6, image: IMG("pizzalemon_coca_cola_1500ml.jpg") },
-      { name: "Coca-Cola Zero", description: "Coca-Cola Zero, 0.5l", price: 4, image: IMG("pizzalemon_97_coca_cola.jpg") },
-      { name: "Coca-Cola Zero 1.5l", description: "Coca-Cola Zero, 1.5l Flasche", price: 6, image: IMG("pizzalemon_coca_cola_zero_1500ml.jpg") },
-      { name: "Fanta", description: "Fanta Orange, 0.5l", price: 6, image: IMG("pizzalemon_98_fanta.jpg") },
-      { name: "Fanta 1.5l", description: "Fanta Orange, 1.5l Flasche", price: 6, image: IMG("pizzalemon_fanta_1500ml.jpg") },
-      { name: "Eistee Pfirsich", description: "Eistee Pfirsich, 0.5l", price: 4, image: IMG("pizzalemon_99_eistee.jpg") },
-      { name: "Eistee Pfirsich 1.5l", description: "Eistee Pfirsich, 1.5l Flasche", price: 6, image: IMG("pizzalemon_eistee_1500ml.jpg") },
-      { name: "Uludag Gazoz", description: "T\xFCrkische Limonade Uludag, 0.5l", price: 4, image: IMG("pizzalemon_101_uludag_gazoz.jpg") },
-      { name: "Rivella Blau", description: "Rivella Blau, 0.5l", price: 4, image: IMG("pizzalemon_102_rivella.jpg") },
-      { name: "Rivella Rot", description: "Rivella Rot, 0.5l", price: 4, image: IMG("pizzalemon_102_rivella.jpg") },
-      { name: "Ayran", description: "T\xFCrkisches Joghurtgetr\xE4nk, 0.25l", price: 4, image: IMG("pizzalemon_103_ayran.jpg") },
-      { name: "Red Bull", description: "Red Bull Energy Drink, 0.25l", price: 5, image: IMG("pizzalemon_104_red_bull.jpg") }
+      { name: "Coca-Cola", description: "50cl oder 1.5 L", price: 4, image: IMG("pizzalemon_97_coca_cola.jpg") },
+      { name: "Coca-Cola Light", description: "50cl oder 1.5 L", price: 4, image: IMG("pizzalemon_97_coca_cola.jpg") },
+      { name: "Coca-Cola Zero", description: "50cl oder 1.5 L", price: 4, image: IMG("pizzalemon_97_coca_cola.jpg") },
+      { name: "Fanta", description: "50cl oder 1.5 L", price: 4, image: IMG("pizzalemon_98_fanta.jpg") },
+      { name: "Eistee", description: "50cl oder 1.5 L", price: 4, image: IMG("pizzalemon_99_eistee.jpg") },
+      { name: "Mineralwasser", description: "50cl oder 1.5 L", price: 4, image: IMG("pizzalemon_100_mineralwasser.jpg") },
+      { name: "Uludag Gazoz", description: "50cl", price: 4, image: IMG("pizzalemon_101_uludag_gazoz.jpg") },
+      { name: "Rivella", description: "50cl", price: 4, image: IMG("pizzalemon_102_rivella.jpg") },
+      { name: "Ayran 0.25 L", description: "0.25 L", price: 4, image: IMG("pizzalemon_103_ayran.jpg") },
+      { name: "Red Bull 0.25 L", description: "0.25 L", price: 5, image: IMG("pizzalemon_104_red_bull.jpg") }
     ];
     BIER = [
       { name: "Feldschl\xF6sschen", description: "Feldschl\xF6sschen Bier, 0.5l", price: 5, image: IMG("pizzalemon_106_feldschloesschen.jpg") }
     ];
     ALKOHOL = [
-      { name: "Rotwein Merlot", description: "Merlot Rotwein, 50cl", price: 13, image: IMG("pizzalemon_107_rotwein_merlot.jpg") },
-      { name: "Weisswein", description: "Weisswein, 50cl", price: 15, image: IMG("pizzalemon_108_weisswein.jpg") },
+      { name: "Rotwein / Merlot", description: "50cl", price: 15, image: IMG("pizzalemon_107_rotwein_merlot.jpg") },
+      { name: "Weisswein", description: "50cl", price: 17, image: IMG("pizzalemon_108_weisswein.jpg") },
       { name: "Whisky", description: "Whisky 40%, 70cl Flasche", price: 50, image: IMG("pizzalemon_109_whisky.jpg") },
       { name: "Vodka", description: "Vodka 40%, 70cl Flasche", price: 50, image: IMG("pizzalemon_110_vodka.jpg") },
-      { name: "Champagner", description: "Champagner, 70cl Flasche", price: 30, image: IMG("pizzalemon_111_champagner.jpg") },
-      { name: "Smirnoff Ice", description: "Smirnoff Ice, 275ml", price: 6, image: IMG("pizzalemon_112_smirnoff_ice.jpg") }
+      { name: "Champagner", description: "70cl", price: 35, image: IMG("pizzalemon_111_champagner.jpg") },
+      { name: "Smirnoff", description: "275ml", price: 6, image: IMG("pizzalemon_112_smirnoff_ice.jpg") }
     ];
     EXTRAS = [
       // ── Existing extras ──────────────────────────────────────────────────────
       { name: "Brot", description: "Frisches Brot", price: 2, image: IMG("pizzalemon_extra_brot.jpg") },
       { name: "Knoblibrot", description: "Knuspriges Brot mit Knoblauchbutter", price: 7, image: IMG("pizzalemon_90_knoblibrot.jpg") },
       { name: "Pommes Extra", description: "Extra Portion Pommes frites", price: 11, image: IMG("pizzalemon_58_pommes.jpg") },
-      { name: "Zigaretten", description: "Zigaretten \u2013 aktueller Preis. Z\xE4hlen nicht zum Mindestbestellwert.", price: 17, image: IMG("pizzalemon_113_zigaretten.jpg") },
       // ── Pizza toppings (+CHF 2.00 each) ──────────────────────────────────────
       { name: "Tomato Sauce", description: "Tomatensauce", price: 2, image: emojiImg("\u{1F345}") },
       { name: "Sliced Tomatoes", description: "Tomatenscheiben", price: 2, image: emojiImg("\u{1F345}") },
@@ -3422,7 +3510,8 @@ var init_seedPizzaLemon = __esm({
       { name: "Gorgonzola", description: "Gorgonzola", price: 2, image: emojiImg("\u{1F9C0}") },
       { name: "Parmesan", description: "Parmesan", price: 2, image: emojiImg("\u{1F9C0}") },
       { name: "Mascarpone", description: "Mascarpone", price: 2, image: emojiImg("\u{1F9C0}") },
-      { name: "Kaesarand", description: "K\xE4serand", price: 2, image: emojiImg("\u{1F9C0}") },
+      { name: "K\xE4serand (33cm)", description: "K\xE4serand 33cm", price: 3, image: emojiImg("\u{1F9C0}") },
+      { name: "K\xE4serand (45cm)", description: "K\xE4serand 45cm", price: 6, image: emojiImg("\u{1F9C0}") },
       // ── Sauces (FREE) ─────────────────────────────────────────────────────────
       { name: "Mayonnaise", description: "Mayonnaise", price: 0, image: emojiImg("\u{1F96B}") },
       { name: "Ketchup", description: "Ketchup", price: 0, image: emojiImg("\u{1F345}") },
@@ -5221,6 +5310,25 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: e.message });
     }
   });
+  app2.get("/api/health", async (_req, res) => {
+    try {
+      const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      await pool2.query("SELECT 1");
+      res.json({
+        ok: true,
+        status: "healthy",
+        database: "mysql",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      });
+    } catch (e) {
+      res.status(500).json({
+        ok: false,
+        status: "unhealthy",
+        database: "mysql",
+        error: e.message
+      });
+    }
+  });
   app2.post("/api/landing/subscribe", async (req, res) => {
     try {
       const {
@@ -6837,12 +6945,12 @@ async function registerRoutes(app2) {
   app2.get("/api/fix-schema-and-seed", async (_req, res) => {
     try {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { sql: sql5 } = await import("drizzle-orm");
+      const { sql: sql4 } = await import("drizzle-orm");
       console.log("[API-SEED] Fixing schema...");
       const tables2 = ["branches", "products", "employees", "sales", "inventory", "customers", "suppliers"];
       for (const table of tables2) {
         try {
-          await db2.execute(sql5.raw(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id integer`));
+          await db2.execute(sql4.raw(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id integer`));
           console.log(`[API-SEED] Table ${table} fixed`);
         } catch (e) {
           console.log(`[API-SEED] Table ${table} skip: ${e.message}`);
@@ -8251,13 +8359,12 @@ async function test(){
     }
     try {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { sql: sql5 } = await import("drizzle-orm");
-      const tenants2 = await db2.execute(sql5`SELECT id, name FROM tenants LIMIT 1`);
-      const rows = tenants2[0];
-      if (!rows || rows.length === 0) {
+      const { sql: sql4 } = await import("drizzle-orm");
+      const firstTenant = (await storage.getTenants())[0];
+      if (!firstTenant) {
         return res.status(404).json({ error: "No tenants found" });
       }
-      const tid = rows[0].id;
+      const tid = firstTenant.id;
       const tables2 = [
         "products",
         "categories",
@@ -8293,14 +8400,18 @@ async function test(){
       for (const table of tables2) {
         try {
           const r = await db2.execute(
-            sql5.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`)
+            sql4.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`)
           );
           results[table] = r[0]?.affectedRows ?? 0;
         } catch (e) {
           results[table] = -1;
         }
       }
-      res.json({ success: true, tenant: { id: tid, name: rows[0].name }, updates: results });
+      res.json({
+        success: true,
+        tenant: { id: tid, name: firstTenant.businessName },
+        updates: results
+      });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -9236,8 +9347,8 @@ function registerSuperAdminRoutes(app2) {
         const branchIds = branchesList.map((b) => b.id);
         let total = 0;
         if (branchIds.length > 0) {
-          const { inArray: inArray2 } = await import("drizzle-orm");
-          const rows = await db.select().from(expenses2).where(inArray2(expenses2.branchId, branchIds));
+          const { inArray } = await import("drizzle-orm");
+          const rows = await db.select().from(expenses2).where(inArray(expenses2.branchId, branchIds));
           total = rows.reduce((acc, e) => acc + parseFloat(e.amount || "0"), 0);
         }
         result.push({ tenantId: t.id, businessName: t.businessName, totalExpenses: total });
@@ -9587,6 +9698,7 @@ var import_jsonwebtoken2 = __toESM(require("jsonwebtoken"));
 init_storage();
 var JWT_SECRET2 = process.env.JWT_SECRET || "barmagly-super-admin-secret-key-2024";
 var PUBLIC_ROUTES = [
+  "/api/health",
   "/api/license/validate",
   "/api/auth/google",
   "/api/landing/subscribe",
@@ -9714,17 +9826,20 @@ var WebhookHandlers = class {
 // server/index.ts
 var fs5 = __toESM(require("fs"));
 var path4 = __toESM(require("path"));
-if (process.env.PGHOST && process.env.PGHOST.includes("neon.tech")) {
-  const neonUrl = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || "neondb"}?sslmode=require`;
-  process.env.DATABASE_URL = neonUrl;
-  process.env.NEON_DATABASE_URL = neonUrl;
-} else if (process.env.NEON_DATABASE_URL) {
-  let neonUrl = process.env.NEON_DATABASE_URL;
-  if (!neonUrl.match(/neon\.tech\/\w+/)) {
-    neonUrl = neonUrl.replace(/\/$/, "") + "/neondb?sslmode=require";
+var usingMySql = Boolean(process.env.MYSQL_HOST || process.env.MYSQL_DATABASE);
+if (!usingMySql) {
+  if (process.env.PGHOST && process.env.PGHOST.includes("neon.tech")) {
+    const neonUrl = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || "neondb"}?sslmode=require`;
+    process.env.DATABASE_URL = neonUrl;
     process.env.NEON_DATABASE_URL = neonUrl;
+  } else if (process.env.NEON_DATABASE_URL) {
+    let neonUrl = process.env.NEON_DATABASE_URL;
+    if (!neonUrl.match(/neon\.tech\/\w+/)) {
+      neonUrl = neonUrl.replace(/\/$/, "") + "/neondb?sslmode=require";
+      process.env.NEON_DATABASE_URL = neonUrl;
+    }
+    process.env.DATABASE_URL = neonUrl;
   }
-  process.env.DATABASE_URL = neonUrl;
 }
 var app = (0, import_express.default)();
 var log2 = console.log;
@@ -10013,6 +10128,10 @@ function setupErrorHandler(app2) {
   });
 }
 async function initStripe() {
+  if (usingMySql) {
+    log2("MySQL mode detected, skipping Stripe schema sync");
+    return;
+  }
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     log2("DATABASE_URL not set, skipping Stripe init");
@@ -10237,8 +10356,8 @@ function setupPaymentGatewayRoutes(app2) {
 (async () => {
   try {
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    const { sql: sql5 } = await import("drizzle-orm");
-    await db2.execute(sql5.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS language text DEFAULT 'en'`));
+    const { sql: sql4 } = await import("drizzle-orm");
+    await db2.execute(sql4.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS language text DEFAULT 'en'`));
   } catch (e) {
     console.log("[Migration] landing_page_config.language:", e.message);
   }
@@ -10271,9 +10390,12 @@ function setupPaymentGatewayRoutes(app2) {
   await callerIdService.init(server);
   whatsappService.connect().catch((err) => log2("WhatsApp auto-connect error:", err));
   initStripe().catch((err) => log2("Stripe init error (non-fatal):", err));
-  try {
-    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    await pool2.query(`
+  if (usingMySql) {
+    log2("MySQL mode active; skipping legacy Postgres-only startup migrations");
+  } else {
+    try {
+      const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      await pool2.query(`
       CREATE TABLE IF NOT EXISTS platform_settings (
         id SERIAL PRIMARY KEY,
         key TEXT NOT NULL UNIQUE,
@@ -10291,18 +10413,18 @@ function setupPaymentGatewayRoutes(app2) {
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
-    log2("Platform tables ready");
-  } catch (err) {
-    log2("Error ensuring platform tables:", err);
-  }
-  try {
-    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    await pool2.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_addon boolean NOT NULL DEFAULT false;`);
-    const callsCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='calls'`);
-    const callsHasPhone = callsCols.rows.some((r) => r.column_name === "phone_number");
-    if (!callsHasPhone) {
-      await pool2.query(`DROP TABLE IF EXISTS calls CASCADE;`);
-      await pool2.query(`
+      log2("Platform tables ready");
+    } catch (err) {
+      log2("Error ensuring platform tables:", err);
+    }
+    try {
+      const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      await pool2.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_addon boolean NOT NULL DEFAULT false;`);
+      const callsCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='calls'`);
+      const callsHasPhone = callsCols.rows.some((r) => r.column_name === "phone_number");
+      if (!callsHasPhone) {
+        await pool2.query(`DROP TABLE IF EXISTS calls CASCADE;`);
+        await pool2.query(`
         CREATE TABLE calls (
           id serial PRIMARY KEY,
           tenant_id integer,
@@ -10314,19 +10436,19 @@ function setupPaymentGatewayRoutes(app2) {
           created_at timestamp DEFAULT now()
         );
       `);
-    } else {
-      await pool2.query(`
+      } else {
+        await pool2.query(`
         ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_tenant_id_fkey;
         ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_branch_id_fkey;
         ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_customer_id_fkey;
         ALTER TABLE calls DROP CONSTRAINT IF EXISTS calls_sale_id_fkey;
       `);
-    }
-    const vehiclesCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='vehicles'`);
-    const vehiclesHasPlate = vehiclesCols.rows.some((r) => r.column_name === "license_plate");
-    if (!vehiclesHasPlate) {
-      await pool2.query(`DROP TABLE IF EXISTS vehicles CASCADE;`);
-      await pool2.query(`
+      }
+      const vehiclesCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='vehicles'`);
+      const vehiclesHasPlate = vehiclesCols.rows.some((r) => r.column_name === "license_plate");
+      if (!vehiclesHasPlate) {
+        await pool2.query(`DROP TABLE IF EXISTS vehicles CASCADE;`);
+        await pool2.query(`
         CREATE TABLE vehicles (
           id serial PRIMARY KEY,
           tenant_id integer REFERENCES tenants(id) ON DELETE CASCADE,
@@ -10342,12 +10464,12 @@ function setupPaymentGatewayRoutes(app2) {
           created_at timestamp DEFAULT now()
         );
       `);
-    }
-    const printerCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='printer_configs'`);
-    const printerHasReceiptType = printerCols.rows.some((r) => r.column_name === "receipt_type");
-    if (!printerHasReceiptType) {
-      await pool2.query(`DROP TABLE IF EXISTS printer_configs CASCADE;`);
-      await pool2.query(`
+      }
+      const printerCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='printer_configs'`);
+      const printerHasReceiptType = printerCols.rows.some((r) => r.column_name === "receipt_type");
+      if (!printerHasReceiptType) {
+        await pool2.query(`DROP TABLE IF EXISTS printer_configs CASCADE;`);
+        await pool2.query(`
         CREATE TABLE printer_configs (
           id serial PRIMARY KEY,
           tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -10362,12 +10484,12 @@ function setupPaymentGatewayRoutes(app2) {
           updated_at timestamp DEFAULT now()
         );
       `);
-    }
-    const dailyCols = await pool2.query(`SELECT column_name, data_type FROM information_schema.columns WHERE table_name='daily_closings'`);
-    const dailyHasBranchId = dailyCols.rows.some((r) => r.column_name === "branch_id");
-    if (!dailyHasBranchId) {
-      await pool2.query(`DROP TABLE IF EXISTS daily_closings CASCADE;`);
-      await pool2.query(`
+      }
+      const dailyCols = await pool2.query(`SELECT column_name, data_type FROM information_schema.columns WHERE table_name='daily_closings'`);
+      const dailyHasBranchId = dailyCols.rows.some((r) => r.column_name === "branch_id");
+      if (!dailyHasBranchId) {
+        await pool2.query(`DROP TABLE IF EXISTS daily_closings CASCADE;`);
+        await pool2.query(`
         CREATE TABLE daily_closings (
           id serial PRIMARY KEY,
           tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -10388,12 +10510,12 @@ function setupPaymentGatewayRoutes(app2) {
           created_at timestamp DEFAULT now()
         );
       `);
-    }
-    const monthlyCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='monthly_closings'`);
-    const monthlyHasBranchId = monthlyCols.rows.some((r) => r.column_name === "branch_id");
-    if (!monthlyHasBranchId) {
-      await pool2.query(`DROP TABLE IF EXISTS monthly_closings CASCADE;`);
-      await pool2.query(`
+      }
+      const monthlyCols = await pool2.query(`SELECT column_name FROM information_schema.columns WHERE table_name='monthly_closings'`);
+      const monthlyHasBranchId = monthlyCols.rows.some((r) => r.column_name === "branch_id");
+      if (!monthlyHasBranchId) {
+        await pool2.query(`DROP TABLE IF EXISTS monthly_closings CASCADE;`);
+        await pool2.query(`
         CREATE TABLE monthly_closings (
           id serial PRIMARY KEY,
           tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -10414,9 +10536,9 @@ function setupPaymentGatewayRoutes(app2) {
           created_at timestamp DEFAULT now()
         );
       `);
-    }
-    await pool2.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL;`);
-    await pool2.query(`
+      }
+      await pool2.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL;`);
+      await pool2.query(`
       ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL;
       DO $$
       BEGIN
@@ -10432,7 +10554,7 @@ function setupPaymentGatewayRoutes(app2) {
           FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
       END $$;
     `);
-    await pool2.query(`
+      await pool2.query(`
       DO $$
       BEGIN
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_product_id_products_id_fk') THEN
@@ -10442,7 +10564,7 @@ function setupPaymentGatewayRoutes(app2) {
           FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
       END $$;
     `);
-    await pool2.query(`
+      await pool2.query(`
       DO $$
       BEGIN
         IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_branch_id_branches_id_fk') THEN
@@ -10452,7 +10574,7 @@ function setupPaymentGatewayRoutes(app2) {
           FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE;
       END $$;
     `);
-    await pool2.query(`
+      await pool2.query(`
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS customer_nr integer;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS salutation text;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_name text;
@@ -10474,10 +10596,11 @@ function setupPaymentGatewayRoutes(app2) {
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS order_count integer DEFAULT 0;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS legacy_ref text;
     `);
-    log2("Customer extended columns migration complete");
-    log2("Schema migration complete");
-  } catch (err) {
-    log2("Schema migration error (non-fatal):", err);
+      log2("Customer extended columns migration complete");
+      log2("Schema migration complete");
+    } catch (err) {
+      log2("Schema migration error (non-fatal):", err);
+    }
   }
   try {
     const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
@@ -10504,8 +10627,8 @@ function setupPaymentGatewayRoutes(app2) {
   }
   try {
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    const { sql: sql5 } = await import("drizzle-orm");
-    const tenantsResult = await db2.execute(sql5`SELECT id FROM tenants LIMIT 1`);
+    const { sql: sql4 } = await import("drizzle-orm");
+    const tenantsResult = await db2.execute(sql4`SELECT id FROM tenants LIMIT 1`);
     const tenantRows = tenantsResult[0];
     if (tenantRows && tenantRows.length > 0) {
       const tid = tenantRows[0].id;
@@ -10543,7 +10666,7 @@ function setupPaymentGatewayRoutes(app2) {
       let totalFixed = 0;
       for (const table of tenantTables) {
         try {
-          const r = await db2.execute(sql5.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`));
+          const r = await db2.execute(sql4.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`));
           const affected = r[0]?.affectedRows ?? 0;
           if (affected > 0) {
             log2(`[migration] Fixed ${affected} rows in ${table}`);

@@ -72,8 +72,21 @@ export const SAUCE_ROW: { name: string; color: string; textColor: string }[] = [
 
 export const SAUCE_NAMES = SAUCE_ROW.map(s => s.name);
 
-export const calcToppingsPrice = (toppings: string[]): number =>
-  toppings.reduce((sum, t) => sum + (SAUCE_NAMES.includes(t) ? 0 : TOPPING_PRICE), 0);
+export const getToppingPrice = (topping: string, selectedSizeLabel?: string | null): number => {
+  if (SAUCE_NAMES.includes(topping)) return 0;
+
+  const normalized = topping.toLowerCase();
+  if (normalized.includes("kaeserand") || normalized.includes("käserand") || normalized.includes("cheese crust")) {
+    const selectedSize = (selectedSizeLabel || "").toLowerCase();
+    if (selectedSize.includes("45")) return 6;
+    return 3;
+  }
+
+  return TOPPING_PRICE;
+};
+
+export const calcToppingsPrice = (toppings: string[], selectedSizeLabel?: string | null): number =>
+  toppings.reduce((sum, topping) => sum + getToppingPrice(topping, selectedSizeLabel), 0);
 
 export const getToppingDisplayName = (name: string, language: string): string => {
   const de: Record<string, string> = {

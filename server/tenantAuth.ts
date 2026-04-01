@@ -10,6 +10,7 @@ export interface TenantAuthRequest extends Request {
 }
 
 const PUBLIC_ROUTES = [
+  "/api/health",
   "/api/license/validate",
   "/api/auth/google",
   "/api/landing/subscribe",

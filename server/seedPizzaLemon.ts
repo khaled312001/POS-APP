@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, sql, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
     branches, employees, categories, products, inventory,
     tenants, tenantSubscriptions, licenseKeys, tenantNotifications,
@@ -47,8 +47,8 @@ function pizzaModifier(price33: number, price45: number) {
             name: "Grösse",
             required: true,
             options: [
-                { label: "33cm Normal", price: "0.00" },
-                { label: `45cm Gross (+${surcharge})`, price: surcharge },
+                { label: "33cm", price: "0.00" },
+                { label: "45cm", price: surcharge },
             ],
         },
         {
@@ -77,10 +77,10 @@ function drinkSizeModifier(largeExtra: number) {
     return [
         {
             name: "Grösse",
-            required: false,
+            required: true,
             options: [
-                { label: "0.5l Klein", price: "0.00" },
-                { label: `1.5l Gross (+${largeExtra.toFixed(2)})`, price: largeExtra.toFixed(2) },
+                { label: "50cl", price: "0.00" },
+                { label: "1.5 L", price: largeExtra.toFixed(2) },
             ],
         },
     ];
@@ -134,155 +134,144 @@ interface MenuItem { name: string; description: string; price: number; price45?:
 
 // ─── PIZZA (01-34) ─────────────────────────────────────────────────────────────
 const PIZZAS: MenuItem[] = [
-    { name: "Wunschpizza", description: "Ihre Wunschpizza – wählen Sie Ihre Zutaten", price: 14.00, price45: 27.00, image: IMG("pizzalemon_wunschpizza.jpg") },
-    { name: "Margherita", description: "Tomaten, Mozzarella, Oregano", price: 14.00, price45: 25.00, image: IMG("pizzalemon_01_margherita.jpg") },
-    { name: "Profumata", description: "Tomaten, Mozzarella, Knoblauch, Petersilie, Oregano", price: 14.00, price45: 27.00, image: IMG("pizzalemon_02_profumata.jpg") },
-    { name: "Funghi", description: "Tomaten, Mozzarella, Pilze", price: 15.00, price45: 28.00, image: IMG("pizzalemon_03_funghi.jpg") },
-    { name: "Spinat", description: "Tomaten, Mozzarella, Spinat", price: 15.00, price45: 28.00, image: IMG("pizzalemon_04_spinat.jpg") },
-    { name: "Gorgonzola", description: "Tomaten, Mozzarella, Gorgonzola", price: 16.00, price45: 29.00, image: IMG("pizzalemon_05_gorgonzola.jpg") },
-    { name: "Prosciutto", description: "Tomaten, Mozzarella, Schinken", price: 16.00, price45: 30.00, image: IMG("pizzalemon_06_prosciutto.jpg") },
-    { name: "Salami", description: "Tomaten, Mozzarella, Salami", price: 16.00, price45: 30.00, image: IMG("pizzalemon_07_salami.jpg") },
-    { name: "Diavola", description: "Tomaten, Mozzarella, scharfe Salami, Oliven, Peperoncini", price: 17.00, price45: 31.00, image: IMG("pizzalemon_08_diavola.jpg") },
-    { name: "Arrabbiata", description: "Tomaten, Mozzarella, Speck, Peperoncini, Knoblauch, Zwiebeln", price: 17.00, price45: 31.00, image: IMG("pizzalemon_09_arrabbiata.jpg") },
-    { name: "Siciliana", description: "Tomaten, Mozzarella, Schinken, Sardellen, Kapern", price: 17.00, price45: 31.00, image: IMG("pizzalemon_10_siciliana.jpg") },
-    { name: "Prosciutto e Funghi", description: "Tomaten, Mozzarella, Schinken, Pilze", price: 17.00, price45: 31.00, image: IMG("pizzalemon_11_prosciutto_e_funghi.jpg") },
-    { name: "Hawaii", description: "Tomaten, Mozzarella, Schinken, Ananas", price: 17.00, price45: 31.00, image: IMG("pizzalemon_12_hawaii.jpg") },
-    { name: "Tonno", description: "Tomaten, Mozzarella, Thunfisch, Zwiebeln", price: 17.00, price45: 31.00, image: IMG("pizzalemon_13_tonno.jpg") },
-    { name: "Piccante", description: "Tomaten, Mozzarella, Peperoni, Peperoncini, Zwiebeln, Knoblauch, Oregano", price: 18.00, price45: 32.00, image: IMG("pizzalemon_14_piccante.jpg") },
-    { name: "Raclette", description: "Tomaten, Mozzarella, Rohschinken", price: 18.00, price45: 32.00, image: IMG("pizzalemon_15_raclette.jpg") },
-    { name: "Fiorentina", description: "Tomaten, Mozzarella, Spinat, Gorgonzola, Knoblauch", price: 18.00, price45: 32.00, image: IMG("pizzalemon_16_fiorentina.jpg") },
-    { name: "Kebab Pizza", description: "Tomaten, Mozzarella, Kebabfleisch", price: 19.00, price45: 33.00, image: IMG("pizzalemon_17_kebab_pizza.jpg") },
-    { name: "Poulet", description: "Tomaten, Mozzarella, Poulet", price: 19.00, price45: 33.00, image: IMG("pizzalemon_18_poulet.jpg") },
-    { name: "Carbonara", description: "Tomaten, Mozzarella, Speck, Ei, Rahm", price: 19.00, price45: 33.00, image: IMG("pizzalemon_19_carbonara.jpg") },
-    { name: "Gamberetti", description: "Tomaten, Mozzarella, Crevetten, Knoblauch", price: 19.00, price45: 33.00, image: IMG("pizzalemon_20_gamberetti.jpg") },
-    { name: "Quattro Formaggi", description: "Tomaten, Mozzarella, 4 verschiedene Käsesorten", price: 19.00, price45: 33.00, image: IMG("pizzalemon_21_quattro_formaggi.jpg") },
-    { name: "Quattro Stagioni", description: "Tomaten, Mozzarella, Schinken, Pilze, Peperoni, Artischocken", price: 19.00, price45: 33.00, image: IMG("pizzalemon_22_quattro_stagioni.jpg") },
-    { name: "Frutti di Mare", description: "Tomaten, Mozzarella, Meeresfrüchte", price: 19.00, price45: 33.00, image: IMG("pizzalemon_23_frutti_di_mare.jpg") },
-    { name: "Verdura", description: "Tomaten, Mozzarella, verschiedenes Gemüse", price: 19.00, price45: 33.00, image: IMG("pizzalemon_24_verdura.jpg") },
-    { name: "Napoli", description: "Tomaten, Mozzarella, Sardellen, Kapern, Oliven", price: 18.00, price45: 32.00, image: IMG("pizzalemon_25_napoli.jpg") },
-    { name: "Pizzaiolo", description: "Tomaten, Mozzarella, Speck, Knoblauch, Pilze", price: 18.00, price45: 32.00, image: IMG("pizzalemon_26_pizzaiolo.jpg") },
-    { name: "A'Casa", description: "Tomaten, Mozzarella, Gorgonzola, Peperoni, Pilze, Knoblauch, Zwiebeln", price: 19.00, price45: 34.00, image: IMG("pizzalemon_27_a_casa.jpg") },
-    { name: "Porcini", description: "Tomaten, Mozzarella, Steinpilze, Zwiebeln, Oregano", price: 19.00, price45: 34.00, image: IMG("pizzalemon_28_porcini.jpg") },
-    { name: "Spezial", description: "Tomaten, Mozzarella, Kalbfleisch, Knoblauch, Kräuterbutter, Zwiebeln, Oregano", price: 19.00, price45: 34.00, image: IMG("pizzalemon_29_spezial.jpg") },
-    { name: "Padrone", description: "Tomaten, Mozzarella, Gorgonzola, Pilze", price: 20.00, price45: 33.00, image: IMG("pizzalemon_30_padrone.jpg") },
-    { name: "Schloss Pizza", description: "Tomaten, Mozzarella, Kalbfleisch, Speck, scharfe Salami", price: 20.00, price45: 34.00, image: IMG("pizzalemon_31_schloss_pizza.jpg") },
-    { name: "Italiano", description: "Tomaten, Mozzarella, Rohschinken, Mascarpone, Rucola", price: 20.00, price45: 34.00, image: IMG("pizzalemon_32_italiano.jpg") },
-    { name: "Americano", description: "Tomaten, Mozzarella, Speck, Mais, Zwiebeln", price: 21.00, price45: 36.00, image: IMG("pizzalemon_33_americano.jpg") },
-    { name: "Lemon Pizza", description: "Tomaten, Mozzarella, Lammfleisch, Knoblauch, Peperoncini, Scharf", price: 20.00, price45: 34.00, image: IMG("pizzalemon_34_lemon_pizza.jpg") },
+    { name: "Margherita", description: "Tomatensauce, Mozzarella, Oregano", price: 15.00, price45: 27.00, image: IMG("pizzalemon_01_margherita.jpg") },
+    { name: "Profumata", description: "Zwiebeln, Knoblauch", price: 16.00, price45: 29.00, image: IMG("pizzalemon_02_profumata.jpg") },
+    { name: "Funghi", description: "Frische Champignons", price: 16.00, price45: 30.00, image: IMG("pizzalemon_03_funghi.jpg") },
+    { name: "Spinat", description: "Spinat", price: 16.00, price45: 30.00, image: IMG("pizzalemon_04_spinat.jpg") },
+    { name: "Gorgonzola", description: "Gorgonzola", price: 16.00, price45: 31.00, image: IMG("pizzalemon_05_gorgonzola.jpg") },
+    { name: "Prosciutto", description: "Schinken", price: 17.00, price45: 32.00, image: IMG("pizzalemon_06_prosciutto.jpg") },
+    { name: "Salami", description: "Scharfe Salami", price: 17.00, price45: 32.00, image: IMG("pizzalemon_07_salami.jpg") },
+    { name: "Arrabbiata", description: "Oliven, frische Champignons, scharf", price: 17.00, price45: 33.00, image: IMG("pizzalemon_09_arrabbiata.jpg") },
+    { name: "Diavola", description: "Scharfe Salami, Oliven, Zwiebeln", price: 18.00, price45: 33.00, image: IMG("pizzalemon_08_diavola.jpg") },
+    { name: "Siciliana", description: "Schinken, Sardellen, Kapern", price: 18.00, price45: 33.00, image: IMG("pizzalemon_10_siciliana.jpg") },
+    { name: "Prosciutto E Funghi", description: "Frische Champignons, Schinken", price: 18.00, price45: 33.00, image: IMG("pizzalemon_11_prosciutto_e_funghi.jpg") },
+    { name: "Hawaii", description: "Schinken, Ananas", price: 18.00, price45: 33.00, image: IMG("pizzalemon_12_hawaii.jpg") },
+    { name: "Tonno", description: "Thon, Zwiebeln", price: 18.00, price45: 33.00, image: IMG("pizzalemon_13_tonno.jpg") },
+    { name: "Piccante", description: "Peperoni, Peperoncini, Zwiebeln, Knoblauch", price: 18.00, price45: 34.00, image: IMG("pizzalemon_14_piccante.jpg") },
+    { name: "Raclette", description: "Raclettekäse", price: 18.00, price45: 34.00, image: IMG("pizzalemon_15_raclette.jpg") },
+    { name: "Fiorentina", description: "Spinat, Parmesan, Ei, Oregano", price: 19.00, price45: 34.00, image: IMG("pizzalemon_16_fiorentina.jpg") },
+    { name: "Kebab Pizza", description: "Kebabfleisch", price: 20.00, price45: 35.00, image: IMG("pizzalemon_17_kebab_pizza.jpg") },
+    { name: "Poulet", description: "Poulet", price: 20.00, price45: 35.00, image: IMG("pizzalemon_18_poulet.jpg") },
+    { name: "Carbonara", description: "Speck, Ei, Zwiebeln", price: 20.00, price45: 35.00, image: IMG("pizzalemon_19_carbonara.jpg") },
+    { name: "Gamberetti", description: "Crevetten, Knoblauch", price: 20.00, price45: 35.00, image: IMG("pizzalemon_20_gamberetti.jpg") },
+    { name: "Quattro Formaggi", description: "4 Käsesorten, Mascarpone", price: 20.00, price45: 35.00, image: IMG("pizzalemon_21_quattro_formaggi.jpg") },
+    { name: "Quattro Stagioni", description: "Schinken, Champignons, Artischocken, Peperoni", price: 20.00, price45: 35.00, image: IMG("pizzalemon_22_quattro_stagioni.jpg") },
+    { name: "Frutti Di Mare", description: "Meeresfrüchte", price: 20.00, price45: 35.00, image: IMG("pizzalemon_23_frutti_di_mare.jpg") },
+    { name: "Verdura", description: "Gemüse", price: 20.00, price45: 35.00, image: IMG("pizzalemon_24_verdura.jpg") },
+    { name: "Napoli", description: "Sardellen, Oliven, Kapern", price: 18.00, price45: 34.00, image: IMG("pizzalemon_25_napoli.jpg") },
+    { name: "Pizzaiolo", description: "Speck, Knoblauch, frische Champignons", price: 18.00, price45: 34.00, image: IMG("pizzalemon_26_pizzaiolo.jpg") },
+    { name: "Acasa", description: "Geflügelgeschnetzeltes, Peperoni, Ei", price: 20.00, price45: 36.00, image: IMG("pizzalemon_27_a_casa.jpg") },
+    { name: "Porcini", description: "Steinpilze, Zwiebeln", price: 20.00, price45: 36.00, image: IMG("pizzalemon_28_porcini.jpg") },
+    { name: "Spezial", description: "Kalbfleisch, Knoblauch, scharf, Kräuterbutter", price: 21.00, price45: 36.00, image: IMG("pizzalemon_29_spezial.jpg") },
+    { name: "Padrone", description: "Gorgonzola, frische Champignons", price: 21.00, price45: 35.00, image: IMG("pizzalemon_30_padrone.jpg") },
+    { name: "Schloss Pizza", description: "Schinken, Speck, scharfe Salami", price: 21.00, price45: 36.00, image: IMG("pizzalemon_31_schloss_pizza.jpg") },
+    { name: "Italiano", description: "Rohschinken, Mascarpone, Rucola", price: 21.00, price45: 36.00, image: IMG("pizzalemon_32_italiano.jpg") },
+    { name: "Americano", description: "Speck, Mais, Zwiebeln", price: 21.00, price45: 36.00, image: IMG("pizzalemon_33_americano.jpg") },
+    { name: "Lemon Pizza", description: "Lammfleisch, Knoblauch, Zwiebeln, Peperoncini, scharf", price: 21.00, price45: 36.00, image: IMG("pizzalemon_34_lemon_pizza.jpg") },
 ];
 
 // ─── CALZONE ──────────────────────────────────────────────────────────────────
 const CALZONES: MenuItem[] = [
     { name: "Calzone", description: "Tomaten, Mozzarella, Schinken, Pilze, Ei", price: 20.00, image: IMG("pizzalemon_c1_calzone.jpg") },
-    { name: "Calzone Kebab", description: "Tomaten, Mozzarella, Kebabfleisch", price: 20.00, image: IMG("pizzalemon_c2_calzone_kebab.jpg") },
+    { name: "Calzone Kebab", description: "Tomaten, Mozzarella, Kebabfleisch, Ei", price: 20.00, image: IMG("pizzalemon_c2_calzone_kebab.jpg") },
     { name: "Calzone Verdura", description: "Tomaten, Mozzarella, Saisongemüse", price: 20.00, image: IMG("pizzalemon_c3_calzone_verdura.jpg") },
 ];
 
 // ─── PIDE ─────────────────────────────────────────────────────────────────────
 const PIDE: MenuItem[] = [
-    { name: "Wunschpide", description: "Ihre Wunschpide – wählen Sie Ihre Zutaten", price: 15.00, image: IMG("pizzalemon_wunschpide.jpg") },
     { name: "Pide mit Käse", description: "Pide mit Schafskäse", price: 15.00, image: IMG("pizzalemon_36_pide_mit_kaese.jpg") },
-    { name: "Pide mit Hackfleisch", description: "Pide mit Hackfleisch und Tomaten", price: 17.00, image: IMG("pizzalemon_37_pide_mit_hackfleisch.jpg") },
+    { name: "Pide mit Hackfleisch", description: "Pide mit Hackfleisch", price: 17.00, image: IMG("pizzalemon_37_pide_mit_hackfleisch.jpg") },
     { name: "Pide mit Käse und Hackfleisch", description: "Pide mit Schafskäse und Hackfleisch", price: 18.00, image: IMG("pizzalemon_38_pide_kaese_hackfleisch.jpg") },
     { name: "Pide mit Käse und Spinat", description: "Pide mit Schafskäse und Spinat", price: 18.00, image: IMG("pizzalemon_39_pide_kaese_spinat.jpg") },
     { name: "Pide mit Käse und Ei", description: "Pide mit Schafskäse und Ei", price: 18.00, image: IMG("pizzalemon_40_pide_kaese_ei.jpg") },
-    { name: "Lemon Pide", description: "Hausgemachte Pide mit gewürztem Hackfleisch und Käse", price: 18.00, image: IMG("pizzalemon_41_lemon_pide.jpg") },
-    { name: "Lemon Pide Spezial", description: "Fein gehacktes Fleisch mit dem Messer gehackt", price: 20.00, image: IMG("pizzalemon_42_lemon_pide_spezial.jpg") },
-    { name: "Pide mit Sucuk", description: "Pide mit türkischer Knoblauchwurst", price: 18.00, image: IMG("pizzalemon_43_pide_mit_sucuk.jpg") },
+    { name: "Lemon Pide / Eti Ekmek", description: "Gewürztes Hackfleisch und Käse", price: 18.00, image: IMG("pizzalemon_41_lemon_pide.jpg") },
+    { name: "Lemon Pide Spezial / Bicak Arasi", description: "Gewürztes, fein gehacktes Fleisch", price: 20.00, image: IMG("pizzalemon_42_lemon_pide_spezial.jpg") },
+    { name: "Pide mit Sucuk", description: "Knoblauchwurst", price: 18.00, image: IMG("pizzalemon_43_pide_mit_sucuk.jpg") },
     { name: "Pide mit Kebabfleisch", description: "Pide mit Kebabfleisch", price: 20.00, image: IMG("pizzalemon_44_pide_mit_kebabfleisch.jpg") },
 ];
 
 // ─── LAHMACUN ─────────────────────────────────────────────────────────────────
 const LAHMACUN: MenuItem[] = [
     { name: "Lahmacun mit Salat", description: "Türkische Minipizza mit Hackfleisch und frischem Salat", price: 15.00, image: IMG("pizzalemon_45_lahmacun_mit_salat.jpg") },
-    { name: "Lahmacun mit Salat und Kebab", description: "Lahmacun mit frischem Salat und Kebabfleisch", price: 18.00, image: IMG("pizzalemon_46_lahmacun_salat_kebab.jpg") },
+    { name: "Lahmacun mit Salat und Kebab", description: "Lahmacun mit frischem Salat und Kebabfleisch", price: 20.00, image: IMG("pizzalemon_46_lahmacun_salat_kebab.jpg") },
 ];
 
 // ─── TELLERGERICHTE ───────────────────────────────────────────────────────────
 const TELLERGERICHTE: MenuItem[] = [
-    { name: "Döner Teller+Pommes", description: "Döner Kebab auf dem Teller mit Pommes frites", price: 18.00, image: IMG("pizzalemon_47_doener_teller_pommes.jpg") },
-    { name: "Döner Teller+Salat", description: "Döner Kebab auf dem Teller mit frischem Salat", price: 18.00, image: IMG("pizzalemon_48_doener_teller_salat.jpg") },
-    { name: "Döner Teller Komplett", description: "Döner Kebab auf dem Teller mit Salat und Pommes", price: 20.00, image: IMG("pizzalemon_49_doener_teller_komplett.jpg") },
-    { name: "Chicken Nuggets 8Stk", description: "8 knusprige Chicken Nuggets mit Pommes oder Salat", price: 17.00, image: IMG("pizzalemon_50_chicken_nuggets_8stk.jpg") },
-    { name: "Pouletschnitzel", description: "Zartes Pouletschnitzel mit Pommes oder Salat und Brot", price: 17.00, image: IMG("pizzalemon_51_pouletschnitzel.jpg") },
-    { name: "Pouletflügeli 12Stk", description: "12 knusprige Pouletflügeli mit Pommes oder Salat", price: 18.00, image: IMG("pizzalemon_52_pouletfluegeli_12stk.jpg") },
-    { name: "Poulet Kebab Teller", description: "Poulet Kebab auf dem Teller mit Pommes oder Salat", price: 18.00, image: IMG("pizzalemon_53_poulet_kebab_teller.jpg") },
-    { name: "Lamm Kebab Teller", description: "Lamm Kebab (Sac Kavurma) mit Pommes oder Salat", price: 22.00, image: IMG("pizzalemon_54_lamm_kebab_teller.jpg") },
-    { name: "Köfte Teller", description: "Türkische Hackfleischbällchen mit Pommes oder Salat", price: 18.00, image: IMG("pizzalemon_55_koefte_teller.jpg") },
-    { name: "Cevapcici Teller", description: "Gegrillte Cevapcici mit Pommes oder Salat und Brot", price: 18.00, image: IMG("pizzalemon_56_cevapcici_teller.jpg") },
-    { name: "Falafel Teller", description: "Knusprige Falafel mit Pommes oder Salat und Brot", price: 16.00, image: IMG("pizzalemon_57_falafel_teller.jpg") },
+    { name: "Döner Teller Mit Pommes", description: "Döner Teller mit Pommes", price: 20.00, image: IMG("pizzalemon_47_doener_teller_pommes.jpg") },
+    { name: "Döner Teller Mit Salat", description: "Döner Teller mit Salat", price: 20.00, image: IMG("pizzalemon_48_doener_teller_salat.jpg") },
+    { name: "Döner Teller Mit Salat Und Pommes", description: "Döner Teller mit Salat und Pommes", price: 22.00, image: IMG("pizzalemon_49_doener_teller_komplett.jpg") },
+    { name: "Chicken Nuggets 8 Stk.", description: "Mit Pommes oder Salat", price: 19.00, image: IMG("pizzalemon_50_chicken_nuggets_8stk.jpg") },
+    { name: "Pouletschnitzel", description: "Mit Pommes oder Salat und Brot", price: 19.00, image: IMG("pizzalemon_51_pouletschnitzel.jpg") },
+    { name: "Pouletflügeli 12 Stk.", description: "Mit Pommes oder Salat und Brot", price: 20.00, image: IMG("pizzalemon_52_pouletfluegeli_12stk.jpg") },
+    { name: "Poulet Kebab Teller", description: "Mit Pommes oder Salat und Brot", price: 20.00, image: IMG("pizzalemon_53_poulet_kebab_teller.jpg") },
+    { name: "Lamm Kebab Teller / Sac Kavurma", description: "Mit Pommes oder Salat und Brot", price: 22.00, image: IMG("pizzalemon_54_lamm_kebab_teller.jpg") },
+    { name: "Köfte Teller", description: "Mit Pommes oder Salat und Brot", price: 21.00, image: IMG("pizzalemon_55_koefte_teller.jpg") },
+    { name: "Cevapcici", description: "Mit Pommes oder Salat und Brot", price: 19.00, image: IMG("pizzalemon_56_cevapcici_teller.jpg") },
+    { name: "Falafel Teller", description: "Mit Pommes oder Salat und Brot", price: 18.00, image: IMG("pizzalemon_57_falafel_teller.jpg") },
     { name: "Pommes", description: "Pommes frites, knusprig frittiert", price: 10.00, image: IMG("pizzalemon_58_pommes.jpg") },
-    { name: "Original Schweins Cordon Bleu", description: "Original Schweins Cordon Bleu mit Gemüse, Salat, Pommes", price: 23.00, image: IMG("pizzalemon_59_cordon_bleu.jpg") },
+    { name: "Original Schweins Cordon Bleu", description: "Mit frischem Gemüse, Salat, Pommes", price: 23.00, image: IMG("pizzalemon_59_cordon_bleu.jpg") },
 ];
 
 // ─── FINGERFOOD ───────────────────────────────────────────────────────────────
 const FINGERFOOD: MenuItem[] = [
-    { name: "Döner Kebab Tasche", description: "Döner Kebab im Taschenbrot", price: 13.00, image: IMG("pizzalemon_60_doener_kebab_tasche.jpg") },
-    { name: "Dürüm Kebab", description: "Döner Kebab im Fladenbrot", price: 14.00, image: IMG("pizzalemon_61_dueruem_kebab.jpg") },
-    { name: "Döner Box", description: "Döner Kebab in der Box mit Salat und Pommes", price: 13.00, image: IMG("pizzalemon_62_doener_box.jpg") },
-    { name: "Falafel", description: "Knusprige Falafel im Taschenbrot", price: 12.00, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
-    { name: "Falafel Dürüm", description: "Falafel im Fladenbrot", price: 12.00, image: IMG("pizzalemon_64_falafel_dueruem.jpg") },
-    { name: "Poulet Pepito", description: "Gegrilltes Poulet im Fladenbrot", price: 12.00, image: IMG("pizzalemon_65_poulet_pepito.jpg") },
-    { name: "Lamm Pepito", description: "Gegrilltes Lammfleisch im Fladenbrot", price: 14.00, image: IMG("pizzalemon_66_lamm_pepito.jpg") },
-    { name: "Hamburger", description: "Klassischer Hamburger mit Salat und Sauce", price: 11.00, image: IMG("pizzalemon_67_hamburger.jpg") },
+    { name: "Döner Kebab Im Taschenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 14.00, image: IMG("pizzalemon_60_doener_kebab_tasche.jpg") },
+    { name: "Dürüm Kebab Im Fladenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 14.00, image: IMG("pizzalemon_61_dueruem_kebab.jpg") },
+    { name: "Döner Box Mit Salat Und Pommes", description: "Döner Box mit Salat und Pommes", price: 14.00, image: IMG("pizzalemon_62_doener_box.jpg") },
+    { name: "Falafel Im Taschenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 13.00, image: IMG("pizzalemon_63_falafel_taschenbrot.jpg") },
+    { name: "Falafel Dürüm Im Fladenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 13.00, image: IMG("pizzalemon_64_falafel_dueruem.jpg") },
+    { name: "Poulet Pepito", description: "Poulet im Fladenbrot", price: 13.00, image: IMG("pizzalemon_65_poulet_pepito.jpg") },
+    { name: "Lamm Pepito", description: "Lamm im Fladenbrot", price: 15.00, image: IMG("pizzalemon_66_lamm_pepito.jpg") },
     { name: "Lemon Burger", description: "Lemon Burger mit Rindfleisch, Raclettekäse und Ei", price: 17.00, image: IMG("pizzalemon_68_lemon_burger.jpg") },
-    { name: "Cheeseburger", description: "Cheeseburger mit Rindfleisch und Käse", price: 13.00, image: IMG("pizzalemon_69_cheeseburger.jpg") },
-    { name: "Hamburger Rindfleisch", description: "Hamburger mit 100% Rindfleisch", price: 12.00, image: IMG("pizzalemon_70_hamburger_rindfleisch.jpg") },
-    { name: "Poulet Kebab Tasche", description: "Poulet Kebab mit Gemüse im Taschenbrot", price: 13.00, image: IMG("pizzalemon_71_poulet_kebab_tasche.jpg") },
-    { name: "Poulet Kebab Fladen", description: "Poulet Kebab mit Gemüse im Fladenbrot", price: 13.00, image: IMG("pizzalemon_72_poulet_kebab_fladen.jpg") },
-    { name: "Lamm Kebab Tasche", description: "Lamm Kebab mit Gemüse im Taschenbrot", price: 14.00, image: IMG("pizzalemon_73_lamm_kebab_tasche.jpg") },
-    { name: "Lamm Kebab Fladen", description: "Lamm Kebab mit Gemüse im Fladenbrot", price: 14.00, image: IMG("pizzalemon_74_lamm_kebab_fladen.jpg") },
-    { name: "Köfte Taschenbrot", description: "Türkische Hackfleischbällchen im Taschenbrot", price: 13.00, image: IMG("pizzalemon_75_koefte_taschenbrot.jpg") },
-    { name: "Cevapcici Taschenbrot", description: "Gegrillte Cevapcici im Taschenbrot", price: 13.00, image: IMG("pizzalemon_76_cevapcici_taschenbrot.jpg") },
-    { name: "Falafel Box", description: "Knusprige Falafel in der Box mit Salat und Pommes", price: 12.00, image: IMG("pizzalemon_77_falafel_box.jpg") },
-    { name: "Chicken Nuggets Box", description: "Chicken Nuggets in der Box mit Dip", price: 12.00, image: IMG("pizzalemon_78_chicken_nuggets_box.jpg") },
-    { name: "Kebab Fladen+Raclette", description: "Kebab im Fladenbrot mit Raclettekäse überbacken", price: 15.00, image: IMG("pizzalemon_79_kebab_fladen_raclette.jpg") },
-    { name: "Kebab Tasche+Raclette", description: "Kebab im Taschenbrot mit Raclettekäse überbacken", price: 15.00, image: IMG("pizzalemon_80_kebab_tasche_raclette.jpg") },
-    { name: "Kebab Fladen+Speck", description: "Kebab im Fladenbrot mit Speck", price: 15.00, image: IMG("pizzalemon_81_kebab_fladen_speck.jpg") },
-    { name: "Kebab Tasche+Speck", description: "Kebab im Taschenbrot mit Speck", price: 15.00, image: IMG("pizzalemon_82_kebab_tasche_speck.jpg") },
-    { name: "Extra Kebap", description: "Extra Portion Kebabfleisch", price: 5.00, image: IMG("pizzalemon_ex_kebap.jpg") },
+    { name: "Cheeseburger", description: "Mit Rindfleisch und Käse", price: 14.00, image: IMG("pizzalemon_69_cheeseburger.jpg") },
+    { name: "Hamburger Mit Rindfleisch", description: "Hamburger mit Rindfleisch", price: 13.00, image: IMG("pizzalemon_70_hamburger_rindfleisch.jpg") },
+    { name: "Poulet Kebab Mit Gemüse Im Taschenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 14.00, image: IMG("pizzalemon_71_poulet_kebab_tasche.jpg") },
+    { name: "Poulet Kebab Mit Gemüse Im Fladenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 14.00, image: IMG("pizzalemon_72_poulet_kebab_fladen.jpg") },
+    { name: "Lamm Kebab Mit Gemüse Im Taschenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 15.00, image: IMG("pizzalemon_73_lamm_kebab_tasche.jpg") },
+    { name: "Lamm Kebab Mit Gemüse Im Fladenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 15.00, image: IMG("pizzalemon_74_lamm_kebab_fladen.jpg") },
+    { name: "Köfte Im Taschenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 14.00, image: IMG("pizzalemon_75_koefte_taschenbrot.jpg") },
+    { name: "Cevapcici Im Taschenbrot", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 14.00, image: IMG("pizzalemon_76_cevapcici_taschenbrot.jpg") },
+    { name: "Falafel Box Mit Salat Und Pommes", description: "Falafel Box mit Salat und Pommes", price: 13.00, image: IMG("pizzalemon_77_falafel_box.jpg") },
+    { name: "Chicken Nuggets Box", description: "Chicken Nuggets Box", price: 13.00, image: IMG("pizzalemon_78_chicken_nuggets_box.jpg") },
+    { name: "Kebab Im Fladenbrot mit Raclette", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 16.00, image: IMG("pizzalemon_79_kebab_fladen_raclette.jpg") },
+    { name: "Kebab Im Taschenbrot mit Raclette", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 16.00, image: IMG("pizzalemon_80_kebab_tasche_raclette.jpg") },
+    { name: "Kebab Im Fladenbrot mit Speck", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 16.00, image: IMG("pizzalemon_81_kebab_fladen_speck.jpg") },
+    { name: "Kebab Im Taschenbrot mit Speck", description: "Mit hausgemachter Cocktail- oder Joghurtsauce", price: 16.00, image: IMG("pizzalemon_82_kebab_tasche_speck.jpg") },
 ];
 
 // ─── SALAT ────────────────────────────────────────────────────────────────────
 const SALATE: MenuItem[] = [
-    { name: "Grüner Salat", description: "Frischer Blattsalat, Sauce: Italienisch oder Französisch", price: 8.00, image: IMG("pizzalemon_83_gruener_salat.jpg") },
-    { name: "Gemischter Salat", description: "Frischer gemischter Salat, Sauce: Italienisch oder Französisch", price: 9.00, image: IMG("pizzalemon_84_gemischter_salat.jpg") },
-    { name: "Griechischer Salat", description: "Tomaten, Gurken, Oliven, Feta", price: 12.00, image: IMG("pizzalemon_85_griechischer_salat.jpg") },
-    { name: "Lemon Salat", description: "Tomaten, Gurken, gegrilliertes Pouletfleisch", price: 13.00, image: IMG("pizzalemon_86_lemon_salat.jpg") },
-    { name: "Thon Salat", description: "Thunfisch, gemischter Salat", price: 10.00, image: IMG("pizzalemon_87_thon_salat.jpg") },
-    { name: "Tomaten Salat", description: "Tomaten, Zwiebeln", price: 9.00, image: IMG("pizzalemon_88_tomaten_salat.jpg") },
-    { name: "Tomaten Mozzarella", description: "Tomaten mit Mozzarella und Basilikum", price: 12.00, image: IMG("pizzalemon_89_tomaten_mozzarella.jpg") },
-    { name: "Knoblibrot", description: "Knuspriges Brot mit Knoblauchbutter", price: 5.00, image: IMG("pizzalemon_90_knoblibrot.jpg") },
+    { name: "Grüner Salat", description: "Sauce nach Wahl: Italienisch oder Französisch", price: 9.00, image: IMG("pizzalemon_83_gruener_salat.jpg") },
+    { name: "Gemischter Salat", description: "Sauce nach Wahl: Italienisch oder Französisch", price: 12.00, image: IMG("pizzalemon_84_gemischter_salat.jpg") },
+    { name: "Griechischer Salat", description: "Sauce nach Wahl: Italienisch oder Französisch", price: 14.00, image: IMG("pizzalemon_85_griechischer_salat.jpg") },
+    { name: "Lemon Salat", description: "Tomaten, Gurken und grilliertes Pouletfleisch", price: 15.00, image: IMG("pizzalemon_86_lemon_salat.jpg") },
+    { name: "Thon Salat", description: "Thunfisch, gemischter Salat", price: 13.00, image: IMG("pizzalemon_87_thon_salat.jpg") },
+    { name: "Tomaten Salat", description: "Tomaten, Zwiebeln", price: 12.00, image: IMG("pizzalemon_88_tomaten_salat.jpg") },
+    { name: "Tomaten Mozzarella Salat", description: "Tomaten, Mozzarella", price: 14.00, image: IMG("pizzalemon_89_tomaten_mozzarella.jpg") },
+    { name: "Knoblibrot", description: "Knoblauchbrot", price: 7.00, image: IMG("pizzalemon_90_knoblibrot.jpg") },
+    { name: "Crevettencocktail Salat", description: "Crevettencocktail Salat", price: 15.00, image: IMG("pizzalemon_91_crevettencocktail.jpg") },
 ];
 
 // ─── DESSERT ──────────────────────────────────────────────────────────────────
 const DESSERTS: MenuItem[] = [
-    { name: "Tiramisu", description: "Klassisches italienisches Tiramisu", price: 6.00, image: IMG("pizzalemon_92_tiramisu.jpg") },
-    { name: "Baklava", description: "Türkisches Baklava mit Honig und Nüssen – Portion 4 Stk.", price: 8.00, image: IMG("pizzalemon_93_baklava.jpg") },
-    { name: "Marlenke mit Honig", description: "Tschechischer Honigkuchen (Marlenka) mit Honig", price: 6.00, image: IMG("pizzalemon_94_marlenke.jpg") },
-    { name: "Marlenke mit Schokolade", description: "Tschechischer Honigkuchen (Marlenka) mit Schokolade", price: 6.00, image: IMG("pizzalemon_94_marlenke.jpg") },
+    { name: "Tiramisù", description: "Klassisches italienisches Tiramisù", price: 7.00, image: IMG("pizzalemon_92_tiramisu.jpg") },
+    { name: "Baklava", description: "Portion 4 Stk.", price: 8.00, image: IMG("pizzalemon_93_baklava.jpg") },
+    { name: "Marlenke mit Honig oder Schokolade", description: "Marlenke mit Honig oder Schokolade", price: 7.00, image: IMG("pizzalemon_94_marlenke.jpg") },
     { name: "Choco-Mousse", description: "Cremige Schokoladenmousse", price: 7.00, image: IMG("pizzalemon_95_choco_mousse.jpg") },
-    { name: "Mövenpick Glace Erdbeer", description: "Mövenpick Premium-Glacé Erdbeer (175ml)", price: 6.00, image: IMG("pizzalemon_96_moevenpick_glace.jpg") },
-    { name: "Mövenpick Glace Schokolade", description: "Mövenpick Premium-Glacé Schokolade (175ml)", price: 6.00, image: IMG("pizzalemon_96_moevenpick_glace.jpg") },
-    { name: "Mövenpick Glace Vanille", description: "Mövenpick Premium-Glacé Vanille (175ml)", price: 6.00, image: IMG("pizzalemon_96_moevenpick_glace.jpg") },
-    { name: "Mövenpick Glace Caramel", description: "Mövenpick Premium-Glacé Caramel (175ml)", price: 6.00, image: IMG("pizzalemon_96_moevenpick_glace.jpg") },
 ];
 
 // ─── GETRÄNKE ─────────────────────────────────────────────────────────────────
 const GETRAENKE: MenuItem[] = [
-    { name: "Coca-Cola", description: "Coca-Cola, 0.5l", price: 4.00, image: IMG("pizzalemon_97_coca_cola.jpg") },
-    { name: "Coca-Cola 1.5l", description: "Coca-Cola, 1.5l Flasche", price: 6.00, image: IMG("pizzalemon_coca_cola_1500ml.jpg") },
-    { name: "Coca-Cola Zero", description: "Coca-Cola Zero, 0.5l", price: 4.00, image: IMG("pizzalemon_97_coca_cola.jpg") },
-    { name: "Coca-Cola Zero 1.5l", description: "Coca-Cola Zero, 1.5l Flasche", price: 6.00, image: IMG("pizzalemon_coca_cola_zero_1500ml.jpg") },
-    { name: "Fanta", description: "Fanta Orange, 0.5l", price: 6.00, image: IMG("pizzalemon_98_fanta.jpg") },
-    { name: "Fanta 1.5l", description: "Fanta Orange, 1.5l Flasche", price: 6.00, image: IMG("pizzalemon_fanta_1500ml.jpg") },
-    { name: "Eistee Pfirsich", description: "Eistee Pfirsich, 0.5l", price: 4.00, image: IMG("pizzalemon_99_eistee.jpg") },
-    { name: "Eistee Pfirsich 1.5l", description: "Eistee Pfirsich, 1.5l Flasche", price: 6.00, image: IMG("pizzalemon_eistee_1500ml.jpg") },
-    { name: "Uludag Gazoz", description: "Türkische Limonade Uludag, 0.5l", price: 4.00, image: IMG("pizzalemon_101_uludag_gazoz.jpg") },
-    { name: "Rivella Blau", description: "Rivella Blau, 0.5l", price: 4.00, image: IMG("pizzalemon_102_rivella.jpg") },
-    { name: "Rivella Rot", description: "Rivella Rot, 0.5l", price: 4.00, image: IMG("pizzalemon_102_rivella.jpg") },
-    { name: "Ayran", description: "Türkisches Joghurtgetränk, 0.25l", price: 4.00, image: IMG("pizzalemon_103_ayran.jpg") },
-    { name: "Red Bull", description: "Red Bull Energy Drink, 0.25l", price: 5.00, image: IMG("pizzalemon_104_red_bull.jpg") },
+    { name: "Coca-Cola", description: "50cl oder 1.5 L", price: 4.00, image: IMG("pizzalemon_97_coca_cola.jpg") },
+    { name: "Coca-Cola Light", description: "50cl oder 1.5 L", price: 4.00, image: IMG("pizzalemon_97_coca_cola.jpg") },
+    { name: "Coca-Cola Zero", description: "50cl oder 1.5 L", price: 4.00, image: IMG("pizzalemon_97_coca_cola.jpg") },
+    { name: "Fanta", description: "50cl oder 1.5 L", price: 4.00, image: IMG("pizzalemon_98_fanta.jpg") },
+    { name: "Eistee", description: "50cl oder 1.5 L", price: 4.00, image: IMG("pizzalemon_99_eistee.jpg") },
+    { name: "Mineralwasser", description: "50cl oder 1.5 L", price: 4.00, image: IMG("pizzalemon_100_mineralwasser.jpg") },
+    { name: "Uludag Gazoz", description: "50cl", price: 4.00, image: IMG("pizzalemon_101_uludag_gazoz.jpg") },
+    { name: "Rivella", description: "50cl", price: 4.00, image: IMG("pizzalemon_102_rivella.jpg") },
+    { name: "Ayran 0.25 L", description: "0.25 L", price: 4.00, image: IMG("pizzalemon_103_ayran.jpg") },
+    { name: "Red Bull 0.25 L", description: "0.25 L", price: 5.00, image: IMG("pizzalemon_104_red_bull.jpg") },
 ];
 
 // ─── BIER ─────────────────────────────────────────────────────────────────────
@@ -292,12 +281,12 @@ const BIER: MenuItem[] = [
 
 // ─── ALKOHOLISCHE GETRÄNKE ────────────────────────────────────────────────────
 const ALKOHOL: MenuItem[] = [
-    { name: "Rotwein Merlot", description: "Merlot Rotwein, 50cl", price: 13.00, image: IMG("pizzalemon_107_rotwein_merlot.jpg") },
-    { name: "Weisswein", description: "Weisswein, 50cl", price: 15.00, image: IMG("pizzalemon_108_weisswein.jpg") },
+    { name: "Rotwein / Merlot", description: "50cl", price: 15.00, image: IMG("pizzalemon_107_rotwein_merlot.jpg") },
+    { name: "Weisswein", description: "50cl", price: 17.00, image: IMG("pizzalemon_108_weisswein.jpg") },
     { name: "Whisky", description: "Whisky 40%, 70cl Flasche", price: 50.00, image: IMG("pizzalemon_109_whisky.jpg") },
     { name: "Vodka", description: "Vodka 40%, 70cl Flasche", price: 50.00, image: IMG("pizzalemon_110_vodka.jpg") },
-    { name: "Champagner", description: "Champagner, 70cl Flasche", price: 30.00, image: IMG("pizzalemon_111_champagner.jpg") },
-    { name: "Smirnoff Ice", description: "Smirnoff Ice, 275ml", price: 6.00, image: IMG("pizzalemon_112_smirnoff_ice.jpg") },
+    { name: "Champagner", description: "70cl", price: 35.00, image: IMG("pizzalemon_111_champagner.jpg") },
+    { name: "Smirnoff", description: "275ml", price: 6.00, image: IMG("pizzalemon_112_smirnoff_ice.jpg") },
 ];
 
 // ─── EXTRA ────────────────────────────────────────────────────────────────────
@@ -311,7 +300,6 @@ const EXTRAS: MenuItem[] = [
     { name: "Brot", description: "Frisches Brot", price: 2.00, image: IMG("pizzalemon_extra_brot.jpg") },
     { name: "Knoblibrot", description: "Knuspriges Brot mit Knoblauchbutter", price: 7.00, image: IMG("pizzalemon_90_knoblibrot.jpg") },
     { name: "Pommes Extra", description: "Extra Portion Pommes frites", price: 11.00, image: IMG("pizzalemon_58_pommes.jpg") },
-    { name: "Zigaretten", description: "Zigaretten – aktueller Preis. Zählen nicht zum Mindestbestellwert.", price: 17.00, image: IMG("pizzalemon_113_zigaretten.jpg") },
 
     // ── Pizza toppings (+CHF 2.00 each) ──────────────────────────────────────
     { name: "Tomato Sauce",    description: "Tomatensauce",          price: 2.00, image: emojiImg("🍅") },
@@ -348,7 +336,8 @@ const EXTRAS: MenuItem[] = [
     { name: "Gorgonzola",      description: "Gorgonzola",            price: 2.00, image: emojiImg("🧀") },
     { name: "Parmesan",        description: "Parmesan",              price: 2.00, image: emojiImg("🧀") },
     { name: "Mascarpone",      description: "Mascarpone",            price: 2.00, image: emojiImg("🧀") },
-    { name: "Kaesarand",       description: "Käserand",              price: 2.00, image: emojiImg("🧀") },
+    { name: "Käserand (33cm)", description: "Käserand 33cm",         price: 3.00, image: emojiImg("🧀") },
+    { name: "Käserand (45cm)", description: "Käserand 45cm",         price: 6.00, image: emojiImg("🧀") },
 
     // ── Sauces (FREE) ─────────────────────────────────────────────────────────
     { name: "Mayonnaise",      description: "Mayonnaise",            price: 0.00, image: emojiImg("🥫") },
@@ -410,8 +399,8 @@ export async function seedPizzaLemon() {
             maxBranches: 3,
             maxEmployees: 20,
             storeType: "restaurant",
-        }).returning();
-        tenant = newTenant;
+        }).$returningId();
+        tenant = { id: newTenant.id } as typeof tenants.$inferSelect;
     }
 
     // ── Phase 3: Ensure an active subscription ────────────────────────────────
@@ -433,7 +422,7 @@ export async function seedPizzaLemon() {
             startDate: new Date(),
             endDate,
             autoRenew: true,
-        }).returning();
+        }).$returningId();
         subId = newSub.id;
     }
 
@@ -471,7 +460,7 @@ export async function seedPizzaLemon() {
             isMain: true,
             currency: "CHF",
             taxRate: "7.70",
-        }).returning();
+        }).$returningId();
         branchId = branch.id;
 
         await db.insert(warehouses).values({ name: "Hauptlager", branchId, isDefault: true, isActive: true });
@@ -497,25 +486,34 @@ export async function seedPizzaLemon() {
     }
 
     // ── Phase 7: Full product catalog reset ───────────────────────────────────
-    // In production: always delete and re-insert to keep catalog up-to-date.
-    // In development: skip reset if products already exist (dev + prod share the same DB;
-    // resetting on every dev restart would wipe production data mid-session).
-    const isProductionEnv = process.env.NODE_ENV === "production";
+    const shouldForceCatalogReset = ["1", "true", "yes"].includes(
+        (process.env.PIZZA_LEMON_FORCE_RESET || "").toLowerCase(),
+    );
     const existingProds = await db.select().from(products)
         .where(eq(products.tenantId, tenant.id));
 
-    if (existingProds.length > 0 && !isProductionEnv) {
-        console.log(`[PIZZA LEMON] Dev mode: ${existingProds.length} products already exist — skipping catalog reset to protect shared DB.`);
+    if (existingProds.length > 0 && !shouldForceCatalogReset) {
+        console.log(`[PIZZA LEMON] ${existingProds.length} products already exist — skipping catalog reset to protect existing data.`);
         return;
     }
 
-    if (existingProds.length > 0) {
-        console.log(`[PIZZA LEMON] Deleting ${existingProds.length} existing products and re-inserting updated catalog...`);
-        const prodIds = existingProds.map(p => p.id);
-        await db.delete(inventory).where(inArray(inventory.productId, prodIds));
-        await db.delete(products).where(eq(products.tenantId, tenant.id));
+    if (shouldForceCatalogReset) {
+        const existingCats = await db.select({ id: categories.id, name: categories.name })
+            .from(categories)
+            .where(eq(categories.tenantId, tenant.id));
+
+        if (existingProds.length > 0) {
+            await db.delete(products).where(eq(products.tenantId, tenant.id));
+        }
+        if (existingCats.length > 0) {
+            await db.delete(categories).where(eq(categories.tenantId, tenant.id));
+        }
+
+        console.log(
+            `[PIZZA LEMON] Force reset enabled — cleared ${existingProds.length} products and ${existingCats.length} categories.`,
+        );
     } else {
-        console.log("[PIZZA LEMON] Creating fresh product catalog...");
+        console.log("[PIZZA LEMON] No products found — creating fresh product catalog...");
     }
 
     // ── Phase 8: Ensure all categories exist ─────────────────────────────────
@@ -548,7 +546,7 @@ export async function seedPizzaLemon() {
                 tenantId: tenant.id,
                 name: cat.name, color: cat.color, icon: cat.icon, isActive: true,
                 sortOrder: cat.sortOrder,
-            }).returning();
+            }).$returningId();
             catMap[cat.name] = ins.id;
             console.log(`[PIZZA LEMON] Created category: ${cat.name}`);
         } else {
@@ -578,8 +576,14 @@ export async function seedPizzaLemon() {
             isActive: true,
             modifiers: mods,
             ...(item.image ? { image: item.image } : {}),
-        }).returning();
-        await db.insert(inventory).values({ productId: prod.id, branchId, quantity: 999, lowStockThreshold: 0, reorderPoint: 0 }).onConflictDoNothing();
+        }).$returningId();
+        await db.insert(inventory).values({
+            productId: prod.id,
+            branchId,
+            quantity: 999,
+            lowStockThreshold: 0,
+            reorderPoint: 0,
+        });
     }
 
     // Insert pizzas with per-pizza size modifiers
@@ -594,9 +598,14 @@ export async function seedPizzaLemon() {
 
     // Tellergerichte: items with Pommes/Salat choice get sideModifier
     const TELLER_WITH_SIDE = new Set([
-        "Chicken Nuggets 8Stk", "Pouletschnitzel", "Pouletflügeli 12Stk",
-        "Poulet Kebab Teller", "Lamm Kebab Teller", "Köfte Teller",
-        "Cevapcici Teller", "Falafel Teller",
+        "Chicken Nuggets 8 Stk.",
+        "Pouletschnitzel",
+        "Pouletflügeli 12 Stk.",
+        "Poulet Kebab Teller",
+        "Lamm Kebab Teller / Sac Kavurma",
+        "Köfte Teller",
+        "Cevapcici",
+        "Falafel Teller",
     ]);
     for (const p of TELLERGERICHTE) {
         await insertItem("Tellergerichte", p, TELLER_WITH_SIDE.has(p.name) ? sideModifier() : []);
@@ -604,20 +613,37 @@ export async function seedPizzaLemon() {
 
     // Fingerfood: Döner/Kebab items get sauce modifier
     const FINGER_WITH_SAUCE = new Set([
-        "Döner Kebab Tasche", "Dürüm Kebab", "Döner Box",
-        "Poulet Kebab Tasche", "Poulet Kebab Fladen",
-        "Lamm Kebab Tasche", "Lamm Kebab Fladen",
-        "Köfte Taschenbrot", "Cevapcici Taschenbrot",
-        "Kebab Fladen+Raclette", "Kebab Tasche+Raclette",
-        "Kebab Fladen+Speck", "Kebab Tasche+Speck",
+        "Döner Kebab Im Taschenbrot",
+        "Dürüm Kebab Im Fladenbrot",
+        "Falafel Im Taschenbrot",
+        "Falafel Dürüm Im Fladenbrot",
+        "Poulet Pepito",
+        "Lamm Pepito",
+        "Poulet Kebab Mit Gemüse Im Taschenbrot",
+        "Poulet Kebab Mit Gemüse Im Fladenbrot",
+        "Lamm Kebab Mit Gemüse Im Taschenbrot",
+        "Lamm Kebab Mit Gemüse Im Fladenbrot",
+        "Köfte Im Taschenbrot",
+        "Cevapcici Im Taschenbrot",
+        "Kebab Im Fladenbrot mit Raclette",
+        "Kebab Im Taschenbrot mit Raclette",
+        "Kebab Im Fladenbrot mit Speck",
+        "Kebab Im Taschenbrot mit Speck",
     ]);
     for (const p of FINGERFOOD) {
         await insertItem("Fingerfood", p, FINGER_WITH_SAUCE.has(p.name) ? sauceModifier() : []);
     }
 
-    // Salat: green/mixed salads get dressing modifier
+    // Salat: all salad items except bread get dressing modifier
     const SALAT_WITH_DRESSING = new Set([
-        "Grüner Salat", "Gemischter Salat", "Thon Salat", "Lemon Salat",
+        "Grüner Salat",
+        "Gemischter Salat",
+        "Griechischer Salat",
+        "Lemon Salat",
+        "Thon Salat",
+        "Tomaten Salat",
+        "Tomaten Mozzarella Salat",
+        "Crevettencocktail Salat",
     ]);
     for (const p of SALATE) {
         await insertItem("Salat", p, SALAT_WITH_DRESSING.has(p.name) ? dressingModifier() : []);
@@ -625,15 +651,17 @@ export async function seedPizzaLemon() {
 
     for (const p of DESSERTS) await insertItem("Dessert", p);
 
-    // Drinks with size modifier: Cola/Zero/Eistee 0.5l→1.5l = +2.00; Fanta both sizes = 6.00 (same price)
-    const DRINKS_WITH_2EUR_SIZE = new Set(["Coca-Cola", "Coca-Cola Zero", "Eistee Pfirsich"]);
+    // Drinks with visible 50cl / 1.5 L sizes from the printed menu
+    const DRINKS_WITH_SIZE = new Set([
+        "Coca-Cola",
+        "Coca-Cola Light",
+        "Coca-Cola Zero",
+        "Fanta",
+        "Eistee",
+        "Mineralwasser",
+    ]);
     for (const p of GETRAENKE) {
-        let sizeMod: any[] = [];
-        if (DRINKS_WITH_2EUR_SIZE.has(p.name)) {
-            sizeMod = drinkSizeModifier(2.00);
-        } else if (p.name === "Fanta") {
-            sizeMod = drinkSizeModifier(0.00); // 0.5l and 1.5l both CHF 6.00
-        }
+        const sizeMod = DRINKS_WITH_SIZE.has(p.name) ? drinkSizeModifier(4.00) : [];
         await insertItem("Getränke", p, sizeMod);
     }
 
@@ -644,7 +672,13 @@ export async function seedPizzaLemon() {
     const total = PIZZAS.length + CALZONES.length + PIDE.length + LAHMACUN.length +
         TELLERGERICHTE.length + FINGERFOOD.length + SALATE.length + DESSERTS.length +
         GETRAENKE.length + BIER.length + ALKOHOL.length + EXTRAS.length;
-    console.log(`[PIZZA LEMON] ✓ ${total} products inserted with updated images (v4) and prices.`);
+    console.log(
+        `[PIZZA LEMON] ✓ ${total} products inserted. ` +
+        `Pizza ${PIZZAS.length}, Calzone ${CALZONES.length}, Pide ${PIDE.length}, ` +
+        `Lahmacun ${LAHMACUN.length}, Tellergerichte ${TELLERGERICHTE.length}, Fingerfood ${FINGERFOOD.length}, ` +
+        `Salat ${SALATE.length}, Dessert ${DESSERTS.length}, Getränke ${GETRAENKE.length}, ` +
+        `Bier ${BIER.length}, Alkohol ${ALKOHOL.length}, Extra ${EXTRAS.length}.`
+    );
 
     // ── Landing page config ────────────────────────────────────────────────────
     const [existingConfig] = await db.select().from(landingPageConfig)
@@ -699,10 +733,10 @@ export async function seedPizzaLemon() {
     await db.insert(tenantNotifications).values({
         tenantId: tenant.id,
         type: "info",
-        title: "Pizza Lemon Katalog aktualisiert (v6)!",
-        message: `+Mövenpick Glace Erdbeer/Schokolade/Vanille/Caramel (je einzeln), Bilder für Wunschpide+Extra Kebap hinzugefügt. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
+        title: "Pizza Lemon Katalog aktualisiert (v7)!",
+        message: `Menüpreise, Größen und Getränkemengen mit dem aktuellen Foto-Menü abgeglichen. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
         priority: "high",
-    }).onConflictDoNothing();
+    });
 
     // ── Sample Vehicles ──────────────────────────────────────────────────────
     const existingVehicles = await db.select().from(vehicles).where(eq(vehicles.tenantId, tenant.id));
@@ -720,5 +754,10 @@ export async function seedPizzaLemon() {
     console.log(`[PIZZA LEMON]    Pass:    ${STORE_PASSWORD}`);
     console.log(`[PIZZA LEMON]    License: ${LICENSE_KEY}`);
     console.log(`[PIZZA LEMON]    Admin PIN: 1234  |  Cashier PIN: 5678`);
-    console.log(`[PIZZA LEMON]    Menu: 35 Pizza, 3 Calzone, 10 Pide, 2 Lahmacun, 13 Tellergerichte, 24 Fingerfood, 8 Salat, 9 Dessert, 9 Getränke, 1 Bier, 6 Alkohol, 1 Tabak = ${total} total`);
+    console.log(
+        `[PIZZA LEMON]    Menu: ${PIZZAS.length} Pizza, ${CALZONES.length} Calzone, ${PIDE.length} Pide, ` +
+        `${LAHMACUN.length} Lahmacun, ${TELLERGERICHTE.length} Tellergerichte, ${FINGERFOOD.length} Fingerfood, ` +
+        `${SALATE.length} Salat, ${DESSERTS.length} Dessert, ${GETRAENKE.length} Getränke, ` +
+        `${BIER.length} Bier, ${ALKOHOL.length} Alkohol, ${EXTRAS.length} Extra = ${total} total`
+    );
 }

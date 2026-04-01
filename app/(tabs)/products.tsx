@@ -218,6 +218,20 @@ export default function ProductsScreen() {
     return new Date(dateStr) < new Date();
   };
 
+  const confirmDelete = (title: string, message: string, onConfirm: () => void) => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      if (window.confirm(`${title}\n\n${message}`)) {
+        onConfirm();
+      }
+      return;
+    }
+
+    Alert.alert(title, message, [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("delete"), style: "destructive", onPress: onConfirm },
+    ]);
+  };
+
   const topPad = Platform.OS === "web" ? 48 : 0;
   const getCatName = (catId: number | null) => categories.find((c: any) => c.id === catId)?.name || t("uncategorized");
 
@@ -403,11 +417,13 @@ export default function ProductsScreen() {
                   </View>
                 )}
                 {canManage && (
-                  <Pressable onPress={() => {
-                    Alert.alert(t("delete"), `${t("delete")} ${item.name}?`, [
-                      { text: t("cancel") },
-                      { text: t("delete"), style: "destructive", onPress: () => deleteMutation.mutate(item.id) },
-                    ]);
+                  <Pressable onPress={(event: any) => {
+                    event?.stopPropagation?.();
+                    confirmDelete(
+                      t("delete"),
+                      `${t("delete")} ${item.name}?`,
+                      () => deleteMutation.mutate(item.id),
+                    );
                   }}>
                     <Ionicons name="trash-outline" size={18} color={Colors.danger} />
                   </Pressable>
@@ -449,11 +465,13 @@ export default function ProductsScreen() {
               <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8 }}>
                 {canManage && (
                   <Pressable
-                    onPress={() => {
-                      Alert.alert(t("delete") + " " + t("category"), `${t("delete")} "${item.name}"?`, [
-                        { text: t("cancel"), style: "cancel" },
-                        { text: t("delete"), style: "destructive", onPress: () => deleteCategoryMutation.mutate(item.id) },
-                      ]);
+                    onPress={(event: any) => {
+                      event?.stopPropagation?.();
+                      confirmDelete(
+                        t("delete") + " " + t("category"),
+                        `${t("delete")} "${item.name}"?`,
+                        () => deleteCategoryMutation.mutate(item.id),
+                      );
                     }}
                   >
                     <Ionicons name="trash-outline" size={18} color={Colors.danger} />

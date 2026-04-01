@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { getDisplayNumber } from "@/lib/api-config";
+import { normalizeOrderItems } from "@/lib/order-items";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { playClickSound, playAddSound } from "@/lib/sound";
 import RealTimeClock from "@/components/RealTimeClock";
@@ -24,6 +25,11 @@ import {
   PIZZA_TOPPINGS, TOPPING_PRICE, TOPPING_GRID, SAUCE_ROW, SAUCE_NAMES,
   calcToppingsPrice, getToppingDisplayName, getToppingEmoji, getToppingInfo,
 } from "@/utils/toppingUtils";
+
+type ProductVariantOption = {
+  name: string;
+  price: number;
+};
 
 const AnimatedProductImage = ({ uri }: { uri: string }) => {
   return (
@@ -49,6 +55,7 @@ export default function POSScreen() {
     return () => sub?.remove();
   }, []);
   const isTablet = screenDims.width > 600;
+  const prefersInlineSizePicker = Platform.OS === "web";
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -104,6 +111,7 @@ export default function POSScreen() {
   const [customerPhoneLoading, setCustomerPhoneLoading] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [leftHandMode, setLeftHandMode] = useState(false);
+  const [expandedSizeProductId, setExpandedSizeProductId] = useState<number | null>(null);
   useEffect(() => {
     import("@react-native-async-storage/async-storage").then(({ default: AsyncStorage }) => {
       AsyncStorage.getItem("barmagly_left_hand_mode").then((v) => {
@@ -283,6 +291,11 @@ export default function POSScreen() {
     enabled: showOnlineOrders && !!tenantId,
     refetchInterval: showOnlineOrders ? 30000 : false,
   });
+
+  const normalizedOnlineOrders = (onlineOrders as any[]).map((order) => ({
+    ...order,
+    items: normalizeOrderItems(order?.items),
+  }));
 
   const { data: callHistory = [] } = useQuery<any[]>({
     queryKey: ["/api/calls", tenantId ? `?tenantId=${tenantId}` : ""],
@@ -547,6 +560,108 @@ export default function POSScreen() {
     return name.includes("fingerfood") || catName.includes("fingerfood");
   }, [categories]);
 
+  const parseJsonArrayLike = useCallback((value: unknown) => {
+    if (Array.isArray(value)) return value;
+    if (typeof value !== "string") return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const getProductVariantOptions = useCallback((product: any): ProductVariantOption[] => {
+    if (!product) return [];
+
+    const explicitVariants = parseJsonArrayLike(product.variants)
+      .map((variant: any) => ({
+        name: String(variant?.name || "").trim(),
+        price: Number(variant?.price ?? 0),
+      }))
+      .filter((variant: ProductVariantOption) => variant.name);
+
+    if (explicitVariants.length > 0) {
+      return explicitVariants;
+    }
+
+    const modifiers = parseJsonArrayLike(product.modifiers);
+    const sizeModifier = modifiers.find((modifier: any) => {
+      const modifierName = String(modifier?.name || "").toLowerCase();
+      const options = parseJsonArrayLike(modifier?.options);
+      const optionLooksLikeSize = options.some((option: any) => {
+        const label = String(option?.label || option?.name || "").toLowerCase();
+        return /cm|cl|\b1[\.,]5\b|\b50\b|gross|klein/.test(label);
+      });
+      return options.length > 1 && (
+        modifier?.required === true ||
+        modifierName.includes("grösse") ||
+        modifierName.includes("größe") ||
+        modifierName.includes("size") ||
+        optionLooksLikeSize
+      );
+    });
+
+    if (!sizeModifier) {
+      return [];
+    }
+
+    const basePrice = Number(product.price || 0);
+    return parseJsonArrayLike(sizeModifier.options)
+      .map((option: any) => ({
+        name: String(option?.label || option?.name || "").trim(),
+        price: basePrice + Number(option?.price ?? 0),
+      }))
+      .filter((variant: ProductVariantOption) => variant.name);
+  }, [parseJsonArrayLike]);
+
+  const getShortVariantLabel = useCallback((label: string) => {
+    return label
+      .replace(/\s*normal$/i, "")
+      .replace(/\s*klein$/i, "")
+      .replace(/\s*gross.*$/i, "")
+      .replace(/\s*\(\+.*?\)\s*$/i, "")
+      .trim();
+  }, []);
+
+  const getVariantSummaryLabel = useCallback((product: any) => {
+    const variants = getProductVariantOptions(product);
+    if (variants.length === 0) return "";
+    return variants.map((variant) => getShortVariantLabel(variant.name)).join(" / ");
+  }, [getProductVariantOptions, getShortVariantLabel]);
+
+  const resetProductOptionsState = useCallback(() => {
+    setExpandedSizeProductId(null);
+    setSelectedProductForOptions(null);
+    setSelectedVariant(null);
+    setSelectedToppings([]);
+    setShowToppingsStep(false);
+    setEditingCartItemId(null);
+  }, []);
+
+  const openProductOptions = useCallback((product: any, options?: {
+    variant?: ProductVariantOption | null;
+    toppings?: string[];
+    editingItemId?: number | null;
+    showExtras?: boolean;
+  }) => {
+    const variants = getProductVariantOptions(product);
+    setExpandedSizeProductId(null);
+    setSelectedProductForOptions(variants.length > 0 ? { ...product, variants } : product);
+    setSelectedVariant(options?.variant ?? null);
+    setSelectedToppings(options?.toppings ?? []);
+    setShowToppingsStep(options?.showExtras ?? false);
+    setEditingCartItemId(options?.editingItemId ?? null);
+    playClickSound("light");
+  }, [getProductVariantOptions]);
+
+  const getCartItemVariant = useCallback((product: any, itemName: string) => {
+    const match = itemName.match(/\(([^)]+)\)/);
+    if (!match) return null;
+    const variantName = match[1].trim();
+    return getProductVariantOptions(product).find((variant) => variant.name === variantName) || null;
+  }, [getProductVariantOptions]);
+
   const parseToppingsFromName = (itemName: string): string[] => {
     const match = itemName.match(/\[(.+?)\]\s*$/);
     if (!match) return [];
@@ -557,6 +672,10 @@ export default function POSScreen() {
     ];
     return allToppings.filter(t => displayNames.includes(toppingDisplayName(t)));
   };
+
+  useEffect(() => {
+    setExpandedSizeProductId(null);
+  }, [search, selectedCategory, tenantId]);
 
   useEffect(() => {
     if (storeSettings?.taxRate !== undefined) {
@@ -592,7 +711,14 @@ export default function POSScreen() {
     const matchesCategory = selectedCategory
       ? (selectedCategory === MERGED_ALCOHOL_ID ? mergedAlcoholIds.includes(p.categoryId) : p.categoryId === selectedCategory)
       : true;
-    const matchesSearch = search ? p.name.toLowerCase().includes(search.toLowerCase()) : true;
+    const s = search ? search.toLowerCase() : "";
+    const matchesSearch = s ? (
+      (p.name || "").toLowerCase().includes(s) ||
+      (p.nameAr || "").toLowerCase().includes(s) ||
+      (p.sku || "").toLowerCase().includes(s) ||
+      (p.barcode || "").toLowerCase().includes(s) ||
+      (p.description || "").toLowerCase().includes(s)
+    ) : true;
     return matchesCategory && matchesSearch;
   }).sort((a: any, b: any) => {
     const aCatIdx = tenantCategories.findIndex((c: any) => c.id === a.categoryId);
@@ -907,47 +1033,57 @@ export default function POSScreen() {
   });
 
   const handleAddToCart = useCallback((product: any) => {
-    // Convert modifiers to variants if no explicit variants exist
-    let enrichedProduct = product;
-    if (
-      (!product.variants || product.variants.length === 0) &&
-      product.modifiers && Array.isArray(product.modifiers) && product.modifiers.length > 0
-    ) {
-      const sizeGroup = product.modifiers.find((m: any) => m.required === true);
-      if (sizeGroup?.options?.length > 0) {
-        const basePrice = Number(product.price);
-        enrichedProduct = {
-          ...product,
-          variants: sizeGroup.options.map((opt: any) => ({
-            name: opt.label,
-            price: basePrice + Number(opt.price),
-          })),
-        };
-      }
-    }
+    const variants = getProductVariantOptions(product);
+    const enrichedProduct = variants.length > 0 ? { ...product, variants } : product;
+    setExpandedSizeProductId(null);
 
     // If product has variants, show options modal (size selection + toppings)
-    if (enrichedProduct.variants && Array.isArray(enrichedProduct.variants) && enrichedProduct.variants.length > 0) {
-      setSelectedProductForOptions(enrichedProduct);
-      setShowToppingsStep(false);
-      setEditingCartItemId(null);
-      playClickSound("light");
+    if (variants.length > 0) {
+      openProductOptions(enrichedProduct, { showExtras: false });
       return;
     }
     // Pizza or Fingerfood without variants: skip directly to extras
     if (isPizzaProduct(product) || isFingerfoodProduct(product)) {
-      setSelectedProductForOptions(product);
-      setSelectedVariant(null);
-      setSelectedToppings([]);
-      setShowToppingsStep(true);
-      setEditingCartItemId(null);
-      playClickSound("light");
+      openProductOptions(enrichedProduct, { showExtras: true });
       return;
     }
     cart.addItem({ id: product.id, name: product.name, price: Number(product.price) });
     playAddSound();
     triggerFlash(product.id);
-  }, [cart, isPizzaProduct, isFingerfoodProduct, triggerFlash]);
+  }, [cart, getProductVariantOptions, isPizzaProduct, isFingerfoodProduct, openProductOptions, triggerFlash]);
+
+  const handleVariantSelection = useCallback((product: any, variant: ProductVariantOption, event?: any) => {
+    event?.stopPropagation?.();
+    if (isPizzaProduct(product) || isFingerfoodProduct(product)) {
+      openProductOptions(product, {
+        variant,
+        toppings: [],
+        showExtras: true,
+      });
+      return;
+    }
+
+    setExpandedSizeProductId(null);
+    cart.addItem({
+      id: product.id,
+      name: product.name,
+      price: Number(product.price),
+      variant,
+    });
+    playAddSound();
+    triggerFlash(product.id);
+  }, [cart, isPizzaProduct, isFingerfoodProduct, openProductOptions, triggerFlash]);
+
+  const handleProductCardPress = useCallback((product: any) => {
+    const variants = getProductVariantOptions(product);
+    if (prefersInlineSizePicker && variants.length > 0) {
+      setExpandedSizeProductId((current) => current === product.id ? null : product.id);
+      playClickSound("light");
+      return;
+    }
+
+    handleAddToCart(product);
+  }, [getProductVariantOptions, handleAddToCart, prefersInlineSizePicker]);
 
   const handleBarcodeScan = useCallback(async (barcode: string) => {
     try {
@@ -1433,10 +1569,13 @@ export default function POSScreen() {
               const catIcon = (cat?.icon || "cube") as keyof typeof Ionicons.glyphMap;
               const cartQty = cart.items.find((i: any) => i.id === item.id || i.productId === item.id)?.quantity || 0;
               const isJustAdded = lastAddedId === item.id;
+              const variantOptions = getProductVariantOptions(item);
+              const hasInlineSizeOptions = prefersInlineSizePicker && variantOptions.length > 0;
+              const isSizePickerOpen = expandedSizeProductId === item.id;
               return (
                 <Pressable
                   style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] }]}
-                  onPress={() => handleAddToCart(item)}
+                  onPress={() => handleProductCardPress(item)}
                 >
                   {isJustAdded && (
                     <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: catColor, opacity: flashAnim, borderRadius: 16 }]} />
@@ -1451,6 +1590,47 @@ export default function POSScreen() {
                   </View>
                   <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
                   <Text style={[styles.productPrice, { color: catColor }]}>CHF {Number(item.price).toFixed(2)}</Text>
+                  {hasInlineSizeOptions && (
+                    <View style={styles.productSizeWrap}>
+                      <Pressable
+                        style={[
+                          styles.productSizeButton,
+                          { borderColor: `${catColor}55`, backgroundColor: `${catColor}16` },
+                          isSizePickerOpen && { borderColor: catColor, backgroundColor: `${catColor}26` },
+                        ]}
+                        onPress={(event: any) => {
+                          event?.stopPropagation?.();
+                          setExpandedSizeProductId((current) => current === item.id ? null : item.id);
+                          playClickSound("light");
+                        }}
+                      >
+                        <Text style={[styles.productSizeButtonText, { color: catColor }]} numberOfLines={1}>
+                          {getVariantSummaryLabel(item)}
+                        </Text>
+                        <Ionicons
+                          name={isSizePickerOpen ? "chevron-up" : "chevron-down"}
+                          size={13}
+                          color={catColor}
+                        />
+                      </Pressable>
+                      {isSizePickerOpen && (
+                        <View style={styles.productSizeDropdown}>
+                          {variantOptions.map((variant) => (
+                            <Pressable
+                              key={`${item.id}-${variant.name}`}
+                              style={styles.productSizeOption}
+                              onPress={(event: any) => handleVariantSelection(item, variant, event)}
+                            >
+                              <Text style={styles.productSizeOptionName}>{getShortVariantLabel(variant.name)}</Text>
+                              <Text style={[styles.productSizeOptionPrice, { color: catColor }]}>
+                                CHF {Number(variant.price).toFixed(2)}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  )}
                   {tenant?.storeType !== "restaurant" && item.trackInventory && (
                     <Text style={[styles.barcodeText, { color: Colors.textSecondary }]}>Stock: {item.quantity || 0}</Text>
                   )}
@@ -1461,7 +1641,7 @@ export default function POSScreen() {
                     </View>
                   ) : (
                     <View style={[styles.productAddBadge, { backgroundColor: `${catColor}22` }]}>
-                      <Ionicons name="add" size={14} color={catColor} />
+                      <Ionicons name={hasInlineSizeOptions ? "chevron-down" : "add"} size={14} color={catColor} />
                     </View>
                   )}
                 </Pressable>
@@ -1579,12 +1759,13 @@ export default function POSScreen() {
                           onPress={() => {
                             const existingToppings = parseToppingsFromName(item.name);
                             const cleanName = item.name.replace(/\s*\[.+?\]$/, "").replace(/\s*\([^)]*\)$/, "");
-                            setSelectedProductForOptions({ ...prod, name: cleanName });
-                            setSelectedVariant(null);
-                            setSelectedToppings(existingToppings);
-                            setShowToppingsStep(true);
-                            setEditingCartItemId(item.id);
-                            playClickSound("light");
+                            const existingVariant = getCartItemVariant(prod, item.name);
+                            openProductOptions({ ...prod, name: cleanName }, {
+                              variant: existingVariant,
+                              toppings: existingToppings,
+                              editingItemId: item.id,
+                              showExtras: true,
+                            });
                           }}
                           style={{ padding: 3, borderRadius: 5, backgroundColor: Colors.accent + "22" }}
                         >
@@ -1717,7 +1898,7 @@ export default function POSScreen() {
                   {showToppingsStep ? (editingCartItemId !== null ? (language === "ar" ? "تعديل الإضافات" : language === "de" ? "Extras bearbeiten" : "Edit Extras") : (language === "ar" ? "اختر الإضافات" : language === "de" ? "Extras wählen" : "Select Extras")) : (t("selectSize" as any) || "Select Size")}
                 </Text>
               </View>
-              <Pressable onPress={() => { setSelectedProductForOptions(null); setSelectedVariant(null); setSelectedToppings([]); setShowToppingsStep(false); setEditingCartItemId(null); }} style={styles.modalCloseBtn}>
+              <Pressable onPress={resetProductOptionsState} style={styles.modalCloseBtn}>
                 <Ionicons name="close" size={28} color={Colors.textMuted} />
               </Pressable>
             </View>
@@ -1736,7 +1917,6 @@ export default function POSScreen() {
                       onPress={() => {
                         if (isPizzaProduct(selectedProductForOptions) || isFingerfoodProduct(selectedProductForOptions)) {
                           setSelectedVariant(v);
-                          setSelectedToppings([]);
                           setShowToppingsStep(true);
                           playClickSound("light");
                         } else {
@@ -1747,11 +1927,11 @@ export default function POSScreen() {
                             variant: v,
                           });
                           playAddSound();
-                          setSelectedProductForOptions(null);
+                          resetProductOptionsState();
                         }
                       }}
                     >
-                      <Text style={[styles.sizeCardName, selectedVariant?.name === v.name && { color: Colors.accent }]}>{v.name}</Text>
+                      <Text style={[styles.sizeCardName, selectedVariant?.name === v.name && { color: Colors.accent }]}>{getShortVariantLabel(v.name)}</Text>
                       <Text style={[styles.sizeCardPrice, selectedVariant?.name === v.name && { color: Colors.accent }]}>CHF {Number(v.price).toFixed(2)}</Text>
                     </Pressable>
                   ))}
@@ -1765,7 +1945,7 @@ export default function POSScreen() {
                   <View style={[styles.selectedSizeBadge, { paddingVertical: 8, paddingHorizontal: 14, backgroundColor: Colors.accent + "18", marginBottom: 8 }]}>
                     <Ionicons name="pizza" size={15} color={Colors.accent} />
                     <Text style={[styles.selectedSizeBadgeText, { fontSize: 14, fontWeight: "700" }]}>
-                      {selectedVariant.name} — CHF {(Number(selectedVariant.price) + calcToppingsPrice(selectedToppings)).toFixed(2)}
+                      {getShortVariantLabel(selectedVariant.name)} — CHF {(Number(selectedVariant.price) + calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)}
                     </Text>
                     {selectedToppings.length > 0 && (
                       <View style={{ marginLeft: "auto", backgroundColor: Colors.accent, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 }}>
@@ -1779,7 +1959,11 @@ export default function POSScreen() {
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 6, paddingHorizontal: 2 }}>
                   <Ionicons name="pricetag" size={12} color={Colors.accent} />
                   <Text style={{ color: Colors.accent, fontSize: 11, fontWeight: "700" }}>
-                    {language === "ar" ? "كل إضافة +CHF 2.00" : language === "de" ? "Jedes Extra +CHF 2.00" : "Each extra +CHF 2.00"}
+                    {language === "ar"
+                      ? "كل إضافة +CHF 2.00، وكِسراند 33cm = CHF 3 / 45cm = CHF 6"
+                      : language === "de"
+                        ? "Jedes Extra +CHF 2.00, Käserand 33cm = CHF 3 / 45cm = CHF 6"
+                        : "Each extra +CHF 2.00, cheese crust 33cm = CHF 3 / 45cm = CHF 6"}
                   </Text>
                 </View>
 
@@ -1867,10 +2051,10 @@ export default function POSScreen() {
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                       <Text style={{ color: Colors.accent, fontSize: 11, fontWeight: "700" }}>
                         {language === "ar"
-                          ? `الإضافات المختارة (${selectedToppings.length}) — +CHF ${(calcToppingsPrice(selectedToppings)).toFixed(2)}`
+                          ? `الإضافات المختارة (${selectedToppings.length}) — +CHF ${(calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)}`
                           : language === "de"
-                          ? `Ausgewählte Extras (${selectedToppings.length}) — +CHF ${(calcToppingsPrice(selectedToppings)).toFixed(2)}`
-                          : `Selected Extras (${selectedToppings.length}) — +CHF ${(calcToppingsPrice(selectedToppings)).toFixed(2)}`}
+                          ? `Ausgewählte Extras (${selectedToppings.length}) — +CHF ${(calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)}`
+                          : `Selected Extras (${selectedToppings.length}) — +CHF ${(calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)}`}
                       </Text>
                       <Pressable onPress={() => setSelectedToppings([])}>
                         <Text style={{ color: Colors.danger, fontSize: 11, fontWeight: "600" }}>
@@ -1890,25 +2074,21 @@ export default function POSScreen() {
                     style={{ borderRadius: 14, overflow: "hidden" }}
                     onPress={() => {
                       const toppingsSuffix = selectedToppings.length > 0 ? ` [${selectedToppings.map(t => toppingDisplayName(t)).join(", ")}]` : "";
-                      const toppingsPrice = calcToppingsPrice(selectedToppings);
+                      const toppingsPrice = calcToppingsPrice(selectedToppings, selectedVariant?.name);
 
                       if (editingCartItemId !== null) {
-                        const cartItem = cart.items.find((i: any) => i.id === editingCartItemId);
-                        if (cartItem) {
-                          const originalToppings = parseToppingsFromName(cartItem.name);
-                          const basePrice = cartItem.price - calcToppingsPrice(originalToppings);
-                          const baseName = cartItem.name.replace(/\s*\[.+?\]$/, "");
-                          cart.updateItem(editingCartItemId, {
-                            name: baseName + toppingsSuffix,
-                            price: basePrice + toppingsPrice,
-                          });
-                        }
+                        const baseName = selectedVariant
+                          ? `${selectedProductForOptions.name} (${selectedVariant.name})`
+                          : selectedProductForOptions.name;
+                        const basePrice = selectedVariant
+                          ? Number(selectedVariant.price)
+                          : Number(selectedProductForOptions.price);
+                        cart.updateItem(editingCartItemId, {
+                          name: baseName + toppingsSuffix,
+                          price: basePrice + toppingsPrice,
+                        });
                         playAddSound();
-                        setSelectedProductForOptions(null);
-                        setSelectedVariant(null);
-                        setSelectedToppings([]);
-                        setShowToppingsStep(false);
-                        setEditingCartItemId(null);
+                        resetProductOptionsState();
                       } else {
                         const variantWithToppings = selectedVariant
                           ? { ...selectedVariant, price: Number(selectedVariant.price) + toppingsPrice }
@@ -1920,10 +2100,8 @@ export default function POSScreen() {
                           variant: variantWithToppings,
                         });
                         playAddSound();
-                        setSelectedProductForOptions(null);
-                        setSelectedVariant(null);
-                        setSelectedToppings([]);
-                        setShowToppingsStep(false);
+                        resetProductOptionsState();
+                        triggerFlash(selectedProductForOptions.id);
                       }
                     }}
                   >
@@ -1932,10 +2110,10 @@ export default function POSScreen() {
                         {editingCartItemId !== null
                           ? (language === "ar" ? "تحديث الإضافات" : language === "de" ? "Extras aktualisieren" : "Update Extras")
                           : language === "ar"
-                          ? `إضافة للسلة${selectedToppings.length > 0 ? ` (+CHF ${(calcToppingsPrice(selectedToppings)).toFixed(2)})` : ""}`
+                          ? `إضافة للسلة${selectedToppings.length > 0 ? ` (+CHF ${(calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)})` : ""}`
                           : language === "de"
-                          ? `In den Warenkorb${selectedToppings.length > 0 ? ` (+CHF ${(calcToppingsPrice(selectedToppings)).toFixed(2)})` : ""}`
-                          : `Add to Cart${selectedToppings.length > 0 ? ` (+CHF ${(calcToppingsPrice(selectedToppings)).toFixed(2)})` : ""}`}
+                          ? `In den Warenkorb${selectedToppings.length > 0 ? ` (+CHF ${(calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)})` : ""}`
+                          : `Add to Cart${selectedToppings.length > 0 ? ` (+CHF ${(calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)})` : ""}`}
                       </Text>
                     </LinearGradient>
                   </Pressable>
@@ -1954,7 +2132,7 @@ export default function POSScreen() {
             {!showToppingsStep && (
               <Pressable
                 style={[styles.modalCancelBtn, { marginTop: 16 }]}
-                onPress={() => { setSelectedProductForOptions(null); setSelectedVariant(null); setSelectedToppings([]); setShowToppingsStep(false); setEditingCartItemId(null); }}
+                onPress={resetProductOptionsState}
               >
                 <Text style={styles.modalCancelBtnText}>{t("cancel")}</Text>
               </Pressable>
@@ -3170,11 +3348,12 @@ export default function POSScreen() {
             </View>
 
             <FlatList
-              data={onlineOrders as any[]}
+              data={normalizedOnlineOrders as any[]}
               keyExtractor={(item: any) => String(item.id)}
               scrollEnabled
               renderItem={({ item }: { item: any }) => {
                 const orderDate = new Date(item.createdAt);
+                const orderItems = normalizeOrderItems(item.items);
                 const statusColor: Record<string, string> = {
                   pending: Colors.warning,
                   accepted: Colors.info,
@@ -3210,7 +3389,7 @@ export default function POSScreen() {
                       {payIcon[item.paymentMethod] || "💵"} {item.paymentMethod?.toUpperCase()} · {item.orderType?.toUpperCase()} · {orderDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </Text>
                     {/* Items */}
-                    {(item.items || []).map((it: any, idx: number) => (
+                    {orderItems.map((it: any, idx: number) => (
                       <Text key={idx} style={{ color: Colors.textMuted, fontSize: 11 }}>
                         • {it.name} x{it.quantity} — CHF {Number(it.total).toFixed(2)}
                       </Text>
@@ -3756,6 +3935,13 @@ const styles = StyleSheet.create({
   productIcon: { width: 64, height: 64, borderRadius: 16, justifyContent: "center", alignItems: "center", marginBottom: 10, marginTop: 4, overflow: "hidden" as const },
   productName: { color: Colors.text, fontSize: 14, fontWeight: "700", textAlign: "center", marginBottom: 4, lineHeight: 19 },
   productPrice: { color: Colors.accent, fontSize: 16, fontWeight: "800" },
+  productSizeWrap: { width: "100%" as const, marginTop: 8, marginBottom: 2 },
+  productSizeButton: { minHeight: 32, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  productSizeButtonText: { flex: 1, fontSize: 11, fontWeight: "800", textAlign: "center" as const },
+  productSizeDropdown: { marginTop: 6, borderRadius: 10, borderWidth: 1, borderColor: Colors.cardBorder, backgroundColor: Colors.surfaceLight, overflow: "hidden" as const },
+  productSizeOption: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" },
+  productSizeOptionName: { color: Colors.text, fontSize: 12, fontWeight: "700" },
+  productSizeOptionPrice: { fontSize: 12, fontWeight: "800" },
   productAddBadge: { position: "absolute" as const, top: 7, right: 7, width: 20, height: 20, borderRadius: 10, justifyContent: "center", alignItems: "center" },
   productCartBadge: { position: "absolute" as const, top: 7, right: 7, minWidth: 20, height: 20, borderRadius: 10, justifyContent: "center", alignItems: "center", paddingHorizontal: 4 },
   productCartBadgeText: { color: Colors.white, fontSize: 11, fontWeight: "800" },

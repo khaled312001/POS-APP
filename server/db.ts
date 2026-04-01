@@ -2,8 +2,9 @@ import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import * as schema from "@shared/schema";
 
-const pool = mysql.createPool({
+export const pool = mysql.createPool({
   host:     process.env.MYSQL_HOST     || "127.0.0.1",
+  port:     Number(process.env.MYSQL_PORT || 3306),
   user:     process.env.MYSQL_USER     || "",
   password: process.env.MYSQL_PASSWORD || "",
   database: process.env.MYSQL_DATABASE || "",
@@ -20,6 +21,8 @@ const pool = mysql.createPool({
   },
 });
 
-console.log(`[DB] MySQL — host: ${process.env.MYSQL_HOST || "127.0.0.1"}, database: ${process.env.MYSQL_DATABASE}`);
+console.log(
+  `[DB] MySQL — host: ${process.env.MYSQL_HOST || "127.0.0.1"}, port: ${process.env.MYSQL_PORT || 3306}, database: ${process.env.MYSQL_DATABASE}`,
+);
 
 export const db = drizzle(pool, { schema, mode: "default" });
