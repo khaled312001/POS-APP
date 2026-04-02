@@ -1509,12 +1509,12 @@ export default function POSScreen() {
                 </Pressable>
               ) : null}
             </View>
-            <Pressable style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" }} onPress={() => setShowScanner(true)}>
+            <Pressable style={{ width: 40, height: 40, borderRadius: 11, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" }} onPress={() => setShowScanner(true)}>
               <Ionicons name="barcode-outline" size={22} color={Colors.textDark} />
             </Pressable>
           </View>
 
-          <View style={styles.categoriesGrid}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll} contentContainerStyle={styles.categoriesScrollContent}>
             {/* ALL chip */}
             <Pressable
               style={[styles.catChip, !selectedCategory && styles.catChipActive]}
@@ -1550,12 +1550,12 @@ export default function POSScreen() {
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
 
           <FlatList
             data={filteredProducts}
-            numColumns={isTablet ? 3 : 2}
-            key={isTablet ? "tablet3" : "phone2"}
+            numColumns={isTablet ? 4 : 2}
+            key={isTablet ? "tablet4" : "phone2"}
             keyExtractor={(item: any) => String(item.id)}
             contentContainerStyle={styles.productGrid}
             style={{ flex: 1 }}
@@ -1585,7 +1585,7 @@ export default function POSScreen() {
                     {item.image ? (
                       <AnimatedProductImage uri={item.image.startsWith("http") || item.image.startsWith("file://") || item.image.startsWith("data:") ? item.image : `${getApiUrl().replace(/\/$/, "")}${item.image}`} />
                     ) : (
-                      <Ionicons name={catIcon} size={26} color={catColor} />
+                      <Ionicons name={catIcon} size={22} color={catColor} />
                     )}
                   </View>
                   <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
@@ -3909,17 +3909,19 @@ const styles = StyleSheet.create({
   mainContent: { flex: 1 },
   productsSection: { flex: 1 },
   productsSectionTablet: { flex: 1 },
-  searchRow: { paddingHorizontal: 14, paddingTop: 12 },
-  searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 14, paddingHorizontal: 14, height: 44, borderWidth: 1, borderColor: Colors.inputBorder },
+  searchRow: { paddingHorizontal: 12, paddingTop: 8 },
+  searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 40, borderWidth: 1, borderColor: Colors.inputBorder },
   searchInput: { flex: 1, color: Colors.text, marginLeft: 8, fontSize: 15 },
 
-  // ── Category grid (no scroll, wraps automatically)
+  // ── Category horizontal scroll row
   categoriesGrid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 10, paddingVertical: 8, gap: 6 },
-  catChip: { flexDirection: "row", borderRadius: 28, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.cardBorder, overflow: "hidden" },
+  categoriesScroll: { flexGrow: 0, flexShrink: 0 },
+  categoriesScrollContent: { flexDirection: "row", paddingHorizontal: 10, paddingVertical: 7, gap: 5, alignItems: "center" },
+  catChip: { flexDirection: "row", borderRadius: 22, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.cardBorder, overflow: "hidden" },
   catChipActive: { borderColor: Colors.accent, borderWidth: 2 },
-  catChipGrad: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 11, gap: 7 },
-  catChipText: { color: Colors.textSecondary, fontSize: 15, fontWeight: "700" },
-  catDot: { width: 10, height: 10, borderRadius: 5 },
+  catChipGrad: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, gap: 6 },
+  catChipText: { color: Colors.textSecondary, fontSize: 13, fontWeight: "700" },
+  catDot: { width: 8, height: 8, borderRadius: 4 },
 
   // ── Kept for compat (unused now)
   categoriesRow: { flexGrow: 0 },
@@ -3929,12 +3931,12 @@ const styles = StyleSheet.create({
   categoryChipText: {}, categoryChipTextAll: {}, categoryDot: {},
 
   // ── Products
-  productGrid: { padding: 8 },
-  productCard: { flex: 1, margin: 4, backgroundColor: Colors.surface, borderRadius: 14, padding: 12, alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder, minWidth: 80, overflow: "hidden", position: "relative" as const },
-  productCardTopBorder: { position: "absolute" as const, top: 0, left: 0, right: 0, height: 3, borderTopLeftRadius: 14, borderTopRightRadius: 14 },
-  productIcon: { width: 64, height: 64, borderRadius: 16, justifyContent: "center", alignItems: "center", marginBottom: 10, marginTop: 4, overflow: "hidden" as const },
-  productName: { color: Colors.text, fontSize: 14, fontWeight: "700", textAlign: "center", marginBottom: 4, lineHeight: 19 },
-  productPrice: { color: Colors.accent, fontSize: 16, fontWeight: "800" },
+  productGrid: { padding: 6 },
+  productCard: { flex: 1, margin: 3, backgroundColor: Colors.surface, borderRadius: 12, padding: 9, alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder, minWidth: 70, overflow: "hidden", position: "relative" as const },
+  productCardTopBorder: { position: "absolute" as const, top: 0, left: 0, right: 0, height: 3, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
+  productIcon: { width: 52, height: 52, borderRadius: 13, justifyContent: "center", alignItems: "center", marginBottom: 7, marginTop: 3, overflow: "hidden" as const },
+  productName: { color: Colors.text, fontSize: 12, fontWeight: "700", textAlign: "center", marginBottom: 3, lineHeight: 16 },
+  productPrice: { color: Colors.accent, fontSize: 14, fontWeight: "800" },
   productSizeWrap: { width: "100%" as const, marginTop: 8, marginBottom: 2 },
   productSizeButton: { minHeight: 32, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   productSizeButtonText: { flex: 1, fontSize: 11, fontWeight: "800", textAlign: "center" as const },
@@ -3950,14 +3952,14 @@ const styles = StyleSheet.create({
   emptyText: { color: Colors.textMuted, fontSize: 15, marginTop: 12 },
 
   // ── Cart
-  cartSection: { backgroundColor: Colors.surface, borderTopWidth: 1, borderColor: Colors.cardBorder, maxHeight: 380 },
-  cartSectionTablet: { flex: 1.2, borderTopWidth: 0, borderLeftWidth: 1, maxHeight: "100%" as any, display: "flex" as any, flexDirection: "column" as any },
+  cartSection: { backgroundColor: Colors.surface, borderTopWidth: 1, borderColor: Colors.cardBorder, maxHeight: 360 },
+  cartSectionTablet: { flex: 0.7, borderTopWidth: 0, borderLeftWidth: 1, maxHeight: "100%" as any, display: "flex" as any, flexDirection: "column" as any },
   cartHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderColor: Colors.cardBorder },
   cartTitle: { color: Colors.text, fontSize: 17, fontWeight: "700" },
   customerSelect: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 10, marginHorizontal: 10, marginVertical: 6, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.primary + "60", borderStyle: "dashed" as const, backgroundColor: Colors.primary + "12" },
   customerSelectText: { color: Colors.primary, fontSize: 14, fontWeight: "700", flex: 1 },
   cartList: { flex: 1 },
-  cartItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 7, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)", gap: 8 },
+  cartItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 5, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)", gap: 6 },
   cartItemIndexBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", flexShrink: 0 },
   cartItemIndexText: { color: Colors.textMuted, fontSize: 10, fontWeight: "700" },
   cartItemInfo: { flex: 1, minWidth: 0 },
@@ -3972,16 +3974,16 @@ const styles = StyleSheet.create({
   cartEmpty: { alignItems: "center", paddingVertical: 28 },
   cartEmptyText: { color: Colors.textMuted, fontSize: 13, marginTop: 8, fontWeight: "600" },
   cartEmptySubtext: { color: Colors.textMuted, fontSize: 11, marginTop: 4 },
-  cartSummary: { paddingHorizontal: 14, paddingVertical: 6, borderTopWidth: 1, borderColor: Colors.cardBorder },
-  summaryRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 },
+  cartSummary: { paddingHorizontal: 12, paddingVertical: 5, borderTopWidth: 1, borderColor: Colors.cardBorder },
+  summaryRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
   summaryLabel: { color: Colors.textSecondary, fontSize: 13 },
   summaryValue: { color: Colors.text, fontSize: 13, fontWeight: "600" },
-  totalRow: { borderTopWidth: 1, borderColor: Colors.cardBorder, paddingTop: 10, marginTop: 6 },
-  totalLabel: { color: Colors.text, fontSize: 22, fontWeight: "800" },
-  totalValue: { color: Colors.accent, fontSize: 26, fontWeight: "800" },
-  checkoutBtn: { marginHorizontal: 14, marginVertical: 7, borderRadius: 14, overflow: "hidden", elevation: 4, boxShadow: "0px 4px 8px rgba(124, 58, 237, 0.3)" },
+  totalRow: { borderTopWidth: 1, borderColor: Colors.cardBorder, paddingTop: 7, marginTop: 4 },
+  totalLabel: { color: Colors.text, fontSize: 19, fontWeight: "800" },
+  totalValue: { color: Colors.accent, fontSize: 22, fontWeight: "800" },
+  checkoutBtn: { marginHorizontal: 12, marginVertical: 6, borderRadius: 14, overflow: "hidden", elevation: 4, boxShadow: "0px 4px 8px rgba(124, 58, 237, 0.3)" },
   checkoutBtnDisabled: { opacity: 0.5, elevation: 0, boxShadow: "none" },
-  checkoutBtnGradient: { paddingVertical: 12, paddingHorizontal: 16 },
+  checkoutBtnGradient: { paddingVertical: 10, paddingHorizontal: 14 },
   checkoutBtnInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   checkoutBtnLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   checkoutBtnPrice: { backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20 },
