@@ -10098,6 +10098,9 @@ function configureExpoAndLanding(app2) {
       if (filePath.endsWith(".webmanifest")) {
         res.setHeader("Content-Type", "application/manifest+json");
       }
+      if (filePath.includes("_expo/static/js") || filePath.endsWith(".js")) {
+        res.setHeader("Cache-Control", "no-cache, must-revalidate");
+      }
     }
   }));
   app2.use(import_express.default.static(path4.resolve(process.cwd(), "static-build")));

@@ -374,6 +374,10 @@ function configureExpoAndLanding(app: express.Application) {
       if (filePath.endsWith(".webmanifest")) {
         res.setHeader("Content-Type", "application/manifest+json");
       }
+      // JS bundles: always revalidate so deploys propagate immediately
+      if (filePath.includes("_expo/static/js") || filePath.endsWith(".js")) {
+        res.setHeader("Cache-Control", "no-cache, must-revalidate");
+      }
     },
   }));
   app.use(express.static(path.resolve(process.cwd(), "static-build")));

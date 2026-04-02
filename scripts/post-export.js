@@ -39,7 +39,7 @@ fs.mkdirSync(appDir, { recursive: true });
 const swContent = `// Barmagly POS — Service Worker
 // Handles offline caching and Web Push notifications.
 
-const CACHE_NAME = "barmagly-pos-v2";
+const CACHE_NAME = "barmagly-pos-v3";
 
 const APP_SHELL = [
   "/app",
