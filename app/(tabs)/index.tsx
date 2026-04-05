@@ -3916,11 +3916,11 @@ const styles = StyleSheet.create({
   // ── Category horizontal scroll row
   categoriesGrid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 10, paddingVertical: 8, gap: 6 },
   categoriesScroll: { flexGrow: 0, flexShrink: 0 },
-  categoriesScrollContent: { flexDirection: "row", paddingHorizontal: 10, paddingVertical: 7, gap: 5, alignItems: "center" },
-  catChip: { flexDirection: "row", borderRadius: 22, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.cardBorder, overflow: "hidden" },
+  categoriesScrollContent: { flexDirection: "row", flexWrap: "nowrap", paddingHorizontal: 10, paddingVertical: 6, gap: 5, alignItems: "center" },
+  catChip: { flexDirection: "row", borderRadius: 20, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.cardBorder, overflow: "hidden" },
   catChipActive: { borderColor: Colors.accent, borderWidth: 2 },
-  catChipGrad: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, gap: 6 },
-  catChipText: { color: Colors.textSecondary, fontSize: 13, fontWeight: "700" },
+  catChipGrad: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 7, gap: 5 },
+  catChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: "700" },
   catDot: { width: 8, height: 8, borderRadius: 4 },
 
   // ── Kept for compat (unused now)

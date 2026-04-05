@@ -206,6 +206,12 @@ const indexDest = path.join(appDir, "index.html");
 if (fs.existsSync(indexSrc)) {
   let html = fs.readFileSync(indexSrc, "utf8");
 
+  // Prevent accidental pinch-zoom on iPad/tablet (breaks tablet layout detection)
+  html = html.replace(
+    /<meta name="viewport"[^>]*>/,
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />'
+  );
+
   // Add manifest + PWA meta tags if not already present
   if (!html.includes('rel="manifest"')) {
     html = html.replace(
