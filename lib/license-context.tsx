@@ -35,6 +35,24 @@ interface LicenseContextType {
 
 const LicenseContext = createContext<LicenseContextType | null>(null);
 
+async function parseJsonResponse(response: Response, context: string) {
+    const contentType = response.headers.get("content-type") || "";
+    const raw = await response.text();
+
+    if (!contentType.toLowerCase().includes("application/json")) {
+        const preview = raw.replace(/\s+/g, " ").trim().slice(0, 120);
+        throw new Error(
+            `${context} returned ${response.status} ${response.statusText || "response"} as ${contentType || "unknown content type"}${preview ? `: ${preview}` : ""}`
+        );
+    }
+
+    try {
+        return JSON.parse(raw);
+    } catch {
+        throw new Error(`${context} returned invalid JSON`);
+    }
+}
+
 export function LicenseProvider({ children }: { children: React.ReactNode }) {
     const [isValidating, setIsValidating] = useState(true);
     const [isValid, setIsValid] = useState<boolean | null>(null);
@@ -101,12 +119,15 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                 body: JSON.stringify(body)
             });
 
-            const data = await response.json();
+            const data = await parseJsonResponse(response, "Validation server");
 
             if (data.isValid) {
                 await AsyncStorage.setItem("barmagly_license_key", key);
                 setCachedLicenseKey(key);
                 if (email) await AsyncStorage.setItem("barmagly_store_email", email);
+                if (data.tenant?.id) {
+                    await AsyncStorage.setItem("barmagly_tenant_id", String(data.tenant.id));
+                }
 
                 setIsValid(true);
                 setTenant(data.tenant);
@@ -114,6 +135,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                 return true;
             } else {
                 await AsyncStorage.removeItem("barmagly_license_key");
+                await AsyncStorage.removeItem("barmagly_tenant_id");
                 clearCachedLicenseKey();
                 setIsValid(false);
                 setErrorReason(data.reason || "Invalid license key");
@@ -142,11 +164,14 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                 body: JSON.stringify({ idToken, deviceId })
             });
 
-            const data = await response.json();
+            const data = await parseJsonResponse(response, "Google authentication server");
 
             if (data.success && data.licenseKey) {
                 await AsyncStorage.setItem("barmagly_license_key", data.licenseKey);
                 setCachedLicenseKey(data.licenseKey);
+                if (data.tenant?.id) {
+                    await AsyncStorage.setItem("barmagly_tenant_id", String(data.tenant.id));
+                }
 
                 setIsValid(true);
                 setTenant(data.tenant);
@@ -165,6 +190,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
 
     const logoutLicense = async () => {
         await AsyncStorage.removeItem("barmagly_license_key");
+        await AsyncStorage.removeItem("barmagly_tenant_id");
         clearCachedLicenseKey();
         setIsValid(false);
         setTenant(null);

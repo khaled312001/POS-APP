@@ -4,6 +4,7 @@ import * as Haptics from "expo-haptics";
 import { useQueryClient } from "@tanstack/react-query";
 import { getApiUrl } from "./query-client";
 import { useLicense } from "./license-context";
+import { getWebStaticFallbackChain } from "./web-static";
 
 interface NotificationContextType {
     onlineOrderNotification: any | null;
@@ -36,7 +37,18 @@ let ringAudioEl: HTMLAudioElement | null = null;
 function getRingAudio(): HTMLAudioElement | null {
     if (Platform.OS !== "web" || typeof window === "undefined") return null;
     if (!ringAudioEl) {
-        ringAudioEl = new Audio("/sounds/ring.wav");
+        const fallbacks = getWebStaticFallbackChain("/sounds/ring.wav");
+        ringAudioEl = new Audio(fallbacks[0] || "/sounds/ring.wav");
+        ringAudioEl.dataset.fallbackIndex = "0";
+        ringAudioEl.addEventListener("error", () => {
+            if (!ringAudioEl) return;
+            const currentIndex = Number(ringAudioEl.dataset.fallbackIndex || "0");
+            const nextSrc = fallbacks[currentIndex + 1];
+            if (!nextSrc) return;
+            ringAudioEl.dataset.fallbackIndex = String(currentIndex + 1);
+            ringAudioEl.src = nextSrc;
+            ringAudioEl.load();
+        });
         ringAudioEl.loop = false;
         ringAudioEl.volume = 0.8;
         ringAudioEl.load();

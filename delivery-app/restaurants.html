@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Restaurants — Barmagly Delivery</title>
+  <meta name="description" content="Order food online from restaurants near you. Fast delivery, great deals." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="/delivery-app/css/base.css" />
+  <link rel="stylesheet" href="/delivery-app/css/components.css" />
+  <link rel="stylesheet" href="/delivery-app/css/pages.css" />
+  <style>
+    /* ── Page-level overrides ── */
+    .discover-hero {
+      background: linear-gradient(135deg, var(--nav-bg) 0%, #2a2e44 100%);
+      padding: var(--space-2xl) var(--space-lg);
+      text-align: center;
+      color: #fff;
+    }
+    .discover-hero h1 { font-size: 2rem; font-weight: 800; margin-bottom: var(--space-sm); }
+    .discover-hero p  { font-size: 1rem; opacity: 0.75; margin-bottom: var(--space-lg); }
+
+    .discover-search-bar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      background: #fff;
+      border-radius: var(--radius-full);
+      padding: 10px var(--space-md);
+      max-width: 560px;
+      margin: 0 auto;
+      box-shadow: var(--shadow-xl);
+    }
+    .discover-search-bar input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 1rem;
+      color: var(--delivery-text);
+      background: transparent;
+    }
+    .discover-search-bar button {
+      background: var(--delivery-primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-full);
+      padding: 8px var(--space-lg);
+      font-size: 0.9375rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity var(--transition-fast);
+    }
+    .discover-search-bar button:hover { opacity: 0.88; }
+
+    /* Location bar */
+    .location-bar {
+      background: var(--delivery-surface);
+      border-bottom: 1px solid var(--delivery-border);
+      padding: var(--space-sm) var(--space-lg);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: 0.875rem;
+      color: var(--delivery-text-secondary);
+      cursor: pointer;
+      transition: background var(--transition-fast);
+    }
+    .location-bar:hover { background: var(--delivery-bg); }
+    .location-bar strong { color: var(--delivery-text); }
+
+    /* Cuisine chips */
+    .cuisine-chips {
+      display: flex;
+      gap: var(--space-xs);
+      overflow-x: auto;
+      padding: var(--space-md) var(--space-lg);
+      scrollbar-width: none;
+      background: var(--delivery-surface);
+      border-bottom: 1px solid var(--delivery-border);
+    }
+    .cuisine-chips::-webkit-scrollbar { display: none; }
+    .cuisine-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px var(--space-md);
+      border-radius: var(--radius-full);
+      border: 1.5px solid var(--delivery-border);
+      background: var(--delivery-bg);
+      font-size: 0.875rem;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      color: var(--delivery-text-secondary);
+    }
+    .cuisine-chip:hover { border-color: var(--delivery-primary); color: var(--delivery-primary); }
+    .cuisine-chip.active { background: var(--delivery-primary); border-color: var(--delivery-primary); color: #fff; }
+
+    /* Main layout */
+    .discover-layout {
+      max-width: var(--page-max);
+      margin: 0 auto;
+      padding: var(--space-lg) var(--space-lg);
+      display: grid;
+      gap: var(--space-lg);
+    }
+    @media (min-width: 1024px) {
+      .discover-layout { grid-template-columns: 260px 1fr; align-items: start; }
+    }
+
+    /* Filters sidebar */
+    .filters-panel {
+      background: var(--delivery-surface);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--delivery-border);
+      overflow: hidden;
+      position: sticky;
+      top: calc(var(--nav-height) + var(--space-sm));
+    }
+    .filters-panel__header {
+      padding: var(--space-md) var(--space-lg);
+      border-bottom: 1px solid var(--delivery-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .filters-panel__title { font-weight: 700; }
+    .filters-panel__clear { font-size: 0.8125rem; color: var(--delivery-primary); cursor: pointer; }
+    .filter-group { padding: var(--space-md) var(--space-lg); border-bottom: 1px solid var(--delivery-border); }
+    .filter-group__label { font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--delivery-text-muted); margin-bottom: var(--space-sm); }
+    .filter-option {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: 6px 0;
+      cursor: pointer;
+      font-size: 0.9375rem;
+    }
+    .filter-option input[type=checkbox] { accent-color: var(--delivery-primary); width: 16px; height: 16px; }
+    .filter-option input[type=radio]    { accent-color: var(--delivery-primary); width: 16px; height: 16px; }
+
+    /* Sort bar */
+    .sort-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-md);
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+    .sort-bar__count { font-size: 0.9375rem; color: var(--delivery-text-secondary); }
+    .sort-bar__sort { display: flex; align-items: center; gap: var(--space-xs); font-size: 0.875rem; }
+    .sort-select {
+      border: 1.5px solid var(--delivery-border);
+      border-radius: var(--radius-md);
+      padding: 6px var(--space-sm);
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--delivery-text);
+      background: var(--delivery-surface);
+      cursor: pointer;
+    }
+
+    /* View toggle */
+    .view-toggle { display: flex; gap: 4px; }
+    .view-btn {
+      width: 34px; height: 34px;
+      border: 1.5px solid var(--delivery-border);
+      border-radius: var(--radius-md);
+      background: var(--delivery-surface);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      transition: all var(--transition-fast);
+    }
+    .view-btn.active { background: var(--delivery-primary); border-color: var(--delivery-primary); color: #fff; }
+
+    /* Restaurant list (overrides grid for list view) */
+    .restaurant-list-view { display: flex; flex-direction: column; gap: var(--space-md); }
+    .restaurant-list-card {
+      background: var(--delivery-surface);
+      border: 1px solid var(--delivery-border);
+      border-radius: var(--radius-xl);
+      display: flex;
+      overflow: hidden;
+      cursor: pointer;
+      transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+    }
+    .restaurant-list-card:hover { box-shadow: var(--shadow-md); border-color: var(--delivery-primary); }
+    .restaurant-list-card__image {
+      width: 140px;
+      min-height: 120px;
+      flex-shrink: 0;
+      object-fit: cover;
+      background: var(--delivery-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+    }
+    .restaurant-list-card__body {
+      flex: 1;
+      padding: var(--space-md) var(--space-lg);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .restaurant-list-card__name { font-weight: 800; font-size: 1.0625rem; }
+    .restaurant-list-card__cuisine { font-size: 0.875rem; color: var(--delivery-text-muted); margin-top: 2px; }
+    .restaurant-list-card__meta {
+      display: flex;
+      gap: var(--space-md);
+      margin-top: var(--space-sm);
+      flex-wrap: wrap;
+    }
+    .restaurant-list-card__badge {
+      font-size: 0.8125rem;
+      color: var(--delivery-text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Promotions banner */
+    .promo-band {
+      background: linear-gradient(90deg, var(--delivery-primary), #FF8A65);
+      color: #fff;
+      border-radius: var(--radius-xl);
+      padding: var(--space-md) var(--space-lg);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-lg);
+      cursor: pointer;
+    }
+    .promo-band__text { font-weight: 700; font-size: 1rem; }
+    .promo-band__sub  { font-size: 0.8125rem; opacity: 0.85; }
+
+    /* Empty state */
+    .empty-results {
+      text-align: center;
+      padding: var(--space-3xl) var(--space-md);
+      color: var(--delivery-text-muted);
+    }
+    .empty-results__icon { font-size: 3rem; margin-bottom: var(--space-sm); }
+    .empty-results__title { font-weight: 700; font-size: 1.125rem; color: var(--delivery-text); margin-bottom: var(--space-xs); }
+
+    /* Mobile filters toggle */
+    .mobile-filters-btn {
+      display: none;
+      align-items: center;
+      gap: var(--space-xs);
+      border: 1.5px solid var(--delivery-border);
+      border-radius: var(--radius-md);
+      padding: 6px var(--space-md);
+      background: var(--delivery-surface);
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    @media (max-width: 1023px) {
+      .mobile-filters-btn { display: flex; }
+      .filters-panel { display: none; }
+      .filters-panel.open { display: block; position: fixed; inset: 0; border-radius: 0; z-index: var(--z-modal); overflow-y: auto; }
+    }
+
+    /* Loading skeleton */
+    .restaurants-skeleton { display: grid; gap: var(--space-md); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  </style>
+</head>
+<body>
+  <!-- Site Header (desktop) -->
+  <header class="site-header desktop-only" id="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="/" id="header-logo">
+        <div class="site-logo__icon">🍽️</div>
+        <span class="site-logo__name" id="header-brand">Barmagly Delivery</span>
+      </a>
+      <nav class="header-nav" id="header-nav" style="display:flex;align-items:center;gap:var(--space-sm)">
+        <a class="btn btn-ghost btn-sm" href="/" id="btn-home" style="font-size:0.9rem">🏠 Home</a>
+        <a class="btn btn-ghost btn-sm" href="/restaurants" style="font-size:0.9rem;color:var(--delivery-primary)">🍴 Restaurants</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="btn btn-ghost btn-sm" id="nav-offers-btn" href="#" style="font-size:0.9rem">🎁 Offers</a>
+        <button class="btn btn-ghost btn-sm" id="nav-account-btn" style="font-size:0.9rem">👤 <span id="nav-user-label">Account</span></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main id="main-content" style="padding-top: var(--nav-height)">
+
+    <!-- Hero Search -->
+    <div class="discover-hero" id="discover-hero">
+      <h1 id="hero-title">Order food from restaurants near you</h1>
+      <p id="hero-sub">Delivered fast to your door</p>
+      <div class="discover-search-bar">
+        <span>🔍</span>
+        <input type="text" id="global-search" placeholder="Search restaurants or cuisines…" autocomplete="off" />
+        <button onclick="doSearch()">Search</button>
+      </div>
+    </div>
+
+    <!-- Location Bar -->
+    <div class="location-bar" id="location-bar" onclick="promptLocation()">
+      📍 <span id="location-text">Detecting your location…</span>
+      <span style="margin-inline-start:auto;color:var(--delivery-primary);font-weight:600;font-size:0.8125rem">Change</span>
+    </div>
+
+    <!-- Cuisine Chips -->
+    <div class="cuisine-chips" id="cuisine-chips">
+      <div class="cuisine-chip active" data-cuisine="all" onclick="filterCuisine('all', this)">🍽️ All</div>
+    </div>
+
+    <!-- Promo Band -->
+    <div style="max-width:var(--page-max);margin:var(--space-lg) auto 0;padding:0 var(--space-lg)">
+      <div class="promo-band" onclick="showPromos()">
+        <div>
+          <div class="promo-band__text">🎁 Special offers available today</div>
+          <div class="promo-band__sub" id="promo-band-sub">Free delivery on your first order</div>
+        </div>
+        <span style="font-size:1.25rem">›</span>
+      </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="discover-layout">
+
+      <!-- Filters Sidebar -->
+      <aside class="filters-panel" id="filters-panel">
+        <div class="filters-panel__header">
+          <span class="filters-panel__title">Filters</span>
+          <span class="filters-panel__clear" onclick="clearFilters()">Clear all</span>
+        </div>
+
+        <!-- Sort (mobile only inside sidebar) -->
+        <div class="filter-group mobile-only">
+          <div class="filter-group__label">Sort by</div>
+          <label class="filter-option"><input type="radio" name="sort-m" value="rating" onchange="applySort('rating')" /> ⭐ Rating</label>
+          <label class="filter-option"><input type="radio" name="sort-m" value="delivery_time" onchange="applySort('delivery_time')" checked /> ⏱ Fastest</label>
+          <label class="filter-option"><input type="radio" name="sort-m" value="delivery_fee" onchange="applySort('delivery_fee')" /> 🚚 Delivery fee</label>
+          <label class="filter-option"><input type="radio" name="sort-m" value="min_order" onchange="applySort('min_order')" /> 💰 Min. order</label>
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-group__label">Delivery</div>
+          <label class="filter-option"><input type="checkbox" id="f-free-delivery" onchange="applyFilters()" /> Free delivery</label>
+          <label class="filter-option"><input type="checkbox" id="f-fast-delivery" onchange="applyFilters()" /> Under 30 min</label>
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-group__label">Rating</div>
+          <label class="filter-option"><input type="radio" name="rating" value="" onchange="applyFilters()" checked /> Any rating</label>
+          <label class="filter-option"><input type="radio" name="rating" value="4" onchange="applyFilters()" /> ⭐ 4.0+</label>
+          <label class="filter-option"><input type="radio" name="rating" value="4.5" onchange="applyFilters()" /> ⭐ 4.5+</label>
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-group__label">Price range</div>
+          <label class="filter-option"><input type="radio" name="price" value="" onchange="applyFilters()" checked /> Any</label>
+          <label class="filter-option"><input type="radio" name="price" value="budget" onchange="applyFilters()" /> 💰 Budget</label>
+          <label class="filter-option"><input type="radio" name="price" value="mid" onchange="applyFilters()" /> 💰💰 Mid-range</label>
+          <label class="filter-option"><input type="radio" name="price" value="premium" onchange="applyFilters()" /> 💰💰💰 Premium</label>
+        </div>
+
+        <div style="padding:var(--space-md) var(--space-lg)">
+          <button class="btn btn-primary btn-full" onclick="closeFiltersMobile()">See results</button>
+        </div>
+      </aside>
+
+      <!-- Results -->
+      <div>
+        <!-- Sort bar -->
+        <div class="sort-bar">
+          <span class="sort-bar__count" id="results-count">Loading…</span>
+          <div style="display:flex;align-items:center;gap:var(--space-sm)">
+            <!-- Mobile filters btn -->
+            <button class="mobile-filters-btn" onclick="toggleFiltersMobile()">⚙️ Filters</button>
+            <div class="sort-bar__sort desktop-only">
+              <span style="font-size:0.875rem;color:var(--delivery-text-muted)">Sort by</span>
+              <select class="sort-select" id="sort-select" onchange="applySort(this.value)">
+                <option value="delivery_time">Fastest</option>
+                <option value="rating">Rating</option>
+                <option value="delivery_fee">Delivery fee</option>
+                <option value="min_order">Min. order</option>
+              </select>
+            </div>
+            <div class="view-toggle desktop-only">
+              <button class="view-btn active" id="btn-grid" title="Grid view" onclick="setView('grid')">⊞</button>
+              <button class="view-btn" id="btn-list" title="List view" onclick="setView('list')">☰</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grid / List container -->
+        <div id="restaurants-container">
+          <!-- Skeleton -->
+          <div class="restaurants-skeleton" id="skeleton">
+            ${Array(6).fill('<div class="skeleton" style="height:280px;border-radius:16px"></div>').join("")}
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Toast -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script>
+    // ── Config ──────────────────────────────────────────────────────────────
+    window.DELIVERY_CONFIG = __DELIVERY_CONFIG__;
+    const cfg = window.DELIVERY_CONFIG || {};
+
+    // ── RTL ──────────────────────────────────────────────────────────────────
+    const rtl = cfg.language === "ar" || cfg.language === "he" || cfg.language === "fa";
+    if (rtl) { document.documentElement.dir = "rtl"; document.documentElement.lang = cfg.language; }
+
+    // Apply brand color
+    if (cfg.primaryColor) document.documentElement.style.setProperty("--delivery-primary", cfg.primaryColor);
+    if (cfg.accentColor)  document.documentElement.style.setProperty("--delivery-accent",  cfg.accentColor);
+    if (cfg.storeName) document.getElementById("header-brand").textContent = cfg.storeName;
+
+    // ── State ────────────────────────────────────────────────────────────────
+    let _allRestaurants = [];
+    let _filtered = [];
+    let _activeCuisine = "all";
+    let _sortBy = "delivery_time";
+    let _view = "grid";
+    let _searchQuery = "";
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function showToast(msg, type = "info") {
+      const el = document.createElement("div");
+      el.className = `toast toast--${type}`;
+      el.textContent = msg;
+      document.getElementById("toast-container").appendChild(el);
+      requestAnimationFrame(() => el.classList.add("toast--visible"));
+      setTimeout(() => { el.classList.remove("toast--visible"); setTimeout(() => el.remove(), 300); }, 3000);
+    }
+
+    function formatCurrency(val, currency) {
+      try {
+        return new Intl.NumberFormat(rtl ? "ar-EG" : "en-US", { style: "currency", currency: currency || "USD", minimumFractionDigits: 0 }).format(val || 0);
+      } catch { return val; }
+    }
+
+    function stars(rating) {
+      const r = parseFloat(rating) || 0;
+      const full = Math.floor(r);
+      return "★".repeat(full) + (r % 1 >= 0.5 ? "½" : "") + "☆".repeat(5 - full - (r % 1 >= 0.5 ? 1 : 0));
+    }
+
+    // ── Fetch Restaurants ────────────────────────────────────────────────────
+    async function loadRestaurants() {
+      try {
+        const res = await fetch(`/api/delivery/restaurants?tenantId=${cfg.tenantId || ""}`);
+        if (!res.ok) throw new Error("Failed to load");
+        const data = await res.json();
+        _allRestaurants = Array.isArray(data) ? data : (data.restaurants || []);
+        buildCuisineChips();
+        applyFilters();
+      } catch (err) {
+        // Fallback: load from landingPageConfig single-store
+        try {
+          const res2 = await fetch(`/api/delivery/store/${cfg.slug}/menu`);
+          const data2 = await res2.json();
+          // Wrap single store as array
+          _allRestaurants = [{ id: cfg.tenantId, slug: cfg.slug, name: cfg.storeName, logo: cfg.logo, coverImage: null, rating: 4.5, reviewCount: 0, deliveryTime: cfg.minDeliveryTime || 25, deliveryFee: 0, minOrder: 0, cuisine: "", isOpen: true }];
+          buildCuisineChips();
+          applyFilters();
+        } catch {
+          showSkeleton(false);
+          document.getElementById("restaurants-container").innerHTML = `
+            <div class="empty-results">
+              <div class="empty-results__icon">🍽️</div>
+              <div class="empty-results__title">${rtl ? "لا توجد مطاعم متاحة" : "No restaurants available"}</div>
+              <div>${rtl ? "حاول مرة أخرى لاحقاً" : "Please try again later"}</div>
+            </div>`;
+        }
+      }
+    }
+
+    function buildCuisineChips() {
+      const cuisines = [...new Set(_allRestaurants.map(r => r.cuisine).filter(Boolean))];
+      const chip = document.getElementById("cuisine-chips");
+      const allChip = `<div class="cuisine-chip active" data-cuisine="all" onclick="filterCuisine('all', this)">🍽️ ${rtl ? "الكل" : "All"}</div>`;
+      const icons = { pizza: "🍕", burger: "🍔", sushi: "🍣", chicken: "🍗", chinese: "🥡", indian: "🍛", italian: "🍝", mexican: "🌮", desserts: "🍰", coffee: "☕", seafood: "🦞", healthy: "🥗", arabic: "🥙", egyptian: "🫕" };
+      chip.innerHTML = allChip + cuisines.map(c => {
+        const icon = icons[c.toLowerCase()] || "🍴";
+        return `<div class="cuisine-chip" data-cuisine="${c}" onclick="filterCuisine('${c}', this)">${icon} ${c}</div>`;
+      }).join("");
+    }
+
+    function filterCuisine(cuisine, el) {
+      _activeCuisine = cuisine;
+      document.querySelectorAll(".cuisine-chip").forEach(c => c.classList.toggle("active", c.dataset.cuisine === cuisine));
+      applyFilters();
+    }
+
+    function applySort(val) {
+      _sortBy = val;
+      renderRestaurants(_filtered);
+    }
+
+    function applyFilters() {
+      const freeDelivery = document.getElementById("f-free-delivery")?.checked;
+      const fastDelivery = document.getElementById("f-fast-delivery")?.checked;
+      const minRating = parseFloat(document.querySelector('input[name="rating"]:checked')?.value || "0");
+      const priceRange = document.querySelector('input[name="price"]:checked')?.value || "";
+
+      let list = [..._allRestaurants];
+
+      // Cuisine filter
+      if (_activeCuisine && _activeCuisine !== "all") {
+        list = list.filter(r => (r.cuisine || "").toLowerCase() === _activeCuisine.toLowerCase());
+      }
+
+      // Search
+      if (_searchQuery) {
+        const q = _searchQuery.toLowerCase();
+        list = list.filter(r => (r.name || "").toLowerCase().includes(q) || (r.cuisine || "").toLowerCase().includes(q));
+      }
+
+      // Free delivery
+      if (freeDelivery) list = list.filter(r => (r.deliveryFee || 0) === 0);
+
+      // Fast delivery
+      if (fastDelivery) list = list.filter(r => (r.deliveryTime || 99) <= 30);
+
+      // Rating
+      if (minRating) list = list.filter(r => parseFloat(r.rating || 0) >= minRating);
+
+      // Price
+      if (priceRange === "budget") list = list.filter(r => (r.minOrder || 0) < 30);
+      else if (priceRange === "mid") list = list.filter(r => (r.minOrder || 0) >= 30 && (r.minOrder || 0) < 80);
+      else if (priceRange === "premium") list = list.filter(r => (r.minOrder || 0) >= 80);
+
+      _filtered = list;
+      renderRestaurants(_filtered);
+    }
+
+    function renderRestaurants(list) {
+      // Sort
+      const sorted = [...list].sort((a, b) => {
+        if (_sortBy === "rating") return (b.rating || 0) - (a.rating || 0);
+        if (_sortBy === "delivery_time") return (a.deliveryTime || 99) - (b.deliveryTime || 99);
+        if (_sortBy === "delivery_fee") return (a.deliveryFee || 0) - (b.deliveryFee || 0);
+        if (_sortBy === "min_order") return (a.minOrder || 0) - (b.minOrder || 0);
+        return 0;
+      });
+
+      const count = sorted.length;
+      document.getElementById("results-count").textContent = rtl ? `${count} مطعم` : `${count} restaurant${count !== 1 ? "s" : ""}`;
+
+      showSkeleton(false);
+
+      if (count === 0) {
+        document.getElementById("restaurants-container").innerHTML = `
+          <div class="empty-results">
+            <div class="empty-results__icon">🔍</div>
+            <div class="empty-results__title">${rtl ? "لا توجد نتائج" : "No results found"}</div>
+            <div>${rtl ? "جرّب تغيير الفلاتر" : "Try changing your filters"}</div>
+          </div>`;
+        return;
+      }
+
+      if (_view === "list") {
+        document.getElementById("restaurants-container").innerHTML = `
+          <div class="restaurant-list-view">
+            ${sorted.map(r => restaurantListCard(r)).join("")}
+          </div>`;
+      } else {
+        document.getElementById("restaurants-container").innerHTML = `
+          <div class="restaurants-grid">
+            ${sorted.map(r => restaurantGridCard(r)).join("")}
+          </div>`;
+      }
+    }
+
+    function restaurantGridCard(r) {
+      const slug = r.slug || cfg.slug;
+      const coverImg = r.coverImage
+        ? `<img src="${r.coverImage}" alt="${r.name}" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'" />`
+        : `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:3rem">🍽️</div>`;
+
+      const freeDelivery = !r.deliveryFee || r.deliveryFee === 0;
+      const rating = parseFloat(r.rating || 4.5).toFixed(1);
+
+      return `
+<div class="restaurant-card" onclick="openStore('${slug}')">
+  <div class="restaurant-card__cover">
+    ${coverImg}
+    ${r.isOpen === false ? `<div class="restaurant-card__closed">${rtl ? "مغلق" : "Closed"}</div>` : ""}
+    ${freeDelivery ? `<div class="restaurant-card__badge badge-free-delivery">${rtl ? "توصيل مجاني" : "Free delivery"}</div>` : ""}
+  </div>
+  <div class="restaurant-card__body">
+    <div class="restaurant-card__header">
+      <h3 class="restaurant-card__name">${r.name || "Restaurant"}</h3>
+      <div class="restaurant-card__rating">
+        <span class="star-icon">★</span>
+        ${rating}
+        ${r.reviewCount ? `<span style="color:var(--delivery-text-muted);font-weight:400">(${r.reviewCount})</span>` : ""}
+      </div>
+    </div>
+    ${r.cuisine ? `<div class="restaurant-card__cuisine">${r.cuisine}</div>` : ""}
+    <div class="restaurant-card__meta">
+      <span>⏱ ${r.deliveryTime || "25–35"} ${rtl ? "دق" : "min"}</span>
+      <span>${freeDelivery ? (rtl ? "🚚 مجاني" : "🚚 Free") : `🚚 ${formatCurrency(r.deliveryFee, cfg.currency)}`}</span>
+      ${r.minOrder ? `<span>${rtl ? "حد أدنى" : "Min."} ${formatCurrency(r.minOrder, cfg.currency)}</span>` : ""}
+    </div>
+  </div>
+</div>`;
+    }
+
+    function restaurantListCard(r) {
+      const slug = r.slug || cfg.slug;
+      const freeDelivery = !r.deliveryFee || r.deliveryFee === 0;
+      const rating = parseFloat(r.rating || 4.5).toFixed(1);
+
+      return `
+<div class="restaurant-list-card" onclick="openStore('${slug}')">
+  <div class="restaurant-list-card__image">
+    ${r.coverImage
+      ? `<img src="${r.coverImage}" alt="${r.name}" style="width:100%;height:100%;object-fit:cover" />`
+      : "🍽️"}
+  </div>
+  <div class="restaurant-list-card__body">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div class="restaurant-list-card__name">${r.name || "Restaurant"}</div>
+      <div style="display:flex;align-items:center;gap:3px;font-weight:700;color:var(--delivery-primary)">★ ${rating}</div>
+    </div>
+    ${r.cuisine ? `<div class="restaurant-list-card__cuisine">${r.cuisine}</div>` : ""}
+    <div class="restaurant-list-card__meta">
+      <span class="restaurant-list-card__badge">⏱ ${r.deliveryTime || "25–35"} ${rtl ? "دق" : "min"}</span>
+      <span class="restaurant-list-card__badge">🚚 ${freeDelivery ? (rtl ? "مجاني" : "Free") : formatCurrency(r.deliveryFee, cfg.currency)}</span>
+      ${r.minOrder ? `<span class="restaurant-list-card__badge">${rtl ? "حد أدنى" : "Min."} ${formatCurrency(r.minOrder, cfg.currency)}</span>` : ""}
+      ${r.isOpen === false ? `<span class="restaurant-list-card__badge" style="color:var(--status-cancelled)">${rtl ? "مغلق" : "Closed"}</span>` : ""}
+    </div>
+  </div>
+</div>`;
+    }
+
+    function openStore(slug) {
+      window.location.href = `/order/${slug}`;
+    }
+
+    function showSkeleton(show) {
+      const sk = document.getElementById("skeleton");
+      if (sk) sk.style.display = show ? "" : "none";
+    }
+
+    // ── Location ─────────────────────────────────────────────────────────────
+    function detectLocation() {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(pos => {
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`)
+          .then(r => r.json())
+          .then(d => {
+            const label = d.address?.suburb || d.address?.city || d.address?.town || "Current location";
+            document.getElementById("location-text").innerHTML = `<strong>${label}</strong>`;
+          })
+          .catch(() => {});
+      }, () => {
+        document.getElementById("location-text").textContent = "Location not available";
+      });
+    }
+
+    function promptLocation() {
+      detectLocation();
+    }
+
+    // ── View toggle ──────────────────────────────────────────────────────────
+    function setView(v) {
+      _view = v;
+      document.getElementById("btn-grid").classList.toggle("active", v === "grid");
+      document.getElementById("btn-list").classList.toggle("active", v === "list");
+      renderRestaurants(_filtered);
+    }
+
+    // ── Search ───────────────────────────────────────────────────────────────
+    function doSearch() {
+      _searchQuery = document.getElementById("global-search").value.trim();
+      applyFilters();
+      document.querySelector(".discover-layout")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    document.getElementById("global-search").addEventListener("keydown", e => {
+      if (e.key === "Enter") doSearch();
+    });
+
+    // ── Filter helpers ───────────────────────────────────────────────────────
+    function clearFilters() {
+      _activeCuisine = "all";
+      _searchQuery = "";
+      document.getElementById("global-search").value = "";
+      document.querySelectorAll(".cuisine-chip").forEach(c => c.classList.toggle("active", c.dataset.cuisine === "all"));
+      document.querySelectorAll("input[type=checkbox]").forEach(c => c.checked = false);
+      document.querySelectorAll("input[type=radio][value='']").forEach(r => r.checked = true);
+      applyFilters();
+    }
+
+    function toggleFiltersMobile() {
+      document.getElementById("filters-panel").classList.toggle("open");
+    }
+    function closeFiltersMobile() {
+      document.getElementById("filters-panel").classList.remove("open");
+    }
+
+    // ── Promos ───────────────────────────────────────────────────────────────
+    function showPromos() {
+      window.location.href = `/order/${cfg.slug || ""}#offers`;
+    }
+
+    // ── RTL text adjustments ─────────────────────────────────────────────────
+    if (rtl) {
+      document.getElementById("hero-title").textContent = "اطلب طعامك من مطاعم قريبة منك";
+      document.getElementById("hero-sub").textContent = "توصيل سريع لباب منزلك";
+      document.getElementById("global-search").placeholder = "ابحث عن مطعم أو مطبخ…";
+      document.getElementById("promo-band-sub").textContent = "توصيل مجاني على أول طلب";
+      document.querySelector(".discover-search-bar button").textContent = "بحث";
+    }
+
+    // ── Boot ─────────────────────────────────────────────────────────────────
+    detectLocation();
+    loadRestaurants();
+  </script>
+</body>
+</html>

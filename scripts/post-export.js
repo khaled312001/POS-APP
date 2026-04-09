@@ -4,6 +4,8 @@
 //   dist/app/index.html          ← Expo POS app  (https://pos.barmagly.tech/app)
 //   dist/app/_expo/...           ← Expo static assets
 //   dist/app/assets/...          ← app assets
+//   dist/uploads/...             ← product uploads served from /uploads/*
+//   dist/sounds/...              ← shared sounds served from /sounds/*
 //   dist/app/sw.js               ← service worker
 //   dist/app/manifest.webmanifest
 //   dist/super_admin/index.html  ← super-admin dashboard
@@ -11,7 +13,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const distDir = path.resolve(__dirname, "../dist");
+const distDir = path.resolve(__dirname, process.env.EXPORT_DIST_DIR || "../dist");
 const appDir = path.join(distDir, "app");
 const superAdminDir = path.join(distDir, "super_admin");
 const superAdminLoginDir = path.join(superAdminDir, "login");
@@ -30,6 +32,23 @@ function moveToApp(name) {
 function copyFile(src, dest) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.copyFileSync(src, dest);
+}
+
+function copyDirRecursive(srcDir, destDir) {
+  if (!fs.existsSync(srcDir)) {
+    return;
+  }
+
+  fs.mkdirSync(destDir, { recursive: true });
+  for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    const src = path.join(srcDir, entry.name);
+    const dest = path.join(destDir, entry.name);
+    if (entry.isDirectory()) {
+      copyDirRecursive(src, dest);
+    } else if (entry.isFile()) {
+      copyFile(src, dest);
+    }
+  }
 }
 
 // ── 1. Create app/ directory ──────────────────────────────────────────────────
@@ -78,9 +97,13 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request).catch(() =>
-        caches.match("/app").then((cached) => cached || caches.match("/app/index.html"))
-      )
+      fetch(request).catch(async () => {
+        const cached = await caches.match("/app");
+        if (cached) return cached;
+        const appIndex = await caches.match("/app/index.html");
+        if (appIndex) return appIndex;
+        return Response.redirect("/app/", 302);
+      })
     );
     return;
   }
@@ -98,7 +121,10 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return response;
-      }).catch(() => caches.match(request));
+      }).catch(async () => {
+        const fallback = await caches.match(request);
+        return fallback || Response.error();
+      });
     })
   );
 });
@@ -196,9 +222,19 @@ const manifestContent = JSON.stringify({
 fs.writeFileSync(path.join(appDir, "manifest.webmanifest"), manifestContent);
 console.log("[post-export] Wrote app/manifest.webmanifest");
 
+// ── 3b. App route fallback for direct /app/* URLs ───────────────────────────
+const appHtaccess = `Options -MultiViews
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [QSA,L]
+`;
+fs.writeFileSync(path.join(appDir, ".htaccess"), appHtaccess, "utf8");
+console.log("[post-export] Wrote app/.htaccess");
+
 // ── 4. Move Expo output files into dist/app/ ──────────────────────────────────
 // These are the folders/files expo export puts at dist/ root
-["_expo", "assets", "favicon.ico", "metadata.json", "sounds"].forEach(moveToApp);
+["_expo", "assets", "favicon.ico", "metadata.json"].forEach(moveToApp);
 
 // Move the SPA entry point
 const indexSrc = path.join(distDir, "index.html");
@@ -241,6 +277,29 @@ for (const img of ["icon.png", "splash-icon.png", "favicon.png"]) {
     fs.copyFileSync(s, d);
     console.log(`[post-export] Copied assets/images/${img} → app/assets/images/${img}`);
   }
+}
+
+// ── 5b. Copy root-served assets that the app requests outside /app/ ──────────
+const sourceUploadsDir = path.resolve(__dirname, "../uploads");
+const sourceSoundsDir = path.resolve(__dirname, "../public/sounds");
+const distUploadsDir = path.join(distDir, "uploads");
+const distSoundsDir = path.join(distDir, "sounds");
+const appUploadsDir = path.join(appDir, "uploads");
+const appSoundsDir = path.join(appDir, "sounds");
+
+if (fs.existsSync(sourceUploadsDir)) {
+  copyDirRecursive(sourceUploadsDir, distUploadsDir);
+  copyDirRecursive(sourceUploadsDir, appUploadsDir);
+  console.log("[post-export] Copied uploads/ → dist/uploads/ and dist/app/uploads/");
+}
+
+if (fs.existsSync(sourceSoundsDir)) {
+  copyDirRecursive(sourceSoundsDir, distSoundsDir);
+  copyDirRecursive(sourceSoundsDir, appSoundsDir);
+  console.log("[post-export] Copied public/sounds/ → dist/sounds/ and dist/app/sounds/");
+} else if (fs.existsSync(distSoundsDir)) {
+  copyDirRecursive(distSoundsDir, appSoundsDir);
+  console.log("[post-export] Mirrored dist/sounds/ → dist/app/sounds/");
 }
 
 // ── 6. Landing page at dist/index.html ───────────────────────────────────────

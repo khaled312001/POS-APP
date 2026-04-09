@@ -16,13 +16,30 @@ import BarcodeScanner from "@/components/BarcodeScanner";
 import { useAuth } from "@/lib/auth-context";
 import { useLicense } from "@/lib/license-context";
 import { useLanguage } from "@/lib/language-context";
+import { getChromeMetrics } from "@/lib/responsive";
+import { getWebStaticFallbackChain } from "@/lib/web-static";
+import TabPageHeader, { HeaderIconButton } from "@/components/tab-page-header";
 
 const AnimatedProductImage = ({ uri }: { uri: string }) => {
+  const fallbacks = getWebStaticFallbackChain(uri);
+  const [currentUri, setCurrentUri] = useState(fallbacks[0] || uri);
+
+  useEffect(() => {
+    setCurrentUri(fallbacks[0] || uri);
+  }, [uri]);
+
   return (
     <Image
-      source={{ uri }}
+      source={{ uri: currentUri }}
       style={{ width: 44, height: 44, borderRadius: 10 }}
       resizeMode="cover"
+      onError={() => {
+        const currentIndex = fallbacks.indexOf(currentUri);
+        const nextUri = fallbacks[currentIndex + 1];
+        if (nextUri && nextUri !== currentUri) {
+          setCurrentUri(nextUri);
+        }
+      }}
     />
   );
 };
@@ -40,6 +57,7 @@ export default function ProductsScreen() {
     return () => sub?.remove();
   }, []);
   const isTablet = screenDims.width > 600;
+  const { isMobileWeb, topPad, bottomPad } = getChromeMetrics(screenDims.width);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState<any>(null);
@@ -232,7 +250,6 @@ export default function ProductsScreen() {
     ]);
   };
 
-  const topPad = Platform.OS === "web" ? 48 : 0;
   const getCatName = (catId: number | null) => categories.find((c: any) => c.id === catId)?.name || t("uncategorized");
 
   const getPriority = (name: string) => {
@@ -263,24 +280,35 @@ export default function ProductsScreen() {
   });
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
-      <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid]} style={[styles.header, isRTL && { flexDirection: "row-reverse" }]}>
-        <Text style={[styles.headerTitle, rtlTextAlign]}>{t("products")}</Text>
-        {canManage && (
-          <Pressable style={styles.addBtn} onPress={() => {
-            playClickSound("medium");
-            if (viewMode === "products") {
-              resetForm(); setEditProduct(null); setShowForm(true);
-            } else {
-              setCatForm({ name: "", color: "#7C3AED", icon: "grid" }); setEditCategory(null); setShowCategoryForm(true);
-            }
-          }}>
-            <Ionicons name="add" size={24} color={Colors.white} />
-          </Pressable>
-        )}
-      </LinearGradient>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top + topPad,
+          direction: isRTL ? "rtl" : "ltr",
+        },
+      ]}
+    >
+      <TabPageHeader
+        title={t("products")}
+        icon="grid"
+        isRTL={isRTL}
+        rightActions={canManage ? (
+          <HeaderIconButton
+            icon="add"
+            onPress={() => {
+              playClickSound("medium");
+              if (viewMode === "products") {
+                resetForm(); setEditProduct(null); setShowForm(true);
+              } else {
+                setCatForm({ name: "", color: "#7C3AED", icon: "grid" }); setEditCategory(null); setShowCategoryForm(true);
+              }
+            }}
+          />
+        ) : undefined}
+      />
 
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", paddingHorizontal: 12, paddingTop: 10, gap: 8 }}>
+      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", paddingHorizontal: 12, paddingTop: 10, gap: 8, flexWrap: isMobileWeb ? "wrap" : "nowrap" }}>
         <Pressable
           style={{ flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: viewMode === "products" ? Colors.accent : Colors.surface, alignItems: "center", borderWidth: 1, borderColor: viewMode === "products" ? Colors.accent : Colors.cardBorder }}
           onPress={() => { playClickSound("light"); setViewMode("products"); }}
@@ -374,7 +402,7 @@ export default function ProductsScreen() {
         <FlatList
           data={sortedProducts}
           keyExtractor={(item: any) => String(item.id)}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: bottomPad + 16 }]}
           scrollEnabled={!!sortedProducts.length}
           renderItem={({ item }: { item: any }) => (
             <Pressable style={[styles.productCard, isRTL && { flexDirection: "row-reverse" }]} onPress={() => { if (canManage) { playClickSound("light"); openEdit(item); } }}>
@@ -439,7 +467,7 @@ export default function ProductsScreen() {
         <FlatList
           data={sortedCategories}
           keyExtractor={(item: any) => String(item.id)}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: bottomPad + 16 }]}
           scrollEnabled={!!sortedCategories.length}
           renderItem={({ item }: { item: any }) => (
             <Pressable style={[styles.productCard, isRTL && { flexDirection: "row-reverse" }]} onPress={() => {
@@ -756,9 +784,6 @@ export default function ProductsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14 },
-  headerTitle: { fontSize: 22, fontWeight: "800", color: Colors.white },
-  addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
   searchRow: { paddingHorizontal: 12, paddingVertical: 10 },
   searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 42, borderWidth: 1, borderColor: Colors.inputBorder },
   searchInput: { flex: 1, color: Colors.text, marginLeft: 8, fontSize: 15 },

@@ -11,7 +11,16 @@ HOME = f"/home/{USER}"
 POS_APP    = f"{HOME}/pos-app"
 POS_NODE   = f"{HOME}/domains/barmagly.tech/pos-nodejs"
 POS_STATIC = f"{HOME}/domains/barmagly.tech/public_html/pos"
+POS_API    = f"{POS_STATIC}/api"
 LOCAL_DIST = r"f:\POS-APP\dist"
+LOCAL_UPLOADS = r"f:\POS-APP\uploads"
+LOCAL_SOUNDS = r"f:\POS-APP\public\sounds"
+LOCAL_STORE = r"f:\POS-APP\store"
+
+STORE_REWRITE_BLOCK = """# Barmagly store route support
+RewriteEngine On
+RewriteRule ^store/([^/]+)/?$ /api/store/$1 [L,QSA]
+"""
 
 def make_ssh():
     c = paramiko.SSHClient()
@@ -47,9 +56,29 @@ def upload_dir(sftp, local_dir, remote_dir, skip_files=None):
             if count % 20 == 0: print(f"    {count} files...")
     return count
 
+def ensure_root_store_rewrite(sftp):
+    root_htaccess_path = f"{HOME}/domains/barmagly.tech/public_html/.htaccess"
+    try:
+        with sftp.open(root_htaccess_path, "r") as f:
+            current = f.read().decode("utf-8", "ignore")
+    except Exception:
+        current = ""
+
+    if "RewriteRule ^store/([^/]+)/?$ /api/store/$1 [L,QSA]" in current:
+        print("  Root /store rewrite already present")
+        return
+
+    updated = current.rstrip() + "\n\n" + STORE_REWRITE_BLOCK
+    with sftp.open(root_htaccess_path, "w") as f:
+        f.write(updated)
+    print("  Root /store rewrite added")
+
 def main():
     ssh = make_ssh()
     sftp = ssh.open_sftp()
+
+    print("=== Ensure root /store rewrite ===")
+    ensure_root_store_rewrite(sftp)
 
     # ── Upload dist/ to public_html/pos/app/ (Apache serves these directly)
     # Skip index.html — let Passenger serve /app (Node.js returns the HTML)
@@ -57,6 +86,21 @@ def main():
     run(ssh, f"mkdir -p {POS_STATIC}/app", "create app dir")
     total = upload_dir(sftp, LOCAL_DIST, f"{POS_STATIC}/app", skip_files=["index.html"])
     print(f"  Uploaded {total} static asset files")
+
+    if os.path.isdir(LOCAL_UPLOADS):
+        print("\n=== Upload uploads/ → public_html/pos/uploads/ ===")
+        total = upload_dir(sftp, LOCAL_UPLOADS, f"{POS_STATIC}/uploads")
+        print(f"  Uploaded {total} upload files")
+
+    if os.path.isdir(LOCAL_SOUNDS):
+        print("\n=== Upload public/sounds/ → public_html/pos/sounds/ ===")
+        total = upload_dir(sftp, LOCAL_SOUNDS, f"{POS_STATIC}/sounds")
+        print(f"  Uploaded {total} sound files")
+
+    if os.path.isdir(LOCAL_STORE):
+        print("\n=== Upload store/ → public_html/pos/store/ ===")
+        total = upload_dir(sftp, LOCAL_STORE, f"{POS_STATIC}/store")
+        print(f"  Uploaded {total} store files")
 
     # ── Write .htaccess: Apache serves files that exist, Passenger gets the rest
     print("\n=== Write optimized .htaccess ===")
@@ -89,6 +133,19 @@ RewriteRule .* - [L]
     with sftp.open(f"{POS_STATIC}/.htaccess", "w") as f:
         f.write(htaccess)
     print("  .htaccess written")
+
+    api_htaccess = f"""PassengerAppRoot {POS_NODE}
+PassengerAppType node
+PassengerNodejs /opt/alt/alt-nodejs22/root/bin/node
+PassengerStartupFile server.js
+PassengerBaseURI /api
+PassengerRestartDir {POS_NODE}/tmp
+SetEnv NODE_ENV=production
+"""
+    run(ssh, f"mkdir -p {POS_API}", "create /api mount dir")
+    with sftp.open(f"{POS_API}/.htaccess", "w") as f:
+        f.write(api_htaccess)
+    print("  /api Passenger mount written")
 
     # ── Restart Passenger ────────────────────────────────────────────────
     run(ssh, f"rm -f {POS_NODE}/startup.log {POS_NODE}/error.log", "clear logs")

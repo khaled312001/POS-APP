@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" id="html-root">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#FF5722" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="/delivery-app/driver/manifest.json" />
+  <title id="page-title">Driver App</title>
+
+  <link rel="stylesheet" href="/delivery-app/css/base.css" />
+  <link rel="stylesheet" href="/delivery-app/css/components.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: var(--delivery-bg); font-family: var(--font-body); }
+    #app { display: flex; flex-direction: column; min-height: 100dvh; max-width: 600px; margin: 0 auto; }
+
+    /* ── Offline banner ── */
+    #offline-banner {
+      background: #EF4444; color: #fff;
+      text-align: center; font-size: 0.8rem; font-weight: 600;
+      padding: 6px; display: none; position: sticky; top: 0; z-index: 200;
+    }
+
+    /* ── Login ── */
+    #login-screen {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 100dvh; padding: 24px; gap: 0;
+    }
+    .login-logo { font-size: 4rem; margin-bottom: 12px; }
+    .login-title { font-size: 1.6rem; font-weight: 800; margin: 0 0 6px; text-align: center; }
+    .login-sub { color: var(--delivery-text-muted); font-size: 0.9rem; text-align: center; margin-bottom: 28px; max-width: 280px; }
+    .login-form { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 12px; }
+    .login-error {
+      color: var(--delivery-danger); background: rgba(239,68,68,0.1);
+      border-radius: var(--radius-md); padding: 10px 14px;
+      font-size: 0.875rem; display: none;
+    }
+
+    /* ── Top bar ── */
+    .driver-topbar {
+      background: var(--delivery-primary, #FF5722);
+      color: #fff; padding: 12px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .topbar-store { font-size: 0.8rem; opacity: 0.85; }
+    .topbar-name { font-size: 1rem; font-weight: 800; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+    .online-pill {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: 999px;
+      background: rgba(255,255,255,0.2);
+      cursor: pointer; font-size: 0.8125rem; font-weight: 700;
+      border: 1.5px solid rgba(255,255,255,0.35);
+      color: #fff; transition: background 0.2s;
+    }
+    .online-pill.is-online { background: rgba(76,175,80,0.3); border-color: rgba(76,175,80,0.6); }
+    .online-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.5); }
+    .online-pill.is-online .online-dot { background: #4CAF50; box-shadow: 0 0 0 2px rgba(76,175,80,0.4); }
+
+    /* ── Tabs ── */
+    .driver-tabs {
+      display: flex; background: var(--delivery-surface);
+      border-bottom: 1px solid var(--delivery-border);
+      position: sticky; top: 56px; z-index: 99;
+    }
+    .driver-tab {
+      flex: 1; padding: 13px 6px; text-align: center;
+      font-weight: 600; font-size: 0.8125rem;
+      color: var(--delivery-text-muted);
+      border-bottom: 2px solid transparent;
+      cursor: pointer; transition: all 0.15s;
+      position: relative;
+    }
+    .driver-tab.active {
+      color: var(--delivery-primary, #FF5722);
+      border-bottom-color: var(--delivery-primary, #FF5722);
+    }
+    .tab-badge {
+      position: absolute; top: 8px; right: 50%;
+      transform: translateX(calc(50% + 6px));
+      background: #EF4444; color: #fff; border-radius: 999px;
+      font-size: 0.65rem; font-weight: 800; padding: 1px 5px;
+      min-width: 16px; text-align: center; display: none;
+    }
+
+    /* ── Orders tab ── */
+    #tab-orders { flex: 1; padding: 12px 0; overflow-y: auto; }
+    .order-card {
+      background: var(--delivery-surface);
+      border-radius: 16px; margin: 0 12px 12px;
+      padding: 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      border-inline-start: 4px solid var(--delivery-primary, #FF5722);
+    }
+    .order-card.status-on_way { border-inline-start-color: #FF5722; }
+    .order-card.status-ready  { border-inline-start-color: #2FD3C6; }
+    .order-card.status-accepted { border-inline-start-color: #3B82F6; }
+    .order-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .order-card__id { font-weight: 800; font-size: 0.9375rem; }
+    .order-card__total { font-weight: 700; color: var(--delivery-primary, #FF5722); }
+    .order-card__address {
+      color: var(--delivery-text-muted); font-size: 0.875rem;
+      display: flex; gap: 6px; align-items: flex-start; margin-bottom: 10px;
+    }
+    .order-card__address-pin { flex-shrink: 0; }
+    .order-card__customer { display: flex; gap: 12px; margin-bottom: 12px; }
+    .order-card__phone-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: 999px;
+      background: rgba(76,175,80,0.12); color: var(--delivery-success);
+      font-size: 0.8125rem; font-weight: 700; text-decoration: none;
+      border: 1px solid rgba(76,175,80,0.25);
+    }
+    .order-card__actions { display: flex; gap: 8px; }
+    .action-btn {
+      flex: 1; padding: 10px; border-radius: 12px;
+      border: none; font-size: 0.875rem; font-weight: 700;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    .action-btn:active { opacity: 0.75; }
+    .action-btn--primary { background: var(--delivery-primary, #FF5722); color: #fff; }
+    .action-btn--success { background: var(--delivery-success); color: #fff; }
+    .action-btn--ghost { background: var(--delivery-border); color: var(--delivery-text); }
+
+    /* ── Map tab ── */
+    #tab-map { flex: 1; display: flex; flex-direction: column; }
+    #driver-map { flex: 1; min-height: 380px; }
+    .map-gps-info { padding: 12px 16px; font-size: 0.8125rem; color: var(--delivery-text-muted); text-align: center; }
+
+    /* ── Earnings tab ── */
+    #tab-earnings { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .stat-card {
+      background: var(--delivery-surface); border-radius: 16px;
+      padding: 20px; text-align: center;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+    }
+    .stat-card__label { font-size: 0.875rem; color: var(--delivery-text-muted); margin-bottom: 8px; }
+    .stat-card__value { font-size: 2.2rem; font-weight: 800; }
+    .stat-card__value.green { color: var(--delivery-success); }
+    .stat-card__value.primary { color: var(--delivery-primary, #FF5722); }
+
+    /* ── New order alert ── */
+    #new-order-alert {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      background: var(--delivery-primary, #FF5722); color: #fff;
+      border-radius: 999px; padding: 14px 24px;
+      font-size: 1rem; font-weight: 700;
+      box-shadow: 0 4px 20px rgba(255,87,34,0.4);
+      z-index: 300; display: none; cursor: pointer;
+      animation: bounce-in 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+    }
+    @keyframes bounce-in { from { transform: translateX(-50%) scale(0.5) translateY(40px); opacity:0; } to { transform: translateX(-50%) scale(1) translateY(0); opacity:1; } }
+
+    /* ── Loading overlay ── */
+    #auth-loader {
+      position: fixed; inset: 0; background: rgba(255,255,255,0.85);
+      display: none; align-items: center; justify-content: center; z-index: 400;
+    }
+    .spinner { width: 44px; height: 44px; border: 3px solid rgba(255,87,34,0.18); border-top-color: #FF5722; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; width: min(320px,90vw); pointer-events: none; }
+    .toast { background: #1a1a2e; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 0.875rem; font-weight: 500; pointer-events: auto; animation: toast-in 0.25s ease; }
+    .toast.success { background: #4CAF50; }
+    .toast.error   { background: #EF4444; }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Offline banner -->
+  <div id="offline-banner">No internet connection — reconnecting...</div>
+
+  <!-- Auth loader -->
+  <div id="auth-loader" style="display:none;position:fixed;inset:0;background:rgba(255,255,255,0.85);align-items:center;justify-content:center;z-index:400">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- ── Login Screen ─────────────────────────────────────────────────────── -->
+  <div id="login-screen">
+    <div class="login-logo">🚗</div>
+    <h1 class="login-title" id="login-title">Driver App</h1>
+    <p class="login-sub" id="login-sub">Enter your driver access token to get started</p>
+    <div class="login-form">
+      <div class="login-error" id="login-error"></div>
+      <input id="token-input" class="form-input" type="text"
+             placeholder="Driver access token..."
+             style="text-align:center"
+             onkeydown="if(event.key==='Enter') driverApp.login()"
+             autocomplete="off" autocorrect="off" spellcheck="false" />
+      <button class="btn btn-primary" id="login-btn" onclick="driverApp.login()">Connect</button>
+    </div>
+  </div>
+
+  <!-- ── Driver Screen ─────────────────────────────────────────────────────── -->
+  <div id="driver-screen" class="hidden" style="display:flex;flex-direction:column;flex:1">
+    <!-- Top bar -->
+    <div class="driver-topbar" id="driver-topbar">
+      <div>
+        <div class="topbar-store" id="topbar-store"></div>
+        <div class="topbar-name" id="topbar-name">Driver</div>
+      </div>
+      <div class="topbar-right">
+        <div class="online-pill" id="online-pill" onclick="driverApp.toggleOnline()">
+          <div class="online-dot" id="online-dot"></div>
+          <span id="online-label">Offline</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="driver-tabs">
+      <div class="driver-tab active" onclick="driverApp.showTab('orders')" id="tab-btn-orders">
+        📦 Orders
+        <span class="tab-badge" id="orders-badge"></span>
+      </div>
+      <div class="driver-tab" onclick="driverApp.showTab('map')" id="tab-btn-map">🗺 Map</div>
+      <div class="driver-tab" onclick="driverApp.showTab('earnings')" id="tab-btn-earnings">💰 Earnings</div>
+    </div>
+
+    <!-- Orders tab -->
+    <div id="tab-orders" style="flex:1;overflow-y:auto;padding:12px 0">
+      <div id="orders-list">
+        <div class="empty-state" style="padding:40px 24px">
+          <div class="empty-state__icon">📭</div>
+          <h2 class="empty-state__title" id="no-orders-title">No orders assigned</h2>
+          <p class="empty-state__text" id="no-orders-sub">Go online to receive delivery assignments</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map tab -->
+    <div id="tab-map" class="hidden" style="flex:1;display:flex;flex-direction:column">
+      <div id="driver-map" style="flex:1;min-height:380px"></div>
+      <div class="map-gps-info" id="gps-info">🛰 GPS updates every 15 seconds</div>
+    </div>
+
+    <!-- Earnings tab -->
+    <div id="tab-earnings" class="hidden" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div class="stat-card">
+        <div class="stat-card__label" id="today-label">Today's Deliveries</div>
+        <div class="stat-card__value primary" id="today-count">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__label" id="week-label">This Week's Earnings</div>
+        <div class="stat-card__value green" id="week-earnings">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__label" id="rating-label">Average Rating</div>
+        <div class="stat-card__value" id="driver-rating-val" style="color:#FFC107">⭐ —</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New order floating alert -->
+  <div id="new-order-alert" onclick="driverApp.showTab('orders'); this.style.display='none'">
+    🔔 New order assigned!
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+const PATH_TOKEN = location.pathname.split("/driver/")[1]?.replace(/\/$/, "");
+let _currency = "EGP";
+
+// ── Offline detection ────────────────────────────────────────────────────────
+const offlineBanner = document.getElementById("offline-banner");
+window.addEventListener("offline", () => { offlineBanner.style.display = "block"; });
+window.addEventListener("online",  () => { offlineBanner.style.display = "none";  });
+if (!navigator.onLine) offlineBanner.style.display = "block";
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg, type = "") {
+  const c = document.getElementById("toast-container");
+  const el = document.createElement("div");
+  el.className = `toast${type ? " " + type : ""}`;
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+// ── Vibrate helper ────────────────────────────────────────────────────────────
+function vibrate(pattern) {
+  try { navigator.vibrate?.(pattern); } catch (_) {}
+}
+
+// ── Driver App ────────────────────────────────────────────────────────────────
+const driverApp = {
+  token: PATH_TOKEN || localStorage.getItem("driver_token") || "",
+  driver: null,
+  store: null,
+  isOnline: false,
+  gpsWatcher: null,
+  map: null,
+  selfMarker: null,
+  activeOrders: [],
+  lastOrderIds: new Set(),
+  gpsLat: null,
+  gpsLng: null,
+
+  // ── Auth ────────────────────────────────────────────────────────────────────
+  async login() {
+    const input = document.getElementById("token-input");
+    const token = (input?.value?.trim() || driverApp.token).trim();
+    if (!token) { driverApp.showLoginError("Please enter your access token"); return; }
+
+    const btn = document.getElementById("login-btn");
+    btn.disabled = true; btn.textContent = "Connecting...";
+    document.getElementById("login-error").style.display = "none";
+    document.getElementById("auth-loader").style.display = "flex";
+
+    try {
+      const resp = await fetch("/api/delivery/driver/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: token }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Invalid token. Check with your manager.");
+      driverApp.driver = data.driver;
+      driverApp.store  = data.store || null;
+      driverApp.token  = token;
+      localStorage.setItem("driver_token", token);
+      driverApp.showDriverScreen();
+    } catch (err) {
+      driverApp.showLoginError(err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = "Connect";
+      document.getElementById("auth-loader").style.display = "none";
+    }
+  },
+
+  showLoginError(msg) {
+    const el = document.getElementById("login-error");
+    el.textContent = msg; el.style.display = "block";
+    vibrate([100, 50, 100]);
+  },
+
+  showDriverScreen() {
+    document.getElementById("login-screen").style.display = "none";
+    const ds = document.getElementById("driver-screen");
+    ds.classList.remove("hidden"); ds.style.display = "flex";
+
+    // Apply store branding
+    if (driverApp.store) {
+      const { name, primaryColor, currency } = driverApp.store;
+      if (primaryColor) {
+        document.documentElement.style.setProperty("--delivery-primary", primaryColor);
+        document.getElementById("driver-topbar").style.background = primaryColor;
+        document.querySelector("meta[name=theme-color]").content = primaryColor;
+      }
+      if (currency) _currency = currency;
+      if (name) document.getElementById("topbar-store").textContent = name;
+    }
+
+    // Driver name
+    const driverName = driverApp.driver?.name || driverApp.driver?.employeeName || "Driver";
+    document.getElementById("topbar-name").textContent = driverName;
+    document.getElementById("page-title").textContent  = `${driverName} — Driver App`;
+
+    driverApp.loadOrders();
+    driverApp.initMap();
+
+    // Refresh orders every 30s
+    setInterval(() => {
+      if (driverApp.isOnline) driverApp.loadOrders();
+    }, 30000);
+  },
+
+  // ── Online toggle ──────────────────────────────────────────────────────────
+  async toggleOnline() {
+    driverApp.isOnline = !driverApp.isOnline;
+    const pill  = document.getElementById("online-pill");
+    const label = document.getElementById("online-label");
+    pill.classList.toggle("is-online", driverApp.isOnline);
+    label.textContent = driverApp.isOnline ? "Online" : "Offline";
+
+    if (driverApp.isOnline) {
+      driverApp.startGps();
+      await driverApp.loadOrders();
+      showToast("You're now online 🟢", "success");
+    } else {
+      driverApp.stopGps();
+      showToast("You're now offline");
+    }
+
+    // Notify server of status change
+    try {
+      await fetch("/api/delivery/driver/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${driverApp.token}` },
+        body: JSON.stringify({ lat: driverApp.gpsLat, lng: driverApp.gpsLng, status: driverApp.isOnline ? "available" : "offline" }),
+      });
+    } catch (_) {}
+  },
+
+  // ── Orders ─────────────────────────────────────────────────────────────────
+  async loadOrders() {
+    if (!driverApp.token) return;
+    try {
+      const resp = await fetch("/api/delivery/driver/orders", {
+        headers: { Authorization: `Bearer ${driverApp.token}` },
+      });
+      if (!resp.ok) {
+        if (resp.status === 401) {
+          showToast("Session expired — please reconnect", "error");
+          driverApp.logout();
+          return;
+        }
+        throw new Error(`Server error (${resp.status})`);
+      }
+      const orders = await resp.json();
+      driverApp.activeOrders = Array.isArray(orders) ? orders : [];
+      driverApp.renderOrders();
+      driverApp.checkNewOrders();
+    } catch (err) {
+      showToast(`Failed to load orders: ${err.message}`, "error");
+    }
+
+    // Load earnings in parallel
+    try {
+      const earnResp = await fetch("/api/delivery/driver/earnings", {
+        headers: { Authorization: `Bearer ${driverApp.token}` },
+      });
+      if (earnResp.ok) {
+        const earn = await earnResp.json();
+        const today = Array.isArray(earn) ? earn[0] : earn;
+        if (today) {
+          document.getElementById("today-count").textContent  = today.count || 0;
+          const fees = parseFloat(today.totalFees || 0).toFixed(2);
+          document.getElementById("week-earnings").textContent = `${_currency} ${fees}`;
+          if (today.rating) document.getElementById("driver-rating-val").textContent = `⭐ ${parseFloat(today.rating).toFixed(1)}`;
+        }
+      }
+    } catch (_) {}
+  },
+
+  checkNewOrders() {
+    const newIds = new Set(driverApp.activeOrders.map(o => o.id));
+    const hasNew = driverApp.activeOrders.some(o => !driverApp.lastOrderIds.has(o.id));
+    if (hasNew && driverApp.lastOrderIds.size > 0) {
+      vibrate([200, 100, 200, 100, 200]);
+      const alert = document.getElementById("new-order-alert");
+      alert.style.display = "block";
+      setTimeout(() => { alert.style.display = "none"; }, 8000);
+    }
+    driverApp.lastOrderIds = newIds;
+
+    // Update tab badge
+    const badge = document.getElementById("orders-badge");
+    const count = driverApp.activeOrders.length;
+    badge.textContent = count > 0 ? count : "";
+    badge.style.display = count > 0 ? "block" : "none";
+  },
+
+  renderOrders() {
+    const list = document.getElementById("orders-list");
+    if (!list) return;
+    if (driverApp.activeOrders.length === 0) {
+      list.innerHTML = `
+        <div class="empty-state" style="padding:40px 24px">
+          <div class="empty-state__icon">📭</div>
+          <h2 class="empty-state__title">${driverApp.isOnline ? "No orders yet" : "You're offline"}</h2>
+          <p class="empty-state__text">${driverApp.isOnline ? "New assignments will appear here" : "Go online to receive deliveries"}</p>
+        </div>`;
+      return;
+    }
+
+    list.innerHTML = driverApp.activeOrders.map(o => {
+      const statusClass = `status-${o.status}`;
+      const totalFmt = o.totalAmount ? `${_currency} ${parseFloat(o.totalAmount).toFixed(2)}` : "";
+      const canPickUp  = ["accepted", "ready"].includes(o.status);
+      const canDeliver = o.status === "on_way";
+      const hasCoords  = o.customerLat && o.customerLng;
+      return `
+        <div class="order-card ${statusClass}">
+          <div class="order-card__header">
+            <span class="order-card__id">Order #${o.orderNumber || o.id}</span>
+            <span class="order-card__total">${totalFmt}</span>
+          </div>
+          <div class="order-card__address">
+            <span class="order-card__address-pin">📍</span>
+            <span>${o.customerAddress || "No address provided"}</span>
+          </div>
+          ${o.customerName ? `<div style="font-size:0.8rem;color:var(--delivery-text-muted);margin-bottom:8px">👤 ${o.customerName}</div>` : ""}
+          <div class="order-card__customer">
+            ${o.customerPhone ? `<a href="tel:${o.customerPhone}" class="order-card__phone-btn">📞 ${o.customerPhone}</a>` : ""}
+          </div>
+          <div class="order-card__actions">
+            ${canPickUp  ? `<button class="action-btn action-btn--primary" onclick="driverApp.updateStatus(${o.id}, 'picked_up')">✅ Picked Up</button>` : ""}
+            ${canDeliver ? `<button class="action-btn action-btn--success" onclick="driverApp.updateStatus(${o.id}, 'delivered')">🎉 Delivered</button>` : ""}
+            ${hasCoords  ? `<button class="action-btn action-btn--ghost" onclick="driverApp.panToCustomer(${o.customerLat},${o.customerLng})">🗺 Navigate</button>` : ""}
+          </div>
+        </div>`;
+    }).join("");
+  },
+
+  panToCustomer(lat, lng) {
+    driverApp.showTab("map");
+    if (driverApp.map) {
+      driverApp.map.setView([Number(lat), Number(lng)], 16);
+    }
+  },
+
+  async updateStatus(orderId, newStatus) {
+    const endpoint = newStatus === "picked_up"
+      ? `/api/delivery/driver/orders/${orderId}/picked-up`
+      : `/api/delivery/driver/orders/${orderId}/delivered`;
+    try {
+      const resp = await fetch(endpoint, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${driverApp.token}` },
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.error || `Failed to update (${resp.status})`);
+      vibrate(newStatus === "delivered" ? [100,50,100,50,300] : [100]);
+      showToast(newStatus === "delivered" ? "🎉 Order delivered!" : "✅ Picked up!", "success");
+      await driverApp.loadOrders();
+    } catch (err) {
+      showToast(`Error: ${err.message}`, "error");
+    }
+  },
+
+  // ── Map ────────────────────────────────────────────────────────────────────
+  initMap() {
+    if (!window.L || driverApp.map) return;
+    // Start with world view; will update when GPS available
+    driverApp.map = L.map("driver-map", { zoomControl: true }).setView([20, 0], 2);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap",
+    }).addTo(driverApp.map);
+  },
+
+  // ── GPS ────────────────────────────────────────────────────────────────────
+  startGps() {
+    if (!navigator.geolocation) {
+      showToast("GPS not available on this device", "error");
+      return;
+    }
+    driverApp.gpsWatcher = navigator.geolocation.watchPosition(
+      (pos) => driverApp.onGpsUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
+      (err) => {
+        const msgs = {
+          1: "GPS permission denied — please enable location access",
+          2: "GPS signal unavailable",
+          3: "GPS timed out",
+        };
+        showToast(msgs[err.code] || "GPS error", "error");
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  },
+
+  stopGps() {
+    if (driverApp.gpsWatcher !== null) {
+      navigator.geolocation.clearWatch(driverApp.gpsWatcher);
+      driverApp.gpsWatcher = null;
+    }
+  },
+
+  onGpsUpdate(lat, lng, accuracy) {
+    driverApp.gpsLat = lat;
+    driverApp.gpsLng = lng;
+
+    // Update map
+    if (driverApp.map) {
+      if (driverApp.selfMarker) {
+        driverApp.selfMarker.setLatLng([lat, lng]);
+      } else {
+        driverApp.selfMarker = L.marker([lat, lng], {
+          icon: L.divIcon({ html: "🚗", className: "", iconSize: [28, 28] }),
+        }).addTo(driverApp.map);
+        driverApp.map.setView([lat, lng], 15);
+      }
+    }
+
+    // GPS info
+    const gpsInfo = document.getElementById("gps-info");
+    if (gpsInfo && accuracy) {
+      gpsInfo.textContent = `🛰 GPS active · ±${Math.round(accuracy)}m accuracy`;
+    }
+
+    // Send to server
+    const activeOrder = driverApp.activeOrders.find(o => o.status === "on_way");
+    fetch("/api/delivery/driver/location", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${driverApp.token}`,
+      },
+      body: JSON.stringify({ lat, lng, orderId: activeOrder?.id }),
+    }).catch(() => {});  // fail silently — offline is expected
+  },
+
+  // ── Tab navigation ─────────────────────────────────────────────────────────
+  showTab(tab) {
+    ["orders", "map", "earnings"].forEach(t => {
+      const el = document.getElementById(`tab-${t}`);
+      if (el) { el.style.display = t === tab ? "" : "none"; el.classList.toggle("hidden", t !== tab); }
+      document.getElementById(`tab-btn-${t}`)?.classList.toggle("active", t === tab);
+    });
+    if (tab === "map" && driverApp.map) {
+      setTimeout(() => driverApp.map.invalidateSize(), 120);
+    }
+  },
+
+  logout() {
+    localStorage.removeItem("driver_token");
+    driverApp.token = "";
+    driverApp.stopGps();
+    document.getElementById("driver-screen").classList.add("hidden");
+    document.getElementById("login-screen").style.display = "flex";
+  },
+};
+
+// ── Service Worker ────────────────────────────────────────────────────────────
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/delivery-app/driver/sw.js").catch(() => {});
+}
+
+// ── Auto-login ────────────────────────────────────────────────────────────────
+if (driverApp.token) {
+  const input = document.getElementById("token-input");
+  if (input) input.value = driverApp.token;
+  driverApp.login();
+}
+</script>
+</body>
+</html>

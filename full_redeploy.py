@@ -15,7 +15,16 @@ HOME = f"/home/{USER}"
 POS_APP  = f"{HOME}/pos-app"          # NEW safe location
 POS_NODE = f"{HOME}/domains/barmagly.tech/pos-nodejs"
 POS_STATIC = f"{HOME}/domains/barmagly.tech/public_html/pos"
+POS_API = f"{POS_STATIC}/api"
 LOCAL_DIST = r"f:\POS-APP\dist"
+LOCAL_UPLOADS = r"f:\POS-APP\uploads"
+LOCAL_SOUNDS = r"f:\POS-APP\public\sounds"
+LOCAL_STORE = r"f:\POS-APP\store"
+
+STORE_REWRITE_BLOCK = """# Barmagly store route support
+RewriteEngine On
+RewriteRule ^store/([^/]+)/?$ /api/store/$1 [L,QSA]
+"""
 
 NEW_ENV = """DATABASE_URL=postgresql://neondb_owner:npg_HFhrVY7sSDp3@ep-polished-sun-amr4cmn7.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require
 PGDATABASE=neondb
@@ -77,10 +86,30 @@ def upload_dir(sftp, local_dir, remote_dir):
             if count % 20 == 0: print(f"    {count} files...")
     return count
 
+def ensure_root_store_rewrite(sftp):
+    root_htaccess_path = f"{HOME}/domains/barmagly.tech/public_html/.htaccess"
+    try:
+        with sftp.open(root_htaccess_path, "r") as f:
+            current = f.read().decode("utf-8", "ignore")
+    except Exception:
+        current = ""
+
+    if "RewriteRule ^store/([^/]+)/?$ /api/store/$1 [L,QSA]" in current:
+        print("  Root /store rewrite already present")
+        return
+
+    updated = current.rstrip() + "\n\n" + STORE_REWRITE_BLOCK
+    with sftp.open(root_htaccess_path, "w") as f:
+        f.write(updated)
+    print("  Root /store rewrite added")
+
 def main():
     print("=== Connecting ===")
     ssh = make_ssh()
     sftp = ssh.open_sftp()
+
+    print("\n=== Ensure root /store rewrite ===")
+    ensure_root_store_rewrite(sftp)
 
     # ── Step 1: Clone repo to ~/pos-app/ ─────────────────────────────────
     print("\n=== Step 1: Check/clone repo to ~/pos-app/ ===")
@@ -134,6 +163,21 @@ def main():
     # Also copy to public_html/pos for static fallback
     run(ssh, f"rm -rf {POS_STATIC}/* {POS_STATIC}/.[!.]*", "clear public_html/pos")
     run(ssh, f"cp -r {POS_APP}/dist/* {POS_STATIC}/", "copy to public_html/pos")
+
+    if os.path.isdir(LOCAL_UPLOADS):
+        print("\n=== Step 4b: Upload uploads/ → public_html/pos/uploads/ ===")
+        total = upload_dir(sftp, LOCAL_UPLOADS, f"{POS_STATIC}/uploads")
+        print(f"  Uploaded {total} upload files")
+
+    if os.path.isdir(LOCAL_SOUNDS):
+        print("\n=== Step 4c: Upload public/sounds/ → public_html/pos/sounds/ ===")
+        total = upload_dir(sftp, LOCAL_SOUNDS, f"{POS_STATIC}/sounds")
+        print(f"  Uploaded {total} sound files")
+
+    if os.path.isdir(LOCAL_STORE):
+        print("\n=== Step 4d: Upload store/ → public_html/pos/store/ ===")
+        total = upload_dir(sftp, LOCAL_STORE, f"{POS_STATIC}/store")
+        print(f"  Uploaded {total} store files")
 
     # ── Step 5: Test server manually ──────────────────────────────────────
     print("\n=== Step 5: Test server_dist manually ===")
@@ -212,6 +256,19 @@ RewriteRule .* - [L]
     with sftp.open(f"{POS_STATIC}/.htaccess", "w") as f:
         f.write(htaccess)
     print("  .htaccess written")
+
+    api_htaccess = f"""PassengerAppRoot {POS_NODE}
+PassengerAppType node
+PassengerNodejs /opt/alt/alt-nodejs22/root/bin/node
+PassengerStartupFile server.js
+PassengerBaseURI /api
+PassengerRestartDir {POS_NODE}/tmp
+SetEnv NODE_ENV=production
+"""
+    run(ssh, f"mkdir -p {POS_API}", "create /api mount dir")
+    with sftp.open(f"{POS_API}/.htaccess", "w") as f:
+        f.write(api_htaccess)
+    print("  /api Passenger mount written")
 
     # ── Step 8: Clear logs and restart ────────────────────────────────────
     run(ssh, f"rm -f {POS_NODE}/startup.log {POS_NODE}/error.log", "clear logs")

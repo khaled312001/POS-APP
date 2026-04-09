@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#FF5722" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="Order food online — fast delivery to your door" />
+
+  <title>Barmagly Delivery</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/delivery-app/css/base.css" />
+  <link rel="stylesheet" href="/delivery-app/css/components.css" />
+  <link rel="stylesheet" href="/delivery-app/css/pages.css" />
+
+  <!-- Leaflet maps -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+
+  <!-- Inline config injected by Express -->
+  <script>window.DELIVERY_CONFIG = __DELIVERY_CONFIG__;</script>
+
+  <style>
+    /* Critical inline: prevent FOUC */
+    body { background: #F8F9FA; }
+    #splash {
+      position: fixed; inset: 0;
+      background: #1A1A2E;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      z-index: 9999;
+      transition: opacity 0.5s ease;
+    }
+    #splash.hidden { opacity: 0; pointer-events: none; }
+    #splash-logo {
+      width: 80px; height: 80px;
+      border-radius: 20px;
+      background: #FF5722;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      box-shadow: 0 8px 32px rgba(255,87,34,0.4);
+    }
+    #splash-name {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.02em;
+    }
+    #splash-loading {
+      width: 40px; height: 3px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    #splash-loading::after {
+      content: "";
+      display: block;
+      height: 100%;
+      width: 40%;
+      background: #FF5722;
+      border-radius: 2px;
+      animation: splash-progress 1.2s ease infinite alternate;
+    }
+    @keyframes splash-progress {
+      from { transform: translateX(-100%); }
+      to   { transform: translateX(350%); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Splash screen ─────────────────────────────────────────────────── -->
+  <div id="splash" role="status" aria-label="Loading">
+    <div id="splash-logo">🍽️</div>
+    <div id="splash-name">Barmagly</div>
+    <div id="splash-loading"></div>
+  </div>
+
+  <!-- ── Toast notifications ───────────────────────────────────────────── -->
+  <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- ── App shell ─────────────────────────────────────────────────────── -->
+  <div id="app-shell" class="hidden">
+
+    <!-- Desktop site header (hidden on mobile by CSS) -->
+    <header class="site-header desktop-only" id="site-header">
+      <div class="container-wide flex items-center gap-lg">
+
+        <!-- Logo -->
+        <a class="site-logo" href="#" onclick="router.navigate('home'); return false;">
+          <div class="site-logo__icon" id="header-logo-icon">🍽️</div>
+          <span class="site-logo__text" id="header-store-name">Barmagly</span>
+        </a>
+
+        <!-- Location -->
+        <button class="location-selector" id="location-btn" onclick="showLocationPicker()">
+          <span class="location-selector__pin">📍</span>
+          <span class="location-selector__label" id="location-label">Select location</span>
+          <span style="color:rgba(255,255,255,0.4);font-size:0.75rem">▾</span>
+        </button>
+
+        <!-- Search bar -->
+        <div class="header-search">
+          <svg class="header-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            class="header-search__input"
+            type="search"
+            id="header-search"
+            placeholder="Search for food or restaurants…"
+            autocomplete="off"
+          />
+        </div>
+
+        <!-- Nav actions -->
+        <nav class="nav-actions" aria-label="Account navigation">
+          <button class="nav-action-btn" id="nav-offers-btn" onclick="router.navigate('offers')">
+            🎁 <span>Offers</span>
+          </button>
+          <button class="nav-action-btn" id="nav-account-btn" onclick="router.navigate('account')">
+            👤 <span id="nav-user-label">Sign in</span>
+          </button>
+          <button class="nav-action-btn nav-cart-btn" id="nav-cart-btn" onclick="openCartDrawer()">
+            🛒 <span>Cart</span>
+            <span class="nav-cart-badge hidden" id="nav-cart-badge">0</span>
+          </button>
+        </nav>
+
+      </div>
+    </header>
+
+    <!-- Page content -->
+    <main id="app" role="main"></main>
+
+    <!-- Mobile bottom navigation -->
+    <nav class="bottom-nav mobile-only" role="navigation" aria-label="Main navigation">
+
+      <button class="bottom-nav__item" data-route="home" onclick="router.navigate('home')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        <span>Home</span>
+      </button>
+
+      <button class="bottom-nav__item" data-route="menu" onclick="router.navigate('menu')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/>
+          <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/>
+          <line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+        <span>Menu</span>
+      </button>
+
+      <button class="bottom-nav__item" data-route="cart" onclick="router.navigate('cart')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+        </svg>
+        <span>Cart</span>
+        <span class="bottom-nav__badge hidden" id="cart-badge">0</span>
+      </button>
+
+      <button class="bottom-nav__item" data-route="offers" onclick="router.navigate('offers')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 12 20 22 4 22 4 12"/>
+          <rect x="2" y="7" width="20" height="5"/>
+          <line x1="12" y1="22" x2="12" y2="7"/>
+          <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+          <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+        </svg>
+        <span>Offers</span>
+      </button>
+
+      <button class="bottom-nav__item" data-route="account" onclick="router.navigate('account')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span>Account</span>
+      </button>
+
+    </nav>
+
+    <!-- Desktop Cart Drawer -->
+    <div class="cart-drawer" id="cart-drawer" aria-label="Shopping cart">
+      <div class="cart-drawer__header">
+        <h2 style="font-size:1.125rem;font-weight:700">Your Cart</h2>
+        <button class="btn-icon btn-ghost" onclick="closeCartDrawer()" aria-label="Close cart">✕</button>
+      </div>
+      <div class="cart-drawer__body" id="cart-drawer-body">
+        <div class="empty-state">
+          <div class="empty-state__icon">🛒</div>
+          <div class="empty-state__title">Your cart is empty</div>
+          <div class="empty-state__text">Add items from the menu to get started</div>
+        </div>
+      </div>
+      <div class="cart-drawer__footer hidden" id="cart-drawer-footer">
+        <div id="cart-drawer-summary"></div>
+        <button class="btn btn-primary btn-full mt-md" onclick="router.navigate('checkout'); closeCartDrawer()">
+          Checkout
+        </button>
+      </div>
+    </div>
+
+    <!-- Cart drawer overlay -->
+    <div class="sheet-backdrop" id="cart-drawer-backdrop" onclick="closeCartDrawer()"></div>
+
+  </div><!-- /#app-shell -->
+
+  <!-- ── Scripts ────────────────────────────────────────────────────────── -->
+
+  <!-- Leaflet -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <!-- Lazy Stripe loader -->
+  <script>
+    window.loadStripe = function() {
+      if (window.Stripe) return Promise.resolve(window.Stripe);
+      return new Promise(function(resolve, reject) {
+        var s = document.createElement("script");
+        s.src = "https://js.stripe.com/v3/";
+        s.onload = function() { resolve(window.Stripe); };
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    };
+  </script>
+
+  <!-- Core modules (order matters) -->
+  <script src="/delivery-app/js/router.js"></script>
+  <script src="/delivery-app/js/cart.js"></script>
+  <script src="/delivery-app/js/auth.js"></script>
+  <script src="/delivery-app/js/api.js"></script>
+
+  <!-- Page modules -->
+  <script src="/delivery-app/js/pages/home.js"></script>
+  <script src="/delivery-app/js/pages/menu.js"></script>
+  <script src="/delivery-app/js/pages/cart-page.js"></script>
+  <script src="/delivery-app/js/pages/checkout.js"></script>
+  <script src="/delivery-app/js/pages/tracking.js"></script>
+  <script src="/delivery-app/js/pages/account.js"></script>
+  <script src="/delivery-app/js/pages/offers.js"></script>
+  <script src="/delivery-app/js/pages/login.js"></script>
+
+  <!-- pages namespace -->
+  <script>window.pages = window.pages || {};</script>
+
+  <!-- Bootstrap -->
+  <script>
+  (async function bootstrap() {
+    var cfg = window.DELIVERY_CONFIG || {};
+    var slug = cfg.slug || "";
+    var storeName = cfg.storeName || "Barmagly";
+    var lang = cfg.language || "en";
+    var currency = cfg.currency || "EGP";
+
+    // ── Apply brand colors ──────────────────────────────────────────────
+    if (cfg.primaryColor) {
+      document.documentElement.style.setProperty("--delivery-primary", cfg.primaryColor);
+      document.documentElement.style.setProperty("--delivery-primary-dark",  shadeColor(cfg.primaryColor, -15));
+      document.documentElement.style.setProperty("--delivery-primary-light", hexToRgba(cfg.primaryColor, 0.12));
+    }
+    if (cfg.accentColor) {
+      document.documentElement.style.setProperty("--delivery-accent", cfg.accentColor);
+    }
+
+    // ── RTL ─────────────────────────────────────────────────────────────
+    if (lang === "ar") {
+      document.documentElement.lang = "ar";
+      document.documentElement.dir = "rtl";
+      document.body.dir = "rtl";
+    }
+
+    // ── Meta ─────────────────────────────────────────────────────────────
+    document.title = storeName + " — Online Ordering";
+
+    // ── Update header ────────────────────────────────────────────────────
+    var nameEl = document.getElementById("header-store-name");
+    if (nameEl) nameEl.textContent = storeName;
+
+    if (cfg.logo) {
+      var logoEl = document.getElementById("header-logo-icon");
+      if (logoEl) logoEl.innerHTML = "<img src=\"" + cfg.logo + "\" alt=\"" + storeName + "\" style=\"width:36px;height:36px;border-radius:8px;object-fit:cover\">";
+
+      var splashLogo = document.getElementById("splash-logo");
+      if (splashLogo) splashLogo.innerHTML = "<img src=\"" + cfg.logo + "\" alt=\"" + storeName + "\" style=\"width:64px;height:64px;border-radius:16px;object-fit:cover\">";
+    }
+
+    var splashName = document.getElementById("splash-name");
+    if (splashName) splashName.textContent = storeName;
+
+    // ── Location label ───────────────────────────────────────────────────
+    var savedLocation = localStorage.getItem("delivery_location_" + slug);
+    if (savedLocation) {
+      var locLabel = document.getElementById("location-label");
+      if (locLabel) locLabel.textContent = savedLocation;
+    }
+
+    // ── Init cart & router ───────────────────────────────────────────────
+    cart.init(cfg.tenantId, slug);
+    router.init(slug);
+
+    // ── Route definitions ────────────────────────────────────────────────
+    router.define([
+      { name: "home",     path: "/order/" + slug,               render: pages.home.render,          loader: true  },
+      { name: "menu",     path: "/order/" + slug + "/menu",     render: pages.menu.render,          loader: true  },
+      { name: "cart",     path: "/order/" + slug + "/cart",     render: pages.cart.render,          loader: false },
+      { name: "checkout", path: "/order/" + slug + "/checkout", render: pages.checkout.render,      loader: true  },
+      { name: "tracking", path: "/order/" + slug + "/track/:token", render: pages.tracking.render, loader: true  },
+      { name: "account",  path: "/order/" + slug + "/account",  render: pages.account.render,       loader: true  },
+      { name: "offers",   path: "/order/" + slug + "/offers",   render: pages.offers.render,        loader: true  },
+      { name: "login",    path: "/order/" + slug + "/login",    render: pages.login.render,         loader: false },
+      { name: "history",  path: "/order/" + slug + "/orders",   render: pages.account.renderHistory, loader: true },
+    ]);
+
+    // ── Cart badge sync ──────────────────────────────────────────────────
+    function updateCartBadge(count) {
+      ["cart-badge", "nav-cart-badge"].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = count;
+        el.classList.toggle("hidden", count === 0);
+      });
+    }
+
+    cart.onChange(function(state) {
+      updateCartBadge(state.count);
+      refreshCartDrawer(state);
+    });
+
+    // ── Auth state ───────────────────────────────────────────────────────
+    var navUserLabel = document.getElementById("nav-user-label");
+    var customer = auth.getCustomer();
+    if (customer && navUserLabel) {
+      navUserLabel.textContent = customer.name ? customer.name.split(" ")[0] : "My Account";
+    }
+
+    // ── Show app ─────────────────────────────────────────────────────────
+    document.getElementById("app-shell").classList.remove("hidden");
+
+    // Dismiss splash with slight delay
+    setTimeout(function() {
+      var splash = document.getElementById("splash");
+      if (splash) {
+        splash.classList.add("hidden");
+        setTimeout(function() { splash.remove(); }, 500);
+      }
+    }, 800);
+
+    // ── Resolve initial URL ──────────────────────────────────────────────
+    router._resolve();
+  })();
+
+  // ── Cart drawer ──────────────────────────────────────────────────────────
+
+  window.openCartDrawer = function() {
+    document.getElementById("cart-drawer").classList.add("open");
+    document.getElementById("cart-drawer-backdrop").classList.add("open");
+    document.body.style.overflow = "hidden";
+  };
+
+  window.closeCartDrawer = function() {
+    document.getElementById("cart-drawer").classList.remove("open");
+    document.getElementById("cart-drawer-backdrop").classList.remove("open");
+    document.body.style.overflow = "";
+  };
+
+  window.refreshCartDrawer = function(state) {
+    if (!state) state = cart.getState();
+    var body = document.getElementById("cart-drawer-body");
+    var footer = document.getElementById("cart-drawer-footer");
+    var summary = document.getElementById("cart-drawer-summary");
+    if (!body) return;
+    var cfg = window.DELIVERY_CONFIG || {};
+
+    if (state.items.length === 0) {
+      body.innerHTML = '<div class="empty-state"><div class="empty-state__icon">🛒</div>' +
+        '<div class="empty-state__title">Your cart is empty</div>' +
+        '<div class="empty-state__text">Add items from the menu to get started</div></div>';
+      if (footer) footer.classList.add("hidden");
+      return;
+    }
+
+    var html = state.items.map(function(item) {
+      var img = item.image
+        ? '<img class="cart-item__image" src="' + item.image + '" alt="' + item.name + '" onerror="this.style.display=\'none\'">'
+        : '<div class="cart-item__image-placeholder">🍽️</div>';
+      var safeKey = item._key.replace(/'/g, "\\'");
+      return '<div class="cart-item">' + img +
+        '<div class="cart-item__info">' +
+        '<div class="cart-item__name">' + item.name + '</div>' +
+        '<div class="cart-item__price">' + formatCurrency((item.price + (item.modifierPrice || 0)) * item.qty, cfg.currency) + '</div>' +
+        '</div>' +
+        '<div class="qty-control">' +
+        '<button class="qty-btn" onclick="cart.setQty(\'' + safeKey + '\', ' + (item.qty - 1) + ')">−</button>' +
+        '<span class="qty-value">' + item.qty + '</span>' +
+        '<button class="qty-btn" onclick="cart.setQty(\'' + safeKey + '\', ' + (item.qty + 1) + ')">+</button>' +
+        '</div></div>';
+    }).join("");
+
+    body.innerHTML = html;
+
+    if (footer) footer.classList.remove("hidden");
+    if (summary) {
+      var subtotal = state.subtotal;
+      var discount = state.discountAmount || 0;
+      var total = Math.max(0, subtotal - discount);
+      summary.innerHTML =
+        '<div class="summary-row"><span class="label">' + (isRtl() ? 'المجموع' : 'Subtotal') + '</span><strong>' + formatCurrency(subtotal, cfg.currency) + '</strong></div>' +
+        (discount > 0 ? '<div class="summary-row" style="color:var(--delivery-success)"><span class="label">' + (isRtl() ? 'خصم' : 'Discount') + '</span><strong>−' + formatCurrency(discount, cfg.currency) + '</strong></div>' : '') +
+        '<div class="summary-row"><span style="font-size:0.75rem;color:var(--delivery-text-muted)">' + (isRtl() ? 'رسوم التوصيل تُحسب عند الطلب' : 'Delivery fee calculated at checkout') + '</span></div>' +
+        '<div class="summary-row total"><span>' + (isRtl() ? 'الإجمالي' : 'Total') + '</span><strong>' + formatCurrency(total, cfg.currency) + '</strong></div>';
+    }
+  };
+
+  // ── Location picker ──────────────────────────────────────────────────────
+
+  window.showLocationPicker = function() {
+    var addr = prompt("Enter your delivery area / city:");
+    if (addr) {
+      var cfg = window.DELIVERY_CONFIG || {};
+      localStorage.setItem("delivery_location_" + (cfg.slug || ""), addr);
+      var el = document.getElementById("location-label");
+      if (el) el.textContent = addr;
+    }
+  };
+
+  // ── Header search ────────────────────────────────────────────────────────
+
+  document.addEventListener("DOMContentLoaded", function() {
+    var hs = document.getElementById("header-search");
+    if (!hs) return;
+    hs.addEventListener("keydown", function(e) {
+      if (e.key === "Enter" && hs.value.trim()) {
+        window._headerSearch = hs.value.trim();
+        router.navigate("menu");
+      }
+    });
+  });
+
+  // ── Bottom nav active state ──────────────────────────────────────────────
+
+  window._setBottomNavActive = function(routeName) {
+    document.querySelectorAll(".bottom-nav__item").forEach(function(btn) {
+      btn.classList.toggle("active", btn.dataset.route === routeName);
+    });
+  };
+
+  // ── Utilities ────────────────────────────────────────────────────────────
+
+  function shadeColor(hex, pct) {
+    var num = parseInt(hex.replace("#",""), 16);
+    var amt = Math.round(2.55 * pct);
+    var R = Math.max(0, Math.min(255, (num >> 16) + amt));
+    var G = Math.max(0, Math.min(255, (num >> 8 & 0x00FF) + amt));
+    var B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+    return "#" + (B | (G << 8) | (R << 16)).toString(16).padStart(6,"0");
+  }
+
+  function hexToRgba(hex, alpha) {
+    var num = parseInt(hex.replace("#",""), 16);
+    return "rgba(" + ((num >> 16) & 255) + "," + ((num >> 8) & 255) + "," + (num & 255) + "," + alpha + ")";
+  }
+
+  window.showToast = function(msg, type, duration) {
+    duration = duration || 3000;
+    var container = document.getElementById("toast-container");
+    if (!container) return;
+    var el = document.createElement("div");
+    el.className = "toast" + (type ? " " + type : "");
+    el.textContent = msg;
+    container.appendChild(el);
+    setTimeout(function() {
+      el.style.opacity = "0";
+      el.style.transform = "translateX(20px)";
+      el.style.transition = "all 0.3s ease";
+      setTimeout(function() { el.remove(); }, 300);
+    }, duration);
+  };
+
+  window.formatCurrency = function(amount, currency) {
+    var c = currency || (window.DELIVERY_CONFIG || {}).currency || "EGP";
+    try {
+      return new Intl.NumberFormat(document.documentElement.lang || "en", {
+        style: "currency", currency: c,
+        minimumFractionDigits: 0, maximumFractionDigits: 2
+      }).format(amount);
+    } catch(e) {
+      return c + " " + parseFloat(amount).toFixed(2);
+    }
+  };
+
+  window.isRtl = function() {
+    return document.documentElement.dir === "rtl";
+  };
+  </script>
+
+</body>
+</html>

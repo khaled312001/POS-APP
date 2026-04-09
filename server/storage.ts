@@ -24,7 +24,13 @@ import {
   vehicles, printerConfigs, dailyClosings, monthlyClosings, dailySequences,
   type InsertOnlineOrder, type InsertLandingPageConfig,
   type InsertPlatformSetting, type InsertPlatformCommission,
-  type InsertVehicle, type InsertPrinterConfig, type InsertDailyClosing, type InsertMonthlyClosing
+  type InsertVehicle, type InsertPrinterConfig, type InsertDailyClosing, type InsertMonthlyClosing,
+  // Delivery Platform
+  customerAddresses, promoCodes, promoCodeUsages, driverLocations,
+  loyaltyTransactions, walletTransactions, orderRatings,
+  customerSessions, otpVerifications, deliveryZones,
+  type InsertCustomerAddress, type InsertPromoCode, type InsertDeliveryZone,
+  type InsertOrderRating, type InsertLoyaltyTransaction, type InsertWalletTransaction,
 } from "@shared/schema";
 
 function getStrippedPhoneSql(column: any) {
@@ -1816,6 +1822,13 @@ export const storage = {
     return config;
   },
 
+  async getAllLandingPageConfigs(tenantId?: string) {
+    if (tenantId) {
+      return db.select().from(landingPageConfig).where(eq(landingPageConfig.tenantId, Number(tenantId)));
+    }
+    return db.select().from(landingPageConfig);
+  },
+
   async upsertLandingPageConfig(tenantId: number, data: Partial<InsertLandingPageConfig>) {
     if (!data.slug) {
       const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId));
@@ -2076,5 +2089,305 @@ export const storage = {
     }
 
     return Number(result?.insertId || 1);
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ── Delivery Platform Storage Methods ──────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ── Delivery Zones ──────────────────────────────────────────────────────────
+  async getDeliveryZones(tenantId: number) {
+    return db.select().from(deliveryZones)
+      .where(eq(deliveryZones.tenantId, tenantId))
+      .orderBy(deliveryZones.sortOrder);
+  },
+
+  async createDeliveryZone(data: InsertDeliveryZone) {
+    const [r] = await db.insert(deliveryZones).values(data).$returningId();
+    const [zone] = await db.select().from(deliveryZones).where(eq(deliveryZones.id, r.id)).limit(1);
+    return zone;
+  },
+
+  async updateDeliveryZone(id: number, data: Partial<InsertDeliveryZone>) {
+    await db.update(deliveryZones).set(data).where(eq(deliveryZones.id, id));
+    const [zone] = await db.select().from(deliveryZones).where(eq(deliveryZones.id, id)).limit(1);
+    return zone;
+  },
+
+  async deleteDeliveryZone(id: number) {
+    await db.delete(deliveryZones).where(eq(deliveryZones.id, id));
+  },
+
+  // ── Promo Codes ─────────────────────────────────────────────────────────────
+  async getPromoCodes(tenantId: number) {
+    return db.select().from(promoCodes)
+      .where(eq(promoCodes.tenantId, tenantId))
+      .orderBy(desc(promoCodes.createdAt));
+  },
+
+  async getPromoCode(tenantId: number, code: string) {
+    const [promo] = await db.select().from(promoCodes)
+      .where(and(eq(promoCodes.tenantId, tenantId), eq(promoCodes.code, code.toUpperCase())))
+      .limit(1);
+    return promo ?? null;
+  },
+
+  async createPromoCode(data: InsertPromoCode) {
+    const [r] = await db.insert(promoCodes).values({ ...data, code: (data.code as string).toUpperCase() }).$returningId();
+    const [promo] = await db.select().from(promoCodes).where(eq(promoCodes.id, r.id)).limit(1);
+    return promo;
+  },
+
+  async updatePromoCode(id: number, data: Partial<InsertPromoCode>) {
+    await db.update(promoCodes).set(data).where(eq(promoCodes.id, id));
+    const [promo] = await db.select().from(promoCodes).where(eq(promoCodes.id, id)).limit(1);
+    return promo;
+  },
+
+  async deletePromoCode(id: number) {
+    await db.delete(promoCodes).where(eq(promoCodes.id, id));
+  },
+
+  // ── Customer Addresses ──────────────────────────────────────────────────────
+  async getCustomerAddresses(customerId: number) {
+    return db.select().from(customerAddresses)
+      .where(eq(customerAddresses.customerId, customerId))
+      .orderBy(desc(customerAddresses.isDefault), desc(customerAddresses.id));
+  },
+
+  async createCustomerAddress(data: InsertCustomerAddress) {
+    if (data.isDefault) {
+      await db.update(customerAddresses)
+        .set({ isDefault: false })
+        .where(eq(customerAddresses.customerId, data.customerId));
+    }
+    const [r] = await db.insert(customerAddresses).values(data).$returningId();
+    const [addr] = await db.select().from(customerAddresses).where(eq(customerAddresses.id, r.id)).limit(1);
+    return addr;
+  },
+
+  async updateCustomerAddress(id: number, data: Partial<InsertCustomerAddress>) {
+    if (data.isDefault && data.customerId) {
+      await db.update(customerAddresses)
+        .set({ isDefault: false })
+        .where(eq(customerAddresses.customerId, data.customerId));
+    }
+    await db.update(customerAddresses).set(data).where(eq(customerAddresses.id, id));
+    const [addr] = await db.select().from(customerAddresses).where(eq(customerAddresses.id, id)).limit(1);
+    return addr;
+  },
+
+  async deleteCustomerAddress(id: number) {
+    await db.delete(customerAddresses).where(eq(customerAddresses.id, id));
+  },
+
+  async setDefaultAddress(id: number, customerId: number) {
+    await db.update(customerAddresses).set({ isDefault: false }).where(eq(customerAddresses.customerId, customerId));
+    await db.update(customerAddresses).set({ isDefault: true }).where(eq(customerAddresses.id, id));
+  },
+
+  // ── Order Ratings ───────────────────────────────────────────────────────────
+  async createOrderRating(data: InsertOrderRating) {
+    const [r] = await db.insert(orderRatings).values(data).$returningId();
+    // Update order rating fields
+    await db.update(onlineOrders).set({ rating: data.overallRating, ratingComment: data.comment ?? null })
+      .where(eq(onlineOrders.id, data.orderId));
+    // Update driver rating average
+    if (data.driverId && data.deliveryRating) {
+      await db.update(vehicles)
+        .set({ driverRating: sql`((driver_rating * total_deliveries) + ${data.deliveryRating}) / (total_deliveries + 1)` })
+        .where(eq(vehicles.id, data.driverId));
+    }
+    const [rating] = await db.select().from(orderRatings).where(eq(orderRatings.id, r.id)).limit(1);
+    return rating;
+  },
+
+  async getOrderRatings(tenantId: number, limit = 50) {
+    return db.select().from(orderRatings)
+      .innerJoin(onlineOrders, eq(orderRatings.orderId, onlineOrders.id))
+      .where(eq(onlineOrders.tenantId, tenantId))
+      .orderBy(desc(orderRatings.createdAt))
+      .limit(limit);
+  },
+
+  // ── Loyalty Transactions ────────────────────────────────────────────────────
+  async getLoyaltyTransactions(customerId: number, limit = 50) {
+    return db.select().from(loyaltyTransactions)
+      .where(eq(loyaltyTransactions.customerId, customerId))
+      .orderBy(desc(loyaltyTransactions.createdAt))
+      .limit(limit);
+  },
+
+  // ── Wallet Transactions ─────────────────────────────────────────────────────
+  async getWalletTransactions(customerId: number, limit = 50) {
+    return db.select().from(walletTransactions)
+      .where(eq(walletTransactions.customerId, customerId))
+      .orderBy(desc(walletTransactions.createdAt))
+      .limit(limit);
+  },
+
+  // ── Driver Location ─────────────────────────────────────────────────────────
+  async updateDriverLocation(vehicleId: number, lat: number, lng: number, orderId?: number) {
+    await db.update(vehicles).set({
+      currentLat: lat.toFixed(7),
+      currentLng: lng.toFixed(7),
+      locationUpdatedAt: new Date(),
+    }).where(eq(vehicles.id, vehicleId));
+
+    // Insert location history record
+    await db.insert(driverLocations).values({
+      vehicleId,
+      orderId: orderId ?? null,
+      lat: lat.toFixed(7),
+      lng: lng.toFixed(7),
+      speed: null,
+      heading: null,
+    });
+  },
+
+  async getDriverLocation(vehicleId: number) {
+    const [vehicle] = await db.select({
+      id: vehicles.id,
+      driverName: vehicles.driverName,
+      driverPhone: vehicles.driverPhone,
+      currentLat: vehicles.currentLat,
+      currentLng: vehicles.currentLng,
+      locationUpdatedAt: vehicles.locationUpdatedAt,
+      driverStatus: vehicles.driverStatus,
+      driverRating: vehicles.driverRating,
+    }).from(vehicles).where(eq(vehicles.id, vehicleId)).limit(1);
+    return vehicle ?? null;
+  },
+
+  async getActiveDrivers(tenantId: number) {
+    return db.select().from(vehicles).where(
+      and(
+        eq(vehicles.tenantId, tenantId),
+        eq(vehicles.isActive, true),
+        sql`${vehicles.driverStatus} != 'offline'`
+      )
+    );
+  },
+
+  // ── Delivery Management ─────────────────────────────────────────────────────
+  async getDeliveryOrders(tenantId: number, filters?: { status?: string; orderType?: string }) {
+    let q = db.select().from(onlineOrders).where(eq(onlineOrders.tenantId, tenantId));
+    if (filters?.status) {
+      q = q.where(eq(onlineOrders.status, filters.status)) as any;
+    }
+    if (filters?.orderType) {
+      q = q.where(eq(onlineOrders.orderType, filters.orderType)) as any;
+    }
+    return q.orderBy(desc(onlineOrders.createdAt));
+  },
+
+  async assignDriverToOrder(orderId: number, vehicleId: number) {
+    await db.update(onlineOrders).set({ driverId: vehicleId }).where(eq(onlineOrders.id, orderId));
+    await db.update(vehicles).set({ driverStatus: "on_delivery", activeOrderId: orderId }).where(eq(vehicles.id, vehicleId));
+  },
+
+  async getDeliveryStats(tenantId: number) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [totalRow] = await db.select({ count: sql<number>`count(*)` })
+      .from(onlineOrders)
+      .where(and(eq(onlineOrders.tenantId, tenantId), gte(onlineOrders.createdAt, today)));
+
+    const [pendingRow] = await db.select({ count: sql<number>`count(*)` })
+      .from(onlineOrders)
+      .where(and(eq(onlineOrders.tenantId, tenantId), eq(onlineOrders.status, "pending"), gte(onlineOrders.createdAt, today)));
+
+    const [deliveredRow] = await db.select({ count: sql<number>`count(*)` })
+      .from(onlineOrders)
+      .where(and(eq(onlineOrders.tenantId, tenantId), eq(onlineOrders.status, "delivered"), gte(onlineOrders.createdAt, today)));
+
+    const [revenueRow] = await db.select({ total: sql<string>`COALESCE(SUM(total_amount), 0)` })
+      .from(onlineOrders)
+      .where(and(eq(onlineOrders.tenantId, tenantId), eq(onlineOrders.status, "delivered"), gte(onlineOrders.createdAt, today)));
+
+    return {
+      todayOrders: totalRow?.count ?? 0,
+      pendingOrders: pendingRow?.count ?? 0,
+      deliveredToday: deliveredRow?.count ?? 0,
+      todayRevenue: parseFloat(revenueRow?.total ?? "0"),
+    };
+  },
+
+  // ── Customer order history (delivery) ──────────────────────────────────────
+  async getCustomerOrderHistory(customerId: number, tenantId: number, limit = 20) {
+    return db.select().from(onlineOrders)
+      .where(and(
+        sql`${onlineOrders.customerPhone} = (SELECT phone FROM customers WHERE id = ${customerId})`,
+        eq(onlineOrders.tenantId, tenantId)
+      ))
+      .orderBy(desc(onlineOrders.createdAt))
+      .limit(limit);
+  },
+
+  // ── Driver earnings ─────────────────────────────────────────────────────────
+  async getDriverEarnings(vehicleId: number, days = 7) {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    return db.select({
+      count: sql<number>`count(*)`,
+      totalFees: sql<string>`COALESCE(SUM(delivery_fee), 0)`,
+    }).from(onlineOrders)
+      .where(and(
+        eq(onlineOrders.driverId, vehicleId),
+        eq(onlineOrders.status, "delivered"),
+        gte(onlineOrders.createdAt, since)
+      ));
+  },
+
+  // ── Missing helpers used by delivery routes ─────────────────────────────────
+
+  async getVehicle(id: number) {
+    const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, id)).limit(1);
+    return vehicle ?? null;
+  },
+
+  async getVehicleByAccessToken(token: string) {
+    const [vehicle] = await db.select().from(vehicles)
+      .where(eq(vehicles.driverAccessToken, token))
+      .limit(1);
+    return vehicle ?? null;
+  },
+
+  async getOnlineOrderByTrackingToken(token: string) {
+    const [order] = await db.select().from(onlineOrders)
+      .where(eq(onlineOrders.trackingToken, token))
+      .limit(1);
+    return order ?? null;
+  },
+
+  async getDriverActiveOrders(vehicleId: number, tenantId: number) {
+    return db.select().from(onlineOrders).where(
+      and(
+        eq(onlineOrders.tenantId, tenantId),
+        eq(onlineOrders.driverId, vehicleId),
+        sql`${onlineOrders.status} NOT IN ('delivered', 'cancelled')`
+      )
+    ).orderBy(desc(onlineOrders.createdAt));
+  },
+
+  async getCustomerIdByPhone(phone: string, tenantId: number): Promise<number | null> {
+    const [customer] = await db.select({ id: customers.id }).from(customers)
+      .where(and(eq(customers.phone, phone), eq(customers.tenantId, tenantId)))
+      .limit(1);
+    return customer?.id ?? null;
+  },
+
+  async getCustomerByReferralCode(code: string) {
+    const [customer] = await db.select().from(customers)
+      .where(eq(customers.referralCode, code))
+      .limit(1);
+    return customer ?? null;
+  },
+
+  async getLandingPageConfigByTenantId(tenantId: number) {
+    const [config] = await db.select().from(landingPageConfig)
+      .where(eq(landingPageConfig.tenantId, tenantId))
+      .limit(1);
+    return config ?? null;
   },
 };

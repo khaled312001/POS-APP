@@ -24,8 +24,10 @@ import { getDisplayNumber } from "@/lib/api-config";
 import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { useLicense } from "@/lib/license-context";
+import { getChromeMetrics } from "@/lib/responsive";
+import TabPageHeader from "@/components/tab-page-header";
 
-type TabType = "overview" | "sales" | "inventory" | "returns" | "finance" | "activity";
+type TabType = "overview" | "sales" | "inventory" | "returns" | "finance" | "activity" | "delivery";
 
 const TAB_ICONS: Record<TabType, string> = {
   overview: "analytics",
@@ -34,6 +36,7 @@ const TAB_ICONS: Record<TabType, string> = {
   returns: "swap-horizontal",
   finance: "wallet",
   activity: "list",
+  delivery: "bicycle",
 };
 
 function GlassCard({ children, style }: { children: React.ReactNode; style?: any }) {
@@ -393,6 +396,7 @@ export default function ReportsScreen() {
     const sub = Dimensions.addEventListener("change", ({ window }) => setScreenDims(window));
     return () => sub?.remove();
   }, []);
+  const { topPad, bottomPad } = getChromeMetrics(screenDims.width);
   const isTablet = screenDims.width > 600;
   const [tab, setTab] = useState<TabType>("overview");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("monthly");
@@ -487,9 +491,6 @@ export default function ReportsScreen() {
       Linking.openURL(fullUrl);
     }
   };
-
-  const topPad = Platform.OS === "web" ? 48 : 0;
-  const bottomPad = Platform.OS === "web" ? 84 : 60;
 
   if (isCashier) {
     return (
@@ -1140,6 +1141,197 @@ export default function ReportsScreen() {
     );
   };
 
+  const renderDelivery = () => {
+    const deliveryStats = (stats as any)?.delivery || {};
+    const totalDeliveryOrders = deliveryStats.totalDeliveryOrders ?? 0;
+    const totalPickupOrders = deliveryStats.totalPickupOrders ?? 0;
+    const avgDeliveryMinutes = deliveryStats.avgDeliveryMinutes ?? 0;
+    const totalDeliveryRevenue = deliveryStats.totalDeliveryRevenue ?? 0;
+    const activeDrivers = deliveryStats.activeDrivers ?? 0;
+    const driverPerformance: any[] = deliveryStats.driverPerformance ?? [];
+    const topZones: any[] = deliveryStats.topZones ?? [];
+    const promoUsage: any[] = deliveryStats.promoUsage ?? [];
+    const loyaltyPointsEarned = deliveryStats.loyaltyPointsEarned ?? 0;
+    const loyaltyPointsRedeemed = deliveryStats.loyaltyPointsRedeemed ?? 0;
+    const totalOrders = totalDeliveryOrders + totalPickupOrders || 1;
+
+    return (
+      <>
+        {/* KPI row */}
+        <View style={[styles.statGrid, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+          <GlassCard style={styles.statCardHalf}>
+            <View style={[styles.statIconWrap, { backgroundColor: Colors.deliveryPrimary + "20" }]}>
+              <Ionicons name="bicycle" size={20} color={Colors.deliveryPrimary} />
+            </View>
+            <Text style={[styles.statLabel, rtlTextAlign, rtlText]}>{t("deliveredToday")}</Text>
+            <Text style={[styles.statValue, rtlTextAlign]}>{totalDeliveryOrders}</Text>
+          </GlassCard>
+          <GlassCard style={styles.statCardHalf}>
+            <View style={[styles.statIconWrap, { backgroundColor: Colors.info + "20" }]}>
+              <Ionicons name="time" size={20} color={Colors.info} />
+            </View>
+            <Text style={[styles.statLabel, rtlTextAlign, rtlText]}>{t("avgDeliveryTime") ?? "Avg. Delivery Time"}</Text>
+            <Text style={[styles.statValue, rtlTextAlign]}>{avgDeliveryMinutes}<Text style={{ fontSize: 12 }}> min</Text></Text>
+          </GlassCard>
+        </View>
+        <View style={[styles.statGrid, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+          <GlassCard style={styles.statCardHalf}>
+            <View style={[styles.statIconWrap, { backgroundColor: Colors.driverOnline + "20" }]}>
+              <Ionicons name="car" size={20} color={Colors.driverOnline} />
+            </View>
+            <Text style={[styles.statLabel, rtlTextAlign, rtlText]}>{t("activeDrivers") ?? "Active Drivers"}</Text>
+            <Text style={[styles.statValue, rtlTextAlign]}>{activeDrivers}</Text>
+          </GlassCard>
+          <GlassCard style={styles.statCardHalf}>
+            <View style={[styles.statIconWrap, { backgroundColor: Colors.success + "20" }]}>
+              <Ionicons name="cash" size={20} color={Colors.success} />
+            </View>
+            <Text style={[styles.statLabel, rtlTextAlign, rtlText]}>{t("deliveryRevenue") ?? "Delivery Revenue"}</Text>
+            <Text style={[styles.statValue, rtlTextAlign]}>CHF {Number(totalDeliveryRevenue).toFixed(2)}</Text>
+          </GlassCard>
+        </View>
+
+        {/* Delivery vs Pickup donut */}
+        <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("deliveryVsPickup") ?? "Delivery vs Pickup"}</Text>
+        <GlassCard style={{ alignItems: "center", paddingVertical: 20 }}>
+          {totalDeliveryOrders + totalPickupOrders > 0 ? (
+            <DonutChart
+              size={160}
+              data={[
+                { label: t("delivery") ?? "Delivery", value: totalDeliveryOrders, color: Colors.deliveryPrimary },
+                { label: t("pickup") ?? "Pickup", value: totalPickupOrders, color: Colors.statusReady },
+              ]}
+            />
+          ) : (
+            <View style={styles.empty}>
+              <Ionicons name="bicycle-outline" size={40} color={Colors.textMuted} />
+              <Text style={[styles.emptyText, rtlText]}>{t("noDeliveryData") ?? "No delivery data yet"}</Text>
+            </View>
+          )}
+        </GlassCard>
+
+        {/* Driver Performance */}
+        <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("driverPerformance") ?? "Driver Performance"}</Text>
+        <GlassCard style={{ padding: 0 }}>
+          {driverPerformance.length === 0 ? (
+            <View style={[styles.empty, { paddingVertical: 24 }]}>
+              <Ionicons name="car-outline" size={36} color={Colors.textMuted} />
+              <Text style={[styles.emptyText, rtlText]}>{t("noDriverData") ?? "No driver data"}</Text>
+            </View>
+          ) : (
+            driverPerformance.map((driver: any, i: number) => (
+              <View
+                key={i}
+                style={{
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: 14,
+                  borderBottomWidth: i < driverPerformance.length - 1 ? 1 : 0,
+                  borderBottomColor: Colors.border,
+                }}
+              >
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.deliveryPrimary + "20", alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ fontSize: 16 }}>🚗</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[{ color: Colors.text, fontSize: 14, fontWeight: "600" }, rtlTextAlign, rtlText]}>{driver.driverName || "Driver"}</Text>
+                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, marginTop: 3 }}>
+                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{driver.deliveries ?? 0} {t("deliveries") ?? "deliveries"}</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>·</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>⭐ {parseFloat(String(driver.rating ?? 5)).toFixed(1)}</Text>
+                  </View>
+                </View>
+                <View style={[styles.badge, { backgroundColor: Colors.driverOnline + "20" }]}>
+                  <Text style={[styles.badgeText, { color: Colors.driverOnline }]}>{driver.avgMinutes ?? "—"} min</Text>
+                </View>
+              </View>
+            ))
+          )}
+        </GlassCard>
+
+        {/* Top Delivery Zones */}
+        <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("topDeliveryZones") ?? "Top Delivery Zones"}</Text>
+        <GlassCard>
+          {topZones.length === 0 ? (
+            <View style={styles.empty}>
+              <Ionicons name="map-outline" size={36} color={Colors.textMuted} />
+              <Text style={[styles.emptyText, rtlText]}>{t("noZoneData") ?? "No zone data"}</Text>
+            </View>
+          ) : (
+            topZones.map((zone: any, i: number) => (
+              <View key={i} style={{ marginBottom: i < topZones.length - 1 ? 12 : 0 }}>
+                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
+                  <Text style={[{ color: Colors.text, fontSize: 13, fontWeight: "600" }, rtlText]}>{zone.name}</Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{zone.count} {t("orders") ?? "orders"}</Text>
+                </View>
+                <PercentBar
+                  percent={(zone.count / (topZones[0]?.count || 1)) * 100}
+                  color={Colors.deliveryPrimary}
+                />
+              </View>
+            ))
+          )}
+        </GlassCard>
+
+        {/* Promo Code Usage */}
+        <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("promoCodeUsage") ?? "Promo Code Usage"}</Text>
+        <GlassCard>
+          {promoUsage.length === 0 ? (
+            <View style={styles.empty}>
+              <Ionicons name="pricetag-outline" size={36} color={Colors.textMuted} />
+              <Text style={[styles.emptyText, rtlText]}>{t("noPromoData") ?? "No promo usage yet"}</Text>
+            </View>
+          ) : (
+            promoUsage.map((promo: any, i: number) => (
+              <View
+                key={i}
+                style={{
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingVertical: 10,
+                  borderBottomWidth: i < promoUsage.length - 1 ? 1 : 0,
+                  borderBottomColor: Colors.border,
+                }}
+              >
+                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ backgroundColor: Colors.accent + "20", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                    <Text style={{ color: Colors.accent, fontWeight: "700", fontSize: 12 }}>{promo.code}</Text>
+                  </View>
+                  <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{promo.usageCount} {t("uses") ?? "uses"}</Text>
+                </View>
+                <Text style={{ color: Colors.danger, fontSize: 13, fontWeight: "600" }}>-CHF {Number(promo.totalDiscount ?? 0).toFixed(2)}</Text>
+              </View>
+            ))
+          )}
+        </GlassCard>
+
+        {/* Loyalty Summary */}
+        <Text style={[styles.sectionTitle, rtlTextAlign, rtlText]}>{t("loyaltySummary") ?? "Loyalty Summary"}</Text>
+        <GlassCard>
+          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between" }}>
+            <View style={{ alignItems: "center", flex: 1 }}>
+              <View style={{ backgroundColor: Colors.loyaltyGold + "20", width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", marginBottom: 6 }}>
+                <Ionicons name="star" size={22} color={Colors.loyaltyGold} />
+              </View>
+              <Text style={{ color: Colors.text, fontSize: 20, fontWeight: "800" }}>{loyaltyPointsEarned.toLocaleString()}</Text>
+              <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }}>{t("pointsEarned") ?? "Points Earned"}</Text>
+            </View>
+            <View style={{ width: 1, backgroundColor: Colors.border }} />
+            <View style={{ alignItems: "center", flex: 1 }}>
+              <View style={{ backgroundColor: Colors.deliveryPrimary + "20", width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", marginBottom: 6 }}>
+                <Ionicons name="gift" size={22} color={Colors.deliveryPrimary} />
+              </View>
+              <Text style={{ color: Colors.text, fontSize: 20, fontWeight: "800" }}>{loyaltyPointsRedeemed.toLocaleString()}</Text>
+              <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }}>{t("pointsRedeemed") ?? "Points Redeemed"}</Text>
+            </View>
+          </View>
+        </GlassCard>
+      </>
+    );
+  };
+
   const renderReturns = () => (
     <>
       <View style={[styles.statGrid, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
@@ -1334,35 +1526,40 @@ export default function ReportsScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
-      <LinearGradient
-        colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={[styles.header, { flexDirection: isRTL ? "row-reverse" : "row" }]}
-      >
-        <Ionicons name="analytics" size={24} color={Colors.white} />
-        <Text style={[styles.headerTitle, rtlText]}>{t("reports")}</Text>
-      </LinearGradient>
-
-      <View style={[styles.tabRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-        {(["overview", "sales", "inventory", "returns", "finance", "activity"] as const).map((tabKey) => (
-          <Pressable
-            key={tabKey}
-            style={[styles.tabBtn, { flexDirection: isRTL ? "row-reverse" : "row" }, tab === tabKey && styles.tabBtnActive]}
-            onPress={() => setTab(tabKey)}
-          >
-            <Ionicons
-              name={TAB_ICONS[tabKey] as any}
-              size={16}
-              color={tab === tabKey ? Colors.textDark : Colors.textSecondary}
-            />
-            <Text style={[styles.tabText, tab === tabKey && styles.tabTextActive, rtlText]}>
-              {t(tabKey)}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top + topPad,
+          direction: isRTL ? "rtl" : "ltr",
+        },
+      ]}
+    >
+      <TabPageHeader title={t("reports")} icon="analytics" isRTL={isRTL}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabScroller}
+          contentContainerStyle={[styles.tabRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}
+        >
+          {(["overview", "sales", "inventory", "returns", "finance", "activity", "delivery"] as const).map((tabKey) => (
+            <Pressable
+              key={tabKey}
+              style={[styles.tabBtn, { flexDirection: isRTL ? "row-reverse" : "row" }, tab === tabKey && styles.tabBtnActive]}
+              onPress={() => setTab(tabKey)}
+            >
+              <Ionicons
+                name={TAB_ICONS[tabKey] as any}
+                size={16}
+                color={tab === tabKey ? Colors.textDark : Colors.textSecondary}
+              />
+              <Text style={[styles.tabText, tab === tabKey && styles.tabTextActive, rtlText]}>
+                {t(tabKey)}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </TabPageHeader>
 
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 20 }]}
@@ -1374,6 +1571,7 @@ export default function ReportsScreen() {
         {tab === "returns" && renderReturns()}
         {tab === "finance" && renderFinance()}
         {tab === "activity" && renderActivity()}
+        {tab === "delivery" && renderDelivery()}
       </ScrollView>
     </View>
   );
@@ -1384,21 +1582,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    alignItems: "center",
-    gap: 10,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: Colors.white,
-  },
   tabRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 0,
+    paddingTop: 2,
+    paddingBottom: 2,
     gap: 8,
+    alignItems: "center",
+  },
+  tabScroller: {
+    flexGrow: 0,
+    backgroundColor: "transparent",
   },
   tabBtn: {
     alignItems: "center",

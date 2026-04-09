@@ -21,6 +21,8 @@ import RealTimeClock from "@/components/RealTimeClock";
 import { useLanguage } from "@/lib/language-context";
 import { useNotifications } from "@/lib/notification-context";
 import { printHtmlViaIframe, autoPrint3Copies } from "@/utils/printing";
+import { getChromeMetrics } from "@/lib/responsive";
+import { getWebStaticFallbackChain } from "@/lib/web-static";
 import {
   PIZZA_TOPPINGS, TOPPING_PRICE, TOPPING_GRID, SAUCE_ROW, SAUCE_NAMES,
   calcToppingsPrice, getToppingDisplayName, getToppingEmoji, getToppingInfo,
@@ -32,11 +34,25 @@ type ProductVariantOption = {
 };
 
 const AnimatedProductImage = ({ uri }: { uri: string }) => {
+  const fallbacks = getWebStaticFallbackChain(uri);
+  const [currentUri, setCurrentUri] = useState(fallbacks[0] || uri);
+
+  useEffect(() => {
+    setCurrentUri(fallbacks[0] || uri);
+  }, [uri]);
+
   return (
     <Image
-      source={{ uri }}
+      source={{ uri: currentUri }}
       style={{ width: 50, height: 50, borderRadius: 12 }}
       resizeMode="cover"
+      onError={() => {
+        const currentIndex = fallbacks.indexOf(currentUri);
+        const nextUri = fallbacks[currentIndex + 1];
+        if (nextUri && nextUri !== currentUri) {
+          setCurrentUri(nextUri);
+        }
+      }}
     />
   );
 };
@@ -55,6 +71,8 @@ export default function POSScreen() {
     return () => sub?.remove();
   }, []);
   const isTablet = screenDims.width > 600;
+  const { isMobileWeb, topPad } = getChromeMetrics(screenDims.width);
+  const useMobileCartSidebar = isMobileWeb;
   const prefersInlineSizePicker = Platform.OS === "web";
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -112,6 +130,7 @@ export default function POSScreen() {
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [leftHandMode, setLeftHandMode] = useState(false);
   const [expandedSizeProductId, setExpandedSizeProductId] = useState<number | null>(null);
+  const [showMobileCart, setShowMobileCart] = useState(false);
   useEffect(() => {
     import("@react-native-async-storage/async-storage").then(({ default: AsyncStorage }) => {
       AsyncStorage.getItem("barmagly_left_hand_mode").then((v) => {
@@ -228,6 +247,20 @@ export default function POSScreen() {
 
   const toppingDisplayName = (name: string) => getToppingDisplayName(name, language);
   const toppingEmoji = (name: string) => getToppingEmoji(name);
+
+  useEffect(() => {
+    if (!useMobileCartSidebar || typeof window === "undefined") return;
+
+    const openCart = () => setShowMobileCart(true);
+    window.addEventListener("barmagly-open-cart", openCart as EventListener);
+    return () => window.removeEventListener("barmagly-open-cart", openCart as EventListener);
+  }, [useMobileCartSidebar]);
+
+  useEffect(() => {
+    if (!useMobileCartSidebar) {
+      setShowMobileCart(false);
+    }
+  }, [useMobileCartSidebar]);
 
 
   const { data: categories = [] } = useQuery<any[]>({
@@ -1117,9 +1150,6 @@ export default function POSScreen() {
     setShowDiscountModal(false);
     setDiscountInput("");
   };
-
-  const topPad = Platform.OS === "web" ? 48 : 0;
-
   const handleSwitchAccount = async (pinCode: string) => {
     if (!switchTarget) return;
     setSwitchLoading(true);
@@ -1279,11 +1309,11 @@ export default function POSScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
-      <View style={styles.header}>
+      <View style={[styles.header, isMobileWeb && styles.headerMobile]}>
         <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.headerGradient}>
-          <View style={[styles.headerContent, isRTL && { flexDirection: "row-reverse" }]}>
+          <View style={[styles.headerContent, isRTL && { flexDirection: "row-reverse" }, isMobileWeb && styles.headerContentMobile]}>
             <Text style={[styles.headerTitle, rtlTextAlign]}>Barmagly POS</Text>
-            <View style={[styles.headerRight, isRTL && { flexDirection: "row-reverse", alignItems: "center" }, { alignItems: "center" }]}>
+            <View style={[styles.headerRight, isRTL && { flexDirection: "row-reverse", alignItems: "center" }, { alignItems: "center" }, isMobileWeb && styles.headerRightMobile]}>
               <RealTimeClock />
               <Pressable onPress={() => setShowCallHistory(true)} style={[styles.headerInvoiceBtn, { position: "relative" }]}>
                 <Ionicons name="call-outline" size={20} color={Colors.white} />
@@ -1291,6 +1321,20 @@ export default function POSScreen() {
                 {incomingCalls.length > 0 && (
                   <View style={{ position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.danger }} />
                 )}
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (Platform.OS === "web" && typeof window !== "undefined") {
+                    window.location.reload();
+                    return;
+                  }
+                  qc.invalidateQueries();
+                  qc.refetchQueries({ type: "active" });
+                }}
+                style={styles.headerInvoiceBtn}
+              >
+                <Ionicons name="refresh-outline" size={20} color={Colors.white} />
+                <Text style={styles.headerInvoiceLabel}>{language === "ar" ? "تحديث" : language === "de" ? "Aktualisieren" : "Refresh"}</Text>
               </Pressable>
               <Pressable onPress={handleEndOfDay} style={styles.headerInvoiceBtn} disabled={endOfDayLoading || zeroOutLoading}>
                 {zeroOutLoading
@@ -1316,8 +1360,8 @@ export default function POSScreen() {
       </View>
 
       {/* ── Phone / Customer Bar ── */}
-      <View style={[styles.phoneBar, isRTL && { flexDirection: "row-reverse" }]}>
-        <View style={[styles.phoneBarInputWrap, isRTL && { flexDirection: "row-reverse" }, selectedCustomer && { flex: 0, minWidth: 160, maxWidth: 200 }]}>
+      <View style={[styles.phoneBar, isRTL && { flexDirection: "row-reverse" }, useMobileCartSidebar && styles.phoneBarMobile]}>
+        <View style={[styles.phoneBarInputWrap, isRTL && { flexDirection: "row-reverse" }, !useMobileCartSidebar && selectedCustomer && { flex: 0, minWidth: 160, maxWidth: 200 }]}>
           <Ionicons name="call-outline" size={16} color={selectedCustomer ? Colors.accent : Colors.textMuted} />
           <TextInput
             style={[styles.phoneBarInput, isRTL && { textAlign: "right" }]}
@@ -1491,7 +1535,7 @@ export default function POSScreen() {
         </View>
       )}
 
-      <View style={[styles.mainContent, { flexDirection: isTablet ? (leftHandMode ? (isRTL ? "row" : "row-reverse") : (isRTL ? "row-reverse" : "row")) : "column" }]}>
+      <View style={[styles.mainContent, { flexDirection: isTablet && !useMobileCartSidebar ? (leftHandMode ? (isRTL ? "row" : "row-reverse") : (isRTL ? "row-reverse" : "row")) : "column" }]}>
         <View style={[styles.productsSection, isTablet && styles.productsSectionTablet]}>
           <View style={[styles.searchRow, { flexDirection: isRTL ? "row-reverse" : "row", gap: 8, alignItems: "center" }]}>
             <View style={[styles.searchBox, { flex: 1 }, isRTL && { flexDirection: "row-reverse" }]}>
@@ -1554,10 +1598,10 @@ export default function POSScreen() {
 
           <FlatList
             data={filteredProducts}
-            numColumns={isTablet ? 4 : 2}
-            key={isTablet ? "tablet4" : "phone2"}
+            numColumns={useMobileCartSidebar ? 2 : isTablet ? 4 : 2}
+            key={useMobileCartSidebar ? "mobile2" : isTablet ? "tablet4" : "phone2"}
             keyExtractor={(item: any) => String(item.id)}
-            contentContainerStyle={styles.productGrid}
+            contentContainerStyle={[styles.productGrid, useMobileCartSidebar && styles.productGridMobile]}
             style={{ flex: 1 }}
             scrollEnabled={true}
             initialNumToRender={30}
@@ -1656,6 +1700,7 @@ export default function POSScreen() {
           />
         </View>
 
+        {!useMobileCartSidebar && (
         <View style={[styles.cartSection, isTablet && styles.cartSectionTablet, isTablet && isRTL && { borderLeftWidth: 0, borderRightWidth: 1, borderColor: Colors.cardBorder }]}>
           <View style={[styles.cartHeader, isRTL && { flexDirection: "row-reverse" }]}>
             <Text style={[styles.cartTitle, rtlTextAlign]}>{t("cart")} ({cart.itemCount})</Text>
@@ -1886,7 +1931,140 @@ export default function POSScreen() {
             </Pressable>
           </Animated.View>
         </View>
+        )}
       </View>
+
+      {useMobileCartSidebar && (
+        <>
+          <Pressable style={styles.mobileCartBar} onPress={() => setShowMobileCart(true)}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.mobileCartBarLabel}>{t("cart")} · {cart.itemCount} {language === "de" ? "Artikel" : "items"}</Text>
+              <Text style={styles.mobileCartBarHint} numberOfLines={1}>
+                {orderNotes ? orderNotes : (language === "de" ? "Tippen zum Oeffnen" : "Tap to open")}
+              </Text>
+            </View>
+            <View style={styles.mobileCartBarPrice}>
+              <Text style={styles.mobileCartBarPriceText}>CHF {(cart.total + manualAdjustment).toFixed(2)}</Text>
+            </View>
+          </Pressable>
+
+          <Modal visible={showMobileCart} animationType="fade" transparent onRequestClose={() => setShowMobileCart(false)}>
+            <View style={styles.mobileCartOverlay}>
+              <Pressable style={styles.mobileCartBackdrop} onPress={() => setShowMobileCart(false)} />
+              <View style={[styles.mobileCartDrawer, isRTL && { alignSelf: "flex-start" }]}>
+                <View style={[styles.cartHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                  <Text style={[styles.cartTitle, rtlTextAlign]}>{t("cart")} ({cart.itemCount})</Text>
+                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10 }}>
+                    <Pressable onPress={() => setShowOrderNotes(true)}>
+                      <Ionicons name="create-outline" size={20} color={orderNotes ? Colors.warning : Colors.textMuted} />
+                    </Pressable>
+                    {cart.items.length > 0 ? (
+                      <Pressable onPress={() => cart.clearCart()}>
+                        <Ionicons name="trash" size={20} color={Colors.danger} />
+                      </Pressable>
+                    ) : null}
+                    <Pressable onPress={() => setShowMobileCart(false)}>
+                      <Ionicons name="close" size={20} color={Colors.textMuted} />
+                    </Pressable>
+                  </View>
+                </View>
+
+                {selectedCustomer ? (
+                  <View style={[styles.cartCustomerCard, isRTL && { flexDirection: "row-reverse" }]}>
+                    <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.cartCustomerAvatar}>
+                      <Text style={styles.cartCustomerAvatarText}>{selectedCustomer.name.charAt(0).toUpperCase()}</Text>
+                    </LinearGradient>
+                    <View style={[styles.cartCustomerBody, isRTL && { alignItems: "flex-end" }]}>
+                      <Text style={[styles.cartCustomerName, rtlTextAlign]} numberOfLines={1}>{selectedCustomer.name}</Text>
+                      {selectedCustomer.phone ? <Text style={styles.cartCustomerChipText}>{selectedCustomer.phone}</Text> : null}
+                    </View>
+                  </View>
+                ) : null}
+
+                <FlatList
+                  data={cart.items}
+                  keyExtractor={(item) => String(item.productId)}
+                  style={styles.cartList}
+                  contentContainerStyle={!cart.items.length ? { flexGrow: 1, justifyContent: "center" } : { paddingBottom: 8 }}
+                  renderItem={({ item }) => (
+                    <View style={[styles.cartItem, isRTL && { flexDirection: "row-reverse" }]}>
+                      <View style={styles.cartItemInfo}>
+                        <Text style={[styles.cartItemName, rtlTextAlign]} numberOfLines={2}>{item.name}</Text>
+                        <Text style={[styles.cartItemUnit, rtlTextAlign]}>CHF {Number(item.price).toFixed(2)} × {item.quantity}</Text>
+                      </View>
+                      <View style={[styles.cartItemActions, isRTL && { flexDirection: "row-reverse" }]}>
+                        <Pressable
+                          style={[styles.qtyBtn, item.quantity === 1 && { backgroundColor: `${Colors.danger}22`, borderColor: Colors.danger }]}
+                          onPress={() => { cart.updateQuantity(item.id, item.quantity - 1); playClickSound("light"); }}
+                        >
+                          <Ionicons name={item.quantity === 1 ? "trash-outline" : "remove"} size={14} color={item.quantity === 1 ? Colors.danger : Colors.text} />
+                        </Pressable>
+                        <View style={styles.qtyBadge}>
+                          <Text style={styles.qtyText}>{item.quantity}</Text>
+                        </View>
+                        <Pressable
+                          style={[styles.qtyBtn, { backgroundColor: `${Colors.accent}22`, borderColor: Colors.accent }]}
+                          onPress={() => { cart.updateQuantity(item.id, item.quantity + 1); playClickSound("light"); }}
+                        >
+                          <Ionicons name="add" size={14} color={Colors.accent} />
+                        </Pressable>
+                      </View>
+                    </View>
+                  )}
+                  ListEmptyComponent={
+                    <View style={styles.cartEmpty}>
+                      <Ionicons name="cart-outline" size={44} color={Colors.textMuted} />
+                      <Text style={styles.cartEmptyText}>{t("emptyCart")}</Text>
+                      <Text style={styles.cartEmptySubtext}>{t("addToCart")}</Text>
+                    </View>
+                  }
+                />
+
+                <View style={styles.cartSummary}>
+                  <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("subtotal")}</Text>
+                    <Text style={[styles.summaryValue, rtlTextAlign]}>CHF {cart.subtotal.toFixed(2)}</Text>
+                  </View>
+                  <View style={[styles.summaryRow, styles.totalRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <Text style={[styles.totalLabel, rtlTextAlign]}>{t("total")}</Text>
+                    <Text style={[styles.totalValue, rtlTextAlign]}>CHF {(cart.total + manualAdjustment).toFixed(2)}</Text>
+                  </View>
+                </View>
+
+                <Pressable
+                  style={[styles.checkoutBtn, !cart.items.length && styles.checkoutBtnDisabled]}
+                  onPress={() => {
+                    if (cart.items.length > 0) {
+                      playClickSound("heavy");
+                      setPaymentConfirmed(false);
+                      setShowMobileCart(false);
+                      setShowCheckout(true);
+                    }
+                  }}
+                  disabled={!cart.items.length}
+                >
+                  <LinearGradient
+                    colors={cart.items.length > 0 ? [Colors.gradientStart, Colors.gradientMid, Colors.accent] : ["#333", "#444", "#555"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.checkoutBtnGradient}
+                  >
+                    <View style={[styles.checkoutBtnInner, isRTL && { flexDirection: "row-reverse" }]}>
+                      <View style={[styles.checkoutBtnLeft, isRTL && { flexDirection: "row-reverse" }]}>
+                        <Ionicons name="bag-check" size={20} color={Colors.white} />
+                        <Text style={styles.checkoutBtnText}>{t("checkout")}</Text>
+                      </View>
+                      <View style={styles.checkoutBtnPrice}>
+                        <Text style={styles.checkoutBtnPriceText}>CHF {(cart.total + manualAdjustment).toFixed(2)}</Text>
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            </View>
+          </Modal>
+        </>
+      )}
 
       <Modal visible={!!selectedProductForOptions} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
@@ -3901,10 +4079,13 @@ export default function POSScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { overflow: "hidden" },
+  headerMobile: { flexShrink: 0 },
   headerGradient: { paddingHorizontal: 16, paddingVertical: 8 },
   headerContent: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  headerContentMobile: { flexDirection: "column", alignItems: "stretch", gap: 10 },
   headerTitle: { fontSize: 18, fontWeight: "800", color: Colors.white, letterSpacing: 0.5 },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerRightMobile: { flexWrap: "wrap", justifyContent: "flex-start", gap: 6 },
   employeeName: { color: Colors.white, fontSize: 13, opacity: 0.9 },
   mainContent: { flex: 1 },
   productsSection: { flex: 1 },
@@ -3932,6 +4113,7 @@ const styles = StyleSheet.create({
 
   // ── Products
   productGrid: { padding: 6 },
+  productGridMobile: { paddingBottom: 96 },
   productCard: { flex: 1, margin: 3, backgroundColor: Colors.surface, borderRadius: 12, padding: 9, alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder, minWidth: 70, overflow: "hidden", position: "relative" as const },
   productCardTopBorder: { position: "absolute" as const, top: 0, left: 0, right: 0, height: 3, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
   productIcon: { width: 52, height: 52, borderRadius: 13, justifyContent: "center", alignItems: "center", marginBottom: 7, marginTop: 3, overflow: "hidden" as const },
@@ -4088,6 +4270,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: Colors.cardBorder,
   },
+  phoneBarMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+  },
   phoneBarInputWrap: {
     flex: 1,
     flexDirection: "row",
@@ -4240,6 +4426,55 @@ const styles = StyleSheet.create({
   headerAvatarBtn: { padding: 2 },
   headerAvatarCircle: { width: 34, height: 34, borderRadius: 17, justifyContent: "center" as const, alignItems: "center" as const, borderWidth: 2, borderColor: "rgba(255,255,255,0.4)" },
   headerAvatarText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" as const },
+  mobileCartBar: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 12,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    zIndex: 25,
+    boxShadow: "0px 12px 36px rgba(0,0,0,0.28)",
+  },
+  mobileCartBarLabel: { color: Colors.text, fontSize: 14, fontWeight: "800" },
+  mobileCartBarHint: { color: Colors.textMuted, fontSize: 11, marginTop: 2, maxWidth: 180 },
+  mobileCartBarPrice: {
+    backgroundColor: Colors.accent,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginLeft: 12,
+  },
+  mobileCartBarPriceText: { color: Colors.textDark, fontSize: 13, fontWeight: "900" },
+  mobileCartOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.48)",
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
+  },
+  mobileCartBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  mobileCartDrawer: {
+    width: "88%",
+    maxWidth: 380,
+    height: "100%",
+    backgroundColor: Colors.surface,
+    borderLeftWidth: 1,
+    borderLeftColor: Colors.cardBorder,
+    paddingTop: 56,
+  },
 
   // Account Switcher
   switchCurrentAccount: { flexDirection: "row" as const, alignItems: "center", gap: 14, backgroundColor: Colors.surfaceLight, borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: Colors.accent + "30" },

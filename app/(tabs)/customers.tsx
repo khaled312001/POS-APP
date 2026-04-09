@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   StyleSheet, Text, View, Pressable, TextInput,
-  Modal, Alert, ScrollView, Platform, ActivityIndicator,
+  Modal, Alert, ScrollView, Platform, ActivityIndicator, useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -13,6 +13,9 @@ import { playClickSound } from "@/lib/sound";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { useLicense } from "@/lib/license-context";
+import { getChromeMetrics } from "@/lib/responsive";
+import TabPageHeader, { HeaderIconButton } from "@/components/tab-page-header";
+import LoyaltyBadge from "@/components/LoyaltyBadge";
 
 const PAGE_SIZE = 200;
 
@@ -31,10 +34,12 @@ function InfoRow({ icon, label, value, isRTL }: { icon: string; label: string; v
 
 export default function CustomersScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const qc = useQueryClient();
   const { canManage, canDeleteCustomers } = useAuth();
   const { t, isRTL, rtlTextAlign, rtlText, language } = useLanguage();
   const { tenant } = useLicense();
+  const { topPad, bottomPad } = getChromeMetrics(width);
 
   // Search state — raw (shown in input) + debounced (sent to API)
   const [search, setSearch] = useState("");
@@ -296,8 +301,6 @@ export default function CustomersScreen() {
     });
   };
 
-  const topPad = Platform.OS === "web" ? 48 : 0;
-
   // Helper to get subtitle for list card
   const getSubtitle = (item: any) => {
     const parts: string[] = [];
@@ -310,23 +313,27 @@ export default function CustomersScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
-      <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid]} style={[styles.header, isRTL && { flexDirection: "row-reverse" }]}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <Text style={[styles.headerTitle, rtlTextAlign]}>{t("customers")}</Text>
-          <View style={{ backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
-            <Text style={{ color: Colors.white, fontSize: 13, fontWeight: "800" }}>{totalCount} {t("total" as any) || "Total"}</Text>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top + topPad,
+          direction: isRTL ? "rtl" : "ltr",
+        },
+      ]}
+    >
+      <TabPageHeader
+        title={t("customers")}
+        icon="people"
+        badgeText={`${totalCount} ${t("total" as any) || "Total"}`}
+        isRTL={isRTL}
+        rightActions={
+          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8 }}>
+            <HeaderIconButton icon="cloud-upload" onPress={() => { playClickSound("medium"); handleImportCSV(); }} />
+            <HeaderIconButton icon="add" onPress={() => { playClickSound("medium"); setEditCustomer(null); resetForm(); setShowForm(true); }} />
           </View>
-        </View>
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <Pressable style={styles.headerBtn} onPress={() => { playClickSound("medium"); handleImportCSV(); }}>
-            <Ionicons name="cloud-upload" size={20} color={Colors.white} />
-          </Pressable>
-          <Pressable style={styles.headerBtn} onPress={() => { playClickSound("medium"); setEditCustomer(null); resetForm(); setShowForm(true); }}>
-            <Ionicons name="add" size={24} color={Colors.white} />
-          </Pressable>
-        </View>
-      </LinearGradient>
+        }
+      />
 
       <View style={styles.searchRow}>
         <View style={[styles.searchBox, isRTL && { flexDirection: "row-reverse" }]}>
@@ -347,7 +354,7 @@ export default function CustomersScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.list}>
+      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: bottomPad + 16 }]}>
         {isFetching && allCustomers.length === 0 ? (
           <View style={styles.empty}><ActivityIndicator size="large" color={Colors.textMuted} /></View>
         ) : allCustomers.length === 0 ? (
@@ -389,6 +396,16 @@ export default function CustomersScreen() {
                     <View style={[styles.loyaltyBadge, isRTL && { flexDirection: "row-reverse" }]}>
                       <Ionicons name="star" size={11} color={Colors.warning} />
                       <Text style={styles.loyaltyText}>{item.loyaltyPoints}</Text>
+                    </View>
+                  )}
+                  {item.loyaltyTier && item.loyaltyTier !== "bronze" && (
+                    <LoyaltyBadge tier={item.loyaltyTier} compact />
+                  )}
+                  {parseFloat(item.walletBalance || "0") > 0 && (
+                    <View style={{ backgroundColor: "rgba(16,185,129,0.12)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                      <Text style={{ color: Colors.success, fontSize: 10, fontWeight: "700" }}>
+                        👛 {parseFloat(item.walletBalance).toFixed(2)}
+                      </Text>
                     </View>
                   )}
                 </View>
@@ -601,6 +618,16 @@ export default function CustomersScreen() {
                   {selectedCustomer.salutation && <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>({selectedCustomer.salutation})</Text>}
                   {selectedCustomer.company && <Text style={{ color: Colors.accent, fontSize: 13, marginTop: 4, fontWeight: "600" }}>🏢 {selectedCustomer.company}</Text>}
                   {selectedCustomer.customerNr && <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }}>Kunden-Nr: #{selectedCustomer.customerNr}</Text>}
+                  {selectedCustomer.loyaltyTier && (
+                    <View style={{ marginTop: 6 }}>
+                      <LoyaltyBadge tier={selectedCustomer.loyaltyTier} points={selectedCustomer.loyaltyPoints} />
+                    </View>
+                  )}
+                  {selectedCustomer.referralCode && (
+                    <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 4 }}>
+                      🎁 {t("referralCode")}: {selectedCustomer.referralCode}
+                    </Text>
+                  )}
                 </View>
 
                 {/* Stats Row */}
@@ -626,6 +653,14 @@ export default function CustomersScreen() {
                         <Text style={[styles.statValue, { color: Colors.warning }]}>{selectedCustomer.loyaltyPoints}</Text>
                       </View>
                       <Text style={styles.statLabel}>{t("loyaltyPoints")}</Text>
+                    </View>
+                  )}
+                  {parseFloat(selectedCustomer.walletBalance || "0") > 0 && (
+                    <View style={styles.statBox}>
+                      <Text style={[styles.statValue, { color: Colors.success }]}>
+                        {parseFloat(selectedCustomer.walletBalance).toFixed(2)}
+                      </Text>
+                      <Text style={styles.statLabel}>👛 {t("walletBalance")}</Text>
                     </View>
                   )}
                 </View>
@@ -778,10 +813,6 @@ export default function CustomersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14 },
-  headerTitle: { fontSize: 22, fontWeight: "800", color: Colors.white },
-  headerBtn: { width: 40, height: 40, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
-  addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
   searchRow: { paddingHorizontal: 12, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 8 },
   searchBox: { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 42, borderWidth: 1, borderColor: Colors.inputBorder },
   searchInput: { flex: 1, color: Colors.text, fontSize: 15 },

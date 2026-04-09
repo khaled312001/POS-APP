@@ -1,0 +1,24 @@
+{
+  "name": "Barmagly Driver",
+  "short_name": "Driver",
+  "description": "Delivery driver app for Barmagly POS",
+  "start_url": "/driver/",
+  "display": "standalone",
+  "background_color": "#FF5722",
+  "theme_color": "#FF5722",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/delivery-app/driver/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/delivery-app/driver/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

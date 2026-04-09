@@ -12,6 +12,18 @@ import { requireSuperAdmin } from "./superAdminAuth";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { sendLicenseKeyEmail } from "./emailService";
 import { whatsappService } from "./whatsappService";
+import {
+  createOtp, verifyOtp, findOrCreateCustomerByPhone,
+  findCustomerByEmail, verifyCustomerPassword, setCustomerPassword,
+  createCustomerSession, getAuthenticatedCustomer, deleteCustomerSession,
+  generateToken,
+} from "./customerAuthService";
+import {
+  validatePromoCode, recordPromoUsage, awardLoyaltyPoints,
+  redeemLoyaltyPoints, assignDriverToOrder, releaseDriver,
+  getDeliveryZoneForLocation, generateTrackingToken,
+  creditWallet, deductWallet,
+} from "./deliveryService";
 
 const TIMESTAMP_FIELDS = [
   "createdAt", "updatedAt", "expiryDate", "expectedDate", "receivedDate",
@@ -2343,8 +2355,11 @@ async function test(){
   app.post("/api/push/subscribe", (req, res) => {
     const sub = req.body;
     if (!sub || !sub.endpoint) return res.status(400).json({ error: "Invalid subscription" });
-    const tenantId = (req as any).tenantId;
-    if (!tenantId) return res.status(401).json({ error: "Tenant identification required" });
+    const rawTenantId = (req as any).tenantId ?? req.body?.tenantId;
+    const tenantId = Number(rawTenantId);
+    if (!Number.isFinite(tenantId) || tenantId <= 0) {
+      return res.status(401).json({ error: "Tenant identification required" });
+    }
     pushService.subscribe(sub, tenantId);
     res.json({ success: true });
   });
@@ -3113,6 +3128,883 @@ async function test(){
       res.status(500).json({ error: e.message });
     }
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ── DELIVERY PLATFORM API ─────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ── Customer Auth ─────────────────────────────────────────────────────────
+
+  app.post("/api/delivery/auth/request-otp", async (req: Request, res: Response) => {
+    try {
+      const { phone, tenantId } = req.body;
+      if (!phone || !tenantId) return res.status(400).json({ error: "phone and tenantId required" });
+      const otp = await createOtp(phone, Number(tenantId));
+      // In production: send via WhatsApp. For now return in dev.
+      if (process.env.NODE_ENV === "development") {
+        return res.json({ success: true, otp }); // expose OTP in dev only
+      }
+      await whatsappService.sendMessage(phone, `Your verification code is: *${otp}*\nValid for 10 minutes.`);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/auth/verify-otp", async (req: Request, res: Response) => {
+    try {
+      const { phone, tenantId, otp } = req.body;
+      if (!phone || !tenantId || !otp) return res.status(400).json({ error: "phone, tenantId, otp required" });
+      const result = await verifyOtp(phone, Number(tenantId), otp);
+      if (!result.success) return res.status(400).json({ error: result.error });
+      const customer = await findOrCreateCustomerByPhone(phone, Number(tenantId));
+      const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
+      res.json({ success: true, token, customer: { id: customer.id, name: customer.name, phone: customer.phone, loyaltyPoints: customer.loyaltyPoints, loyaltyTier: customer.loyaltyTier, walletBalance: customer.walletBalance } });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/auth/login", async (req: Request, res: Response) => {
+    try {
+      const { email, password, tenantId } = req.body;
+      if (!email || !password || !tenantId) return res.status(400).json({ error: "email, password, tenantId required" });
+      const customer = await findCustomerByEmail(email, Number(tenantId));
+      if (!customer) return res.status(401).json({ error: "Invalid credentials" });
+      const valid = await verifyCustomerPassword(customer, password);
+      if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+      const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
+      res.json({ success: true, token, customer: { id: customer.id, name: customer.name, email: customer.email, loyaltyPoints: customer.loyaltyPoints, loyaltyTier: customer.loyaltyTier, walletBalance: customer.walletBalance } });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/auth/register", async (req: Request, res: Response) => {
+    try {
+      const { name, email, phone, password, tenantId, referralCode } = req.body;
+      if (!phone || !tenantId) return res.status(400).json({ error: "phone and tenantId required" });
+      const customer = await findOrCreateCustomerByPhone(phone, Number(tenantId));
+      // Update with registration details
+      const updates: any = { name: name || customer.name, hasAccount: true };
+      if (email) updates.email = email;
+      if (password) { await setCustomerPassword(customer.id, password); }
+      await storage.updateCustomer(customer.id, updates);
+      const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
+      res.json({ success: true, token, customer: { id: customer.id, name: updates.name, phone } });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/auth/logout", async (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        await deleteCustomerSession(authHeader.split(" ")[1]);
+      }
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/auth/me", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      res.json({ customer });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/delivery/auth/me", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { name, email, dateOfBirth, gender, preferredLanguage } = req.body;
+      const updates: any = {};
+      if (name) updates.name = name;
+      if (email) updates.email = email;
+      if (dateOfBirth) updates.dateOfBirth = dateOfBirth;
+      if (gender) updates.gender = gender;
+      if (preferredLanguage) updates.preferredLanguage = preferredLanguage;
+      await storage.updateCustomer(customer.id, updates);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Customer Addresses ────────────────────────────────────────────────────
+
+  app.get("/api/delivery/addresses", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const addresses = await storage.getCustomerAddresses(customer.id);
+      res.json(addresses);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/addresses", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const address = await storage.createCustomerAddress({ ...req.body, customerId: customer.id, tenantId: customer.tenantId });
+      res.status(201).json(address);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/delivery/addresses/:id", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const address = await storage.updateCustomerAddress(Number(req.params.id), req.body);
+      res.json(address);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete("/api/delivery/addresses/:id", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      await storage.deleteCustomerAddress(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/delivery/addresses/:id/default", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      await storage.setDefaultAddress(Number(req.params.id), customer.id);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Multi-restaurant discovery (Public) ──────────────────────────────────
+
+  app.get("/api/delivery/restaurants", async (req: Request, res: Response) => {
+    try {
+      // Return all active landing page configs as a restaurant list
+      const tenantId = req.query.tenantId as string | undefined;
+      const configs = await storage.getAllLandingPageConfigs(tenantId);
+      const restaurants = (configs || []).map((c: any) => ({
+        id: c.tenantId,
+        slug: c.slug,
+        name: c.storeName || c.restaurantName || "Restaurant",
+        logo: c.logo || c.logomark || null,
+        coverImage: c.coverImage || c.headerBgImage || null,
+        cuisine: c.cuisineType || c.cuisine || "",
+        rating: c.rating || 4.5,
+        reviewCount: c.reviewCount || 0,
+        deliveryTime: c.minDeliveryTime || 25,
+        deliveryFee: c.deliveryFee || 0,
+        minOrder: c.minOrderAmount || 0,
+        isOpen: c.isOpen !== false,
+        primaryColor: c.primaryColor || "#FF5722",
+      }));
+      res.json(restaurants);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Storefront / Menu (Public) ────────────────────────────────────────────
+
+  app.get("/api/delivery/store/:slug", async (req: Request, res: Response) => {
+    try {
+      const config = await storage.getLandingPageConfigBySlug(req.params.slug);
+      if (!config) return res.status(404).json({ error: "Store not found" });
+      const tenant = await storage.getTenant(config.tenantId).catch(() => null);
+      const currency = (config as any).currency || tenant?.currency || process.env.DEFAULT_CURRENCY || "EGP";
+      res.json({
+        slug: config.slug,
+        tenantId: config.tenantId,
+        storeName: (config as any).storeName || (config as any).heroTitle || tenant?.businessName || "Store",
+        name: (config as any).storeName || (config as any).heroTitle || tenant?.businessName || "Store",
+        primaryColor: config.primaryColor || "#FF5722",
+        accentColor: config.accentColor || "#2FD3C6",
+        currency,
+        phone: config.phone,
+        address: config.address,
+        openingHours: config.openingHours,
+        minOrderAmount: config.minOrderAmount,
+        deliveryFee: (config as any).deliveryFee || 0,
+        estimatedDeliveryTime: config.estimatedDeliveryTime,
+        enableDelivery: config.enableDelivery !== false,
+        enablePickup: config.enablePickup !== false,
+        enableLoyalty: (config as any).enableLoyalty ?? true,
+        enableWallet: (config as any).enableWallet ?? false,
+        enableScheduledOrders: (config as any).enableScheduledOrders ?? true,
+        enablePromos: (config as any).enablePromos ?? true,
+        minDeliveryTime: (config as any).minDeliveryTime ?? 20,
+        maxDeliveryTime: (config as any).maxDeliveryTime ?? 45,
+        bannerImages: (config as any).bannerImages ?? [],
+        promoText: (config as any).promoText,
+        logo: config.heroImage || (config as any).logo,
+        coverImage: (config as any).coverImage || (config as any).headerBgImage,
+        socialWhatsapp: config.socialWhatsapp,
+        supportPhone: (config as any).supportPhone || config.phone || "",
+        rating: (config as any).rating || 4.5,
+        reviewCount: (config as any).reviewCount || 0,
+        cuisine: (config as any).cuisineType || (config as any).cuisine || "",
+      });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/store/:slug/menu", async (req: Request, res: Response) => {
+    try {
+      const config = await storage.getLandingPageConfigBySlug(req.params.slug);
+      if (!config) return res.status(404).json({ error: "Store not found" });
+      const [cats, prods] = await Promise.all([
+        storage.getCategories(config.tenantId),
+        storage.getProductsByTenant(config.tenantId),
+      ]);
+      const activeProds = prods.filter((p: any) => p.isActive !== false);
+      const menu = cats
+        .filter((c: any) => c.isActive !== false)
+        .map((cat: any) => ({
+          ...cat,
+          items: activeProds.filter((p: any) => p.categoryId === cat.id),
+        }))
+        .filter((cat: any) => cat.items.length > 0);
+      res.json({ categories: menu, allProducts: activeProds });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/store/:slug/product/:id", async (req: Request, res: Response) => {
+    try {
+      const config = await storage.getLandingPageConfigBySlug(req.params.slug);
+      if (!config) return res.status(404).json({ error: "Store not found" });
+      const product = await storage.getProduct(Number(req.params.id));
+      if (!product || product.tenantId !== config.tenantId) return res.status(404).json({ error: "Product not found" });
+      res.json(product);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/store/:slug/promos", async (req: Request, res: Response) => {
+    try {
+      const config = await storage.getLandingPageConfigBySlug(req.params.slug);
+      if (!config) return res.status(404).json({ error: "Store not found" });
+      const now = new Date();
+      const codes = await storage.getPromoCodes ? await storage.getPromoCodes(config.tenantId) : [];
+      const active = codes.filter((c: any) => c.isActive &&
+        (!c.validFrom || new Date(c.validFrom) <= now) &&
+        (!c.validUntil || new Date(c.validUntil) >= now));
+      res.json({ promos: active, bannerImages: (config as any).bannerImages ?? [], promoText: (config as any).promoText });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/promo/validate", async (req: Request, res: Response) => {
+    try {
+      const { tenantId, code, orderTotal, orderType, customerId } = req.body;
+      if (!tenantId || !code || orderTotal === undefined) return res.status(400).json({ error: "tenantId, code, orderTotal required" });
+      const result = await validatePromoCode(Number(tenantId), code, Number(orderTotal), orderType || "delivery", customerId ? Number(customerId) : undefined);
+      res.json(result);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/zones", async (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.query;
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      const zones = await storage.getDeliveryZones(Number(tenantId));
+      res.json(zones);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Orders ────────────────────────────────────────────────────────────────
+
+  app.post("/api/delivery/orders", async (req: Request, res: Response) => {
+    try {
+      const {
+        tenantId, customerName, customerPhone, customerEmail,
+        customerAddress, items, subtotal, deliveryFee, totalAmount,
+        paymentMethod, orderType, notes, promoCode, promoCodeId,
+        discountAmount, customerLat, customerLng, floor, buildingName,
+        addressNotes, scheduledAt, loyaltyPointsUsed, walletAmountUsed,
+        savedAddressId,
+      } = req.body;
+
+      if (!tenantId || !customerPhone || !items?.length) {
+        return res.status(400).json({ error: "tenantId, customerPhone, items required" });
+      }
+
+      const trackingToken = generateTrackingToken();
+      const orderNumber = `DEL-${Date.now()}`;
+
+      // Verify promo if provided
+      let finalDiscount = Number(discountAmount ?? 0);
+      let resolvedPromoId = promoCodeId ? Number(promoCodeId) : null;
+
+      if (promoCode && !promoCodeId) {
+        const promoResult = await validatePromoCode(Number(tenantId), promoCode, Number(subtotal), orderType || "delivery");
+        if (promoResult.valid && promoResult.promoCode) {
+          finalDiscount = promoResult.discountAmount ?? 0;
+          resolvedPromoId = promoResult.promoCode.id;
+        }
+      }
+
+      // Wallet deduction
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      let walletUsed = Number(walletAmountUsed ?? 0);
+      if (walletUsed > 0 && customer) {
+        const walletResult = await deductWallet(customer.id, Number(tenantId), walletUsed);
+        if (!walletResult.success) {
+          return res.status(400).json({ error: walletResult.error });
+        }
+      }
+
+      const order = await storage.createOnlineOrder({
+        tenantId: Number(tenantId),
+        orderNumber,
+        customerName: customerName || customerPhone,
+        customerPhone,
+        customerEmail: customerEmail ?? null,
+        customerAddress: customerAddress ?? null,
+        items: items || [],
+        subtotal: Number(subtotal).toFixed(2),
+        taxAmount: "0",
+        deliveryFee: Number(deliveryFee ?? 0).toFixed(2),
+        totalAmount: Number(totalAmount).toFixed(2),
+        paymentMethod: paymentMethod || "cash",
+        paymentStatus: "pending",
+        status: "pending",
+        orderType: orderType || "delivery",
+        notes: notes ?? null,
+        estimatedTime: 35,
+        language: req.body.language || "en",
+        trackingToken,
+        sourceChannel: "web",
+        promoCodeId: resolvedPromoId ?? undefined,
+        discountAmount: finalDiscount.toFixed(2),
+        customerLat: customerLat ? String(customerLat) : null,
+        customerLng: customerLng ? String(customerLng) : null,
+        floor: floor ?? null,
+        buildingName: buildingName ?? null,
+        addressNotes: addressNotes ?? null,
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        walletAmountUsed: walletUsed.toFixed(2),
+        loyaltyPointsUsed: Number(loyaltyPointsUsed ?? 0),
+        savedAddressId: savedAddressId ? Number(savedAddressId) : null,
+      } as any);
+
+      // Record promo usage
+      if (resolvedPromoId && finalDiscount > 0) {
+        await recordPromoUsage(resolvedPromoId, customer?.id, order.id, finalDiscount);
+      }
+
+      // Notify via WhatsApp
+      try {
+        const config = await storage.getLandingPageConfigByTenantId(Number(tenantId));
+        if (config?.socialWhatsapp) {
+          await whatsappService.sendMessage(
+            config.socialWhatsapp,
+            `🛎 New delivery order #${orderNumber}\nCustomer: ${customerName || customerPhone}\nTotal: ${totalAmount}\nAddress: ${customerAddress || "Pickup"}`
+          );
+        }
+      } catch (_) {}
+
+      // Broadcast to POS via WebSocket
+      try {
+        callerIdService.broadcastToTenant(Number(tenantId), {
+          type: "new_online_order",
+          order: { id: order.id, orderNumber, customerName, totalAmount, orderType }
+        });
+      } catch (_) {}
+
+      res.status(201).json({ success: true, orderId: order.id, orderNumber, trackingToken });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/orders/track/:token", async (req: Request, res: Response) => {
+    try {
+      const order = await storage.getOnlineOrderByTrackingToken(req.params.token);
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      // Get driver info if assigned
+      let driver = null;
+      if ((order as any).driverId) {
+        driver = await storage.getDriverLocation((order as any).driverId);
+      }
+      // Include store branding for the public tracking page
+      let store: any = null;
+      try {
+        if ((order as any).tenantId) {
+          const cfg = await storage.getLandingPageConfigByTenantId(Number((order as any).tenantId));
+          if (cfg) {
+            store = {
+              name: cfg.storeName || (cfg as any).name,
+              primaryColor: (cfg as any).primaryColor || "#FF5722",
+              currency: (cfg as any).currency || process.env.DEFAULT_CURRENCY || "EGP",
+              logo: (cfg as any).logo,
+              supportPhone: (cfg as any).supportPhone,
+              slug: cfg.slug,
+            };
+          }
+        }
+      } catch (_) {}
+      res.json({ order, driver, store });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/orders/history", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const orders = await storage.getCustomerOrderHistory(customer.id, customer.tenantId!);
+      res.json(orders);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/orders/:id/rate", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      const { overallRating, foodRating, deliveryRating, comment } = req.body;
+      if (!overallRating) return res.status(400).json({ error: "overallRating required" });
+      const orderId = Number(req.params.id);
+      const order = await storage.getOnlineOrder(orderId);
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      const rating = await storage.createOrderRating({
+        orderId,
+        customerId: customer?.id ?? null,
+        driverId: (order as any).driverId ?? null,
+        overallRating: Number(overallRating),
+        foodRating: foodRating ? Number(foodRating) : null,
+        deliveryRating: deliveryRating ? Number(deliveryRating) : null,
+        comment: comment ?? null,
+      });
+      res.json(rating);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Driver Routes ─────────────────────────────────────────────────────────
+
+  app.post("/api/delivery/driver/auth", async (req: Request, res: Response) => {
+    try {
+      const { accessToken } = req.body;
+      if (!accessToken) return res.status(400).json({ error: "accessToken required" });
+      const driver = await storage.getVehicleByAccessToken(accessToken);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      res.json({ driver: { id: driver.id, driverName: driver.driverName, driverPhone: driver.driverPhone, driverStatus: driver.driverStatus } });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/driver/orders", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.query;
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token as string);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const orders = await storage.getDriverActiveOrders(driver.id, driver.tenantId!);
+      res.json(orders);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/driver/orders/:id/accept", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.body;
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const orderId = Number(req.params.id);
+      await assignDriverToOrder(orderId, driver.id);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/driver/orders/:id/picked-up", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.body;
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const orderId = Number(req.params.id);
+      await storage.updateOnlineOrder(orderId, { status: "on_way", riderPickedUpAt: new Date() } as any);
+      // Notify customer
+      const order = await storage.getOnlineOrder(orderId);
+      if (order?.customerPhone && (order as any).trackingToken) {
+        try {
+          await whatsappService.sendMessage(order.customerPhone,
+            `🛵 Your order is on the way!\nTrack live: ${process.env.APP_URL || ""}/track/${(order as any).trackingToken}`);
+        } catch (_) {}
+      }
+      callerIdService.broadcast({ type: "delivery_status_change", orderId, status: "on_way", driverName: driver.driverName }, driver.tenantId!);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/driver/orders/:id/delivered", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.body;
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const orderId = Number(req.params.id);
+      await storage.updateOnlineOrder(orderId, { status: "delivered", riderDeliveredAt: new Date() } as any);
+      await releaseDriver(driver.id);
+      // Award loyalty points
+      const order = await storage.getOnlineOrder(orderId);
+      if (order) {
+        const customerId = await storage.getCustomerIdByPhone(order.customerPhone, driver.tenantId!);
+        if (customerId) {
+          await awardLoyaltyPoints(customerId, driver.tenantId!, orderId, Number(order.totalAmount));
+        }
+        // Send rating request after delivery
+        if (order.customerPhone && (order as any).trackingToken) {
+          setTimeout(async () => {
+            try {
+              await whatsappService.sendMessage(order.customerPhone,
+                `⭐ How was your order?\nLeave a quick review: ${process.env.APP_URL || ""}/track/${(order as any).trackingToken}#rate`);
+            } catch (_) {}
+          }, 10 * 60 * 1000); // 10 minutes later
+        }
+      }
+      callerIdService.broadcast({ type: "delivery_status_change", orderId, status: "delivered", driverName: driver.driverName }, driver.tenantId!);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/driver/location", async (req: Request, res: Response) => {
+    try {
+      const { token, lat, lng, orderId } = req.body;
+      if (!token || lat === undefined || lng === undefined) return res.status(400).json({ error: "token, lat, lng required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      await storage.updateDriverLocation(driver.id, Number(lat), Number(lng), orderId ? Number(orderId) : undefined);
+      // Broadcast to POS clients
+      callerIdService.broadcastToTenant(driver.tenantId!, {
+        type: "driver_location_update",
+        vehicleId: driver.id,
+        lat: Number(lat),
+        lng: Number(lng),
+        orderId: orderId || null,
+      });
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/driver/earnings", async (req: Request, res: Response) => {
+    try {
+      const { token, days } = req.query;
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token as string);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const earnings = await storage.getDriverEarnings(driver.id, Number(days ?? 7));
+      res.json(earnings);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── POS Management ────────────────────────────────────────────────────────
+
+  app.get("/api/delivery/manage/orders", async (req: Request, res: Response) => {
+    try {
+      const { tenantId, status, orderType } = req.query;
+      const tid = (req as any).tenantId || Number(tenantId);
+      const orders = await storage.getDeliveryOrders(tid, { status: status as string, orderType: orderType as string });
+      res.json(orders);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/delivery/manage/orders/:id/assign", async (req: Request, res: Response) => {
+    try {
+      const { vehicleId } = req.body;
+      if (!vehicleId) return res.status(400).json({ error: "vehicleId required" });
+      const orderId = Number(req.params.id);
+      await storage.assignDriverToOrder(orderId, Number(vehicleId));
+      const driver = await storage.getVehicle(Number(vehicleId));
+      const order = await storage.getOnlineOrder(orderId);
+      // Notify driver
+      if (driver?.driverPhone && driver.driverAccessToken && order) {
+        try {
+          await whatsappService.sendMessage(driver.driverPhone,
+            `🛵 New delivery assignment!\nOrder #${order.orderNumber}\nCustomer: ${order.customerName}\nAddress: ${order.customerAddress || "Pickup"}\nOpen app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`);
+        } catch (_) {}
+      }
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/delivery/manage/orders/:id/status", async (req: Request, res: Response) => {
+    try {
+      const { status } = req.body;
+      if (!status) return res.status(400).json({ error: "status required" });
+      const orderId = Number(req.params.id);
+      await storage.updateOnlineOrder(orderId, { status });
+      const order = await storage.getOnlineOrder(orderId);
+      // Send WhatsApp to customer based on status (Food Tracker™ style)
+      if (order?.customerPhone) {
+        const messages: Record<string, string> = {
+          accepted: "✅ Your order has been confirmed and is being prepared!",
+          preparing: "👨‍🍳 Your order is being prepared fresh for you!",
+          ready: "✅ Your order is ready! The driver is collecting it now.",
+          delivered: "🎉 Your order has been delivered. Enjoy your meal!",
+          cancelled: "❌ Your order has been cancelled. Contact us if you need help.",
+        };
+        if (messages[status]) {
+          try { await whatsappService.sendMessage(order.customerPhone, messages[status]); } catch (_) {}
+        }
+      }
+      if (order?.tenantId) {
+        callerIdService.broadcast({ type: "delivery_status_change", orderId, status }, order.tenantId);
+      }
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/manage/drivers", async (req: Request, res: Response) => {
+    try {
+      const tid = (req as any).tenantId;
+      const drivers = await storage.getActiveDrivers(tid);
+      res.json(drivers);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/manage/stats", async (req: Request, res: Response) => {
+    try {
+      const tid = (req as any).tenantId;
+      const stats = await storage.getDeliveryStats(tid);
+      res.json(stats);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Delivery Zone Management ──────────────────────────────────────────────
+
+  app.get("/api/delivery/manage/zones", async (req: Request, res: Response) => {
+    try {
+      const tid = (req as any).tenantId;
+      res.json(await storage.getDeliveryZones(tid));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/manage/zones", async (req: Request, res: Response) => {
+    try {
+      const tid = (req as any).tenantId;
+      const zone = await storage.createDeliveryZone({ ...req.body, tenantId: tid });
+      res.status(201).json(zone);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/delivery/manage/zones/:id", async (req: Request, res: Response) => {
+    try {
+      const zone = await storage.updateDeliveryZone(Number(req.params.id), req.body);
+      res.json(zone);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete("/api/delivery/manage/zones/:id", async (req: Request, res: Response) => {
+    try {
+      await storage.deleteDeliveryZone(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Promo Code Management ─────────────────────────────────────────────────
+
+  app.get("/api/delivery/promos", async (req: Request, res: Response) => {
+    try {
+      const tid = (req as any).tenantId;
+      res.json(await storage.getPromoCodes(tid));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/promos", async (req: Request, res: Response) => {
+    try {
+      const tid = (req as any).tenantId;
+      const promo = await storage.createPromoCode({ ...req.body, tenantId: tid });
+      res.status(201).json(promo);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/delivery/promos/:id", async (req: Request, res: Response) => {
+    try {
+      const promo = await storage.updatePromoCode(Number(req.params.id), req.body);
+      res.json(promo);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete("/api/delivery/promos/:id", async (req: Request, res: Response) => {
+    try {
+      await storage.deletePromoCode(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Loyalty & Wallet ──────────────────────────────────────────────────────
+
+  app.get("/api/delivery/loyalty/:customerId", async (req: Request, res: Response) => {
+    try {
+      const customerId = Number(req.params.customerId);
+      const [customer, transactions] = await Promise.all([
+        storage.getCustomer(customerId),
+        storage.getLoyaltyTransactions(customerId),
+      ]);
+      if (!customer) return res.status(404).json({ error: "Customer not found" });
+      res.json({ points: customer.loyaltyPoints, tier: customer.loyaltyTier, transactions });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/loyalty/redeem", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { points } = req.body;
+      const result = await redeemLoyaltyPoints(customer.id, customer.tenantId!, Number(points));
+      res.json(result);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/wallet/:customerId", async (req: Request, res: Response) => {
+    try {
+      const customerId = Number(req.params.customerId);
+      const [customer, transactions] = await Promise.all([
+        storage.getCustomer(customerId),
+        storage.getWalletTransactions(customerId),
+      ]);
+      if (!customer) return res.status(404).json({ error: "Customer not found" });
+      res.json({ balance: customer.walletBalance, transactions });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/wallet/topup", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { amount } = req.body;
+      if (!amount || Number(amount) <= 0) return res.status(400).json({ error: "Valid amount required" });
+      // Create Stripe PaymentIntent for wallet top-up
+      const stripe = getUncachableStripeClient();
+      const intent = await stripe.paymentIntents.create({
+        amount: Math.round(Number(amount) * 100),
+        currency: "chf",
+        metadata: { type: "wallet_topup", customerId: customer.id, tenantId: customer.tenantId },
+      });
+      res.json({ clientSecret: intent.client_secret, paymentIntentId: intent.id });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/referral/:code", async (req: Request, res: Response) => {
+    try {
+      const customer = await storage.getCustomerByReferralCode(req.params.code);
+      if (!customer) return res.status(404).json({ error: "Referral code not found" });
+      res.json({ valid: true, referrerName: customer.name });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Order Status SSE Stream (delivery customer app) ──────────────────────
+  // Clients subscribe to live status changes for a specific order by token
+
+  app.get("/api/delivery/orders/:idOrToken/status-stream", (req, res) => {
+    const idOrToken = req.params.idOrToken;
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+
+    // Keep-alive heartbeat every 25s
+    const heartbeat = setInterval(() => {
+      try { res.write(": heartbeat\n\n"); } catch (_) {}
+    }, 25000);
+
+    // Listen on the existing orderSseClients map that already exists for /api/online-orders/:id/status-stream
+    // We reuse the same broadcast mechanism by looking up orderId
+    const resolveAndListen = async () => {
+      try {
+        let orderId: number;
+        if (/^\d+$/.test(idOrToken)) {
+          orderId = Number(idOrToken);
+        } else {
+          const order = await storage.getOnlineOrderByTrackingToken(idOrToken);
+          if (!order) {
+            res.write(`data: ${JSON.stringify({ type: "error", error: "Order not found" })}\n\n`);
+            clearInterval(heartbeat);
+            res.end();
+            return;
+          }
+          orderId = order.id;
+          // Send initial status
+          res.write(`data: ${JSON.stringify({ type: "status_update", order: { id: order.id, status: order.status, orderNumber: order.orderNumber } })}\n\n`);
+        }
+
+        // Register client in existing SSE client map
+        if (!(app as any)._orderSseClients) {
+          (app as any)._orderSseClients = new Map<number, Set<any>>();
+        }
+        const sseMap: Map<number, Set<any>> = (app as any)._orderSseClients;
+        if (!sseMap.has(orderId)) sseMap.set(orderId, new Set());
+        sseMap.get(orderId)!.add(res);
+
+        req.on("close", () => {
+          clearInterval(heartbeat);
+          sseMap.get(orderId)?.delete(res);
+          if (sseMap.get(orderId)?.size === 0) sseMap.delete(orderId);
+        });
+      } catch (err) {
+        clearInterval(heartbeat);
+        res.end();
+      }
+    };
+    resolveAndListen();
+  });
+
+  // Wire up broadcaster to delivery SSE clients (called from broadcastOrderStatus)
+  if (!(app as any)._broadcastDeliveryStatus) {
+    (app as any)._broadcastDeliveryStatus = (orderId: number, payload: object) => {
+      const sseMap: Map<number, Set<any>> | undefined = (app as any)._orderSseClients;
+      if (!sseMap) return;
+      const clients = sseMap.get(orderId);
+      if (!clients) return;
+      const msg = `data: ${JSON.stringify(payload)}\n\n`;
+      clients.forEach(client => {
+        try { client.write(msg); } catch (_) { clients.delete(client); }
+      });
+    };
+  }
+
+  // ── Reorder ───────────────────────────────────────────────────────────────
+
+  app.post("/api/delivery/orders/:id/reorder", async (req: Request, res: Response) => {
+    try {
+      const orderId = Number(req.params.id);
+      const originalOrder = await storage.getOnlineOrder(orderId);
+      if (!originalOrder) return res.status(404).json({ error: "Order not found" });
+
+      const trackingToken = generateTrackingToken();
+      const orderNumber = `DEL-${Date.now()}`;
+
+      const newOrder = await storage.createOnlineOrder({
+        tenantId: originalOrder.tenantId,
+        orderNumber,
+        customerName: originalOrder.customerName,
+        customerPhone: originalOrder.customerPhone,
+        customerEmail: originalOrder.customerEmail ?? null,
+        customerAddress: originalOrder.customerAddress ?? null,
+        items: originalOrder.items as any,
+        subtotal: originalOrder.subtotal,
+        taxAmount: "0",
+        deliveryFee: originalOrder.deliveryFee ?? "0",
+        totalAmount: originalOrder.totalAmount,
+        paymentMethod: originalOrder.paymentMethod || "cash",
+        paymentStatus: "pending",
+        status: "pending",
+        orderType: (originalOrder as any).orderType || "delivery",
+        notes: originalOrder.notes ?? null,
+        estimatedTime: 35,
+        language: originalOrder.language || "en",
+        trackingToken,
+        sourceChannel: "web",
+      } as any);
+
+      // Notify store
+      try {
+        callerIdService.broadcast({
+          type: "new_online_order",
+          order: { id: newOrder.id, orderNumber, customerName: originalOrder.customerName, totalAmount: originalOrder.totalAmount, orderType: (originalOrder as any).orderType }
+        }, originalOrder.tenantId);
+      } catch (_) {}
+
+      res.status(201).json({ success: true, orderId: newOrder.id, orderNumber, trackingToken });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Order Ratings (POS view) ──────────────────────────────────────────────
+
+  app.get("/api/delivery/order-ratings", async (req: Request, res: Response) => {
+    try {
+      const tid = (req as any).tenantId;
+      const ratings = await storage.getOrderRatings(tid);
+      res.json(ratings);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
 
   const httpServer = createServer(app);
 

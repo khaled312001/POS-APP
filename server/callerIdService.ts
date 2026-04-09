@@ -316,6 +316,64 @@ export class CallerIDService extends EventEmitter {
   public simulateCall(number: string = "0123456789", slot?: number, tenantId?: number) {
     this.handleIncomingCall(number, slot, tenantId);
   }
+
+  // ── Delivery Platform broadcast helpers ──────────────────────────────────────
+
+  /**
+   * Broadcast driver GPS location update to tenant POS clients
+   */
+  public broadcastDriverLocation(
+    tenantId: number,
+    vehicleId: number,
+    lat: number,
+    lng: number,
+    orderId?: number,
+  ) {
+    this.broadcast({
+      type: "driver_location_update",
+      vehicleId,
+      lat,
+      lng,
+      orderId: orderId ?? null,
+      timestamp: new Date().toISOString(),
+    }, tenantId);
+  }
+
+  /**
+   * Broadcast delivery order status change to tenant POS clients
+   */
+  public broadcastDeliveryStatus(
+    tenantId: number,
+    orderId: number,
+    status: string,
+    driverName?: string,
+  ) {
+    this.broadcast({
+      type: "delivery_status_change",
+      orderId,
+      status,
+      driverName: driverName ?? null,
+      timestamp: new Date().toISOString(),
+    }, tenantId);
+  }
+
+  /**
+   * Broadcast a new scheduled order alert to tenant POS clients
+   */
+  public broadcastScheduledOrder(
+    tenantId: number,
+    orderId: number,
+    scheduledAt: string,
+    customerName?: string,
+  ) {
+    this.broadcast({
+      type: "new_scheduled_order",
+      orderId,
+      scheduledAt,
+      customerName: customerName ?? null,
+      timestamp: new Date().toISOString(),
+    }, tenantId);
+  }
 }
 
 export const callerIdService = new CallerIDService();

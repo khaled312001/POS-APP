@@ -1,0 +1,570 @@
+[
+  {
+    "n": 1,
+    "name": "01_intro_welcome",
+    "status": "ok",
+    "size_kb": 2105,
+    "hash": "3720219a5074163221a1f9ebe9f33f08",
+    "desc": "Welcome screen"
+  },
+  {
+    "n": 2,
+    "name": "02_license_gate",
+    "status": "ok",
+    "size_kb": 183,
+    "hash": "60280d0db45d24b8226c9be181f666ea",
+    "desc": "License gate"
+  },
+  {
+    "n": 3,
+    "name": "02b_license_filled",
+    "status": "ok",
+    "size_kb": 194,
+    "hash": "34d63c2470d770f8ce0604c0d5cb8e46",
+    "desc": "License form filled"
+  },
+  {
+    "n": 4,
+    "name": "02c_license_confirmed",
+    "status": "ok",
+    "size_kb": 2453,
+    "hash": "36a2bc50eb84aa33fdcb34245cea1e49",
+    "desc": "License validated"
+  },
+  {
+    "n": 5,
+    "name": "03_employee_select",
+    "status": "ok",
+    "size_kb": 2453,
+    "hash": "36a2bc50eb84aa33fdcb34245cea1e49",
+    "desc": "Employee select"
+  },
+  {
+    "n": 6,
+    "name": "04_pin_pad",
+    "status": "ok",
+    "size_kb": 2444,
+    "hash": "b05e9b638be895d70ae05d4eb77ffbb8",
+    "desc": "PIN pad"
+  },
+  {
+    "n": 7,
+    "name": "07_pos_main_ready",
+    "status": "ok",
+    "size_kb": 584,
+    "hash": "ad6f096b134d24cf89f0aa7adf08f58d",
+    "desc": "POS main screen"
+  },
+  {
+    "n": 8,
+    "name": "pos_overview",
+    "status": "ok",
+    "size_kb": 745,
+    "hash": "e2754e99954da8461fcdd01e854a40fa",
+    "desc": "POS products + cart"
+  },
+  {
+    "n": 9,
+    "name": "pos_cart_first_item",
+    "status": "ok",
+    "size_kb": 827,
+    "hash": "415de6d7e1b60af0c76c761099d9b8e5",
+    "desc": "Cart — Lemon Pizza added"
+  },
+  {
+    "n": 10,
+    "name": "pos_cart_with_items",
+    "status": "ok",
+    "size_kb": 840,
+    "hash": "2b177d7f2b1839d3fa70abd98bf71424",
+    "desc": "Cart with multiple items"
+  },
+  {
+    "n": 11,
+    "name": "pos_notes_modal_open",
+    "status": "ok",
+    "size_kb": 675,
+    "hash": "dd9ab2336262dfcb37c3597c1fcd20f6",
+    "desc": "Order notes modal"
+  },
+  {
+    "n": 12,
+    "name": "pos_notes_typed",
+    "status": "ok",
+    "size_kb": 679,
+    "hash": "8d2e887a56d728d39bc8c998d38b1810",
+    "desc": "Note typed"
+  },
+  {
+    "n": 13,
+    "name": "pos_customer_picker_open",
+    "status": "ok",
+    "size_kb": 654,
+    "hash": "e52c4d59da739e9e8555c52124dfcaea",
+    "desc": "Customer picker modal"
+  },
+  {
+    "n": 14,
+    "name": "pos_customer_search_results",
+    "status": "ok",
+    "size_kb": 656,
+    "hash": "b725fd72aef18cb41fc4dd2b245a2f35",
+    "desc": "Customer search: Ahmed"
+  },
+  {
+    "n": 15,
+    "name": "pos_invoice_history_open",
+    "status": "ok",
+    "size_kb": 611,
+    "hash": "848d010dc283dd19b88802f7c7864c5c",
+    "desc": "Invoice history"
+  },
+  {
+    "n": 16,
+    "name": "pos_zero_out_shift_dialog",
+    "status": "ok",
+    "size_kb": 652,
+    "hash": "3f369e99de7272497e8f276ce2fb55b0",
+    "desc": "Zero Out Shift report dialog"
+  },
+  {
+    "n": 17,
+    "name": "checkout_modal_open",
+    "status": "ok",
+    "size_kb": 649,
+    "hash": "e9e31d066306190ac77702efbbd0d7ca",
+    "desc": "Checkout — payment methods"
+  },
+  {
+    "n": 18,
+    "name": "checkout_cash_selected",
+    "status": "ok",
+    "size_kb": 649,
+    "hash": "30beba8503c785408745ef4fad38e4d8",
+    "desc": "Payment: Cash"
+  },
+  {
+    "n": 19,
+    "name": "checkout_cash_amount",
+    "status": "ok",
+    "size_kb": 651,
+    "hash": "8cbc06bd76997a3183554978aef5057c",
+    "desc": "Cash amount: CHF 50"
+  },
+  {
+    "n": 20,
+    "name": "checkout_card_selected",
+    "status": "ok",
+    "size_kb": 659,
+    "hash": "5ea35ddade24c6bb0c88e0710059e0c7",
+    "desc": "Payment: Card"
+  },
+  {
+    "n": 21,
+    "name": "checkout_twint_selected",
+    "status": "ok",
+    "size_kb": 658,
+    "hash": "1a598d86922df0bcab9511989e2960f3",
+    "desc": "Payment: TWINT"
+  },
+  {
+    "n": 22,
+    "name": "checkout_ready_to_confirm",
+    "status": "ok",
+    "size_kb": 651,
+    "hash": "bbd2fbd6c5fbf6619973e02b4321e2d7",
+    "desc": "Ready to confirm — total + change"
+  },
+  {
+    "n": 23,
+    "name": "checkout_receipt_shown",
+    "status": "ok",
+    "size_kb": 746,
+    "hash": "e3884a1cd0d2df23007316361159516f",
+    "desc": "Receipt — sale complete"
+  },
+  {
+    "n": 24,
+    "name": "pos_call_history_open",
+    "status": "ok",
+    "size_kb": 659,
+    "hash": "db0161eb105565951b4fca8dafe46b91",
+    "desc": "Call history panel"
+  },
+  {
+    "n": 25,
+    "name": "online_orders_all",
+    "status": "ok",
+    "size_kb": 620,
+    "hash": "8889fe36c10917b29960465fb43afdff",
+    "desc": "Online orders — all"
+  },
+  {
+    "n": 26,
+    "name": "products_list_full",
+    "status": "ok",
+    "size_kb": 455,
+    "hash": "99d6213ad14f24bda67925a2984992ae",
+    "desc": "Products list"
+  },
+  {
+    "n": 27,
+    "name": "products_search_pizza",
+    "status": "ok",
+    "size_kb": 360,
+    "hash": "85e0de2d7b261a67bad1160d0a1e0900",
+    "desc": "Search: pizza"
+  },
+  {
+    "n": 28,
+    "name": "products_edit_modal",
+    "status": "ok",
+    "size_kb": 483,
+    "hash": "af3f38eb304da0ba4339b8c1d6846d49",
+    "desc": "Product edit modal"
+  },
+  {
+    "n": 29,
+    "name": "customers_list_full",
+    "status": "ok",
+    "size_kb": 391,
+    "hash": "4cb522fe7e83db1e43cbb3fdfdf81927",
+    "desc": "Customers list"
+  },
+  {
+    "n": 30,
+    "name": "customers_search_ahmed",
+    "status": "ok",
+    "size_kb": 407,
+    "hash": "f1359674e0b640ea7679f83de42d00ea",
+    "desc": "Search: Ahmed"
+  },
+  {
+    "n": 31,
+    "name": "customers_detail_open",
+    "status": "ok",
+    "size_kb": 393,
+    "hash": "72182a6def861787dbf0af908d9995b6",
+    "desc": "Customer detail + order history"
+  },
+  {
+    "n": 32,
+    "name": "reports_overview",
+    "status": "ok",
+    "size_kb": 423,
+    "hash": "343fc980071b21a852a28e275a4128e8",
+    "desc": "Reports overview"
+  },
+  {
+    "n": 33,
+    "name": "reports_sales",
+    "status": "ok",
+    "size_kb": 454,
+    "hash": "f747bdeaef1a103e12e15db9dfd8af59",
+    "desc": "Reports: Sales"
+  },
+  {
+    "n": 34,
+    "name": "reports_inventory",
+    "status": "ok",
+    "size_kb": 418,
+    "hash": "6c85f4ddacafc729ac9c76656b2aaf96",
+    "desc": "Reports: Inventory"
+  },
+  {
+    "n": 35,
+    "name": "reports_returns",
+    "status": "ok",
+    "size_kb": 325,
+    "hash": "77a5444c8e2f0f00bba49f220ace1b34",
+    "desc": "Reports: Returns"
+  },
+  {
+    "n": 36,
+    "name": "reports_finance",
+    "status": "ok",
+    "size_kb": 392,
+    "hash": "b9061c507cfa65d72ea70aa48de7755e",
+    "desc": "Reports: Finance"
+  },
+  {
+    "n": 37,
+    "name": "reports_activity",
+    "status": "ok",
+    "size_kb": 534,
+    "hash": "f63b8becbe8b798e41a7261ceba7a112",
+    "desc": "Reports: Activity"
+  },
+  {
+    "n": 38,
+    "name": "settings_main_page",
+    "status": "ok",
+    "size_kb": 318,
+    "hash": "10a8c6daa97e14f1ef5f75dde819aea1",
+    "desc": "Settings — main page"
+  },
+  {
+    "n": 39,
+    "name": "settings_store_settings",
+    "status": "ok",
+    "size_kb": 346,
+    "hash": "f190e414d3d400cea6fafcb1339a72a0",
+    "desc": "Settings: Store Settings"
+  },
+  {
+    "n": 40,
+    "name": "settings_payment_gateways",
+    "status": "ok",
+    "size_kb": 339,
+    "hash": "ac47de276923db7bd64b859e73a20b71",
+    "desc": "Settings: Payment Gateways"
+  },
+  {
+    "n": 41,
+    "name": "settings_bulk_import",
+    "status": "ok",
+    "size_kb": 273,
+    "hash": "c714bef6aad7de1a348755af72acaa48",
+    "desc": "Settings: Bulk Import"
+  },
+  {
+    "n": 42,
+    "name": "settings_employees",
+    "status": "ok",
+    "size_kb": 262,
+    "hash": "79293ed3f0df74621280497684cbee22",
+    "desc": "Settings: Employees"
+  },
+  {
+    "n": 43,
+    "name": "settings_branches",
+    "status": "ok",
+    "size_kb": 251,
+    "hash": "bd2c64447dc4dd2b88abaa94f7427985",
+    "desc": "Settings: Branches"
+  },
+  {
+    "n": 44,
+    "name": "settings_suppliers",
+    "status": "ok",
+    "size_kb": 295,
+    "hash": "3fb36e4d2d22972fd24abb697888d66a",
+    "desc": "Settings: Suppliers"
+  },
+  {
+    "n": 45,
+    "name": "settings_expenses",
+    "status": "ok",
+    "size_kb": 299,
+    "hash": "f528d3846115a7ad42d0f1eabeee9afe",
+    "desc": "Settings: Expenses"
+  },
+  {
+    "n": 46,
+    "name": "settings_attendance",
+    "status": "ok",
+    "size_kb": 404,
+    "hash": "b20d4dcb0f7aeb7bae59da2cfb36cd5e",
+    "desc": "Settings: Attendance"
+  },
+  {
+    "n": 47,
+    "name": "settings_shift_monitor",
+    "status": "ok",
+    "size_kb": 259,
+    "hash": "8afc45605239373fda51a9850f97c332",
+    "desc": "Settings: Shift Monitor"
+  },
+  {
+    "n": 48,
+    "name": "settings_purchase_orders",
+    "status": "ok",
+    "size_kb": 237,
+    "hash": "8a20fd0ed8306742c2fbf5ce81a64ca3",
+    "desc": "Settings: Purchase Orders"
+  },
+  {
+    "n": 49,
+    "name": "settings_activity_log",
+    "status": "ok",
+    "size_kb": 397,
+    "hash": "a4a680fe41fe649248b702e9eb6fc482",
+    "desc": "Settings: Activity Log"
+  },
+  {
+    "n": 50,
+    "name": "settings_returns_and_refunds",
+    "status": "ok",
+    "size_kb": 237,
+    "hash": "ee3bde3554a067471eb11294aa7235f5",
+    "desc": "Settings: Returns & Refunds"
+  },
+  {
+    "n": 51,
+    "name": "settings_cash_drawer",
+    "status": "ok",
+    "size_kb": 283,
+    "hash": "378382ae1ad364e5b4d0bdd63c510c07",
+    "desc": "Settings: Cash Drawer"
+  },
+  {
+    "n": 52,
+    "name": "settings_warehouses",
+    "status": "ok",
+    "size_kb": 244,
+    "hash": "71f76ab22f922a3bf87465ca659f5052",
+    "desc": "Settings: Warehouses"
+  },
+  {
+    "n": 53,
+    "name": "settings_product_batches",
+    "status": "ok",
+    "size_kb": 238,
+    "hash": "de683f7c0dbfb99da357a01c7489fd33",
+    "desc": "Settings: Product Batches"
+  },
+  {
+    "n": 54,
+    "name": "settings_vehicles",
+    "status": "ok",
+    "size_kb": 286,
+    "hash": "2179f5c76c6f37359fedb56a31bc22c3",
+    "desc": "Settings: Vehicles"
+  },
+  {
+    "n": 55,
+    "name": "settings_daily_closing",
+    "status": "ok",
+    "size_kb": 305,
+    "hash": "f6d1e08307f59cfbc8c0a4cbfe2307bc",
+    "desc": "Settings: Daily Closing"
+  },
+  {
+    "n": 56,
+    "name": "settings_monthly_closing",
+    "status": "ok",
+    "size_kb": 283,
+    "hash": "2d477a0ba0666d31cb836e4aafa79429",
+    "desc": "Settings: Monthly Closing"
+  },
+  {
+    "n": 57,
+    "name": "settings_accounts_receivable",
+    "status": "ok",
+    "size_kb": 255,
+    "hash": "86bde04365437ee26dd5c08682995ee7",
+    "desc": "Settings: Accounts Receivable"
+  },
+  {
+    "n": 58,
+    "name": "settings_language",
+    "status": "ok",
+    "size_kb": 254,
+    "hash": "a53324e658d05c56f33b9ecc0c153bbd",
+    "desc": "Settings: Language"
+  },
+  {
+    "n": 59,
+    "name": "settings_receipt_printer",
+    "status": "ok",
+    "size_kb": 290,
+    "hash": "a30273d429895669d8ae5e1647dba917",
+    "desc": "Settings: Receipt Printer"
+  },
+  {
+    "n": 60,
+    "name": "settings_printer_configuration",
+    "status": "ok",
+    "size_kb": 322,
+    "hash": "8ad1a2c81c4b2af275af66bb5dd266f4",
+    "desc": "Settings: Printer Configuration"
+  },
+  {
+    "n": 61,
+    "name": "store_homepage_hero",
+    "status": "ok",
+    "size_kb": 11409,
+    "hash": "117499d9bea3b40cc4a39f637b781a68",
+    "desc": "Store homepage — hero"
+  },
+  {
+    "n": 62,
+    "name": "store_menu_section",
+    "status": "ok",
+    "size_kb": 11551,
+    "hash": "e6d985b0dd4dffdea68aa71716e6c51d",
+    "desc": "Store — menu section"
+  },
+  {
+    "n": 63,
+    "name": "store_product_grid",
+    "status": "ok",
+    "size_kb": 11898,
+    "hash": "ec060c78c065764d2f3f3b22b231a0f1",
+    "desc": "Store — product grid"
+  },
+  {
+    "n": 64,
+    "name": "store_product_detail",
+    "status": "ok",
+    "size_kb": 11418,
+    "hash": "4904e77aa39245df77fb65c4d40e2450",
+    "desc": "Product detail — size + toppings"
+  },
+  {
+    "n": 65,
+    "name": "store_added_to_cart",
+    "status": "ok",
+    "size_kb": 12116,
+    "hash": "9c74d12471078458a4faffabae8d7a68",
+    "desc": "Product added — cart count updated"
+  },
+  {
+    "n": 66,
+    "name": "store_cart_open",
+    "status": "ok",
+    "size_kb": 11239,
+    "hash": "8f848f1f15e667be1e767e5287ca4cd8",
+    "desc": "Store cart sidebar open"
+  },
+  {
+    "n": 67,
+    "name": "store_checkout_form",
+    "status": "ok",
+    "size_kb": 11252,
+    "hash": "155e579bcfb19d9645d5060daef94258",
+    "desc": "Store checkout form in cart sidebar"
+  },
+  {
+    "n": 68,
+    "name": "store_checkout_form_filled",
+    "status": "ok",
+    "size_kb": 11411,
+    "hash": "5b7d6f006b09bbbeea322384a7d42a35",
+    "desc": "Store checkout form filled with English data"
+  },
+  {
+    "n": 69,
+    "name": "pos_before_call",
+    "status": "ok",
+    "size_kb": 746,
+    "hash": "3885165e517543522a6e25310cbbc168",
+    "desc": "POS — before incoming call"
+  },
+  {
+    "n": 70,
+    "name": "incoming_call_popup",
+    "status": "ok",
+    "size_kb": 745,
+    "hash": "9710c109d759eab96724a01039d83eb0",
+    "desc": "Incoming call popup — customer data shown"
+  },
+  {
+    "n": 71,
+    "name": "pos_cart_linked_to_caller",
+    "status": "ok",
+    "size_kb": 745,
+    "hash": "db4c01bfa900a8c9c2a5d375947a67d3",
+    "desc": "Cart auto-linked to caller"
+  }
+]

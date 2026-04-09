@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   StyleSheet, Text, View, FlatList, Pressable, ScrollView,
   Alert, Platform, Animated, RefreshControl, Modal, TextInput, KeyboardAvoidingView,
-  Image,
+  Image, useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -16,10 +16,17 @@ import { useLanguage } from "@/lib/language-context";
 import { cloneOrderItems, normalizeOrderItems } from "@/lib/order-items";
 import { playClickSound } from "@/lib/sound";
 import { autoPrint3Copies } from "@/utils/printing";
+import { getChromeMetrics } from "@/lib/responsive";
+import { getWebStaticFallbackChain } from "@/lib/web-static";
+import TabPageHeader from "@/components/tab-page-header";
 import {
   PIZZA_TOPPINGS, TOPPING_GRID, SAUCE_ROW, SAUCE_NAMES,
   getToppingDisplayName, getToppingEmoji,
 } from "@/utils/toppingUtils";
+import DriverAssignModal from "@/components/DriverAssignModal";
+import TrackingLinkButton from "@/components/TrackingLinkButton";
+import ScheduledOrderBadge from "@/components/ScheduledOrderBadge";
+import DeliveryStatusPipeline from "@/components/DeliveryStatusPipeline";
 
 const STATUS_FLOW = ["pending", "accepted", "preparing", "ready", "delivered"];
 
@@ -34,6 +41,30 @@ const STATUS_META: Record<string, { label: string; labelAr: string; labelDe: str
 };
 
 const PAY_ICON: Record<string, string> = { cash: "💵", card: "💳", mobile: "📱" };
+
+function FallbackOrderImage({ uri, style }: { uri: string; style: any }) {
+  const fallbacks = getWebStaticFallbackChain(uri);
+  const [currentUri, setCurrentUri] = useState(fallbacks[0] || uri);
+
+  useEffect(() => {
+    setCurrentUri(fallbacks[0] || uri);
+  }, [uri]);
+
+  return (
+    <Image
+      source={{ uri: currentUri }}
+      style={style}
+      resizeMode="cover"
+      onError={() => {
+        const currentIndex = fallbacks.indexOf(currentUri);
+        const nextUri = fallbacks[currentIndex + 1];
+        if (nextUri && nextUri !== currentUri) {
+          setCurrentUri(nextUri);
+        }
+      }}
+    />
+  );
+}
 
 function playNotificationSound() {
   if (Platform.OS !== "web") return;
@@ -56,6 +87,7 @@ function playNotificationSound() {
 
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { tenant } = useLicense();
   const { language } = useLanguage();
   const qc = useQueryClient();
@@ -63,6 +95,8 @@ export default function OrdersScreen() {
 
   const [viewMode, setViewMode] = useState<"online" | "pos" | "all">("all");
   const [filter, setFilter] = useState<string>("all");
+  const [orderTypeFilter, setOrderTypeFilter] = useState<string>("all_types");
+  const [driverAssignOrderId, setDriverAssignOrderId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [newOrderIds, setNewOrderIds] = useState<Set<number>>(new Set());
   const knownOrderIds = useRef<Set<string>>(new Set());
@@ -100,6 +134,7 @@ export default function OrdersScreen() {
   const [showToppingsStep, setShowToppingsStep] = useState(false);
 
   const isRTL = language === "ar";
+  const { topPad } = getChromeMetrics(width);
   const lbl = (en: string, ar: string, de: string) =>
     language === "ar" ? ar : language === "de" ? de : en;
 
@@ -180,6 +215,10 @@ export default function OrdersScreen() {
     if (viewMode === "pos" && o._type !== "pos") return false;
     if (filter === "active") return ["pending", "accepted", "preparing", "ready"].includes(o.status);
     if (filter === "done") return ["delivered", "cancelled", "completed"].includes(o.status);
+    // Delivery order type filter
+    if (orderTypeFilter === "delivery") return o.orderType === "delivery";
+    if (orderTypeFilter === "pickup") return o.orderType === "pickup";
+    if (orderTypeFilter === "scheduled") return Boolean(o.scheduledAt);
     return true;
   });
 
@@ -594,6 +633,20 @@ export default function OrdersScreen() {
           </View>
         ) : null}
 
+        {/* Scheduled badge */}
+        {item.scheduledAt ? (
+          <View style={{ marginBottom: 6 }}>
+            <ScheduledOrderBadge scheduledAt={item.scheduledAt} isRtl={isRTL} />
+          </View>
+        ) : null}
+
+        {/* Tracking link + driver info */}
+        {!isPOS && item.orderType === "delivery" && item.trackingToken ? (
+          <View style={{ marginBottom: 6 }}>
+            <TrackingLinkButton trackingToken={item.trackingToken} label={lbl("Share Tracking", "رابط التتبع", "Tracking teilen")} />
+          </View>
+        ) : null}
+
         {/* Time + fee */}
         <View style={[styles.totalsRow, isRTL && { flexDirection: "row-reverse" }]}>
           <Text style={styles.timeText}>
@@ -615,6 +668,15 @@ export default function OrdersScreen() {
                   {language === "ar" ? STATUS_META[next]?.labelAr : language === "de" ? STATUS_META[next]?.labelDe : STATUS_META[next]?.label}
                 </Text>
               </LinearGradient>
+            </Pressable>
+          )}
+          {/* Assign Driver - delivery orders only */}
+          {!isPOS && item.orderType === "delivery" && item.status !== "delivered" && item.status !== "cancelled" && (
+            <Pressable
+              style={[styles.editBtn, { backgroundColor: Colors.deliveryPrimaryLight }]}
+              onPress={() => { playClickSound("light"); setDriverAssignOrderId(item.id); }}
+            >
+              <Ionicons name="bicycle" size={16} color={Colors.deliveryPrimary} />
             </Pressable>
           )}
           {/* Edit */}
@@ -724,7 +786,29 @@ export default function OrdersScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top + topPad,
+        },
+      ]}
+    >
+
+      {/* ===== DRIVER ASSIGN MODAL ===== */}
+      {driverAssignOrderId !== null && (
+        <DriverAssignModal
+          visible={driverAssignOrderId !== null}
+          orderId={driverAssignOrderId}
+          tenantId={tenantId || 0}
+          licenseKey={(tenant as any)?.licenseKey || ""}
+          apiBase={getApiUrl()}
+          onAssigned={(driverId) => {
+            qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+          }}
+          onClose={() => setDriverAssignOrderId(null)}
+        />
+      )}
 
       {/* ===== EDIT ORDER MODAL ===== */}
       <Modal visible={!!editingOrder} animationType="slide" transparent onRequestClose={() => setEditingOrder(null)}>
@@ -1181,7 +1265,7 @@ export default function OrdersScreen() {
                           onPress={() => addItemToOrder(p)}
                         >
                           {p.image ? (
-                            <Image source={{ uri: p.image }} style={styles.productCardImage} resizeMode="cover" />
+                            <FallbackOrderImage uri={p.image} style={styles.productCardImage} />
                           ) : (
                             <View style={[styles.productCardImagePlaceholder, { backgroundColor: catColor + "20" }]}>
                               <Text style={{ fontSize: 20 }}>🍕</Text>
@@ -1213,59 +1297,75 @@ export default function OrdersScreen() {
         </View>
       </Modal>
 
-      {/* ===== HEADER ===== */}
-      <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 48 : insets.top }]}>
-        <LinearGradient colors={["#1E1B4B", "#312E81", "#0A0E27"]} style={styles.headerGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-          <View style={[styles.headerContent, isRTL && { flexDirection: "row-reverse" }]}>
-            <View>
-              <Text style={[styles.headerTitle, isRTL && { textAlign: "right" }]}>
-                {lbl("All Orders", "جميع الطلبات", "Alle Bestellungen")}
+      <TabPageHeader
+        title={lbl("All Orders", "جميع الطلبات", "Alle Bestellungen")}
+        subtitle={pendingCount > 0
+          ? lbl(`${pendingCount} online order${pendingCount > 1 ? "s" : ""} pending`, `${pendingCount} طلب إلكتروني جديد`, `${pendingCount} neue Online - Bestellung(en)`)
+          : lbl("Live orders dashboard", "لوحة الطلبات المباشرة", "Live-Bestellübersicht")}
+        icon="receipt"
+        isRTL={isRTL}
+        colors={["#1E1B4B", "#312E81", "#0A0E27"]}
+        rightActions={pendingCount > 0 ? (
+          <Animated.View style={[styles.pendingBadge, { transform: [{ scale: pulseAnim }] }]}>
+            <Text style={styles.pendingBadgeText}>{pendingCount}</Text>
+          </Animated.View>
+        ) : undefined}
+      >
+        <View style={[styles.filterRow, isRTL && { flexDirection: "row-reverse" }]}>
+          {[
+            { key: "all", en: "All Orders", ar: "الكل", de: "Alle" },
+            { key: "online", en: "🌐 Online", ar: "🌐 إلكتروني", de: "🌐 Online" },
+            { key: "pos", en: "📞 POS", ar: "📞 كاشير", de: "📞 Kasse" },
+          ].map(f => (
+            <Pressable key={f.key} onPress={() => { playClickSound("light"); setViewMode(f.key as any); }} style={[styles.filterTab, viewMode === f.key && styles.filterTabActive]}>
+              <Text style={[styles.filterTabText, viewMode === f.key && styles.filterTabTextActive]}>
+                {language === "ar" ? f.ar : language === "de" ? f.de : f.en}
               </Text>
-              <Text style={[styles.headerSub, isRTL && { textAlign: "right" }]}>
-                {pendingCount > 0
-                  ? lbl(`${pendingCount} online order${pendingCount > 1 ? "s" : ""} pending`, `${pendingCount} طلب إلكتروني جديد`, `${pendingCount} neue Online - Bestellung(en)`)
-                  : lbl("Live orders dashboard", "لوحة الطلبات المباشرة", "Live-Bestellübersicht")}
-              </Text>
-            </View>
-            {pendingCount > 0 && (
-              <Animated.View style={[styles.pendingBadge, { transform: [{ scale: pulseAnim }] }]}>
-                <Text style={styles.pendingBadgeText}>{pendingCount}</Text>
-              </Animated.View>
-            )}
-          </View>
+            </Pressable>
+          ))}
+        </View>
 
-          {/* Source tabs */}
+        <View style={[styles.filterRow, isRTL && { flexDirection: "row-reverse" }]}>
+          {[
+            { key: "active", en: "Active", ar: "النشطة", de: "Aktiv" },
+            { key: "done", en: "Done", ar: "المكتملة", de: "Erledigt" },
+            { key: "all", en: "All", ar: "الكل", de: "Alle" },
+          ].map(f => (
+            <Pressable key={f.key} onPress={() => { playClickSound("light"); setFilter(f.key); }} style={[styles.filterTab, filter === f.key && styles.filterTabActive]}>
+              <Text style={[styles.filterTabText, filter === f.key && styles.filterTabTextActive]}>
+                {language === "ar" ? f.ar : language === "de" ? f.de : f.en}
+                {f.key === "active" && pendingCount > 0 && viewMode !== "pos" ? ` (${pendingCount})` : ""}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Delivery order type filter */}
+        {viewMode === "online" && (
           <View style={[styles.filterRow, isRTL && { flexDirection: "row-reverse" }]}>
             {[
-              { key: "all", en: "All Orders", ar: "الكل", de: "Alle" },
-              { key: "online", en: "🌐 Online", ar: "🌐 إلكتروني", de: "🌐 Online" },
-              { key: "pos", en: "📞 POS", ar: "📞 كاشير", de: "📞 Kasse" },
+              { key: "all_types", en: "All Types", ar: "الكل", de: "Alle" },
+              { key: "delivery", en: "🛵 Delivery", ar: "🛵 توصيل", de: "🛵 Lieferung" },
+              { key: "pickup", en: "🏃 Pickup", ar: "🏃 استلام", de: "🏃 Abholung" },
+              { key: "scheduled", en: "📅 Scheduled", ar: "📅 مجدول", de: "📅 Geplant" },
             ].map(f => (
-              <Pressable key={f.key} onPress={() => { playClickSound("light"); setViewMode(f.key as any); }} style={[styles.filterTab, viewMode === f.key && styles.filterTabActive]}>
-                <Text style={[styles.filterTabText, viewMode === f.key && styles.filterTabTextActive]}>
+              <Pressable
+                key={f.key}
+                onPress={() => { playClickSound("light"); setOrderTypeFilter?.(f.key); }}
+                style={[
+                  styles.filterTab,
+                  { paddingHorizontal: 8 },
+                  (orderTypeFilter || "all_types") === f.key && { backgroundColor: Colors.deliveryPrimaryLight, borderColor: Colors.deliveryPrimary },
+                ]}
+              >
+                <Text style={[styles.filterTabText, (orderTypeFilter || "all_types") === f.key && { color: Colors.deliveryPrimary }]}>
                   {language === "ar" ? f.ar : language === "de" ? f.de : f.en}
                 </Text>
               </Pressable>
             ))}
           </View>
-
-          {/* Status filter */}
-          <View style={[styles.filterRow, isRTL && { flexDirection: "row-reverse" }]}>
-            {[
-              { key: "active", en: "Active", ar: "النشطة", de: "Aktiv" },
-              { key: "done", en: "Done", ar: "المكتملة", de: "Erledigt" },
-              { key: "all", en: "All", ar: "الكل", de: "Alle" },
-            ].map(f => (
-              <Pressable key={f.key} onPress={() => { playClickSound("light"); setFilter(f.key); }} style={[styles.filterTab, filter === f.key && styles.filterTabActive]}>
-                <Text style={[styles.filterTabText, filter === f.key && styles.filterTabTextActive]}>
-                  {language === "ar" ? f.ar : language === "de" ? f.de : f.en}
-                  {f.key === "active" && pendingCount > 0 && viewMode !== "pos" ? ` (${pendingCount})` : ""}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </LinearGradient>
-      </View>
+        )}
+      </TabPageHeader>
 
       {/* ===== ORDER LIST ===== */}
       <FlatList
@@ -1290,11 +1390,6 @@ export default function OrdersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { overflow: "hidden" },
-  headerGrad: { paddingHorizontal: 16, paddingBottom: 0 },
-  headerContent: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 16, paddingBottom: 12 },
-  headerTitle: { color: "#fff", fontSize: 22, fontWeight: "800" },
-  headerSub: { color: "rgba(255,255,255,0.6)", fontSize: 12, marginTop: 2 },
   pendingBadge: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.danger,
     justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: "rgba(255,255,255,0.3)",

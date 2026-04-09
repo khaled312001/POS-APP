@@ -139,6 +139,19 @@ export const customers = mysqlTable("customers", {
   r18: boolean("r18").default(false),
   r19: boolean("r19").default(false),
   r20: boolean("r20").default(false),
+  // ── Delivery Platform Extensions ──
+  hasAccount: boolean("has_account").default(false),
+  passwordHash: text("password_hash"),
+  dateOfBirth: text("date_of_birth"),
+  gender: text("gender"),
+  preferredLanguage: text("preferred_language").default("en"),
+  walletBalance: decimal("wallet_balance", { precision: 10, scale: 2 }).default("0"),
+  totalOrdersDelivery: int("total_orders_delivery").default(0),
+  totalOrdersPickup: int("total_orders_pickup").default(0),
+  referralCode: varchar("referral_code", { length: 16 }),
+  referredByCode: varchar("referred_by_code", { length: 16 }),
+  fcmToken: text("fcm_token"),
+  loyaltyTier: text("loyalty_tier").default("bronze"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -610,6 +623,28 @@ export const onlineOrders = mysqlTable("online_orders", {
   notes: text("notes"),
   estimatedTime: int("estimated_time"), // minutes
   language: text("language").default("en"),
+  // ── Delivery Platform Extensions ──
+  driverId: int("driver_id"),
+  scheduledAt: timestamp("scheduled_at"),
+  promoCodeId: int("promo_code_id"),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
+  driverLat: decimal("driver_lat", { precision: 10, scale: 7 }),
+  driverLng: decimal("driver_lng", { precision: 10, scale: 7 }),
+  customerLat: decimal("customer_lat", { precision: 10, scale: 7 }),
+  customerLng: decimal("customer_lng", { precision: 10, scale: 7 }),
+  riderPickedUpAt: timestamp("rider_picked_up_at"),
+  riderDeliveredAt: timestamp("rider_delivered_at"),
+  rating: int("rating"),
+  ratingComment: text("rating_comment"),
+  trackingToken: varchar("tracking_token", { length: 64 }),
+  sourceChannel: text("source_channel").default("web"),
+  floor: text("floor"),
+  buildingName: text("building_name"),
+  addressNotes: text("address_notes"),
+  savedAddressId: int("saved_address_id"),
+  walletAmountUsed: decimal("wallet_amount_used", { precision: 10, scale: 2 }).default("0"),
+  loyaltyPointsUsed: int("loyalty_points_used").default(0),
+  loyaltyPointsEarned: int("loyalty_points_earned").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -645,6 +680,25 @@ export const landingPageConfig = mysqlTable("landing_page_config", {
   customCss: text("custom_css"),
   isPublished: boolean("is_published").default(true),
   language: text("language").default("en"), // System language: en | ar | de
+  // ── Delivery Platform Extensions ──
+  bannerImages: json("banner_images").$type<{ url: string; title?: string; link?: string }[]>().default([]),
+  featuredCategoryIds: json("featured_category_ids").$type<number[]>().default([]),
+  promoText: text("promo_text"),
+  deliveryZonesJson: json("delivery_zones_json").$type<{ label: string; lat: number; lng: number; radiusKm: number; fee: number }[]>().default([]),
+  minDeliveryTime: int("min_delivery_time").default(20),
+  maxDeliveryTime: int("max_delivery_time").default(45),
+  loyaltyPointsPerUnit: decimal("loyalty_points_per_unit", { precision: 5, scale: 2 }).default("1.00"),
+  loyaltyRedemptionRate: decimal("loyalty_redemption_rate", { precision: 5, scale: 2 }).default("0.01"),
+  enableLoyalty: boolean("enable_loyalty").default(true),
+  enableScheduledOrders: boolean("enable_scheduled_orders").default(true),
+  enablePromos: boolean("enable_promos").default(true),
+  enableWallet: boolean("enable_wallet").default(false),
+  metaTitle: text("meta_title"),
+  metaDescription: text("meta_description"),
+  googleAnalyticsId: text("google_analytics_id"),
+  supportPhone: text("support_phone"),
+  logomark: text("logomark"),
+  headerBgImage: text("header_bg_image"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -663,6 +717,17 @@ export const vehicles = mysqlTable("vehicles", {
   driverPhone: text("driver_phone"),
   isActive: boolean("is_active").default(true),
   notes: text("notes"),
+  // ── Delivery Platform Extensions ──
+  employeeId: int("employee_id"),
+  currentLat: decimal("current_lat", { precision: 10, scale: 7 }),
+  currentLng: decimal("current_lng", { precision: 10, scale: 7 }),
+  locationUpdatedAt: timestamp("location_updated_at"),
+  driverStatus: text("driver_status").default("offline"),
+  driverRating: decimal("driver_rating", { precision: 3, scale: 2 }).default("5.00"),
+  totalDeliveries: int("total_deliveries").default(0),
+  activeOrderId: int("active_order_id"),
+  deviceToken: text("device_token"),
+  driverAccessToken: varchar("driver_access_token", { length: 64 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -734,6 +799,144 @@ export const dailySequences = mysqlTable("daily_sequences", {
 }, (table) => ({
   uniqScopeDate: unique("daily_seq_scope_date_unique").on(table.scopeKey, table.date),
 }));
+
+// ========== Delivery Platform Tables ==========
+
+export const customerAddresses = mysqlTable("customer_addresses", {
+  id: serial("id").primaryKey(),
+  customerId: int("customer_id").references(() => customers.id, { onDelete: 'cascade' }).notNull(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  label: text("label").notNull().default("Home"),
+  street: text("street").notNull(),
+  buildingName: text("building_name"),
+  floor: text("floor"),
+  city: text("city").notNull(),
+  postalCode: text("postal_code"),
+  lat: decimal("lat", { precision: 10, scale: 7 }),
+  lng: decimal("lng", { precision: 10, scale: 7 }),
+  notes: text("notes"),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const promoCodes = mysqlTable("promo_codes", {
+  id: serial("id").primaryKey(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  code: varchar("code", { length: 32 }).notNull(),
+  description: text("description"),
+  discountType: text("discount_type").notNull().default("percent"), // percent | fixed | free_delivery
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
+  minOrderAmount: decimal("min_order_amount", { precision: 10, scale: 2 }).default("0"),
+  maxDiscountCap: decimal("max_discount_cap", { precision: 10, scale: 2 }),
+  usageLimit: int("usage_limit"),
+  usageCount: int("usage_count").default(0),
+  perCustomerLimit: int("per_customer_limit").default(1),
+  validFrom: timestamp("valid_from"),
+  validUntil: timestamp("valid_until"),
+  isActive: boolean("is_active").default(true),
+  applicableOrderTypes: json("applicable_order_types").$type<string[]>().default(["delivery", "pickup"]),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  uniqTenantCode: unique("promo_tenant_code").on(t.tenantId, t.code),
+}));
+
+export const promoCodeUsages = mysqlTable("promo_code_usages", {
+  id: serial("id").primaryKey(),
+  promoCodeId: int("promo_code_id").references(() => promoCodes.id, { onDelete: 'cascade' }).notNull(),
+  customerId: int("customer_id").references(() => customers.id, { onDelete: 'set null' }),
+  orderId: int("order_id").references(() => onlineOrders.id, { onDelete: 'set null' }),
+  discountApplied: decimal("discount_applied", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const driverLocations = mysqlTable("driver_locations", {
+  id: serial("id").primaryKey(),
+  vehicleId: int("vehicle_id").references(() => vehicles.id, { onDelete: 'cascade' }).notNull(),
+  orderId: int("order_id").references(() => onlineOrders.id, { onDelete: 'set null' }),
+  lat: decimal("lat", { precision: 10, scale: 7 }).notNull(),
+  lng: decimal("lng", { precision: 10, scale: 7 }).notNull(),
+  speed: decimal("speed", { precision: 5, scale: 2 }),
+  heading: int("heading"),
+  recordedAt: timestamp("recorded_at").defaultNow(),
+});
+
+export const loyaltyTransactions = mysqlTable("loyalty_transactions", {
+  id: serial("id").primaryKey(),
+  customerId: int("customer_id").references(() => customers.id, { onDelete: 'cascade' }).notNull(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  orderId: int("order_id").references(() => onlineOrders.id, { onDelete: 'set null' }),
+  type: text("type").notNull(), // earn | redeem | expire | bonus | referral
+  points: int("points").notNull(),
+  balanceBefore: int("balance_before").notNull(),
+  balanceAfter: int("balance_after").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const walletTransactions = mysqlTable("wallet_transactions", {
+  id: serial("id").primaryKey(),
+  customerId: int("customer_id").references(() => customers.id, { onDelete: 'cascade' }).notNull(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  orderId: int("order_id").references(() => onlineOrders.id, { onDelete: 'set null' }),
+  type: text("type").notNull(), // top_up | payment | refund | bonus
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  balanceBefore: decimal("balance_before", { precision: 10, scale: 2 }).notNull(),
+  balanceAfter: decimal("balance_after", { precision: 10, scale: 2 }).notNull(),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const orderRatings = mysqlTable("order_ratings", {
+  id: serial("id").primaryKey(),
+  orderId: int("order_id").references(() => onlineOrders.id, { onDelete: 'cascade' }).notNull().unique(),
+  customerId: int("customer_id").references(() => customers.id, { onDelete: 'set null' }),
+  driverId: int("driver_id").references(() => vehicles.id, { onDelete: 'set null' }),
+  foodRating: int("food_rating"),
+  deliveryRating: int("delivery_rating"),
+  overallRating: int("overall_rating").notNull(),
+  comment: text("comment"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const customerSessions = mysqlTable("customer_sessions", {
+  id: serial("id").primaryKey(),
+  customerId: int("customer_id").references(() => customers.id, { onDelete: 'cascade' }).notNull(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  deviceInfo: text("device_info"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const otpVerifications = mysqlTable("otp_verifications", {
+  id: serial("id").primaryKey(),
+  phone: varchar("phone", { length: 32 }).notNull(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  otp: varchar("otp", { length: 8 }).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  attempts: int("attempts").default(0),
+  verified: boolean("verified").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const deliveryZones = mysqlTable("delivery_zones", {
+  id: serial("id").primaryKey(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  branchId: int("branch_id").references(() => branches.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  nameAr: text("name_ar"),
+  polygon: json("polygon").$type<{ lat: number; lng: number }[]>(),
+  centerLat: decimal("center_lat", { precision: 10, scale: 7 }),
+  centerLng: decimal("center_lng", { precision: 10, scale: 7 }),
+  radiusKm: decimal("radius_km", { precision: 5, scale: 2 }),
+  deliveryFee: decimal("delivery_fee", { precision: 10, scale: 2 }).default("0"),
+  minOrderAmount: decimal("min_order_amount", { precision: 10, scale: 2 }).default("0"),
+  estimatedMinutes: int("estimated_minutes").default(30),
+  isActive: boolean("is_active").default(true),
+  sortOrder: int("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 // ========== Insert Schemas ==========
 
@@ -874,3 +1077,37 @@ export type OnlineOrder = typeof onlineOrders.$inferSelect;
 export type InsertOnlineOrder = z.infer<typeof insertOnlineOrderSchema>;
 export type LandingPageConfig = typeof landingPageConfig.$inferSelect;
 export type InsertLandingPageConfig = z.infer<typeof insertLandingPageConfigSchema>;
+
+// ── Delivery Platform Insert Schemas ──
+export const insertCustomerAddressSchema = createInsertSchema(customerAddresses).omit({ id: true, createdAt: true });
+export const insertPromoCodeSchema = createInsertSchema(promoCodes).omit({ id: true, createdAt: true });
+export const insertPromoCodeUsageSchema = createInsertSchema(promoCodeUsages).omit({ id: true, createdAt: true });
+export const insertDriverLocationSchema = createInsertSchema(driverLocations).omit({ id: true, recordedAt: true });
+export const insertLoyaltyTransactionSchema = createInsertSchema(loyaltyTransactions).omit({ id: true, createdAt: true });
+export const insertWalletTransactionSchema = createInsertSchema(walletTransactions).omit({ id: true, createdAt: true });
+export const insertOrderRatingSchema = createInsertSchema(orderRatings).omit({ id: true, createdAt: true });
+export const insertCustomerSessionSchema = createInsertSchema(customerSessions).omit({ id: true, createdAt: true });
+export const insertOtpVerificationSchema = createInsertSchema(otpVerifications).omit({ id: true, createdAt: true });
+export const insertDeliveryZoneSchema = createInsertSchema(deliveryZones).omit({ id: true, createdAt: true });
+
+// ── Delivery Platform Types ──
+export type CustomerAddress = typeof customerAddresses.$inferSelect;
+export type InsertCustomerAddress = z.infer<typeof insertCustomerAddressSchema>;
+export type PromoCode = typeof promoCodes.$inferSelect;
+export type InsertPromoCode = z.infer<typeof insertPromoCodeSchema>;
+export type PromoCodeUsage = typeof promoCodeUsages.$inferSelect;
+export type InsertPromoCodeUsage = z.infer<typeof insertPromoCodeUsageSchema>;
+export type DriverLocation = typeof driverLocations.$inferSelect;
+export type InsertDriverLocation = z.infer<typeof insertDriverLocationSchema>;
+export type LoyaltyTransaction = typeof loyaltyTransactions.$inferSelect;
+export type InsertLoyaltyTransaction = z.infer<typeof insertLoyaltyTransactionSchema>;
+export type WalletTransaction = typeof walletTransactions.$inferSelect;
+export type InsertWalletTransaction = z.infer<typeof insertWalletTransactionSchema>;
+export type OrderRating = typeof orderRatings.$inferSelect;
+export type InsertOrderRating = z.infer<typeof insertOrderRatingSchema>;
+export type CustomerSession = typeof customerSessions.$inferSelect;
+export type InsertCustomerSession = z.infer<typeof insertCustomerSessionSchema>;
+export type OtpVerification = typeof otpVerifications.$inferSelect;
+export type InsertOtpVerification = z.infer<typeof insertOtpVerificationSchema>;
+export type DeliveryZone = typeof deliveryZones.$inferSelect;
+export type InsertDeliveryZone = z.infer<typeof insertDeliveryZoneSchema>;

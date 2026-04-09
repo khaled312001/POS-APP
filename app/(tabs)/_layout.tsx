@@ -1,6 +1,6 @@
 import { Tabs, Redirect } from "expo-router";
-import { Platform, StyleSheet } from "react-native";
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import { Platform, StyleSheet, Dimensions, Modal } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/colors";
 import { BlurView } from "expo-blur";
@@ -9,51 +9,31 @@ import { useLanguage } from "@/lib/language-context";
 import { useLicense } from "@/lib/license-context";
 import { useNotifications } from "@/lib/notification-context";
 import { Text, View, Animated, Pressable } from "react-native";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
+import { usePathname, useRouter } from "expo-router";
 import { getQueryFn, getApiUrl } from "@/lib/query-client";
-
-// ── Web-only fixed toolbar height (screens reserve this via topPad) ──────────
-const WEB_TOOLBAR_H = 48;
+import { getChromeMetrics, WEB_TOOLBAR_DESKTOP_H, WEB_TOOLBAR_MOBILE_H } from "@/lib/responsive";
 
 export default function TabLayout() {
   const { isLoggedIn, isCashier } = useAuth();
   const { t, isRTL } = useLanguage();
   const { subscription, tenant } = useLicense();
   const tenantId = tenant?.id;
-  const qc = useQueryClient();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const notifPulse = useRef(new Animated.Value(1)).current;
   const [pendingCount, setPendingCount] = useState(0);
   const lastNotifiedOrderIdRef = useRef<number | null>(null);
+  const [screenDims, setScreenDims] = useState(Dimensions.get("window"));
+  const [showMobileNav, setShowMobileNav] = useState(false);
+  const pathname = usePathname();
 
-  // ── Global Refresh ──────────────────────────────────────────────────────────
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const refreshSpin = useRef(new Animated.Value(0)).current;
-  const spinAnim = useRef<Animated.CompositeAnimation | null>(null);
+  useEffect(() => {
+    const sub = Dimensions.addEventListener("change", ({ window }) => setScreenDims(window));
+    return () => sub?.remove();
+  }, []);
 
-  const handleGlobalRefresh = useCallback(async () => {
-    if (Platform.OS === "web") {
-      (window as any).location.reload();
-      return;
-    }
-    if (isRefreshing) return;
-    setIsRefreshing(true);
-    spinAnim.current = Animated.loop(
-      Animated.timing(refreshSpin, { toValue: 1, duration: 700, useNativeDriver: true })
-    );
-    spinAnim.current.start();
-    try {
-      await qc.invalidateQueries();
-      await qc.refetchQueries({ type: "active" });
-    } finally {
-      spinAnim.current?.stop();
-      refreshSpin.setValue(0);
-      setIsRefreshing(false);
-    }
-  }, [isRefreshing, qc, refreshSpin]);
-
-  const refreshRotate = refreshSpin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
+  const { isMobileWeb } = getChromeMetrics(screenDims.width);
+  const webToolbarHeight = isMobileWeb ? WEB_TOOLBAR_MOBILE_H : WEB_TOOLBAR_DESKTOP_H;
 
   const { data: onlineOrders = [] } = useQuery<any[]>({
     queryKey: ["/api/online-orders", tenantId ? `?tenantId=${tenantId}` : ""],
@@ -64,6 +44,18 @@ export default function TabLayout() {
 
   const { onlineOrderNotification, setOnlineOrderNotification, playNotificationSound } = useNotifications();
   const router = useRouter();
+  const navItems = [
+    { href: "/", icon: "cart", label: t("pos") },
+    { href: "/online-orders", icon: "receipt", label: t("onlineOrdersTitle" as any) || "Orders" },
+    { href: "/products", icon: "grid", label: t("products") },
+    { href: "/customers", icon: "people", label: t("customers") },
+    ...(!isCashier ? [
+      { href: "/reports", icon: "stats-chart", label: t("reports") },
+      { href: "/settings", icon: "menu", label: t("more") },
+    ] : []),
+  ];
+  const currentTitle = navItems.find((item) => item.href === pathname)?.label || t("pos");
+  const isPosRoute = pathname === "/" || pathname === "/index";
 
   // ── Detect new online orders → play sound + show toast ────────────────────
   useEffect(() => {
@@ -153,11 +145,12 @@ export default function TabLayout() {
             backgroundColor: Platform.OS === "ios" ? "transparent" : Colors.tabBar,
             borderTopWidth: 0,
             elevation: 0,
-            height: Platform.OS === "web" ? 84 : 60,
-            paddingBottom: Platform.OS === "web" ? 34 : 6,
+            height: Platform.OS === "web" ? (isMobileWeb ? 0 : 84) : 60,
+            paddingBottom: Platform.OS === "web" ? (isMobileWeb ? 0 : 34) : 6,
             paddingTop: 6,
             position: "absolute" as const,
             direction: isRTL ? "rtl" : "ltr",
+            display: Platform.OS === "web" && isMobileWeb ? "none" : "flex",
           },
           tabBarBackground: () =>
             Platform.OS === "ios" ? (
@@ -244,74 +237,104 @@ export default function TabLayout() {
         />
       </Tabs>
 
-      {/* ── Web fixed toolbar with refresh button ─────────────────────────── */}
-      {Platform.OS === "web" && (
-        <View style={{
-          position: "absolute" as const,
-          top: 0, left: 0, right: 0,
-          height: WEB_TOOLBAR_H,
-          backgroundColor: Colors.background,
-          borderBottomWidth: 1,
-          borderBottomColor: "rgba(255,255,255,0.08)",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          paddingHorizontal: 16,
-          zIndex: 9998,
-        }}>
-          <Pressable
-            onPress={handleGlobalRefresh}
-            style={({ pressed }) => ({
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-              paddingHorizontal: 14,
-              paddingVertical: 8,
-              borderRadius: 10,
-              backgroundColor: pressed ? Colors.cardBg : "rgba(255,255,255,0.07)",
-              borderWidth: 1,
-              borderColor: "rgba(255,255,255,0.12)",
-            })}
-          >
-            <Ionicons name="refresh-outline" size={18} color={Colors.white} />
-            <Text style={{ color: Colors.white, fontSize: 13, fontWeight: "600" }}>
-              Refresh
-            </Text>
-          </Pressable>
-        </View>
-      )}
-
-      {/* ── Native: floating refresh button (bottom-right) ─────────────────── */}
-      {Platform.OS !== "web" && (
-        <Pressable
-          onPress={handleGlobalRefresh}
-          disabled={isRefreshing}
-          style={{
+      {Platform.OS === "web" && isMobileWeb && (
+        <>
+          <View style={{
             position: "absolute",
-            bottom: 72,
-            right: 16,
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: isRefreshing ? Colors.cardBg : Colors.accent,
-            justifyContent: "center",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: webToolbarHeight,
+            backgroundColor: Colors.background,
+            borderBottomWidth: 1,
+            borderBottomColor: "rgba(255,255,255,0.08)",
+            flexDirection: isRTL ? "row-reverse" : "row",
             alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 12,
             zIndex: 9998,
-            elevation: 8,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-          }}
-        >
-          <Animated.View style={{ transform: [{ rotate: refreshRotate }] }}>
-            <Ionicons
-              name="refresh-outline"
-              size={22}
-              color={isRefreshing ? Colors.textMuted : Colors.white}
-            />
-          </Animated.View>
-        </Pressable>
+          }}>
+            <Pressable
+              onPress={() => setShowMobileNav(true)}
+              style={({ pressed }) => ({
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: pressed ? Colors.card : "rgba(255,255,255,0.07)",
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.12)",
+              })}
+            >
+              <Ionicons name="menu-outline" size={22} color={Colors.white} />
+            </Pressable>
+
+            <Text style={{ color: Colors.white, fontSize: 16, fontWeight: "800" }} numberOfLines={1}>
+              {currentTitle}
+            </Text>
+
+            <View style={{ width: 40, height: 40, alignItems: "flex-end", justifyContent: "center" }}>
+              {isPosRoute ? (
+                <Pressable
+                  onPress={() => {
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(new CustomEvent("barmagly-open-cart"));
+                    }
+                  }}
+                  style={({ pressed }) => ({
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: pressed ? Colors.card : "rgba(255,255,255,0.07)",
+                    borderWidth: 1,
+                    borderColor: "rgba(255,255,255,0.12)",
+                  })}
+                >
+                  <Ionicons name="cart-outline" size={20} color={Colors.white} />
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+
+          <Modal visible={showMobileNav} animationType="fade" transparent onRequestClose={() => setShowMobileNav(false)}>
+            <View style={styles.mobileNavOverlay}>
+              <Pressable style={styles.mobileNavBackdrop} onPress={() => setShowMobileNav(false)} />
+              <View style={[styles.mobileNavSheet, isRTL && { alignSelf: "flex-start" }]}>
+                <View style={[styles.mobileNavHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                  <Text style={styles.mobileNavTitle}>Barmagly POS</Text>
+                  <Pressable onPress={() => setShowMobileNav(false)} style={styles.mobileNavClose}>
+                    <Ionicons name="close" size={22} color={Colors.text} />
+                  </Pressable>
+                </View>
+
+                {navItems.map((item) => {
+                  const active = pathname === item.href;
+                  return (
+                    <Pressable
+                      key={item.href}
+                      onPress={() => {
+                        setShowMobileNav(false);
+                        router.push(item.href as any);
+                      }}
+                      style={[styles.mobileNavItem, active && styles.mobileNavItemActive, isRTL && { flexDirection: "row-reverse" }]}
+                    >
+                      <Ionicons name={item.icon as any} size={20} color={active ? Colors.textDark : Colors.text} />
+                      <Text style={[styles.mobileNavItemText, active && styles.mobileNavItemTextActive]}>{item.label}</Text>
+                      {item.href === "/online-orders" && pendingCount > 0 ? (
+                        <View style={styles.mobileNavBadge}>
+                          <Text style={styles.mobileNavBadgeText}>{pendingCount > 9 ? "9+" : pendingCount}</Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          </Modal>
+        </>
       )}
 
       {/* Global Online Order Notification Toast — visible on every tab */}
@@ -322,7 +345,7 @@ export default function TabLayout() {
             setOnlineOrderNotification(null);
           }}
           style={{
-            position: "absolute", top: Platform.OS === "web" ? WEB_TOOLBAR_H + 8 : 16, left: 12, right: 12,
+            position: "absolute", top: Platform.OS === "web" ? (isMobileWeb ? webToolbarHeight + 8 : 8) : 16, left: 12, right: 12,
             borderRadius: 18, overflow: "hidden",
             zIndex: 99999,
             ...(Platform.OS === "web"
@@ -375,3 +398,88 @@ export default function TabLayout() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  mobileNavOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.48)",
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
+  },
+  mobileNavBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  mobileNavSheet: {
+    marginTop: WEB_TOOLBAR_MOBILE_H,
+    width: "82%",
+    maxWidth: 320,
+    height: "100%",
+    backgroundColor: Colors.surface,
+    borderLeftWidth: 1,
+    borderLeftColor: Colors.cardBorder,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  mobileNavHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  mobileNavTitle: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  mobileNavClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.card,
+  },
+  mobileNavItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginBottom: 8,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  mobileNavItemActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  mobileNavItemText: {
+    flex: 1,
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  mobileNavItemTextActive: {
+    color: Colors.textDark,
+  },
+  mobileNavBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.danger,
+  },
+  mobileNavBadgeText: {
+    color: Colors.white,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+});

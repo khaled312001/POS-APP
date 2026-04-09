@@ -31,6 +31,16 @@ if (Platform.OS === "web" && typeof window !== "undefined" && "serviceWorker" in
       const permission = await Notification.requestPermission();
       if (permission === "granted") {
         try {
+          const [licenseKey, tenantId] = await Promise.all([
+            AsyncStorage.getItem("barmagly_license_key"),
+            AsyncStorage.getItem("barmagly_tenant_id"),
+          ]);
+
+          if (!licenseKey || !tenantId) {
+            console.log("[Push] Skipped subscription: missing tenant context");
+            return;
+          }
+
           // Get VAPID public key
           const keyRes = await fetch("/api/push/vapid-public-key");
           if (!keyRes.ok) throw new Error("VAPID key unavailable");
@@ -46,11 +56,20 @@ if (Platform.OS === "web" && typeof window !== "undefined" && "serviceWorker" in
           });
 
           // Send subscription to server
-          await fetch("/api/push/subscribe", {
+          const subscribeRes = await fetch("/api/push/subscribe", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(sub.toJSON()),
+            headers: {
+              "Content-Type": "application/json",
+              "x-license-key": licenseKey,
+            },
+            body: JSON.stringify({
+              ...sub.toJSON(),
+              tenantId: Number(tenantId),
+            }),
           });
+          if (!subscribeRes.ok) {
+            throw new Error(`Push subscribe failed: ${subscribeRes.status}`);
+          }
           console.log("[Push] Subscribed successfully");
         } catch (pushErr) {
           console.warn("[Push] Subscription failed:", pushErr);

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet, Text, View, ScrollView, Pressable, Modal,
-  TextInput, Alert, Platform, FlatList, Switch, Image,
+  TextInput, Alert, Platform, FlatList, Switch, Image, useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,6 +17,8 @@ import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { getDisplayNumber } from "@/lib/api-config";
 import { playClickSound } from "@/lib/sound";
+import { getChromeMetrics } from "@/lib/responsive";
+import TabPageHeader from "@/components/tab-page-header";
 
 function printHtmlViaIframe(html: string, onDone?: () => void) {
   if (typeof document === "undefined") return;
@@ -94,10 +97,21 @@ const EMPTY_SHIFTS: any[] = [];
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const qc = useQueryClient();
   const { employee, logout, isAdmin, canManage, isCashier } = useAuth();
   const { t, isRTL, language, setLanguage } = useLanguage();
   const { tenant } = useLicense();
+  const { topPad, bottomPad } = getChromeMetrics(width);
+  const tenantId = tenant?.id;
+
+  // Landing page config for slug
+  const { data: landingConfigData } = useQuery({
+    queryKey: ["/api/landing-page-config", tenantId],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!tenantId,
+  });
+  const slug = (landingConfigData as any)?.slug;
   const [showEmployees, setShowEmployees] = useState(false);
   const [showSuppliers, setShowSuppliers] = useState(false);
   const [showBranches, setShowBranches] = useState(false);
@@ -135,6 +149,12 @@ export default function SettingsScreen() {
   const [branchForm, setBranchForm] = useState({ name: "", address: "", phone: "", currency: "CHF", taxRate: "" });
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState({ name: "", address: "", type: "main" });
+  // Delivery Platform modals
+  const [showDeliveryZones, setShowDeliveryZones] = useState(false);
+  const [showPromoCodes, setShowPromoCodes] = useState(false);
+  const [showDriverManagement, setShowDriverManagement] = useState(false);
+  const [showLoyaltyConfig, setShowLoyaltyConfig] = useState(false);
+
   const [showPrinterSettings, setShowPrinterSettings] = useState(false);
   const [printerPaperSize, setPrinterPaperSize] = useState("80mm");
   const [printerAutoPrint, setPrinterAutoPrint] = useState(false);
@@ -594,7 +614,6 @@ export default function SettingsScreen() {
 
   const closedShifts = shifts.filter((s: any) => s.endTime && s.status === "closed");
 
-  const topPad = Platform.OS === "web" ? 48 : 0;
   const roleColors: Record<string, string> = { admin: Colors.danger, manager: Colors.warning, cashier: Colors.info, owner: Colors.secondary };
 
   const formatDuration = (startTime: string, endTime: string) => {
@@ -642,10 +661,20 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
-      <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid]} style={styles.header}>
-        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Text style={styles.headerTitle}>{t("settingsMore")}</Text>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top + topPad,
+          direction: isRTL ? "rtl" : "ltr",
+        },
+      ]}
+    >
+      <TabPageHeader
+        title={t("settingsMore")}
+        icon="settings"
+        isRTL={isRTL}
+        rightActions={
           <Pressable onPress={() => setShowNotifications(true)} style={{ position: "relative", padding: 4 }}>
             <Ionicons name="notifications-outline" size={24} color={Colors.white} />
             {unreadCount > 0 && (
@@ -654,10 +683,10 @@ export default function SettingsScreen() {
               </View>
             )}
           </Pressable>
-        </View>
-      </LinearGradient>
+        }
+      />
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: (Platform.OS === "web" ? 84 : 60) + 20 }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 20 }]}>
         {employee && (
           <View style={styles.profileCard}>
             <View style={styles.profileAvatar}>
@@ -723,6 +752,13 @@ export default function SettingsScreen() {
             <SettingRow icon="cash" label={t("cashDrawer")} value={activeShift ? t("activeShift") : t("noActiveShift")} onPress={() => setShowCashDrawer(true)} color={Colors.success} rtl={isRTL} />
           </>
         )}
+
+        <Text style={styles.sectionTitle}>{t("deliveryPlatform")}</Text>
+        <SettingRow icon="bicycle" label={t("deliveryZones")} value={t("addDeliveryZone")} onPress={() => router.push("/delivery-zones")} color={Colors.deliveryPrimary} rtl={isRTL} />
+        <SettingRow icon="pricetag" label={t("promoCodes")} value={t("addPromoCode")} onPress={() => router.push("/promo-codes")} color="#8B5CF6" rtl={isRTL} />
+        <SettingRow icon="car" label={t("driverManagement")} value={t("activeDrivers")} onPress={() => router.push("/driver-management")} color={Colors.driverOnline} rtl={isRTL} />
+        <SettingRow icon="storefront" label={t("storefrontPreview")} value={slug || "—"} onPress={() => { if (slug) require("react-native").Linking.openURL(getApiUrl() + `/order/${slug}`); }} color={Colors.accent} rtl={isRTL} />
+        <SettingRow icon="star" label={t("loyaltyConfiguration")} value={t("loyaltyPoints")} onPress={() => setShowLoyaltyConfig(true)} color={Colors.loyaltyGold} rtl={isRTL} />
 
         <Text style={styles.sectionTitle}>{t("system")}</Text>
         <SettingRow icon="language" label={t("language")} value={language === "ar" ? "العربية" : language === "de" ? "Deutsch" : "English"} onPress={() => setShowLanguagePicker(true)} color={Colors.info} rtl={isRTL} />
@@ -3031,6 +3067,66 @@ export default function SettingsScreen() {
         </View>
       </Modal>
 
+      {/* ── Delivery Zones Modal ────────────────────────────────────────────── */}
+      <Modal visible={showDeliveryZones} animationType="slide" transparent onRequestClose={() => setShowDeliveryZones(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>🚲 {t("deliveryZones")}</Text>
+              <Pressable onPress={() => setShowDeliveryZones(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <Text style={{ color: Colors.textMuted, padding: 16, textAlign: "center" }}>
+              {t("addDeliveryZone")} — Coming Soon
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Promo Codes Modal ───────────────────────────────────────────────── */}
+      <Modal visible={showPromoCodes} animationType="slide" transparent onRequestClose={() => setShowPromoCodes(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>🏷️ {t("promoCodes")}</Text>
+              <Pressable onPress={() => setShowPromoCodes(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <Text style={{ color: Colors.textMuted, padding: 16, textAlign: "center" }}>
+              {t("addPromoCode")} — Coming Soon
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Driver Management Modal ─────────────────────────────────────────── */}
+      <Modal visible={showDriverManagement} animationType="slide" transparent onRequestClose={() => setShowDriverManagement(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>🚗 {t("driverManagement")}</Text>
+              <Pressable onPress={() => setShowDriverManagement(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <Text style={{ color: Colors.textMuted, padding: 16, textAlign: "center" }}>
+              {t("activeDrivers")} — Coming Soon
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Loyalty Configuration Modal ─────────────────────────────────────── */}
+      <Modal visible={showLoyaltyConfig} animationType="slide" transparent onRequestClose={() => setShowLoyaltyConfig(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>⭐ {t("loyaltyConfiguration")}</Text>
+              <Pressable onPress={() => setShowLoyaltyConfig(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <Text style={{ color: Colors.textMuted, padding: 16, textAlign: "center" }}>
+              {t("loyaltyPoints")} — Coming Soon
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -3069,8 +3165,6 @@ const pgStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 16, paddingVertical: 14 },
-  headerTitle: { fontSize: 22, fontWeight: "800", color: Colors.white },
   content: { paddingHorizontal: 12 },
   profileCard: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.cardBorder },
   profileAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center", marginRight: 14 },

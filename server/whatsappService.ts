@@ -632,4 +632,144 @@ export const whatsappService = {
         const msg = `${storeName} — Order ${orderNumber}\n\n${text}`;
         return this.sendText(customerPhone, msg);
     },
+
+    // ── Delivery Platform Notifications ───────────────────────────────────────
+
+    /** Notify driver about new assignment + deep link to driver PWA */
+    async sendDriverAssignment(
+        driverPhone: string,
+        driverName: string,
+        orderId: number,
+        customerAddress: string,
+        storeName: string,
+        driverToken: string,
+        baseUrl: string,
+    ): Promise<boolean> {
+        const driverLink = `${baseUrl}/driver/${driverToken}`;
+        const msg = [
+            `🚗 New Delivery Assignment — ${storeName}`,
+            ``,
+            `Hi ${driverName}!`,
+            `Order #${orderId} has been assigned to you.`,
+            ``,
+            `📍 Deliver to: ${customerAddress}`,
+            ``,
+            `Open the driver app to start navigation:`,
+            driverLink,
+        ].join("\n");
+        return this.sendText(driverPhone, msg);
+    },
+
+    /** Send live tracking link to customer when driver picks up order */
+    async sendOrderTracking(
+        customerPhone: string,
+        orderNumber: string,
+        storeName: string,
+        trackingToken: string,
+        baseUrl: string,
+    ): Promise<boolean> {
+        const trackLink = `${baseUrl}/track/${trackingToken}`;
+        const msg = [
+            `🛵 Your order is on the way! — ${storeName}`,
+            ``,
+            `Order ${orderNumber} has been picked up and is heading your way.`,
+            ``,
+            `Track your delivery in real time:`,
+            trackLink,
+        ].join("\n");
+        return this.sendText(customerPhone, msg);
+    },
+
+    /** Request a rating after successful delivery */
+    async sendRatingRequest(
+        customerPhone: string,
+        orderNumber: string,
+        storeName: string,
+        orderId: number,
+        baseUrl: string,
+        slug: string,
+    ): Promise<boolean> {
+        const rateLink = `${baseUrl}/order/${slug}#rate-${orderId}`;
+        const msg = [
+            `⭐ How was your order? — ${storeName}`,
+            ``,
+            `Your order ${orderNumber} has been delivered. We hope you enjoyed it!`,
+            ``,
+            `Please take a moment to rate your experience:`,
+            rateLink,
+        ].join("\n");
+        return this.sendText(customerPhone, msg);
+    },
+
+    /** Broadcast a promotional message to a customer */
+    async sendPromoNotification(
+        customerPhone: string,
+        storeName: string,
+        promoTitle: string,
+        promoCode: string,
+        expiryDate: string,
+        baseUrl: string,
+        slug: string,
+    ): Promise<boolean> {
+        const storeLink = `${baseUrl}/order/${slug}`;
+        const msg = [
+            `🎁 Special Offer from ${storeName}!`,
+            ``,
+            `${promoTitle}`,
+            ``,
+            `Use code: *${promoCode}*`,
+            `Valid until: ${expiryDate}`,
+            ``,
+            `Order now:`,
+            storeLink,
+        ].join("\n");
+        return this.sendText(customerPhone, msg);
+    },
+
+    // ── Food Tracker™ automatic milestone messages ────────────────────────────
+
+    /** Sends the right WhatsApp message per order milestone (accepted/ready/on_way) */
+    async sendFoodTrackerUpdate(
+        customerPhone: string,
+        orderNumber: string,
+        storeName: string,
+        status: string,
+        trackingToken?: string,
+        baseUrl?: string,
+    ): Promise<boolean> {
+        if (status === "accepted") {
+            const msg = [
+                `✅ Order Received — ${storeName}`,
+                ``,
+                `Order ${orderNumber} has been accepted and is now being prepared.`,
+                `We'll notify you when it's on the way!`,
+            ].join("\n");
+            return this.sendText(customerPhone, msg);
+        }
+
+        if (status === "ready") {
+            const msg = [
+                `👨‍🍳 Order Ready — ${storeName}`,
+                ``,
+                `Order ${orderNumber} is ready and waiting for the driver.`,
+                `Delivery is starting soon!`,
+            ].join("\n");
+            return this.sendText(customerPhone, msg);
+        }
+
+        if (status === "on_way" && trackingToken && baseUrl) {
+            const trackLink = `${baseUrl}/track/${trackingToken}`;
+            const msg = [
+                `🛵 On the Way! — ${storeName}`,
+                ``,
+                `Your driver has picked up order ${orderNumber} and is heading to you.`,
+                ``,
+                `Live tracking:`,
+                trackLink,
+            ].join("\n");
+            return this.sendText(customerPhone, msg);
+        }
+
+        return false;
+    },
 };

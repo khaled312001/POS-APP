@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" id="html-root">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" id="theme-meta" content="#FF5722" />
+  <title id="page-title">Track Your Order</title>
+
+  <link rel="stylesheet" href="/delivery-app/css/base.css" />
+  <link rel="stylesheet" href="/delivery-app/css/components.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      max-width: 600px;
+      margin: 0 auto;
+      background: var(--delivery-bg);
+      font-family: var(--font-body);
+      color: var(--delivery-text);
+      min-height: 100dvh;
+    }
+
+    /* ── Header ── */
+    #track-header {
+      background: var(--primary, #FF5722);
+      color: #fff;
+      padding: 20px 16px 24px;
+      position: relative;
+    }
+    .track-header__logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .track-header__logo img { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; }
+    .track-header__logo-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: rgba(255,255,255,0.25);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+    }
+    .track-header__store { font-size: 0.85rem; font-weight: 600; opacity: 0.9; }
+    #track-header h1 { color: #fff; font-size: 1.2rem; font-weight: 800; margin: 0; }
+    #track-order-num { color: rgba(255,255,255,0.8); font-size: 0.875rem; margin: 2px 0 0; }
+    .header-actions {
+      position: absolute; top: 16px; right: 16px;
+      display: flex; gap: 8px;
+    }
+    [dir="rtl"] .header-actions { right: auto; left: 16px; }
+    .header-btn {
+      background: rgba(255,255,255,0.2);
+      border: none; color: #fff;
+      width: 36px; height: 36px; border-radius: 50%;
+      cursor: pointer; font-size: 1rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .header-btn:hover { background: rgba(255,255,255,0.35); }
+
+    /* ── Loading / Error ── */
+    #loading, #error-state {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 55vh; gap: 16px; padding: 24px;
+      text-align: center;
+    }
+    .spinner {
+      width: 44px; height: 44px;
+      border: 3px solid rgba(255,87,34,0.18);
+      border-top-color: var(--primary, #FF5722);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #error-state { display: none; }
+    .error-icon { font-size: 3rem; }
+    .error-msg { color: var(--delivery-text-muted); font-size: 0.9rem; max-width: 280px; }
+    .retry-btn {
+      background: var(--primary, #FF5722);
+      color: #fff; border: none;
+      padding: 10px 28px; border-radius: 999px;
+      font-size: 0.9375rem; font-weight: 600;
+      cursor: pointer; margin-top: 8px;
+    }
+
+    /* ── Map ── */
+    #map { width: 100%; height: 240px; background: var(--delivery-border); }
+    #map-placeholder {
+      width: 100%; height: 120px;
+      background: linear-gradient(135deg, var(--delivery-border), var(--delivery-primary-light));
+      display: flex; align-items: center; justify-content: center;
+      color: var(--delivery-text-muted); font-size: 2rem; gap: 12px;
+    }
+
+    /* ── Status Section ── */
+    .track-body { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+
+    .current-status {
+      background: var(--delivery-surface);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      border-left: 4px solid var(--status-color, var(--primary, #FF5722));
+      display: flex; align-items: center; gap: 14px;
+    }
+    [dir="rtl"] .current-status { border-left: none; border-right: 4px solid var(--status-color, var(--primary, #FF5722)); }
+    .status-icon { font-size: 2rem; }
+    .status-label { font-size: 1.1rem; font-weight: 800; color: var(--delivery-text); }
+    .status-sublabel { font-size: 0.875rem; color: var(--delivery-text-muted); margin-top: 2px; }
+
+    /* Pipeline */
+    .pipeline-wrap {
+      background: var(--delivery-surface);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .pipeline-title { font-size: 0.875rem; font-weight: 600; color: var(--delivery-text-muted); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .status-pipeline {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .pipeline-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding-bottom: 16px;
+      position: relative;
+    }
+    .pipeline-step:last-child { padding-bottom: 0; }
+    .pipeline-step::before {
+      content: "";
+      position: absolute;
+      left: 14px;
+      top: 28px;
+      width: 2px;
+      height: calc(100% - 14px);
+      background: var(--delivery-border);
+    }
+    [dir="rtl"] .pipeline-step::before { left: auto; right: 14px; }
+    .pipeline-step:last-child::before { display: none; }
+    .pipeline-step.done::before { background: var(--delivery-success); }
+    .pipeline-step.active::before { background: var(--primary, #FF5722); }
+    .pipeline-step__dot {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 700;
+      flex-shrink: 0;
+      background: var(--delivery-border);
+      color: var(--delivery-text-muted);
+      position: relative; z-index: 1;
+      transition: all 0.3s;
+    }
+    .pipeline-step.done .pipeline-step__dot {
+      background: var(--delivery-success);
+      color: #fff;
+    }
+    .pipeline-step.active .pipeline-step__dot {
+      background: var(--primary, #FF5722);
+      color: #fff;
+      box-shadow: 0 0 0 4px var(--delivery-primary-light);
+    }
+    .pipeline-step__content { flex: 1; padding-top: 4px; }
+    .pipeline-step__label {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--delivery-text-muted);
+    }
+    .pipeline-step.done .pipeline-step__label,
+    .pipeline-step.active .pipeline-step__label { color: var(--delivery-text); }
+    .pipeline-step__time { font-size: 0.8rem; color: var(--delivery-text-muted); margin-top: 1px; }
+
+    /* ── Driver card ── */
+    .driver-card {
+      background: var(--delivery-surface);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .driver-card__avatar {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: var(--delivery-primary-light);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; flex-shrink: 0;
+    }
+    .driver-card__info { flex: 1; }
+    .driver-card__name { font-weight: 700; font-size: 1rem; }
+    .driver-card__rating { font-size: 0.8125rem; color: var(--delivery-text-muted); margin-top: 2px; }
+    .driver-card__call {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: var(--delivery-success);
+      color: #fff; font-size: 1.2rem;
+      display: flex; align-items: center; justify-content: center;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+
+    /* ── Order summary ── */
+    .order-summary {
+      background: var(--delivery-surface);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+    .order-summary__title { font-weight: 700; font-size: 0.9375rem; margin-bottom: 12px; }
+    .summary-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 0.875rem; }
+    .summary-row + .summary-row { border-top: 1px solid var(--delivery-border); }
+    .summary-row.total { font-weight: 700; font-size: 1rem; }
+    .summary-row span:last-child { font-variant-numeric: tabular-nums; }
+
+    /* ── Rating sheet ── */
+    .rating-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 200; display: flex; align-items: flex-end;
+      opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    .rating-overlay.open { opacity: 1; pointer-events: auto; }
+    .rating-sheet {
+      background: var(--delivery-surface);
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      padding: 24px;
+      width: 100%;
+      transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+    }
+    .rating-overlay.open .rating-sheet { transform: translateY(0); }
+    .rating-sheet__handle { width: 40px; height: 4px; background: var(--delivery-border); border-radius: 2px; margin: 0 auto 20px; }
+    .rating-sheet__title { font-size: 1.2rem; font-weight: 800; margin-bottom: 4px; }
+    .rating-sheet__sub { color: var(--delivery-text-muted); font-size: 0.9rem; margin-bottom: 20px; }
+    .star-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 20px; }
+    .star-btn {
+      font-size: 2.5rem; cursor: pointer; transition: transform 0.15s;
+      background: none; border: none; padding: 4px;
+      filter: grayscale(1); opacity: 0.4;
+    }
+    .star-btn.active { filter: none; opacity: 1; transform: scale(1.15); }
+    .rating-comment {
+      width: 100%; padding: 12px; border-radius: var(--radius-md);
+      border: 1.5px solid var(--delivery-border);
+      font-size: 0.9375rem; resize: none; min-height: 80px;
+      font-family: var(--font-body);
+      background: var(--delivery-bg);
+      color: var(--delivery-text);
+      margin-bottom: 16px;
+    }
+    .rating-comment:focus { outline: none; border-color: var(--primary, #FF5722); }
+    .submit-rating-btn {
+      width: 100%; padding: 14px; border-radius: var(--radius-pill);
+      background: var(--primary, #FF5722); color: #fff; border: none;
+      font-size: 1rem; font-weight: 700; cursor: pointer;
+    }
+    .submit-rating-btn:disabled { opacity: 0.6; pointer-events: none; }
+
+    /* ── Cancelled state ── */
+    .cancelled-banner {
+      background: rgba(239,68,68,0.1);
+      border: 1.5px solid rgba(239,68,68,0.3);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      display: flex; align-items: center; gap: 12px;
+      color: var(--delivery-danger);
+      font-weight: 600;
+    }
+
+    /* ── Footer ── */
+    .track-footer { text-align: center; padding: 8px 16px 20px; color: var(--delivery-text-muted); font-size: 0.8rem; }
+    .track-footer a { color: var(--primary, #FF5722); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div id="track-header">
+    <div class="track-header__logo">
+      <div class="track-header__logo-icon" id="store-logo-wrap">🛵</div>
+      <span class="track-header__store" id="store-name-label">Delivery</span>
+    </div>
+    <h1 id="header-title">Order Tracking</h1>
+    <p id="track-order-num">Loading...</p>
+    <div class="header-actions">
+      <button class="header-btn" id="share-btn" title="Share" onclick="shareOrder()" style="display:none">🔗</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <p id="loading-text">Loading order...</p>
+  </div>
+
+  <!-- Error -->
+  <div id="error-state">
+    <div class="error-icon">⚠️</div>
+    <h2 id="error-title">Order not found</h2>
+    <p class="error-msg" id="error-msg">The tracking link may be invalid or expired.</p>
+    <button class="retry-btn" onclick="loadOrder()">Try Again</button>
+  </div>
+
+  <!-- Main content -->
+  <div id="track-content" class="hidden">
+    <!-- Map or placeholder -->
+    <div id="map-placeholder"><span>🗺️</span></div>
+    <div id="map" style="display:none"></div>
+
+    <div class="track-body">
+      <!-- Current status -->
+      <div class="current-status" id="current-status">
+        <div class="status-icon" id="status-icon">⏳</div>
+        <div>
+          <div class="status-label" id="status-text">Pending</div>
+          <div class="status-sublabel" id="eta-text">Calculating delivery time...</div>
+        </div>
+      </div>
+
+      <!-- Cancelled banner (shown only when cancelled) -->
+      <div id="cancelled-banner" class="cancelled-banner hidden">
+        <span>❌</span>
+        <span id="cancelled-msg">This order has been cancelled.</span>
+      </div>
+
+      <!-- Pipeline -->
+      <div class="pipeline-wrap" id="pipeline-wrap">
+        <div class="pipeline-title" id="pipeline-title">Order Progress</div>
+        <div class="status-pipeline" id="pipeline"></div>
+      </div>
+
+      <!-- Driver card -->
+      <div id="driver-info" class="hidden">
+        <div class="driver-card">
+          <div class="driver-card__avatar">🚗</div>
+          <div class="driver-card__info">
+            <div class="driver-card__name" id="driver-name">Your Driver</div>
+            <div class="driver-card__rating" id="driver-rating">⭐ —</div>
+          </div>
+          <a id="driver-call" href="#" class="driver-card__call">📞</a>
+        </div>
+      </div>
+
+      <!-- Order items -->
+      <div class="order-summary">
+        <div class="order-summary__title" id="items-title">Order Details</div>
+        <div id="order-items"></div>
+        <div class="summary-row total">
+          <span id="total-label">Total</span>
+          <span id="order-total">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="track-footer">
+      <span id="footer-text">Live tracking updates every 10s</span>
+      <span> · </span>
+      <a id="support-link" href="#" id="support-link">Contact Support</a>
+    </div>
+  </div>
+
+  <!-- Rating overlay -->
+  <div class="rating-overlay" id="rating-overlay">
+    <div class="rating-sheet">
+      <div class="rating-sheet__handle"></div>
+      <div class="rating-sheet__title" id="rating-title">How was your order?</div>
+      <div class="rating-sheet__sub" id="rating-sub">Rate your experience to help us improve</div>
+      <div class="star-row" id="star-row">
+        <button class="star-btn" data-v="1" onclick="setStar(1)">⭐</button>
+        <button class="star-btn" data-v="2" onclick="setStar(2)">⭐</button>
+        <button class="star-btn" data-v="3" onclick="setStar(3)">⭐</button>
+        <button class="star-btn" data-v="4" onclick="setStar(4)">⭐</button>
+        <button class="star-btn" data-v="5" onclick="setStar(5)">⭐</button>
+      </div>
+      <textarea class="rating-comment" id="rating-comment" placeholder="Tell us more (optional)..."></textarea>
+      <button class="submit-rating-btn" id="submit-rating-btn" onclick="submitRating()" disabled>Submit Rating</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ── Config ─────────────────────────────────────────────────────────────────
+    const TOKEN = location.pathname.split("/track/")[1]?.replace(/\/$/, "");
+    const LANG  = new URLSearchParams(location.search).get("lang") || "en";
+    const IS_AR = LANG === "ar";
+
+    // Apply RTL
+    if (IS_AR) {
+      document.getElementById("html-root").setAttribute("lang", "ar");
+      document.getElementById("html-root").setAttribute("dir", "rtl");
+    }
+
+    // ── i18n ───────────────────────────────────────────────────────────────────
+    const T = {
+      en: {
+        trackTitle: "Order Tracking", loading: "Loading order...", retry: "Try Again",
+        orderNotFound: "Order not found", orderNotFoundMsg: "The tracking link may be invalid or expired.",
+        orderNum: n => `Order #${n}`,
+        steps: { pending:"Received", accepted:"Accepted", preparing:"Preparing", ready:"Ready", on_way:"On the Way", delivered:"Delivered" },
+        stepSubs: { pending:"We received your order", accepted:"Restaurant confirmed your order", preparing:"Kitchen is preparing your food", ready:"Ready for pickup by driver", on_way:"Driver is on the way!", delivered:"Order delivered successfully" },
+        currentStatuses: { pending:"Order Received", accepted:"Confirmed ✓", preparing:"Being Prepared 🍳", ready:"Ready for Driver 📦", on_way:"Driver On the Way 🚗", delivered:"Delivered! 🎉", cancelled:"Cancelled" },
+        eta: "Est. delivery time", minutes: m => `~${m} minutes`,
+        orderProgress: "Order Progress", orderDetails: "Order Details", total: "Total",
+        driverOnWay: "Your Driver", liveUpdates: "Live tracking updates every 10s", support: "Contact Support",
+        ratingTitle: "How was your order?", ratingSub: "Rate your experience to help us improve",
+        ratingPlaceholder: "Tell us more (optional)...", submitRating: "Submit Rating", ratingThanks: "Thanks for your feedback!",
+        share: "Share tracking link", cancelled: "This order has been cancelled.",
+        itemsTitle: "Order Details",
+      },
+      ar: {
+        trackTitle: "تتبع الطلب", loading: "جاري تحميل الطلب...", retry: "حاول مرة أخرى",
+        orderNotFound: "الطلب غير موجود", orderNotFoundMsg: "رابط التتبع قد يكون غير صحيح أو منتهي الصلاحية.",
+        orderNum: n => `طلب #${n}`,
+        steps: { pending:"استُلم", accepted:"مقبول", preparing:"يُحضَّر", ready:"جاهز", on_way:"في الطريق", delivered:"تم التوصيل" },
+        stepSubs: { pending:"استلمنا طلبك", accepted:"المطعم قبل طلبك", preparing:"المطبخ يحضر طعامك", ready:"جاهز لاستلام السائق", on_way:"السائق في الطريق إليك!", delivered:"تم توصيل الطلب بنجاح" },
+        currentStatuses: { pending:"تم استلام الطلب", accepted:"تم التأكيد ✓", preparing:"جاري التحضير 🍳", ready:"جاهز للسائق 📦", on_way:"السائق في الطريق 🚗", delivered:"تم التوصيل! 🎉", cancelled:"ملغي" },
+        eta: "وقت التوصيل المتوقع", minutes: m => `~${m} دقيقة`,
+        orderProgress: "مراحل الطلب", orderDetails: "تفاصيل الطلب", total: "الإجمالي",
+        driverOnWay: "السائق", liveUpdates: "تحديثات مباشرة كل 10 ثوانٍ", support: "تواصل مع الدعم",
+        ratingTitle: "كيف كان طلبك؟", ratingSub: "قيّم تجربتك لمساعدتنا على التحسين",
+        ratingPlaceholder: "أخبرنا المزيد (اختياري)...", submitRating: "إرسال التقييم", ratingThanks: "شكراً لملاحظاتك!",
+        share: "مشاركة رابط التتبع", cancelled: "تم إلغاء هذا الطلب.",
+        itemsTitle: "تفاصيل الطلب",
+      }
+    };
+    const t = T[IS_AR ? "ar" : "en"];
+
+    // Apply i18n to static labels
+    document.getElementById("header-title").textContent     = t.trackTitle;
+    document.getElementById("loading-text").textContent     = t.loading;
+    document.getElementById("error-title").textContent      = t.orderNotFound;
+    document.getElementById("error-msg").textContent        = t.orderNotFoundMsg;
+    document.getElementById("pipeline-title").textContent   = t.orderProgress;
+    document.getElementById("items-title").textContent      = t.itemsTitle;
+    document.getElementById("total-label").textContent      = t.total;
+    document.getElementById("footer-text").textContent      = t.liveUpdates;
+    document.getElementById("support-link").textContent     = t.support;
+    document.getElementById("rating-title").textContent     = t.ratingTitle;
+    document.getElementById("rating-sheet__sub") && (document.querySelector(".rating-sheet__sub").textContent = t.ratingSub);
+    document.getElementById("rating-comment").placeholder   = t.ratingPlaceholder;
+    document.getElementById("submit-rating-btn").textContent = t.submitRating;
+    document.getElementById("cancelled-msg").textContent    = t.cancelled;
+
+    // ── State ──────────────────────────────────────────────────────────────────
+    let map, driverMarker, customerMarker, es;
+    let currentOrder = null;
+    let currentStore = null;
+    let selectedStar = 0;
+    let currency = "EGP";
+
+    const STATUS_COLORS = {
+      pending: "#F59E0B", accepted: "#3B82F6", preparing: "#8B5CF6",
+      ready: "#2FD3C6", on_way: "#FF5722", delivered: "#10B981", cancelled: "#EF4444",
+    };
+    const STATUS_ICONS = {
+      pending: "⏳", accepted: "✅", preparing: "🍳", ready: "📦", on_way: "🚗", delivered: "🎉", cancelled: "❌",
+    };
+    const STEPS = [
+      { key: "pending" }, { key: "accepted" }, { key: "preparing" },
+      { key: "ready" }, { key: "on_way" }, { key: "delivered" },
+    ];
+
+    // ── Main load ──────────────────────────────────────────────────────────────
+    async function loadOrder() {
+      document.getElementById("loading").style.display = "flex";
+      document.getElementById("error-state").style.display = "none";
+      document.getElementById("track-content").classList.add("hidden");
+
+      if (!TOKEN) {
+        showError(t.orderNotFound, t.orderNotFoundMsg);
+        return;
+      }
+      try {
+        const resp = await fetch(`/api/delivery/orders/track/${TOKEN}`);
+        if (!resp.ok) throw new Error(resp.status === 404 ? t.orderNotFound : "Server error");
+        const data = await resp.json();
+        currentOrder = data.order;
+        currentStore = data.store;
+        renderStore(currentStore);
+        renderOrder(currentOrder, data.driver);
+        connectSSE(currentOrder.id);
+        document.getElementById("share-btn").style.display = "flex";
+      } catch (err) {
+        showError(t.orderNotFound, err.message || t.orderNotFoundMsg);
+      }
+    }
+
+    function showError(title, msg) {
+      document.getElementById("loading").style.display = "none";
+      const err = document.getElementById("error-state");
+      err.style.display = "flex";
+      document.getElementById("error-title").textContent = title;
+      document.getElementById("error-msg").textContent  = msg;
+    }
+
+    // ── Apply store branding ───────────────────────────────────────────────────
+    function renderStore(store) {
+      if (!store) return;
+      currency = store.currency || currency;
+
+      // Primary color
+      const primary = store.primaryColor || "#FF5722";
+      document.documentElement.style.setProperty("--primary", primary);
+      document.documentElement.style.setProperty("--delivery-primary", primary);
+      document.getElementById("theme-meta").content = primary;
+      document.getElementById("track-header").style.background = primary;
+
+      // Logo / name
+      if (store.logo) {
+        document.getElementById("store-logo-wrap").innerHTML = `<img src="${store.logo}" alt="${store.name || ''}" style="width:32px;height:32px;border-radius:8px;object-fit:cover" />`;
+      }
+      document.getElementById("store-name-label").textContent = store.name || "Delivery";
+      if (store.name) {
+        document.getElementById("page-title").textContent = `${t.trackTitle} — ${store.name}`;
+      }
+
+      // Support link
+      if (store.supportPhone) {
+        document.getElementById("support-link").href = `tel:${store.supportPhone}`;
+      } else if (store.slug) {
+        document.getElementById("support-link").href = `/order/${store.slug}`;
+      }
+    }
+
+    // ── Render order ───────────────────────────────────────────────────────────
+    function renderOrder(order, driver) {
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("track-content").classList.remove("hidden");
+
+      document.getElementById("track-order-num").textContent = t.orderNum(order.orderNumber || order.id);
+
+      updateStatus(order.status);
+
+      // Map
+      const hasDriverCoords = order.driverLat && order.driverLng;
+      const hasCustomerCoords = order.customerLat && order.customerLng;
+      if (hasDriverCoords || hasCustomerCoords) {
+        document.getElementById("map-placeholder").style.display = "none";
+        const mapEl = document.getElementById("map");
+        mapEl.style.display = "block";
+        const lat = hasCustomerCoords ? Number(order.customerLat) : Number(order.driverLat);
+        const lng = hasCustomerCoords ? Number(order.customerLng) : Number(order.driverLng);
+        map = L.map("map", { zoomControl: false }).setView([lat, lng], 14);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
+        if (hasCustomerCoords) {
+          customerMarker = L.marker([Number(order.customerLat), Number(order.customerLng)])
+            .addTo(map).bindPopup(IS_AR ? "📍 موقعك" : "📍 Your location");
+        }
+        if (hasDriverCoords) {
+          driverMarker = L.marker([Number(order.driverLat), Number(order.driverLng)], {
+            icon: L.divIcon({ html: "🚗", className: "", iconSize: [24, 24] }),
+          }).addTo(map);
+        }
+      }
+
+      // Items
+      const fmt = (v) => `${currency} ${parseFloat(v || 0).toFixed(2)}`;
+      const itemsEl = document.getElementById("order-items");
+      itemsEl.innerHTML = (order.items || []).map(i => `
+        <div class="summary-row">
+          <span>${i.productName || i.name || "—"} ×${i.quantity}</span>
+          <span>${fmt(parseFloat(i.unitPrice || 0) * i.quantity)}</span>
+        </div>
+      `).join("");
+      document.getElementById("order-total").textContent = fmt(order.totalAmount);
+
+      // Driver info
+      if (driver || order.driverId) {
+        const driverEl = document.getElementById("driver-info");
+        driverEl.classList.remove("hidden");
+        document.getElementById("driver-name").textContent = driver?.name || t.driverOnWay;
+        if (driver?.rating) document.getElementById("driver-rating").textContent = `⭐ ${driver.rating}`;
+        if (driver?.phone || order.driverPhone) {
+          document.getElementById("driver-call").href = `tel:${driver?.phone || order.driverPhone}`;
+        }
+      }
+
+      // Show rating sheet for delivered orders
+      if (order.status === "delivered" && !order.rating) {
+        setTimeout(() => openRatingSheet(), 1200);
+      }
+    }
+
+    // ── Status update ──────────────────────────────────────────────────────────
+    function updateStatus(status) {
+      const color = STATUS_COLORS[status] || "#FF5722";
+      const icon  = STATUS_ICONS[status] || "⏳";
+      const label = t.currentStatuses[status] || status;
+
+      document.documentElement.style.setProperty("--status-color", color);
+      document.getElementById("status-icon").textContent = icon;
+      document.getElementById("status-text").textContent = label;
+
+      // ETA for on_way
+      if (status === "on_way") {
+        document.getElementById("eta-text").textContent = t.minutes(currentOrder?.maxDeliveryTime || 30);
+      } else if (status === "delivered") {
+        document.getElementById("eta-text").textContent = IS_AR ? "تم التوصيل بنجاح ✓" : "Successfully delivered ✓";
+      } else {
+        document.getElementById("eta-text").textContent = "";
+      }
+
+      // Cancelled banner
+      const cancelledBanner = document.getElementById("cancelled-banner");
+      const pipelineWrap   = document.getElementById("pipeline-wrap");
+      if (status === "cancelled") {
+        cancelledBanner.classList.remove("hidden");
+        pipelineWrap.style.display = "none";
+      } else {
+        cancelledBanner.classList.add("hidden");
+        pipelineWrap.style.display = "";
+      }
+
+      // Pipeline
+      const currentIdx = STEPS.findIndex(s => s.key === status);
+      const pipeline   = document.getElementById("pipeline");
+      pipeline.innerHTML = STEPS.map((s, i) => {
+        const isDone   = i < currentIdx;
+        const isActive = i === currentIdx;
+        const sub      = isActive ? (t.stepSubs[s.key] || "") : "";
+        return `
+          <div class="pipeline-step ${isDone ? "done" : ""} ${isActive ? "active" : ""}">
+            <div class="pipeline-step__dot">${isDone ? "✓" : i + 1}</div>
+            <div class="pipeline-step__content">
+              <div class="pipeline-step__label">${t.steps[s.key] || s.key}</div>
+              ${sub ? `<div class="pipeline-step__time">${sub}</div>` : ""}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      // Open rating after delivery
+      if (status === "delivered" && currentOrder && !currentOrder.rating) {
+        setTimeout(() => openRatingSheet(), 1500);
+      }
+    }
+
+    // ── SSE ────────────────────────────────────────────────────────────────────
+    function connectSSE(orderId) {
+      if (es) es.close();
+      es = new EventSource(`/api/delivery/orders/${orderId}/status-stream`);
+      es.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.status) {
+            if (currentOrder) currentOrder.status = data.status;
+            updateStatus(data.status);
+          }
+          if (data.driverLat && data.driverLng) {
+            const ll = [Number(data.driverLat), Number(data.driverLng)];
+            if (map) {
+              if (driverMarker) {
+                driverMarker.setLatLng(ll);
+              } else {
+                driverMarker = L.marker(ll, { icon: L.divIcon({ html: "🚗", className: "", iconSize: [24, 24] }) }).addTo(map);
+              }
+              map.panTo(ll);
+            }
+          }
+        } catch (_) {}
+      };
+      es.onerror = () => {
+        // EventSource auto-reconnects; no action needed
+      };
+    }
+
+    // ── Share ──────────────────────────────────────────────────────────────────
+    function shareOrder() {
+      const url  = location.href;
+      const text = currentStore?.name ? `${t.trackTitle} — ${currentStore.name}` : t.trackTitle;
+      if (navigator.share) {
+        navigator.share({ title: text, url }).catch(() => {});
+      } else {
+        navigator.clipboard?.writeText(url).then(() => {
+          const btn = document.getElementById("share-btn");
+          btn.textContent = "✓"; setTimeout(() => btn.textContent = "🔗", 2000);
+        }).catch(() => {
+          prompt(IS_AR ? "انسخ الرابط:" : "Copy tracking link:", url);
+        });
+      }
+    }
+
+    // ── Rating ─────────────────────────────────────────────────────────────────
+    function openRatingSheet() {
+      document.getElementById("rating-overlay").classList.add("open");
+    }
+    function setStar(v) {
+      selectedStar = v;
+      document.querySelectorAll(".star-btn").forEach((btn, i) => {
+        btn.classList.toggle("active", i < v);
+      });
+      document.getElementById("submit-rating-btn").disabled = false;
+    }
+    async function submitRating() {
+      if (!selectedStar || !currentOrder) return;
+      const btn = document.getElementById("submit-rating-btn");
+      btn.disabled = true;
+      btn.textContent = IS_AR ? "جاري الإرسال..." : "Submitting...";
+      try {
+        const token = localStorage.getItem("delivery_token");
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        await fetch(`/api/delivery/orders/${currentOrder.id}/rate`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            overallRating: selectedStar,
+            comment: document.getElementById("rating-comment").value,
+          }),
+        });
+        document.getElementById("rating-title").textContent = t.ratingThanks;
+        document.querySelector(".rating-sheet__sub").textContent = IS_AR ? "شكراً لك 🙏" : "Thank you 🙏";
+        document.querySelector(".star-row").style.display = "none";
+        document.getElementById("rating-comment").style.display = "none";
+        btn.style.display = "none";
+        setTimeout(() => document.getElementById("rating-overlay").classList.remove("open"), 2200);
+      } catch (_) {
+        btn.disabled = false;
+        btn.textContent = t.submitRating;
+      }
+    }
+
+    // Close rating overlay on backdrop click
+    document.getElementById("rating-overlay").addEventListener("click", (e) => {
+      if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
+    });
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    loadOrder();
+  </script>
+</body>
+</html>

@@ -296,6 +296,110 @@ function configureExpoAndLanding(app: express.Application) {
       return res.status(200).send(dbTemplate);
     }
 
+    // ── Delivery App Routes ──────────────────────────────────────────────────
+    const deliveryMatch = req.path.match(/^\/order\/([^/]+)(\/.*)?$/);
+    if (deliveryMatch) {
+      try {
+        const slug = deliveryMatch[1];
+        const { storage } = await import("./storage");
+        const config = await storage.getLandingPageConfigBySlug(slug);
+        if (!config) return res.status(404).send("<h1>Store not found</h1>");
+        const tenantId = config.tenantId;
+        const tenant = await storage.getTenant(tenantId);
+        if (!tenant) return res.status(404).send("<h1>Store not found</h1>");
+
+        const deliveryIndexPath = path.resolve(process.cwd(), "delivery-app", "index.html");
+        if (!fs.existsSync(deliveryIndexPath)) {
+          return res.status(503).send("<h1>Delivery app not yet deployed</h1>");
+        }
+        let html = fs.readFileSync(deliveryIndexPath, "utf-8");
+        const stripeKey = process.env.STRIPE_PUBLISHABLE_KEY || "";
+        const configJson = JSON.stringify({
+          slug,
+          tenantId,
+          primaryColor: (config as any).primaryColor || "#FF5722",
+          accentColor: (config as any).accentColor || "#2FD3C6",
+          currency: (tenant as any).currency || process.env.DEFAULT_CURRENCY || "EGP",
+          language: (config as any).language || "en",
+          storeName: config.storeName || (config as any).name || tenant.name,
+          logo: (config as any).logo || config.logoUrl || "",
+          phone: config.phone || "",
+          supportPhone: (config as any).supportPhone || config.phone || "",
+          phonePlaceholder: (config as any).phonePlaceholder || "",
+          minDeliveryTime: (config as any).minDeliveryTime || 20,
+          maxDeliveryTime: (config as any).maxDeliveryTime || 45,
+          enableLoyalty: (config as any).enableLoyalty ?? true,
+          enableWallet: (config as any).enableWallet ?? false,
+          enableScheduledOrders: (config as any).enableScheduledOrders ?? true,
+          stripePublishableKey: stripeKey,
+          defaultLat: (config as any).defaultLat || null,
+          defaultLng: (config as any).defaultLng || null,
+          coverImage: (config as any).coverImage || (config as any).headerBgImage || "",
+          metaTitle: (config as any).metaTitle || "",
+          metaDescription: (config as any).metaDescription || "",
+        });
+        html = html.replace("__DELIVERY_CONFIG__", configJson);
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.status(200).send(html);
+      } catch (err) {
+        console.error("[delivery/order/:slug] Error:", err);
+        return res.status(500).send("<h1>Server error</h1>");
+      }
+    }
+
+    // Multi-restaurant discovery page
+    if (req.path === "/restaurants" || req.path === "/restaurants/") {
+      try {
+        const { storage } = await import("./storage");
+        const restaurantsIndexPath = path.resolve(process.cwd(), "delivery-app", "restaurants.html");
+        if (!fs.existsSync(restaurantsIndexPath)) {
+          return res.status(503).send("<h1>Restaurants page not yet deployed</h1>");
+        }
+        let html = fs.readFileSync(restaurantsIndexPath, "utf-8");
+        // Inject minimal global config (no tenant-specific slug)
+        const configJson = JSON.stringify({
+          storeName: "Barmagly Delivery",
+          currency: process.env.DEFAULT_CURRENCY || "EGP",
+          language: req.query.lang || "en",
+          stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
+          primaryColor: "#FF5722",
+          accentColor: "#2FD3C6",
+          tenantId: null,
+          slug: null,
+        });
+        html = html.replace("__DELIVERY_CONFIG__", configJson);
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.status(200).send(html);
+      } catch (err) {
+        console.error("[/restaurants] Error:", err);
+        return res.status(500).send("<h1>Server error</h1>");
+      }
+    }
+
+    // Driver PWA
+    const driverMatch = req.path.match(/^\/driver\/([^/]+)$/);
+    if (driverMatch) {
+      const driverIndexPath = path.resolve(process.cwd(), "delivery-app", "driver", "index.html");
+      if (!fs.existsSync(driverIndexPath)) {
+        return res.status(503).send("<h1>Driver app not yet deployed</h1>");
+      }
+      const html = fs.readFileSync(driverIndexPath, "utf-8");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(html);
+    }
+
+    // Public tracking page
+    const trackMatch = req.path.match(/^\/track\/([^/]+)$/);
+    if (trackMatch) {
+      const trackIndexPath = path.resolve(process.cwd(), "delivery-app", "track", "index.html");
+      if (!fs.existsSync(trackIndexPath)) {
+        return res.status(503).send("<h1>Tracking page not yet deployed</h1>");
+      }
+      const html = fs.readFileSync(trackIndexPath, "utf-8");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(html);
+    }
+
     const storeMatch = req.path.match(/^\/store\/(.+)$/);
     if (storeMatch) {
       try {
@@ -356,6 +460,11 @@ function configureExpoAndLanding(app: express.Application) {
 
     next();
   });
+
+  // ── Delivery App static assets ───────────────────────────────────────────────
+  app.use("/delivery-app", express.static(path.resolve(process.cwd(), "delivery-app"), {
+    index: false, // HTML is served dynamically above
+  }));
 
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));

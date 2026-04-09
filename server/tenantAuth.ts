@@ -28,6 +28,16 @@ const PUBLIC_ROUTES = [
   "/api/push/vapid-public-key", // Public — needed for SW push subscription before auth
   "/api/push/subscribe", // Public — SW registers subscription before full auth
   "/api/maintenance/fix-tenant-ids", // One-time migration fix (secured by secret header)
+  // ── Delivery Platform Public Routes ──
+  "/api/delivery/auth/",           // Customer OTP login/register
+  "/api/delivery/store/",          // Menu & store config browsing
+  "/api/delivery/restaurants",     // Multi-restaurant discovery listing
+  "/api/delivery/orders/track/",   // Public order tracking by token
+  "/api/delivery/orders/public",   // Public order placement
+  "/api/delivery/promo/validate",  // Promo code validation
+  "/api/delivery/zones",           // Delivery zones for checkout map
+  "/api/delivery/referral/",       // Referral code lookup
+  "/api/delivery/driver/auth",     // Driver token login
 ];
 
 const PUBLIC_ROUTE_PATTERNS = [

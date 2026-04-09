@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Barmagly POS — Professional Brochure 2026</title>
+  <style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --black:  #000000;
+  --dark1:  #080B10;
+  --dark2:  #0D1117;
+  --dark3:  #111827;
+  --dark4:  #1A2236;
+  --cyan:   #22d3ee;
+  --cyan2:  #06b6d4;
+  --cyan3:  #0891b2;
+  --purple: #7c3aed;
+  --purple2:#9333ea;
+  --purple3:#a855f7;
+  --white:  #ffffff;
+  --gray1:  #e2e8f0;
+  --gray2:  #94a3b8;
+  --gray3:  #475569;
+  --border: rgba(255,255,255,0.08);
+  --borderhover: rgba(34,211,238,0.3);
+  --glow-c: rgba(34,211,238,0.15);
+  --glow-p: rgba(124,58,237,0.15);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+}
+
+body{background:#111;display:flex;flex-direction:column;align-items:center;padding:20px 0;}
+
+/* ── A4 PAGE ── */
+.page{
+  width:210mm; min-height:297mm;
+  background:var(--dark1);
+  margin:0 auto 10mm;
+  position:relative; overflow:hidden;
+  page-break-after:always;
+}
+
+/* ── SCREENSHOT BASE ── */
+.ss{width:100%;height:auto;display:block;border-radius:6px;}
+.missing{background:rgba(255,255,255,0.05);border:1px dashed var(--gray3);
+  border-radius:6px;padding:20px;text-align:center;color:var(--gray3);font-size:9px;}
+
+/* ── SCREENSHOT CARD ── */
+.sc{display:flex;flex-direction:column;}
+.sc-img{border-radius:8px;overflow:hidden;border:1px solid var(--border);
+  box-shadow:0 4px 20px rgba(0,0,0,0.5);}
+.sc-lbl{font-size:8px;font-weight:600;text-align:center;color:var(--gray2);
+  text-transform:uppercase;letter-spacing:0.7px;margin-top:5px;}
+
+/* ── GRIDS ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:5mm;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4mm;}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:3mm;}
+.g21{display:grid;grid-template-columns:2fr 1fr;gap:5mm;}
+.g12{display:grid;grid-template-columns:1fr 2fr;gap:5mm;}
+.g32{display:grid;grid-template-columns:3fr 2fr;gap:5mm;}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:3mm;}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   COVER
+────────────────────────────────────────────────────────────────────────── */
+.cover{
+  background:var(--black);
+  display:flex;flex-direction:column;
+  min-height:297mm;position:relative;overflow:hidden;
+}
+/* ambient glow blobs */
+.cover::before{
+  content:'';position:absolute;top:-40mm;right:-30mm;
+  width:150mm;height:150mm;border-radius:50%;
+  background:radial-gradient(circle,rgba(124,58,237,0.35) 0%,transparent 70%);
+  pointer-events:none;
+}
+.cover::after{
+  content:'';position:absolute;bottom:-20mm;left:-20mm;
+  width:120mm;height:120mm;border-radius:50%;
+  background:radial-gradient(circle,rgba(34,211,238,0.25) 0%,transparent 70%);
+  pointer-events:none;
+}
+
+.c-nav{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:7mm 10mm 4mm;
+  border-bottom:1px solid var(--border);
+  position:relative;z-index:1;
+}
+.c-logo{display:flex;align-items:center;gap:10px;}
+.c-logo-icon{
+  width:38px;height:38px;border-radius:10px;
+  background:linear-gradient(135deg,var(--purple),var(--cyan));
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:900;color:white;
+  box-shadow:0 0 20px rgba(34,211,238,0.3);
+}
+.c-logo-text{font-size:18px;font-weight:800;color:var(--white);letter-spacing:-0.5px;}
+.c-logo-sub{font-size:9px;color:var(--gray2);letter-spacing:2px;text-transform:uppercase;margin-top:1px;}
+.c-badge{
+  background:linear-gradient(135deg,var(--purple),var(--purple2));
+  color:white;font-size:9px;font-weight:700;
+  padding:4px 12px;border-radius:20px;letter-spacing:1px;
+  text-transform:uppercase;
+  box-shadow:0 0 12px rgba(124,58,237,0.4);
+}
+
+.c-hero-text{
+  padding:8mm 10mm 5mm;text-align:center;position:relative;z-index:1;
+}
+.c-hero-text h1{
+  font-size:30px;font-weight:900;letter-spacing:-1.5px;color:var(--white);
+  line-height:1.1;margin-bottom:4px;
+}
+.c-hero-text h1 span{
+  background:linear-gradient(90deg,var(--cyan),var(--purple3));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.c-hero-text p{font-size:11px;color:var(--gray2);letter-spacing:0.5px;}
+
+.c-screen{
+  margin:0 10mm;border-radius:10px;overflow:hidden;position:relative;z-index:1;
+  border:1px solid var(--borderhover);
+  box-shadow:0 0 40px rgba(34,211,238,0.15),0 20px 60px rgba(0,0,0,0.7);
+}
+.c-screen img{width:100%;display:block;border-radius:0;}
+
+.c-stats{
+  display:grid;grid-template-columns:repeat(6,1fr);
+  gap:3mm;padding:5mm 10mm;position:relative;z-index:1;
+}
+.c-stat{
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--border);
+  border-radius:8px;padding:8px 5px;text-align:center;
+  transition:border-color .2s;
+}
+.c-stat:hover{border-color:var(--borderhover);}
+.c-stat .e{font-size:18px;display:block;margin-bottom:3px;}
+.c-stat .t{font-size:8.5px;font-weight:700;color:var(--white);display:block;}
+.c-stat .s{font-size:7.5px;color:var(--gray2);display:block;margin-top:1px;}
+
+.c-tagline{
+  text-align:center;padding:3mm 10mm;
+  font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;
+  color:var(--gray3);position:relative;z-index:1;
+  border-top:1px solid var(--border);
+}
+.c-tagline span{
+  background:linear-gradient(90deg,var(--cyan2),var(--purple3));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+
+.c-bottom{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:3mm 10mm 5mm;font-size:8px;color:var(--gray3);
+  position:relative;z-index:1;
+}
+.c-bottom .url{color:var(--cyan);font-weight:600;font-size:10px;}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   SECTION PAGES
+────────────────────────────────────────────────────────────────────────── */
+.section{background:var(--dark1);}
+
+/* Section header */
+.shdr{
+  padding:6mm 10mm 5mm;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;
+  background:var(--dark2);
+}
+.shdr-icon{
+  width:42px;height:42px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;flex-shrink:0;
+}
+.ic-cyan  {background:linear-gradient(135deg,rgba(34,211,238,.2),rgba(6,182,212,.1));border:1px solid rgba(34,211,238,.3);}
+.ic-purple{background:linear-gradient(135deg,rgba(124,58,237,.2),rgba(147,51,234,.1));border:1px solid rgba(124,58,237,.3);}
+.ic-grad  {background:linear-gradient(135deg,rgba(124,58,237,.2),rgba(34,211,238,.1));border:1px solid rgba(34,211,238,.2);}
+
+.shdr-txt h2{font-size:18px;font-weight:800;color:var(--white);letter-spacing:-0.5px;}
+.shdr-txt p{font-size:10px;color:var(--gray2);margin-top:2px;}
+
+/* Section body */
+.sbdy{padding:5mm 10mm 13mm;}
+
+/* Description text */
+.sdesc{font-size:10.5px;color:var(--gray2);line-height:1.65;margin-bottom:5mm;}
+
+/* Highlight box — cyan left border */
+.hbox{
+  background:linear-gradient(135deg,rgba(34,211,238,.06),rgba(124,58,237,.04));
+  border-left:3px solid var(--cyan);
+  border-radius:0 8px 8px 0;
+  padding:8px 12px;font-size:10px;color:var(--gray1);line-height:1.6;
+}
+.hbox strong{color:var(--cyan);display:block;margin-bottom:3px;font-size:11px;font-weight:700;}
+
+/* Purple highlight */
+.hbox-p{
+  background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(168,85,247,.04));
+  border-left:3px solid var(--purple2);
+  border-radius:0 8px 8px 0;
+  padding:8px 12px;font-size:10px;color:var(--gray1);line-height:1.6;
+}
+.hbox-p strong{color:var(--purple3);display:block;margin-bottom:3px;font-size:11px;font-weight:700;}
+
+/* Feature pills */
+.feats{display:flex;flex-wrap:wrap;gap:5px;margin-top:4mm;}
+.feat{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  border-radius:20px;padding:4px 10px;
+  font-size:9px;font-weight:500;color:var(--gray1);
+}
+.feat::before{content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.feat.c::before{background:var(--cyan);}
+.feat.p::before{background:var(--purple3);}
+.feat.g::before{background:linear-gradient(135deg,var(--cyan),var(--purple3));}
+
+/* Gradient divider */
+.gdiv{
+  height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),var(--purple),transparent);
+  margin:4mm 0;opacity:0.4;
+}
+
+/* Section number badge */
+.snum{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:6px;font-size:10px;font-weight:800;
+  background:linear-gradient(135deg,var(--purple),var(--cyan2));
+  color:white;flex-shrink:0;
+}
+
+/* Glow card wrapper */
+.gcard{
+  background:rgba(255,255,255,0.02);
+  border:1px solid var(--border);border-radius:10px;padding:4mm;
+}
+.gcard.cyan-glow{border-color:rgba(34,211,238,0.2);box-shadow:0 0 20px rgba(34,211,238,0.08);}
+.gcard.purple-glow{border-color:rgba(124,58,237,0.2);box-shadow:0 0 20px rgba(124,58,237,0.08);}
+
+/* Dark callout */
+.dark-callout{
+  background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(34,211,238,0.08));
+  border:1px solid rgba(34,211,238,0.2);
+  border-radius:10px;padding:5mm;
+  box-shadow:0 0 30px rgba(124,58,237,0.1);
+}
+.dark-callout h3{font-size:15px;font-weight:800;color:var(--white);margin-bottom:4px;}
+.dark-callout p{font-size:10px;color:var(--gray2);line-height:1.6;}
+
+/* Callout chips */
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+.chip{
+  background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);
+  border-radius:20px;padding:3px 10px;font-size:9px;font-weight:600;color:var(--gray1);
+}
+.chip.c{border-color:rgba(34,211,238,0.3);color:var(--cyan);}
+.chip.p{border-color:rgba(168,85,247,0.3);color:var(--purple3);}
+
+/* PAGE FOOTER */
+.pftr{
+  position:absolute;bottom:0;left:0;right:0;
+  padding:3mm 10mm;
+  background:var(--dark2);
+  border-top:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:8px;color:var(--gray3);
+}
+.pftr .brand{
+  font-weight:700;font-size:9px;
+  background:linear-gradient(90deg,var(--cyan),var(--purple3));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.pftr .url{color:var(--gray3);}
+.pftr .pg{color:var(--gray3);}
+
+/* ── BACK COVER ── */
+.back{
+  background:var(--black);
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;text-align:center;
+  min-height:297mm;padding:15mm;
+  position:relative;overflow:hidden;
+}
+.back::before{
+  content:'';position:absolute;top:-30mm;left:50%;transform:translateX(-50%);
+  width:200mm;height:200mm;border-radius:50%;
+  background:radial-gradient(circle,rgba(124,58,237,0.25) 0%,rgba(34,211,238,0.1) 40%,transparent 70%);
+  pointer-events:none;
+}
+.back-logo{
+  width:70px;height:70px;border-radius:18px;
+  background:linear-gradient(135deg,var(--purple),var(--cyan));
+  display:flex;align-items:center;justify-content:center;
+  font-size:36px;font-weight:900;color:white;
+  margin:0 auto 6mm;
+  box-shadow:0 0 40px rgba(34,211,238,0.3),0 0 80px rgba(124,58,237,0.2);
+  position:relative;z-index:1;
+}
+.back h1{font-size:30px;font-weight:900;color:var(--white);letter-spacing:-1px;margin-bottom:4mm;position:relative;z-index:1;}
+.back h1 span{background:linear-gradient(90deg,var(--cyan),var(--purple3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.back-sub{font-size:12px;color:var(--gray2);max-width:120mm;line-height:1.7;margin-bottom:8mm;position:relative;z-index:1;}
+.back-url{
+  font-size:16px;font-weight:700;
+  background:linear-gradient(90deg,var(--cyan),var(--purple3));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  border:1px solid rgba(34,211,238,0.3);
+  padding:8px 28px;border-radius:30px;margin-bottom:10mm;
+  display:inline-block;position:relative;z-index:1;
+  box-shadow:0 0 20px rgba(34,211,238,0.1);
+}
+.back-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;width:100%;max-width:140mm;position:relative;z-index:1;}
+.back-item{
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);
+  border-radius:10px;padding:7mm 5mm;text-align:center;
+}
+.back-item:nth-child(odd){border-color:rgba(34,211,238,0.15);}
+.back-item:nth-child(even){border-color:rgba(124,58,237,0.15);}
+.back-item .e{font-size:24px;display:block;margin-bottom:5px;}
+.back-item .t{font-size:11px;font-weight:700;color:var(--white);}
+.back-item .s{font-size:8.5px;color:var(--gray2);display:block;margin-top:3px;}
+.back-tagline{
+  margin-top:8mm;font-size:10px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--gray3);position:relative;z-index:1;
+}
+.back-tagline span{color:var(--cyan);}
+
+/* ── PRINT ── */
+@media print{
+  body{background:black;padding:0;}
+  .page{margin:0;page-break-after:always;}
+  @page{size:A4;margin:0;}
+}
+</style>
+</head>
+<body>
+
+<div class="page cover">
+  <div class="c-nav">
+    <div class="c-logo">
+      <div class="c-logo-icon">B</div>
+      <div>
+        <div class="c-logo-text">Barmagly POS</div>
+        <div class="c-logo-sub">Point of Sale System</div>
+      </div>
+    </div>
+    <div class="c-badge">Professional Edition 2026</div>
+  </div>
+
+  <div class="c-hero-text">
+    <h1>Complete POS for<br><span>Modern Restaurants</span></h1>
+    <p>Fast · Reliable · Cloud-Connected · Swiss Precision</p>
+  </div>
+
+  <div class="c-screen">
+    <img class="ss" src="008_pos_overview.png" alt="POS Screen">
+  </div>
+
+  <div class="c-stats">
+    <div class="c-stat"><span class="e">💳</span><span class="t">3 Payment Methods</span><span class="s">Cash · Card · TWINT</span></div>
+    <div class="c-stat"><span class="e">📞</span><span class="t">Caller ID</span><span class="s">Auto Customer Lookup</span></div>
+    <div class="c-stat"><span class="e">🌐</span><span class="t">Online Store</span><span class="s">Commission-Free</span></div>
+    <div class="c-stat"><span class="e">📊</span><span class="t">6 Report Types</span><span class="s">Live Analytics</span></div>
+    <div class="c-stat"><span class="e">👥</span><span class="t">Full CRM</span><span class="s">Customer History</span></div>
+    <div class="c-stat"><span class="e">⚙️</span><span class="t">22+ Modules</span><span class="s">Full Configuration</span></div>
+  </div>
+
+  <div class="c-tagline"><span>Swiss Precision · Global Innovation · barmagly.tech</span></div>
+  <div class="c-bottom">
+    <span>© 2026 Barmagly — Licensed Swiss Tech Company</span>
+    <span class="url">pos.barmagly.tech</span>
+  </div>
+</div>
+
+
+<div class="page section">
+  <div class="shdr">
+  <div class="shdr-icon ic-cyan">🖥️</div>
+  <div class="shdr-txt"><h2>Point of Sale Screen</h2><p>Intuitive, fast, and built for high-volume restaurant operations</p></div>
+</div>
+  <div class="sbdy">
+    <p class="sdesc">
+      The Barmagly POS screen puts everything your cashier needs in one place — full product catalog,
+      live cart with quantity controls, customer assignment, order notes, and one-tap checkout.
+      Designed for speed: add an item, select a size, confirm — done in under 5 seconds.
+    </p>
+    <div style="margin-bottom:4mm;">
+      <img class="ss" src="007_07_pos_main_ready.png" alt="POS Main Screen">
+      <div style="text-align:center;font-size:8px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.7px;margin-top:5px;">POS — Full product grid with live cart</div>
+    </div>
+    <div class="g3" style="margin-bottom:4mm;">
+      <div class="sc"><div class="sc-img"><img class="ss" src="009_pos_cart_first_item.png" alt=""></div><div class="sc-lbl">First item added</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="010_pos_cart_with_items.png" alt=""></div><div class="sc-lbl">Cart with multiple items</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="012_pos_notes_typed.png" alt=""></div><div class="sc-lbl">Order notes</div></div>
+    </div>
+    <div class="feats">
+      <div class="feat c">Real-time inventory sync</div>
+      <div class="feat c">Category filtering</div>
+      <div class="feat c">Product search</div>
+      <div class="feat c">Size &amp; variant selection</div>
+      <div class="feat c">Per-order notes</div>
+      <div class="feat c">Customer assignment</div>
+      <div class="feat c">Invoice history</div>
+      <div class="feat c">Shift management</div>
+      <div class="feat c">Zero-out shift report</div>
+    </div>
+  </div>
+  <div class="pftr">
+  <span class="brand">BARMAGLY POS</span>
+  <span class="pg">2 / 10</span>
+  <span class="url">pos.barmagly.tech</span>
+</div>
+</div>
+
+
+<div class="page section">
+  <div class="shdr">
+  <div class="shdr-icon ic-grad">💳</div>
+  <div class="shdr-txt"><h2>Checkout &amp; Payments</h2><p>Cash, Card, and TWINT — complete a sale in under 10 seconds</p></div>
+</div>
+  <div class="sbdy">
+    <p class="sdesc">
+      A streamlined 3-step checkout: pick payment method, enter amount, confirm.
+      Auto change calculation, receipt generation, and instant thermal print support.
+    </p>
+    <div class="g2" style="margin-bottom:4mm;">
+      <div class="sc"><div class="sc-img"><img class="ss" src="017_checkout_modal_open.png" alt=""></div><div class="sc-lbl">Payment method selection</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="022_checkout_ready_to_confirm.png" alt=""></div><div class="sc-lbl">Amount &amp; change calculation</div></div>
+    </div>
+    <div class="g3" style="margin-bottom:4mm;">
+      <div class="sc"><div class="sc-img"><img class="ss" src="018_checkout_cash_selected.png" alt=""></div><div class="sc-lbl">💵 Cash payment</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="020_checkout_card_selected.png" alt=""></div><div class="sc-lbl">💳 Card payment</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="021_checkout_twint_selected.png" alt=""></div><div class="sc-lbl">📱 TWINT payment</div></div>
+    </div>
+    <div class="g21">
+      <div class="hbox">
+        <strong>Instant Digital Receipt</strong>
+        After confirming, a full receipt is generated — itemised totals, payment method,
+        change given, tax breakdown, and business details. Supports thermal printer via network or USB.
+      </div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="023_checkout_receipt_shown.png" alt=""></div><div class="sc-lbl">Receipt — sale complete</div></div>
+    </div>
+    <div class="feats" style="margin-top:4mm;">
+      <div class="feat g">Cash with change calc</div>
+      <div class="feat g">Card (tap/chip)</div>
+      <div class="feat g">TWINT (Swiss QR)</div>
+      <div class="feat g">Split payment</div>
+      <div class="feat g">Thermal receipt print</div>
+      <div class="feat g">Digital receipt history</div>
+    </div>
+  </div>
+  <div class="pftr">
+  <span class="brand">BARMAGLY POS</span>
+  <span class="pg">3 / 10</span>
+  <span class="url">pos.barmagly.tech</span>
+</div>
+</div>
+
+
+<div class="page section">
+  <div class="shdr">
+  <div class="shdr-icon ic-purple">👥</div>
+  <div class="shdr-txt"><h2>Customer Management &amp; CRM</h2><p>Know your customers — lookup, history, and smart assignment at the POS</p></div>
+</div>
+  <div class="sbdy">
+    <p class="sdesc">
+      Every order can be tied to a customer with one tap. Search by name or phone number,
+      view full order history and delivery addresses, and create new customer profiles
+      without ever leaving the POS screen.
+    </p>
+    <div class="g3" style="margin-bottom:4mm;">
+      <div class="sc"><div class="sc-img"><img class="ss" src="013_pos_customer_picker_open.png" alt=""></div><div class="sc-lbl">Customer picker on POS</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="014_pos_customer_search_results.png" alt=""></div><div class="sc-lbl">Live search results</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="031_customers_detail_open.png" alt=""></div><div class="sc-lbl">Full order history</div></div>
+    </div>
+    <div class="g2" style="margin-bottom:4mm;">
+      <div class="sc"><div class="sc-img"><img class="ss" src="029_customers_list_full.png" alt=""></div><div class="sc-lbl">Customers directory</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="030_customers_search_ahmed.png" alt=""></div><div class="sc-lbl">Search customers</div></div>
+    </div>
+    <div class="feats">
+      <div class="feat p">Search by name or phone</div>
+      <div class="feat p">Full purchase history</div>
+      <div class="feat p">Saved delivery address</div>
+      <div class="feat p">Walk-in mode (no account needed)</div>
+      <div class="feat p">New customer from POS</div>
+      <div class="feat p">Order count &amp; spend stats</div>
+    </div>
+  </div>
+  <div class="pftr">
+  <span class="brand">BARMAGLY POS</span>
+  <span class="pg">4 / 10</span>
+  <span class="url">pos.barmagly.tech</span>
+</div>
+</div>
+
+
+<div class="page section">
+  <div class="shdr">
+  <div class="shdr-icon ic-cyan">📦</div>
+  <div class="shdr-txt"><h2>Online Orders &amp; Product Catalog</h2><p>Live order management and a full inventory system in one place</p></div>
+</div>
+  <div class="sbdy">
+    <div class="g2" style="margin-bottom:4mm;">
+      <div>
+        <div class="hbox" style="margin-bottom:3mm;">
+          <strong>Online Orders</strong>
+          All orders from your online store land here instantly. Filter by status —
+          Pending · Confirmed · Ready · Delivered. One tap to update and notify the customer.
+        </div>
+        <div class="sc"><div class="sc-img"><img class="ss" src="025_online_orders_all.png" alt=""></div><div class="sc-lbl">Online orders dashboard</div></div>
+      </div>
+      <div>
+        <div class="hbox-p" style="margin-bottom:3mm;">
+          <strong>Product Catalog</strong>
+          100+ products, categories, size variants, stock levels, and pricing.
+          Search, filter, and edit from one unified screen.
+        </div>
+        <div class="sc"><div class="sc-img"><img class="ss" src="026_products_list_full.png" alt=""></div><div class="sc-lbl">Products catalog</div></div>
+      </div>
+    </div>
+    <div class="g3" style="margin-bottom:4mm;">
+      <div class="sc"><div class="sc-img"><img class="ss" src="027_products_search_pizza.png" alt=""></div><div class="sc-lbl">Product search</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="028_products_edit_modal.png" alt=""></div><div class="sc-lbl">Edit product</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="041_settings_bulk_import.png" alt=""></div><div class="sc-lbl">Bulk import</div></div>
+    </div>
+    <div class="feats">
+      <div class="feat c">Real-time order push</div>
+      <div class="feat c">Status workflow</div>
+      <div class="feat c">Category management</div>
+      <div class="feat c">Size &amp; variant support</div>
+      <div class="feat p">Stock level tracking</div>
+      <div class="feat p">CSV bulk import</div>
+      <div class="feat p">Product search</div>
+      <div class="feat p">Price management</div>
+    </div>
+  </div>
+  <div class="pftr">
+  <span class="brand">BARMAGLY POS</span>
+  <span class="pg">5 / 10</span>
+  <span class="url">pos.barmagly.tech</span>
+</div>
+</div>
+
+
+<div class="page section">
+  <div class="shdr">
+  <div class="shdr-icon ic-grad">📊</div>
+  <div class="shdr-txt"><h2>Reports &amp; Analytics</h2><p>6 report modules — sales, inventory, finance, returns, activity &amp; more</p></div>
+</div>
+  <div class="sbdy">
+    <p class="sdesc">
+      Track every metric that matters — daily sales totals, product performance, staff activity,
+      inventory turnover, return rates, and financial summaries. All reports exportable to CSV or PDF.
+    </p>
+    <div style="margin-bottom:4mm;"><div class="sc"><div class="sc-img"><img class="ss" src="032_reports_overview.png" alt=""></div><div class="sc-lbl">Reports dashboard — overview</div></div></div>
+    <div class="g3" style="margin-bottom:4mm;">
+      <div class="sc"><div class="sc-img"><img class="ss" src="033_reports_sales.png" alt=""></div><div class="sc-lbl">📈 Sales</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="034_reports_inventory.png" alt=""></div><div class="sc-lbl">📦 Inventory</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="035_reports_returns.png" alt=""></div><div class="sc-lbl">↩️ Returns</div></div>
+    </div>
+    <div class="g3" style="margin-bottom:4mm;">
+      <div class="sc"><div class="sc-img"><img class="ss" src="036_reports_finance.png" alt=""></div><div class="sc-lbl">💰 Finance</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="037_reports_activity.png" alt=""></div><div class="sc-lbl">📋 Activity</div></div>
+      <div class="gcard cyan-glow" style="display:flex;flex-direction:column;justify-content:center;gap:8px;padding:5mm;">
+        <div style="font-size:11px;font-weight:700;color:var(--cyan);">Export &amp; Schedule</div>
+        <div style="font-size:9.5px;color:var(--gray2);line-height:1.6;">
+          Export any report to CSV or PDF.<br>
+          Schedule automated daily or weekly email reports.
+        </div>
+        <div class="chips">
+          <span class="chip c">CSV</span>
+          <span class="chip c">PDF</span>
+          <span class="chip p">Email</span>
+          <span class="chip p">Scheduled</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pftr">
+  <span class="brand">BARMAGLY POS</span>
+  <span class="pg">6 / 10</span>
+  <span class="url">pos.barmagly.tech</span>
+</div>
+</div>
+
+
+<div class="page section">
+  <div class="shdr">
+  <div class="shdr-icon ic-purple">📞</div>
+  <div class="shdr-txt"><h2>Caller ID Integration</h2><p>Your customer's order starts before you say hello</p></div>
+</div>
+  <div class="sbdy">
+    <div class="dark-callout" style="margin-bottom:5mm;">
+      <h3>⚡ Industry-First Feature</h3>
+      <p>
+        When a customer calls, Barmagly POS instantly detects their phone number, matches it to your
+        customer database, and pre-fills the cart with their name and saved delivery address.
+        Your staff starts taking the order in seconds — zero manual lookup, zero delays.
+      </p>
+      <div class="chips" style="margin-top:8px;">
+        <span class="chip c">📲 Call detected</span>
+        <span class="chip c">🔍 Customer matched</span>
+        <span class="chip c">🛒 Cart pre-filled</span>
+        <span class="chip p">📦 Address ready</span>
+        <span class="chip p">⚡ Zero manual entry</span>
+        <span class="chip p">📋 Full call log</span>
+      </div>
+    </div>
+    <div class="g3" style="margin-bottom:4mm;">
+      <div class="sc"><div class="sc-img"><img class="ss" src="069_pos_before_call.png" alt=""></div><div class="sc-lbl">POS — awaiting call</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="070_incoming_call_popup.png" alt=""></div><div class="sc-lbl">📞 Incoming call popup</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="071_pos_cart_linked_to_caller.png" alt=""></div><div class="sc-lbl">Cart auto-linked to caller</div></div>
+    </div>
+    <div class="g21">
+      <div class="sc"><div class="sc-img"><img class="ss" src="024_pos_call_history_open.png" alt=""></div><div class="sc-lbl">Call history panel</div></div>
+      <div style="display:flex;flex-direction:column;gap:3mm;">
+        <div class="hbox">
+          <strong>Call History Log</strong>
+          Every call logged: caller name, number, timestamp, and order outcome.
+          Missed calls flagged for callback.
+        </div>
+        <div class="feats">
+          <div class="feat p">Auto number detection</div>
+          <div class="feat p">Customer database match</div>
+          <div class="feat p">Address auto-fill</div>
+          <div class="feat p">Multiple lines</div>
+          <div class="feat p">Missed call alerts</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pftr">
+  <span class="brand">BARMAGLY POS</span>
+  <span class="pg">7 / 10</span>
+  <span class="url">pos.barmagly.tech</span>
+</div>
+</div>
+
+
+<div class="page section">
+  <div class="shdr">
+  <div class="shdr-icon ic-cyan">🌐</div>
+  <div class="shdr-txt"><h2>Integrated Online Store</h2><p>Your branded ordering website — zero commission, fully synced</p></div>
+</div>
+  <div class="sbdy">
+    <p class="sdesc">
+      Barmagly comes with a fully branded online ordering website for your customers.
+      Menu, cart, checkout — all synced live with your POS. No third-party platform, no commission fees.
+    </p>
+    <div style="margin-bottom:4mm;"><div class="sc"><div class="sc-img"><img class="ss" src="061_store_homepage_hero.png" alt=""></div><div class="sc-lbl">Customer-facing store homepage</div></div></div>
+    <div class="g3" style="margin-bottom:4mm;">
+      <div class="sc"><div class="sc-img"><img class="ss" src="064_store_product_detail.png" alt=""></div><div class="sc-lbl">Product — size selection</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="066_store_cart_open.png" alt=""></div><div class="sc-lbl">Cart sidebar</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="068_store_checkout_form_filled.png" alt=""></div><div class="sc-lbl">Checkout — delivery details</div></div>
+    </div>
+    <div class="g2">
+      <div class="sc"><div class="sc-img"><img class="ss" src="065_store_added_to_cart.png" alt=""></div><div class="sc-lbl">Item added — cart updated</div></div>
+      <div style="display:flex;flex-direction:column;gap:3mm;">
+        <div class="hbox">
+          <strong>Commission-Free</strong>
+          Keep 100% of every online order. No monthly fee per order,
+          no percentage cut — your revenue stays yours.
+        </div>
+        <div class="feats">
+          <div class="feat c">Your brand &amp; domain</div>
+          <div class="feat c">Real-time menu sync</div>
+          <div class="feat c">Mobile responsive</div>
+          <div class="feat c">Multi-language</div>
+          <div class="feat p">Delivery address capture</div>
+          <div class="feat p">Order status SMS</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pftr">
+  <span class="brand">BARMAGLY POS</span>
+  <span class="pg">8 / 10</span>
+  <span class="url">pos.barmagly.tech</span>
+</div>
+</div>
+
+
+<div class="page section">
+  <div class="shdr">
+  <div class="shdr-icon ic-purple">⚙️</div>
+  <div class="shdr-txt"><h2>Settings &amp; Configuration</h2><p>22+ modules — every aspect of your business under your control</p></div>
+</div>
+  <div class="sbdy">
+    <p class="sdesc">
+      From store branding and payment gateways to employee roles, supplier management,
+      attendance tracking, daily financial closing, and printer setup — all in one place.
+    </p>
+    <div class="g4" style="margin-bottom:3mm;">
+      <div class="sc"><div class="sc-img"><img class="ss" src="039_settings_store_settings.png" alt=""></div><div class="sc-lbl">Store Settings</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="040_settings_payment_gateways.png" alt=""></div><div class="sc-lbl">Payment Gateways</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="042_settings_employees.png" alt=""></div><div class="sc-lbl">Employees</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="043_settings_branches.png" alt=""></div><div class="sc-lbl">Branches</div></div>
+    </div>
+    <div class="g4" style="margin-bottom:3mm;">
+      <div class="sc"><div class="sc-img"><img class="ss" src="044_settings_suppliers.png" alt=""></div><div class="sc-lbl">Suppliers</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="045_settings_expenses.png" alt=""></div><div class="sc-lbl">Expenses</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="046_settings_attendance.png" alt=""></div><div class="sc-lbl">Attendance</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="047_settings_shift_monitor.png" alt=""></div><div class="sc-lbl">Shift Monitor</div></div>
+    </div>
+    <div class="g4" style="margin-bottom:4mm;">
+      <div class="sc"><div class="sc-img"><img class="ss" src="049_settings_activity_log.png" alt=""></div><div class="sc-lbl">Activity Log</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="051_settings_cash_drawer.png" alt=""></div><div class="sc-lbl">Cash Drawer</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="055_settings_daily_closing.png" alt=""></div><div class="sc-lbl">Daily Closing</div></div>
+      <div class="sc"><div class="sc-img"><img class="ss" src="059_settings_receipt_printer.png" alt=""></div><div class="sc-lbl">Receipt Printer</div></div>
+    </div>
+    <div class="feats">
+      <div class="feat p">Store Info &amp; Branding</div>
+      <div class="feat p">Multi-Branch Support</div>
+      <div class="feat p">Employee Roles &amp; PIN</div>
+      <div class="feat p">Purchase Orders</div>
+      <div class="feat c">Warehouse Management</div>
+      <div class="feat c">Product Batches</div>
+      <div class="feat c">Financial Closing</div>
+      <div class="feat c">Printer Configuration</div>
+      <div class="feat g">Returns &amp; Refunds</div>
+      <div class="feat g">Accounts Receivable</div>
+      <div class="feat g">Vehicles &amp; Delivery</div>
+      <div class="feat g">Bulk Import</div>
+    </div>
+  </div>
+  <div class="pftr">
+  <span class="brand">BARMAGLY POS</span>
+  <span class="pg">9 / 10</span>
+  <span class="url">pos.barmagly.tech</span>
+</div>
+</div>
+
+
+<div class="page back">
+  <div class="back-logo">B</div>
+  <h1><span>Barmagly POS</span></h1>
+  <p class="back-sub">
+    The complete point of sale solution built for modern restaurants.
+    Fast setup, zero commission, full control — Swiss precision, global innovation.
+  </p>
+  <div class="back-url">pos.barmagly.tech</div>
+  <div class="back-grid">
+    <div class="back-item"><span class="e">🚀</span><span class="t">Live in 30 Min</span><span class="s">Simple onboarding</span></div>
+    <div class="back-item"><span class="e">☁️</span><span class="t">Cloud Synced</span><span class="s">Access anywhere</span></div>
+    <div class="back-item"><span class="e">🔒</span><span class="t">Secure</span><span class="s">PIN-protected access</span></div>
+    <div class="back-item"><span class="e">📊</span><span class="t">Rich Analytics</span><span class="s">6 report modules</span></div>
+    <div class="back-item"><span class="e">📞</span><span class="t">Caller ID</span><span class="s">Auto recognition</span></div>
+    <div class="back-item"><span class="e">🌐</span><span class="t">Online Store</span><span class="s">Commission-free</span></div>
+  </div>
+  <div class="back-tagline">© 2026 Barmagly · <span>barmagly.tech</span> · Licensed Swiss Tech Company</div>
+</div>
+
+</body>
+</html>

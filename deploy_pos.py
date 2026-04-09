@@ -17,7 +17,10 @@ BASE  = f"/home/{USER}/domains/barmagly.tech"
 APP   = f"{BASE}/nodejs/app"
 POS_NODE = f"{BASE}/pos-nodejs"
 POS_STATIC = f"{BASE}/public_html/pos"
+POS_API = f"{POS_STATIC}/api"
 LOCAL_DIST = r"f:\POS-APP\dist"
+LOCAL_UPLOADS = r"f:\POS-APP\uploads"
+LOCAL_SOUNDS = r"f:\POS-APP\public\sounds"
 
 def make_ssh():
     c = paramiko.SSHClient()
@@ -66,6 +69,16 @@ def main():
     # Also keep a copy in public_html/pos for direct static fallback
     run(ssh, f"rm -rf {POS_STATIC}/* {POS_STATIC}/.[!.]*", "clearing public_html/pos")
     run(ssh, f"cp -r {APP}/dist/* {POS_STATIC}/", "copy dist to public_html/pos")
+
+    if os.path.isdir(LOCAL_UPLOADS):
+        print("\n=== Step 1b: Upload uploads/ → public_html/pos/uploads/ ===")
+        total = upload_dir(sftp, LOCAL_UPLOADS, f"{POS_STATIC}/uploads")
+        print(f"  Uploaded {total} upload files")
+
+    if os.path.isdir(LOCAL_SOUNDS):
+        print("\n=== Step 1c: Upload public/sounds/ → public_html/pos/sounds/ ===")
+        total = upload_dir(sftp, LOCAL_SOUNDS, f"{POS_STATIC}/sounds")
+        print(f"  Uploaded {total} sound files")
 
     # ── Step 2: Create pos-nodejs/ directory ─────────────────────────────
     print("\n=== Step 2: Create pos-nodejs/ ===")
@@ -122,6 +135,19 @@ RewriteRule .* - [L]
     with sftp.open(f"{POS_STATIC}/.htaccess", "w") as f:
         f.write(htaccess)
     print(f"  Written {POS_STATIC}/.htaccess")
+
+    api_htaccess = f"""PassengerAppRoot {POS_NODE}
+PassengerAppType node
+PassengerNodejs /opt/alt/alt-nodejs22/root/bin/node
+PassengerStartupFile server.js
+PassengerBaseURI /api
+PassengerRestartDir {POS_NODE}/tmp
+SetEnv NODE_ENV=production
+"""
+    run(ssh, f"mkdir -p {POS_API}", "create /api mount dir")
+    with sftp.open(f"{POS_API}/.htaccess", "w") as f:
+        f.write(api_htaccess)
+    print(f"  Written {POS_API}/.htaccess")
 
     # ── Step 5: Touch restart.txt to trigger Passenger reload ────────────
     print("\n=== Step 5: Restart Passenger ===")

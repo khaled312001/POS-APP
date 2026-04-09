@@ -29,6 +29,8 @@ export const Colors = {
   tabActive: "#2FD3C6",
   tabInactive: "rgba(255, 255, 255, 0.4)",
 
+  border: "rgba(255, 255, 255, 0.12)",
+
   inputBg: "rgba(255, 255, 255, 0.08)",
   inputBorder: "rgba(255, 255, 255, 0.15)",
   inputFocusBorder: "#2FD3C6",
@@ -37,6 +39,30 @@ export const Colors = {
   statusOccupied: "#EF4444",
   statusReserved: "#F59E0B",
   statusPending: "#3B82F6",
+
+  // ── Delivery Platform ──────────────────────────────────────────────────────
+  deliveryPrimary: "#FF5722",
+  deliveryPrimaryDark: "#E64A19",
+  deliveryPrimaryLight: "rgba(255,87,34,0.12)",
+
+  // Order status
+  statusAccepted: "#3B82F6",
+  statusPreparing: "#8B5CF6",
+  statusReady: "#2FD3C6",
+  statusOnWay: "#FF5722",
+  statusDelivered: "#10B981",
+  statusCancelled: "#EF4444",
+
+  // Driver status
+  driverOnline: "#4CAF50",
+  driverBusy: "#FF5722",
+  driverOffline: "#9E9E9E",
+
+  // Loyalty tiers
+  loyaltyBronze: "#CD7F32",
+  loyaltySilver: "#C0C0C0",
+  loyaltyGold: "#FFD700",
+  loyaltyPlatinum: "#E5E4E2",
 };
 
 export default {

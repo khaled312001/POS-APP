@@ -61,8 +61,8 @@ function getDeploymentDomain() {
 function prepareDirectories(timestamp) {
   console.log("Preparing build directories...");
 
-  if (fs.existsSync("static-build")) {
-    fs.rmSync("static-build", { recursive: true });
+  if (!fs.existsSync("static-build")) {
+    fs.mkdirSync("static-build", { recursive: true });
   }
 
   const dirs = [
