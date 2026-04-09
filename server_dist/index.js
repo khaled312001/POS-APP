@@ -11488,8 +11488,19 @@ var PUBLIC_ROUTES = [
   // Delivery zones for checkout map
   "/api/delivery/referral/",
   // Referral code lookup
-  "/api/delivery/driver/auth"
+  "/api/delivery/driver/auth",
   // Driver token login
+  // ── HTML pages served under /api/ prefix (Hostinger CDN compatibility) ──
+  "/api/order/",
+  // Delivery SPA HTML
+  "/api/track/",
+  // Public tracking page HTML
+  "/api/driver/",
+  // Driver PWA HTML
+  "/api/restaurants",
+  // Restaurant listing HTML
+  "/api/delivery-app/"
+  // Static assets (CSS, JS, images)
 ];
 var PUBLIC_ROUTE_PATTERNS = [
   /^\/api\/store\/\d+\/menu$/
@@ -11751,7 +11762,8 @@ function configureExpoAndLanding(app2) {
   const appName = getAppName();
   log2("Serving static Expo files with dynamic manifest routing");
   app2.use(async (req, res, next) => {
-    if (req.path.startsWith("/api")) {
+    const isDeliveryApiPath = req.path.startsWith("/api/order/") || req.path.startsWith("/api/track/") || req.path.startsWith("/api/driver/") || req.path === "/api/restaurants" || req.path === "/api/restaurants/";
+    if (req.path.startsWith("/api") && !isDeliveryApiPath) {
       return next();
     }
     if (req.path === "/favicon.ico") {

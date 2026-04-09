@@ -225,7 +225,14 @@ function configureExpoAndLanding(app: express.Application) {
   log("Serving static Expo files with dynamic manifest routing");
 
   app.use(async (req: Request, res: Response, next: NextFunction) => {
-    if (req.path.startsWith("/api")) {
+    // Pass normal API routes through — but handle delivery HTML routes that use /api/ prefix
+    // for Hostinger CDN compatibility (CDN only forwards /api/* to the origin)
+    const isDeliveryApiPath =
+      req.path.startsWith("/api/order/") ||
+      req.path.startsWith("/api/track/") ||
+      req.path.startsWith("/api/driver/") ||
+      req.path === "/api/restaurants" || req.path === "/api/restaurants/";
+    if (req.path.startsWith("/api") && !isDeliveryApiPath) {
       return next();
     }
 
