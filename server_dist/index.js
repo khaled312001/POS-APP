@@ -11805,10 +11805,11 @@ function configureExpoAndLanding(app2) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(dbTemplate);
     }
-    const deliveryMatch = req.path.match(/^\/order\/([^/]+)(\/.*)?$/);
+    const deliveryMatch = req.path.match(/^(?:\/api)?\/order\/([^/]+)(\/.*)?$/);
     if (deliveryMatch) {
       try {
         const slug = deliveryMatch[1];
+        const isApiPrefixed = req.path.startsWith("/api/");
         const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
         const config = await storage2.getLandingPageConfigBySlug(slug);
         if (!config) return res.status(404).send("<h1>Store not found</h1>");
@@ -11824,6 +11825,7 @@ function configureExpoAndLanding(app2) {
         const configJson = JSON.stringify({
           slug,
           tenantId,
+          basePath: isApiPrefixed ? "/api" : "",
           primaryColor: config.primaryColor || "#FF5722",
           accentColor: config.accentColor || "#2FD3C6",
           currency: tenant.currency || process.env.DEFAULT_CURRENCY || "EGP",
@@ -11853,7 +11855,7 @@ function configureExpoAndLanding(app2) {
         return res.status(500).send("<h1>Server error</h1>");
       }
     }
-    if (req.path === "/restaurants" || req.path === "/restaurants/") {
+    if (req.path === "/restaurants" || req.path === "/restaurants/" || req.path === "/api/restaurants" || req.path === "/api/restaurants/") {
       try {
         const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
         const restaurantsIndexPath = path4.resolve(process.cwd(), "delivery-app", "restaurants.html");
@@ -11879,7 +11881,7 @@ function configureExpoAndLanding(app2) {
         return res.status(500).send("<h1>Server error</h1>");
       }
     }
-    const driverMatch = req.path.match(/^\/driver\/([^/]+)$/);
+    const driverMatch = req.path.match(/^(?:\/api)?\/driver\/([^/]+)$/);
     if (driverMatch) {
       const driverIndexPath = path4.resolve(process.cwd(), "delivery-app", "driver", "index.html");
       if (!fs5.existsSync(driverIndexPath)) {
@@ -11889,7 +11891,7 @@ function configureExpoAndLanding(app2) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(html);
     }
-    const trackMatch = req.path.match(/^\/track\/([^/]+)$/);
+    const trackMatch = req.path.match(/^(?:\/api)?\/track\/([^/]+)$/);
     if (trackMatch) {
       const trackIndexPath = path4.resolve(process.cwd(), "delivery-app", "track", "index.html");
       if (!fs5.existsSync(trackIndexPath)) {
@@ -11950,10 +11952,12 @@ function configureExpoAndLanding(app2) {
     }
     next();
   });
-  app2.use("/delivery-app", import_express.default.static(path4.resolve(process.cwd(), "delivery-app"), {
+  const deliveryAppStatic = import_express.default.static(path4.resolve(process.cwd(), "delivery-app"), {
     index: false
     // HTML is served dynamically above
-  }));
+  });
+  app2.use("/delivery-app", deliveryAppStatic);
+  app2.use("/api/delivery-app", deliveryAppStatic);
   app2.use("/assets", import_express.default.static(path4.resolve(process.cwd(), "assets")));
   app2.use("/uploads", import_express.default.static(path4.resolve(process.cwd(), "uploads")));
   app2.use("/objects", import_express.default.static(path4.resolve(process.cwd(), "uploads")));

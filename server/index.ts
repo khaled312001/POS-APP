@@ -297,10 +297,13 @@ function configureExpoAndLanding(app: express.Application) {
     }
 
     // ── Delivery App Routes ──────────────────────────────────────────────────
-    const deliveryMatch = req.path.match(/^\/order\/([^/]+)(\/.*)?$/);
+    // Supports both /order/:slug (direct) and /api/order/:slug (Hostinger CDN compatibility)
+    const deliveryMatch = req.path.match(/^(?:\/api)?\/order\/([^/]+)(\/.*)?$/);
     if (deliveryMatch) {
       try {
         const slug = deliveryMatch[1];
+        // Detect if request came via /api/ prefix (Hostinger CDN compatibility)
+        const isApiPrefixed = req.path.startsWith("/api/");
         const { storage } = await import("./storage");
         const config = await storage.getLandingPageConfigBySlug(slug);
         if (!config) return res.status(404).send("<h1>Store not found</h1>");
@@ -317,6 +320,7 @@ function configureExpoAndLanding(app: express.Application) {
         const configJson = JSON.stringify({
           slug,
           tenantId,
+          basePath: isApiPrefixed ? "/api" : "",
           primaryColor: (config as any).primaryColor || "#FF5722",
           accentColor: (config as any).accentColor || "#2FD3C6",
           currency: (tenant as any).currency || process.env.DEFAULT_CURRENCY || "EGP",
@@ -348,7 +352,7 @@ function configureExpoAndLanding(app: express.Application) {
     }
 
     // Multi-restaurant discovery page
-    if (req.path === "/restaurants" || req.path === "/restaurants/") {
+    if (req.path === "/restaurants" || req.path === "/restaurants/" || req.path === "/api/restaurants" || req.path === "/api/restaurants/") {
       try {
         const { storage } = await import("./storage");
         const restaurantsIndexPath = path.resolve(process.cwd(), "delivery-app", "restaurants.html");
@@ -377,7 +381,7 @@ function configureExpoAndLanding(app: express.Application) {
     }
 
     // Driver PWA
-    const driverMatch = req.path.match(/^\/driver\/([^/]+)$/);
+    const driverMatch = req.path.match(/^(?:\/api)?\/driver\/([^/]+)$/);
     if (driverMatch) {
       const driverIndexPath = path.resolve(process.cwd(), "delivery-app", "driver", "index.html");
       if (!fs.existsSync(driverIndexPath)) {
@@ -389,7 +393,7 @@ function configureExpoAndLanding(app: express.Application) {
     }
 
     // Public tracking page
-    const trackMatch = req.path.match(/^\/track\/([^/]+)$/);
+    const trackMatch = req.path.match(/^(?:\/api)?\/track\/([^/]+)$/);
     if (trackMatch) {
       const trackIndexPath = path.resolve(process.cwd(), "delivery-app", "track", "index.html");
       if (!fs.existsSync(trackIndexPath)) {
@@ -462,9 +466,12 @@ function configureExpoAndLanding(app: express.Application) {
   });
 
   // ── Delivery App static assets ───────────────────────────────────────────────
-  app.use("/delivery-app", express.static(path.resolve(process.cwd(), "delivery-app"), {
+  // Served from both /delivery-app/ (local dev) and /api/delivery-app/ (Hostinger CDN)
+  const deliveryAppStatic = express.static(path.resolve(process.cwd(), "delivery-app"), {
     index: false, // HTML is served dynamically above
-  }));
+  });
+  app.use("/delivery-app", deliveryAppStatic);
+  app.use("/api/delivery-app", deliveryAppStatic);
 
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));

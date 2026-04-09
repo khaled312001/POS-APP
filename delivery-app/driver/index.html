@@ -7,11 +7,11 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="manifest" href="/delivery-app/driver/manifest.json" />
+  <link rel="manifest" href="/api/delivery-app/driver/manifest.json" />
   <title id="page-title">Driver App</title>
 
-  <link rel="stylesheet" href="/delivery-app/css/base.css" />
-  <link rel="stylesheet" href="/delivery-app/css/components.css" />
+  <link rel="stylesheet" href="/api/delivery-app/css/base.css" />
+  <link rel="stylesheet" href="/api/delivery-app/css/components.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
@@ -625,7 +625,7 @@ const driverApp = {
 
 // ── Service Worker ────────────────────────────────────────────────────────────
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/delivery-app/driver/sw.js").catch(() => {});
+  navigator.serviceWorker.register("/api/delivery-app/driver/sw.js").catch(() => {});
 }
 
 // ── Auto-login ────────────────────────────────────────────────────────────────

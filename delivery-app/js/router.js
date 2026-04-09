@@ -7,9 +7,11 @@ const router = {
   _routes: [],
   _slug: null,
   _current: null,
+  _basePath: "",
 
-  init(slug) {
+  init(slug, basePath = "") {
     this._slug = slug;
+    this._basePath = basePath || "";
     window.addEventListener("popstate", () => this._resolve());
     document.addEventListener("click", (e) => {
       const a = e.target.closest("a[data-route]");
@@ -40,7 +42,11 @@ const router = {
   },
 
   _resolve() {
-    const path = location.pathname;
+    // Strip basePath prefix before matching routes
+    let path = location.pathname;
+    if (this._basePath && path.startsWith(this._basePath)) {
+      path = path.slice(this._basePath.length) || "/";
+    }
     for (const route of this._routes) {
       const params = this._match(route.path, path);
       if (params !== null) {
@@ -76,7 +82,8 @@ const router = {
     }
     // Replace :slug placeholder
     path = path.replace(":slug", this._slug);
-    return path;
+    // Prepend basePath for external URL
+    return this._basePath + path;
   },
 
   async _render(route, params) {

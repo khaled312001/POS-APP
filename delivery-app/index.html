@@ -12,9 +12,9 @@
   <title>Barmagly Delivery</title>
 
   <!-- CSS -->
-  <link rel="stylesheet" href="/delivery-app/css/base.css" />
-  <link rel="stylesheet" href="/delivery-app/css/components.css" />
-  <link rel="stylesheet" href="/delivery-app/css/pages.css" />
+  <link rel="stylesheet" href="/api/delivery-app/css/base.css" />
+  <link rel="stylesheet" href="/api/delivery-app/css/components.css" />
+  <link rel="stylesheet" href="/api/delivery-app/css/pages.css" />
 
   <!-- Leaflet maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -238,20 +238,20 @@
   </script>
 
   <!-- Core modules (order matters) -->
-  <script src="/delivery-app/js/router.js"></script>
-  <script src="/delivery-app/js/cart.js"></script>
-  <script src="/delivery-app/js/auth.js"></script>
-  <script src="/delivery-app/js/api.js"></script>
+  <script src="/api/delivery-app/js/router.js"></script>
+  <script src="/api/delivery-app/js/cart.js"></script>
+  <script src="/api/delivery-app/js/auth.js"></script>
+  <script src="/api/delivery-app/js/api.js"></script>
 
   <!-- Page modules -->
-  <script src="/delivery-app/js/pages/home.js"></script>
-  <script src="/delivery-app/js/pages/menu.js"></script>
-  <script src="/delivery-app/js/pages/cart-page.js"></script>
-  <script src="/delivery-app/js/pages/checkout.js"></script>
-  <script src="/delivery-app/js/pages/tracking.js"></script>
-  <script src="/delivery-app/js/pages/account.js"></script>
-  <script src="/delivery-app/js/pages/offers.js"></script>
-  <script src="/delivery-app/js/pages/login.js"></script>
+  <script src="/api/delivery-app/js/pages/home.js"></script>
+  <script src="/api/delivery-app/js/pages/menu.js"></script>
+  <script src="/api/delivery-app/js/pages/cart-page.js"></script>
+  <script src="/api/delivery-app/js/pages/checkout.js"></script>
+  <script src="/api/delivery-app/js/pages/tracking.js"></script>
+  <script src="/api/delivery-app/js/pages/account.js"></script>
+  <script src="/api/delivery-app/js/pages/offers.js"></script>
+  <script src="/api/delivery-app/js/pages/login.js"></script>
 
   <!-- pages namespace -->
   <script>window.pages = window.pages || {};</script>
@@ -309,7 +309,7 @@
 
     // ── Init cart & router ───────────────────────────────────────────────
     cart.init(cfg.tenantId, slug);
-    router.init(slug);
+    router.init(slug, cfg.basePath || "");
 
     // ── Route definitions ────────────────────────────────────────────────
     router.define([
