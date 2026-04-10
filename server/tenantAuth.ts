@@ -44,6 +44,11 @@ const PUBLIC_ROUTES = [
   "/api/driver/",                  // Driver PWA HTML
   "/api/restaurants",              // Restaurant listing HTML
   "/api/delivery-app/",            // Static assets (CSS, JS, images)
+  // ── Static files under /api/ prefix (CDN compatibility) ──
+  "/api/uploads/",                 // Product images & media
+  "/api/assets/",                  // App assets
+  "/api/objects/",                 // Alias for uploads
+  "/api/sounds/",                  // Notification sounds
 ];
 
 const PUBLIC_ROUTE_PATTERNS = [

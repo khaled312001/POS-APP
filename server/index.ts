@@ -233,6 +233,10 @@ function configureExpoAndLanding(app: express.Application) {
       req.path.startsWith("/api/driver/") ||
       req.path.startsWith("/api/super-admin") ||
       req.path.startsWith("/api/super_admin") ||
+      req.path.startsWith("/api/uploads/") ||
+      req.path.startsWith("/api/assets/") ||
+      req.path.startsWith("/api/objects/") ||
+      req.path.startsWith("/api/sounds/") ||
       req.path === "/api/restaurants" || req.path === "/api/restaurants/";
     if (req.path.startsWith("/api") && !isDeliveryApiPath) {
       return next();
@@ -490,10 +494,16 @@ function configureExpoAndLanding(app: express.Application) {
   app.use("/delivery-app", deliveryAppStatic);
   app.use("/api/delivery-app", deliveryAppStatic);
 
-  app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
-  app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
-  app.use("/objects", express.static(path.resolve(process.cwd(), "uploads")));
+  const uploadsStatic = express.static(path.resolve(process.cwd(), "uploads"));
+  const assetsStatic  = express.static(path.resolve(process.cwd(), "assets"));
+  app.use("/assets",          assetsStatic);
+  app.use("/api/assets",      assetsStatic);
+  app.use("/uploads",         uploadsStatic);
+  app.use("/api/uploads",     uploadsStatic);   // CDN-compatible path
+  app.use("/objects",         uploadsStatic);
+  app.use("/api/objects",     uploadsStatic);
   app.use("/sounds", express.static(path.resolve(process.cwd(), "public", "sounds")));
+  app.use("/api/sounds", express.static(path.resolve(process.cwd(), "public", "sounds")));
   // Serve project icon assets at the /app/assets/images path so the PWA manifest icons resolve
   app.use("/app/assets/images", express.static(path.resolve(process.cwd(), "assets", "images")));
 

@@ -11499,8 +11499,17 @@ var PUBLIC_ROUTES = [
   // Driver PWA HTML
   "/api/restaurants",
   // Restaurant listing HTML
-  "/api/delivery-app/"
+  "/api/delivery-app/",
   // Static assets (CSS, JS, images)
+  // ── Static files under /api/ prefix (CDN compatibility) ──
+  "/api/uploads/",
+  // Product images & media
+  "/api/assets/",
+  // App assets
+  "/api/objects/",
+  // Alias for uploads
+  "/api/sounds/"
+  // Notification sounds
 ];
 var PUBLIC_ROUTE_PATTERNS = [
   /^\/api\/store\/\d+\/menu$/
@@ -11762,7 +11771,7 @@ function configureExpoAndLanding(app2) {
   const appName = getAppName();
   log2("Serving static Expo files with dynamic manifest routing");
   app2.use(async (req, res, next) => {
-    const isDeliveryApiPath = req.path.startsWith("/api/order/") || req.path.startsWith("/api/track/") || req.path.startsWith("/api/driver/") || req.path.startsWith("/api/super-admin") || req.path.startsWith("/api/super_admin") || req.path === "/api/restaurants" || req.path === "/api/restaurants/";
+    const isDeliveryApiPath = req.path.startsWith("/api/order/") || req.path.startsWith("/api/track/") || req.path.startsWith("/api/driver/") || req.path.startsWith("/api/super-admin") || req.path.startsWith("/api/super_admin") || req.path.startsWith("/api/uploads/") || req.path.startsWith("/api/assets/") || req.path.startsWith("/api/objects/") || req.path.startsWith("/api/sounds/") || req.path === "/api/restaurants" || req.path === "/api/restaurants/";
     if (req.path.startsWith("/api") && !isDeliveryApiPath) {
       return next();
     }
@@ -11984,10 +11993,16 @@ function configureExpoAndLanding(app2) {
   });
   app2.use("/delivery-app", deliveryAppStatic);
   app2.use("/api/delivery-app", deliveryAppStatic);
-  app2.use("/assets", import_express.default.static(path4.resolve(process.cwd(), "assets")));
-  app2.use("/uploads", import_express.default.static(path4.resolve(process.cwd(), "uploads")));
-  app2.use("/objects", import_express.default.static(path4.resolve(process.cwd(), "uploads")));
+  const uploadsStatic = import_express.default.static(path4.resolve(process.cwd(), "uploads"));
+  const assetsStatic = import_express.default.static(path4.resolve(process.cwd(), "assets"));
+  app2.use("/assets", assetsStatic);
+  app2.use("/api/assets", assetsStatic);
+  app2.use("/uploads", uploadsStatic);
+  app2.use("/api/uploads", uploadsStatic);
+  app2.use("/objects", uploadsStatic);
+  app2.use("/api/objects", uploadsStatic);
   app2.use("/sounds", import_express.default.static(path4.resolve(process.cwd(), "public", "sounds")));
+  app2.use("/api/sounds", import_express.default.static(path4.resolve(process.cwd(), "public", "sounds")));
   app2.use("/app/assets/images", import_express.default.static(path4.resolve(process.cwd(), "assets", "images")));
   const appDistDir = fs5.existsSync(path4.resolve(process.cwd(), "dist", "app")) ? path4.resolve(process.cwd(), "dist", "app") : path4.resolve(process.cwd(), "dist");
   app2.use("/app", import_express.default.static(appDistDir, {
