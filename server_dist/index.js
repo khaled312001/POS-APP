@@ -11636,6 +11636,21 @@ app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
   next();
 });
+var MEDIA_PATH_RE = /"\/(?:uploads|assets|objects)\//g;
+app.use((_req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = function(data) {
+    if (data != null && typeof data === "object") {
+      try {
+        const str = JSON.stringify(data).replace(MEDIA_PATH_RE, (m) => `"/api${m.slice(1)}`);
+        return originalJson(JSON.parse(str));
+      } catch (_) {
+      }
+    }
+    return originalJson(data);
+  };
+  next();
+});
 function setupCors(app2) {
   app2.use((req, res, next) => {
     const origins = /* @__PURE__ */ new Set([

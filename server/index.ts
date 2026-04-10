@@ -40,6 +40,25 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Rewrite media URLs for CDN compatibility ─────────────────────────────────
+// On Hostinger, only /api/* paths reach Express via CDN.
+// Rewrite /uploads/, /assets/, /objects/ to /api/uploads/ etc. in all JSON
+// responses so browsers can load images regardless of entry point.
+const MEDIA_PATH_RE = /"\/(?:uploads|assets|objects)\//g;
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  const originalJson = res.json.bind(res);
+  (res as any).json = function (data: unknown) {
+    if (data != null && typeof data === "object") {
+      try {
+        const str = JSON.stringify(data).replace(MEDIA_PATH_RE, (m) => `"/api${m.slice(1)}`);
+        return originalJson(JSON.parse(str));
+      } catch (_) { /* fall through */ }
+    }
+    return originalJson(data);
+  };
+  next();
+});
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
