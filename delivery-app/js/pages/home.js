@@ -263,7 +263,7 @@ pages.home = {
     return `
       <div class="product-card" onclick="pages.menu.openProductModal(${p.id})">
         ${p.imageUrl
-          ? `<img class="product-card__image" src="${p.imageUrl}" alt="${p.name}" loading="lazy" />`
+          ? `<img class="product-card__image" src="${fixImageUrl(p.imageUrl)}" alt="${p.name}" loading="lazy" />`
           : `<div class="product-card__image-placeholder">🍽️</div>`}
         <div class="product-card__body">
           <div class="product-card__name line-clamp-2">${p.name}</div>

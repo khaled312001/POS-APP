@@ -227,7 +227,7 @@ pages.menu = {
           </div>
         </div>
         ${hasImg
-          ? `<img class="menu-item-card__image" src="${p.imageUrl}" alt="${p.name}" loading="lazy" />`
+          ? `<img class="menu-item-card__image" src="${fixImageUrl(p.imageUrl)}" alt="${p.name}" loading="lazy" />`
           : `<div class="menu-item-card__image-placeholder">🍽️</div>`}
       </div>`;
   },
@@ -341,7 +341,7 @@ pages.menu = {
 
     inner.innerHTML = `
       ${product.imageUrl
-        ? `<img class="product-modal-image" src="${product.imageUrl}" alt="${product.name}" />`
+        ? `<img class="product-modal-image" src="${fixImageUrl(product.imageUrl)}" alt="${product.name}" />`
         : `<div style="height:180px;background:linear-gradient(135deg,var(--delivery-border),var(--delivery-primary-light));display:flex;align-items:center;justify-content:center;font-size:5rem">🍽️</div>`}
       <div class="product-modal-body">
         <h2 class="product-modal-name" id="product-modal-name">${product.name}</h2>

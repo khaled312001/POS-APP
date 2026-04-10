@@ -13,6 +13,22 @@ function isRtl() {
   return lang === "ar" || document.documentElement.dir === "rtl";
 }
 
+// Fix image URLs: prepend /api if on CDN (path starts with /api/)
+function fixImageUrl(url) {
+  if (!url) return url;
+  // Already absolute URL
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  // Already has /api/ prefix
+  if (url.startsWith("/api/")) return url;
+  // On Hostinger CDN, prepend /api to relative /uploads/ and /assets/ paths
+  const cfg = window.DELIVERY_CONFIG || {};
+  const base = cfg.basePath || "";
+  if (base && (url.startsWith("/uploads/") || url.startsWith("/assets/") || url.startsWith("/objects/"))) {
+    return base + url;
+  }
+  return url;
+}
+
 // showToast and formatCurrency are defined in index.html bootstrap script;
 // provide fallbacks here in case they're called before bootstrap runs.
 function showToast(msg, type, duration) {
