@@ -49,7 +49,7 @@ pages.menu = {
   <!-- Cover photo -->
   <div class="restaurant-cover" id="rest-cover">
     ${(storeConfig?.coverImage || storeConfig?.coverImageUrl || storeConfig?.headerBgImage)
-      ? `<img class="restaurant-cover__img" src="${storeConfig.coverImage || storeConfig.coverImageUrl || storeConfig.headerBgImage}" alt="${storeConfig.storeName || ''}" loading="lazy" onerror="this.style.display='none'" />`
+      ? `<img class="restaurant-cover__img" src="${fixImageUrl(storeConfig.coverImage || storeConfig.coverImageUrl || storeConfig.headerBgImage)}" alt="${storeConfig.storeName || ''}" loading="lazy" onerror="this.style.display='none'" />`
       : `<div style="width:100%;height:100%;background:linear-gradient(135deg,var(--nav-bg),var(--delivery-primary-dark));display:flex;align-items:center;justify-content:center;font-size:6rem;opacity:0.25">🍽️</div>`}
     <div class="restaurant-cover__overlay"></div>
     <button class="restaurant-cover__back" onclick="history.back()" aria-label="Go back">
@@ -61,7 +61,7 @@ pages.menu = {
   <div class="restaurant-info">
     <div class="restaurant-info__header">
       ${(storeConfig?.logo || storeConfig?.logoUrl || cfg.logo)
-        ? `<img class="restaurant-info__logo" src="${storeConfig.logo || storeConfig.logoUrl || cfg.logo}" alt="${storeConfig.storeName || ''}" onerror="this.style.display='none'" />`
+        ? `<img class="restaurant-info__logo" src="${fixImageUrl(storeConfig.logo || storeConfig.logoUrl || cfg.logo)}" alt="${storeConfig.storeName || ''}" onerror="this.style.display='none'" />`
         : `<div class="restaurant-info__logo-placeholder">🏪</div>`}
       <div class="flex-1">
         <h1 class="restaurant-info__name">${storeConfig?.storeName || storeConfig?.name || cfg.storeName || "Menu"}</h1>

@@ -126,7 +126,7 @@ pages.cart = {
 
     listEl.innerHTML = state.items.map(item => {
       const img = item.image
-        ? `<img class="cart-item__image" src="${item.image}" alt="${item.name}" loading="lazy" onerror="this.style.display='none'" />`
+        ? `<img class="cart-item__image" src="${fixImageUrl(item.image)}" alt="${item.name}" loading="lazy" onerror="this.style.display='none'" />`
         : `<div class="cart-item__image-placeholder">🍽️</div>`;
       const safeKey = item._key.replace(/'/g, "\\'").replace(/"/g, '\\"');
       const rerender = `pages.cart._renderItems(window.DELIVERY_CONFIG, isRtl()); pages.cart._renderSummary(window.DELIVERY_CONFIG, isRtl()); refreshCartDrawer()`;
@@ -159,7 +159,7 @@ pages.cart = {
     section.style.display = "";
     itemsEl.innerHTML = upsell.map(p => {
       const img = p.imageUrl
-        ? `<img class="upsell-item__image" src="${p.imageUrl}" alt="${p.name}" loading="lazy" />`
+        ? `<img class="upsell-item__image" src="${fixImageUrl(p.imageUrl)}" alt="${p.name}" loading="lazy" />`
         : `<div class="upsell-item__image">🍽️</div>`;
       return `<div class="upsell-item" onclick="cart.addItem(${JSON.stringify({id:p.id,name:p.name,price:p.price,imageUrl:p.imageUrl||""}).replace(/"/g,'&quot;')},1); pages.cart._renderItems(window.DELIVERY_CONFIG,isRtl()); showToast('Added','success'); refreshCartDrawer()">
         ${img}

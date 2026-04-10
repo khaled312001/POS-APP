@@ -107,7 +107,7 @@ pages.home = {
       <div class="banner-track" id="home-banner-track">
         ${banners.map(b =>
           b.url
-            ? `<img class="banner-slide" src="${b.url}" alt="${b.title || ''}" loading="lazy" />`
+            ? `<img class="banner-slide" src="${fixImageUrl(b.url)}" alt="${b.title || ''}" loading="lazy" />`
             : `<div class="banner-slide-inner">
                  <h3>${b.title || ""}</h3>
                  <p>${b.subtitle || ""}</p>
