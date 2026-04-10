@@ -231,6 +231,8 @@ function configureExpoAndLanding(app: express.Application) {
       req.path.startsWith("/api/order/") ||
       req.path.startsWith("/api/track/") ||
       req.path.startsWith("/api/driver/") ||
+      req.path.startsWith("/api/super-admin") ||
+      req.path.startsWith("/api/super_admin") ||
       req.path === "/api/restaurants" || req.path === "/api/restaurants/";
     if (req.path.startsWith("/api") && !isDeliveryApiPath) {
       return next();
@@ -279,9 +281,12 @@ function configureExpoAndLanding(app: express.Application) {
     }
 
     // Handle both /super_admin and /super-admin (serve directly, no redirect)
-    if (req.path.startsWith("/super_admin") || req.path.startsWith("/super-admin")) {
-      const isLogin = req.path === "/super_admin/login" || req.path === "/super-admin/login"
-        || req.path === "/super_admin" || req.path === "/super-admin";
+    // Also handles /api/super-admin/* for Hostinger CDN compatibility
+    if (req.path.startsWith("/super_admin") || req.path.startsWith("/super-admin") ||
+        req.path.startsWith("/api/super_admin") || req.path.startsWith("/api/super-admin")) {
+      const isLogin = req.path.endsWith("/login") || req.path === "/super_admin"
+        || req.path === "/super-admin" || req.path === "/api/super-admin"
+        || req.path === "/api/super_admin";
       const superAdminTemplatePath = path.resolve(
         process.cwd(),
         "server",

@@ -5,6 +5,44 @@
 
 const API_BASE = "";  // same origin — no CORS
 
+// ── Global utilities ───────────────────────────────────────────────────────
+
+function isRtl() {
+  const cfg = window.DELIVERY_CONFIG || {};
+  const lang = cfg.language || document.documentElement.lang || "en";
+  return lang === "ar" || document.documentElement.dir === "rtl";
+}
+
+// showToast and formatCurrency are defined in index.html bootstrap script;
+// provide fallbacks here in case they're called before bootstrap runs.
+function showToast(msg, type, duration) {
+  if (window.showToast && window.showToast !== showToast) {
+    return window.showToast(msg, type, duration);
+  }
+  duration = duration || 3000;
+  var container = document.getElementById("toast-container");
+  if (!container) return;
+  var el = document.createElement("div");
+  el.className = "toast" + (type ? " " + type : "");
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(function() { el.remove(); }, duration + 300);
+}
+
+function formatCurrency(amount, currency) {
+  if (window.formatCurrency && window.formatCurrency !== formatCurrency) {
+    return window.formatCurrency(amount, currency);
+  }
+  var c = currency || (window.DELIVERY_CONFIG || {}).currency || "EGP";
+  try {
+    return new Intl.NumberFormat(isRtl() ? "ar-EG" : "en", {
+      style: "currency", currency: c, minimumFractionDigits: 0,
+    }).format(amount || 0);
+  } catch (_) {
+    return c + " " + (amount || 0);
+  }
+}
+
 // ── Core fetch wrapper ─────────────────────────────────────────────────────
 
 async function apiFetch(path, options = {}) {
