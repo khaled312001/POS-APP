@@ -282,8 +282,10 @@ function configureExpoAndLanding(app: express.Application) {
 
     // Handle both /super_admin and /super-admin (serve directly, no redirect)
     // Also handles /api/super-admin/* for Hostinger CDN compatibility
-    if (req.path.startsWith("/super_admin") || req.path.startsWith("/super-admin") ||
-        req.path.startsWith("/api/super_admin") || req.path.startsWith("/api/super-admin")) {
+    // Only intercept GET requests — POST/PUT/DELETE go to the API route handlers
+    if (req.method === "GET" && (
+        req.path.startsWith("/super_admin") || req.path.startsWith("/super-admin") ||
+        req.path.startsWith("/api/super_admin") || req.path.startsWith("/api/super-admin"))) {
       const isLogin = req.path.endsWith("/login") || req.path === "/super_admin"
         || req.path === "/super-admin" || req.path === "/api/super-admin"
         || req.path === "/api/super_admin";

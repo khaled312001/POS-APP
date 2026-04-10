@@ -354,7 +354,9 @@
                 localStorage.setItem('super_admin_user', JSON.stringify(data.admin || data.user));
 
                 // Keep button in loading state while redirecting
-                window.location.href = '/super-admin/dashboard';
+                // Use /api/ prefix for Hostinger CDN compatibility
+                const base = location.pathname.startsWith('/api/') ? '/api' : '';
+                window.location.href = base + '/super-admin/dashboard';
             } catch (err) {
                 document.getElementById('errorText').innerText = err.message;
                 errorBox.style.display = 'flex';

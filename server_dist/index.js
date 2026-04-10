@@ -11796,7 +11796,7 @@ function configureExpoAndLanding(app2) {
         return res.sendFile(swPath);
       }
     }
-    if (req.path.startsWith("/super_admin") || req.path.startsWith("/super-admin") || req.path.startsWith("/api/super_admin") || req.path.startsWith("/api/super-admin")) {
+    if (req.method === "GET" && (req.path.startsWith("/super_admin") || req.path.startsWith("/super-admin") || req.path.startsWith("/api/super_admin") || req.path.startsWith("/api/super-admin"))) {
       const isLogin = req.path.endsWith("/login") || req.path === "/super_admin" || req.path === "/super-admin" || req.path === "/api/super-admin" || req.path === "/api/super_admin";
       const superAdminTemplatePath = path4.resolve(
         process.cwd(),
