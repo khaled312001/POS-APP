@@ -11786,7 +11786,7 @@ function configureExpoAndLanding(app2) {
   const appName = getAppName();
   log2("Serving static Expo files with dynamic manifest routing");
   app2.use(async (req, res, next) => {
-    const isDeliveryApiPath = req.path.startsWith("/api/order/") || req.path.startsWith("/api/track/") || req.path.startsWith("/api/driver/") || req.path.startsWith("/api/super-admin") || req.path.startsWith("/api/super_admin") || req.path.startsWith("/api/uploads/") || req.path.startsWith("/api/assets/") || req.path.startsWith("/api/objects/") || req.path.startsWith("/api/sounds/") || req.path === "/api/restaurants" || req.path === "/api/restaurants/";
+    const isDeliveryApiPath = req.path.startsWith("/api/order/") || req.path.startsWith("/api/track/") || req.path.startsWith("/api/driver/") || req.path.startsWith("/api/super-admin") || req.path.startsWith("/api/super_admin") || req.path.startsWith("/api/uploads/") || req.path.startsWith("/api/assets/") || req.path.startsWith("/api/objects/") || req.path.startsWith("/api/sounds/") || req.path === "/api/restaurants" || req.path === "/api/restaurants/" || req.path === "/api/order" || req.path === "/api/order/";
     if (req.path.startsWith("/api") && !isDeliveryApiPath) {
       return next();
     }
@@ -11855,6 +11855,34 @@ function configureExpoAndLanding(app2) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(dbTemplate);
     }
+    if (req.path === "/order" || req.path === "/order/" || req.path === "/api/order" || req.path === "/api/order/") {
+      try {
+        const restaurantsIndexPath = path4.resolve(process.cwd(), "delivery-app", "restaurants.html");
+        if (!fs5.existsSync(restaurantsIndexPath)) {
+          return res.status(503).send("<h1>Restaurants page not yet deployed</h1>");
+        }
+        const isApiPrefixed = req.path.startsWith("/api/");
+        const basePath = isApiPrefixed ? "/api" : "";
+        let html = fs5.readFileSync(restaurantsIndexPath, "utf-8");
+        const configJson = JSON.stringify({
+          storeName: "Barmagly Delivery",
+          currency: process.env.DEFAULT_CURRENCY || "EGP",
+          language: req.query.lang || "en",
+          stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
+          primaryColor: "#FF5722",
+          accentColor: "#2FD3C6",
+          tenantId: null,
+          slug: null,
+          basePath
+        });
+        html = html.replace("__DELIVERY_CONFIG__", configJson);
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.status(200).send(html);
+      } catch (err) {
+        console.error("[/order] Error:", err);
+        return res.status(500).send("<h1>Server error</h1>");
+      }
+    }
     const deliveryMatch = req.path.match(/^(?:\/api)?\/order\/([^/]+)(\/.*)?$/);
     if (deliveryMatch) {
       try {
@@ -11907,11 +11935,12 @@ function configureExpoAndLanding(app2) {
     }
     if (req.path === "/restaurants" || req.path === "/restaurants/" || req.path === "/api/restaurants" || req.path === "/api/restaurants/") {
       try {
-        const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
         const restaurantsIndexPath = path4.resolve(process.cwd(), "delivery-app", "restaurants.html");
         if (!fs5.existsSync(restaurantsIndexPath)) {
           return res.status(503).send("<h1>Restaurants page not yet deployed</h1>");
         }
+        const isApiPrefixed = req.path.startsWith("/api/");
+        const basePath = isApiPrefixed ? "/api" : "";
         let html = fs5.readFileSync(restaurantsIndexPath, "utf-8");
         const configJson = JSON.stringify({
           storeName: "Barmagly Delivery",
@@ -11921,7 +11950,8 @@ function configureExpoAndLanding(app2) {
           primaryColor: "#FF5722",
           accentColor: "#2FD3C6",
           tenantId: null,
-          slug: null
+          slug: null,
+          basePath
         });
         html = html.replace("__DELIVERY_CONFIG__", configJson);
         res.setHeader("Content-Type", "text/html; charset=utf-8");

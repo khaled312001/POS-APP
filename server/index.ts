@@ -256,7 +256,8 @@ function configureExpoAndLanding(app: express.Application) {
       req.path.startsWith("/api/assets/") ||
       req.path.startsWith("/api/objects/") ||
       req.path.startsWith("/api/sounds/") ||
-      req.path === "/api/restaurants" || req.path === "/api/restaurants/";
+      req.path === "/api/restaurants" || req.path === "/api/restaurants/" ||
+      req.path === "/api/order" || req.path === "/api/order/";
     if (req.path.startsWith("/api") && !isDeliveryApiPath) {
       return next();
     }
@@ -336,6 +337,37 @@ function configureExpoAndLanding(app: express.Application) {
       return res.status(200).send(dbTemplate);
     }
 
+    // ── General delivery listing (no slug) ─────────────────────────────────
+    // /order or /api/order → shows all restaurants
+    if (req.path === "/order" || req.path === "/order/" || req.path === "/api/order" || req.path === "/api/order/") {
+      try {
+        const restaurantsIndexPath = path.resolve(process.cwd(), "delivery-app", "restaurants.html");
+        if (!fs.existsSync(restaurantsIndexPath)) {
+          return res.status(503).send("<h1>Restaurants page not yet deployed</h1>");
+        }
+        const isApiPrefixed = req.path.startsWith("/api/");
+        const basePath = isApiPrefixed ? "/api" : "";
+        let html = fs.readFileSync(restaurantsIndexPath, "utf-8");
+        const configJson = JSON.stringify({
+          storeName: "Barmagly Delivery",
+          currency: process.env.DEFAULT_CURRENCY || "EGP",
+          language: (req.query.lang as string) || "en",
+          stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
+          primaryColor: "#FF5722",
+          accentColor: "#2FD3C6",
+          tenantId: null,
+          slug: null,
+          basePath,
+        });
+        html = html.replace("__DELIVERY_CONFIG__", configJson);
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.status(200).send(html);
+      } catch (err) {
+        console.error("[/order] Error:", err);
+        return res.status(500).send("<h1>Server error</h1>");
+      }
+    }
+
     // ── Delivery App Routes ──────────────────────────────────────────────────
     // Supports both /order/:slug (direct) and /api/order/:slug (Hostinger CDN compatibility)
     const deliveryMatch = req.path.match(/^(?:\/api)?\/order\/([^/]+)(\/.*)?$/);
@@ -394,22 +426,23 @@ function configureExpoAndLanding(app: express.Application) {
     // Multi-restaurant discovery page
     if (req.path === "/restaurants" || req.path === "/restaurants/" || req.path === "/api/restaurants" || req.path === "/api/restaurants/") {
       try {
-        const { storage } = await import("./storage");
         const restaurantsIndexPath = path.resolve(process.cwd(), "delivery-app", "restaurants.html");
         if (!fs.existsSync(restaurantsIndexPath)) {
           return res.status(503).send("<h1>Restaurants page not yet deployed</h1>");
         }
+        const isApiPrefixed = req.path.startsWith("/api/");
+        const basePath = isApiPrefixed ? "/api" : "";
         let html = fs.readFileSync(restaurantsIndexPath, "utf-8");
-        // Inject minimal global config (no tenant-specific slug)
         const configJson = JSON.stringify({
           storeName: "Barmagly Delivery",
           currency: process.env.DEFAULT_CURRENCY || "EGP",
-          language: req.query.lang || "en",
+          language: (req.query.lang as string) || "en",
           stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
           primaryColor: "#FF5722",
           accentColor: "#2FD3C6",
           tenantId: null,
           slug: null,
+          basePath,
         });
         html = html.replace("__DELIVERY_CONFIG__", configJson);
         res.setHeader("Content-Type", "text/html; charset=utf-8");

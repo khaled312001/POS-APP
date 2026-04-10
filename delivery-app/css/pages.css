@@ -55,12 +55,12 @@
 .home-hero .search-bar { max-width: 560px; }
 .home-hero .search-bar input {
   background: #fff;
-  color: var(--delivery-text);
+  color: #1A1A2E;
   border-color: transparent;
   box-shadow: var(--shadow-md);
   padding-block: 15px;
 }
-.home-hero .search-bar input::placeholder { color: #9CA3AF; }
+.home-hero .search-bar input::placeholder { color: #6B7280; }
 .home-hero .search-bar input:focus { border-color: var(--delivery-primary); }
 
 .home-hero__meta {

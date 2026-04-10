@@ -52,7 +52,8 @@
       "Bash(start http://localhost:5001/order/demo)",
       "Bash(start http://localhost:5001/order/demo/menu)",
       "Bash(start http://localhost:5001/order/demo/offers)",
-      "Bash(start \"http://localhost:5001/?licenseKey=DEMO-LICENSE-2024\")"
+      "Bash(start \"http://localhost:5001/?licenseKey=DEMO-LICENSE-2024\")",
+      "Bash(py -c ':*)"
     ]
   }
 }
