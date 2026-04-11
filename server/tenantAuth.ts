@@ -38,8 +38,11 @@ const PUBLIC_ROUTES = [
   "/api/delivery/zones",           // Delivery zones for checkout map
   "/api/delivery/referral/",       // Referral code lookup
   "/api/delivery/driver/auth",     // Driver token login
+  "/api/delivery/search",          // Public product search
+  "/api/delivery/help/faq",        // Public FAQ listing
+  "/api/delivery/sitemap.xml",     // Dynamic sitemap XML
   // ── HTML pages served under /api/ prefix (Hostinger CDN compatibility) ──
-  "/api/order/",                   // Delivery SPA HTML
+  "/api/order",                    // Delivery listing (no-slug) + /api/order/
   "/api/track/",                   // Public tracking page HTML
   "/api/driver/",                  // Driver PWA HTML
   "/api/restaurants",              // Restaurant listing HTML

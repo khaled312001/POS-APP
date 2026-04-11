@@ -37,13 +37,13 @@ pages.home = {
 
       // Cuisine categories (from actual menu categories + generic icons)
       const cuisineIcons = { en: {
-        "Pizza":"🍕","Burger":"🍔","Sushi":"🍣","Chicken":"🍗","Pasta":"🍝",
-        "Salad":"🥗","Dessert":"🍰","Drinks":"🥤","Breakfast":"🥞","Sandwiches":"🥪",
-        "Seafood":"🦞","Grill":"🔥","Vegan":"🌱","Soup":"🍲","Coffee":"☕",
+        "Pizza":'<i data-lucide="pizza" class="icon-lg"></i>',"Burger":'<i data-lucide="beef" class="icon-lg"></i>',"Sushi":'<i data-lucide="fish" class="icon-lg"></i>',"Chicken":'<i data-lucide="drumstick" class="icon-lg"></i>',"Pasta":'<i data-lucide="soup" class="icon-lg"></i>',
+        "Salad":'<i data-lucide="salad" class="icon-lg"></i>',"Dessert":'<i data-lucide="cake-slice" class="icon-lg"></i>',"Drinks":'<i data-lucide="cup-soda" class="icon-lg"></i>',"Breakfast":'<i data-lucide="egg-fried" class="icon-lg"></i>',"Sandwiches":'<i data-lucide="sandwich" class="icon-lg"></i>',
+        "Seafood":'<i data-lucide="fish" class="icon-lg"></i>',"Grill":'<i data-lucide="flame" class="icon-lg"></i>',"Vegan":'<i data-lucide="vegan" class="icon-lg"></i>',"Soup":'<i data-lucide="soup" class="icon-lg"></i>',"Coffee":'<i data-lucide="coffee" class="icon-lg"></i>',
       }, ar: {
-        "بيتزا":"🍕","برجر":"🍔","سوشي":"🍣","دجاج":"🍗","باستا":"🍝",
-        "سلطة":"🥗","حلويات":"🍰","مشروبات":"🥤","فطار":"🥞","ساندوتشات":"🥪",
-        "مأكولات بحرية":"🦞","مشويات":"🔥","نباتي":"🌱","شوربة":"🍲","قهوة":"☕",
+        "بيتزا":'<i data-lucide="pizza" class="icon-lg"></i>',"برجر":'<i data-lucide="beef" class="icon-lg"></i>',"سوشي":'<i data-lucide="fish" class="icon-lg"></i>',"دجاج":'<i data-lucide="drumstick" class="icon-lg"></i>',"باستا":'<i data-lucide="soup" class="icon-lg"></i>',
+        "سلطة":'<i data-lucide="salad" class="icon-lg"></i>',"حلويات":'<i data-lucide="cake-slice" class="icon-lg"></i>',"مشروبات":'<i data-lucide="cup-soda" class="icon-lg"></i>',"فطار":'<i data-lucide="egg-fried" class="icon-lg"></i>',"ساندوتشات":'<i data-lucide="sandwich" class="icon-lg"></i>',
+        "مأكولات بحرية":'<i data-lucide="fish" class="icon-lg"></i>',"مشويات":'<i data-lucide="flame" class="icon-lg"></i>',"نباتي":'<i data-lucide="vegan" class="icon-lg"></i>',"شوربة":'<i data-lucide="soup" class="icon-lg"></i>',"قهوة":'<i data-lucide="coffee" class="icon-lg"></i>',
       } };
       const icons = cuisineIcons[rtl ? "ar" : "en"];
 
@@ -52,7 +52,7 @@ pages.home = {
 
   <!-- ── Hero ──────────────────────────────────────────────────────── -->
   <section class="home-hero" aria-label="Search">
-    <div class="home-hero__greeting">${rtl ? "أهلاً 👋" : "Hello 👋"}</div>
+    <div class="home-hero__greeting">${rtl ? "أهلاً" : "Hello"} <i data-lucide="hand" class="icon-md"></i></div>
     <h1 class="home-hero__title">
       ${storeConfig?.tagline || (rtl ? "اطلب طعامك المفضل" : "Order your favourite food")}
     </h1>
@@ -75,17 +75,17 @@ pages.home = {
 
     <div class="home-hero__meta">
       <div class="home-hero__meta-item">
-        ⏱ <strong>${cfg.minDeliveryTime || 20}–${cfg.maxDeliveryTime || 45} min</strong> ${rtl ? "توصيل" : "delivery"}
+        <i data-lucide="clock" class="icon-sm"></i> <strong>${cfg.minDeliveryTime || 20}–${cfg.maxDeliveryTime || 45} min</strong> ${rtl ? "توصيل" : "delivery"}
       </div>
       ${storeConfig?.deliveryFee != null ? `
       <div class="home-hero__meta-item">
-        🚚 ${parseFloat(storeConfig.deliveryFee) === 0
+        <i data-lucide="truck" class="icon-sm"></i> ${parseFloat(storeConfig.deliveryFee) === 0
           ? (rtl ? "<strong>توصيل مجاني</strong>" : "<strong>Free delivery</strong>")
           : formatCurrency(storeConfig.deliveryFee, cfg.currency) + " " + (rtl ? "توصيل" : "delivery")}
       </div>` : ""}
       ${storeConfig?.minOrderAmount ? `
       <div class="home-hero__meta-item">
-        🛒 ${rtl ? "حد أدنى" : "Min."} <strong>${formatCurrency(storeConfig.minOrderAmount, cfg.currency)}</strong>
+        <i data-lucide="shopping-cart" class="icon-sm"></i> ${rtl ? "حد أدنى" : "Min."} <strong>${formatCurrency(storeConfig.minOrderAmount, cfg.currency)}</strong>
       </div>` : ""}
     </div>
   </section>
@@ -93,16 +93,16 @@ pages.home = {
   <!-- ── Service tabs ───────────────────────────────────────────────── -->
   <div class="service-tabs" role="tablist">
     <button class="service-tab active" role="tab" aria-selected="true" onclick="pages.home._setServiceTab(this,'delivery')">
-      🚴 ${rtl ? "توصيل" : "Delivery"}
+      <i data-lucide="bike" class="icon-sm"></i> ${rtl ? "توصيل" : "Delivery"}
     </button>
     <button class="service-tab" role="tab" aria-selected="false" onclick="pages.home._setServiceTab(this,'pickup')">
-      🏃 ${rtl ? "استلام ذاتي" : "Pickup"}
+      <i data-lucide="footprints" class="icon-sm"></i> ${rtl ? "استلام ذاتي" : "Pickup"}
     </button>
   </div>
 
   <!-- ── Banners ────────────────────────────────────────────────────── -->
   ${banners.length > 0 ? `
-  <div class="home-section" style="padding-top:var(--space-md);padding-bottom:var(--space-md)">
+  <div class="home-section home-section--compact">
     <div class="banner-carousel" id="home-banner">
       <div class="banner-track" id="home-banner-track">
         ${banners.map(b =>
@@ -128,10 +128,10 @@ pages.home = {
 
   <!-- ── Promo strip ────────────────────────────────────────────────── -->
   ${featuredPromos ? `
-  <div class="home-section" style="padding-top:0;padding-bottom:0">
+  <div class="home-section home-section--flush">
     <div class="promo-strip" onclick="router.navigate('offers')">
       <div>
-        <div class="promo-strip__title">${rtl ? "🎁 عروض اليوم" : "🎁 Today's Deals"}</div>
+        <div class="promo-strip__title"><i data-lucide="gift" class="icon-sm"></i> ${rtl ? "عروض اليوم" : "Today's Deals"}</div>
         <div class="promo-strip__sub">${featuredPromos}</div>
       </div>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2">
@@ -179,7 +179,7 @@ pages.home = {
       <h2 class="section-header__title">${rtl ? "برنامج الولاء" : "Loyalty Rewards"}</h2>
     </div>
     <div class="loyalty-bar" onclick="router.navigate('account')">
-      <div class="loyalty-bar__icon">⭐</div>
+      <div class="loyalty-bar__icon"><i data-lucide="star" class="icon-lg"></i></div>
       <div class="loyalty-bar__info">
         <div class="loyalty-bar__points">${rtl ? "اكسب نقاط مع كل طلب" : "Earn points with every order"}</div>
         <div class="loyalty-bar__tier">${rtl ? "انضم الآن وابدأ توفير المال" : "Join now and start saving"}</div>
@@ -192,16 +192,16 @@ pages.home = {
 
   <!-- ── App download banner ────────────────────────────────────────── -->
   <div class="home-section">
-    <div class="promo-strip" style="background:linear-gradient(135deg,#1A1A2E,#2a2e44)" onclick="router.navigate('offers')">
+    <div class="promo-strip home-promo-dark" onclick="router.navigate('offers')">
       <div>
-        <div class="promo-strip__title">${rtl ? "🎁 انتظرك عرض ترحيبي!" : "🎁 Welcome offer inside!"}</div>
+        <div class="promo-strip__title"><i data-lucide="gift" class="icon-sm"></i> ${rtl ? "انتظرك عرض ترحيبي!" : "Welcome offer inside!"}</div>
         <div class="promo-strip__sub">${rtl ? "استخدم كود WELCOME10 واحصل على 10% خصم" : "Use code WELCOME10 for 10% off your first order"}</div>
       </div>
     </div>
   </div>
 
   <!-- Bottom spacer for mobile nav -->
-  <div style="height:var(--space-xl)"></div>
+  <div class="home-spacer"></div>
 </div>
       `;
 
@@ -231,7 +231,7 @@ pages.home = {
       console.error("Home render error:", err);
       container.innerHTML = `
         <div class="empty-state">
-          <div class="empty-state__icon">⚠️</div>
+          <div class="empty-state__icon"><i data-lucide="alert-triangle" class="icon-2xl"></i></div>
           <div class="empty-state__title">Something went wrong</div>
           <div class="empty-state__text">${err.message}</div>
           <button class="btn btn-primary mt-md" onclick="router.navigate('home')">Retry</button>
@@ -242,16 +242,16 @@ pages.home = {
   _skeleton() {
     return `
       <div class="home-page">
-        <div style="background:var(--nav-bg);padding:var(--space-xl) var(--space-md);min-height:180px;position:relative">
-          <div class="skeleton" style="width:80px;height:14px;margin-bottom:12px"></div>
-          <div class="skeleton" style="width:200px;height:28px;margin-bottom:8px"></div>
-          <div class="skeleton" style="width:140px;height:14px;margin-bottom:20px"></div>
-          <div class="skeleton" style="height:48px;border-radius:var(--radius-pill)"></div>
+        <div class="home-skeleton-hero">
+          <div class="skeleton skeleton-text" style="width:80px"></div>
+          <div class="skeleton skeleton-text" style="width:200px;height:28px"></div>
+          <div class="skeleton skeleton-text" style="width:140px"></div>
+          <div class="skeleton skeleton-text" style="height:48px;border-radius:var(--radius-pill)"></div>
         </div>
-        <div style="height:8px;background:var(--delivery-bg)"></div>
+        <div class="home-skeleton-divider"></div>
         <div class="home-section">
           <div class="products-grid">
-            ${Array(6).fill('<div style="border-radius:var(--radius-md);overflow:hidden"><div class="skeleton" style="aspect-ratio:1"></div><div style="padding:8px"><div class="skeleton" style="height:14px;margin-bottom:6px"></div><div class="skeleton" style="height:12px;width:60%"></div></div></div>').join("")}
+            ${Array(6).fill('<div class="home-skeleton-card"><div class="skeleton" style="aspect-ratio:1"></div><div style="padding:8px"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width:60%"></div></div></div>').join("")}
           </div>
         </div>
       </div>`;
@@ -264,7 +264,7 @@ pages.home = {
       <div class="product-card" onclick="pages.menu.openProductModal(${p.id})">
         ${p.imageUrl
           ? `<img class="product-card__image" src="${fixImageUrl(p.imageUrl)}" alt="${p.name}" loading="lazy" />`
-          : `<div class="product-card__image-placeholder">🍽️</div>`}
+          : `<div class="product-card__image-placeholder"><i data-lucide="utensils" class="icon-xl"></i></div>`}
         <div class="product-card__body">
           <div class="product-card__name line-clamp-2">${p.name}</div>
           ${p.description ? `<div class="product-card__desc line-clamp-2">${p.description}</div>` : ""}
@@ -296,7 +296,7 @@ pages.home = {
 
     if (results.length === 0) {
       grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-        <div class="empty-state__icon">🔍</div>
+        <div class="empty-state__icon"><i data-lucide="search" class="icon-2xl"></i></div>
         <div class="empty-state__title">${isRtl() ? "لا نتائج" : "No results"}</div>
         <div class="empty-state__text">${isRtl() ? "جرب كلمات مختلفة" : "Try different keywords"}</div>
       </div>`;

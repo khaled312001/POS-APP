@@ -8,6 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="description" content="Order food online — fast delivery to your door" />
+  <link rel="manifest" href="/api/delivery-app/manifest.json" />
 
   <title>Barmagly Delivery</title>
 
@@ -79,7 +80,7 @@
 
   <!-- ── Splash screen ─────────────────────────────────────────────────── -->
   <div id="splash" role="status" aria-label="Loading">
-    <div id="splash-logo">🍽️</div>
+    <div id="splash-logo"><i data-lucide="utensils" class="icon-2xl" style="color:#fff"></i></div>
     <div id="splash-name">Barmagly</div>
     <div id="splash-loading"></div>
   </div>
@@ -96,13 +97,13 @@
 
         <!-- Logo -->
         <a class="site-logo" href="#" onclick="router.navigate('home'); return false;">
-          <div class="site-logo__icon" id="header-logo-icon">🍽️</div>
+          <div class="site-logo__icon" id="header-logo-icon"><i data-lucide="utensils" class="icon-lg"></i></div>
           <span class="site-logo__text" id="header-store-name">Barmagly</span>
         </a>
 
         <!-- Location -->
         <button class="location-selector" id="location-btn" onclick="showLocationPicker()">
-          <span class="location-selector__pin">📍</span>
+          <span class="location-selector__pin"><i data-lucide="map-pin" class="icon-sm"></i></span>
           <span class="location-selector__label" id="location-label">Select location</span>
           <span style="color:rgba(255,255,255,0.4);font-size:0.75rem">▾</span>
         </button>
@@ -124,13 +125,13 @@
         <!-- Nav actions -->
         <nav class="nav-actions" aria-label="Account navigation">
           <button class="nav-action-btn" id="nav-offers-btn" onclick="router.navigate('offers')">
-            🎁 <span>Offers</span>
+            <i data-lucide="gift" class="icon-sm"></i> <span>Offers</span>
           </button>
           <button class="nav-action-btn" id="nav-account-btn" onclick="router.navigate('account')">
-            👤 <span id="nav-user-label">Sign in</span>
+            <i data-lucide="user" class="icon-sm"></i> <span id="nav-user-label">Sign in</span>
           </button>
           <button class="nav-action-btn nav-cart-btn" id="nav-cart-btn" onclick="openCartDrawer()">
-            🛒 <span>Cart</span>
+            <i data-lucide="shopping-cart" class="icon-sm"></i> <span>Cart</span>
             <span class="nav-cart-badge hidden" id="nav-cart-badge">0</span>
           </button>
         </nav>
@@ -195,12 +196,12 @@
     <!-- Desktop Cart Drawer -->
     <div class="cart-drawer" id="cart-drawer" aria-label="Shopping cart">
       <div class="cart-drawer__header">
-        <h2 style="font-size:1.125rem;font-weight:700">Your Cart</h2>
+        <h2 class="cart-drawer__title">Your Cart</h2>
         <button class="btn-icon btn-ghost" onclick="closeCartDrawer()" aria-label="Close cart">✕</button>
       </div>
       <div class="cart-drawer__body" id="cart-drawer-body">
         <div class="empty-state">
-          <div class="empty-state__icon">🛒</div>
+          <div class="empty-state__icon"><i data-lucide="shopping-cart" class="icon-2xl"></i></div>
           <div class="empty-state__title">Your cart is empty</div>
           <div class="empty-state__text">Add items from the menu to get started</div>
         </div>
@@ -219,6 +220,9 @@
   </div><!-- /#app-shell -->
 
   <!-- ── Scripts ────────────────────────────────────────────────────────── -->
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
   <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
@@ -358,8 +362,15 @@
       }
     }, 800);
 
+    // ── Register service worker ─────────────────────────────────────────
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/api/delivery-app/sw.js", { scope: "/api/" }).catch(function() {});
+    }
+
     // ── Resolve initial URL ──────────────────────────────────────────────
     router._resolve();
+    // Initialize Lucide icons for static header elements
+    if (window.lucide) window.lucide.createIcons();
   })();
 
   // ── Cart drawer ──────────────────────────────────────────────────────────
@@ -385,7 +396,7 @@
     var cfg = window.DELIVERY_CONFIG || {};
 
     if (state.items.length === 0) {
-      body.innerHTML = '<div class="empty-state"><div class="empty-state__icon">🛒</div>' +
+      body.innerHTML = '<div class="empty-state"><div class="empty-state__icon"><i data-lucide="shopping-cart" class="icon-2xl"></i></div>' +
         '<div class="empty-state__title">Your cart is empty</div>' +
         '<div class="empty-state__text">Add items from the menu to get started</div></div>';
       if (footer) footer.classList.add("hidden");
@@ -395,7 +406,7 @@
     var html = state.items.map(function(item) {
       var img = item.image
         ? '<img class="cart-item__image" src="' + item.image + '" alt="' + item.name + '" onerror="this.style.display=\'none\'">'
-        : '<div class="cart-item__image-placeholder">🍽️</div>';
+        : '<div class="cart-item__image-placeholder"><i data-lucide="utensils" class="icon-lg"></i></div>';
       var safeKey = item._key.replace(/'/g, "\\'");
       return '<div class="cart-item">' + img +
         '<div class="cart-item__info">' +
@@ -422,6 +433,7 @@
         '<div class="summary-row"><span style="font-size:0.75rem;color:var(--delivery-text-muted)">' + (isRtl() ? 'رسوم التوصيل تُحسب عند الطلب' : 'Delivery fee calculated at checkout') + '</span></div>' +
         '<div class="summary-row total"><span>' + (isRtl() ? 'الإجمالي' : 'Total') + '</span><strong>' + formatCurrency(total, cfg.currency) + '</strong></div>';
     }
+    if (window.lucide) window.lucide.createIcons();
   };
 
   // ── Location picker ──────────────────────────────────────────────────────

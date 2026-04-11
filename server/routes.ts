@@ -3994,6 +3994,227 @@ async function test(){
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── Favorites ──────────────────────────────────────────────────────────────
+
+  app.get("/api/delivery/favorites", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db } = await import("./db");
+      const { customerFavorites, products } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const favs = await db.select({
+        id: customerFavorites.id,
+        productId: customerFavorites.productId,
+        createdAt: customerFavorites.createdAt,
+        productName: products.name,
+        productNameAr: products.nameAr,
+        productPrice: products.price,
+        productImage: products.image,
+        productDescription: products.description,
+      })
+        .from(customerFavorites)
+        .innerJoin(products, eq(products.id, customerFavorites.productId))
+        .where(and(eq(customerFavorites.customerId, customer.id), eq(customerFavorites.tenantId, customer.tenantId!)));
+      res.json(favs);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/favorites", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { productId } = req.body;
+      if (!productId) return res.status(400).json({ error: "productId required" });
+      const { db } = await import("./db");
+      const { customerFavorites } = await import("@shared/schema");
+      const [fav] = await db.insert(customerFavorites).values({
+        tenantId: customer.tenantId!,
+        customerId: customer.id,
+        productId: Number(productId),
+      }).$returningId();
+      res.status(201).json({ id: fav.id, productId: Number(productId) });
+    } catch (e: any) {
+      if (e.code === "ER_DUP_ENTRY") return res.status(409).json({ error: "Already in favorites" });
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.delete("/api/delivery/favorites/:id", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db } = await import("./db");
+      const { customerFavorites } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      await db.delete(customerFavorites).where(
+        and(eq(customerFavorites.id, Number(req.params.id)), eq(customerFavorites.customerId, customer.id))
+      );
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Product Search ────────────────────────────────────────────────────────
+
+  app.get("/api/delivery/search", async (req: Request, res: Response) => {
+    try {
+      const q = (req.query.q as string || "").trim();
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      if (!q) return res.json([]);
+      const { db } = await import("./db");
+      const { products, categories } = await import("@shared/schema");
+      const { eq, and, or, like, sql } = await import("drizzle-orm");
+      const pattern = `%${q}%`;
+      const results = await db.select({
+        id: products.id,
+        name: products.name,
+        nameAr: products.nameAr,
+        description: products.description,
+        price: products.price,
+        image: products.image,
+        categoryId: products.categoryId,
+        categoryName: categories.name,
+      })
+        .from(products)
+        .leftJoin(categories, eq(categories.id, products.categoryId))
+        .where(and(
+          eq(products.tenantId, tenantId),
+          eq(products.isActive, true),
+          or(
+            like(products.name, pattern),
+            like(products.nameAr, pattern),
+            like(products.description, pattern),
+          ),
+        ))
+        .limit(50);
+      res.json(results);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Help / FAQ / Tickets ──────────────────────────────────────────────────
+
+  app.get("/api/delivery/help/faq", async (req: Request, res: Response) => {
+    try {
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      const { db } = await import("./db");
+      const { faqEntries } = await import("@shared/schema");
+      const { eq, and, asc } = await import("drizzle-orm");
+      const faqs = await db.select().from(faqEntries)
+        .where(and(eq(faqEntries.tenantId, tenantId), eq(faqEntries.isActive, true)))
+        .orderBy(asc(faqEntries.sortOrder));
+      res.json(faqs);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/delivery/help/ticket", async (req: Request, res: Response) => {
+    try {
+      const { subject, message, orderId, tenantId } = req.body;
+      if (!subject || !message || !tenantId) return res.status(400).json({ error: "subject, message, tenantId required" });
+      const customer = await getAuthenticatedCustomer(req.headers.authorization).catch(() => null);
+      const { db } = await import("./db");
+      const { helpTickets } = await import("@shared/schema");
+      const [ticket] = await db.insert(helpTickets).values({
+        tenantId: Number(tenantId),
+        customerId: customer?.id ?? null,
+        orderId: orderId ? Number(orderId) : null,
+        subject,
+        message,
+        status: "open",
+        priority: "normal",
+      }).$returningId();
+      res.status(201).json({ id: ticket.id, status: "open" });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/delivery/help/tickets", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db } = await import("./db");
+      const { helpTickets } = await import("@shared/schema");
+      const { eq, and, desc } = await import("drizzle-orm");
+      const tickets = await db.select().from(helpTickets)
+        .where(and(eq(helpTickets.customerId, customer.id), eq(helpTickets.tenantId, customer.tenantId!)))
+        .orderBy(desc(helpTickets.createdAt));
+      res.json(tickets);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Recently Ordered ─────────────────────────────────────────────────────
+
+  app.get("/api/delivery/recently-ordered", async (req: Request, res: Response) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db } = await import("./db");
+      const { onlineOrders, products } = await import("@shared/schema");
+      const { eq, and, desc } = await import("drizzle-orm");
+      // Get the last 20 orders for this customer
+      const orders = await db.select({ items: onlineOrders.items })
+        .from(onlineOrders)
+        .where(and(
+          eq(onlineOrders.customerPhone, customer.phone!),
+          eq(onlineOrders.tenantId, customer.tenantId!),
+        ))
+        .orderBy(desc(onlineOrders.createdAt))
+        .limit(20);
+      // Extract unique product IDs from order items
+      const seenIds = new Set<number>();
+      const recentItems: { productId: number; name: string; quantity: number; unitPrice: number }[] = [];
+      for (const order of orders) {
+        const items = (order.items || []) as { productId: number; name: string; quantity: number; unitPrice: number }[];
+        for (const item of items) {
+          if (item.productId && !seenIds.has(item.productId)) {
+            seenIds.add(item.productId);
+            recentItems.push({ productId: item.productId, name: item.name, quantity: item.quantity, unitPrice: item.unitPrice });
+          }
+        }
+      }
+      // Enrich with current product data
+      const enriched = [];
+      for (const item of recentItems.slice(0, 20)) {
+        const [product] = await db.select({ id: products.id, name: products.name, nameAr: products.nameAr, price: products.price, image: products.image, isActive: products.isActive })
+          .from(products)
+          .where(eq(products.id, item.productId))
+          .limit(1);
+        enriched.push({
+          productId: item.productId,
+          name: product?.name || item.name,
+          nameAr: product?.nameAr || null,
+          price: product?.price || String(item.unitPrice),
+          image: product?.image || null,
+          isActive: product?.isActive ?? true,
+          lastOrderedQuantity: item.quantity,
+        });
+      }
+      res.json(enriched);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Sitemap ───────────────────────────────────────────────────────────────
+
+  app.get("/api/delivery/sitemap.xml", async (_req: Request, res: Response) => {
+    try {
+      const configs = await storage.getAllLandingPageConfigs();
+      const baseUrl = process.env.APP_URL || "https://pos.barmagly.tech";
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+      for (const config of (configs || [])) {
+        if (!config.slug) continue;
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}/order/${config.slug}</loc>\n`;
+        xml += `    <changefreq>daily</changefreq>\n`;
+        xml += `    <priority>0.8</priority>\n`;
+        xml += `  </url>\n`;
+      }
+      xml += `</urlset>`;
+      res.set("Content-Type", "application/xml");
+      res.send(xml);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // ── Order Ratings (POS view) ──────────────────────────────────────────────
 
   app.get("/api/delivery/order-ratings", async (req: Request, res: Response) => {

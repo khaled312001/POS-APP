@@ -49,7 +49,7 @@ pages.account = {
               <div class="profile-avatar">${(customer.name||customer.phone||"?").charAt(0).toUpperCase()}</div>
               <div><div class="profile-header__name">${customer.name||customer.phone||""}</div></div>
             </div>
-            <div style="padding:16px;text-align:center;color:var(--delivery-text-muted)">
+            <div class="account-error-box">
               <p>${rtl ? "حدث خطأ في التحميل" : "Some data failed to load"}</p>
               <button class="btn btn-primary mt-md" onclick="router.navigate('account')">${rtl ? "إعادة المحاولة" : "Retry"}</button>
             </div>
@@ -58,24 +58,24 @@ pages.account = {
       _setBottomNavActive("account");
 
     } catch (err) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">${err.message}</div><button class="btn btn-primary mt-md" onclick="router.navigate('account')">${isRtl() ? "إعادة المحاولة" : "Retry"}</button></div>`;
+      container.innerHTML = `<div class="empty-state"><div class="empty-state__icon"><i data-lucide="alert-triangle" class="icon-2xl"></i></div><div class="empty-state__title">${err.message}</div><button class="btn btn-primary mt-md" onclick="router.navigate('account')">${isRtl() ? "إعادة المحاولة" : "Retry"}</button></div>`;
     }
   },
 
   _guestView(cfg, rtl) {
     return `
 <div class="account-page">
-  <div class="profile-header" style="flex-direction:column;align-items:center;text-align:center;padding:var(--space-3xl) var(--space-md)">
-    <div class="profile-avatar" style="width:96px;height:96px;font-size:3rem;margin-bottom:var(--space-md)">👤</div>
-    <h2 style="color:#fff">${rtl ? "سجل دخولك" : "Sign in to your account"}</h2>
-    <p style="color:rgba(255,255,255,0.6);margin-top:var(--space-sm)">${rtl ? "تتبع طلباتك، واحفظ عناوينك، واكسب نقاط ولاء" : "Track orders, save addresses & earn loyalty points"}</p>
-    <button class="btn btn-primary" style="margin-top:var(--space-lg);min-width:180px" onclick="router.navigate('login')">
+  <div class="profile-header profile-header--guest">
+    <div class="profile-avatar profile-avatar--guest"><i data-lucide="user" class="icon-2xl"></i></div>
+    <h2 class="account-guest__title">${rtl ? "سجل دخولك" : "Sign in to your account"}</h2>
+    <p class="account-guest__subtitle">${rtl ? "تتبع طلباتك، واحفظ عناوينك، واكسب نقاط ولاء" : "Track orders, save addresses & earn loyalty points"}</p>
+    <button class="btn btn-primary account-guest__cta" onclick="router.navigate('login')">
       ${rtl ? "تسجيل الدخول / إنشاء حساب" : "Sign in / Register"}
     </button>
   </div>
   <div class="account-menu">
     <div class="account-menu-item" onclick="router.navigate('offers')">
-      <div class="account-menu-item__icon" style="background:rgba(255,87,34,0.12);color:var(--delivery-primary)">🎁</div>
+      <div class="account-menu-item__icon account-menu-item__icon--guest-offers"><i data-lucide="gift" class="icon-md"></i></div>
       <span class="account-menu-item__label">${rtl ? "العروض والخصومات" : "Offers & Discounts"}</span>
       <span class="account-menu-item__arrow">›</span>
     </div>
@@ -85,12 +85,12 @@ pages.account = {
 
   _skeleton(rtl) {
     return `<div class="account-page">
-      <div style="background:var(--nav-bg);height:160px;display:flex;align-items:center;padding:var(--space-xl) var(--space-md);gap:var(--space-md)">
-        <div class="skeleton" style="width:72px;height:72px;border-radius:50%"></div>
-        <div style="flex:1"><div class="skeleton" style="height:18px;width:60%;margin-bottom:8px"></div><div class="skeleton" style="height:14px;width:40%"></div></div>
+      <div class="account-skeleton-header">
+        <div class="skeleton account-skeleton-avatar"></div>
+        <div class="account-skeleton-text"><div class="skeleton account-skeleton-name"></div><div class="skeleton account-skeleton-phone"></div></div>
       </div>
-      <div style="background:var(--delivery-surface);margin-top:var(--space-sm);padding:var(--space-md)">
-        ${Array(4).fill('<div class="skeleton" style="height:48px;margin-bottom:8px;border-radius:8px"></div>').join("")}
+      <div class="account-skeleton-menu">
+        ${Array(4).fill('<div class="skeleton account-skeleton-row"></div>').join("")}
       </div>
     </div>`;
   },
@@ -112,13 +112,13 @@ pages.account = {
     <div>
       <div class="profile-header__name">${customer.name || customer.phone || "Guest"}</div>
       <div class="profile-header__phone">${customer.phone || customer.email || ""}</div>
-      <div class="profile-header__tier" style="margin-top:6px">
-        <span class="badge badge-${tier}" style="font-size:0.75rem">
-          ${tier === "bronze" ? "🥉" : tier === "silver" ? "🥈" : tier === "gold" ? "🥇" : "💎"} ${tier.charAt(0).toUpperCase() + tier.slice(1)}
+      <div class="profile-header__tier">
+        <span class="badge badge-${tier} badge--tier">
+          ${tier === "bronze" ? '<i data-lucide="medal" class="icon-xs"></i>' : tier === "silver" ? '<i data-lucide="medal" class="icon-xs"></i>' : tier === "gold" ? '<i data-lucide="trophy" class="icon-xs"></i>' : '<i data-lucide="gem" class="icon-xs"></i>'} ${tier.charAt(0).toUpperCase() + tier.slice(1)}
         </span>
       </div>
     </div>
-    <button class="btn btn-icon btn-ghost ms-auto" onclick="pages.account._editProfile()" style="color:rgba(255,255,255,0.6)" aria-label="Edit profile">✎</button>
+    <button class="btn btn-icon btn-ghost ms-auto account-edit-btn" onclick="pages.account._editProfile()" aria-label="Edit profile">✎</button>
   </div>
 
   <!-- Stats bar -->
@@ -128,7 +128,7 @@ pages.account = {
       <div class="account-stat__label">${rtl ? "طلبات" : "Orders"}</div>
     </div>
     <div class="account-stat">
-      <div class="account-stat__value" style="color:var(--delivery-primary)">${points.toLocaleString()}</div>
+      <div class="account-stat__value account-stat__value--primary">${points.toLocaleString()}</div>
       <div class="account-stat__label">${rtl ? "نقاط" : "Points"}</div>
     </div>
     <div class="account-stat">
@@ -138,13 +138,13 @@ pages.account = {
   </div>
 
   <!-- Loyalty bar -->
-  <div style="background:var(--delivery-surface);padding:var(--space-md);margin-top:var(--space-sm)">
+  <div class="account-loyalty-section">
     <div class="loyalty-bar">
-      <div class="loyalty-bar__icon">⭐</div>
+      <div class="loyalty-bar__icon"><i data-lucide="star" class="icon-lg"></i></div>
       <div class="loyalty-bar__info">
         <div class="loyalty-bar__points">${points.toLocaleString()} ${rtl ? "نقطة" : "pts"}</div>
-        <div class="loyalty-bar__tier">${rtl ? `حتى ${tier === "platinum" ? "💎 أعلى مستوى!" : `${(nextPoints - points).toLocaleString()} نقطة للمستوى التالي`}` : `${tier === "platinum" ? "💎 Top tier!" : `${(nextPoints - points).toLocaleString()} pts to next tier`}`}</div>
-        <div class="tier-progress" style="margin-top:8px">
+        <div class="loyalty-bar__tier">${rtl ? `حتى ${tier === "platinum" ? "أعلى مستوى!" : `${(nextPoints - points).toLocaleString()} نقطة للمستوى التالي`}` : `${tier === "platinum" ? "Top tier!" : `${(nextPoints - points).toLocaleString()} pts to next tier`}`}</div>
+        <div class="tier-progress tier-progress--spaced">
           <div class="tier-progress__fill" style="width:${progress}%"></div>
         </div>
       </div>
@@ -153,15 +153,15 @@ pages.account = {
 
   <!-- Recent orders -->
   ${recentOrders.length > 0 ? `
-  <div style="margin-top:var(--space-sm)">
-    <div style="background:var(--delivery-surface);padding:var(--space-md);border-bottom:1px solid var(--delivery-border);display:flex;justify-content:space-between;align-items:center">
-      <h3 style="font-size:1rem;font-weight:700">${rtl ? "آخر الطلبات" : "Recent orders"}</h3>
+  <div class="account-recent-orders">
+    <div class="account-section-header">
+      <h3 class="account-section-title">${rtl ? "آخر الطلبات" : "Recent orders"}</h3>
       <a class="section-header__link" onclick="router.navigate('history')" href="#" role="button">${rtl ? "عرض الكل" : "See all"} →</a>
     </div>
     <div class="account-menu">
       ${recentOrders.map(order => `
         <div class="order-history-item" onclick="router.navigate('tracking', {token: '${order.trackingToken || order.id}'})">
-          <div class="order-history-item__icon">🍽️</div>
+          <div class="order-history-item__icon"><i data-lucide="utensils" class="icon-md"></i></div>
           <div class="order-history-item__info">
             <div class="order-history-item__store">${order.orderNumber || "#" + order.id}</div>
             <div class="order-history-item__date">${new Date(order.createdAt).toLocaleDateString()}</div>
@@ -169,16 +169,16 @@ pages.account = {
           </div>
           <div class="order-history-item__right">
             <div class="order-history-item__total">${formatCurrency(order.total || 0, cfg.currency)}</div>
-            <span class="badge badge-${order.status}" style="margin-top:4px">${order.status}</span>
+            <span class="badge badge-${order.status} badge--status-spaced">${order.status}</span>
           </div>
         </div>`).join("")}
     </div>
   </div>` : ""}
 
   <!-- Account menu -->
-  <div class="account-menu" style="margin-top:var(--space-sm)">
+  <div class="account-menu account-menu--spaced">
     <div class="account-menu-item" onclick="router.navigate('history')">
-      <div class="account-menu-item__icon" style="background:rgba(59,130,246,0.12);color:#3B82F6">📋</div>
+      <div class="account-menu-item__icon account-menu-item__icon--orders"><i data-lucide="clipboard-list" class="icon-md"></i></div>
       <div class="flex-1">
         <div class="account-menu-item__label">${rtl ? "سجل الطلبات" : "Order history"}</div>
         <div class="account-menu-item__sub">${pages.account._orders.length} ${rtl ? "طلب" : "orders"}</div>
@@ -187,7 +187,7 @@ pages.account = {
     </div>
 
     <div class="account-menu-item" onclick="pages.account._showAddresses()">
-      <div class="account-menu-item__icon" style="background:rgba(255,87,34,0.12);color:var(--delivery-primary)">📍</div>
+      <div class="account-menu-item__icon account-menu-item__icon--address"><i data-lucide="map-pin" class="icon-md"></i></div>
       <div class="flex-1">
         <div class="account-menu-item__label">${rtl ? "عناوين التوصيل" : "Delivery addresses"}</div>
         <div class="account-menu-item__sub">${pages.account._addresses.length} ${rtl ? "عنوان" : "saved"}</div>
@@ -196,7 +196,7 @@ pages.account = {
     </div>
 
     <div class="account-menu-item" onclick="router.navigate('offers')">
-      <div class="account-menu-item__icon" style="background:rgba(139,92,246,0.12);color:#8B5CF6">🎁</div>
+      <div class="account-menu-item__icon account-menu-item__icon--offers"><i data-lucide="gift" class="icon-md"></i></div>
       <div class="flex-1">
         <div class="account-menu-item__label">${rtl ? "العروض والخصومات" : "Offers & Promos"}</div>
       </div>
@@ -204,7 +204,7 @@ pages.account = {
     </div>
 
     <div class="account-menu-item" onclick="pages.account._topUpWallet()">
-      <div class="account-menu-item__icon" style="background:rgba(16,185,129,0.12);color:var(--delivery-success)">👛</div>
+      <div class="account-menu-item__icon account-menu-item__icon--wallet"><i data-lucide="wallet" class="icon-md"></i></div>
       <div class="flex-1">
         <div class="account-menu-item__label">${rtl ? "المحفظة" : "Wallet"}</div>
         <div class="account-menu-item__sub">${formatCurrency(wallet.balance || 0, cfg.currency)}</div>
@@ -213,12 +213,12 @@ pages.account = {
     </div>
 
     <div class="account-menu-item" onclick="pages.account._logout()">
-      <div class="account-menu-item__icon" style="background:rgba(239,68,68,0.12);color:var(--delivery-danger)">🚪</div>
-      <span class="account-menu-item__label" style="color:var(--delivery-danger)">${rtl ? "تسجيل الخروج" : "Sign out"}</span>
+      <div class="account-menu-item__icon account-menu-item__icon--logout"><i data-lucide="log-out" class="icon-md"></i></div>
+      <span class="account-menu-item__label account-menu-item__label--danger">${rtl ? "تسجيل الخروج" : "Sign out"}</span>
     </div>
   </div>
 
-  <div style="height:var(--space-3xl)"></div>
+  <div class="account-spacer"></div>
 </div>`;
   },
 
@@ -228,23 +228,23 @@ pages.account = {
     const customer = auth.getCustomer();
     if (!customer) { router.navigate("login"); return; }
 
-    container.innerHTML = `<div class="top-bar"><button class="top-bar__icon" onclick="history.back()">${rtl ? "›" : "‹"}</button><span class="top-bar__title">${rtl ? "سجل الطلبات" : "Order history"}</span></div><div style="padding:var(--space-md);text-align:center"><div class="loading-spinner" style="margin:0 auto"></div></div>`;
+    container.innerHTML = `<div class="top-bar"><button class="top-bar__icon" onclick="history.back()">${rtl ? "›" : "‹"}</button><span class="top-bar__title">${rtl ? "سجل الطلبات" : "Order history"}</span></div><div class="account-loading"><div class="loading-spinner"></div></div>`;
 
     try {
       const orders = await api.orders.history(cfg.tenantId);
       const list = Array.isArray(orders) ? orders : (orders?.orders || []);
 
-      const topBar = `<div class="top-bar" style="position:sticky;top:0;z-index:100"><button class="top-bar__icon" onclick="history.back()">${rtl ? "›" : "‹"}</button><span class="top-bar__title">${rtl ? "سجل الطلبات" : "Order history"} (${list.length})</span></div>`;
+      const topBar = `<div class="top-bar top-bar--sticky"><button class="top-bar__icon" onclick="history.back()">${rtl ? "›" : "‹"}</button><span class="top-bar__title">${rtl ? "سجل الطلبات" : "Order history"} (${list.length})</span></div>`;
 
       if (list.length === 0) {
-        container.innerHTML = topBar + `<div class="empty-state"><div class="empty-state__icon">📋</div><div class="empty-state__title">${rtl ? "لا طلبات بعد" : "No orders yet"}</div><button class="btn btn-primary mt-md" onclick="router.navigate('menu')">${rtl ? "اطلب الآن" : "Order now"}</button></div>`;
+        container.innerHTML = topBar + `<div class="empty-state"><div class="empty-state__icon"><i data-lucide="clipboard-list" class="icon-2xl"></i></div><div class="empty-state__title">${rtl ? "لا طلبات بعد" : "No orders yet"}</div><button class="btn btn-primary mt-md" onclick="router.navigate('menu')">${rtl ? "اطلب الآن" : "Order now"}</button></div>`;
         return;
       }
 
-      container.innerHTML = topBar + `<div class="account-menu" style="margin-top:var(--space-sm)">
+      container.innerHTML = topBar + `<div class="account-menu account-menu--spaced">
         ${list.map(order => `
           <div class="order-history-item" onclick="router.navigate('tracking', {token: '${order.trackingToken || order.id}'})">
-            <div class="order-history-item__icon">🍽️</div>
+            <div class="order-history-item__icon"><i data-lucide="utensils" class="icon-md"></i></div>
             <div class="order-history-item__info">
               <div class="order-history-item__store">${order.orderNumber || "#" + order.id}</div>
               <div class="order-history-item__date">${new Date(order.createdAt).toLocaleString()}</div>
@@ -252,14 +252,14 @@ pages.account = {
             </div>
             <div class="order-history-item__right">
               <div class="order-history-item__total">${formatCurrency(order.total || 0, cfg.currency)}</div>
-              <span class="badge badge-${order.status}" style="margin-top:4px;font-size:0.7rem">${order.status}</span>
-              ${order.status === "delivered" ? `<button class="btn btn-sm btn-ghost" style="margin-top:4px" onclick="event.stopPropagation();api.orders.reorder(${order.id}).then(()=>{showToast('Reordering…','success');router.navigate('cart')}).catch(e=>showToast(e.message,'error'))">${rtl ? "🔄 أعد الطلب" : "🔄 Reorder"}</button>` : ""}
+              <span class="badge badge-${order.status} badge--history">${order.status}</span>
+              ${order.status === "delivered" ? `<button class="btn btn-sm btn-ghost btn--reorder" onclick="event.stopPropagation();api.orders.reorder(${order.id}).then(()=>{showToast('Reordering…','success');router.navigate('cart')}).catch(e=>showToast(e.message,'error'))">${rtl ? "أعد الطلب" : "Reorder"}</button>` : ""}
             </div>
           </div>`).join("")}
-      </div><div style="height:100px"></div>`;
+      </div><div class="account-spacer--lg"></div>`;
 
     } catch (err) {
-      container.innerHTML += `<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">${err.message}</div></div>`;
+      container.innerHTML += `<div class="empty-state"><div class="empty-state__icon"><i data-lucide="alert-triangle" class="icon-2xl"></i></div><div class="empty-state__title">${err.message}</div></div>`;
     }
   },
 

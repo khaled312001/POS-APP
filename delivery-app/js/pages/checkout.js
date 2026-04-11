@@ -79,7 +79,7 @@ pages.checkout = {
   </div>
 
   <!-- Step indicator -->
-  <div style="padding:var(--space-md);background:var(--delivery-surface);border-bottom:1px solid var(--delivery-border)">
+  <div class="checkout-step-indicator-bar">
     <div class="step-indicator">
       <div class="step active" id="step-ind-1">
         <div class="step__dot">1</div>
@@ -108,16 +108,16 @@ pages.checkout = {
           </div>
         </div>
         <div class="checkout-step__body">
-          <div id="checkout-map" style="height:200px;border-radius:var(--radius-md);margin-bottom:var(--space-md);border:1px solid var(--delivery-border)"></div>
+          <div id="checkout-map"></div>
 
           ${pages.checkout._savedAddresses.length > 0 ? `
-          <div style="margin-bottom:var(--space-md)">
-            <div class="form-label" style="margin-bottom:8px">${rtl ? "العناوين المحفوظة" : "Saved addresses"}</div>
-            <div style="display:flex;flex-direction:column;gap:var(--space-sm)" id="saved-addresses">
+          <div class="checkout-saved-addresses-wrap">
+            <div class="form-label checkout-label-mb">${rtl ? "العناوين المحفوظة" : "Saved addresses"}</div>
+            <div class="checkout-field-stack" id="saved-addresses">
               ${pages.checkout._savedAddresses.map(addr => `
                 <div class="address-card ${addr.id === pages.checkout._address?.id ? "selected" : ""}"
                   onclick="pages.checkout._selectAddress(${addr.id})" data-addr-id="${addr.id}">
-                  <div class="address-card__icon">${addr.label === "home" ? "🏠" : addr.label === "work" ? "🏢" : "📍"}</div>
+                  <div class="address-card__icon">${addr.label === "home" ? '<i data-lucide="home" class="icon-md"></i>' : addr.label === "work" ? '<i data-lucide="building-2" class="icon-md"></i>' : '<i data-lucide="map-pin" class="icon-md"></i>'}</div>
                   <div>
                     <div class="address-card__label">${addr.label || "Address"}</div>
                     <div class="address-card__text">${addr.address}</div>
@@ -128,12 +128,12 @@ pages.checkout = {
           <div class="auth-divider">${rtl ? "أو أدخل عنواناً جديداً" : "or enter new address"}</div>
           ` : ""}
 
-          <div style="display:flex;flex-direction:column;gap:var(--space-sm)">
+          <div class="checkout-field-stack">
             <div class="form-group">
               <label class="form-label" for="addr-street">${rtl ? "الشارع / العقار" : "Street address"}</label>
               <input id="addr-street" class="form-input" placeholder="${rtl ? "مثال: 12 شارع النيل" : "e.g. 12 Main Street"}" value="${pages.checkout._address?.address || ""}" />
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-sm)">
+            <div class="checkout-two-col">
               <div class="form-group">
                 <label class="form-label" for="addr-apt">${rtl ? "الشقة/الطابق" : "Apartment/Floor"}</label>
                 <input id="addr-apt" class="form-input" placeholder="${rtl ? "شقة 3" : "Apt 3"}" value="${pages.checkout._address?.floor || ""}" />
@@ -161,8 +161,8 @@ pages.checkout = {
               <span class="toggle-switch__track"></span>
             </label>
           </div>
-          <div id="schedule-picker" class="hidden" style="margin-top:var(--space-md)">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-sm)">
+          <div id="schedule-picker" class="hidden checkout-schedule-picker">
+            <div class="checkout-two-col">
               <div class="form-group">
                 <label class="form-label">${rtl ? "التاريخ" : "Date"}</label>
                 <input type="date" id="schedule-date" class="form-input" min="${new Date().toISOString().split("T")[0]}" />
@@ -174,7 +174,7 @@ pages.checkout = {
             </div>
           </div>
 
-          <button class="btn btn-primary btn-full" style="margin-top:var(--space-lg)" onclick="pages.checkout._nextStep(2)">
+          <button class="btn btn-primary btn-full checkout-btn-next" onclick="pages.checkout._nextStep(2)">
             ${rtl ? "التالي: طريقة الدفع" : "Next: Payment method"} →
           </button>
         </div>
@@ -189,10 +189,10 @@ pages.checkout = {
           </div>
         </div>
         <div class="checkout-step__body">
-          <div style="display:flex;flex-direction:column;gap:var(--space-sm)">
+          <div class="checkout-field-stack">
             <div class="payment-option selected" data-method="cod" onclick="pages.checkout._selectPayment('cod', this)">
               <div class="payment-option__radio"></div>
-              <div class="payment-option__icon">💵</div>
+              <div class="payment-option__icon"><i data-lucide="banknote" class="icon-lg"></i></div>
               <div>
                 <div class="payment-option__label">${rtl ? "الدفع عند الاستلام" : "Cash on delivery"}</div>
                 <div class="payment-option__desc">${rtl ? "ادفع نقداً عند استلام طلبك" : "Pay when your order arrives"}</div>
@@ -201,7 +201,7 @@ pages.checkout = {
 
             <div class="payment-option" data-method="card" onclick="pages.checkout._selectPayment('card', this)">
               <div class="payment-option__radio"></div>
-              <div class="payment-option__icon">💳</div>
+              <div class="payment-option__icon"><i data-lucide="credit-card" class="icon-lg"></i></div>
               <div>
                 <div class="payment-option__label">${rtl ? "بطاقة ائتمانية / مدى" : "Credit / Debit card"}</div>
                 <div class="payment-option__desc">Visa · Mastercard · Meeza</div>
@@ -211,7 +211,7 @@ pages.checkout = {
             ${auth.getCustomer() ? `
             <div class="payment-option" data-method="wallet" onclick="pages.checkout._selectPayment('wallet', this)">
               <div class="payment-option__radio"></div>
-              <div class="payment-option__icon">👛</div>
+              <div class="payment-option__icon"><i data-lucide="wallet" class="icon-lg"></i></div>
               <div>
                 <div class="payment-option__label">${rtl ? "المحفظة" : "Wallet"}</div>
                 <div class="payment-option__desc" id="wallet-balance-label">${rtl ? "يتم تحميل الرصيد..." : "Loading balance…"}</div>
@@ -220,12 +220,12 @@ pages.checkout = {
           </div>
 
           <!-- Stripe card element -->
-          <div id="stripe-card-wrapper" class="hidden" style="margin-top:var(--space-md)">
-            <div class="form-label" style="margin-bottom:8px">${rtl ? "بيانات البطاقة" : "Card details"}</div>
-            <div id="stripe-card-element" style="padding:14px var(--space-md);border:1.5px solid var(--delivery-border);border-radius:var(--radius-md);background:var(--delivery-surface)"></div>
+          <div id="stripe-card-wrapper" class="hidden checkout-stripe-wrapper">
+            <div class="form-label checkout-label-mb">${rtl ? "بيانات البطاقة" : "Card details"}</div>
+            <div id="stripe-card-element"></div>
           </div>
 
-          <div style="display:flex;gap:var(--space-sm);margin-top:var(--space-lg)">
+          <div class="checkout-step-nav">
             <button class="btn btn-ghost flex-1" onclick="pages.checkout._prevStep(1)">
               ${rtl ? "← السابق" : "← Back"}
             </button>
@@ -246,12 +246,12 @@ pages.checkout = {
         </div>
         <div class="checkout-step__body">
           <div id="review-content"></div>
-          <div style="display:flex;gap:var(--space-sm);margin-top:var(--space-lg)">
+          <div class="checkout-step-nav">
             <button class="btn btn-ghost flex-1" onclick="pages.checkout._prevStep(2)">
               ${rtl ? "← السابق" : "← Back"}
             </button>
             <button class="btn btn-primary flex-1 btn-lg" id="place-order-btn" onclick="pages.checkout._placeOrder()">
-              ${rtl ? "تأكيد الطلب 🎉" : "Place order 🎉"}
+              ${rtl ? "تأكيد الطلب" : "Place order"} <i data-lucide="check-circle" class="icon-sm"></i>
             </button>
           </div>
         </div>
@@ -261,7 +261,7 @@ pages.checkout = {
     <!-- Aside: order summary -->
     <div class="cart-aside desktop-only">
       <div class="card">
-        <div style="padding:var(--space-md);font-weight:700;border-bottom:1px solid var(--delivery-border)">${rtl ? "ملخص طلبك" : "Order summary"}</div>
+        <div class="checkout-summary-header">${rtl ? "ملخص طلبك" : "Order summary"}</div>
         <div class="card-body" id="order-summary-aside"></div>
       </div>
     </div>
@@ -410,19 +410,19 @@ pages.checkout = {
     const reviewEl = document.getElementById("review-content");
     if (!reviewEl) return;
     reviewEl.innerHTML = `
-      <h4 style="margin-bottom:var(--space-sm)">${rtl ? "العناصر" : "Items"}</h4>
+      <h4 class="checkout-review-heading">${rtl ? "العناصر" : "Items"}</h4>
       ${state.items.map(item => `
-        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--delivery-border)">
+        <div class="checkout-review-item">
           <span>${item.qty}× ${item.name}</span>
           <strong>${formatCurrency(item.price * item.qty, cfg.currency)}</strong>
         </div>`).join("")}
-      <div style="margin-top:var(--space-md)">
-        <h4 style="margin-bottom:var(--space-sm)">${rtl ? "التوصيل إلى" : "Delivering to"}</h4>
-        <div style="color:var(--delivery-text-secondary)">${addr?.address || "—"}${addr?.floor ? ", " + addr.floor : ""}</div>
-        ${pages.checkout._scheduledAt ? `<div class="badge badge-info mt-sm">📅 ${new Date(pages.checkout._scheduledAt).toLocaleString()}</div>` : ""}
+      <div class="checkout-review-section">
+        <h4 class="checkout-review-heading">${rtl ? "التوصيل إلى" : "Delivering to"}</h4>
+        <div class="checkout-review-address-text">${addr?.address || "—"}${addr?.floor ? ", " + addr.floor : ""}</div>
+        ${pages.checkout._scheduledAt ? `<div class="badge badge-info mt-sm"><i data-lucide="calendar" class="icon-xs"></i> ${new Date(pages.checkout._scheduledAt).toLocaleString()}</div>` : ""}
       </div>
-      <div style="margin-top:var(--space-md)">
-        <h4 style="margin-bottom:var(--space-sm)">${rtl ? "طريقة الدفع" : "Payment"}</h4>
+      <div class="checkout-review-section">
+        <h4 class="checkout-review-heading">${rtl ? "طريقة الدفع" : "Payment"}</h4>
         <div>${paymentLabels[pages.checkout._paymentMethod] || "—"}</div>
       </div>
       <div class="divider"></div>
@@ -441,13 +441,13 @@ pages.checkout = {
     const total = Math.max(0, state.subtotal - discount) + deliveryFee;
     summaryEl.innerHTML = `
       ${state.items.map(item => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--delivery-border)">
-          <span style="font-size:0.875rem">${item.qty}× ${item.name}</span>
-          <span style="font-size:0.875rem;font-weight:600">${formatCurrency(item.price * item.qty, cfg.currency)}</span>
+        <div class="checkout-summary-item">
+          <span class="checkout-summary-item-name">${item.qty}× ${item.name}</span>
+          <span class="checkout-summary-item-price">${formatCurrency(item.price * item.qty, cfg.currency)}</span>
         </div>`).join("")}
-      <div style="margin-top:var(--space-sm)">
+      <div class="checkout-summary-totals">
         <div class="summary-row"><span class="label">${rtl ? "المجموع" : "Subtotal"}</span><strong>${formatCurrency(state.subtotal, cfg.currency)}</strong></div>
-        ${deliveryFee > 0 ? `<div class="summary-row"><span class="label">${rtl ? "التوصيل" : "Delivery"}</span><strong>${formatCurrency(deliveryFee, cfg.currency)}</strong></div>` : `<div class="summary-row"><span class="label">${rtl ? "التوصيل" : "Delivery"}</span><strong style="color:var(--delivery-success)">${rtl ? "مجاني" : "Free"}</strong></div>`}
+        ${deliveryFee > 0 ? `<div class="summary-row"><span class="label">${rtl ? "التوصيل" : "Delivery"}</span><strong>${formatCurrency(deliveryFee, cfg.currency)}</strong></div>` : `<div class="summary-row"><span class="label">${rtl ? "التوصيل" : "Delivery"}</span><strong class="checkout-free-delivery">${rtl ? "مجاني" : "Free"}</strong></div>`}
         ${discount > 0 ? `<div class="summary-row discount"><span class="label">${rtl ? "خصم" : "Discount"}</span><strong>−${formatCurrency(discount, cfg.currency)}</strong></div>` : ""}
         <div class="summary-row total"><span>${rtl ? "الإجمالي" : "Total"}</span><strong>${formatCurrency(total, cfg.currency)}</strong></div>
       </div>

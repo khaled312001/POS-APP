@@ -38,6 +38,7 @@ __export(schema_exports, {
   cashDrawerOperations: () => cashDrawerOperations,
   categories: () => categories,
   customerAddresses: () => customerAddresses,
+  customerFavorites: () => customerFavorites,
   customerSessions: () => customerSessions,
   customers: () => customers,
   dailyClosings: () => dailyClosings,
@@ -47,12 +48,15 @@ __export(schema_exports, {
   employeeCommissions: () => employeeCommissions,
   employees: () => employees,
   expenses: () => expenses,
+  faqEntries: () => faqEntries,
+  helpTickets: () => helpTickets,
   insertActivityLogSchema: () => insertActivityLogSchema,
   insertBranchSchema: () => insertBranchSchema,
   insertCallSchema: () => insertCallSchema,
   insertCashDrawerOperationSchema: () => insertCashDrawerOperationSchema,
   insertCategorySchema: () => insertCategorySchema,
   insertCustomerAddressSchema: () => insertCustomerAddressSchema,
+  insertCustomerFavoriteSchema: () => insertCustomerFavoriteSchema,
   insertCustomerSchema: () => insertCustomerSchema,
   insertCustomerSessionSchema: () => insertCustomerSessionSchema,
   insertDailyClosingSchema: () => insertDailyClosingSchema,
@@ -61,6 +65,8 @@ __export(schema_exports, {
   insertEmployeeCommissionSchema: () => insertEmployeeCommissionSchema,
   insertEmployeeSchema: () => insertEmployeeSchema,
   insertExpenseSchema: () => insertExpenseSchema,
+  insertFaqEntrySchema: () => insertFaqEntrySchema,
+  insertHelpTicketSchema: () => insertHelpTicketSchema,
   insertInventoryMovementSchema: () => insertInventoryMovementSchema,
   insertInventorySchema: () => insertInventorySchema,
   insertKitchenOrderSchema: () => insertKitchenOrderSchema,
@@ -76,6 +82,7 @@ __export(schema_exports, {
   insertPlatformSettingSchema: () => insertPlatformSettingSchema,
   insertPrinterConfigSchema: () => insertPrinterConfigSchema,
   insertProductBatchSchema: () => insertProductBatchSchema,
+  insertProductDietaryTagSchema: () => insertProductDietaryTagSchema,
   insertProductSchema: () => insertProductSchema,
   insertPromoCodeSchema: () => insertPromoCodeSchema,
   insertPromoCodeUsageSchema: () => insertPromoCodeUsageSchema,
@@ -116,6 +123,7 @@ __export(schema_exports, {
   platformSettings: () => platformSettings,
   printerConfigs: () => printerConfigs,
   productBatches: () => productBatches,
+  productDietaryTags: () => productDietaryTags,
   products: () => products,
   promoCodeUsages: () => promoCodeUsages,
   promoCodes: () => promoCodes,
@@ -143,7 +151,7 @@ __export(schema_exports, {
   warehouseTransfers: () => warehouseTransfers,
   warehouses: () => warehouses
 });
-var import_mysql_core, import_drizzle_zod, branches, employees, categories, products, inventory, customers, sales, saleItems, calls, suppliers, purchaseOrders, purchaseOrderItems, shifts, notifications, expenses, tables, kitchenOrders, subscriptionPlans, subscriptions, activityLog, returns, returnItems, syncQueue, cashDrawerOperations, warehouses, warehouseTransfers, productBatches, inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications, platformSettings, platformCommissions, onlineOrders, landingPageConfig, vehicles, printerConfigs, dailyClosings, monthlyClosings, dailySequences, customerAddresses, promoCodes, promoCodeUsages, driverLocations, loyaltyTransactions, walletTransactions, orderRatings, customerSessions, otpVerifications, deliveryZones, insertBranchSchema, insertEmployeeSchema, insertCategorySchema, insertProductSchema, insertInventorySchema, insertCustomerSchema, insertSaleSchema, insertSaleItemSchema, insertSupplierSchema, insertPurchaseOrderSchema, insertPurchaseOrderItemSchema, insertShiftSchema, insertNotificationSchema, insertExpenseSchema, insertCallSchema, insertTableSchema, insertKitchenOrderSchema, insertSubscriptionPlanSchema, insertSubscriptionSchema, insertActivityLogSchema, insertReturnSchema, insertReturnItemSchema, insertCashDrawerOperationSchema, insertWarehouseSchema, insertWarehouseTransferSchema, insertProductBatchSchema, insertInventoryMovementSchema, insertStockCountSchema, insertStockCountItemSchema, insertSupplierContractSchema, insertEmployeeCommissionSchema, insertSuperAdminSchema, insertTenantSchema, insertTenantSubscriptionSchema, insertLicenseKeySchema, insertTenantNotificationSchema, insertOnlineOrderSchema, insertLandingPageConfigSchema, insertPlatformSettingSchema, insertPlatformCommissionSchema, insertVehicleSchema, insertPrinterConfigSchema, insertDailyClosingSchema, insertMonthlyClosingSchema, insertCustomerAddressSchema, insertPromoCodeSchema, insertPromoCodeUsageSchema, insertDriverLocationSchema, insertLoyaltyTransactionSchema, insertWalletTransactionSchema, insertOrderRatingSchema, insertCustomerSessionSchema, insertOtpVerificationSchema, insertDeliveryZoneSchema;
+var import_mysql_core, import_drizzle_zod, branches, employees, categories, products, inventory, customers, sales, saleItems, calls, suppliers, purchaseOrders, purchaseOrderItems, shifts, notifications, expenses, tables, kitchenOrders, subscriptionPlans, subscriptions, activityLog, returns, returnItems, syncQueue, cashDrawerOperations, warehouses, warehouseTransfers, productBatches, inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications, platformSettings, platformCommissions, onlineOrders, landingPageConfig, vehicles, printerConfigs, dailyClosings, monthlyClosings, dailySequences, customerAddresses, promoCodes, promoCodeUsages, driverLocations, loyaltyTransactions, walletTransactions, orderRatings, customerSessions, otpVerifications, deliveryZones, customerFavorites, productDietaryTags, helpTickets, faqEntries, insertBranchSchema, insertEmployeeSchema, insertCategorySchema, insertProductSchema, insertInventorySchema, insertCustomerSchema, insertSaleSchema, insertSaleItemSchema, insertSupplierSchema, insertPurchaseOrderSchema, insertPurchaseOrderItemSchema, insertShiftSchema, insertNotificationSchema, insertExpenseSchema, insertCallSchema, insertTableSchema, insertKitchenOrderSchema, insertSubscriptionPlanSchema, insertSubscriptionSchema, insertActivityLogSchema, insertReturnSchema, insertReturnItemSchema, insertCashDrawerOperationSchema, insertWarehouseSchema, insertWarehouseTransferSchema, insertProductBatchSchema, insertInventoryMovementSchema, insertStockCountSchema, insertStockCountItemSchema, insertSupplierContractSchema, insertEmployeeCommissionSchema, insertSuperAdminSchema, insertTenantSchema, insertTenantSubscriptionSchema, insertLicenseKeySchema, insertTenantNotificationSchema, insertOnlineOrderSchema, insertLandingPageConfigSchema, insertPlatformSettingSchema, insertPlatformCommissionSchema, insertVehicleSchema, insertPrinterConfigSchema, insertDailyClosingSchema, insertMonthlyClosingSchema, insertCustomerAddressSchema, insertPromoCodeSchema, insertPromoCodeUsageSchema, insertDriverLocationSchema, insertLoyaltyTransactionSchema, insertWalletTransactionSchema, insertOrderRatingSchema, insertCustomerSessionSchema, insertOtpVerificationSchema, insertDeliveryZoneSchema, insertCustomerFavoriteSchema, insertProductDietaryTagSchema, insertHelpTicketSchema, insertFaqEntrySchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -1045,6 +1053,51 @@ var init_schema = __esm({
       sortOrder: (0, import_mysql_core.int)("sort_order").default(0),
       createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
+    customerFavorites = (0, import_mysql_core.mysqlTable)("customer_favorites", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
+      productId: (0, import_mysql_core.int)("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    }, (t) => ({
+      uniqFav: (0, import_mysql_core.unique)("fav_tenant_customer_product").on(t.tenantId, t.customerId, t.productId)
+    }));
+    productDietaryTags = (0, import_mysql_core.mysqlTable)("product_dietary_tags", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      productId: (0, import_mysql_core.int)("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      tag: (0, import_mysql_core.text)("tag").notNull()
+      // vegetarian, vegan, gluten_free, halal, spicy
+    });
+    helpTickets = (0, import_mysql_core.mysqlTable)("help_tickets", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "set null" }),
+      orderId: (0, import_mysql_core.int)("order_id").references(() => onlineOrders.id, { onDelete: "set null" }),
+      subject: (0, import_mysql_core.text)("subject").notNull(),
+      message: (0, import_mysql_core.text)("message").notNull(),
+      status: (0, import_mysql_core.text)("status").notNull().default("open"),
+      // open, in_progress, resolved, closed
+      priority: (0, import_mysql_core.text)("priority").default("normal"),
+      // low, normal, high, urgent
+      response: (0, import_mysql_core.text)("response"),
+      resolvedAt: (0, import_mysql_core.timestamp)("resolved_at"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
+    });
+    faqEntries = (0, import_mysql_core.mysqlTable)("faq_entries", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      question: (0, import_mysql_core.text)("question").notNull(),
+      questionAr: (0, import_mysql_core.text)("question_ar"),
+      answer: (0, import_mysql_core.text)("answer").notNull(),
+      answerAr: (0, import_mysql_core.text)("answer_ar"),
+      category: (0, import_mysql_core.text)("category").default("general"),
+      // general, orders, delivery, payment, account
+      sortOrder: (0, import_mysql_core.int)("sort_order").default(0),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    });
     insertBranchSchema = (0, import_drizzle_zod.createInsertSchema)(branches).omit({ id: true, createdAt: true, updatedAt: true });
     insertEmployeeSchema = (0, import_drizzle_zod.createInsertSchema)(employees).omit({ id: true, createdAt: true, updatedAt: true });
     insertCategorySchema = (0, import_drizzle_zod.createInsertSchema)(categories).omit({ id: true, createdAt: true });
@@ -1099,6 +1152,10 @@ var init_schema = __esm({
     insertCustomerSessionSchema = (0, import_drizzle_zod.createInsertSchema)(customerSessions).omit({ id: true, createdAt: true });
     insertOtpVerificationSchema = (0, import_drizzle_zod.createInsertSchema)(otpVerifications).omit({ id: true, createdAt: true });
     insertDeliveryZoneSchema = (0, import_drizzle_zod.createInsertSchema)(deliveryZones).omit({ id: true, createdAt: true });
+    insertCustomerFavoriteSchema = (0, import_drizzle_zod.createInsertSchema)(customerFavorites).omit({ id: true, createdAt: true });
+    insertProductDietaryTagSchema = (0, import_drizzle_zod.createInsertSchema)(productDietaryTags).omit({ id: true });
+    insertHelpTicketSchema = (0, import_drizzle_zod.createInsertSchema)(helpTickets).omit({ id: true, createdAt: true, updatedAt: true });
+    insertFaqEntrySchema = (0, import_drizzle_zod.createInsertSchema)(faqEntries).omit({ id: true, createdAt: true });
   }
 });
 
@@ -10157,6 +10214,210 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
       res.status(500).json({ error: e.message });
     }
   });
+  app2.get("/api/delivery/favorites", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { customerFavorites: customerFavorites2, products: products2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq7, and: and5 } = await import("drizzle-orm");
+      const favs = await db2.select({
+        id: customerFavorites2.id,
+        productId: customerFavorites2.productId,
+        createdAt: customerFavorites2.createdAt,
+        productName: products2.name,
+        productNameAr: products2.nameAr,
+        productPrice: products2.price,
+        productImage: products2.image,
+        productDescription: products2.description
+      }).from(customerFavorites2).innerJoin(products2, eq7(products2.id, customerFavorites2.productId)).where(and5(eq7(customerFavorites2.customerId, customer.id), eq7(customerFavorites2.tenantId, customer.tenantId)));
+      res.json(favs);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/favorites", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { productId } = req.body;
+      if (!productId) return res.status(400).json({ error: "productId required" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { customerFavorites: customerFavorites2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const [fav] = await db2.insert(customerFavorites2).values({
+        tenantId: customer.tenantId,
+        customerId: customer.id,
+        productId: Number(productId)
+      }).$returningId();
+      res.status(201).json({ id: fav.id, productId: Number(productId) });
+    } catch (e) {
+      if (e.code === "ER_DUP_ENTRY") return res.status(409).json({ error: "Already in favorites" });
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/delivery/favorites/:id", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { customerFavorites: customerFavorites2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq7, and: and5 } = await import("drizzle-orm");
+      await db2.delete(customerFavorites2).where(
+        and5(eq7(customerFavorites2.id, Number(req.params.id)), eq7(customerFavorites2.customerId, customer.id))
+      );
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/search", async (req, res) => {
+    try {
+      const q = (req.query.q || "").trim();
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      if (!q) return res.json([]);
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { products: products2, categories: categories2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq7, and: and5, or: or3, like: like2, sql: sql5 } = await import("drizzle-orm");
+      const pattern = `%${q}%`;
+      const results = await db2.select({
+        id: products2.id,
+        name: products2.name,
+        nameAr: products2.nameAr,
+        description: products2.description,
+        price: products2.price,
+        image: products2.image,
+        categoryId: products2.categoryId,
+        categoryName: categories2.name
+      }).from(products2).leftJoin(categories2, eq7(categories2.id, products2.categoryId)).where(and5(
+        eq7(products2.tenantId, tenantId),
+        eq7(products2.isActive, true),
+        or3(
+          like2(products2.name, pattern),
+          like2(products2.nameAr, pattern),
+          like2(products2.description, pattern)
+        )
+      )).limit(50);
+      res.json(results);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/help/faq", async (req, res) => {
+    try {
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { faqEntries: faqEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq7, and: and5, asc } = await import("drizzle-orm");
+      const faqs = await db2.select().from(faqEntries2).where(and5(eq7(faqEntries2.tenantId, tenantId), eq7(faqEntries2.isActive, true))).orderBy(asc(faqEntries2.sortOrder));
+      res.json(faqs);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/help/ticket", async (req, res) => {
+    try {
+      const { subject, message, orderId, tenantId } = req.body;
+      if (!subject || !message || !tenantId) return res.status(400).json({ error: "subject, message, tenantId required" });
+      const customer = await getAuthenticatedCustomer(req.headers.authorization).catch(() => null);
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { helpTickets: helpTickets2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const [ticket] = await db2.insert(helpTickets2).values({
+        tenantId: Number(tenantId),
+        customerId: customer?.id ?? null,
+        orderId: orderId ? Number(orderId) : null,
+        subject,
+        message,
+        status: "open",
+        priority: "normal"
+      }).$returningId();
+      res.status(201).json({ id: ticket.id, status: "open" });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/help/tickets", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { helpTickets: helpTickets2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq7, and: and5, desc: desc3 } = await import("drizzle-orm");
+      const tickets = await db2.select().from(helpTickets2).where(and5(eq7(helpTickets2.customerId, customer.id), eq7(helpTickets2.tenantId, customer.tenantId))).orderBy(desc3(helpTickets2.createdAt));
+      res.json(tickets);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/recently-ordered", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { onlineOrders: onlineOrders2, products: products2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq7, and: and5, desc: desc3 } = await import("drizzle-orm");
+      const orders = await db2.select({ items: onlineOrders2.items }).from(onlineOrders2).where(and5(
+        eq7(onlineOrders2.customerPhone, customer.phone),
+        eq7(onlineOrders2.tenantId, customer.tenantId)
+      )).orderBy(desc3(onlineOrders2.createdAt)).limit(20);
+      const seenIds = /* @__PURE__ */ new Set();
+      const recentItems = [];
+      for (const order of orders) {
+        const items = order.items || [];
+        for (const item of items) {
+          if (item.productId && !seenIds.has(item.productId)) {
+            seenIds.add(item.productId);
+            recentItems.push({ productId: item.productId, name: item.name, quantity: item.quantity, unitPrice: item.unitPrice });
+          }
+        }
+      }
+      const enriched = [];
+      for (const item of recentItems.slice(0, 20)) {
+        const [product] = await db2.select({ id: products2.id, name: products2.name, nameAr: products2.nameAr, price: products2.price, image: products2.image, isActive: products2.isActive }).from(products2).where(eq7(products2.id, item.productId)).limit(1);
+        enriched.push({
+          productId: item.productId,
+          name: product?.name || item.name,
+          nameAr: product?.nameAr || null,
+          price: product?.price || String(item.unitPrice),
+          image: product?.image || null,
+          isActive: product?.isActive ?? true,
+          lastOrderedQuantity: item.quantity
+        });
+      }
+      res.json(enriched);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/sitemap.xml", async (_req, res) => {
+    try {
+      const configs = await storage.getAllLandingPageConfigs();
+      const baseUrl = process.env.APP_URL || "https://pos.barmagly.tech";
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>
+`;
+      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+`;
+      for (const config of configs || []) {
+        if (!config.slug) continue;
+        xml += `  <url>
+`;
+        xml += `    <loc>${baseUrl}/order/${config.slug}</loc>
+`;
+        xml += `    <changefreq>daily</changefreq>
+`;
+        xml += `    <priority>0.8</priority>
+`;
+        xml += `  </url>
+`;
+      }
+      xml += `</urlset>`;
+      res.set("Content-Type", "application/xml");
+      res.send(xml);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
   app2.get("/api/delivery/order-ratings", async (req, res) => {
     try {
       const tid = req.tenantId;
@@ -11490,9 +11751,15 @@ var PUBLIC_ROUTES = [
   // Referral code lookup
   "/api/delivery/driver/auth",
   // Driver token login
+  "/api/delivery/search",
+  // Public product search
+  "/api/delivery/help/faq",
+  // Public FAQ listing
+  "/api/delivery/sitemap.xml",
+  // Dynamic sitemap XML
   // ── HTML pages served under /api/ prefix (Hostinger CDN compatibility) ──
-  "/api/order/",
-  // Delivery SPA HTML
+  "/api/order",
+  // Delivery listing (no-slug) + /api/order/
   "/api/track/",
   // Public tracking page HTML
   "/api/driver/",
@@ -11857,9 +12124,10 @@ function configureExpoAndLanding(app2) {
     }
     if (req.path === "/order" || req.path === "/order/" || req.path === "/api/order" || req.path === "/api/order/") {
       try {
-        const restaurantsIndexPath = path4.resolve(process.cwd(), "delivery-app", "restaurants.html");
+        const landingPath = path4.resolve(process.cwd(), "delivery-app", "landing.html");
+        const restaurantsIndexPath = fs5.existsSync(landingPath) ? landingPath : path4.resolve(process.cwd(), "delivery-app", "restaurants.html");
         if (!fs5.existsSync(restaurantsIndexPath)) {
-          return res.status(503).send("<h1>Restaurants page not yet deployed</h1>");
+          return res.status(503).send("<h1>Landing page not yet deployed</h1>");
         }
         const isApiPrefixed = req.path.startsWith("/api/");
         const basePath = isApiPrefixed ? "/api" : "";
@@ -11926,6 +12194,18 @@ function configureExpoAndLanding(app2) {
           metaDescription: config.metaDescription || ""
         });
         html = html.replace("__DELIVERY_CONFIG__", configJson);
+        const storeName = config.storeName || config.name || tenant.name;
+        const metaTitle = config.metaTitle || `${storeName} \u2014 Order Online | Barmagly Delivery`;
+        const metaDesc = config.metaDescription || `Order food online from ${storeName}. Fast delivery to your door.`;
+        const coverImage = config.coverImage || config.headerBgImage || "";
+        const seoMeta = `
+    <meta property="og:title" content="${metaTitle.replace(/"/g, "&quot;")}" />
+    <meta property="og:description" content="${metaDesc.replace(/"/g, "&quot;")}" />
+    <meta property="og:type" content="restaurant.restaurant" />
+    ${coverImage ? `<meta property="og:image" content="${coverImage.replace(/"/g, "&quot;")}" />` : ""}
+    <meta name="twitter:card" content="summary_large_image" />`;
+        html = html.replace("</head>", `${seoMeta}
+  </head>`);
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         return res.status(200).send(html);
       } catch (err) {

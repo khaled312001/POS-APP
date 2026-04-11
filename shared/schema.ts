@@ -938,6 +938,53 @@ export const deliveryZones = mysqlTable("delivery_zones", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ========== Delivery Platform Extended Tables ==========
+
+export const customerFavorites = mysqlTable("customer_favorites", {
+  id: serial("id").primaryKey(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  customerId: int("customer_id").references(() => customers.id, { onDelete: 'cascade' }).notNull(),
+  productId: int("product_id").references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  uniqFav: unique("fav_tenant_customer_product").on(t.tenantId, t.customerId, t.productId),
+}));
+
+export const productDietaryTags = mysqlTable("product_dietary_tags", {
+  id: serial("id").primaryKey(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  productId: int("product_id").references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  tag: text("tag").notNull(), // vegetarian, vegan, gluten_free, halal, spicy
+});
+
+export const helpTickets = mysqlTable("help_tickets", {
+  id: serial("id").primaryKey(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  customerId: int("customer_id").references(() => customers.id, { onDelete: 'set null' }),
+  orderId: int("order_id").references(() => onlineOrders.id, { onDelete: 'set null' }),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  status: text("status").notNull().default("open"), // open, in_progress, resolved, closed
+  priority: text("priority").default("normal"), // low, normal, high, urgent
+  response: text("response"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const faqEntries = mysqlTable("faq_entries", {
+  id: serial("id").primaryKey(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  question: text("question").notNull(),
+  questionAr: text("question_ar"),
+  answer: text("answer").notNull(),
+  answerAr: text("answer_ar"),
+  category: text("category").default("general"), // general, orders, delivery, payment, account
+  sortOrder: int("sort_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // ========== Insert Schemas ==========
 
 export const insertBranchSchema = createInsertSchema(branches).omit({ id: true, createdAt: true, updatedAt: true });
@@ -1089,6 +1136,10 @@ export const insertOrderRatingSchema = createInsertSchema(orderRatings).omit({ i
 export const insertCustomerSessionSchema = createInsertSchema(customerSessions).omit({ id: true, createdAt: true });
 export const insertOtpVerificationSchema = createInsertSchema(otpVerifications).omit({ id: true, createdAt: true });
 export const insertDeliveryZoneSchema = createInsertSchema(deliveryZones).omit({ id: true, createdAt: true });
+export const insertCustomerFavoriteSchema = createInsertSchema(customerFavorites).omit({ id: true, createdAt: true });
+export const insertProductDietaryTagSchema = createInsertSchema(productDietaryTags).omit({ id: true });
+export const insertHelpTicketSchema = createInsertSchema(helpTickets).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertFaqEntrySchema = createInsertSchema(faqEntries).omit({ id: true, createdAt: true });
 
 // ── Delivery Platform Types ──
 export type CustomerAddress = typeof customerAddresses.$inferSelect;
@@ -1111,3 +1162,11 @@ export type OtpVerification = typeof otpVerifications.$inferSelect;
 export type InsertOtpVerification = z.infer<typeof insertOtpVerificationSchema>;
 export type DeliveryZone = typeof deliveryZones.$inferSelect;
 export type InsertDeliveryZone = z.infer<typeof insertDeliveryZoneSchema>;
+export type CustomerFavorite = typeof customerFavorites.$inferSelect;
+export type InsertCustomerFavorite = z.infer<typeof insertCustomerFavoriteSchema>;
+export type ProductDietaryTag = typeof productDietaryTags.$inferSelect;
+export type InsertProductDietaryTag = z.infer<typeof insertProductDietaryTagSchema>;
+export type HelpTicket = typeof helpTickets.$inferSelect;
+export type InsertHelpTicket = z.infer<typeof insertHelpTicketSchema>;
+export type FaqEntry = typeof faqEntries.$inferSelect;
+export type InsertFaqEntry = z.infer<typeof insertFaqEntrySchema>;

@@ -50,7 +50,7 @@ pages.menu = {
   <div class="restaurant-cover" id="rest-cover">
     ${(storeConfig?.coverImage || storeConfig?.coverImageUrl || storeConfig?.headerBgImage)
       ? `<img class="restaurant-cover__img" src="${fixImageUrl(storeConfig.coverImage || storeConfig.coverImageUrl || storeConfig.headerBgImage)}" alt="${storeConfig.storeName || ''}" loading="lazy" onerror="this.style.display='none'" />`
-      : `<div style="width:100%;height:100%;background:linear-gradient(135deg,var(--nav-bg),var(--delivery-primary-dark));display:flex;align-items:center;justify-content:center;font-size:6rem;opacity:0.25">🍽️</div>`}
+      : `<div class="menu-cover-fallback"><i data-lucide="utensils" class="icon-3xl"></i></div>`}
     <div class="restaurant-cover__overlay"></div>
     <button class="restaurant-cover__back" onclick="history.back()" aria-label="Go back">
       ${rtl ? "›" : "‹"}
@@ -62,7 +62,7 @@ pages.menu = {
     <div class="restaurant-info__header">
       ${(storeConfig?.logo || storeConfig?.logoUrl || cfg.logo)
         ? `<img class="restaurant-info__logo" src="${fixImageUrl(storeConfig.logo || storeConfig.logoUrl || cfg.logo)}" alt="${storeConfig.storeName || ''}" onerror="this.style.display='none'" />`
-        : `<div class="restaurant-info__logo-placeholder">🏪</div>`}
+        : `<div class="restaurant-info__logo-placeholder"><i data-lucide="store" class="icon-xl"></i></div>`}
       <div class="flex-1">
         <h1 class="restaurant-info__name">${storeConfig?.storeName || storeConfig?.name || cfg.storeName || "Menu"}</h1>
         ${(storeConfig?.cuisine || storeConfig?.cuisineTypes) ? `<div class="restaurant-info__cuisine">${storeConfig.cuisine || storeConfig.cuisineTypes}</div>` : ""}
@@ -70,20 +70,20 @@ pages.menu = {
           <div class="restaurant-info__rating">
             <span class="rating-star">★</span>
             ${storeConfig?.rating ? parseFloat(storeConfig.rating).toFixed(1) : (storeConfig?.averageRating ? storeConfig.averageRating.toFixed(1) : "4.8")}
-            <span class="text-muted font-medium" style="font-size:0.8125rem">(${storeConfig?.reviewCount || "100+"})</span>
+            <span class="text-muted font-medium menu-review-count">(${storeConfig?.reviewCount || "100+"})</span>
           </div>
           <div class="restaurant-info__meta-item">
-            ⏱ ${cfg.minDeliveryTime || 20}–${cfg.maxDeliveryTime || 45} min
+            <i data-lucide="clock" class="icon-xs"></i> ${cfg.minDeliveryTime || 20}–${cfg.maxDeliveryTime || 45} min
           </div>
           ${storeConfig?.deliveryFee != null ? `
           <div class="restaurant-info__meta-item">
-            🚚 ${parseFloat(storeConfig.deliveryFee) === 0
-              ? `<span style="color:var(--delivery-success);font-weight:600">${rtl ? "توصيل مجاني" : "Free delivery"}</span>`
+            <i data-lucide="truck" class="icon-xs"></i> ${parseFloat(storeConfig.deliveryFee) === 0
+              ? `<span class="menu-free-delivery">${rtl ? "توصيل مجاني" : "Free delivery"}</span>`
               : formatCurrency(storeConfig.deliveryFee, cfg.currency)}
           </div>` : ""}
           ${storeConfig?.minOrderAmount ? `
           <div class="restaurant-info__meta-item">
-            🛒 ${rtl ? "حد أدنى" : "Min"} ${formatCurrency(storeConfig.minOrderAmount, cfg.currency)}
+            <i data-lucide="shopping-cart" class="icon-xs"></i> ${rtl ? "حد أدنى" : "Min"} ${formatCurrency(storeConfig.minOrderAmount, cfg.currency)}
           </div>` : ""}
         </div>
       </div>
@@ -93,11 +93,11 @@ pages.menu = {
     <div class="order-type-toggle">
       <button class="order-type-btn ${pages.menu._orderType === "delivery" ? "active" : ""}"
         onclick="pages.menu._setOrderType('delivery', this)">
-        🚴 ${rtl ? "توصيل" : "Delivery"}
+        <i data-lucide="bike" class="icon-sm"></i> ${rtl ? "توصيل" : "Delivery"}
       </button>
       <button class="order-type-btn ${pages.menu._orderType === "pickup" ? "active" : ""}"
         onclick="pages.menu._setOrderType('pickup', this)">
-        🏃 ${rtl ? "استلام ذاتي" : "Pickup"}
+        <i data-lucide="footprints" class="icon-sm"></i> ${rtl ? "استلام ذاتي" : "Pickup"}
       </button>
     </div>
 
@@ -144,11 +144,11 @@ pages.menu = {
 
     <!-- Desktop cart sidebar -->
     <aside class="menu-sidebar desktop-only" id="menu-sidebar">
-      <div style="padding:var(--space-md);font-weight:700;font-size:1rem;border-bottom:1px solid var(--delivery-border)">
+      <div class="menu-sidebar-header">
         ${rtl ? "سلتك" : "Your order"}
       </div>
-      <div id="sidebar-cart-items" style="padding:var(--space-sm)"></div>
-      <div id="sidebar-cart-footer" class="hidden" style="padding:var(--space-md);border-top:1px solid var(--delivery-border)"></div>
+      <div id="sidebar-cart-items" class="menu-sidebar-items"></div>
+      <div id="sidebar-cart-footer" class="hidden menu-sidebar-footer"></div>
     </aside>
   </div>
 
@@ -187,25 +187,25 @@ pages.menu = {
 
     } catch (err) {
       console.error("Menu render error:", err);
-      container.innerHTML = `<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">Failed to load menu</div><button class="btn btn-primary mt-md" onclick="router.navigate('menu')">Retry</button></div>`;
+      container.innerHTML = `<div class="empty-state"><div class="empty-state__icon"><i data-lucide="alert-triangle" class="icon-2xl"></i></div><div class="empty-state__title">Failed to load menu</div><button class="btn btn-primary mt-md" onclick="router.navigate('menu')">Retry</button></div>`;
     }
   },
 
   _skeleton() {
     return `<div class="menu-page">
-      <div style="height:220px;background:var(--delivery-border)" class="skeleton"></div>
-      <div style="padding:var(--space-lg) var(--space-md);background:var(--delivery-surface)">
-        <div style="display:flex;gap:16px">
-          <div class="skeleton" style="width:72px;height:72px;border-radius:12px;flex-shrink:0"></div>
-          <div style="flex:1"><div class="skeleton" style="height:20px;margin-bottom:8px"></div><div class="skeleton" style="height:14px;width:60%"></div></div>
+      <div class="skeleton menu-skel-cover"></div>
+      <div class="menu-skel-info">
+        <div class="menu-skel-row">
+          <div class="skeleton menu-skel-logo"></div>
+          <div class="menu-skel-flex1"><div class="skeleton menu-skel-text-lg"></div><div class="skeleton menu-skel-text-sm"></div></div>
         </div>
       </div>
-      <div style="height:52px;background:var(--delivery-surface);border-bottom:1px solid var(--delivery-border)"></div>
-      <div style="padding:var(--space-md)">
+      <div class="menu-skel-nav"></div>
+      <div class="menu-skel-items">
         ${Array(4).fill('').map(() => `
-          <div style="display:flex;gap:16px;padding:16px;background:var(--delivery-surface);border-radius:12px;margin-bottom:8px">
-            <div style="flex:1"><div class="skeleton" style="height:16px;margin-bottom:8px"></div><div class="skeleton" style="height:12px;width:80%;margin-bottom:6px"></div><div class="skeleton" style="height:12px;width:40%"></div></div>
-            <div class="skeleton" style="width:88px;height:88px;border-radius:8px;flex-shrink:0"></div>
+          <div class="menu-skel-item">
+            <div class="menu-skel-item-text"><div class="skeleton menu-skel-item-line1"></div><div class="skeleton menu-skel-item-line2"></div><div class="skeleton menu-skel-item-line3"></div></div>
+            <div class="skeleton menu-skel-item-img"></div>
           </div>`).join("")}
       </div>
     </div>`;
@@ -222,13 +222,13 @@ pages.menu = {
           ${p.description ? `<div class="menu-item-card__desc line-clamp-2">${p.description}</div>` : ""}
           <div class="menu-item-card__footer">
             <span class="product-card__price">${price}</span>
-            ${p.isVegetarian ? `<span class="badge badge-success" style="font-size:0.7rem">🌱 Veg</span>` : ""}
-            ${p.isHalal ? `<span class="badge badge-info" style="font-size:0.7rem">Halal</span>` : ""}
+            ${p.isVegetarian ? `<span class="badge badge-success menu-badge-sm"><i data-lucide="vegan" class="icon-xs"></i> Veg</span>` : ""}
+            ${p.isHalal ? `<span class="badge badge-info menu-badge-sm">Halal</span>` : ""}
           </div>
         </div>
         ${hasImg
           ? `<img class="menu-item-card__image" src="${fixImageUrl(p.imageUrl)}" alt="${p.name}" loading="lazy" />`
-          : `<div class="menu-item-card__image-placeholder">🍽️</div>`}
+          : `<div class="menu-item-card__image-placeholder"><i data-lucide="utensils" class="icon-xl"></i></div>`}
       </div>`;
   },
 
@@ -289,10 +289,10 @@ pages.menu = {
     if (!sideItems) return;
 
     if (state.items.length === 0) {
-      sideItems.innerHTML = `<div class="empty-state" style="padding:var(--space-xl) var(--space-md)">
-        <div style="font-size:2.5rem">🛒</div>
-        <div style="font-size:0.9375rem;font-weight:600;margin-top:8px">${rtl ? "السلة فارغة" : "Cart is empty"}</div>
-        <div style="font-size:0.8125rem;color:var(--delivery-text-muted);margin-top:4px">${rtl ? "اختر من القائمة" : "Select items from menu"}</div>
+      sideItems.innerHTML = `<div class="empty-state menu-cart-empty">
+        <div><i data-lucide="shopping-cart" class="icon-2xl"></i></div>
+        <div class="menu-cart-empty-title">${rtl ? "السلة فارغة" : "Cart is empty"}</div>
+        <div class="menu-cart-empty-sub">${rtl ? "اختر من القائمة" : "Select items from menu"}</div>
       </div>`;
       if (sideFoot) sideFoot.classList.add("hidden");
       return;
@@ -301,9 +301,9 @@ pages.menu = {
     sideItems.innerHTML = state.items.map(item => {
       const safeKey = item._key.replace(/'/g, "\\'");
       return `
-      <div class="cart-item" style="padding:var(--space-sm) 0">
+      <div class="cart-item menu-cart-item">
         <div class="cart-item__info">
-          <div class="cart-item__name" style="font-size:0.875rem">${item.name}</div>
+          <div class="cart-item__name menu-cart-item-name">${item.name}</div>
           <div class="cart-item__price">${formatCurrency((item.price + (item.modifierPrice || 0)) * item.qty, cfg.currency)}</div>
         </div>
         <div class="qty-control">
@@ -342,15 +342,15 @@ pages.menu = {
     inner.innerHTML = `
       ${product.imageUrl
         ? `<img class="product-modal-image" src="${fixImageUrl(product.imageUrl)}" alt="${product.name}" />`
-        : `<div style="height:180px;background:linear-gradient(135deg,var(--delivery-border),var(--delivery-primary-light));display:flex;align-items:center;justify-content:center;font-size:5rem">🍽️</div>`}
+        : `<div class="menu-modal-img-fallback"><i data-lucide="utensils" class="icon-3xl"></i></div>`}
       <div class="product-modal-body">
         <h2 class="product-modal-name" id="product-modal-name">${product.name}</h2>
         ${product.description ? `<p class="product-modal-desc">${product.description}</p>` : ""}
-        ${product.calories ? `<p class="text-sm text-muted">🔥 ${product.calories} kcal</p>` : ""}
-        <div style="display:flex;gap:var(--space-xs);margin-top:var(--space-sm)">
-          ${product.isVegetarian ? `<span class="badge badge-success">🌱 Vegetarian</span>` : ""}
+        ${product.calories ? `<p class="text-sm text-muted"><i data-lucide="flame" class="icon-xs"></i> ${product.calories} kcal</p>` : ""}
+        <div class="menu-modal-badges">
+          ${product.isVegetarian ? `<span class="badge badge-success"><i data-lucide="vegan" class="icon-xs"></i> Vegetarian</span>` : ""}
           ${product.isHalal ? `<span class="badge badge-info">✓ Halal</span>` : ""}
-          ${product.isSpicy ? `<span class="badge badge-danger">🌶 Spicy</span>` : ""}
+          ${product.isSpicy ? `<span class="badge badge-danger"><i data-lucide="flame" class="icon-xs"></i> Spicy</span>` : ""}
         </div>
       </div>
       <div class="product-modal-footer">

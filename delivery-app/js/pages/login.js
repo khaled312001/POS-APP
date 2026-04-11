@@ -19,17 +19,17 @@ pages.login = {
 <div class="auth-page">
   <div class="auth-card">
     <div class="auth-card__header">
-      <div class="auth-logo">🍽️</div>
+      <div class="auth-logo"><i data-lucide="utensils" class="icon-2xl"></i></div>
       <div class="auth-title">${rtl ? "مرحباً بك" : "Welcome back"}</div>
       <div class="auth-subtitle">${rtl ? "سجّل دخولك لمتابعة طلباتك" : "Sign in to track your orders"}</div>
     </div>
 
     <div class="auth-tabs" role="tablist">
       <button class="auth-tab active" role="tab" id="tab-phone" onclick="pages.login._switchTab('phone')">
-        📱 ${rtl ? "الهاتف" : "Phone"}
+        <i data-lucide="smartphone" class="icon-sm"></i> ${rtl ? "الهاتف" : "Phone"}
       </button>
       <button class="auth-tab" role="tab" id="tab-email" onclick="pages.login._switchTab('email')">
-        ✉️ ${rtl ? "البريد الإلكتروني" : "Email"}
+        <i data-lucide="mail" class="icon-sm"></i> ${rtl ? "البريد الإلكتروني" : "Email"}
       </button>
     </div>
 
@@ -48,7 +48,7 @@ pages.login = {
         </div>
 
         <div id="phone-step-2" class="hidden">
-          <p style="text-align:center;color:var(--delivery-text-secondary);margin-bottom:var(--space-lg)" id="otp-sent-msg">
+          <p class="auth-otp-sent" id="otp-sent-msg">
             ${rtl ? "تم إرسال الرمز إلى" : "Code sent to"} <strong id="otp-phone-display"></strong>
           </p>
           <div class="otp-inputs" id="otp-inputs">
@@ -56,16 +56,16 @@ pages.login = {
               `<input class="otp-input" type="text" maxlength="1" inputmode="numeric" data-idx="${i}" aria-label="Digit ${i+1}" />`
             ).join("")}
           </div>
-          <div class="form-error hidden" id="otp-error" style="text-align:center;margin-top:var(--space-sm)"></div>
-          <button class="btn btn-primary btn-full" style="margin-top:var(--space-lg)" id="verify-otp-btn" onclick="pages.login._verifyOtp()">
+          <div class="form-error hidden auth-otp-error" id="otp-error"></div>
+          <button class="btn btn-primary btn-full auth-otp-verify-btn" id="verify-otp-btn" onclick="pages.login._verifyOtp()">
             ${rtl ? "تحقق وادخل" : "Verify & sign in"}
           </button>
-          <div style="text-align:center;margin-top:var(--space-md)">
+          <div class="auth-center-row">
             <button class="text-primary text-sm" onclick="pages.login._resetOtp()">
               ${rtl ? "← تغيير رقم الهاتف" : "← Change number"}
             </button>
           </div>
-          <div id="resend-row" class="hidden" style="text-align:center;margin-top:var(--space-sm)">
+          <div id="resend-row" class="hidden auth-resend-row">
             <button class="text-primary text-sm" onclick="pages.login._sendOtp()">
               ${rtl ? "إعادة إرسال الرمز" : "Resend code"}
             </button>
@@ -84,8 +84,8 @@ pages.login = {
             <label class="form-label" for="auth-password">${rtl ? "كلمة المرور" : "Password"}</label>
             <input id="auth-password" class="form-input" type="password" placeholder="••••••••" autocomplete="current-password" />
           </div>
-          <div class="form-error hidden" id="email-error" style="margin-top:var(--space-sm)"></div>
-          <button class="btn btn-primary btn-full" style="margin-top:var(--space-md)" id="email-login-btn" onclick="pages.login._emailLogin()">
+          <div class="form-error hidden auth-form-error" id="email-error"></div>
+          <button class="btn btn-primary btn-full auth-submit-btn" id="email-login-btn" onclick="pages.login._emailLogin()">
             ${rtl ? "تسجيل الدخول" : "Sign in"}
           </button>
 
@@ -113,18 +113,18 @@ pages.login = {
             <label class="form-label" for="reg-password">${rtl ? "كلمة المرور" : "Password"}</label>
             <input id="reg-password" class="form-input" type="password" placeholder="${rtl ? "8 أحرف على الأقل" : "8+ characters"}" autocomplete="new-password" />
           </div>
-          <div class="form-error hidden" id="reg-error" style="margin-top:var(--space-sm)"></div>
-          <button class="btn btn-primary btn-full" style="margin-top:var(--space-md)" id="reg-btn" onclick="pages.login._register()">
+          <div class="form-error hidden auth-form-error" id="reg-error"></div>
+          <button class="btn btn-primary btn-full auth-submit-btn" id="reg-btn" onclick="pages.login._register()">
             ${rtl ? "إنشاء الحساب" : "Create account"}
           </button>
-          <button class="btn btn-ghost btn-full" style="margin-top:var(--space-sm)" onclick="pages.login._showLogin()">
+          <button class="btn btn-ghost btn-full auth-back-btn" onclick="pages.login._showLogin()">
             ${rtl ? "← تسجيل الدخول" : "← Sign in"}
           </button>
         </div>
       </div>
 
       <!-- Skip -->
-      <div style="text-align:center;margin-top:var(--space-md)">
+      <div class="auth-skip-row">
         <button class="text-muted text-sm" onclick="history.back()">
           ${rtl ? "تخطي، متابعة كضيف" : "Skip, continue as guest"}
         </button>
@@ -232,7 +232,7 @@ pages.login = {
     try {
       const result = await api.auth.verifyOtp(pages.login._phone, cfg.tenantId, otp);
       auth.setSession(result.token, result.customer);
-      showToast(isRtl() ? "مرحباً 👋 " + (result.customer?.name || "") : "Welcome 👋 " + (result.customer?.name || ""), "success");
+      showToast(isRtl() ? "مرحباً " + (result.customer?.name || "") : "Welcome " + (result.customer?.name || ""), "success");
 
       // Update nav label
       const navLabel = document.getElementById("nav-user-label");
@@ -262,7 +262,7 @@ pages.login = {
     try {
       const result = await api.auth.login(email, password, cfg.tenantId);
       auth.setSession(result.token, result.customer);
-      showToast(isRtl() ? "مرحباً 👋 " + (result.customer?.name || "") : "Welcome back 👋", "success");
+      showToast(isRtl() ? "مرحباً " + (result.customer?.name || "") : "Welcome back", "success");
       const navLabel = document.getElementById("nav-user-label");
       if (navLabel && result.customer?.name) navLabel.textContent = result.customer.name.split(" ")[0];
       history.back();
@@ -301,7 +301,7 @@ pages.login = {
     try {
       const result = await api.auth.register({ name, email, phone, password, tenantId: cfg.tenantId });
       auth.setSession(result.token, result.customer);
-      showToast(isRtl() ? "تم إنشاء الحساب 🎉" : "Account created! 🎉", "success");
+      showToast(isRtl() ? "تم إنشاء الحساب" : "Account created!", "success");
       const navLabel = document.getElementById("nav-user-label");
       if (navLabel) navLabel.textContent = name.split(" ")[0];
       history.back();

@@ -277,16 +277,16 @@
   <header class="site-header desktop-only" id="site-header">
     <div class="site-header__inner">
       <a class="site-logo" href="/" id="header-logo">
-        <div class="site-logo__icon">🍽️</div>
+        <div class="site-logo__icon"><i data-lucide="utensils"></i></div>
         <span class="site-logo__name" id="header-brand">Barmagly Delivery</span>
       </a>
       <nav class="header-nav" id="header-nav" style="display:flex;align-items:center;gap:var(--space-sm)">
-        <a class="btn btn-ghost btn-sm" href="/" id="btn-home" style="font-size:0.9rem">🏠 Home</a>
-        <a class="btn btn-ghost btn-sm" id="nav-restaurants-link" href="/api/order" style="font-size:0.9rem;color:var(--delivery-primary)">🍴 Restaurants</a>
+        <a class="btn btn-ghost btn-sm" href="/" id="btn-home" style="font-size:0.9rem"><i data-lucide="home" style="width:16px;height:16px;display:inline-block;vertical-align:middle"></i> Home</a>
+        <a class="btn btn-ghost btn-sm" id="nav-restaurants-link" href="/api/order" style="font-size:0.9rem;color:var(--delivery-primary)"><i data-lucide="utensils-crossed" style="width:16px;height:16px;display:inline-block;vertical-align:middle"></i> Restaurants</a>
       </nav>
       <div class="nav-actions">
-        <a class="btn btn-ghost btn-sm" id="nav-offers-btn" href="#" style="font-size:0.9rem">🎁 Offers</a>
-        <button class="btn btn-ghost btn-sm" id="nav-account-btn" style="font-size:0.9rem">👤 <span id="nav-user-label">Account</span></button>
+        <a class="btn btn-ghost btn-sm" id="nav-offers-btn" href="#" style="font-size:0.9rem"><i data-lucide="gift" style="width:16px;height:16px;display:inline-block;vertical-align:middle"></i> Offers</a>
+        <button class="btn btn-ghost btn-sm" id="nav-account-btn" style="font-size:0.9rem"><i data-lucide="user" style="width:16px;height:16px;display:inline-block;vertical-align:middle"></i> <span id="nav-user-label">Account</span></button>
       </div>
     </div>
   </header>
@@ -299,7 +299,7 @@
       <h1 id="hero-title">Order food from restaurants near you</h1>
       <p id="hero-sub">Delivered fast to your door</p>
       <div class="discover-search-bar">
-        <span>🔍</span>
+        <span><i data-lucide="search" style="width:18px;height:18px;display:inline-block;vertical-align:middle;color:var(--delivery-text-muted)"></i></span>
         <input type="text" id="global-search" placeholder="Search restaurants or cuisines…" autocomplete="off" />
         <button onclick="doSearch()">Search</button>
       </div>
@@ -307,20 +307,20 @@
 
     <!-- Location Bar -->
     <div class="location-bar" id="location-bar" onclick="promptLocation()">
-      📍 <span id="location-text">Detecting your location…</span>
+      <i data-lucide="map-pin" style="width:16px;height:16px;display:inline-block;vertical-align:middle"></i> <span id="location-text">Detecting your location…</span>
       <span style="margin-inline-start:auto;color:var(--delivery-primary);font-weight:600;font-size:0.8125rem">Change</span>
     </div>
 
     <!-- Cuisine Chips -->
     <div class="cuisine-chips" id="cuisine-chips">
-      <div class="cuisine-chip active" data-cuisine="all" onclick="filterCuisine('all', this)">🍽️ All</div>
+      <div class="cuisine-chip active" data-cuisine="all" onclick="filterCuisine('all', this)"><i data-lucide="utensils" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i> All</div>
     </div>
 
     <!-- Promo Band -->
     <div style="max-width:var(--page-max);margin:var(--space-lg) auto 0;padding:0 var(--space-lg)">
       <div class="promo-band" onclick="showPromos()">
         <div>
-          <div class="promo-band__text">🎁 Special offers available today</div>
+          <div class="promo-band__text"><i data-lucide="gift" style="width:18px;height:18px;display:inline-block;vertical-align:middle"></i> Special offers available today</div>
           <div class="promo-band__sub" id="promo-band-sub">Free delivery on your first order</div>
         </div>
         <span style="font-size:1.25rem">›</span>
@@ -340,10 +340,10 @@
         <!-- Sort (mobile only inside sidebar) -->
         <div class="filter-group mobile-only">
           <div class="filter-group__label">Sort by</div>
-          <label class="filter-option"><input type="radio" name="sort-m" value="rating" onchange="applySort('rating')" /> ⭐ Rating</label>
-          <label class="filter-option"><input type="radio" name="sort-m" value="delivery_time" onchange="applySort('delivery_time')" checked /> ⏱ Fastest</label>
-          <label class="filter-option"><input type="radio" name="sort-m" value="delivery_fee" onchange="applySort('delivery_fee')" /> 🚚 Delivery fee</label>
-          <label class="filter-option"><input type="radio" name="sort-m" value="min_order" onchange="applySort('min_order')" /> 💰 Min. order</label>
+          <label class="filter-option"><input type="radio" name="sort-m" value="rating" onchange="applySort('rating')" /> <i data-lucide="star" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i> Rating</label>
+          <label class="filter-option"><input type="radio" name="sort-m" value="delivery_time" onchange="applySort('delivery_time')" checked /> <i data-lucide="clock" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i> Fastest</label>
+          <label class="filter-option"><input type="radio" name="sort-m" value="delivery_fee" onchange="applySort('delivery_fee')" /> <i data-lucide="truck" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i> Delivery fee</label>
+          <label class="filter-option"><input type="radio" name="sort-m" value="min_order" onchange="applySort('min_order')" /> <i data-lucide="coins" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i> Min. order</label>
         </div>
 
         <div class="filter-group">
@@ -355,16 +355,16 @@
         <div class="filter-group">
           <div class="filter-group__label">Rating</div>
           <label class="filter-option"><input type="radio" name="rating" value="" onchange="applyFilters()" checked /> Any rating</label>
-          <label class="filter-option"><input type="radio" name="rating" value="4" onchange="applyFilters()" /> ⭐ 4.0+</label>
-          <label class="filter-option"><input type="radio" name="rating" value="4.5" onchange="applyFilters()" /> ⭐ 4.5+</label>
+          <label class="filter-option"><input type="radio" name="rating" value="4" onchange="applyFilters()" /> <i data-lucide="star" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i> 4.0+</label>
+          <label class="filter-option"><input type="radio" name="rating" value="4.5" onchange="applyFilters()" /> <i data-lucide="star" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i> 4.5+</label>
         </div>
 
         <div class="filter-group">
           <div class="filter-group__label">Price range</div>
           <label class="filter-option"><input type="radio" name="price" value="" onchange="applyFilters()" checked /> Any</label>
-          <label class="filter-option"><input type="radio" name="price" value="budget" onchange="applyFilters()" /> 💰 Budget</label>
-          <label class="filter-option"><input type="radio" name="price" value="mid" onchange="applyFilters()" /> 💰💰 Mid-range</label>
-          <label class="filter-option"><input type="radio" name="price" value="premium" onchange="applyFilters()" /> 💰💰💰 Premium</label>
+          <label class="filter-option"><input type="radio" name="price" value="budget" onchange="applyFilters()" /> <i data-lucide="coins" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i> Budget</label>
+          <label class="filter-option"><input type="radio" name="price" value="mid" onchange="applyFilters()" /> <i data-lucide="coins" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i><i data-lucide="coins" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i> Mid-range</label>
+          <label class="filter-option"><input type="radio" name="price" value="premium" onchange="applyFilters()" /> <i data-lucide="coins" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i><i data-lucide="coins" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i><i data-lucide="coins" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i> Premium</label>
         </div>
 
         <div style="padding:var(--space-md) var(--space-lg)">
@@ -379,7 +379,7 @@
           <span class="sort-bar__count" id="results-count">Loading…</span>
           <div style="display:flex;align-items:center;gap:var(--space-sm)">
             <!-- Mobile filters btn -->
-            <button class="mobile-filters-btn" onclick="toggleFiltersMobile()">⚙️ Filters</button>
+            <button class="mobile-filters-btn" onclick="toggleFiltersMobile()"><i data-lucide="sliders-horizontal" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i> Filters</button>
             <div class="sort-bar__sort desktop-only">
               <span style="font-size:0.875rem;color:var(--delivery-text-muted)">Sort by</span>
               <select class="sort-select" id="sort-select" onchange="applySort(this.value)">
@@ -390,8 +390,8 @@
               </select>
             </div>
             <div class="view-toggle desktop-only">
-              <button class="view-btn active" id="btn-grid" title="Grid view" onclick="setView('grid')">⊞</button>
-              <button class="view-btn" id="btn-list" title="List view" onclick="setView('list')">☰</button>
+              <button class="view-btn active" id="btn-grid" title="Grid view" onclick="setView('grid')"><i data-lucide="layout-grid" style="width:16px;height:16px"></i></button>
+              <button class="view-btn" id="btn-list" title="List view" onclick="setView('list')"><i data-lucide="list" style="width:16px;height:16px"></i></button>
             </div>
           </div>
         </div>
@@ -411,6 +411,9 @@
 
   <!-- Toast -->
   <div id="toast-container" class="toast-container"></div>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
   <!-- Scripts -->
   <script>
@@ -492,10 +495,11 @@
           showSkeleton(false);
           document.getElementById("restaurants-container").innerHTML = `
             <div class="empty-results">
-              <div class="empty-results__icon">🍽️</div>
+              <div class="empty-results__icon"><i data-lucide="utensils" style="width:48px;height:48px"></i></div>
               <div class="empty-results__title">${rtl ? "لا توجد مطاعم متاحة" : "No restaurants available"}</div>
               <div>${rtl ? "حاول مرة أخرى لاحقاً" : "Please try again later"}</div>
             </div>`;
+          if (window.lucide) lucide.createIcons();
         }
       }
     }
@@ -503,12 +507,14 @@
     function buildCuisineChips() {
       const cuisines = [...new Set(_allRestaurants.map(r => r.cuisine).filter(Boolean))];
       const chip = document.getElementById("cuisine-chips");
-      const allChip = `<div class="cuisine-chip active" data-cuisine="all" onclick="filterCuisine('all', this)">🍽️ ${rtl ? "الكل" : "All"}</div>`;
-      const icons = { pizza: "🍕", burger: "🍔", sushi: "🍣", chicken: "🍗", chinese: "🥡", indian: "🍛", italian: "🍝", mexican: "🌮", desserts: "🍰", coffee: "☕", seafood: "🦞", healthy: "🥗", arabic: "🥙", egyptian: "🫕" };
+      const lucideIcon = (name) => `<i data-lucide="${name}" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></i>`;
+      const allChip = `<div class="cuisine-chip active" data-cuisine="all" onclick="filterCuisine('all', this)">${lucideIcon("utensils")} ${rtl ? "الكل" : "All"}</div>`;
+      const icons = { pizza: "pizza", burger: "beef", sushi: "fish", chicken: "drumstick", chinese: "soup", indian: "flame", italian: "wheat", mexican: "salad", desserts: "cake-slice", coffee: "coffee", seafood: "fish", healthy: "apple", arabic: "sandwich", egyptian: "cooking-pot" };
       chip.innerHTML = allChip + cuisines.map(c => {
-        const icon = icons[c.toLowerCase()] || "🍴";
-        return `<div class="cuisine-chip" data-cuisine="${c}" onclick="filterCuisine('${c}', this)">${icon} ${c}</div>`;
+        const icon = icons[c.toLowerCase()] || "utensils-crossed";
+        return `<div class="cuisine-chip" data-cuisine="${c}" onclick="filterCuisine('${c}', this)">${lucideIcon(icon)} ${c}</div>`;
       }).join("");
+      if (window.lucide) lucide.createIcons();
     }
 
     function filterCuisine(cuisine, el) {
@@ -577,10 +583,11 @@
       if (count === 0) {
         document.getElementById("restaurants-container").innerHTML = `
           <div class="empty-results">
-            <div class="empty-results__icon">🔍</div>
+            <div class="empty-results__icon"><i data-lucide="search" style="width:48px;height:48px"></i></div>
             <div class="empty-results__title">${rtl ? "لا توجد نتائج" : "No results found"}</div>
             <div>${rtl ? "جرّب تغيير الفلاتر" : "Try changing your filters"}</div>
           </div>`;
+        if (window.lucide) lucide.createIcons();
         return;
       }
 
@@ -595,6 +602,7 @@
             ${sorted.map(r => restaurantGridCard(r)).join("")}
           </div>`;
       }
+      if (window.lucide) lucide.createIcons();
     }
 
     function fixImg(url) {
@@ -611,7 +619,7 @@
       const slug = r.slug || cfg.slug;
       const coverImg = r.coverImage
         ? `<img src="${fixImg(r.coverImage)}" alt="${r.name}" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'" />`
-        : `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:3rem">🍽️</div>`;
+        : `<div style="display:flex;align-items:center;justify-content:center;height:100%"><i data-lucide="utensils" style="width:48px;height:48px;color:var(--delivery-text-muted)"></i></div>`;
 
       const freeDelivery = !r.deliveryFee || r.deliveryFee === 0;
       const rating = parseFloat(r.rating || 4.5).toFixed(1);
@@ -634,8 +642,8 @@
     </div>
     ${r.cuisine ? `<div class="restaurant-card__cuisine">${r.cuisine}</div>` : ""}
     <div class="restaurant-card__meta">
-      <span>⏱ ${r.deliveryTime || "25–35"} ${rtl ? "دق" : "min"}</span>
-      <span>${freeDelivery ? (rtl ? "🚚 مجاني" : "🚚 Free") : `🚚 ${formatCurrency(r.deliveryFee, cfg.currency)}`}</span>
+      <span><i data-lucide="clock" style="width:13px;height:13px;display:inline-block;vertical-align:middle"></i> ${r.deliveryTime || "25–35"} ${rtl ? "دق" : "min"}</span>
+      <span>${freeDelivery ? (rtl ? '<i data-lucide="truck" style="width:13px;height:13px;display:inline-block;vertical-align:middle"></i> مجاني' : '<i data-lucide="truck" style="width:13px;height:13px;display:inline-block;vertical-align:middle"></i> Free') : `<i data-lucide="truck" style="width:13px;height:13px;display:inline-block;vertical-align:middle"></i> ${formatCurrency(r.deliveryFee, cfg.currency)}`}</span>
       ${r.minOrder ? `<span>${rtl ? "حد أدنى" : "Min."} ${formatCurrency(r.minOrder, cfg.currency)}</span>` : ""}
     </div>
   </div>
@@ -652,7 +660,7 @@
   <div class="restaurant-list-card__image">
     ${r.coverImage
       ? `<img src="${fixImg(r.coverImage)}" alt="${r.name}" style="width:100%;height:100%;object-fit:cover" />`
-      : "🍽️"}
+      : '<i data-lucide="utensils" style="width:48px;height:48px;color:var(--delivery-text-muted)"></i>'}
   </div>
   <div class="restaurant-list-card__body">
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -661,8 +669,8 @@
     </div>
     ${r.cuisine ? `<div class="restaurant-list-card__cuisine">${r.cuisine}</div>` : ""}
     <div class="restaurant-list-card__meta">
-      <span class="restaurant-list-card__badge">⏱ ${r.deliveryTime || "25–35"} ${rtl ? "دق" : "min"}</span>
-      <span class="restaurant-list-card__badge">🚚 ${freeDelivery ? (rtl ? "مجاني" : "Free") : formatCurrency(r.deliveryFee, cfg.currency)}</span>
+      <span class="restaurant-list-card__badge"><i data-lucide="clock" style="width:13px;height:13px;display:inline-block;vertical-align:middle"></i> ${r.deliveryTime || "25–35"} ${rtl ? "دق" : "min"}</span>
+      <span class="restaurant-list-card__badge"><i data-lucide="truck" style="width:13px;height:13px;display:inline-block;vertical-align:middle"></i> ${freeDelivery ? (rtl ? "مجاني" : "Free") : formatCurrency(r.deliveryFee, cfg.currency)}</span>
       ${r.minOrder ? `<span class="restaurant-list-card__badge">${rtl ? "حد أدنى" : "Min."} ${formatCurrency(r.minOrder, cfg.currency)}</span>` : ""}
       ${r.isOpen === false ? `<span class="restaurant-list-card__badge" style="color:var(--status-cancelled)">${rtl ? "مغلق" : "Closed"}</span>` : ""}
     </div>
@@ -753,6 +761,9 @@
     // ── Boot ─────────────────────────────────────────────────────────────────
     detectLocation();
     loadRestaurants();
+
+    // Initialize Lucide icons for static HTML elements
+    if (window.lucide) lucide.createIcons();
   </script>
 </body>
 </html>

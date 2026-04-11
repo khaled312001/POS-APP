@@ -33,8 +33,8 @@ pages.tracking = {
 
     } catch (err) {
       container.innerHTML = `
-        <div class="empty-state" style="min-height:60vh">
-          <div class="empty-state__icon">📦</div>
+        <div class="empty-state tracking-empty">
+          <div class="empty-state__icon"><i data-lucide="package" class="icon-2xl"></i></div>
           <div class="empty-state__title">${rtl ? "لم يُعثر على الطلب" : "Order not found"}</div>
           <div class="empty-state__text">${err.message}</div>
           <button class="btn btn-primary mt-md" onclick="router.navigate('home')">${rtl ? "الرئيسية" : "Home"}</button>
@@ -43,9 +43,9 @@ pages.tracking = {
   },
 
   _skeleton(rtl) {
-    return `<div style="padding:var(--space-xl) var(--space-md);text-align:center">
-      <div class="loading-spinner" style="margin:0 auto"></div>
-      <div style="margin-top:var(--space-md);color:var(--delivery-text-muted)">${rtl ? "جار تحميل الطلب..." : "Loading order…"}</div>
+    return `<div class="tracking-skeleton">
+      <div class="loading-spinner tracking-skeleton__spinner"></div>
+      <div class="tracking-skeleton__text">${rtl ? "جار تحميل الطلب..." : "Loading order…"}</div>
     </div>`;
   },
 
@@ -78,15 +78,15 @@ pages.tracking = {
   <!-- Confirmation / status header -->
   <div class="tracking-confirmation">
     ${order.status === "delivered"
-      ? `<div class="confirmation-icon">✅</div>`
+      ? `<div class="confirmation-icon"><i data-lucide="check-circle" class="icon-xl"></i></div>`
       : order.status === "cancelled"
-      ? `<div class="confirmation-icon" style="background:rgba(239,68,68,0.12)">❌</div>`
-      : `<div class="confirmation-icon">🎉</div>`}
+      ? `<div class="confirmation-icon tracking-cancelled-icon"><i data-lucide="x-circle" class="icon-xl"></i></div>`
+      : `<div class="confirmation-icon"><i data-lucide="party-popper" class="icon-xl"></i></div>`}
     <h2>${order.status === "delivered" ? (rtl ? "تم التوصيل!" : "Order delivered!") : order.status === "cancelled" ? (rtl ? "تم الإلغاء" : "Order cancelled") : (rtl ? "تم استلام طلبك!" : "Order confirmed!")}</h2>
-    <p style="margin-top:var(--space-sm);color:var(--delivery-text-secondary)">
+    <p class="tracking-order-num">
       ${rtl ? "رقم الطلب" : "Order"} #${order.orderNumber || order.id}
     </p>
-    <div class="badge badge-${order.status === "delivered" ? "delivered" : order.status === "cancelled" ? "cancelled" : "preparing"}" style="margin-top:var(--space-sm)">
+    <div class="badge badge-${order.status === "delivered" ? "delivered" : order.status === "cancelled" ? "cancelled" : "preparing"} tracking-status-badge">
       ${statusLabels[order.status] || order.status}
     </div>
   </div>
@@ -103,7 +103,7 @@ pages.tracking = {
 
   <!-- Status pipeline -->
   <div class="tracking-info-card">
-    <h3 style="font-weight:700;margin-bottom:var(--space-md)">${rtl ? "حالة الطلب" : "Order status"}</h3>
+    <h3 class="tracking-section-title">${rtl ? "حالة الطلب" : "Order status"}</h3>
     <div class="status-pipeline" id="status-pipeline">
       ${steps.filter(s => s !== "cancelled").map((s, i) => {
         const isDone   = currentIdx > i;
@@ -118,47 +118,47 @@ pages.tracking = {
 
   <!-- Map -->
   ${!isFinal ? `
-  <div class="tracking-info-card" style="padding:0;overflow:hidden">
-    <div id="tracking-map" style="height:300px"></div>
+  <div class="tracking-info-card tracking-map-card">
+    <div id="tracking-map" class="tracking-map"></div>
   </div>` : ""}
 
   <!-- Driver info (when on_way) -->
   ${order.driver ? `
   <div class="tracking-info-card">
-    <h3 style="font-weight:700;margin-bottom:var(--space-sm)">${rtl ? "معلومات السائق" : "Your driver"}</h3>
+    <h3 class="tracking-section-title--sm">${rtl ? "معلومات السائق" : "Your driver"}</h3>
     <div class="driver-info">
-      <div class="driver-avatar">🏍️</div>
+      <div class="driver-avatar"><i data-lucide="bike" class="icon-xl"></i></div>
       <div>
         <div class="driver-info__name">${order.driver.name || "Driver"}</div>
-        <div class="driver-info__rating">⭐ ${order.driver.rating || "5.0"}</div>
+        <div class="driver-info__rating"><i data-lucide="star" class="icon-xs"></i> ${order.driver.rating || "5.0"}</div>
       </div>
       ${order.driver.phone ? `
-      <a href="tel:${order.driver.phone}" class="driver-call-btn" aria-label="Call driver">📞</a>` : ""}
+      <a href="tel:${order.driver.phone}" class="driver-call-btn" aria-label="Call driver"><i data-lucide="phone" class="icon-md"></i></a>` : ""}
     </div>
   </div>` : ""}
 
   <!-- Order details -->
   <div class="tracking-info-card">
-    <h3 style="font-weight:700;margin-bottom:var(--space-md)">${rtl ? "تفاصيل الطلب" : "Order details"}</h3>
+    <h3 class="tracking-section-title">${rtl ? "تفاصيل الطلب" : "Order details"}</h3>
     ${(order.items || []).map(item => `
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--delivery-border)">
+      <div class="tracking-order-item">
         <span>${item.qty || 1}× ${item.name}</span>
         <strong>${formatCurrency(item.price * (item.qty || 1), cfg.currency)}</strong>
       </div>`).join("")}
-    <div class="summary-row" style="margin-top:var(--space-sm)">
+    <div class="summary-row tracking-total-row">
       <span class="label">${rtl ? "المجموع" : "Total"}</span>
       <strong>${formatCurrency(order.total || order.subtotal || 0, cfg.currency)}</strong>
     </div>
   </div>
 
   <!-- Actions -->
-  <div style="padding:var(--space-md);display:flex;flex-direction:column;gap:var(--space-sm)">
+  <div class="tracking-actions">
     ${order.status === "delivered" ? `
     <button class="btn btn-primary btn-full" onclick="pages.tracking._openRating()">
-      ${rtl ? "⭐ قيّم طلبك" : "⭐ Rate your order"}
+      <i data-lucide="star" class="icon-sm"></i> ${rtl ? "قيّم طلبك" : "Rate your order"}
     </button>
     <button class="btn btn-ghost btn-full" onclick="api.orders.reorder(${order.id}).then(r => { cart.clear(); showToast('Reordering…','success'); router.navigate('cart'); })">
-      ${rtl ? "🔄 اطلب مجدداً" : "🔄 Reorder"}
+      <i data-lucide="refresh-cw" class="icon-sm"></i> ${rtl ? "اطلب مجدداً" : "Reorder"}
     </button>` : ""}
     <button class="btn btn-ghost btn-full" onclick="router.navigate('home')">
       ${rtl ? "← الرئيسية" : "← Back to home"}
@@ -173,16 +173,16 @@ pages.tracking = {
       <span class="sheet-title">${rtl ? "كيف كانت تجربتك؟" : "How was your experience?"}</span>
     </div>
     <div class="sheet-body">
-      <p style="text-align:center;margin-bottom:var(--space-lg)">${order.restaurant || cfg.storeName || "Restaurant"}</p>
-      <div class="stars" style="justify-content:center" id="rating-stars">
+      <p class="tracking-rating-restaurant">${order.restaurant || cfg.storeName || "Restaurant"}</p>
+      <div class="stars tracking-stars-row" id="rating-stars">
         ${[1,2,3,4,5].map(n =>
           `<span class="star" data-val="${n}" onclick="pages.tracking._setRating(${n})">★</span>`
         ).join("")}
       </div>
-      <div class="form-group" style="margin-top:var(--space-lg)">
+      <div class="form-group tracking-rating-comment">
         <textarea id="rating-comment" class="form-input form-textarea" placeholder="${rtl ? "أخبرنا عن تجربتك..." : "Tell us about your experience…"}"></textarea>
       </div>
-      <button class="btn btn-primary btn-full" style="margin-top:var(--space-md)" onclick="pages.tracking._submitRating(${order.id})">
+      <button class="btn btn-primary btn-full tracking-rating-submit" onclick="pages.tracking._submitRating(${order.id})">
         ${rtl ? "إرسال التقييم" : "Submit rating"}
       </button>
     </div>
@@ -201,7 +201,7 @@ pages.tracking = {
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap", maxZoom: 19 }).addTo(pages.tracking._map);
 
       // Customer marker
-      const customerIcon = L.divIcon({ html: `<div style="background:var(--delivery-primary);width:32px;height:32px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.3)">🏠</div>`, className: "", iconSize: [32, 32], iconAnchor: [16, 32] });
+      const customerIcon = L.divIcon({ html: `<div style="background:var(--delivery-primary);width:32px;height:32px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3)"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>`, className: "", iconSize: [32, 32], iconAnchor: [16, 32] });
       pages.tracking._customerMarker = L.marker([lat, lng], { icon: customerIcon }).addTo(pages.tracking._map);
 
       // Driver marker (if available)
@@ -214,7 +214,7 @@ pages.tracking = {
   _addDriverMarker(lat, lng) {
     const map = pages.tracking._map;
     if (!map || !window.L) return;
-    const icon = L.divIcon({ html: `<div style="background:#FF5722;width:36px;height:36px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,0.3)">🏍️</div>`, className: "", iconSize: [36, 36], iconAnchor: [18, 18] });
+    const icon = L.divIcon({ html: `<div style="background:#FF5722;width:36px;height:36px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3)"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3.5-3.5 2-2 5 5h3"/></svg></div>`, className: "", iconSize: [36, 36], iconAnchor: [18, 18] });
     if (pages.tracking._driverMarker) {
       pages.tracking._driverMarker.setLatLng([lat, lng]);
     } else {
@@ -318,7 +318,7 @@ pages.tracking = {
     if (rating === 0) { showToast(isRtl() ? "اختر تقييماً" : "Select a rating", "warning"); return; }
     try {
       await api.orders.rate(orderId, { rating, comment });
-      showToast(isRtl() ? "شكراً لتقييمك 🙏" : "Thank you for your rating 🙏", "success");
+      showToast(isRtl() ? "شكراً لتقييمك" : "Thank you for your rating", "success");
       pages.tracking._closeRating();
     } catch(err) {
       showToast(err.message || "Error", "error");

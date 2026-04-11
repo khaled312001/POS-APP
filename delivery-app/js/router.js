@@ -103,12 +103,15 @@ const router = {
     } catch (err) {
       console.error("[router] Render error:", err);
       app.innerHTML = `<div class="empty-state">
-        <div class="empty-state__icon">⚠️</div>
+        <div class="empty-state__icon"><i data-lucide="alert-triangle" class="icon-2xl"></i></div>
         <h2 class="empty-state__title">Something went wrong</h2>
         <p class="empty-state__text">${err.message || "Please try again."}</p>
         <button class="btn btn-primary mt-md" onclick="router.navigate('home')">Go Home</button>
       </div>`;
     }
+
+    // Initialize Lucide icons after page render
+    if (window.lucide) window.lucide.createIcons();
 
     this._updateBottomNav(route.name);
   },

@@ -337,13 +337,17 @@ function configureExpoAndLanding(app: express.Application) {
       return res.status(200).send(dbTemplate);
     }
 
-    // ── General delivery listing (no slug) ─────────────────────────────────
-    // /order or /api/order → shows all restaurants
+    // ── General delivery landing page (no slug) ────────────────────────────
+    // /order or /api/order → shows landing page
     if (req.path === "/order" || req.path === "/order/" || req.path === "/api/order" || req.path === "/api/order/") {
       try {
-        const restaurantsIndexPath = path.resolve(process.cwd(), "delivery-app", "restaurants.html");
+        // Prefer landing page if available, fallback to restaurants listing
+        const landingPath = path.resolve(process.cwd(), "delivery-app", "landing.html");
+        const restaurantsIndexPath = fs.existsSync(landingPath)
+          ? landingPath
+          : path.resolve(process.cwd(), "delivery-app", "restaurants.html");
         if (!fs.existsSync(restaurantsIndexPath)) {
-          return res.status(503).send("<h1>Restaurants page not yet deployed</h1>");
+          return res.status(503).send("<h1>Landing page not yet deployed</h1>");
         }
         const isApiPrefixed = req.path.startsWith("/api/");
         const basePath = isApiPrefixed ? "/api" : "";
@@ -415,6 +419,20 @@ function configureExpoAndLanding(app: express.Application) {
           metaDescription: (config as any).metaDescription || "",
         });
         html = html.replace("__DELIVERY_CONFIG__", configJson);
+
+        // SEO meta tag injection for restaurant pages
+        const storeName = config.storeName || (config as any).name || tenant.name;
+        const metaTitle = (config as any).metaTitle || `${storeName} — Order Online | Barmagly Delivery`;
+        const metaDesc = (config as any).metaDescription || `Order food online from ${storeName}. Fast delivery to your door.`;
+        const coverImage = (config as any).coverImage || (config as any).headerBgImage || "";
+        const seoMeta = `
+    <meta property="og:title" content="${metaTitle.replace(/"/g, '&quot;')}" />
+    <meta property="og:description" content="${metaDesc.replace(/"/g, '&quot;')}" />
+    <meta property="og:type" content="restaurant.restaurant" />
+    ${coverImage ? `<meta property="og:image" content="${coverImage.replace(/"/g, '&quot;')}" />` : ""}
+    <meta name="twitter:card" content="summary_large_image" />`;
+        html = html.replace("</head>", `${seoMeta}\n  </head>`);
+
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         return res.status(200).send(html);
       } catch (err) {

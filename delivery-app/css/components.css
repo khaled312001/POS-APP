@@ -1664,3 +1664,215 @@
 }
 .step.active .step__label,
 .step.done .step__label { color: var(--delivery-text); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NEW REUSABLE COMPONENTS — Phase 1D
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Rating Stars ──────────────────────────────────────────────────────── */
+.rating-stars {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+.rating-stars [data-lucide] {
+  width: 16px; height: 16px;
+  color: var(--delivery-text-muted);
+}
+.rating-stars .filled [data-lucide],
+.rating-stars [data-lucide].filled {
+  color: #F59E0B;
+  fill: #F59E0B;
+}
+
+/* ── Status Timeline (vertical) ────────────────────────────────────────── */
+.status-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+}
+.status-timeline__item {
+  display: flex;
+  gap: var(--space-md);
+  padding-bottom: var(--space-lg);
+  position: relative;
+}
+.status-timeline__item:last-child { padding-bottom: 0; }
+.status-timeline__item::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 13px;
+  top: 28px;
+  width: 2px;
+  height: calc(100% - 14px);
+  background: var(--delivery-border);
+}
+.status-timeline__item:last-child::before { display: none; }
+.status-timeline__item.done::before { background: var(--delivery-success); }
+.status-timeline__item.active::before { background: var(--delivery-primary); }
+.status-timeline__dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--delivery-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700;
+  flex-shrink: 0;
+  color: var(--delivery-text-muted);
+  z-index: 1;
+  transition: all 0.3s;
+}
+.status-timeline__item.done .status-timeline__dot {
+  background: var(--delivery-success); color: #fff;
+}
+.status-timeline__item.active .status-timeline__dot {
+  background: var(--delivery-primary); color: #fff;
+  box-shadow: 0 0 0 4px var(--delivery-primary-light);
+}
+.status-timeline__content { flex: 1; padding-top: 4px; }
+.status-timeline__label { font-size: 0.9375rem; font-weight: 600; }
+.status-timeline__time { font-size: 0.8rem; color: var(--delivery-text-muted); margin-top: 2px; }
+
+/* ── Price Tag ─────────────────────────────────────────────────────────── */
+.price-tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.price-tag__currency {
+  font-size: 0.75em;
+  font-weight: 600;
+  opacity: 0.7;
+}
+.price-tag--old {
+  text-decoration: line-through;
+  color: var(--delivery-text-muted);
+  font-weight: 500;
+}
+.price-tag--sale { color: var(--delivery-danger); }
+
+/* ── Avatar ────────────────────────────────────────────────────────────── */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--delivery-primary-light);
+  color: var(--delivery-primary);
+  font-weight: 700;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar--xs { width: 24px; height: 24px; font-size: 0.625rem; }
+.avatar--sm { width: 32px; height: 32px; font-size: 0.75rem; }
+.avatar--md { width: 40px; height: 40px; font-size: 0.875rem; }
+.avatar--lg { width: 56px; height: 56px; font-size: 1.25rem; }
+.avatar--xl { width: 72px; height: 72px; font-size: 1.75rem; }
+
+/* ── Floating Action Button ────────────────────────────────────────────── */
+.fab {
+  position: fixed;
+  bottom: calc(var(--bottom-nav-height) + var(--space-md));
+  inset-inline-end: var(--space-md);
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--delivery-primary);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-lg), 0 0 0 0 var(--delivery-primary-light);
+  z-index: var(--z-sticky);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.fab:hover { transform: scale(1.05); }
+.fab:active { transform: scale(0.95); }
+.fab [data-lucide] { width: 24px; height: 24px; }
+@media (min-width: 768px) {
+  .fab { bottom: var(--space-xl); }
+}
+
+/* ── Snackbar / Toast with Undo ────────────────────────────────────────── */
+.snackbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--delivery-text);
+  color: var(--delivery-surface);
+  padding: 12px var(--space-md);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.snackbar__action {
+  color: var(--delivery-accent);
+  font-weight: 700;
+  background: none;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-inline-start: auto;
+}
+
+/* ── Empty State (improved) ────────────────────────────────────────────── */
+.empty-state [data-lucide] {
+  color: var(--delivery-text-muted);
+  opacity: 0.6;
+}
+
+/* ── Chip / Filter Pill ────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--delivery-card);
+  border: 1.5px solid var(--delivery-border);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--delivery-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+.chip:hover { border-color: var(--delivery-primary); color: var(--delivery-primary); }
+.chip.active {
+  background: var(--delivery-primary-light);
+  border-color: var(--delivery-primary);
+  color: var(--delivery-primary);
+}
+.chip [data-lucide] { width: 14px; height: 14px; }
+
+/* ── Info Row (icon + label + value) ───────────────────────────────────── */
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+}
+.info-row__icon {
+  width: 36px; height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.info-row__label { flex: 1; font-size: 0.9rem; }
+.info-row__value { font-weight: 600; font-size: 0.9rem; }
+
+/* ── Notification Dot ──────────────────────────────────────────────────── */
+.notification-dot {
+  position: absolute;
+  top: -2px;
+  inset-inline-end: -2px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--delivery-danger);
+  border: 2px solid var(--delivery-surface);
+}

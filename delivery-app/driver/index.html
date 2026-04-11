@@ -14,163 +14,7 @@
   <link rel="stylesheet" href="/api/delivery-app/css/components.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-  <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; background: var(--delivery-bg); font-family: var(--font-body); }
-    #app { display: flex; flex-direction: column; min-height: 100dvh; max-width: 600px; margin: 0 auto; }
-
-    /* ── Offline banner ── */
-    #offline-banner {
-      background: #EF4444; color: #fff;
-      text-align: center; font-size: 0.8rem; font-weight: 600;
-      padding: 6px; display: none; position: sticky; top: 0; z-index: 200;
-    }
-
-    /* ── Login ── */
-    #login-screen {
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; min-height: 100dvh; padding: 24px; gap: 0;
-    }
-    .login-logo { font-size: 4rem; margin-bottom: 12px; }
-    .login-title { font-size: 1.6rem; font-weight: 800; margin: 0 0 6px; text-align: center; }
-    .login-sub { color: var(--delivery-text-muted); font-size: 0.9rem; text-align: center; margin-bottom: 28px; max-width: 280px; }
-    .login-form { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 12px; }
-    .login-error {
-      color: var(--delivery-danger); background: rgba(239,68,68,0.1);
-      border-radius: var(--radius-md); padding: 10px 14px;
-      font-size: 0.875rem; display: none;
-    }
-
-    /* ── Top bar ── */
-    .driver-topbar {
-      background: var(--delivery-primary, #FF5722);
-      color: #fff; padding: 12px 16px;
-      display: flex; align-items: center; justify-content: space-between;
-      position: sticky; top: 0; z-index: 100;
-    }
-    .topbar-store { font-size: 0.8rem; opacity: 0.85; }
-    .topbar-name { font-size: 1rem; font-weight: 800; }
-    .topbar-right { display: flex; align-items: center; gap: 10px; }
-    .online-pill {
-      display: flex; align-items: center; gap: 6px;
-      padding: 6px 14px; border-radius: 999px;
-      background: rgba(255,255,255,0.2);
-      cursor: pointer; font-size: 0.8125rem; font-weight: 700;
-      border: 1.5px solid rgba(255,255,255,0.35);
-      color: #fff; transition: background 0.2s;
-    }
-    .online-pill.is-online { background: rgba(76,175,80,0.3); border-color: rgba(76,175,80,0.6); }
-    .online-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.5); }
-    .online-pill.is-online .online-dot { background: #4CAF50; box-shadow: 0 0 0 2px rgba(76,175,80,0.4); }
-
-    /* ── Tabs ── */
-    .driver-tabs {
-      display: flex; background: var(--delivery-surface);
-      border-bottom: 1px solid var(--delivery-border);
-      position: sticky; top: 56px; z-index: 99;
-    }
-    .driver-tab {
-      flex: 1; padding: 13px 6px; text-align: center;
-      font-weight: 600; font-size: 0.8125rem;
-      color: var(--delivery-text-muted);
-      border-bottom: 2px solid transparent;
-      cursor: pointer; transition: all 0.15s;
-      position: relative;
-    }
-    .driver-tab.active {
-      color: var(--delivery-primary, #FF5722);
-      border-bottom-color: var(--delivery-primary, #FF5722);
-    }
-    .tab-badge {
-      position: absolute; top: 8px; right: 50%;
-      transform: translateX(calc(50% + 6px));
-      background: #EF4444; color: #fff; border-radius: 999px;
-      font-size: 0.65rem; font-weight: 800; padding: 1px 5px;
-      min-width: 16px; text-align: center; display: none;
-    }
-
-    /* ── Orders tab ── */
-    #tab-orders { flex: 1; padding: 12px 0; overflow-y: auto; }
-    .order-card {
-      background: var(--delivery-surface);
-      border-radius: 16px; margin: 0 12px 12px;
-      padding: 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.08);
-      border-inline-start: 4px solid var(--delivery-primary, #FF5722);
-    }
-    .order-card.status-on_way { border-inline-start-color: #FF5722; }
-    .order-card.status-ready  { border-inline-start-color: #2FD3C6; }
-    .order-card.status-accepted { border-inline-start-color: #3B82F6; }
-    .order-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .order-card__id { font-weight: 800; font-size: 0.9375rem; }
-    .order-card__total { font-weight: 700; color: var(--delivery-primary, #FF5722); }
-    .order-card__address {
-      color: var(--delivery-text-muted); font-size: 0.875rem;
-      display: flex; gap: 6px; align-items: flex-start; margin-bottom: 10px;
-    }
-    .order-card__address-pin { flex-shrink: 0; }
-    .order-card__customer { display: flex; gap: 12px; margin-bottom: 12px; }
-    .order-card__phone-btn {
-      display: flex; align-items: center; gap: 6px;
-      padding: 7px 14px; border-radius: 999px;
-      background: rgba(76,175,80,0.12); color: var(--delivery-success);
-      font-size: 0.8125rem; font-weight: 700; text-decoration: none;
-      border: 1px solid rgba(76,175,80,0.25);
-    }
-    .order-card__actions { display: flex; gap: 8px; }
-    .action-btn {
-      flex: 1; padding: 10px; border-radius: 12px;
-      border: none; font-size: 0.875rem; font-weight: 700;
-      cursor: pointer; transition: opacity 0.15s;
-    }
-    .action-btn:active { opacity: 0.75; }
-    .action-btn--primary { background: var(--delivery-primary, #FF5722); color: #fff; }
-    .action-btn--success { background: var(--delivery-success); color: #fff; }
-    .action-btn--ghost { background: var(--delivery-border); color: var(--delivery-text); }
-
-    /* ── Map tab ── */
-    #tab-map { flex: 1; display: flex; flex-direction: column; }
-    #driver-map { flex: 1; min-height: 380px; }
-    .map-gps-info { padding: 12px 16px; font-size: 0.8125rem; color: var(--delivery-text-muted); text-align: center; }
-
-    /* ── Earnings tab ── */
-    #tab-earnings { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-    .stat-card {
-      background: var(--delivery-surface); border-radius: 16px;
-      padding: 20px; text-align: center;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
-    }
-    .stat-card__label { font-size: 0.875rem; color: var(--delivery-text-muted); margin-bottom: 8px; }
-    .stat-card__value { font-size: 2.2rem; font-weight: 800; }
-    .stat-card__value.green { color: var(--delivery-success); }
-    .stat-card__value.primary { color: var(--delivery-primary, #FF5722); }
-
-    /* ── New order alert ── */
-    #new-order-alert {
-      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-      background: var(--delivery-primary, #FF5722); color: #fff;
-      border-radius: 999px; padding: 14px 24px;
-      font-size: 1rem; font-weight: 700;
-      box-shadow: 0 4px 20px rgba(255,87,34,0.4);
-      z-index: 300; display: none; cursor: pointer;
-      animation: bounce-in 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
-    }
-    @keyframes bounce-in { from { transform: translateX(-50%) scale(0.5) translateY(40px); opacity:0; } to { transform: translateX(-50%) scale(1) translateY(0); opacity:1; } }
-
-    /* ── Loading overlay ── */
-    #auth-loader {
-      position: fixed; inset: 0; background: rgba(255,255,255,0.85);
-      display: none; align-items: center; justify-content: center; z-index: 400;
-    }
-    .spinner { width: 44px; height: 44px; border: 3px solid rgba(255,87,34,0.18); border-top-color: #FF5722; border-radius: 50%; animation: spin 0.8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Toast */
-    #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; width: min(320px,90vw); pointer-events: none; }
-    .toast { background: #1a1a2e; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 0.875rem; font-weight: 500; pointer-events: auto; animation: toast-in 0.25s ease; }
-    .toast.success { background: #4CAF50; }
-    .toast.error   { background: #EF4444; }
-    @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-  </style>
+  <link rel="stylesheet" href="/api/delivery-app/driver/driver.css" />
 </head>
 <body>
 <div id="app">
@@ -185,7 +29,7 @@
 
   <!-- ── Login Screen ─────────────────────────────────────────────────────── -->
   <div id="login-screen">
-    <div class="login-logo">🚗</div>
+    <div class="login-logo"><i data-lucide="car" class="icon-3xl"></i></div>
     <h1 class="login-title" id="login-title">Driver App</h1>
     <p class="login-sub" id="login-sub">Enter your driver access token to get started</p>
     <div class="login-form">
@@ -218,18 +62,18 @@
     <!-- Tabs -->
     <div class="driver-tabs">
       <div class="driver-tab active" onclick="driverApp.showTab('orders')" id="tab-btn-orders">
-        📦 Orders
+        <i data-lucide="package" class="icon-sm"></i> Orders
         <span class="tab-badge" id="orders-badge"></span>
       </div>
-      <div class="driver-tab" onclick="driverApp.showTab('map')" id="tab-btn-map">🗺 Map</div>
-      <div class="driver-tab" onclick="driverApp.showTab('earnings')" id="tab-btn-earnings">💰 Earnings</div>
+      <div class="driver-tab" onclick="driverApp.showTab('map')" id="tab-btn-map"><i data-lucide="map" class="icon-sm"></i> Map</div>
+      <div class="driver-tab" onclick="driverApp.showTab('earnings')" id="tab-btn-earnings"><i data-lucide="coins" class="icon-sm"></i> Earnings</div>
     </div>
 
     <!-- Orders tab -->
     <div id="tab-orders" style="flex:1;overflow-y:auto;padding:12px 0">
       <div id="orders-list">
         <div class="empty-state" style="padding:40px 24px">
-          <div class="empty-state__icon">📭</div>
+          <div class="empty-state__icon"><i data-lucide="inbox" class="icon-2xl"></i></div>
           <h2 class="empty-state__title" id="no-orders-title">No orders assigned</h2>
           <p class="empty-state__text" id="no-orders-sub">Go online to receive delivery assignments</p>
         </div>
@@ -239,7 +83,7 @@
     <!-- Map tab -->
     <div id="tab-map" class="hidden" style="flex:1;display:flex;flex-direction:column">
       <div id="driver-map" style="flex:1;min-height:380px"></div>
-      <div class="map-gps-info" id="gps-info">🛰 GPS updates every 15 seconds</div>
+      <div class="map-gps-info" id="gps-info"><i data-lucide="satellite" class="icon-sm"></i> GPS updates every 15 seconds</div>
     </div>
 
     <!-- Earnings tab -->
@@ -254,19 +98,20 @@
       </div>
       <div class="stat-card">
         <div class="stat-card__label" id="rating-label">Average Rating</div>
-        <div class="stat-card__value" id="driver-rating-val" style="color:#FFC107">⭐ —</div>
+        <div class="stat-card__value" id="driver-rating-val" style="color:#FFC107"><i data-lucide="star" class="icon-sm"></i> —</div>
       </div>
     </div>
   </div>
 
   <!-- New order floating alert -->
   <div id="new-order-alert" onclick="driverApp.showTab('orders'); this.style.display='none'">
-    🔔 New order assigned!
+    <i data-lucide="bell-ring" class="icon-sm"></i> New order assigned!
   </div>
 </div>
 
 <div id="toast-container"></div>
 
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // ── Config ──────────────────────────────────────────────────────────────────
@@ -370,6 +215,7 @@ const driverApp = {
 
     driverApp.loadOrders();
     driverApp.initMap();
+    if (window.lucide) lucide.createIcons();
 
     // Refresh orders every 30s
     setInterval(() => {
@@ -388,7 +234,7 @@ const driverApp = {
     if (driverApp.isOnline) {
       driverApp.startGps();
       await driverApp.loadOrders();
-      showToast("You're now online 🟢", "success");
+      showToast("You're now online", "success");
     } else {
       driverApp.stopGps();
       showToast("You're now offline");
@@ -439,7 +285,7 @@ const driverApp = {
           document.getElementById("today-count").textContent  = today.count || 0;
           const fees = parseFloat(today.totalFees || 0).toFixed(2);
           document.getElementById("week-earnings").textContent = `${_currency} ${fees}`;
-          if (today.rating) document.getElementById("driver-rating-val").textContent = `⭐ ${parseFloat(today.rating).toFixed(1)}`;
+          if (today.rating) document.getElementById("driver-rating-val").innerHTML = `<i data-lucide="star" class="icon-sm"></i> ${parseFloat(today.rating).toFixed(1)}`;
         }
       }
     } catch (_) {}
@@ -469,10 +315,11 @@ const driverApp = {
     if (driverApp.activeOrders.length === 0) {
       list.innerHTML = `
         <div class="empty-state" style="padding:40px 24px">
-          <div class="empty-state__icon">📭</div>
+          <div class="empty-state__icon"><i data-lucide="inbox" class="icon-2xl"></i></div>
           <h2 class="empty-state__title">${driverApp.isOnline ? "No orders yet" : "You're offline"}</h2>
           <p class="empty-state__text">${driverApp.isOnline ? "New assignments will appear here" : "Go online to receive deliveries"}</p>
         </div>`;
+      if (window.lucide) lucide.createIcons();
       return;
     }
 
@@ -489,20 +336,21 @@ const driverApp = {
             <span class="order-card__total">${totalFmt}</span>
           </div>
           <div class="order-card__address">
-            <span class="order-card__address-pin">📍</span>
+            <span class="order-card__address-pin"><i data-lucide="map-pin" class="icon-sm"></i></span>
             <span>${o.customerAddress || "No address provided"}</span>
           </div>
-          ${o.customerName ? `<div style="font-size:0.8rem;color:var(--delivery-text-muted);margin-bottom:8px">👤 ${o.customerName}</div>` : ""}
+          ${o.customerName ? `<div style="font-size:0.8rem;color:var(--delivery-text-muted);margin-bottom:8px"><i data-lucide="user" class="icon-xs"></i> ${o.customerName}</div>` : ""}
           <div class="order-card__customer">
-            ${o.customerPhone ? `<a href="tel:${o.customerPhone}" class="order-card__phone-btn">📞 ${o.customerPhone}</a>` : ""}
+            ${o.customerPhone ? `<a href="tel:${o.customerPhone}" class="order-card__phone-btn"><i data-lucide="phone" class="icon-xs"></i> ${o.customerPhone}</a>` : ""}
           </div>
           <div class="order-card__actions">
-            ${canPickUp  ? `<button class="action-btn action-btn--primary" onclick="driverApp.updateStatus(${o.id}, 'picked_up')">✅ Picked Up</button>` : ""}
-            ${canDeliver ? `<button class="action-btn action-btn--success" onclick="driverApp.updateStatus(${o.id}, 'delivered')">🎉 Delivered</button>` : ""}
-            ${hasCoords  ? `<button class="action-btn action-btn--ghost" onclick="driverApp.panToCustomer(${o.customerLat},${o.customerLng})">🗺 Navigate</button>` : ""}
+            ${canPickUp  ? `<button class="action-btn action-btn--primary" onclick="driverApp.updateStatus(${o.id}, 'picked_up')"><i data-lucide="check-circle" class="icon-sm"></i> Picked Up</button>` : ""}
+            ${canDeliver ? `<button class="action-btn action-btn--success" onclick="driverApp.updateStatus(${o.id}, 'delivered')"><i data-lucide="party-popper" class="icon-sm"></i> Delivered</button>` : ""}
+            ${hasCoords  ? `<button class="action-btn action-btn--ghost" onclick="driverApp.panToCustomer(${o.customerLat},${o.customerLng})"><i data-lucide="navigation" class="icon-sm"></i> Navigate</button>` : ""}
           </div>
         </div>`;
     }).join("");
+    if (window.lucide) lucide.createIcons();
   },
 
   panToCustomer(lat, lng) {
@@ -524,7 +372,7 @@ const driverApp = {
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data.error || `Failed to update (${resp.status})`);
       vibrate(newStatus === "delivered" ? [100,50,100,50,300] : [100]);
-      showToast(newStatus === "delivered" ? "🎉 Order delivered!" : "✅ Picked up!", "success");
+      showToast(newStatus === "delivered" ? "Order delivered!" : "Picked up!", "success");
       await driverApp.loadOrders();
     } catch (err) {
       showToast(`Error: ${err.message}`, "error");
@@ -578,7 +426,7 @@ const driverApp = {
         driverApp.selfMarker.setLatLng([lat, lng]);
       } else {
         driverApp.selfMarker = L.marker([lat, lng], {
-          icon: L.divIcon({ html: "🚗", className: "", iconSize: [28, 28] }),
+          icon: L.divIcon({ html: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF5722" stroke-width="2"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>', className: "", iconSize: [28, 28] }),
         }).addTo(driverApp.map);
         driverApp.map.setView([lat, lng], 15);
       }
@@ -587,7 +435,7 @@ const driverApp = {
     // GPS info
     const gpsInfo = document.getElementById("gps-info");
     if (gpsInfo && accuracy) {
-      gpsInfo.textContent = `🛰 GPS active · ±${Math.round(accuracy)}m accuracy`;
+      gpsInfo.textContent = `GPS active · ±${Math.round(accuracy)}m accuracy`;
     }
 
     // Send to server
@@ -633,6 +481,8 @@ if (driverApp.token) {
   const input = document.getElementById("token-input");
   if (input) input.value = driverApp.token;
   driverApp.login();
+} else {
+  if (window.lucide) lucide.createIcons();
 }
 </script>
 </body>

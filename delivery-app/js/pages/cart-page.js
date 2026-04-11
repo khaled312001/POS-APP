@@ -27,53 +27,53 @@ pages.cart = {
   <div class="cart-layout">
     <div class="cart-main">
       <div class="card">
-        <div style="padding:var(--space-md);border-bottom:1px solid var(--delivery-border);display:flex;justify-content:space-between;align-items:center">
-          <span style="font-weight:700">${rtl ? "العناصر" : "Items"}</span>
+        <div class="cart-items-header">
+          <span class="cart-items-title">${rtl ? "العناصر" : "Items"}</span>
           <span id="cart-item-count" class="text-sm text-muted"></span>
         </div>
         <div class="card-body" id="cart-items-list"></div>
       </div>
       <div class="card" id="min-order-card" style="display:none">
         <div class="card-body">
-          <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="cart-min-order-row">
             <span id="min-order-label" class="text-sm"></span>
             <span id="min-order-pct" class="text-sm font-bold text-primary"></span>
           </div>
-          <div class="min-order-bar" style="margin-top:var(--space-sm)">
+          <div class="min-order-bar cart-min-order-bar">
             <div class="min-order-bar__fill" id="min-order-fill" style="width:0%"></div>
           </div>
         </div>
       </div>
       <div class="card">
-        <div style="padding:var(--space-md)">
+        <div class="cart-notes-wrap">
           <label class="form-label" for="order-notes">${rtl ? "ملاحظات الطلب" : "Order notes (optional)"}</label>
-          <textarea id="order-notes" class="item-notes-area" style="margin-top:6px"
+          <textarea id="order-notes" class="item-notes-area cart-notes-textarea"
             placeholder="${rtl ? "مثال: بدون بصل..." : "e.g. No onions, extra sauce…"}" rows="2"></textarea>
         </div>
       </div>
       <div class="upsell-section" id="upsell-section" style="display:none">
-        <div class="upsell-header">${rtl ? "🍟 يضاف معها عادةً" : "🍟 People also order"}</div>
+        <div class="upsell-header"><i data-lucide="plus-circle" class="icon-sm"></i> ${rtl ? "يضاف معها عادةً" : "People also order"}</div>
         <div class="upsell-scroll" id="upsell-items"></div>
       </div>
     </div>
     <div class="cart-aside">
       <div class="card">
-        <div style="padding:var(--space-md)">
-          <div class="form-label" style="margin-bottom:8px">🎟️ ${rtl ? "كود الخصم" : "Promo code"}</div>
-          <div id="applied-promo" class="hidden" style="background:var(--delivery-success-light);border:1px solid var(--delivery-success);border-radius:var(--radius-md);padding:10px var(--space-md);display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <span style="color:var(--delivery-success);font-weight:700" id="applied-promo-text"></span>
-            <button onclick="pages.cart._removePromo()" style="color:var(--delivery-danger)">✕</button>
+        <div class="cart-promo-wrap">
+          <div class="form-label cart-promo-label"><i data-lucide="ticket" class="icon-sm"></i> ${rtl ? "كود الخصم" : "Promo code"}</div>
+          <div id="applied-promo" class="hidden cart-applied-promo">
+            <span class="cart-applied-promo__text" id="applied-promo-text"></span>
+            <button onclick="pages.cart._removePromo()" class="cart-promo-remove">✕</button>
           </div>
           <div class="promo-row" id="promo-input-row">
-            <input class="form-input" id="promo-code-input" placeholder="${rtl ? "أدخل الكود" : "Enter code"}" style="text-transform:uppercase;letter-spacing:0.06em;font-weight:600" />
+            <input class="form-input cart-promo-input" id="promo-code-input" placeholder="${rtl ? "أدخل الكود" : "Enter code"}" />
             <button class="btn btn-outline btn-sm" id="promo-apply-btn" onclick="pages.cart._applyPromo()">${rtl ? "تطبيق" : "Apply"}</button>
           </div>
-          <div id="promo-error" class="form-error hidden" style="margin-top:6px"></div>
+          <div id="promo-error" class="form-error hidden cart-promo-error"></div>
         </div>
       </div>
       <div class="card">
-        <div style="padding:var(--space-md)">
-          <h3 style="font-size:1rem;margin-bottom:var(--space-md)">${rtl ? "ملخص الطلب" : "Order summary"}</h3>
+        <div class="cart-summary-wrap">
+          <h3 class="cart-summary-title">${rtl ? "ملخص الطلب" : "Order summary"}</h3>
           <div id="summary-rows"></div>
         </div>
       </div>
@@ -110,7 +110,7 @@ pages.cart = {
 
     if (state.items.length === 0) {
       listEl.innerHTML = `<div class="empty-state">
-        <div class="empty-state__icon">🛒</div>
+        <div class="empty-state__icon"><i data-lucide="shopping-cart" class="icon-2xl"></i></div>
         <div class="empty-state__title">${rtl ? "السلة فارغة" : "Cart is empty"}</div>
         <div class="empty-state__text">${rtl ? "اختر عناصر من القائمة" : "Add items from the menu"}</div>
         <button class="btn btn-primary mt-md" onclick="router.navigate('menu')">${rtl ? "تصفح القائمة" : "Browse menu"}</button>
@@ -127,7 +127,7 @@ pages.cart = {
     listEl.innerHTML = state.items.map(item => {
       const img = item.image
         ? `<img class="cart-item__image" src="${fixImageUrl(item.image)}" alt="${item.name}" loading="lazy" onerror="this.style.display='none'" />`
-        : `<div class="cart-item__image-placeholder">🍽️</div>`;
+        : `<div class="cart-item__image-placeholder"><i data-lucide="utensils" class="icon-lg"></i></div>`;
       const safeKey = item._key.replace(/'/g, "\\'").replace(/"/g, '\\"');
       const rerender = `pages.cart._renderItems(window.DELIVERY_CONFIG, isRtl()); pages.cart._renderSummary(window.DELIVERY_CONFIG, isRtl()); refreshCartDrawer()`;
       return `<div class="cart-item">
@@ -160,7 +160,7 @@ pages.cart = {
     itemsEl.innerHTML = upsell.map(p => {
       const img = p.imageUrl
         ? `<img class="upsell-item__image" src="${fixImageUrl(p.imageUrl)}" alt="${p.name}" loading="lazy" />`
-        : `<div class="upsell-item__image">🍽️</div>`;
+        : `<div class="upsell-item__image"><i data-lucide="utensils" class="icon-lg"></i></div>`;
       return `<div class="upsell-item" onclick="cart.addItem(${JSON.stringify({id:p.id,name:p.name,price:p.price,imageUrl:p.imageUrl||""}).replace(/"/g,'&quot;')},1); pages.cart._renderItems(window.DELIVERY_CONFIG,isRtl()); showToast('Added','success'); refreshCartDrawer()">
         ${img}
         <div class="upsell-item__body">
@@ -183,8 +183,8 @@ pages.cart = {
         <div class="summary-row"><span class="label">${rtl ? "المجموع الجزئي" : "Subtotal"}</span><strong>${formatCurrency(subtotal, cfg.currency)}</strong></div>
         ${deliveryFee > 0
           ? `<div class="summary-row"><span class="label">${rtl ? "التوصيل" : "Delivery"}</span><strong>${formatCurrency(deliveryFee, cfg.currency)}</strong></div>`
-          : `<div class="summary-row"><span class="label">${rtl ? "التوصيل" : "Delivery"}</span><strong style="color:var(--delivery-success)">${rtl ? "مجاني" : "Free"}</strong></div>`}
-        ${discount > 0 ? `<div class="summary-row discount"><span class="label">🎟️ ${rtl ? "خصم" : "Discount"}</span><strong>−${formatCurrency(discount, cfg.currency)}</strong></div>` : ""}
+          : `<div class="summary-row"><span class="label">${rtl ? "التوصيل" : "Delivery"}</span><strong class="cart-free-delivery">${rtl ? "مجاني" : "Free"}</strong></div>`}
+        ${discount > 0 ? `<div class="summary-row discount"><span class="label"><i data-lucide="ticket" class="icon-xs"></i> ${rtl ? "خصم" : "Discount"}</span><strong>−${formatCurrency(discount, cfg.currency)}</strong></div>` : ""}
         <div class="summary-row total"><span>${rtl ? "الإجمالي" : "Total"}</span><strong>${formatCurrency(total, cfg.currency)}</strong></div>`;
     }
     const mobileTotal = document.getElementById("checkout-total-mobile");
@@ -231,7 +231,7 @@ pages.cart = {
         inputRow.classList.add("hidden");
       }
       pages.cart._renderSummary(cfg, isRtl());
-      showToast(isRtl() ? "تم تطبيق الخصم 🎉" : "Promo applied! 🎉", "success");
+      showToast(isRtl() ? "تم تطبيق الخصم" : "Promo applied!", "success");
     } catch (err) {
       if (errEl) { errEl.textContent = err.message || (isRtl() ? "كود غير صالح" : "Invalid code"); errEl.classList.remove("hidden"); }
     } finally {
