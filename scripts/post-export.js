@@ -320,6 +320,66 @@ if (fs.existsSync(landingTemplatePath)) {
   console.warn("[post-export] WARNING: landing-page.html template not found, root will be empty");
 }
 
+// ── 6b. Delivery Platform (static HTML/CSS/JS at dist/delivery-app/) ─────────
+// Served via vercel.json rewrites for /restaurants, /order/:slug, /track/:token,
+// /driver/:token. __DELIVERY_CONFIG__ placeholder is replaced with a client-side
+// IIFE that reads slug from URL and lets JS fetch full config from /api/delivery/*.
+const deliverySrcDir = path.resolve(__dirname, "../delivery-app");
+const deliveryDestDir = path.join(distDir, "delivery-app");
+
+const DELIVERY_CONFIG_IIFE = `(function(){
+  var m = location.pathname.match(/\\/(?:api\\/)?order\\/([^/?#]+)/);
+  var slug = m ? decodeURIComponent(m[1]) : null;
+  var tm = location.pathname.match(/\\/(?:api\\/)?track\\/([^/?#]+)/);
+  var trackingToken = tm ? decodeURIComponent(tm[1]) : null;
+  var dm = location.pathname.match(/\\/(?:api\\/)?driver\\/([^/?#]+)/);
+  var driverToken = dm ? decodeURIComponent(dm[1]) : null;
+  var qs = new URLSearchParams(location.search);
+  return {
+    slug: slug,
+    trackingToken: trackingToken,
+    driverToken: driverToken,
+    storeName: "Barmagly",
+    currency: "CHF",
+    language: qs.get("lang") || "en",
+    primaryColor: "#FF5722",
+    accentColor: "#2FD3C6",
+    tenantId: null,
+    basePath: "",
+    stripePublishableKey: ""
+  };
+})()`;
+
+function filterSkip(name) {
+  // Skip Windows Office lock files and stale temp files
+  return name.startsWith("~$") || /\.tmp\.[0-9]+\.[0-9]+/.test(name);
+}
+
+function copyDeliveryTree(srcDir, destDir) {
+  if (!fs.existsSync(srcDir)) return;
+  fs.mkdirSync(destDir, { recursive: true });
+  for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    if (filterSkip(entry.name)) continue;
+    const src = path.join(srcDir, entry.name);
+    const dest = path.join(destDir, entry.name);
+    if (entry.isDirectory()) {
+      copyDeliveryTree(src, dest);
+    } else if (entry.isFile()) {
+      if (entry.name.endsWith(".html")) {
+        // Substitute the server-side config placeholder with a client-side IIFE
+        const raw = fs.readFileSync(src, "utf-8");
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.writeFileSync(dest, raw.replace(/__DELIVERY_CONFIG__/g, DELIVERY_CONFIG_IIFE), "utf-8");
+      } else {
+        copyFile(src, dest);
+      }
+    }
+  }
+}
+
+copyDeliveryTree(deliverySrcDir, deliveryDestDir);
+console.log("[post-export] Copied delivery-app/ → dist/delivery-app/");
+
 // ── 7. Super Admin pages ──────────────────────────────────────────────────────
 fs.mkdirSync(superAdminDir, { recursive: true });
 fs.mkdirSync(superAdminLoginDir, { recursive: true });

@@ -17,6 +17,27 @@
     { "source": "/app/(.*)",         "destination": "/app/index.html" },
     { "source": "/super_admin",      "destination": "/super_admin/index.html" },
     { "source": "/super_admin/(.*)", "destination": "/super_admin/index.html" },
-    { "source": "/store/(.*)",       "destination": "/api/store/$1" }
+    { "source": "/store/(.*)",       "destination": "/api/store/$1" },
+
+    { "source": "/restaurants",          "destination": "/delivery-app/restaurants.html" },
+    { "source": "/restaurants/",         "destination": "/delivery-app/restaurants.html" },
+    { "source": "/order",                "destination": "/delivery-app/landing.html" },
+    { "source": "/order/",               "destination": "/delivery-app/landing.html" },
+    { "source": "/order/:slug",          "destination": "/delivery-app/index.html" },
+    { "source": "/order/:slug/(.*)",     "destination": "/delivery-app/index.html" },
+    { "source": "/track",                "destination": "/delivery-app/track/index.html" },
+    { "source": "/track/",               "destination": "/delivery-app/track/index.html" },
+    { "source": "/track/:token",         "destination": "/delivery-app/track/index.html" },
+    { "source": "/driver",               "destination": "/delivery-app/driver/index.html" },
+    { "source": "/driver/",              "destination": "/delivery-app/driver/index.html" },
+    { "source": "/driver/:token",        "destination": "/delivery-app/driver/index.html" },
+
+    { "source": "/api/delivery-app/(.*)", "destination": "/delivery-app/$1" },
+    { "source": "/api/restaurants",       "destination": "/delivery-app/restaurants.html" },
+    { "source": "/api/order",             "destination": "/delivery-app/landing.html" },
+    { "source": "/api/order/:slug",       "destination": "/delivery-app/index.html" },
+    { "source": "/api/order/:slug/(.*)",  "destination": "/delivery-app/index.html" },
+    { "source": "/api/track/:token",      "destination": "/delivery-app/track/index.html" },
+    { "source": "/api/driver/:token",     "destination": "/delivery-app/driver/index.html" }
   ]
 }
