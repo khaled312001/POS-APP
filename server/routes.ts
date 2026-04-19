@@ -2904,15 +2904,8 @@ async function test(){
   });
 
   // ── Tenant Backup & Restore (accessible from mobile app via license-key auth) ─
-  // On Vercel the deployment filesystem is read-only; only /tmp is writable.
-  const TENANT_BACKUP_DIR = process.env.VERCEL
-    ? path.join("/tmp", "backups")
-    : path.resolve(process.cwd(), "backups");
-  try {
-    if (!fs.existsSync(TENANT_BACKUP_DIR)) fs.mkdirSync(TENANT_BACKUP_DIR, { recursive: true });
-  } catch (err) {
-    console.warn("[routes] Could not create TENANT_BACKUP_DIR:", (err as Error).message);
-  }
+  const TENANT_BACKUP_DIR = path.resolve(process.cwd(), "backups");
+  if (!fs.existsSync(TENANT_BACKUP_DIR)) fs.mkdirSync(TENANT_BACKUP_DIR, { recursive: true });
 
   // List backups for this tenant
   app.get("/api/backup/list", async (req: any, res) => {

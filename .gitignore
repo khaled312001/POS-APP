@@ -41,8 +41,6 @@ yarn-error.*
 # WhatsApp session data
 .wppconnect/
 
-.vercel
-
 # Stale build artifacts & Word/Excel lock files
 *.tmp.*
 ~$*
