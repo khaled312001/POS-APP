@@ -29,11 +29,13 @@ const PUBLIC_ROUTES = [
   "/api/push/subscribe", // Public — SW registers subscription before full auth
   "/api/maintenance/fix-tenant-ids", // One-time migration fix (secured by secret header)
   // ── Delivery Platform Public Routes ──
+  "/api/dine-in/validate/",         // Public QR token validation for dine-in
   "/api/delivery/auth/",           // Customer OTP login/register
   "/api/delivery/store/",          // Menu & store config browsing
   "/api/delivery/restaurants",     // Multi-restaurant discovery listing
   "/api/delivery/orders/track/",   // Public order tracking by token
   "/api/delivery/orders/public",   // Public order placement
+  "/api/delivery/orders",          // Order creation (customer-facing)
   "/api/delivery/promo/validate",  // Promo code validation
   "/api/delivery/zones",           // Delivery zones for checkout map
   "/api/delivery/referral/",       // Referral code lookup
@@ -41,10 +43,13 @@ const PUBLIC_ROUTES = [
   "/api/delivery/search",          // Public product search
   "/api/delivery/help/faq",        // Public FAQ listing
   "/api/delivery/sitemap.xml",     // Dynamic sitemap XML
+  "/api/delivery/recommendations", // Public recommendations
+  "/api/robots.txt",               // SEO robots.txt
   // ── HTML pages served under /api/ prefix (Hostinger CDN compatibility) ──
   "/api/order",                    // Delivery listing (no-slug) + /api/order/
   "/api/track/",                   // Public tracking page HTML
-  "/api/driver/",                  // Driver PWA HTML
+  "/api/driver",                   // Driver PWA HTML (exact)
+  "/api/driver/",                  // Driver PWA HTML (with slash/slug)
   "/api/restaurants",              // Restaurant listing HTML
   "/api/delivery-app/",            // Static assets (CSS, JS, images)
   // ── Static files under /api/ prefix (CDN compatibility) ──

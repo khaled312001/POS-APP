@@ -499,6 +499,18 @@ p { color: var(--delivery-text-secondary); line-height: 1.6; }
   }
 }
 
+/* ── Offline banner ─────────────────────────────────────────────────────── */
+.offline-banner {
+  position: fixed; top: 0; left: 0; right: 0;
+  background: var(--delivery-danger); color: #fff;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.875rem; font-weight: 600;
+  text-align: center; z-index: var(--z-toast);
+  display: flex; align-items: center; justify-content: center; gap: var(--space-sm);
+  transform: translateY(0); transition: transform var(--transition-normal);
+}
+.offline-banner.hidden { transform: translateY(-100%); pointer-events: none; }
+
 /* ── Responsive helpers ──────────────────────────────────────────────────── */
 .desktop-only { display: none; }
 .mobile-only  { display: block; }

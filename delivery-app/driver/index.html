@@ -17,10 +17,10 @@
   <link rel="stylesheet" href="/api/delivery-app/driver/driver.css" />
 </head>
 <body>
-<div id="app">
+<div id="app" role="application">
 
   <!-- Offline banner -->
-  <div id="offline-banner">No internet connection — reconnecting...</div>
+  <div id="offline-banner" role="alert">No internet connection — reconnecting...</div>
 
   <!-- Auth loader -->
   <div id="auth-loader" style="display:none;position:fixed;inset:0;background:rgba(255,255,255,0.85);align-items:center;justify-content:center;z-index:400">
@@ -44,9 +44,9 @@
   </div>
 
   <!-- ── Driver Screen ─────────────────────────────────────────────────────── -->
-  <div id="driver-screen" class="hidden" style="display:flex;flex-direction:column;flex:1">
+  <main id="driver-screen" class="hidden" style="display:flex;flex-direction:column;flex:1">
     <!-- Top bar -->
-    <div class="driver-topbar" id="driver-topbar">
+    <header class="driver-topbar" id="driver-topbar">
       <div>
         <div class="topbar-store" id="topbar-store"></div>
         <div class="topbar-name" id="topbar-name">Driver</div>
@@ -57,17 +57,17 @@
           <span id="online-label">Offline</span>
         </div>
       </div>
-    </div>
+    </header>
 
     <!-- Tabs -->
-    <div class="driver-tabs">
+    <nav class="driver-tabs" role="tablist">
       <div class="driver-tab active" onclick="driverApp.showTab('orders')" id="tab-btn-orders">
         <i data-lucide="package" class="icon-sm"></i> Orders
         <span class="tab-badge" id="orders-badge"></span>
       </div>
       <div class="driver-tab" onclick="driverApp.showTab('map')" id="tab-btn-map"><i data-lucide="map" class="icon-sm"></i> Map</div>
       <div class="driver-tab" onclick="driverApp.showTab('earnings')" id="tab-btn-earnings"><i data-lucide="coins" class="icon-sm"></i> Earnings</div>
-    </div>
+    </nav>
 
     <!-- Orders tab -->
     <div id="tab-orders" style="flex:1;overflow-y:auto;padding:12px 0">
@@ -101,7 +101,7 @@
         <div class="stat-card__value" id="driver-rating-val" style="color:#FFC107"><i data-lucide="star" class="icon-sm"></i> —</div>
       </div>
     </div>
-  </div>
+  </main>
 
   <!-- New order floating alert -->
   <div id="new-order-alert" onclick="driverApp.showTab('orders'); this.style.display='none'">
@@ -116,7 +116,7 @@
 <script>
 // ── Config ──────────────────────────────────────────────────────────────────
 const PATH_TOKEN = location.pathname.split("/driver/")[1]?.replace(/\/$/, "");
-let _currency = "EGP";
+let _currency = "CHF";
 
 // ── Offline detection ────────────────────────────────────────────────────────
 const offlineBanner = document.getElementById("offline-banner");
@@ -347,6 +347,8 @@ const driverApp = {
             ${canPickUp  ? `<button class="action-btn action-btn--primary" onclick="driverApp.updateStatus(${o.id}, 'picked_up')"><i data-lucide="check-circle" class="icon-sm"></i> Picked Up</button>` : ""}
             ${canDeliver ? `<button class="action-btn action-btn--success" onclick="driverApp.updateStatus(${o.id}, 'delivered')"><i data-lucide="party-popper" class="icon-sm"></i> Delivered</button>` : ""}
             ${hasCoords  ? `<button class="action-btn action-btn--ghost" onclick="driverApp.panToCustomer(${o.customerLat},${o.customerLng})"><i data-lucide="navigation" class="icon-sm"></i> Navigate</button>` : ""}
+            ${hasCoords  ? `<a class="action-btn action-btn--ghost" href="https://www.google.com/maps/dir/?api=1&destination=${o.customerLat},${o.customerLng}" target="_blank" rel="noopener"><i data-lucide="map" class="icon-sm"></i> Open Maps</a>` : ""}
+            ${canDeliver ? `<label class="action-btn action-btn--ghost"><i data-lucide="camera" class="icon-sm"></i> Photo Proof<input type="file" accept="image/*" capture="environment" style="display:none" onchange="driverApp.uploadProofPhoto(${o.id}, this.files[0])"></label>` : ""}
           </div>
         </div>`;
     }).join("");
@@ -459,6 +461,25 @@ const driverApp = {
     });
     if (tab === "map" && driverApp.map) {
       setTimeout(() => driverApp.map.invalidateSize(), 120);
+    }
+  },
+
+  async uploadProofPhoto(orderId, file) {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("photo", file);
+    formData.append("orderId", orderId);
+    try {
+      showToast("Uploading photo...");
+      const resp = await fetch(`/api/delivery/driver/orders/${orderId}/photo`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${driverApp.token}` },
+        body: formData,
+      });
+      if (!resp.ok) throw new Error("Upload failed");
+      showToast("Delivery photo uploaded!", "success");
+    } catch (err) {
+      showToast(`Photo upload failed: ${err.message}`, "error");
     }
   },
 

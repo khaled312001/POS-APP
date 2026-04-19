@@ -20,13 +20,22 @@ pages.checkout = {
     const rtl = isRtl();
     const state = cart.getState();
 
+    // Require login for delivery/pickup, but allow guest for dine-in
+    const isDineInCheck = state.orderType === "dine_in";
+    if (!isDineInCheck && !auth.isLoggedIn()) {
+      showToast(rtl ? "يجب تسجيل الدخول أولاً لإتمام الطلب" : "Please login first to place an order", "warning");
+      router.navigate("login");
+      return;
+    }
+
     if (state.items.length === 0) {
       router.navigate("cart");
       return;
     }
 
     const customer = auth.getCustomer();
-    pages.checkout._step = 1;
+    const isDineIn = state.orderType === "dine_in";
+    pages.checkout._step = isDineIn ? 2 : 1; // Skip address for dine-in
 
     // Load saved addresses if logged in
     if (customer) {
@@ -43,6 +52,7 @@ pages.checkout = {
 
     pages.checkout._initMap();
     pages.checkout._renderOrderSummary(cfg, rtl, state);
+    pages.checkout._initFieldValidation();
 
     // Load Stripe
     if (cfg.stripePublishableKey) {
@@ -66,7 +76,8 @@ pages.checkout = {
   },
 
   _buildLayout(cfg, rtl, state) {
-    const deliveryFee = parseFloat(pages.menu?._storeConfig?.deliveryFee) || 0;
+    const isDineIn = state.orderType === "dine_in";
+    const deliveryFee = isDineIn ? 0 : (parseFloat(pages.menu?._storeConfig?.deliveryFee) || 0);
     const discount = parseFloat(state.discountAmount || 0);
     const subtotal = state.subtotal;
     const total = Math.max(0, subtotal - discount) + deliveryFee;
@@ -78,19 +89,31 @@ pages.checkout = {
     <span class="top-bar__title">${rtl ? "إتمام الطلب" : "Checkout"}</span>
   </div>
 
+  ${isDineIn ? `
+  <!-- Dine-in banner -->
+  <div class="dine-in-checkout-banner">
+    <div class="dine-in-checkout-banner__icon">🍽</div>
+    <div>
+      <div class="dine-in-checkout-banner__title">${rtl ? "طلب من الطاولة" : "Dine-in Order"}</div>
+      <div class="dine-in-checkout-banner__table">${state.tableName || "Table"}</div>
+    </div>
+  </div>
+  ` : ""}
+
   <!-- Step indicator -->
   <div class="checkout-step-indicator-bar">
     <div class="step-indicator">
+      ${isDineIn ? "" : `
       <div class="step active" id="step-ind-1">
         <div class="step__dot">1</div>
         <div class="step__label">${rtl ? "العنوان" : "Address"}</div>
-      </div>
-      <div class="step" id="step-ind-2">
-        <div class="step__dot">2</div>
+      </div>`}
+      <div class="step ${isDineIn ? "active" : ""}" id="step-ind-2">
+        <div class="step__dot">${isDineIn ? "1" : "2"}</div>
         <div class="step__label">${rtl ? "الدفع" : "Payment"}</div>
       </div>
       <div class="step" id="step-ind-3">
-        <div class="step__dot">3</div>
+        <div class="step__dot">${isDineIn ? "2" : "3"}</div>
         <div class="step__label">${rtl ? "تأكيد" : "Review"}</div>
       </div>
     </div>
@@ -98,8 +121,8 @@ pages.checkout = {
 
   <div class="checkout-layout">
     <div id="checkout-steps">
-      <!-- Step 1: Address -->
-      <div id="step-1" class="checkout-step">
+      <!-- Step 1: Address (hidden for dine-in) -->
+      <div id="step-1" class="checkout-step" ${isDineIn ? 'style="display:none"' : ""}>
         <div class="checkout-step__header">
           <div class="checkout-step__num">1</div>
           <div>
@@ -181,14 +204,26 @@ pages.checkout = {
       </div>
 
       <!-- Step 2: Payment -->
-      <div id="step-2" class="checkout-step hidden">
+      <div id="step-2" class="checkout-step ${isDineIn ? "" : "hidden"}">
         <div class="checkout-step__header">
-          <div class="checkout-step__num">2</div>
+          <div class="checkout-step__num">${isDineIn ? "1" : "2"}</div>
           <div>
-            <div class="checkout-step__title">${rtl ? "طريقة الدفع" : "Payment method"}</div>
+            <div class="checkout-step__title">${isDineIn ? (rtl ? "بيانات الطلب والدفع" : "Order Info & Payment") : (rtl ? "طريقة الدفع" : "Payment method")}</div>
           </div>
         </div>
         <div class="checkout-step__body">
+          ${isDineIn ? `
+          <div class="checkout-field-stack" style="margin-bottom:16px">
+            <div class="form-group">
+              <label class="form-label" for="dinein-name">${rtl ? "الاسم (اختياري)" : "Your name (optional)"}</label>
+              <input id="dinein-name" class="form-input" placeholder="${rtl ? "اسمك" : "Your name"}" value="${auth.getCustomer()?.name || ""}" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="dinein-phone">${rtl ? "رقم الهاتف" : "Phone number"}</label>
+              <input id="dinein-phone" class="form-input" type="tel" placeholder="${cfg.phonePlaceholder || cfg.supportPhone || ""}" value="${auth.getCustomer()?.phone || ""}" />
+            </div>
+          </div>
+          ` : ""}
           <div class="checkout-field-stack">
             <div class="payment-option selected" data-method="cod" onclick="pages.checkout._selectPayment('cod', this)">
               <div class="payment-option__radio"></div>
@@ -226,9 +261,15 @@ pages.checkout = {
           </div>
 
           <div class="checkout-step-nav">
+            ${isDineIn ? `
+            <button class="btn btn-ghost flex-1" onclick="history.back()">
+              ${rtl ? "← رجوع للقائمة" : "← Back to menu"}
+            </button>
+            ` : `
             <button class="btn btn-ghost flex-1" onclick="pages.checkout._prevStep(1)">
               ${rtl ? "← السابق" : "← Back"}
             </button>
+            `}
             <button class="btn btn-primary flex-1" onclick="pages.checkout._nextStep(3)">
               ${rtl ? "مراجعة الطلب" : "Review order"} →
             </button>
@@ -290,6 +331,16 @@ pages.checkout = {
         if (!pages.checkout._address) pages.checkout._address = {};
         pages.checkout._address.lat = pos.lat;
         pages.checkout._address.lng = pos.lng;
+        pages.checkout._reverseGeocode(pos.lat, pos.lng);
+      });
+      // Also update on map click
+      pages.checkout._map.on("click", (e) => {
+        const lat = e.latlng.lat, lng = e.latlng.lng;
+        pages.checkout._marker.setLatLng([lat, lng]);
+        if (!pages.checkout._address) pages.checkout._address = {};
+        pages.checkout._address.lat = lat;
+        pages.checkout._address.lng = lng;
+        pages.checkout._reverseGeocode(lat, lng);
       });
       // Try geolocation
       if (navigator.geolocation) {
@@ -300,9 +351,44 @@ pages.checkout = {
           if (!pages.checkout._address) pages.checkout._address = {};
           pages.checkout._address.lat = lat;
           pages.checkout._address.lng = lng;
+          pages.checkout._reverseGeocode(lat, lng);
         }, () => {});
       }
     } catch(e) {}
+  },
+
+  /** Reverse geocode lat/lng using Nominatim and fill address fields */
+  _reverseGeocode(lat, lng) {
+    const lang = document.documentElement.lang || "en";
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=${lang}&addressdetails=1`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data || data.error) return;
+        const addr = data.address || {};
+        // Build street address from components
+        const road = addr.road || addr.pedestrian || addr.footway || "";
+        const houseNumber = addr.house_number || "";
+        const neighbourhood = addr.neighbourhood || addr.suburb || addr.district || "";
+        const city = addr.city || addr.town || addr.village || "";
+        // Compose a readable street address
+        let street = "";
+        if (houseNumber && road) street = houseNumber + " " + road;
+        else if (road) street = road;
+        if (neighbourhood) street += (street ? "، " : "") + neighbourhood;
+        if (city) street += (street ? "، " : "") + city;
+
+        const streetEl = document.getElementById("addr-street");
+        if (streetEl && street) {
+          streetEl.value = street;
+          streetEl.classList.remove("form-input--error");
+          const errEl = streetEl.parentElement.querySelector(".form-error");
+          if (errEl) errEl.remove();
+        }
+        // Update internal address state
+        if (!pages.checkout._address) pages.checkout._address = {};
+        if (street) pages.checkout._address.address = street;
+      })
+      .catch(() => {});
   },
 
   _selectAddress(addrId) {
@@ -335,13 +421,58 @@ pages.checkout = {
     if (cardWrapper) cardWrapper.classList.toggle("hidden", method !== "card");
   },
 
+  _validateField(id, msg) {
+    const el = document.getElementById(id);
+    if (!el) return false;
+    const val = el.value.trim();
+    if (!val) {
+      el.classList.add("form-input--error");
+      let errEl = el.parentElement.querySelector(".form-error");
+      if (!errEl) {
+        errEl = document.createElement("div");
+        errEl.className = "form-error";
+        el.parentElement.appendChild(errEl);
+      }
+      errEl.textContent = msg;
+      return false;
+    }
+    el.classList.remove("form-input--error");
+    const errEl = el.parentElement.querySelector(".form-error");
+    if (errEl) errEl.remove();
+    return true;
+  },
+
+  _initFieldValidation() {
+    const rtl = isRtl();
+    const fields = [
+      { id: "addr-street", msg: rtl ? "أدخل عنواناً" : "Address is required" },
+      { id: "addr-phone", msg: rtl ? "أدخل رقم الهاتف" : "Phone is required" },
+    ];
+    fields.forEach(f => {
+      const el = document.getElementById(f.id);
+      if (el) {
+        el.addEventListener("blur", () => pages.checkout._validateField(f.id, f.msg));
+        el.addEventListener("input", () => {
+          if (el.value.trim()) {
+            el.classList.remove("form-input--error");
+            const errEl = el.parentElement.querySelector(".form-error");
+            if (errEl) errEl.remove();
+          }
+        });
+      }
+    });
+  },
+
   _nextStep(step) {
     if (step === 2) {
-      // Validate address
+      const rtl = isRtl();
+      // Validate address with inline errors
+      const streetOk = pages.checkout._validateField("addr-street", rtl ? "أدخل عنواناً" : "Address is required");
+      const phoneOk = pages.checkout._validateField("addr-phone", rtl ? "أدخل رقم الهاتف" : "Phone is required");
+      if (!streetOk || !phoneOk) return;
+
       const street = document.getElementById("addr-street")?.value.trim();
-      if (!street) { showToast(isRtl() ? "أدخل عنواناً" : "Please enter your address", "warning"); return; }
       const phone = document.getElementById("addr-phone")?.value.trim();
-      if (!phone) { showToast(isRtl() ? "أدخل رقم الهاتف" : "Please enter phone number", "warning"); return; }
 
       pages.checkout._address = {
         ...pages.checkout._address,
@@ -460,12 +591,18 @@ pages.checkout = {
     const rtl = isRtl();
     const state = cart.getState();
     const btn = document.getElementById("place-order-btn");
-    const addr = pages.checkout._address;
+    const addr = pages.checkout._address || {};
+    const isDineIn = state.orderType === "dine_in";
 
-    if (!addr?.address) { showToast(rtl ? "أدخل عنواناً" : "Please enter address", "warning"); pages.checkout._prevStep(1); return; }
+    if (!isDineIn && !addr?.address) { showToast(rtl ? "أدخل عنواناً" : "Please enter address", "warning"); pages.checkout._prevStep(1); return; }
 
     pages.checkout._submitting = true;
-    if (btn) btn.classList.add("loading");
+    if (btn) { btn.disabled = true; btn.classList.add("loading"); }
+    // Show loading overlay
+    const overlay = document.createElement("div");
+    overlay.className = "checkout-loading-overlay";
+    overlay.innerHTML = `<div class="loading-spinner"></div><p>${rtl ? "جاري تأكيد طلبك..." : "Placing your order..."}</p>`;
+    document.querySelector(".checkout-page")?.appendChild(overlay);
 
     try {
       let paymentIntentId = null;
@@ -492,43 +629,50 @@ pages.checkout = {
       }
 
       const customer = auth.getCustomer();
-      const deliveryFee2 = parseFloat(pages.menu?._storeConfig?.deliveryFee) || 0;
+      const deliveryFee2 = isDineIn ? 0 : (parseFloat(pages.menu?._storeConfig?.deliveryFee) || 0);
       const discount2 = parseFloat(state.discountAmount || 0);
+
+      // For dine-in, read name/phone from dine-in fields
+      const dineInName = isDineIn ? (document.getElementById("dinein-name")?.value || "") : "";
+      const dineInPhone = isDineIn ? (document.getElementById("dinein-phone")?.value || "") : "";
 
       const total2 = Math.max(0, state.subtotal - discount2) + deliveryFee2;
       const orderPayload = {
         tenantId: cfg.tenantId,
         slug: cfg.slug,
         customerId: customer?.id || null,
-        customerName: customer?.name || addr.name || "Guest",
-        customerPhone: addr.phone || customer?.phone || "",
+        customerName: isDineIn ? (dineInName || customer?.name || "Dine-in Guest") : (customer?.name || addr.name || "Guest"),
+        customerPhone: isDineIn ? (dineInPhone || customer?.phone || "0000000000") : (addr.phone || customer?.phone || ""),
         customerEmail: customer?.email || null,
         orderType: state.orderType || "delivery",
         items: state.items.map(i => ({
           productId: i.productId,
           productName: i.name,
-          unitPrice: i.price,
+          unitPrice: parseFloat(i.price) || 0,
           quantity: i.qty,
+          total: ((parseFloat(i.price) || 0) + (parseFloat(i.modifierPrice) || 0)) * i.qty,
           modifiers: i.modifiers || [],
         })),
-        customerAddress: addr.address || addr.street || "",
-        floor: addr.floor || "",
-        buildingName: addr.buildingName || "",
-        addressNotes: addr.notes || "",
-        customerLat: addr.lat || null,
-        customerLng: addr.lng || null,
+        customerAddress: state.orderType === "dine_in" ? "" : (addr.address || addr.street || ""),
+        floor: state.orderType === "dine_in" ? "" : (addr.floor || ""),
+        buildingName: state.orderType === "dine_in" ? "" : (addr.buildingName || ""),
+        addressNotes: state.orderType === "dine_in" ? "" : (addr.notes || ""),
+        customerLat: state.orderType === "dine_in" ? null : (addr.lat || null),
+        customerLng: state.orderType === "dine_in" ? null : (addr.lng || null),
         subtotal: state.subtotal,
-        deliveryFee: deliveryFee2,
-        totalAmount: total2,
+        deliveryFee: state.orderType === "dine_in" ? 0 : deliveryFee2,
+        totalAmount: state.orderType === "dine_in" ? Math.max(0, state.subtotal - discount2) : total2,
         discountAmount: discount2,
         promoCodeId: state.promoCodeId || null,
         paymentMethod: pages.checkout._paymentMethod,
         paymentIntentId,
         scheduledAt: pages.checkout._scheduledAt,
         notes: state.notes || "",
-        sourceChannel: "web",
+        sourceChannel: state.orderType === "dine_in" ? "dine_in_qr" : "web",
         walletAmountUsed: 0,
         language: document.documentElement.lang || "en",
+        tableQrToken: state.tableQrToken || null,
+        tableNumber: state.tableName || null,
       };
 
       const result = await api.orders.create(orderPayload);
@@ -542,7 +686,9 @@ pages.checkout = {
       showToast(err.message || (rtl ? "فشل في إتمام الطلب" : "Failed to place order"), "error");
     } finally {
       pages.checkout._submitting = false;
-      if (btn) btn.classList.remove("loading");
+      if (btn) { btn.disabled = false; btn.classList.remove("loading"); }
+      const ov = document.querySelector(".checkout-loading-overlay");
+      if (ov) ov.remove();
     }
   },
 };

@@ -5,7 +5,9 @@ import { registerSuperAdminRoutes } from "./superAdminRoutes";
 import { tenantAuthMiddleware } from "./tenantAuth";
 import { callerIdService } from "./callerIdService";
 import { whatsappService } from "./whatsappService";
-import { runMigrations } from "stripe-replit-sync";
+// stripe-replit-sync uses import.meta.url which crashes in CJS bundles on Hostinger
+// Use dynamic import only when needed
+let runMigrations: any = null;
 import { getStripeSync, getStripePublishableKey, getUncachableStripeClient, getStripeSecretKey } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 import * as fs from "fs";
@@ -249,6 +251,7 @@ function configureExpoAndLanding(app: express.Application) {
     const isDeliveryApiPath =
       req.path.startsWith("/api/order/") ||
       req.path.startsWith("/api/track/") ||
+      req.path === "/api/driver" ||
       req.path.startsWith("/api/driver/") ||
       req.path.startsWith("/api/super-admin") ||
       req.path.startsWith("/api/super_admin") ||
@@ -354,7 +357,7 @@ function configureExpoAndLanding(app: express.Application) {
         let html = fs.readFileSync(restaurantsIndexPath, "utf-8");
         const configJson = JSON.stringify({
           storeName: "Barmagly Delivery",
-          currency: process.env.DEFAULT_CURRENCY || "EGP",
+          currency: process.env.DEFAULT_CURRENCY || "CHF",
           language: (req.query.lang as string) || "en",
           stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
           primaryColor: "#FF5722",
@@ -364,6 +367,14 @@ function configureExpoAndLanding(app: express.Application) {
           basePath,
         });
         html = html.replace("__DELIVERY_CONFIG__", configJson);
+        // Fix asset & route paths when served under /api/ prefix
+        if (basePath) {
+          html = html.replace(/href="\/(delivery-app\/)/g, `href="${basePath}/$1`);
+          html = html.replace(/src="\/(delivery-app\/)/g, `src="${basePath}/$1`);
+          html = html.replace(/href="\/order/g, `href="${basePath}/order`);
+          html = html.replace(/href="\/restaurants"/g, `href="${basePath}/restaurants"`);
+          html = html.replace(/window\.location\.href\s*=\s*"\/restaurants"/g, `window.location.href = "${basePath}/restaurants"`);
+        }
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         return res.status(200).send(html);
       } catch (err) {
@@ -377,11 +388,31 @@ function configureExpoAndLanding(app: express.Application) {
     const deliveryMatch = req.path.match(/^(?:\/api)?\/order\/([^/]+)(\/.*)?$/);
     if (deliveryMatch) {
       try {
-        const slug = deliveryMatch[1];
+        let slug = deliveryMatch[1];
         // Detect if request came via /api/ prefix (Hostinger CDN compatibility)
         const isApiPrefixed = req.path.startsWith("/api/");
         const { storage } = await import("./storage");
-        const config = await storage.getLandingPageConfigBySlug(slug);
+
+        // Try to find store config by slug, fall back to primary tenant for demo restaurants
+        let config: any;
+        const isBrandAlias = slug === "barmagly";
+        config = await storage.getLandingPageConfigBySlug(isBrandAlias ? "pizza-lemon" : slug);
+
+        // If slug not found in DB, this is a demo restaurant — use primary tenant data
+        // but override the display name based on the slug
+        if (!config) {
+          config = await storage.getLandingPageConfigBySlug("pizza-lemon");
+          if (config) {
+            // Convert slug back to readable name for display
+            const displayName = slug.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+            (config as any).storeName = displayName;
+            (config as any).heroTitle = displayName;
+          }
+        }
+        if (isBrandAlias && config) {
+          (config as any).storeName = "Barmagly";
+          (config as any).heroTitle = "Barmagly Delivery";
+        }
         if (!config) return res.status(404).send("<h1>Store not found</h1>");
         const tenantId = config.tenantId;
         const tenant = await storage.getTenant(tenantId);
@@ -399,9 +430,9 @@ function configureExpoAndLanding(app: express.Application) {
           basePath: isApiPrefixed ? "/api" : "",
           primaryColor: (config as any).primaryColor || "#FF5722",
           accentColor: (config as any).accentColor || "#2FD3C6",
-          currency: (tenant as any).currency || process.env.DEFAULT_CURRENCY || "EGP",
+          currency: (tenant as any).currency || process.env.DEFAULT_CURRENCY || "CHF",
           language: (config as any).language || "en",
-          storeName: config.storeName || (config as any).name || tenant.name,
+          storeName: config.storeName || (config as any).heroTitle || (config as any).name || tenant.businessName,
           logo: (config as any).logo || config.logoUrl || "",
           phone: config.phone || "",
           supportPhone: (config as any).supportPhone || config.phone || "",
@@ -421,7 +452,7 @@ function configureExpoAndLanding(app: express.Application) {
         html = html.replace("__DELIVERY_CONFIG__", configJson);
 
         // SEO meta tag injection for restaurant pages
-        const storeName = config.storeName || (config as any).name || tenant.name;
+        const storeName = config.storeName || (config as any).heroTitle || (config as any).name || tenant.businessName;
         const metaTitle = (config as any).metaTitle || `${storeName} — Order Online | Barmagly Delivery`;
         const metaDesc = (config as any).metaDescription || `Order food online from ${storeName}. Fast delivery to your door.`;
         const coverImage = (config as any).coverImage || (config as any).headerBgImage || "";
@@ -453,7 +484,7 @@ function configureExpoAndLanding(app: express.Application) {
         let html = fs.readFileSync(restaurantsIndexPath, "utf-8");
         const configJson = JSON.stringify({
           storeName: "Barmagly Delivery",
-          currency: process.env.DEFAULT_CURRENCY || "EGP",
+          currency: process.env.DEFAULT_CURRENCY || "CHF",
           language: (req.query.lang as string) || "en",
           stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
           primaryColor: "#FF5722",
@@ -463,6 +494,11 @@ function configureExpoAndLanding(app: express.Application) {
           basePath,
         });
         html = html.replace("__DELIVERY_CONFIG__", configJson);
+        // Fix asset paths when served under /api/ prefix
+        if (basePath) {
+          html = html.replace(/href="\/(delivery-app\/)/g, `href="${basePath}/$1`);
+          html = html.replace(/src="\/(delivery-app\/)/g, `src="${basePath}/$1`);
+        }
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         return res.status(200).send(html);
       } catch (err) {
@@ -471,14 +507,19 @@ function configureExpoAndLanding(app: express.Application) {
       }
     }
 
-    // Driver PWA
-    const driverMatch = req.path.match(/^(?:\/api)?\/driver\/([^/]+)$/);
+    // Driver PWA — /driver, /driver/, /driver/:slug
+    const driverMatch = req.path.match(/^(?:\/api)?\/driver(\/[^/]*)?$/);
     if (driverMatch) {
       const driverIndexPath = path.resolve(process.cwd(), "delivery-app", "driver", "index.html");
       if (!fs.existsSync(driverIndexPath)) {
         return res.status(503).send("<h1>Driver app not yet deployed</h1>");
       }
-      const html = fs.readFileSync(driverIndexPath, "utf-8");
+      let html = fs.readFileSync(driverIndexPath, "utf-8");
+      const isApiPrefixed = req.path.startsWith("/api/");
+      if (isApiPrefixed) {
+        html = html.replace(/href="\/(delivery-app\/)/g, `href="/api/$1`);
+        html = html.replace(/src="\/(delivery-app\/)/g, `src="/api/$1`);
+      }
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(html);
     }
@@ -649,8 +690,14 @@ async function initStripe() {
 
   try {
     log('Initializing Stripe schema...');
-    await runMigrations({ databaseUrl });
-    log('Stripe schema ready');
+    try {
+      const stripeSyncModule = await import("stripe-replit-sync");
+      runMigrations = stripeSyncModule.runMigrations;
+      await runMigrations({ databaseUrl });
+      log('Stripe schema ready');
+    } catch (migErr: any) {
+      log('Stripe migrations skipped (stripe-replit-sync not available):', migErr?.message);
+    }
 
     let stripeSync, secretKey;
     try {

@@ -198,6 +198,16 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="table-qr"
+          options={{
+            title: "QR Tables",
+            href: null,
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="qr-code" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="products"
           options={{
             title: t("products"),

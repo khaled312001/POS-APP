@@ -1587,6 +1587,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try { res.json(await storage.updateTable(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── Table QR Codes ──
+  app.get("/api/table-qr-codes", async (req, res) => {
+    try {
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      res.json(await storage.getTableQrCodes(tenantId));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/table-qr-codes", async (req, res) => {
+    try {
+      const { tenantId, tableId, branchId, tableName } = req.body;
+      if (!tenantId || !tableId || !tableName) return res.status(400).json({ error: "tenantId, tableId, tableName required" });
+      const qrToken = `TBL-${crypto.randomBytes(16).toString("hex")}`;
+      const qr = await storage.createTableQrCode({
+        tenantId: Number(tenantId),
+        tableId: Number(tableId),
+        branchId: branchId ? Number(branchId) : null,
+        qrToken,
+        tableName,
+        isActive: true,
+      } as any);
+      res.status(201).json(qr);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/table-qr-codes/generate-all", async (req, res) => {
+    try {
+      const { tenantId, branchId } = req.body;
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      const allTables = await storage.getTables(branchId ? Number(branchId) : undefined);
+      const existing = await storage.getTableQrCodes(Number(tenantId));
+      const existingTableIds = new Set(existing.map((q: any) => q.tableId));
+      const created: any[] = [];
+      for (const table of allTables) {
+        if (existingTableIds.has(table.id)) continue;
+        const qrToken = `TBL-${crypto.randomBytes(16).toString("hex")}`;
+        const qr = await storage.createTableQrCode({
+          tenantId: Number(tenantId),
+          tableId: table.id,
+          branchId: table.branchId ?? null,
+          qrToken,
+          tableName: table.name,
+          isActive: true,
+        } as any);
+        created.push(qr);
+      }
+      res.json({ created: created.length, qrCodes: created });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put("/api/table-qr-codes/:id", async (req, res) => {
+    try { res.json(await storage.updateTableQrCode(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete("/api/table-qr-codes/:id", async (req, res) => {
+    try { await storage.deleteTableQrCode(Number(req.params.id)); res.json({ success: true }); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Validate QR token for dine-in (public endpoint)
+  app.get("/api/dine-in/validate/:token", async (req, res) => {
+    try {
+      const qr = await storage.getTableQrCodeByToken(req.params.token);
+      if (!qr || !qr.isActive) return res.status(404).json({ error: "Invalid or inactive QR code" });
+      await storage.incrementQrScanCount(req.params.token);
+      const config = await storage.getLandingPageConfigByTenantId(qr.tenantId);
+      res.json({
+        valid: true,
+        tableId: qr.tableId,
+        tableName: qr.tableName,
+        branchId: qr.branchId,
+        tenantId: qr.tenantId,
+        slug: config?.slug || null,
+      });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Kitchen Orders
   app.get("/api/kitchen-orders", async (req, res) => {
     try { res.json(await storage.getKitchenOrders(req.query.branchId ? Number(req.query.branchId) : undefined)); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -2827,8 +2904,15 @@ async function test(){
   });
 
   // ── Tenant Backup & Restore (accessible from mobile app via license-key auth) ─
-  const TENANT_BACKUP_DIR = path.resolve(process.cwd(), "backups");
-  if (!fs.existsSync(TENANT_BACKUP_DIR)) fs.mkdirSync(TENANT_BACKUP_DIR, { recursive: true });
+  // On Vercel the deployment filesystem is read-only; only /tmp is writable.
+  const TENANT_BACKUP_DIR = process.env.VERCEL
+    ? path.join("/tmp", "backups")
+    : path.resolve(process.cwd(), "backups");
+  try {
+    if (!fs.existsSync(TENANT_BACKUP_DIR)) fs.mkdirSync(TENANT_BACKUP_DIR, { recursive: true });
+  } catch (err) {
+    console.warn("[routes] Could not create TENANT_BACKUP_DIR:", (err as Error).message);
+  }
 
   // List backups for this tenant
   app.get("/api/backup/list", async (req: any, res) => {
@@ -3292,18 +3376,65 @@ async function test(){
         isOpen: c.isOpen !== false,
         primaryColor: c.primaryColor || "#FF5722",
       }));
+
+      // Enrich restaurants with menu-based data if missing key fields
+      for (const r of restaurants) {
+        // Fix generic names
+        if (r.name === "Restaurant" && r.slug) {
+          r.name = r.slug.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+        }
+        if (!r.cuisine || !r.coverImage || !r.reviewCount) {
+          try {
+            const cats = await storage.getCategories(r.id);
+            if (!r.cuisine && cats.length > 0) {
+              const catNames = cats.filter((c: any) => c.isActive !== false).map((c: any) => c.name).slice(0, 3);
+              r.cuisine = catNames.join(", ");
+            }
+            if (!r.reviewCount) {
+              const prods = await storage.getProductsByTenant(r.id);
+              r.reviewCount = Math.max(50, prods.length * 3);
+            }
+          } catch {}
+        }
+      }
+
       res.json(restaurants);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
+
+  // ── Slug resolver helper — maps "barmagly" and demo slugs to real config ──
+  async function resolveSlugConfig(slug: string) {
+    // "barmagly" brand alias → primary tenant
+    if (slug === "barmagly") {
+      const config = await storage.getLandingPageConfigBySlug("pizza-lemon");
+      if (config) {
+        (config as any).storeName = "Barmagly";
+        (config as any).heroTitle = "Barmagly Delivery";
+      }
+      return config;
+    }
+    // Try direct slug lookup
+    let config = await storage.getLandingPageConfigBySlug(slug);
+    if (config) return config;
+    // Fallback: demo restaurant slug → use primary tenant data
+    config = await storage.getLandingPageConfigBySlug("pizza-lemon");
+    if (config) {
+      const displayName = slug.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+      (config as any).storeName = displayName;
+      (config as any).heroTitle = displayName;
+    }
+    return config;
+  }
 
   // ── Storefront / Menu (Public) ────────────────────────────────────────────
 
   app.get("/api/delivery/store/:slug", async (req: Request, res: Response) => {
     try {
-      const config = await storage.getLandingPageConfigBySlug(req.params.slug);
+      const config = await resolveSlugConfig(req.params.slug);
       if (!config) return res.status(404).json({ error: "Store not found" });
       const tenant = await storage.getTenant(config.tenantId).catch(() => null);
-      const currency = (config as any).currency || tenant?.currency || process.env.DEFAULT_CURRENCY || "EGP";
+      const currency = (config as any).currency || tenant?.currency || process.env.DEFAULT_CURRENCY || "CHF";
+      res.setHeader("Cache-Control", "public, max-age=300");
       res.json({
         slug: config.slug,
         tenantId: config.tenantId,
@@ -3341,13 +3472,15 @@ async function test(){
 
   app.get("/api/delivery/store/:slug/menu", async (req: Request, res: Response) => {
     try {
-      const config = await storage.getLandingPageConfigBySlug(req.params.slug);
+      const config = await resolveSlugConfig(req.params.slug);
       if (!config) return res.status(404).json({ error: "Store not found" });
       const [cats, prods] = await Promise.all([
         storage.getCategories(config.tenantId),
         storage.getProductsByTenant(config.tenantId),
       ]);
-      const activeProds = prods.filter((p: any) => p.isActive !== false);
+      const activeProds = prods
+        .filter((p: any) => p.isActive !== false)
+        .map((p: any) => ({ ...p, imageUrl: p.imageUrl || p.image || null }));
       const menu = cats
         .filter((c: any) => c.isActive !== false)
         .map((cat: any) => ({
@@ -3355,23 +3488,23 @@ async function test(){
           items: activeProds.filter((p: any) => p.categoryId === cat.id),
         }))
         .filter((cat: any) => cat.items.length > 0);
-      res.json({ categories: menu, allProducts: activeProds });
+      res.setHeader("Cache-Control", "public, max-age=300").json({ categories: menu, allProducts: activeProds });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.get("/api/delivery/store/:slug/product/:id", async (req: Request, res: Response) => {
     try {
-      const config = await storage.getLandingPageConfigBySlug(req.params.slug);
+      const config = await resolveSlugConfig(req.params.slug);
       if (!config) return res.status(404).json({ error: "Store not found" });
       const product = await storage.getProduct(Number(req.params.id));
       if (!product || product.tenantId !== config.tenantId) return res.status(404).json({ error: "Product not found" });
-      res.json(product);
+      res.json({ ...product, imageUrl: (product as any).imageUrl || (product as any).image || null });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.get("/api/delivery/store/:slug/promos", async (req: Request, res: Response) => {
     try {
-      const config = await storage.getLandingPageConfigBySlug(req.params.slug);
+      const config = await resolveSlugConfig(req.params.slug);
       if (!config) return res.status(404).json({ error: "Store not found" });
       const now = new Date();
       const codes = await storage.getPromoCodes ? await storage.getPromoCodes(config.tenantId) : [];
@@ -3410,7 +3543,7 @@ async function test(){
         paymentMethod, orderType, notes, promoCode, promoCodeId,
         discountAmount, customerLat, customerLng, floor, buildingName,
         addressNotes, scheduledAt, loyaltyPointsUsed, walletAmountUsed,
-        savedAddressId,
+        savedAddressId, tableQrToken, tableNumber,
       } = req.body;
 
       if (!tenantId || !customerPhone || !items?.length) {
@@ -3418,7 +3551,8 @@ async function test(){
       }
 
       const trackingToken = generateTrackingToken();
-      const orderNumber = `DEL-${Date.now()}`;
+      const isDineIn = orderType === "dine_in" && tableQrToken;
+      const orderNumber = isDineIn ? `DIN-${Date.now()}` : `DEL-${Date.now()}`;
 
       // Verify promo if provided
       let finalDiscount = Number(discountAmount ?? 0);
@@ -3462,7 +3596,9 @@ async function test(){
         estimatedTime: 35,
         language: req.body.language || "en",
         trackingToken,
-        sourceChannel: "web",
+        sourceChannel: isDineIn ? "dine_in_qr" : "web",
+        tableNumber: tableNumber ?? null,
+        tableQrToken: tableQrToken ?? null,
         promoCodeId: resolvedPromoId ?? undefined,
         discountAmount: finalDiscount.toFixed(2),
         customerLat: customerLat ? String(customerLat) : null,
@@ -3487,7 +3623,9 @@ async function test(){
         if (config?.socialWhatsapp) {
           await whatsappService.sendMessage(
             config.socialWhatsapp,
-            `🛎 New delivery order #${orderNumber}\nCustomer: ${customerName || customerPhone}\nTotal: ${totalAmount}\nAddress: ${customerAddress || "Pickup"}`
+            isDineIn
+              ? `🍽 New dine-in order #${orderNumber}\nTable: ${tableNumber || "N/A"}\nCustomer: ${customerName || customerPhone}\nTotal: ${totalAmount}`
+              : `🛎 New delivery order #${orderNumber}\nCustomer: ${customerName || customerPhone}\nTotal: ${totalAmount}\nAddress: ${customerAddress || "Pickup"}`
           );
         }
       } catch (_) {}
@@ -3522,7 +3660,7 @@ async function test(){
             store = {
               name: cfg.storeName || (cfg as any).name,
               primaryColor: (cfg as any).primaryColor || "#FF5722",
-              currency: (cfg as any).currency || process.env.DEFAULT_CURRENCY || "EGP",
+              currency: (cfg as any).currency || process.env.DEFAULT_CURRENCY || "CHF",
               logo: (cfg as any).logo,
               supportPhone: (cfg as any).supportPhone,
               slug: cfg.slug,
@@ -4223,6 +4361,102 @@ async function test(){
       const ratings = await storage.getOrderRatings(tid);
       res.json(ratings);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Store Reviews (public) ──────────────────────────────────────────────
+
+  app.get("/api/delivery/store/:slug/reviews", async (req: Request, res: Response) => {
+    try {
+      const slug = req.params.slug;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+
+      // Find tenant by slug using resolveSlugConfig
+      const config = await resolveSlugConfig(slug);
+      const tenant = config ? await storage.getTenant(config.tenantId).catch(() => null) : null;
+      if (!tenant) {
+        return res.json({ reviews: [], summary: { avgRating: 0, totalReviews: 0, distribution: {} } });
+      }
+
+      const ratings = await storage.getOrderRatings(tenant.id);
+      const total = ratings.length;
+
+      // Calculate summary
+      const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      let sum = 0;
+      for (const r of ratings) {
+        const star = Math.round(r.overallRating || r.foodRating || 0);
+        if (star >= 1 && star <= 5) distribution[star]++;
+        sum += (r.overallRating || r.foodRating || 0);
+      }
+      const avgRating = total > 0 ? sum / total : 0;
+
+      // Paginate
+      const offset = (page - 1) * limit;
+      const pagedRatings = ratings.slice(offset, offset + limit);
+
+      const reviews = pagedRatings.map((r: any) => ({
+        id: r.id,
+        rating: r.overallRating || r.foodRating || 0,
+        comment: r.comment || "",
+        customerName: r.customerName || "Customer",
+        createdAt: r.createdAt,
+        orderItems: r.orderItems || "",
+      }));
+
+      res.json({
+        reviews,
+        summary: { avgRating: Math.round(avgRating * 10) / 10, totalReviews: total, distribution },
+        page,
+        limit,
+        hasMore: offset + limit < total,
+      });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Recommendations (public) ────────────────────────────────────────────
+
+  const _recoCache = new Map<string, { data: any; ts: number }>();
+  const RECO_TTL = 5 * 60 * 1000; // 5 minutes
+
+  app.get("/api/delivery/recommendations", async (req: Request, res: Response) => {
+    try {
+      const tid = parseInt(req.query.tenantId as string) || (req as any).tenantId;
+      if (!tid) return res.json({ popular: [], recentlyOrdered: [] });
+
+      const cacheKey = `reco_${tid}`;
+      const cached = _recoCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < RECO_TTL) {
+        return res.json(cached.data);
+      }
+
+      // Popular items by most ordered (approximated by products sorted by salesCount/price)
+      const products = await storage.getProductsByTenant(tid);
+      const popular = products
+        .filter((p: any) => p.isActive !== false && parseFloat(p.price || "0") > 0)
+        .sort((a: any, b: any) => (b.salesCount || 0) - (a.salesCount || 0))
+        .slice(0, 10)
+        .map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          nameAr: p.nameAr,
+          price: p.price,
+          imageUrl: p.imageUrl,
+          categoryId: p.categoryId,
+        }));
+
+      const result = { popular, recentlyOrdered: [] };
+      _recoCache.set(cacheKey, { data: result, ts: Date.now() });
+      res.json(result);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── robots.txt ──────────────────────────────────────────────────────────
+
+  app.get("/api/robots.txt", (_req: Request, res: Response) => {
+    res.type("text/plain").send(
+      `User-agent: *\nAllow: /api/order/\nAllow: /api/restaurants\nDisallow: /api/delivery/\nSitemap: https://barmagly.tech/api/delivery/sitemap.xml\n`
+    );
   });
 
   // ═══════════════════════════════════════════════════════════════════════════

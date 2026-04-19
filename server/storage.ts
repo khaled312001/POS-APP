@@ -4,7 +4,7 @@ import * as fs from "fs";
 import {
   branches, employees, categories, products, inventory,
   customers, sales, saleItems, suppliers, purchaseOrders,
-  purchaseOrderItems, shifts, expenses, tables, kitchenOrders,
+  purchaseOrderItems, shifts, expenses, tables, tableQrCodes, kitchenOrders,
   subscriptionPlans, subscriptions, syncQueue, activityLog, returns, returnItems,
   cashDrawerOperations, warehouses, warehouseTransfers, productBatches,
   inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions,
@@ -13,7 +13,7 @@ import {
   type InsertProduct, type InsertInventory, type InsertCustomer,
   type InsertSale, type InsertSaleItem, type InsertSupplier,
   type InsertPurchaseOrder, type InsertPurchaseOrderItem, type InsertShift, type InsertExpense,
-  type InsertTable, type InsertKitchenOrder, type InsertSubscriptionPlan,
+  type InsertTable, type InsertTableQrCode, type InsertKitchenOrder, type InsertSubscriptionPlan,
   type InsertSubscription, type InsertActivityLog, type InsertReturn, type InsertReturnItem,
   type InsertCashDrawerOperation, type InsertWarehouse, type InsertWarehouseTransfer,
   type InsertProductBatch, type InsertInventoryMovement, type InsertStockCount,
@@ -652,6 +652,33 @@ export const storage = {
   async updateTable(id: number, data: Partial<InsertTable>) {
     const [table] = await db.update(tables).set(data).where(eq(tables.id, id));
     return table;
+  },
+
+  // Table QR Codes
+  async getTableQrCodes(tenantId: number) {
+    return db.select().from(tableQrCodes).where(eq(tableQrCodes.tenantId, tenantId)).orderBy(tableQrCodes.tableName);
+  },
+  async getTableQrCodeByToken(token: string) {
+    const [qr] = await db.select().from(tableQrCodes).where(eq(tableQrCodes.qrToken, token));
+    return qr;
+  },
+  async createTableQrCode(data: InsertTableQrCode) {
+    const _ins = await db.insert(tableQrCodes).values(data).$returningId();
+    const [qr] = await db.select().from(tableQrCodes).where(eq(tableQrCodes.id, _ins[0]?.id ?? 0));
+    return qr;
+  },
+  async updateTableQrCode(id: number, data: Partial<InsertTableQrCode>) {
+    await db.update(tableQrCodes).set(data).where(eq(tableQrCodes.id, id));
+    const [qr] = await db.select().from(tableQrCodes).where(eq(tableQrCodes.id, id));
+    return qr;
+  },
+  async deleteTableQrCode(id: number) {
+    await db.delete(tableQrCodes).where(eq(tableQrCodes.id, id));
+  },
+  async incrementQrScanCount(token: string) {
+    await db.update(tableQrCodes)
+      .set({ scannedCount: sql`scanned_count + 1`, lastScannedAt: new Date() })
+      .where(eq(tableQrCodes.qrToken, token));
   },
 
   // Kitchen Orders

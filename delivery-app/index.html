@@ -13,9 +13,9 @@
   <title>Barmagly Delivery</title>
 
   <!-- CSS -->
-  <link rel="stylesheet" href="/api/delivery-app/css/base.css" />
-  <link rel="stylesheet" href="/api/delivery-app/css/components.css" />
-  <link rel="stylesheet" href="/api/delivery-app/css/pages.css" />
+  <link rel="stylesheet" href="/api/delivery-app/css/base.css?v=20260412h" />
+  <link rel="stylesheet" href="/api/delivery-app/css/components.css?v=20260412h" />
+  <link rel="stylesheet" href="/api/delivery-app/css/pages.css?v=20260412h" />
 
   <!-- Leaflet maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -74,6 +74,243 @@
       from { transform: translateX(-100%); }
       to   { transform: translateX(350%); }
     }
+
+    /* ── Onboarding ────────────────────────────────────────────────────── */
+    #onboarding {
+      position: fixed; inset: 0;
+      background: #1A1A2E;
+      z-index: 9998;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #onboarding.active { display: flex; }
+
+    .onboarding-slides {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+    .onboarding-slide {
+      min-width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 32px;
+      text-align: center;
+      transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+      color: #fff;
+    }
+    .onboarding-slide__illustration {
+      width: 160px; height: 160px;
+      border-radius: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 32px;
+      font-size: 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .onboarding-slide__illustration::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 40px;
+      opacity: 0.15;
+    }
+    .slide-bg-1 { background: linear-gradient(135deg, #FF5722, #FF8A65); }
+    .slide-bg-1::before { background: radial-gradient(circle at 30% 30%, #fff, transparent 60%); }
+    .slide-bg-2 { background: linear-gradient(135deg, #2FD3C6, #4DD0E1); }
+    .slide-bg-2::before { background: radial-gradient(circle at 70% 30%, #fff, transparent 60%); }
+    .slide-bg-3 { background: linear-gradient(135deg, #F59E0B, #FBBF24); }
+    .slide-bg-3::before { background: radial-gradient(circle at 30% 70%, #fff, transparent 60%); }
+    .slide-bg-4 { background: linear-gradient(135deg, #6366F1, #818CF8); }
+    .slide-bg-4::before { background: radial-gradient(circle at 70% 70%, #fff, transparent 60%); }
+
+    .onboarding-slide__title {
+      font-size: 1.75rem;
+      font-weight: 800;
+      margin-bottom: 12px;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+    .onboarding-slide__desc {
+      font-size: 1rem;
+      color: rgba(255,255,255,0.7);
+      line-height: 1.6;
+      max-width: 320px;
+    }
+
+    .onboarding-footer {
+      padding: 24px 32px 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .onboarding-dots {
+      display: flex;
+      gap: 8px;
+    }
+    .onboarding-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      transition: all 0.3s ease;
+    }
+    .onboarding-dot.active {
+      background: #FF5722;
+      width: 24px;
+      border-radius: 4px;
+    }
+    .onboarding-actions {
+      display: flex;
+      width: 100%;
+      gap: 12px;
+    }
+    .onboarding-btn {
+      flex: 1;
+      padding: 14px 24px;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .onboarding-btn--skip {
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.6);
+    }
+    .onboarding-btn--skip:hover { background: rgba(255,255,255,0.12); }
+    .onboarding-btn--next {
+      background: #FF5722;
+      color: #fff;
+      flex: 2;
+    }
+    .onboarding-btn--next:hover { background: #E64A19; }
+
+    /* ── Terms & Conditions ─────────────────────────────────────────── */
+    #terms-screen {
+      position: fixed; inset: 0;
+      background: #1A1A2E;
+      z-index: 9997;
+      display: none;
+      flex-direction: column;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #fff;
+    }
+    #terms-screen.active { display: flex; }
+
+    .terms-header {
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .terms-header__icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: rgba(255,87,34,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FF5722;
+    }
+    .terms-header__title {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    .terms-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .terms-body h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #FF5722;
+      margin: 20px 0 8px;
+    }
+    .terms-body h3:first-child { margin-top: 0; }
+    .terms-body p, .terms-body li {
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.7);
+      line-height: 1.7;
+      margin-bottom: 8px;
+    }
+    .terms-body ul {
+      padding-inline-start: 20px;
+      margin: 8px 0;
+    }
+    .terms-footer {
+      padding: 20px 24px 36px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .terms-checkbox-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .terms-checkbox {
+      width: 22px; height: 22px;
+      border-radius: 6px;
+      border: 2px solid rgba(255,255,255,0.3);
+      background: transparent;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      margin-top: 2px;
+    }
+    .terms-checkbox.checked {
+      background: #FF5722;
+      border-color: #FF5722;
+    }
+    .terms-checkbox.checked::after {
+      content: '';
+      width: 6px; height: 10px;
+      border: 2px solid #fff;
+      border-top: none; border-left: none;
+      transform: rotate(45deg);
+      margin-top: -2px;
+    }
+    .terms-checkbox-label {
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.8);
+      line-height: 1.4;
+    }
+    .terms-accept-btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      background: rgba(255,87,34,0.3);
+      color: rgba(255,255,255,0.4);
+      font-size: 1rem;
+      font-weight: 700;
+      border: none;
+      cursor: not-allowed;
+      transition: all 0.3s ease;
+    }
+    .terms-accept-btn.enabled {
+      background: #FF5722;
+      color: #fff;
+      cursor: pointer;
+    }
+    .terms-accept-btn.enabled:hover {
+      background: #E64A19;
+    }
   </style>
 </head>
 <body>
@@ -83,6 +320,107 @@
     <div id="splash-logo"><i data-lucide="utensils" class="icon-2xl" style="color:#fff"></i></div>
     <div id="splash-name">Barmagly</div>
     <div id="splash-loading"></div>
+  </div>
+
+  <!-- ── Onboarding screens (first visit only) ─────────────────────────── -->
+  <div id="onboarding">
+    <div class="onboarding-slides" id="onboarding-slides">
+      <!-- Slide 1: Welcome -->
+      <div class="onboarding-slide">
+        <div class="onboarding-slide__illustration slide-bg-1">
+          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h18v20H3z"/><path d="M9 22V12h6v10"/><path d="M3 12l9-7 9 7"/></svg>
+        </div>
+        <div class="onboarding-slide__title" data-i18n-key="onb_title_1">Welcome to Barmagly</div>
+        <div class="onboarding-slide__desc" data-i18n-key="onb_desc_1">Your favorite restaurants, delivered fast to your door. Browse menus, customize orders, and enjoy!</div>
+      </div>
+      <!-- Slide 2: Browse & Order -->
+      <div class="onboarding-slide">
+        <div class="onboarding-slide__illustration slide-bg-2">
+          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M8 11h6"/><path d="M11 8v6"/></svg>
+        </div>
+        <div class="onboarding-slide__title" data-i18n-key="onb_title_2">Browse & Discover</div>
+        <div class="onboarding-slide__desc" data-i18n-key="onb_desc_2">Explore menus, filter by category, and find exactly what you're craving. Add items to your cart with one tap.</div>
+      </div>
+      <!-- Slide 3: Track delivery -->
+      <div class="onboarding-slide">
+        <div class="onboarding-slide__illustration slide-bg-3">
+          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        </div>
+        <div class="onboarding-slide__title" data-i18n-key="onb_title_3">Live Order Tracking</div>
+        <div class="onboarding-slide__desc" data-i18n-key="onb_desc_3">Track your order in real-time from kitchen to doorstep. Know exactly when your food will arrive.</div>
+      </div>
+      <!-- Slide 4: Rewards -->
+      <div class="onboarding-slide">
+        <div class="onboarding-slide__illustration slide-bg-4">
+          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+        </div>
+        <div class="onboarding-slide__title" data-i18n-key="onb_title_4">Rewards & Offers</div>
+        <div class="onboarding-slide__desc" data-i18n-key="onb_desc_4">Earn loyalty points with every order, unlock exclusive deals, and save with special promotions.</div>
+      </div>
+    </div>
+    <div class="onboarding-footer">
+      <div class="onboarding-dots" id="onboarding-dots">
+        <div class="onboarding-dot active"></div>
+        <div class="onboarding-dot"></div>
+        <div class="onboarding-dot"></div>
+        <div class="onboarding-dot"></div>
+      </div>
+      <div class="onboarding-actions">
+        <button class="onboarding-btn onboarding-btn--skip" id="onboarding-skip" onclick="finishOnboarding()">Skip</button>
+        <button class="onboarding-btn onboarding-btn--next" id="onboarding-next" onclick="nextSlide()">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Terms & Conditions (first visit) ─────────────────────────────── -->
+  <div id="terms-screen">
+    <div class="terms-header">
+      <div class="terms-header__icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      </div>
+      <div class="terms-header__title" id="terms-title">Terms & Conditions</div>
+    </div>
+    <div class="terms-body" id="terms-body">
+      <h3>1. Acceptance of Terms</h3>
+      <p>By accessing or using the Barmagly Delivery service, you agree to be bound by these Terms and Conditions. If you do not agree, please do not use the service.</p>
+
+      <h3>2. Service Description</h3>
+      <p>Barmagly Delivery provides an online food ordering and delivery platform connecting customers with restaurant partners. We facilitate orders but are not responsible for food preparation.</p>
+
+      <h3>3. Account & Orders</h3>
+      <ul>
+        <li>You must provide accurate contact information for delivery</li>
+        <li>Orders are confirmed once accepted by the restaurant</li>
+        <li>Prices include applicable taxes unless stated otherwise</li>
+        <li>Delivery fees and minimum order amounts may apply</li>
+      </ul>
+
+      <h3>4. Payments</h3>
+      <p>We accept cash on delivery and online payment methods. All transactions are processed securely. Refunds are handled on a case-by-case basis.</p>
+
+      <h3>5. Delivery</h3>
+      <ul>
+        <li>Estimated delivery times are approximate</li>
+        <li>You must be available at the delivery address</li>
+        <li>We are not liable for delays caused by external factors</li>
+      </ul>
+
+      <h3>6. Privacy</h3>
+      <p>We collect and process personal data as described in our Privacy Policy. Your data is used solely for order fulfillment, customer support, and service improvement.</p>
+
+      <h3>7. Cancellation</h3>
+      <p>Orders may be cancelled before the restaurant begins preparation. Once preparation starts, cancellation may not be possible. Contact support for assistance.</p>
+
+      <h3>8. Liability</h3>
+      <p>Barmagly Delivery acts as an intermediary. We are not liable for food quality, allergens, or hygiene — these are the responsibility of the restaurant partner.</p>
+    </div>
+    <div class="terms-footer">
+      <div class="terms-checkbox-row" onclick="toggleTerms()">
+        <div class="terms-checkbox" id="terms-check"></div>
+        <div class="terms-checkbox-label" id="terms-check-label">I have read and agree to the Terms & Conditions and Privacy Policy</div>
+      </div>
+      <button class="terms-accept-btn" id="terms-accept-btn" onclick="acceptTerms()">Continue</button>
+    </div>
   </div>
 
   <!-- ── Toast notifications ───────────────────────────────────────────── -->
@@ -134,6 +472,9 @@
             <i data-lucide="shopping-cart" class="icon-sm"></i> <span>Cart</span>
             <span class="nav-cart-badge hidden" id="nav-cart-badge">0</span>
           </button>
+          <button class="nav-hamburger" id="nav-hamburger" onclick="toggleSideMenu()" aria-label="Menu">
+            <span></span><span></span><span></span>
+          </button>
         </nav>
 
       </div>
@@ -145,7 +486,7 @@
     <!-- Mobile bottom navigation -->
     <nav class="bottom-nav mobile-only" role="navigation" aria-label="Main navigation">
 
-      <button class="bottom-nav__item" data-route="home" onclick="router.navigate('home')">
+      <button class="bottom-nav__item" data-route="home" onclick="router.navigate('home')" aria-label="Home">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
           <polyline points="9 22 9 12 15 12 15 22"/>
@@ -153,17 +494,14 @@
         <span>Home</span>
       </button>
 
-      <button class="bottom-nav__item" data-route="menu" onclick="router.navigate('menu')">
+      <button class="bottom-nav__item" data-route="search" onclick="router.navigate('search')" aria-label="Search">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
-          <line x1="8" y1="18" x2="21" y2="18"/>
-          <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/>
-          <line x1="3" y1="18" x2="3.01" y2="18"/>
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <span>Menu</span>
+        <span>Search</span>
       </button>
 
-      <button class="bottom-nav__item" data-route="cart" onclick="router.navigate('cart')">
+      <button class="bottom-nav__item" data-route="cart" onclick="router.navigate('cart')" aria-label="Cart">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
           <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
@@ -172,7 +510,7 @@
         <span class="bottom-nav__badge hidden" id="cart-badge">0</span>
       </button>
 
-      <button class="bottom-nav__item" data-route="offers" onclick="router.navigate('offers')">
+      <button class="bottom-nav__item" data-route="offers" onclick="router.navigate('offers')" aria-label="Offers">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="20 12 20 22 4 22 4 12"/>
           <rect x="2" y="7" width="20" height="5"/>
@@ -183,7 +521,7 @@
         <span>Offers</span>
       </button>
 
-      <button class="bottom-nav__item" data-route="account" onclick="router.navigate('account')">
+      <button class="bottom-nav__item" data-route="account" onclick="router.navigate('account')" aria-label="Account">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
           <circle cx="12" cy="7" r="4"/>
@@ -192,6 +530,89 @@
       </button>
 
     </nav>
+
+    <!-- ── Side Menu Drawer (Just Eat style) ─────────────────────────── -->
+    <div class="side-menu-backdrop" id="side-menu-backdrop" onclick="closeSideMenu()"></div>
+    <aside class="side-menu" id="side-menu" aria-label="Main menu">
+      <div class="side-menu__header">
+        <h2 class="side-menu__title">My account</h2>
+        <button class="btn-icon btn-ghost" onclick="closeSideMenu()" aria-label="Close">✕</button>
+      </div>
+
+      <!-- Join perks banner (shown when not logged in) -->
+      <div class="side-menu__perks" id="side-menu-perks">
+        <div class="side-menu__perks-content">
+          <h3>Join for more perks</h3>
+          <ul>
+            <li>Unlock rewards and savings</li>
+            <li>Order faster</li>
+            <li>Track orders easily</li>
+          </ul>
+          <button class="btn btn-primary btn-sm" onclick="closeSideMenu();router.navigate('login')">Log in or sign up</button>
+        </div>
+        <div class="side-menu__perks-icon"><i data-lucide="lock-open" class="icon-2xl"></i></div>
+      </div>
+
+      <!-- Logged in user info (hidden until auth) -->
+      <div class="side-menu__user hidden" id="side-menu-user">
+        <div class="side-menu__user-avatar" id="side-menu-avatar">?</div>
+        <div class="side-menu__user-info">
+          <div class="side-menu__user-name" id="side-menu-name"></div>
+          <div class="side-menu__user-email" id="side-menu-email"></div>
+        </div>
+      </div>
+
+      <div class="side-menu__divider"></div>
+
+      <!-- Main menu items -->
+      <nav class="side-menu__nav">
+        <button class="side-menu__item" onclick="closeSideMenu();router.navigate('history')">
+          <i data-lucide="clipboard-list" class="icon-md"></i> <span>Orders</span>
+        </button>
+        <button class="side-menu__item" onclick="closeSideMenu();router.navigate('rewards')">
+          <i data-lucide="award" class="icon-md"></i> <span>Rewards</span>
+        </button>
+        <button class="side-menu__item" onclick="closeSideMenu();router.navigate('stamps')">
+          <i data-lucide="stamp" class="icon-md"></i> <span>StampCards</span>
+        </button>
+        <button class="side-menu__item" onclick="closeSideMenu();router.navigate('help')">
+          <i data-lucide="help-circle" class="icon-md"></i> <span>Need help?</span>
+        </button>
+        <button class="side-menu__item" onclick="closeSideMenu();router.navigate('giftcards')">
+          <i data-lucide="credit-card" class="icon-md"></i> <span>Gift cards</span>
+        </button>
+
+        <div class="side-menu__item side-menu__item--theme">
+          <i data-lucide="palette" class="icon-md"></i> <span>Theme</span>
+          <span class="side-menu__theme-badge">New</span>
+          <span class="side-menu__theme-value" id="side-menu-theme-label">System</span>
+          <div class="side-menu__theme-toggle" id="side-menu-theme-toggle">
+            <button class="side-menu__theme-btn" data-theme-val="light" onclick="setAppTheme('light')"><i data-lucide="sun" class="icon-xs"></i></button>
+            <button class="side-menu__theme-btn active" data-theme-val="system" onclick="setAppTheme('system')"><i data-lucide="monitor" class="icon-xs"></i></button>
+            <button class="side-menu__theme-btn" data-theme-val="dark" onclick="setAppTheme('dark')"><i data-lucide="moon" class="icon-xs"></i></button>
+          </div>
+        </div>
+      </nav>
+
+      <div class="side-menu__divider"></div>
+
+      <!-- Business links -->
+      <nav class="side-menu__nav">
+        <button class="side-menu__item" onclick="closeSideMenu();router.navigate('courier')">
+          <i data-lucide="bike" class="icon-md"></i> <span>Become a courier</span>
+        </button>
+        <button class="side-menu__item" onclick="closeSideMenu();router.navigate('partner')">
+          <i data-lucide="store" class="icon-md"></i> <span>Barmagly for business</span>
+        </button>
+        <button class="side-menu__item" onclick="closeSideMenu();router.navigate('partner')">
+          <i data-lucide="handshake" class="icon-md"></i> <span>Partner with us</span>
+        </button>
+      </nav>
+
+      <div class="side-menu__footer">
+        <button class="side-menu__feedback-btn" onclick="closeSideMenu();router.navigate('help')">Feedback</button>
+      </div>
+    </aside>
 
     <!-- Desktop Cart Drawer -->
     <div class="cart-drawer" id="cart-drawer" aria-label="Shopping cart">
@@ -216,6 +637,13 @@
 
     <!-- Cart drawer overlay -->
     <div class="sheet-backdrop" id="cart-drawer-backdrop" onclick="closeCartDrawer()"></div>
+
+    <!-- Product detail modal -->
+    <div class="sheet-backdrop" id="product-modal-backdrop" onclick="pages.menu.closeModal()"></div>
+    <div class="product-modal" id="product-modal">
+      <div class="product-modal__close" onclick="pages.menu.closeModal()"><i data-lucide="x"></i></div>
+      <div id="product-modal-inner"></div>
+    </div>
 
   </div><!-- /#app-shell -->
 
@@ -242,20 +670,29 @@
   </script>
 
   <!-- Core modules (order matters) -->
-  <script src="/api/delivery-app/js/router.js"></script>
-  <script src="/api/delivery-app/js/cart.js"></script>
-  <script src="/api/delivery-app/js/auth.js"></script>
-  <script src="/api/delivery-app/js/api.js"></script>
+  <script src="/api/delivery-app/js/router.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/cart.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/auth.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/api.js?v=20260412h"></script>
 
   <!-- Page modules -->
-  <script src="/api/delivery-app/js/pages/home.js"></script>
-  <script src="/api/delivery-app/js/pages/menu.js"></script>
-  <script src="/api/delivery-app/js/pages/cart-page.js"></script>
-  <script src="/api/delivery-app/js/pages/checkout.js"></script>
-  <script src="/api/delivery-app/js/pages/tracking.js"></script>
-  <script src="/api/delivery-app/js/pages/account.js"></script>
-  <script src="/api/delivery-app/js/pages/offers.js"></script>
-  <script src="/api/delivery-app/js/pages/login.js"></script>
+  <script src="/api/delivery-app/js/pages/home.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/menu.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/cart-page.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/checkout.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/tracking.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/account.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/offers.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/login.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/search.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/favorites.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/help.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/reviews.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/rewards.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/stamps.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/giftcards.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/courier.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/partner.js?v=20260412h"></script>
 
   <!-- pages namespace -->
   <script>window.pages = window.pages || {};</script>
@@ -267,7 +704,7 @@
     var slug = cfg.slug || "";
     var storeName = cfg.storeName || "Barmagly";
     var lang = cfg.language || "en";
-    var currency = cfg.currency || "EGP";
+    var currency = cfg.currency || "CHF";
 
     // ── Apply brand colors ──────────────────────────────────────────────
     if (cfg.primaryColor) {
@@ -326,6 +763,15 @@
       { name: "offers",   path: "/order/" + slug + "/offers",   render: pages.offers.render,        loader: true  },
       { name: "login",    path: "/order/" + slug + "/login",    render: pages.login.render,         loader: false },
       { name: "history",  path: "/order/" + slug + "/orders",   render: pages.account.renderHistory, loader: true },
+      { name: "search",   path: "/order/" + slug + "/search",   render: pages.search.render,        loader: false },
+      { name: "favorites",path: "/order/" + slug + "/favorites", render: pages.favorites.render,     loader: true  },
+      { name: "help",     path: "/order/" + slug + "/help",     render: pages.help.render,          loader: true  },
+      { name: "reviews",  path: "/order/" + slug + "/reviews",  render: pages.reviews.render,       loader: true  },
+      { name: "rewards",  path: "/order/" + slug + "/rewards",  render: pages.rewards.render,       loader: false },
+      { name: "stamps",   path: "/order/" + slug + "/stamps",   render: pages.stamps.render,        loader: false },
+      { name: "giftcards",path: "/order/" + slug + "/giftcards",render: pages.giftcards.render,     loader: false },
+      { name: "courier",  path: "/order/" + slug + "/courier",  render: pages.courier.render,       loader: false },
+      { name: "partner",  path: "/order/" + slug + "/partner",  render: pages.partner.render,       loader: false },
     ]);
 
     // ── Cart badge sync ──────────────────────────────────────────────────
@@ -350,28 +796,295 @@
       navUserLabel.textContent = customer.name ? customer.name.split(" ")[0] : "My Account";
     }
 
-    // ── Show app ─────────────────────────────────────────────────────────
-    document.getElementById("app-shell").classList.remove("hidden");
+    // ── Onboarding & Terms (first visit) ────────────────────────────────
+    var onboardingKey = "barmagly_onboarding_" + slug;
+    var termsKey = "barmagly_terms_" + slug;
+    var hasOnboarded = localStorage.getItem(onboardingKey);
+    var hasAcceptedTerms = localStorage.getItem(termsKey);
 
-    // Dismiss splash with slight delay
-    setTimeout(function() {
+    // Apply RTL to onboarding text
+    if (lang === "ar") {
+      var i18n = {
+        onb_title_1: "مرحباً بك في " + storeName,
+        onb_desc_1: "مطاعمك المفضلة، توصيل سريع لباب منزلك. تصفّح القوائم وخصّص طلبك واستمتع!",
+        onb_title_2: "تصفّح واكتشف",
+        onb_desc_2: "استكشف القوائم، فلتر حسب الفئة، واعثر على ما تشتهيه. أضف الأصناف بنقرة واحدة.",
+        onb_title_3: "تتبّع طلبك مباشرة",
+        onb_desc_3: "تابع طلبك لحظة بلحظة من المطبخ حتى باب منزلك.",
+        onb_title_4: "مكافآت وعروض",
+        onb_desc_4: "اكسب نقاط ولاء مع كل طلب، واحصل على عروض حصرية وخصومات مميزة."
+      };
+      document.querySelectorAll("[data-i18n-key]").forEach(function(el) {
+        var key = el.getAttribute("data-i18n-key");
+        if (i18n[key]) el.textContent = i18n[key];
+      });
+      var skipBtn = document.getElementById("onboarding-skip");
+      if (skipBtn) skipBtn.textContent = "تخطي";
+      var nextBtn = document.getElementById("onboarding-next");
+      if (nextBtn) nextBtn.textContent = "التالي";
+      var termsTitle = document.getElementById("terms-title");
+      if (termsTitle) termsTitle.textContent = "الشروط والأحكام";
+      var termsCheckLabel = document.getElementById("terms-check-label");
+      if (termsCheckLabel) termsCheckLabel.textContent = "لقد قرأت وأوافق على الشروط والأحكام وسياسة الخصوصية";
+      var termsAcceptBtn = document.getElementById("terms-accept-btn");
+      if (termsAcceptBtn) termsAcceptBtn.textContent = "متابعة";
+    } else {
+      // Update title with store name
+      var titleEl = document.querySelector('[data-i18n-key="onb_title_1"]');
+      if (titleEl) titleEl.textContent = "Welcome to " + storeName;
+    }
+
+    function dismissSplashAndShowApp() {
+      document.getElementById("app-shell").classList.remove("hidden");
       var splash = document.getElementById("splash");
       if (splash) {
         splash.classList.add("hidden");
         setTimeout(function() { splash.remove(); }, 500);
       }
-    }, 800);
+    }
+
+    if (!hasOnboarded) {
+      // Show onboarding after splash
+      setTimeout(function() {
+        var splash = document.getElementById("splash");
+        if (splash) {
+          splash.classList.add("hidden");
+          setTimeout(function() { splash.remove(); }, 500);
+        }
+        document.getElementById("onboarding").classList.add("active");
+      }, 1200);
+    } else if (!hasAcceptedTerms) {
+      // Skip onboarding, show terms
+      setTimeout(function() {
+        var splash = document.getElementById("splash");
+        if (splash) {
+          splash.classList.add("hidden");
+          setTimeout(function() { splash.remove(); }, 500);
+        }
+        document.getElementById("terms-screen").classList.add("active");
+      }, 800);
+    } else {
+      // Returning user — show app directly
+      dismissSplashAndShowApp();
+      setTimeout(function() {
+        var splash = document.getElementById("splash");
+        if (splash) {
+          splash.classList.add("hidden");
+          setTimeout(function() { splash.remove(); }, 500);
+        }
+      }, 800);
+    }
 
     // ── Register service worker ─────────────────────────────────────────
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/api/delivery-app/sw.js", { scope: "/api/" }).catch(function() {});
+      navigator.serviceWorker.register("/api/delivery-app/sw.js", { scope: "/api/delivery-app/" }).catch(function() {});
     }
+
+    // ── Detect dine-in QR table from URL globally ──────────────────────
+    (async function() {
+      var urlParams = new URLSearchParams(window.location.search);
+      var tableToken = urlParams.get("table");
+      if (tableToken && cart.getState().orderType !== "dine_in") {
+        try {
+          var qrResp = await fetch("/api/dine-in/validate/" + tableToken).then(function(r) { return r.json(); });
+          if (qrResp.valid) {
+            cart.setDineIn(tableToken, qrResp.tableName);
+            console.log("[QR] Dine-in mode:", qrResp.tableName);
+          }
+        } catch(e) { console.warn("[QR] validation failed:", e); }
+      }
+    })();
 
     // ── Resolve initial URL ──────────────────────────────────────────────
     router._resolve();
     // Initialize Lucide icons for static header elements
     if (window.lucide) window.lucide.createIcons();
   })();
+
+  // ── Global error handling ────────────────────────────────────────────────
+  window.addEventListener("unhandledrejection", function(e) {
+    console.error("[unhandled]", e.reason);
+    if (e.reason && e.reason.message && e.reason.message !== "Unauthorized") {
+      showToast(e.reason.message || "Something went wrong", "error");
+    }
+    e.preventDefault();
+  });
+
+  // ── Offline detection ──────────────────────────────────────────────────
+  (function() {
+    var banner = document.createElement("div");
+    banner.id = "offline-banner";
+    banner.className = "offline-banner hidden";
+    banner.innerHTML = '<i data-lucide="wifi-off" class="icon-sm"></i> You\'re offline — check your connection';
+    document.body.appendChild(banner);
+    window.addEventListener("offline", function() { banner.classList.remove("hidden"); });
+    window.addEventListener("online", function() { banner.classList.add("hidden"); showToast("Back online", "success"); });
+    if (!navigator.onLine) banner.classList.remove("hidden");
+  })();
+
+  // ── Side Menu ────────────────────────────────────────────────────────────
+  window.toggleSideMenu = function() {
+    var menu = document.getElementById("side-menu");
+    var backdrop = document.getElementById("side-menu-backdrop");
+    var isOpen = menu.classList.contains("open");
+    if (isOpen) { closeSideMenu(); } else { openSideMenu(); }
+  };
+  window.openSideMenu = function() {
+    var menu = document.getElementById("side-menu");
+    var backdrop = document.getElementById("side-menu-backdrop");
+    menu.classList.add("open");
+    backdrop.classList.add("open");
+    document.body.style.overflow = "hidden";
+    // Update user info
+    var customer = auth.getCustomer();
+    var perks = document.getElementById("side-menu-perks");
+    var userSection = document.getElementById("side-menu-user");
+    if (customer) {
+      if (perks) perks.classList.add("hidden");
+      if (userSection) {
+        userSection.classList.remove("hidden");
+        document.getElementById("side-menu-avatar").textContent = (customer.name || customer.phone || "?").charAt(0).toUpperCase();
+        document.getElementById("side-menu-name").textContent = customer.name || customer.phone || "User";
+        document.getElementById("side-menu-email").textContent = customer.email || customer.phone || "";
+      }
+    } else {
+      if (perks) perks.classList.remove("hidden");
+      if (userSection) userSection.classList.add("hidden");
+    }
+    if (window.lucide) window.lucide.createIcons();
+  };
+  window.closeSideMenu = function() {
+    var menu = document.getElementById("side-menu");
+    var backdrop = document.getElementById("side-menu-backdrop");
+    menu.classList.remove("open");
+    backdrop.classList.remove("open");
+    document.body.style.overflow = "";
+  };
+
+  // ── Theme Toggle ──────────────────────────────────────────────────────────
+  window.setAppTheme = function(theme) {
+    localStorage.setItem("barmagly_theme", theme);
+    applyTheme(theme);
+    // Update toggle buttons
+    document.querySelectorAll(".side-menu__theme-btn").forEach(function(btn) {
+      btn.classList.toggle("active", btn.dataset.themeVal === theme);
+    });
+    var label = document.getElementById("side-menu-theme-label");
+    if (label) label.textContent = theme === "light" ? "Light" : theme === "dark" ? "Dark" : "System";
+  };
+  function applyTheme(theme) {
+    if (theme === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    } else if (theme === "light") {
+      document.documentElement.removeAttribute("data-theme");
+    } else {
+      // System
+      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      } else {
+        document.documentElement.removeAttribute("data-theme");
+      }
+    }
+  }
+  // Apply saved theme on load
+  (function() {
+    var saved = localStorage.getItem("barmagly_theme") || "system";
+    applyTheme(saved);
+    // Listen for system changes
+    if (window.matchMedia) {
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function() {
+        if ((localStorage.getItem("barmagly_theme") || "system") === "system") applyTheme("system");
+      });
+    }
+  })();
+
+  // ── Onboarding slide navigation ──────────────────────────────────────────
+
+  var _currentSlide = 0;
+  var _totalSlides = 4;
+
+  window.nextSlide = function() {
+    if (_currentSlide < _totalSlides - 1) {
+      _currentSlide++;
+      updateSlidePosition();
+    } else {
+      finishOnboarding();
+    }
+  };
+
+  window.finishOnboarding = function() {
+    var cfg = window.DELIVERY_CONFIG || {};
+    var slug = cfg.slug || "";
+    localStorage.setItem("barmagly_onboarding_" + slug, "1");
+    document.getElementById("onboarding").classList.remove("active");
+
+    var hasTerms = localStorage.getItem("barmagly_terms_" + slug);
+    if (!hasTerms) {
+      document.getElementById("terms-screen").classList.add("active");
+    } else {
+      document.getElementById("app-shell").classList.remove("hidden");
+      if (window.lucide) window.lucide.createIcons();
+    }
+  };
+
+  function updateSlidePosition() {
+    var slides = document.querySelectorAll(".onboarding-slide");
+    slides.forEach(function(slide) {
+      slide.style.transform = "translateX(-" + (_currentSlide * 100) + "%)";
+    });
+    var dots = document.querySelectorAll(".onboarding-dot");
+    dots.forEach(function(dot, i) {
+      dot.classList.toggle("active", i === _currentSlide);
+    });
+    // Update button text on last slide
+    var nextBtn = document.getElementById("onboarding-next");
+    var lang = (window.DELIVERY_CONFIG || {}).language || "en";
+    if (_currentSlide === _totalSlides - 1) {
+      nextBtn.textContent = lang === "ar" ? "ابدأ الآن" : "Get Started";
+    } else {
+      nextBtn.textContent = lang === "ar" ? "التالي" : "Next";
+    }
+  }
+
+  // Touch/swipe support for onboarding
+  (function() {
+    var slidesEl = document.getElementById("onboarding-slides");
+    if (!slidesEl) return;
+    var startX = 0, diffX = 0;
+    slidesEl.addEventListener("touchstart", function(e) { startX = e.touches[0].clientX; }, { passive: true });
+    slidesEl.addEventListener("touchmove", function(e) { diffX = e.touches[0].clientX - startX; }, { passive: true });
+    slidesEl.addEventListener("touchend", function() {
+      if (Math.abs(diffX) > 50) {
+        var isRtl = document.documentElement.dir === "rtl";
+        if ((!isRtl && diffX < 0) || (isRtl && diffX > 0)) {
+          if (_currentSlide < _totalSlides - 1) { _currentSlide++; updateSlidePosition(); }
+        } else {
+          if (_currentSlide > 0) { _currentSlide--; updateSlidePosition(); }
+        }
+      }
+      diffX = 0;
+    });
+  })();
+
+  // ── Terms & Conditions ─────────────────────────────────────────────────
+
+  var _termsAccepted = false;
+
+  window.toggleTerms = function() {
+    _termsAccepted = !_termsAccepted;
+    document.getElementById("terms-check").classList.toggle("checked", _termsAccepted);
+    document.getElementById("terms-accept-btn").classList.toggle("enabled", _termsAccepted);
+  };
+
+  window.acceptTerms = function() {
+    if (!_termsAccepted) return;
+    var cfg = window.DELIVERY_CONFIG || {};
+    var slug = cfg.slug || "";
+    localStorage.setItem("barmagly_terms_" + slug, "1");
+    document.getElementById("terms-screen").classList.remove("active");
+    document.getElementById("app-shell").classList.remove("hidden");
+    if (window.lucide) window.lucide.createIcons();
+  };
 
   // ── Cart drawer ──────────────────────────────────────────────────────────
 
@@ -408,9 +1121,13 @@
         ? '<img class="cart-item__image" src="' + item.image + '" alt="' + item.name + '" onerror="this.style.display=\'none\'">'
         : '<div class="cart-item__image-placeholder"><i data-lucide="utensils" class="icon-lg"></i></div>';
       var safeKey = item._key.replace(/'/g, "\\'");
+      var modsHtml = (item.modifiers && item.modifiers.length > 0)
+        ? '<div class="cart-item__mods">' + item.modifiers.map(function(m) { return m.name; }).join(", ") + '</div>'
+        : '';
       return '<div class="cart-item">' + img +
         '<div class="cart-item__info">' +
         '<div class="cart-item__name">' + item.name + '</div>' +
+        modsHtml +
         '<div class="cart-item__price">' + formatCurrency((item.price + (item.modifierPrice || 0)) * item.qty, cfg.currency) + '</div>' +
         '</div>' +
         '<div class="qty-control">' +
@@ -453,6 +1170,16 @@
   document.addEventListener("DOMContentLoaded", function() {
     var hs = document.getElementById("header-search");
     if (!hs) return;
+    // Real-time filtering on home page
+    hs.addEventListener("input", function() {
+      var q = hs.value.trim();
+      if (pages.home && pages.home._filterProducts && pages.home._allProducts && pages.home._allProducts.length > 0) {
+        pages.home._filterProducts(q);
+        // Also sync the hero search bar
+        var heroSearch = document.getElementById("home-search");
+        if (heroSearch) heroSearch.value = q;
+      }
+    });
     hs.addEventListener("keydown", function(e) {
       if (e.key === "Enter" && hs.value.trim()) {
         window._headerSearch = hs.value.trim();
@@ -502,7 +1229,7 @@
   };
 
   window.formatCurrency = function(amount, currency) {
-    var c = currency || (window.DELIVERY_CONFIG || {}).currency || "EGP";
+    var c = currency || (window.DELIVERY_CONFIG || {}).currency || "CHF";
     try {
       return new Intl.NumberFormat(document.documentElement.lang || "en", {
         style: "currency", currency: c,

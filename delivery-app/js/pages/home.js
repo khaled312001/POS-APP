@@ -28,24 +28,78 @@ pages.home = {
       pages.home._storeConfig = storeConfig;
       pages.home._menu = menu;
       pages.home._allProducts = menu?.allProducts || menu?.products || [];
+      pages.home._categories = menu?.categories || [];
 
       const banners      = storeConfig?.bannerImages || [];
-      const categories   = menu?.categories || [];
+      const categories   = pages.home._categories;
       const allProducts  = pages.home._allProducts;
-      const popular      = [...allProducts].sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0)).slice(0, 8);
+
+      // Filter out alcohol/beer categories
+      const alcoholRegex = /^(beer|bier|alcohol|alkohol|wine|wein|spirits|spirituosen|cocktail|drinks?.?alcohol|vodka|whisky|champagn|likör|liqueur)/i;
+      const alcoholCatIds = new Set(categories.filter(c => alcoholRegex.test(c.name)).map(c => c.id));
+
+      // Filter out alcohol products by name
+      const alcoholProductRegex = /\b(beer|bier|alcohol|alkohol|wine|wein|spirits|vodka|whisky|whiskey|champagn|rum|gin|tequila|cognac|brandy|likör|liqueur|prosecco|aperol|spritz|grappa|absinth|jägermeister|sambuca|ouzo|raki|schnapps|schnaps)\b/i;
+
+      // Find "Extra" / addon categories to exclude from featured items
+      const extraCatIds = new Set(categories.filter(c =>
+        /^extra|^addon|^zusatz|^beilage/i.test(c.name)
+      ).map(c => c.id));
+
+      // Featured items: exclude extras/zero-price AND alcohol, sort by price (main dishes first), then salesCount
+      const mainItems = allProducts.filter(p =>
+        !extraCatIds.has(p.categoryId) &&
+        !alcoholCatIds.has(p.categoryId) &&
+        !alcoholProductRegex.test(p.name || "") &&
+        parseFloat(p.price || 0) > 0
+      );
+
+      // Also filter categories to exclude alcohol from cuisine grid
+      const filteredCategories = categories.filter(c => !alcoholRegex.test(c.name));
+      const hasSales = mainItems.some(p => (p.salesCount || 0) > 0);
+      const popular = [...mainItems].sort((a, b) => {
+        if (hasSales) return (b.salesCount || 0) - (a.salesCount || 0);
+        return (parseFloat(b.price) || 0) - (parseFloat(a.price) || 0);
+      }).slice(0, 12);
       const featuredPromos = storeConfig?.promoText || null;
 
-      // Cuisine categories (from actual menu categories + generic icons)
-      const cuisineIcons = { en: {
-        "Pizza":'<i data-lucide="pizza" class="icon-lg"></i>',"Burger":'<i data-lucide="beef" class="icon-lg"></i>',"Sushi":'<i data-lucide="fish" class="icon-lg"></i>',"Chicken":'<i data-lucide="drumstick" class="icon-lg"></i>',"Pasta":'<i data-lucide="soup" class="icon-lg"></i>',
-        "Salad":'<i data-lucide="salad" class="icon-lg"></i>',"Dessert":'<i data-lucide="cake-slice" class="icon-lg"></i>',"Drinks":'<i data-lucide="cup-soda" class="icon-lg"></i>',"Breakfast":'<i data-lucide="egg-fried" class="icon-lg"></i>',"Sandwiches":'<i data-lucide="sandwich" class="icon-lg"></i>',
-        "Seafood":'<i data-lucide="fish" class="icon-lg"></i>',"Grill":'<i data-lucide="flame" class="icon-lg"></i>',"Vegan":'<i data-lucide="vegan" class="icon-lg"></i>',"Soup":'<i data-lucide="soup" class="icon-lg"></i>',"Coffee":'<i data-lucide="coffee" class="icon-lg"></i>',
-      }, ar: {
-        "بيتزا":'<i data-lucide="pizza" class="icon-lg"></i>',"برجر":'<i data-lucide="beef" class="icon-lg"></i>',"سوشي":'<i data-lucide="fish" class="icon-lg"></i>',"دجاج":'<i data-lucide="drumstick" class="icon-lg"></i>',"باستا":'<i data-lucide="soup" class="icon-lg"></i>',
-        "سلطة":'<i data-lucide="salad" class="icon-lg"></i>',"حلويات":'<i data-lucide="cake-slice" class="icon-lg"></i>',"مشروبات":'<i data-lucide="cup-soda" class="icon-lg"></i>',"فطار":'<i data-lucide="egg-fried" class="icon-lg"></i>',"ساندوتشات":'<i data-lucide="sandwich" class="icon-lg"></i>',
-        "مأكولات بحرية":'<i data-lucide="fish" class="icon-lg"></i>',"مشويات":'<i data-lucide="flame" class="icon-lg"></i>',"نباتي":'<i data-lucide="vegan" class="icon-lg"></i>',"شوربة":'<i data-lucide="soup" class="icon-lg"></i>',"قهوة":'<i data-lucide="coffee" class="icon-lg"></i>',
-      } };
-      const icons = cuisineIcons[rtl ? "ar" : "en"];
+      // Cuisine categories with real food photos (Just Eat style circular images)
+      const cuisineImages = {
+        "pizza": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=150&h=150&fit=crop",
+        "burger": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=150&h=150&fit=crop",
+        "sushi": "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=150&h=150&fit=crop",
+        "chicken": "https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=150&h=150&fit=crop",
+        "pasta": "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=150&h=150&fit=crop",
+        "salad": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=150&h=150&fit=crop",
+        "dessert": "https://images.unsplash.com/photo-1551024506-0bccd828d307?w=150&h=150&fit=crop",
+        "drinks": "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=150&h=150&fit=crop",
+        "breakfast": "https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=150&h=150&fit=crop",
+        "sandwich": "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=150&h=150&fit=crop",
+        "seafood": "https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?w=150&h=150&fit=crop",
+        "grill": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=150&h=150&fit=crop",
+        "vegan": "https://images.unsplash.com/photo-1543362906-acfc16c67564?w=150&h=150&fit=crop",
+        "soup": "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=150&h=150&fit=crop",
+        "coffee": "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=150&h=150&fit=crop",
+        "wrap": "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=150&h=150&fit=crop",
+        "steak": "https://images.unsplash.com/photo-1600891964092-4316c288032e?w=150&h=150&fit=crop",
+        "falafel": "https://images.unsplash.com/photo-1593001872095-7d5b3868fb1d?w=150&h=150&fit=crop",
+        "kebab": "https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=150&h=150&fit=crop",
+        "shawarma": "https://images.unsplash.com/photo-1529006557810-274b9b2fc783?w=150&h=150&fit=crop",
+      };
+      // Arabic name to key map
+      var arMap = {"بيتزا":"pizza","برجر":"burger","سوشي":"sushi","دجاج":"chicken","باستا":"pasta","سلطة":"salad","حلويات":"dessert","مشروبات":"drinks","فطار":"breakfast","ساندوتشات":"sandwich","مأكولات بحرية":"seafood","مشويات":"grill","نباتي":"vegan","شوربة":"soup","قهوة":"coffee"};
+      function getCuisineImage(name) {
+        var key = name.toLowerCase();
+        // Try direct match
+        for (var k in cuisineImages) { if (key.includes(k)) return cuisineImages[k]; }
+        // Try Arabic
+        if (arMap[name]) return cuisineImages[arMap[name]];
+        // Fallback: pick by hash
+        var keys = Object.keys(cuisineImages);
+        var hash = 0;
+        for (var i = 0; i < name.length; i++) hash = ((hash << 5) - hash) + name.charCodeAt(i);
+        return cuisineImages[keys[Math.abs(hash) % keys.length]];
+      }
 
       container.innerHTML = `
 <div class="home-page">
@@ -141,17 +195,19 @@ pages.home = {
   </div>` : ""}
 
   <!-- ── Cuisine categories ─────────────────────────────────────────── -->
-  ${categories.length > 0 ? `
+  ${filteredCategories.length > 0 ? `
   <div class="home-section">
     <div class="section-header">
       <h2 class="section-header__title">${rtl ? "ماذا تحب اليوم؟" : "What do you fancy?"}</h2>
     </div>
     <div class="cuisine-grid">
-      ${categories.slice(0, 12).map(c => {
-        const emoji = icons[c.name] || (Object.values(icons)[Math.abs(c.id) % Object.values(icons).length]);
+      ${filteredCategories.slice(0, 12).map(c => {
+        const imgUrl = getCuisineImage(c.name);
         return `
         <div class="cuisine-card" onclick="pages.home._filterByCategory(${c.id})" data-cat="${c.id}">
-          <div class="cuisine-card__emoji">${emoji}</div>
+          <div class="cuisine-card__emoji-wrap">
+            <img src="${imgUrl}" alt="${c.name}" loading="lazy" onerror="this.style.display='none'" />
+          </div>
           <div class="cuisine-card__label">${c.name}</div>
         </div>`;
       }).join("")}
@@ -210,6 +266,9 @@ pages.home = {
       if (searchInput) {
         searchInput.addEventListener("input", (e) => {
           pages.home._filterProducts(e.target.value);
+          // Sync header search
+          var headerSearch = document.getElementById("header-search");
+          if (headerSearch) headerSearch.value = e.target.value;
         });
         // Pre-fill from header search
         if (window._headerSearch) {
@@ -242,16 +301,22 @@ pages.home = {
   _skeleton() {
     return `
       <div class="home-page">
-        <div class="home-skeleton-hero">
-          <div class="skeleton skeleton-text" style="width:80px"></div>
-          <div class="skeleton skeleton-text" style="width:200px;height:28px"></div>
-          <div class="skeleton skeleton-text" style="width:140px"></div>
-          <div class="skeleton skeleton-text" style="height:48px;border-radius:var(--radius-pill)"></div>
+        <div class="home-hero" style="min-height:220px">
+          <div class="skeleton skeleton-text" style="width:100px;height:14px;background:rgba(255,255,255,0.08)"></div>
+          <div class="skeleton skeleton-text" style="width:260px;height:32px;margin-top:12px;background:rgba(255,255,255,0.1)"></div>
+          <div class="skeleton skeleton-text" style="width:180px;height:16px;margin-top:8px;background:rgba(255,255,255,0.06)"></div>
+          <div class="skeleton skeleton-text" style="height:52px;border-radius:var(--radius-lg);margin-top:20px;background:rgba(255,255,255,0.08)"></div>
         </div>
-        <div class="home-skeleton-divider"></div>
         <div class="home-section">
-          <div class="products-grid">
-            ${Array(6).fill('<div class="home-skeleton-card"><div class="skeleton" style="aspect-ratio:1"></div><div style="padding:8px"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width:60%"></div></div></div>').join("")}
+          <div class="skeleton skeleton-text" style="width:160px;height:22px"></div>
+          <div style="display:flex;gap:12px;margin-top:16px;overflow:hidden">
+            ${Array(6).fill('<div style="flex-shrink:0;text-align:center"><div class="skeleton" style="width:68px;height:68px;border-radius:50%"></div><div class="skeleton skeleton-text" style="width:50px;height:12px;margin:8px auto 0"></div></div>').join("")}
+          </div>
+        </div>
+        <div class="home-section">
+          <div class="skeleton skeleton-text" style="width:180px;height:22px"></div>
+          <div class="products-grid" style="margin-top:16px">
+            ${Array(4).fill('<div style="border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--delivery-border)"><div class="skeleton" style="aspect-ratio:4/3"></div><div style="padding:12px"><div class="skeleton skeleton-text" style="width:80%"></div><div class="skeleton skeleton-text" style="width:50%;margin-top:8px"></div></div></div>').join("")}
           </div>
         </div>
       </div>`;
@@ -260,11 +325,18 @@ pages.home = {
   _productCard(p) {
     const cfg = window.DELIVERY_CONFIG || {};
     const price = formatCurrency(parseFloat(p.price) || 0, cfg.currency);
+    // Use real image or food fallback from menu page
+    const imgUrl = p.imageUrl || "";
+    const isRealImg = imgUrl && !imgUrl.startsWith("data:image/svg") && imgUrl.length > 10;
+    const fallbackImg = (pages.menu && pages.menu._getFoodImage) ? pages.menu._getFoodImage(p) : "";
+    const displayImg = isRealImg ? fixImageUrl(imgUrl) : fallbackImg;
     return `
       <div class="product-card" onclick="pages.menu.openProductModal(${p.id})">
-        ${p.imageUrl
-          ? `<img class="product-card__image" src="${fixImageUrl(p.imageUrl)}" alt="${p.name}" loading="lazy" />`
+        <div style="overflow:hidden;border-radius:var(--radius-lg) var(--radius-lg) 0 0">
+        ${displayImg
+          ? `<img class="product-card__image" src="${displayImg}" alt="${p.name}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=product-card__image-placeholder><i data-lucide=utensils class=icon-xl></i></div>'" />`
           : `<div class="product-card__image-placeholder"><i data-lucide="utensils" class="icon-xl"></i></div>`}
+        </div>
         <div class="product-card__body">
           <div class="product-card__name line-clamp-2">${p.name}</div>
           ${p.description ? `<div class="product-card__desc line-clamp-2">${p.description}</div>` : ""}
@@ -272,7 +344,7 @@ pages.home = {
         <div class="product-card__footer">
           <span class="product-card__price">${price}</span>
           <button class="product-card__add" aria-label="Add ${p.name} to cart"
-            onclick="event.stopPropagation(); pages.home._quickAdd(${JSON.stringify({id:p.id,name:p.name,price:p.price,imageUrl:p.imageUrl||""}).replace(/"/g,'&quot;')})">+</button>
+            onclick="event.stopPropagation(); pages.menu.openProductModal(${p.id})">+</button>
         </div>
       </div>`;
   },
@@ -288,11 +360,14 @@ pages.home = {
     if (!grid) return;
     const q = query.toLowerCase().trim();
     const allProducts = pages.home._allProducts;
+    const alcoholRx = /\b(beer|bier|alcohol|alkohol|wine|wein|vodka|whisky|whiskey|champagn|rum|gin|tequila|cognac|brandy|likör|liqueur|prosecco|aperol|spritz|grappa|absinth|jägermeister|sambuca|ouzo|raki|schnapps|schnaps)\b/i;
+    // Exclude zero-price extras and alcohol from default view
+    const mainProducts = allProducts.filter(p => parseFloat(p.price || 0) > 0 && !alcoholRx.test(p.name || ""));
     const results = q
-      ? allProducts.filter(p =>
+      ? mainProducts.filter(p =>
           p.name.toLowerCase().includes(q) ||
           (p.description || "").toLowerCase().includes(q))
-      : allProducts.slice(0, 8);
+      : mainProducts.slice(0, 12);
 
     if (results.length === 0) {
       grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">

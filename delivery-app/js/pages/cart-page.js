@@ -250,6 +250,13 @@ pages.cart = {
   },
 
   _goCheckout() {
+    // Require login for delivery/pickup, but allow guest for dine-in
+    const isDineIn = cart.getState().orderType === "dine_in";
+    if (!isDineIn && !auth.isLoggedIn()) {
+      showToast(isRtl() ? "يجب تسجيل الدخول أولاً لإتمام الطلب" : "Please login first to place an order", "warning");
+      router.navigate("login");
+      return;
+    }
     const state = cart.getState();
     const minOrder = parseFloat(pages.menu?._storeConfig?.minOrderAmount) || 0;
     if (state.items.length === 0) { showToast(isRtl() ? "السلة فارغة" : "Cart is empty", "warning"); return; }

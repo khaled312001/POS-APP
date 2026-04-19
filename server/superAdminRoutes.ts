@@ -10,8 +10,16 @@ import { db } from "./db";
 import { eq, desc, sql, and, gte, lte, sum } from "drizzle-orm";
 
 // ── BACKUP HELPERS ────────────────────────────────────────────────────────
-const BACKUP_DIR = path.resolve(process.cwd(), "backups");
-if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+// On Vercel the deployment filesystem is read-only; only /tmp is writable.
+// Fall back to /tmp so cold-start doesn't throw EROFS and kill the function.
+const BACKUP_DIR = process.env.VERCEL
+  ? path.join("/tmp", "backups")
+  : path.resolve(process.cwd(), "backups");
+try {
+  if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+} catch (err) {
+  console.warn("[superAdminRoutes] Could not create BACKUP_DIR:", (err as Error).message);
+}
 
 async function createTenantBackup(tenantId: number): Promise<string> {
   const tenant = await storage.getTenant(tenantId);

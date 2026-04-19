@@ -49,9 +49,9 @@ function formatCurrency(amount, currency) {
   if (window.formatCurrency && window.formatCurrency !== formatCurrency) {
     return window.formatCurrency(amount, currency);
   }
-  var c = currency || (window.DELIVERY_CONFIG || {}).currency || "EGP";
+  var c = currency || (window.DELIVERY_CONFIG || {}).currency || "CHF";
   try {
-    return new Intl.NumberFormat(isRtl() ? "ar-EG" : "en", {
+    return new Intl.NumberFormat(isRtl() ? "ar" : "de-CH", {
       style: "currency", currency: c, minimumFractionDigits: 0,
     }).format(amount || 0);
   } catch (_) {
@@ -228,6 +228,44 @@ const referralApi = {
   lookup: (code) => apiFetch(`/api/delivery/referral/${code}`),
 };
 
+// ── Favorites ──────────────────────────────────────────────────────────────
+
+const favoritesApi = {
+  list: () => apiFetch("/api/delivery/favorites"),
+  add: (productId, tenantId) =>
+    apiFetch("/api/delivery/favorites", {
+      method: "POST",
+      body: JSON.stringify({ productId, tenantId }),
+    }),
+  remove: (productId) =>
+    apiFetch(`/api/delivery/favorites/${productId}`, { method: "DELETE" }),
+};
+
+// ── Search ─────────────────────────────────────────────────────────────────
+
+const searchApi = {
+  query: (q, tenantId) => apiFetch(`/api/delivery/search?q=${encodeURIComponent(q)}&tenantId=${tenantId || ""}`),
+};
+
+// ── Help ───────────────────────────────────────────────────────────────────
+
+const helpApi = {
+  getFaq: (tenantId) => apiFetch(`/api/delivery/help/faq?tenantId=${tenantId || ""}`),
+  getTickets: () => apiFetch("/api/delivery/help/tickets"),
+  submitTicket: (data) =>
+    apiFetch("/api/delivery/help/ticket", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
+// ── Reviews ───────────────────────────────────────────────────────────────
+
+const reviewsApi = {
+  getForStore: (slug, page, limit) =>
+    apiFetch(`/api/delivery/store/${slug}/reviews?page=${page || 1}&limit=${limit || 10}`),
+};
+
 // ── Exports ─────────────────────────────────────────────────────────────────
 
 window.api = {
@@ -240,4 +278,8 @@ window.api = {
   loyalty: loyaltyApi,
   wallet: walletApi,
   referral: referralApi,
+  favorites: favoritesApi,
+  search: searchApi,
+  help: helpApi,
+  reviews: reviewsApi,
 };

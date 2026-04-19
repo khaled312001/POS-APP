@@ -213,11 +213,13 @@ export default function OrdersScreen() {
   const filteredOrders = unifiedOrders.filter(o => {
     if (viewMode === "online" && o._type !== "online") return false;
     if (viewMode === "pos" && o._type !== "pos") return false;
+    if (viewMode === "dine_in" && (o._type !== "online" || o.orderType !== "dine_in")) return false;
     if (filter === "active") return ["pending", "accepted", "preparing", "ready"].includes(o.status);
     if (filter === "done") return ["delivered", "cancelled", "completed"].includes(o.status);
     // Delivery order type filter
     if (orderTypeFilter === "delivery") return o.orderType === "delivery";
     if (orderTypeFilter === "pickup") return o.orderType === "pickup";
+    if (orderTypeFilter === "dine_in") return o.orderType === "dine_in";
     if (orderTypeFilter === "scheduled") return Boolean(o.scheduledAt);
     return true;
   });
@@ -603,8 +605,19 @@ export default function OrdersScreen() {
                 </View>
               ) : null}
               {item.orderType ? (
-                <View style={[styles.metaChip, { backgroundColor: item.orderType === "delivery" ? "rgba(99,102,241,0.15)" : "rgba(16,185,129,0.15)" }]}>
-                  <Text style={styles.metaChipText}>{item.orderType === "delivery" ? "🛵" : "🏃"} {item.orderType}</Text>
+                <View style={[styles.metaChip, {
+                  backgroundColor: item.orderType === "delivery" ? "rgba(99,102,241,0.15)"
+                    : item.orderType === "dine_in" ? "rgba(245,158,11,0.15)"
+                    : "rgba(16,185,129,0.15)"
+                }]}>
+                  <Text style={styles.metaChipText}>
+                    {item.orderType === "delivery" ? "🛵" : item.orderType === "dine_in" ? "🍽" : "🏃"} {item.orderType === "dine_in" ? "Dine-in" : item.orderType}
+                  </Text>
+                </View>
+              ) : null}
+              {item.tableNumber ? (
+                <View style={[styles.metaChip, { backgroundColor: "rgba(30,64,175,0.15)" }]}>
+                  <Text style={styles.metaChipText}>🪑 {item.tableNumber}</Text>
                 </View>
               ) : null}
             </View>
@@ -619,7 +632,7 @@ export default function OrdersScreen() {
                 <View style={[styles.itemRow, isRTL && { flexDirection: "row-reverse" }]}>
                   <Text style={styles.itemQty}>{it.quantity}×</Text>
                   <Text style={[styles.itemName, { flex: 1 }, isRTL && { textAlign: "right" }]}>{it.name || it.productName}</Text>
-                  <Text style={styles.itemPrice}>CHF {Number(it.total).toFixed(2)}</Text>
+                  <Text style={styles.itemPrice}>CHF {(Number(it.total) || (Number(it.unitPrice) * Number(it.quantity)) || 0).toFixed(2)}</Text>
                 </View>
                 {it.notes ? <Text style={[styles.itemAddons, isRTL && { textAlign: "right" }]}>↳ {it.notes}</Text> : null}
               </View>
@@ -1315,6 +1328,7 @@ export default function OrdersScreen() {
           {[
             { key: "all", en: "All Orders", ar: "الكل", de: "Alle" },
             { key: "online", en: "🌐 Online", ar: "🌐 إلكتروني", de: "🌐 Online" },
+            { key: "dine_in", en: "🍽 Tables", ar: "🍽 طاولات", de: "🍽 Tisch" },
             { key: "pos", en: "📞 POS", ar: "📞 كاشير", de: "📞 Kasse" },
           ].map(f => (
             <Pressable key={f.key} onPress={() => { playClickSound("light"); setViewMode(f.key as any); }} style={[styles.filterTab, viewMode === f.key && styles.filterTabActive]}>
@@ -1347,6 +1361,7 @@ export default function OrdersScreen() {
               { key: "all_types", en: "All Types", ar: "الكل", de: "Alle" },
               { key: "delivery", en: "🛵 Delivery", ar: "🛵 توصيل", de: "🛵 Lieferung" },
               { key: "pickup", en: "🏃 Pickup", ar: "🏃 استلام", de: "🏃 Abholung" },
+              { key: "dine_in", en: "🍽 Dine-in", ar: "🍽 طاولات", de: "🍽 Vor Ort" },
               { key: "scheduled", en: "📅 Scheduled", ar: "📅 مجدول", de: "📅 Geplant" },
             ].map(f => (
               <Pressable

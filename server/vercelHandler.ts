@@ -65,11 +65,24 @@ const ready: Promise<void> = (async () => {
     const message = err.message || "Internal Server Error";
     if (!res.headersSent) res.status(status).json({ message });
   });
-})();
+})().catch((err) => {
+  // Surface init failures in function logs instead of letting Vercel return
+  // an opaque 503 HTML page. The handler below will translate the rejection
+  // into a JSON 500 with a useful message.
+  console.error("[vercelHandler] Bootstrap failed:", err);
+  throw err;
+});
 
 // ── Vercel handler ────────────────────────────────────────────────────────────
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  await ready;
+  try {
+    await ready;
+  } catch (err: any) {
+    return res.status(500).json({
+      error: "Server initialization failed",
+      message: err?.message || String(err),
+    });
+  }
   // @ts-ignore — express accepts the Vercel req/res shapes
   return app(req, res);
 }

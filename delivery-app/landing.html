@@ -19,15 +19,20 @@
   <!-- ── Transparent Nav ────────────────────────────────────────────────── -->
   <nav class="landing-nav" id="landing-nav">
     <div class="landing-nav__inner">
-      <a class="site-logo" href="/delivery-app/landing.html">
+      <a class="site-logo" href="/order">
         <div class="site-logo__icon"><i data-lucide="utensils"></i></div>
         <div class="site-logo__text">Bar<span>magly</span></div>
       </a>
       <div class="landing-nav__links">
-        <a class="landing-nav__link" href="#how-it-works" data-en="How it works" data-ar="كيف يعمل">How it works</a>
-        <a class="landing-nav__link" href="#cuisines" data-en="Cuisines" data-ar="المطابخ">Cuisines</a>
-        <a class="landing-nav__link" href="#restaurants" data-en="Restaurants" data-ar="المطاعم">Restaurants</a>
-        <a class="landing-nav__btn" href="/delivery-app/restaurants.html" data-en="Order Now" data-ar="اطلب الان">Order Now</a>
+        <a class="landing-nav__link" href="#how-it-works" data-en="How it works" data-de="So funktioniert's" data-ar="كيف يعمل">How it works</a>
+        <a class="landing-nav__link" href="#cuisines" data-en="Cuisines" data-de="Küchen" data-ar="المطابخ">Cuisines</a>
+        <a class="landing-nav__link" href="#restaurants" data-en="Restaurants" data-de="Restaurants" data-ar="المطاعم">Restaurants</a>
+        <div class="landing-nav__lang" id="nav-lang-switcher">
+          <button class="lang-toggle active" data-lang="en" onclick="setLang('en')">EN</button>
+          <button class="lang-toggle" data-lang="de" onclick="setLang('de')">DE</button>
+          <button class="lang-toggle" data-lang="ar" onclick="setLang('ar')">AR</button>
+        </div>
+        <a class="landing-nav__btn" href="/restaurants" data-en="Order Now" data-de="Jetzt bestellen" data-ar="اطلب الان">Order Now</a>
       </div>
     </div>
   </nav>
@@ -37,30 +42,29 @@
     <div class="landing-hero__content">
       <div class="landing-hero__badge">
         <i data-lucide="zap" style="width:14px;height:14px"></i>
-        <span data-en="Fast Delivery in 30 min" data-ar="توصيل سريع في 30 دقيقة">Fast Delivery in 30 min</span>
+        <span data-en="Fast Delivery in 30 min" data-de="Schnelle Lieferung in 30 Min" data-ar="توصيل سريع في 30 دقيقة">Fast Delivery in 30 min</span>
       </div>
-      <h1 class="landing-hero__title" data-en="Hungry? Order from the <span class='text-highlight'>best restaurants</span> near you" data-ar="جائع؟ اطلب من <span class='text-highlight'>أفضل المطاعم</span> بالقرب منك">Hungry? Order from the <span class="text-highlight">best restaurants</span> near you</h1>
-      <p class="landing-hero__subtitle" data-en="Discover top-rated restaurants, order your favorite meals, and get them delivered to your door." data-ar="اكتشف أفضل المطاعم، اطلب وجباتك المفضلة، واحصل عليها حتى باب منزلك.">Discover top-rated restaurants, order your favorite meals, and get them delivered to your door.</p>
-      <p class="landing-hero__subtitle-ar" id="hero-subtitle-ar">جائع؟ اطلب من أفضل المطاعم بالقرب منك</p>
+      <h1 class="landing-hero__title" data-en="Hungry? Order from the <span class='text-highlight'>best restaurants</span> near you" data-de="Hunger? Bestelle bei den <span class='text-highlight'>besten Restaurants</span> in deiner Nähe" data-ar="جائع؟ اطلب من <span class='text-highlight'>أفضل المطاعم</span> بالقرب منك">Hungry? Order from the <span class="text-highlight">best restaurants</span> near you</h1>
+      <p class="landing-hero__subtitle" data-en="Discover top-rated restaurants, order your favorite meals, and get them delivered to your door." data-de="Entdecke die bestbewerteten Restaurants, bestelle deine Lieblingsgerichte und lass sie dir liefern." data-ar="اكتشف أفضل المطاعم، اطلب وجباتك المفضلة، واحصل عليها حتى باب منزلك.">Discover top-rated restaurants, order your favorite meals, and get them delivered to your door.</p>
 
       <div class="landing-hero__search">
         <i data-lucide="map-pin" style="width:20px;height:20px;color:var(--delivery-primary);flex-shrink:0"></i>
-        <input type="text" id="hero-search" data-placeholder-en="Enter your delivery address..." data-placeholder-ar="أدخل عنوان التوصيل..." placeholder="Enter your delivery address..." />
-        <button class="landing-hero__cta" onclick="goToRestaurants()" data-en="Find Food" data-ar="ابحث عن الطعام">Find Food</button>
+        <input type="text" id="hero-search" data-placeholder-en="Enter your delivery address..." data-placeholder-de="Lieferadresse eingeben..." data-placeholder-ar="أدخل عنوان التوصيل..." placeholder="Enter your delivery address..." />
+        <button class="landing-hero__cta" onclick="goToRestaurants()" data-en="Find Food" data-de="Essen finden" data-ar="ابحث عن الطعام">Find Food</button>
       </div>
 
       <div class="landing-hero__stats">
         <div class="landing-hero__stat">
           <span class="landing-hero__stat-value">500+</span>
-          <span class="landing-hero__stat-label" data-en="Restaurants" data-ar="مطعم">Restaurants</span>
+          <span class="landing-hero__stat-label" data-en="Restaurants" data-de="Restaurants" data-ar="مطعم">Restaurants</span>
         </div>
         <div class="landing-hero__stat">
           <span class="landing-hero__stat-value">50K+</span>
-          <span class="landing-hero__stat-label" data-en="Happy Customers" data-ar="عميل سعيد">Happy Customers</span>
+          <span class="landing-hero__stat-label" data-en="Happy Customers" data-de="Zufriedene Kunden" data-ar="عميل سعيد">Happy Customers</span>
         </div>
         <div class="landing-hero__stat">
           <span class="landing-hero__stat-value">30 min</span>
-          <span class="landing-hero__stat-label" data-en="Avg. Delivery" data-ar="متوسط التوصيل">Avg. Delivery</span>
+          <span class="landing-hero__stat-label" data-en="Avg. Delivery" data-de="Ø Lieferzeit" data-ar="متوسط التوصيل">Avg. Delivery</span>
         </div>
       </div>
     </div>
@@ -69,9 +73,9 @@
   <!-- ── How It Works ───────────────────────────────────────────────────── -->
   <section class="landing-section" id="how-it-works">
     <div class="landing-section__header">
-      <div class="landing-section__overline" data-en="Simple &amp; Easy" data-ar="بسيط وسهل">Simple &amp; Easy</div>
-      <h2 class="landing-section__title" data-en="How It Works" data-ar="كيف يعمل">How It Works</h2>
-      <p class="landing-section__desc" data-en="Order your favorite food in just 3 simple steps." data-ar="اطلب طعامك المفضل في 3 خطوات بسيطة.">Order your favorite food in just 3 simple steps.</p>
+      <div class="landing-section__overline" data-en="Simple &amp; Easy" data-de="Einfach &amp; Schnell" data-ar="بسيط وسهل">Simple &amp; Easy</div>
+      <h2 class="landing-section__title" data-en="How It Works" data-de="So funktioniert's" data-ar="كيف يعمل">How It Works</h2>
+      <p class="landing-section__desc" data-en="Order your favorite food in just 3 simple steps." data-de="Bestelle dein Lieblingsessen in nur 3 einfachen Schritten." data-ar="اطلب طعامك المفضل في 3 خطوات بسيطة.">Order your favorite food in just 3 simple steps.</p>
     </div>
     <div class="how-it-works">
       <div class="how-step">
@@ -79,24 +83,24 @@
           <i data-lucide="search" style="width:36px;height:36px"></i>
           <span class="how-step__number">1</span>
         </div>
-        <h3 class="how-step__title" data-en="Browse" data-ar="تصفح">Browse</h3>
-        <p class="how-step__desc" data-en="Explore restaurants and menus near you" data-ar="استكشف المطاعم والقوائم بالقرب منك">Explore restaurants and menus near you</p>
+        <h3 class="how-step__title" data-en="Browse" data-de="Stöbern" data-ar="تصفح">Browse</h3>
+        <p class="how-step__desc" data-en="Explore restaurants and menus near you" data-de="Entdecke Restaurants und Menüs in deiner Nähe" data-ar="استكشف المطاعم والقوائم بالقرب منك">Explore restaurants and menus near you</p>
       </div>
       <div class="how-step">
         <div class="how-step__icon">
           <i data-lucide="shopping-cart" style="width:36px;height:36px"></i>
           <span class="how-step__number">2</span>
         </div>
-        <h3 class="how-step__title" data-en="Order" data-ar="اطلب">Order</h3>
-        <p class="how-step__desc" data-en="Add your favorite items and checkout securely" data-ar="أضف أصنافك المفضلة وادفع بأمان">Add your favorite items and checkout securely</p>
+        <h3 class="how-step__title" data-en="Order" data-de="Bestellen" data-ar="اطلب">Order</h3>
+        <p class="how-step__desc" data-en="Add your favorite items and checkout securely" data-de="Füge deine Lieblingsartikel hinzu und bezahle sicher" data-ar="أضف أصنافك المفضلة وادفع بأمان">Add your favorite items and checkout securely</p>
       </div>
       <div class="how-step">
         <div class="how-step__icon">
           <i data-lucide="utensils" style="width:36px;height:36px"></i>
           <span class="how-step__number">3</span>
         </div>
-        <h3 class="how-step__title" data-en="Enjoy" data-ar="استمتع">Enjoy</h3>
-        <p class="how-step__desc" data-en="Get your food delivered fast and fresh" data-ar="احصل على طعامك طازجاً وسريعاً">Get your food delivered fast and fresh</p>
+        <h3 class="how-step__title" data-en="Enjoy" data-de="Geniessen" data-ar="استمتع">Enjoy</h3>
+        <p class="how-step__desc" data-en="Get your food delivered fast and fresh" data-de="Erhalte dein Essen schnell und frisch geliefert" data-ar="احصل على طعامك طازجاً وسريعاً">Get your food delivered fast and fresh</p>
       </div>
     </div>
   </section>
@@ -104,50 +108,50 @@
   <!-- ── Popular Cuisines ───────────────────────────────────────────────── -->
   <section class="landing-section landing-section--alt" id="cuisines">
     <div class="landing-section__header">
-      <div class="landing-section__overline" data-en="Explore" data-ar="استكشف">Explore</div>
-      <h2 class="landing-section__title" data-en="Popular Cuisines" data-ar="المطابخ الشائعة">Popular Cuisines</h2>
-      <p class="landing-section__desc" data-en="From local favorites to international flavors, find something for every craving." data-ar="من المأكولات المحلية إلى النكهات العالمية، اعثر على ما يناسب رغبتك.">From local favorites to international flavors, find something for every craving.</p>
+      <div class="landing-section__overline" data-en="Explore" data-de="Entdecken" data-ar="استكشف">Explore</div>
+      <h2 class="landing-section__title" data-en="Popular Cuisines" data-de="Beliebte Küchen" data-ar="المطابخ الشائعة">Popular Cuisines</h2>
+      <p class="landing-section__desc" data-en="From local favorites to international flavors, find something for every craving." data-de="Von lokalen Favoriten bis zu internationalen Aromen — für jeden Geschmack etwas." data-ar="من المأكولات المحلية إلى النكهات العالمية، اعثر على ما يناسب رغبتك.">From local favorites to international flavors, find something for every craving.</p>
     </div>
     <div class="cuisines-scroll">
-      <a class="cuisine-card" href="/delivery-app/restaurants.html">
+      <a class="cuisine-card" href="/restaurants">
         <div class="cuisine-card__icon"><i data-lucide="flame" style="width:24px;height:24px"></i></div>
-        <div class="cuisine-card__name" data-en="Grills" data-ar="مشويات">Grills</div>
-        <div class="cuisine-card__count" data-en="45 restaurants" data-ar="45 مطعم">45 restaurants</div>
+        <div class="cuisine-card__name" data-en="Grills" data-de="Grill" data-ar="مشويات">Grills</div>
+        <div class="cuisine-card__count" data-en="45 restaurants" data-de="45 Restaurants" data-ar="45 مطعم">45 restaurants</div>
       </a>
-      <a class="cuisine-card" href="/delivery-app/restaurants.html">
+      <a class="cuisine-card" href="/restaurants">
         <div class="cuisine-card__icon"><i data-lucide="pizza" style="width:24px;height:24px"></i></div>
-        <div class="cuisine-card__name" data-en="Pizza" data-ar="بيتزا">Pizza</div>
-        <div class="cuisine-card__count" data-en="38 restaurants" data-ar="38 مطعم">38 restaurants</div>
+        <div class="cuisine-card__name" data-en="Pizza" data-de="Pizza" data-ar="بيتزا">Pizza</div>
+        <div class="cuisine-card__count" data-en="38 restaurants" data-de="38 Restaurants" data-ar="38 مطعم">38 restaurants</div>
       </a>
-      <a class="cuisine-card" href="/delivery-app/restaurants.html">
+      <a class="cuisine-card" href="/restaurants">
         <div class="cuisine-card__icon"><i data-lucide="sandwich" style="width:24px;height:24px"></i></div>
-        <div class="cuisine-card__name" data-en="Burgers" data-ar="برجر">Burgers</div>
-        <div class="cuisine-card__count" data-en="52 restaurants" data-ar="52 مطعم">52 restaurants</div>
+        <div class="cuisine-card__name" data-en="Burgers" data-de="Burger" data-ar="برجر">Burgers</div>
+        <div class="cuisine-card__count" data-en="52 restaurants" data-de="52 Restaurants" data-ar="52 مطعم">52 restaurants</div>
       </a>
-      <a class="cuisine-card" href="/delivery-app/restaurants.html">
+      <a class="cuisine-card" href="/restaurants">
         <div class="cuisine-card__icon"><i data-lucide="soup" style="width:24px;height:24px"></i></div>
-        <div class="cuisine-card__name" data-en="Asian" data-ar="آسيوي">Asian</div>
-        <div class="cuisine-card__count" data-en="29 restaurants" data-ar="29 مطعم">29 restaurants</div>
+        <div class="cuisine-card__name" data-en="Asian" data-de="Asiatisch" data-ar="آسيوي">Asian</div>
+        <div class="cuisine-card__count" data-en="29 restaurants" data-de="29 Restaurants" data-ar="29 مطعم">29 restaurants</div>
       </a>
-      <a class="cuisine-card" href="/delivery-app/restaurants.html">
+      <a class="cuisine-card" href="/restaurants">
         <div class="cuisine-card__icon"><i data-lucide="salad" style="width:24px;height:24px"></i></div>
-        <div class="cuisine-card__name" data-en="Healthy" data-ar="صحي">Healthy</div>
-        <div class="cuisine-card__count" data-en="21 restaurants" data-ar="21 مطعم">21 restaurants</div>
+        <div class="cuisine-card__name" data-en="Healthy" data-de="Gesund" data-ar="صحي">Healthy</div>
+        <div class="cuisine-card__count" data-en="21 restaurants" data-de="21 Restaurants" data-ar="21 مطعم">21 restaurants</div>
       </a>
-      <a class="cuisine-card" href="/delivery-app/restaurants.html">
+      <a class="cuisine-card" href="/restaurants">
         <div class="cuisine-card__icon"><i data-lucide="cake-slice" style="width:24px;height:24px"></i></div>
-        <div class="cuisine-card__name" data-en="Desserts" data-ar="حلويات">Desserts</div>
-        <div class="cuisine-card__count" data-en="33 restaurants" data-ar="33 مطعم">33 restaurants</div>
+        <div class="cuisine-card__name" data-en="Desserts" data-de="Desserts" data-ar="حلويات">Desserts</div>
+        <div class="cuisine-card__count" data-en="33 restaurants" data-de="33 Restaurants" data-ar="33 مطعم">33 restaurants</div>
       </a>
-      <a class="cuisine-card" href="/delivery-app/restaurants.html">
+      <a class="cuisine-card" href="/restaurants">
         <div class="cuisine-card__icon"><i data-lucide="coffee" style="width:24px;height:24px"></i></div>
-        <div class="cuisine-card__name" data-en="Cafe" data-ar="كافيه">Cafe</div>
-        <div class="cuisine-card__count" data-en="27 restaurants" data-ar="27 مطعم">27 restaurants</div>
+        <div class="cuisine-card__name" data-en="Cafe" data-de="Café" data-ar="كافيه">Cafe</div>
+        <div class="cuisine-card__count" data-en="27 restaurants" data-de="27 Restaurants" data-ar="27 مطعم">27 restaurants</div>
       </a>
-      <a class="cuisine-card" href="/delivery-app/restaurants.html">
+      <a class="cuisine-card" href="/restaurants">
         <div class="cuisine-card__icon"><i data-lucide="fish" style="width:24px;height:24px"></i></div>
-        <div class="cuisine-card__name" data-en="Seafood" data-ar="مأكولات بحرية">Seafood</div>
-        <div class="cuisine-card__count" data-en="18 restaurants" data-ar="18 مطعم">18 restaurants</div>
+        <div class="cuisine-card__name" data-en="Seafood" data-de="Meeresfrüchte" data-ar="مأكولات بحرية">Seafood</div>
+        <div class="cuisine-card__count" data-en="18 restaurants" data-de="18 Restaurants" data-ar="18 مطعم">18 restaurants</div>
       </a>
     </div>
   </section>
@@ -155,102 +159,102 @@
   <!-- ── Featured Restaurants ───────────────────────────────────────────── -->
   <section class="landing-section" id="restaurants">
     <div class="landing-section__header">
-      <div class="landing-section__overline" data-en="Top Rated" data-ar="الاعلى تقييماً">Top Rated</div>
-      <h2 class="landing-section__title" data-en="Featured Restaurants" data-ar="مطاعم مميزة">Featured Restaurants</h2>
-      <p class="landing-section__desc" data-en="Hand-picked restaurants loved by customers in your area." data-ar="مطاعم مختارة بعناية يحبها العملاء في منطقتك.">Hand-picked restaurants loved by customers in your area.</p>
+      <div class="landing-section__overline" data-en="Top Rated" data-de="Bestbewertet" data-ar="الاعلى تقييماً">Top Rated</div>
+      <h2 class="landing-section__title" data-en="Featured Restaurants" data-de="Empfohlene Restaurants" data-ar="مطاعم مميزة">Featured Restaurants</h2>
+      <p class="landing-section__desc" data-en="Hand-picked restaurants loved by customers in your area." data-de="Handverlesene Restaurants, die Kunden in deiner Nähe lieben." data-ar="مطاعم مختارة بعناية يحبها العملاء في منطقتك.">Hand-picked restaurants loved by customers in your area.</p>
     </div>
     <div class="featured-grid">
 
-      <a class="featured-card" href="/delivery-app/restaurants.html">
+      <a class="featured-card" href="/restaurants">
         <div class="featured-card__img">
-          <i data-lucide="utensils" style="width:48px;height:48px"></i>
-          <span class="featured-card__badge" data-en="Popular" data-ar="شائع">Popular</span>
+          <img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=250&fit=crop&q=80" alt="The Grill House" loading="lazy" />
+          <span class="featured-card__badge" data-en="Popular" data-de="Beliebt" data-ar="شائع">Popular</span>
         </div>
         <div class="featured-card__body">
-          <div class="featured-card__name" data-en="The Grill House" data-ar="بيت المشويات">The Grill House</div>
-          <div class="featured-card__cuisine" data-en="Grills, BBQ, Middle Eastern" data-ar="مشويات، شرقي">Grills, BBQ, Middle Eastern</div>
+          <div class="featured-card__name" data-en="The Grill House" data-de="The Grill House" data-ar="بيت المشويات">The Grill House</div>
+          <div class="featured-card__cuisine" data-en="Grills, BBQ, Middle Eastern" data-de="Grill, BBQ, Orientalisch" data-ar="مشويات، شرقي">Grills, BBQ, Middle Eastern</div>
           <div class="featured-card__meta">
             <span class="featured-card__rating"><i data-lucide="star" style="width:14px;height:14px"></i> 4.8</span>
-            <span><i data-lucide="clock" style="width:14px;height:14px"></i> <span data-en="25-35 min" data-ar="25-35 دق">25-35 min</span></span>
-            <span><i data-lucide="truck" style="width:14px;height:14px"></i> <span data-en="Free" data-ar="مجاني">Free</span></span>
+            <span><i data-lucide="clock" style="width:14px;height:14px"></i> <span data-en="25-35 min" data-de="25-35 Min" data-ar="25-35 دق">25-35 min</span></span>
+            <span><i data-lucide="truck" style="width:14px;height:14px"></i> <span data-en="Free" data-de="Gratis" data-ar="مجاني">Free</span></span>
           </div>
         </div>
       </a>
 
-      <a class="featured-card" href="/delivery-app/restaurants.html">
+      <a class="featured-card" href="/restaurants">
         <div class="featured-card__img">
-          <i data-lucide="pizza" style="width:48px;height:48px"></i>
-          <span class="featured-card__badge" data-en="New" data-ar="جديد">New</span>
+          <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=250&fit=crop&q=80" alt="Pizza Roma" loading="lazy" />
+          <span class="featured-card__badge featured-card__badge--new" data-en="New" data-de="Neu" data-ar="جديد">New</span>
         </div>
         <div class="featured-card__body">
-          <div class="featured-card__name" data-en="Pizza Roma" data-ar="بيتزا روما">Pizza Roma</div>
-          <div class="featured-card__cuisine" data-en="Pizza, Italian, Pasta" data-ar="بيتزا، إيطالي، باستا">Pizza, Italian, Pasta</div>
+          <div class="featured-card__name" data-en="Pizza Roma" data-de="Pizza Roma" data-ar="بيتزا روما">Pizza Roma</div>
+          <div class="featured-card__cuisine" data-en="Pizza, Italian, Pasta" data-de="Pizza, Italienisch, Pasta" data-ar="بيتزا، إيطالي، باستا">Pizza, Italian, Pasta</div>
           <div class="featured-card__meta">
             <span class="featured-card__rating"><i data-lucide="star" style="width:14px;height:14px"></i> 4.6</span>
-            <span><i data-lucide="clock" style="width:14px;height:14px"></i> <span data-en="20-30 min" data-ar="20-30 دق">20-30 min</span></span>
-            <span><i data-lucide="truck" style="width:14px;height:14px"></i> <span data-en="EGP 10" data-ar="10 ج.م">EGP 10</span></span>
+            <span><i data-lucide="clock" style="width:14px;height:14px"></i> <span data-en="20-30 min" data-de="20-30 Min" data-ar="20-30 دق">20-30 min</span></span>
+            <span><i data-lucide="truck" style="width:14px;height:14px"></i> CHF 5</span>
           </div>
         </div>
       </a>
 
-      <a class="featured-card" href="/delivery-app/restaurants.html">
+      <a class="featured-card" href="/restaurants">
         <div class="featured-card__img">
-          <i data-lucide="sandwich" style="width:48px;height:48px"></i>
-          <span class="featured-card__badge" data-en="Top Rated" data-ar="الاعلى">Top Rated</span>
+          <img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=250&fit=crop&q=80" alt="Burger Palace" loading="lazy" />
+          <span class="featured-card__badge featured-card__badge--top" data-en="Top Rated" data-de="Bestbewertet" data-ar="الاعلى">Top Rated</span>
         </div>
         <div class="featured-card__body">
-          <div class="featured-card__name" data-en="Burger Palace" data-ar="قصر البرجر">Burger Palace</div>
-          <div class="featured-card__cuisine" data-en="Burgers, American, Fast Food" data-ar="برجر، أمريكي، وجبات سريعة">Burgers, American, Fast Food</div>
+          <div class="featured-card__name" data-en="Burger Palace" data-de="Burger Palace" data-ar="قصر البرجر">Burger Palace</div>
+          <div class="featured-card__cuisine" data-en="Burgers, American, Fast Food" data-de="Burger, Amerikanisch, Fast Food" data-ar="برجر، أمريكي، وجبات سريعة">Burgers, American, Fast Food</div>
           <div class="featured-card__meta">
             <span class="featured-card__rating"><i data-lucide="star" style="width:14px;height:14px"></i> 4.9</span>
-            <span><i data-lucide="clock" style="width:14px;height:14px"></i> <span data-en="15-25 min" data-ar="15-25 دق">15-25 min</span></span>
-            <span><i data-lucide="truck" style="width:14px;height:14px"></i> <span data-en="Free" data-ar="مجاني">Free</span></span>
+            <span><i data-lucide="clock" style="width:14px;height:14px"></i> <span data-en="15-25 min" data-de="15-25 Min" data-ar="15-25 دق">15-25 min</span></span>
+            <span><i data-lucide="truck" style="width:14px;height:14px"></i> <span data-en="Free" data-de="Gratis" data-ar="مجاني">Free</span></span>
           </div>
         </div>
       </a>
 
-      <a class="featured-card" href="/delivery-app/restaurants.html">
+      <a class="featured-card" href="/restaurants">
         <div class="featured-card__img">
-          <i data-lucide="soup" style="width:48px;height:48px"></i>
+          <img src="https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400&h=250&fit=crop&q=80" alt="Sushi Master" loading="lazy" />
         </div>
         <div class="featured-card__body">
-          <div class="featured-card__name" data-en="Sushi Master" data-ar="سوشي ماستر">Sushi Master</div>
-          <div class="featured-card__cuisine" data-en="Japanese, Sushi, Asian" data-ar="ياباني، سوشي، آسيوي">Japanese, Sushi, Asian</div>
+          <div class="featured-card__name" data-en="Sushi Master" data-de="Sushi Master" data-ar="سوشي ماستر">Sushi Master</div>
+          <div class="featured-card__cuisine" data-en="Japanese, Sushi, Asian" data-de="Japanisch, Sushi, Asiatisch" data-ar="ياباني، سوشي، آسيوي">Japanese, Sushi, Asian</div>
           <div class="featured-card__meta">
             <span class="featured-card__rating"><i data-lucide="star" style="width:14px;height:14px"></i> 4.7</span>
-            <span><i data-lucide="clock" style="width:14px;height:14px"></i> <span data-en="30-40 min" data-ar="30-40 دق">30-40 min</span></span>
-            <span><i data-lucide="truck" style="width:14px;height:14px"></i> <span data-en="EGP 15" data-ar="15 ج.م">EGP 15</span></span>
+            <span><i data-lucide="clock" style="width:14px;height:14px"></i> <span data-en="30-40 min" data-de="30-40 Min" data-ar="30-40 دق">30-40 min</span></span>
+            <span><i data-lucide="truck" style="width:14px;height:14px"></i> CHF 8</span>
           </div>
         </div>
       </a>
 
-      <a class="featured-card" href="/delivery-app/restaurants.html">
+      <a class="featured-card" href="/restaurants">
         <div class="featured-card__img">
-          <i data-lucide="salad" style="width:48px;height:48px"></i>
-          <span class="featured-card__badge" data-en="Healthy" data-ar="صحي">Healthy</span>
+          <img src="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=250&fit=crop&q=80" alt="Green Bowl" loading="lazy" />
+          <span class="featured-card__badge featured-card__badge--healthy" data-en="Healthy" data-de="Gesund" data-ar="صحي">Healthy</span>
         </div>
         <div class="featured-card__body">
-          <div class="featured-card__name" data-en="Green Bowl" data-ar="الطبق الاخضر">Green Bowl</div>
-          <div class="featured-card__cuisine" data-en="Salads, Healthy, Bowls" data-ar="سلطات، صحي، أطباق">Salads, Healthy, Bowls</div>
+          <div class="featured-card__name" data-en="Green Bowl" data-de="Green Bowl" data-ar="الطبق الاخضر">Green Bowl</div>
+          <div class="featured-card__cuisine" data-en="Salads, Healthy, Bowls" data-de="Salate, Gesund, Bowls" data-ar="سلطات، صحي، أطباق">Salads, Healthy, Bowls</div>
           <div class="featured-card__meta">
             <span class="featured-card__rating"><i data-lucide="star" style="width:14px;height:14px"></i> 4.5</span>
-            <span><i data-lucide="clock" style="width:14px;height:14px"></i> <span data-en="20-30 min" data-ar="20-30 دق">20-30 min</span></span>
-            <span><i data-lucide="truck" style="width:14px;height:14px"></i> <span data-en="EGP 8" data-ar="8 ج.م">EGP 8</span></span>
+            <span><i data-lucide="clock" style="width:14px;height:14px"></i> <span data-en="20-30 min" data-de="20-30 Min" data-ar="20-30 دق">20-30 min</span></span>
+            <span><i data-lucide="truck" style="width:14px;height:14px"></i> CHF 3</span>
           </div>
         </div>
       </a>
 
-      <a class="featured-card" href="/delivery-app/restaurants.html">
+      <a class="featured-card" href="/restaurants">
         <div class="featured-card__img">
-          <i data-lucide="cake-slice" style="width:48px;height:48px"></i>
+          <img src="https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=400&h=250&fit=crop&q=80" alt="Sweet Tooth" loading="lazy" />
         </div>
         <div class="featured-card__body">
-          <div class="featured-card__name" data-en="Sweet Tooth" data-ar="حلويات سويت">Sweet Tooth</div>
-          <div class="featured-card__cuisine" data-en="Desserts, Cakes, Pastries" data-ar="حلويات، كيك، معجنات">Desserts, Cakes, Pastries</div>
+          <div class="featured-card__name" data-en="Sweet Tooth" data-de="Sweet Tooth" data-ar="حلويات سويت">Sweet Tooth</div>
+          <div class="featured-card__cuisine" data-en="Desserts, Cakes, Pastries" data-de="Desserts, Kuchen, Gebäck" data-ar="حلويات، كيك، معجنات">Desserts, Cakes, Pastries</div>
           <div class="featured-card__meta">
             <span class="featured-card__rating"><i data-lucide="star" style="width:14px;height:14px"></i> 4.8</span>
-            <span><i data-lucide="clock" style="width:14px;height:14px"></i> <span data-en="25-35 min" data-ar="25-35 دق">25-35 min</span></span>
-            <span><i data-lucide="truck" style="width:14px;height:14px"></i> <span data-en="Free" data-ar="مجاني">Free</span></span>
+            <span><i data-lucide="clock" style="width:14px;height:14px"></i> <span data-en="25-35 min" data-de="25-35 Min" data-ar="25-35 دق">25-35 min</span></span>
+            <span><i data-lucide="truck" style="width:14px;height:14px"></i> <span data-en="Free" data-de="Gratis" data-ar="مجاني">Free</span></span>
           </div>
         </div>
       </a>
@@ -261,42 +265,42 @@
   <!-- ── App Features ───────────────────────────────────────────────────── -->
   <section class="landing-section landing-section--alt" id="features">
     <div class="landing-section__header">
-      <div class="landing-section__overline" data-en="Why Choose Us" data-ar="لماذا تختارنا">Why Choose Us</div>
-      <h2 class="landing-section__title" data-en="Delivery Done Right" data-ar="توصيل على أصوله">Delivery Done Right</h2>
-      <p class="landing-section__desc" data-en="We make ordering food a delightful experience from start to finish." data-ar="نجعل طلب الطعام تجربة ممتعة من البداية حتى النهاية.">We make ordering food a delightful experience from start to finish.</p>
+      <div class="landing-section__overline" data-en="Why Choose Us" data-de="Warum wir" data-ar="لماذا تختارنا">Why Choose Us</div>
+      <h2 class="landing-section__title" data-en="Delivery Done Right" data-de="Lieferung richtig gemacht" data-ar="توصيل على أصوله">Delivery Done Right</h2>
+      <p class="landing-section__desc" data-en="We make ordering food a delightful experience from start to finish." data-de="Wir machen Essensbestellung zu einem grossartigen Erlebnis." data-ar="نجعل طلب الطعام تجربة ممتعة من البداية حتى النهاية.">We make ordering food a delightful experience from start to finish.</p>
     </div>
     <div class="features-grid">
       <div class="feature-card">
         <div class="feature-card__icon">
           <i data-lucide="rocket" style="width:32px;height:32px"></i>
         </div>
-        <h3 class="feature-card__title" data-en="Fast Delivery" data-ar="توصيل سريع">Fast Delivery</h3>
-        <p class="feature-card__desc" data-en="Average delivery in under 30 minutes. Hot food, right to your door." data-ar="متوسط التوصيل أقل من 30 دقيقة. طعام ساخن حتى باب بيتك.">Average delivery in under 30 minutes. Hot food, right to your door.</p>
+        <h3 class="feature-card__title" data-en="Fast Delivery" data-de="Schnelle Lieferung" data-ar="توصيل سريع">Fast Delivery</h3>
+        <p class="feature-card__desc" data-en="Average delivery in under 30 minutes. Hot food, right to your door." data-de="Durchschnittliche Lieferung in unter 30 Minuten. Heisses Essen direkt zu dir." data-ar="متوسط التوصيل أقل من 30 دقيقة. طعام ساخن حتى باب بيتك.">Average delivery in under 30 minutes. Hot food, right to your door.</p>
       </div>
       <div class="feature-card">
         <div class="feature-card__icon">
           <i data-lucide="map" style="width:32px;height:32px"></i>
         </div>
-        <h3 class="feature-card__title" data-en="Live Tracking" data-ar="تتبع مباشر">Live Tracking</h3>
-        <p class="feature-card__desc" data-en="Track your order in real-time from the kitchen to your doorstep." data-ar="تتبع طلبك في الوقت الحقيقي من المطبخ حتى باب منزلك.">Track your order in real-time from the kitchen to your doorstep.</p>
+        <h3 class="feature-card__title" data-en="Live Tracking" data-de="Live-Verfolgung" data-ar="تتبع مباشر">Live Tracking</h3>
+        <p class="feature-card__desc" data-en="Track your order in real-time from the kitchen to your doorstep." data-de="Verfolge deine Bestellung in Echtzeit von der Küche bis zu deiner Haustür." data-ar="تتبع طلبك في الوقت الحقيقي من المطبخ حتى باب منزلك.">Track your order in real-time from the kitchen to your doorstep.</p>
       </div>
       <div class="feature-card">
         <div class="feature-card__icon">
           <i data-lucide="shield-check" style="width:32px;height:32px"></i>
         </div>
-        <h3 class="feature-card__title" data-en="Secure Payment" data-ar="دفع آمن">Secure Payment</h3>
-        <p class="feature-card__desc" data-en="Multiple payment options with bank-level security for every transaction." data-ar="خيارات دفع متعددة مع أمان بمستوى البنوك لكل معاملة.">Multiple payment options with bank-level security for every transaction.</p>
+        <h3 class="feature-card__title" data-en="Secure Payment" data-de="Sichere Zahlung" data-ar="دفع آمن">Secure Payment</h3>
+        <p class="feature-card__desc" data-en="Multiple payment options with bank-level security for every transaction." data-de="Mehrere Zahlungsoptionen mit bankmässiger Sicherheit für jede Transaktion." data-ar="خيارات دفع متعددة مع أمان بمستوى البنوك لكل معاملة.">Multiple payment options with bank-level security for every transaction.</p>
       </div>
     </div>
   </section>
 
   <!-- ── CTA Banner ─────────────────────────────────────────────────────── -->
   <section class="landing-cta">
-    <h2 class="landing-cta__title" data-en="Ready to Order?" data-ar="جاهز للطلب؟">Ready to Order?</h2>
-    <p class="landing-cta__desc" data-en="Browse hundreds of restaurants and get your food delivered in minutes." data-ar="تصفح مئات المطاعم واحصل على طعامك في دقائق.">Browse hundreds of restaurants and get your food delivered in minutes.</p>
+    <h2 class="landing-cta__title" data-en="Ready to Order?" data-de="Bereit zu bestellen?" data-ar="جاهز للطلب؟">Ready to Order?</h2>
+    <p class="landing-cta__desc" data-en="Browse hundreds of restaurants and get your food delivered in minutes." data-de="Durchstöbere hunderte Restaurants und lass dir dein Essen in Minuten liefern." data-ar="تصفح مئات المطاعم واحصل على طعامك في دقائق.">Browse hundreds of restaurants and get your food delivered in minutes.</p>
     <button class="landing-cta__btn" onclick="goToRestaurants()">
       <i data-lucide="utensils" style="width:18px;height:18px"></i>
-      <span data-en="Start Ordering" data-ar="ابدأ الطلب">Start Ordering</span>
+      <span data-en="Start Ordering" data-de="Jetzt bestellen" data-ar="ابدأ الطلب">Start Ordering</span>
     </button>
   </section>
 
@@ -309,45 +313,37 @@
             <div class="landing-footer__logo-icon"><i data-lucide="utensils" style="width:20px;height:20px"></i></div>
             <div class="landing-footer__logo-text">Bar<span>magly</span></div>
           </div>
-          <p class="landing-footer__about" data-en="Your favorite food delivery platform. Order from the best restaurants near you and enjoy fast, reliable delivery every time." data-ar="منصة توصيل الطعام المفضلة لديك. اطلب من أفضل المطاعم القريبة واستمتع بتوصيل سريع وموثوق في كل مرة.">Your favorite food delivery platform. Order from the best restaurants near you and enjoy fast, reliable delivery every time.</p>
+          <p class="landing-footer__about" data-en="Your favorite food delivery platform. Order from the best restaurants near you and enjoy fast, reliable delivery every time." data-de="Deine liebste Lieferplattform. Bestelle bei den besten Restaurants in deiner Nähe und geniesse schnelle, zuverlässige Lieferung." data-ar="منصة توصيل الطعام المفضلة لديك. اطلب من أفضل المطاعم القريبة واستمتع بتوصيل سريع وموثوق في كل مرة.">Your favorite food delivery platform. Order from the best restaurants near you and enjoy fast, reliable delivery every time.</p>
         </div>
         <div>
-          <div class="landing-footer__col-title" data-en="Company" data-ar="الشركة">Company</div>
+          <div class="landing-footer__col-title" data-en="Company" data-de="Unternehmen" data-ar="الشركة">Company</div>
           <div class="landing-footer__links">
-            <a href="#" data-en="About Us" data-ar="من نحن">About Us</a>
-            <a href="#" data-en="Careers" data-ar="وظائف">Careers</a>
-            <a href="#" data-en="Partner with Us" data-ar="كن شريكاً">Partner with Us</a>
-            <a href="#" data-en="Blog" data-ar="المدونة">Blog</a>
+            <a href="#" data-en="About Us" data-de="Über uns" data-ar="من نحن">About Us</a>
+            <a href="#" data-en="Careers" data-de="Karriere" data-ar="وظائف">Careers</a>
+            <a href="#" data-en="Partner with Us" data-de="Partner werden" data-ar="كن شريكاً">Partner with Us</a>
+            <a href="#" data-en="Blog" data-de="Blog" data-ar="المدونة">Blog</a>
           </div>
         </div>
         <div>
-          <div class="landing-footer__col-title" data-en="Support" data-ar="الدعم">Support</div>
+          <div class="landing-footer__col-title" data-en="Support" data-de="Hilfe" data-ar="الدعم">Support</div>
           <div class="landing-footer__links">
-            <a href="#" data-en="Help Center" data-ar="مركز المساعدة">Help Center</a>
-            <a href="#" data-en="Contact Us" data-ar="تواصل معنا">Contact Us</a>
-            <a href="#" data-en="Privacy Policy" data-ar="سياسة الخصوصية">Privacy Policy</a>
-            <a href="#" data-en="Terms of Service" data-ar="شروط الخدمة">Terms of Service</a>
+            <a href="#" data-en="Help Center" data-de="Hilfecenter" data-ar="مركز المساعدة">Help Center</a>
+            <a href="#" data-en="Contact Us" data-de="Kontakt" data-ar="تواصل معنا">Contact Us</a>
+            <a href="#" data-en="Privacy Policy" data-de="Datenschutz" data-ar="سياسة الخصوصية">Privacy Policy</a>
+            <a href="#" data-en="Terms of Service" data-de="AGB" data-ar="شروط الخدمة">Terms of Service</a>
           </div>
         </div>
         <div>
-          <div class="landing-footer__col-title" data-en="Get in Touch" data-ar="تواصل معنا">Get in Touch</div>
+          <div class="landing-footer__col-title" data-en="Get in Touch" data-de="Kontakt" data-ar="تواصل معنا">Get in Touch</div>
           <div class="landing-footer__links">
             <a href="#"><i data-lucide="mail" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-inline-end:6px"></i>support@barmagly.com</a>
-            <a href="#"><i data-lucide="phone" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-inline-end:6px"></i>+20 123 456 789</a>
-            <a href="#"><i data-lucide="map-pin" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-inline-end:6px"></i><span data-en="Cairo, Egypt" data-ar="القاهرة، مصر">Cairo, Egypt</span></a>
+            <a href="#"><i data-lucide="phone" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-inline-end:6px"></i>+41 44 123 45 67</a>
+            <a href="#"><i data-lucide="map-pin" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-inline-end:6px"></i><span data-en="Zürich, Switzerland" data-de="Zürich, Schweiz" data-ar="زيورخ، سويسرا">Zürich, Switzerland</span></a>
           </div>
         </div>
       </div>
       <div class="landing-footer__bottom">
-        <div class="landing-footer__copy">&copy; 2026 Barmagly. <span data-en="All rights reserved." data-ar="جميع الحقوق محفوظة.">All rights reserved.</span></div>
-        <div class="landing-footer__lang">
-          <button class="lang-toggle active" id="lang-en" onclick="setLang('en')">
-            <i data-lucide="globe" style="width:14px;height:14px"></i> English
-          </button>
-          <button class="lang-toggle" id="lang-ar" onclick="setLang('ar')">
-            <i data-lucide="globe" style="width:14px;height:14px"></i> العربية
-          </button>
-        </div>
+        <div class="landing-footer__copy">&copy; 2026 Barmagly. <span data-en="All rights reserved." data-de="Alle Rechte vorbehalten." data-ar="جميع الحقوق محفوظة.">All rights reserved.</span></div>
       </div>
     </div>
   </footer>
@@ -366,10 +362,10 @@
 
     // ── Navigate to restaurants ────────────────────────────────────────────
     function goToRestaurants() {
-      window.location.href = "/delivery-app/restaurants.html";
+      window.location.href = "/restaurants";
     }
 
-    // ── Language Toggle ────────────────────────────────────────────────────
+    // ── Language Toggle (EN / DE / AR) ──────────────────────────────────────
     let currentLang = "en";
 
     function setLang(lang) {
@@ -379,15 +375,12 @@
       document.documentElement.lang = lang;
       document.documentElement.dir = isAr ? "rtl" : "ltr";
 
-      // Toggle active language button
-      document.getElementById("lang-en").classList.toggle("active", !isAr);
-      document.getElementById("lang-ar").classList.toggle("active", isAr);
+      // Toggle active language button — both nav and footer switchers
+      document.querySelectorAll(".lang-toggle").forEach(btn => {
+        btn.classList.toggle("active", btn.getAttribute("data-lang") === lang);
+      });
 
-      // Show/hide Arabic subtitle in hero
-      const arSub = document.getElementById("hero-subtitle-ar");
-      if (arSub) arSub.style.display = isAr ? "none" : "block";
-
-      // Update all elements with data-en/data-ar attributes
+      // Update all elements with data-{lang} attributes
       document.querySelectorAll("[data-" + lang + "]").forEach(el => {
         const val = el.getAttribute("data-" + lang);
         if (val !== null) {
@@ -402,9 +395,9 @@
       // Update placeholders
       const heroSearch = document.getElementById("hero-search");
       if (heroSearch) {
-        heroSearch.placeholder = heroSearch.getAttribute(
-          isAr ? "data-placeholder-ar" : "data-placeholder-en"
-        ) || heroSearch.placeholder;
+        heroSearch.placeholder = heroSearch.getAttribute("data-placeholder-" + lang)
+          || heroSearch.getAttribute("data-placeholder-en")
+          || heroSearch.placeholder;
       }
 
       // Re-render Lucide icons after innerHTML changes

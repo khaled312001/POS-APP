@@ -9,10 +9,12 @@ const cart = {
   _items: [],   // [{ productId, name, price, image, qty, modifiers, modifierPrice }]
   _tenantId: null,
   _slug: null,
-  _orderType: "delivery",  // "delivery" | "pickup"
+  _orderType: "delivery",  // "delivery" | "pickup" | "dine_in"
   _promo: null,            // { code, discountType, discountValue, promoCodeId }
   _discountAmount: 0,
   _notes: "",
+  _tableQrToken: null,     // QR token for dine-in orders
+  _tableName: null,        // Table name for dine-in orders
 
   // ── Init ────────────────────────────────────────────────────────────────────
   init(tenantId, slug) {
@@ -37,6 +39,8 @@ const cart = {
         this._promo = data.promo || null;
         this._discountAmount = data.discountAmount || 0;
         this._notes = data.notes || "";
+        this._tableQrToken = data.tableQrToken || null;
+        this._tableName = data.tableName || null;
       } else {
         this._items = [];
       }
@@ -54,6 +58,8 @@ const cart = {
       promo: this._promo,
       discountAmount: this._discountAmount,
       notes: this._notes,
+      tableQrToken: this._tableQrToken,
+      tableName: this._tableName,
     }));
     this._emit();
   },
@@ -83,6 +89,8 @@ const cart = {
       discountAmount: this._discountAmount,
       promoCodeId: this._promo?.promoCodeId || null,
       notes: this._notes,
+      tableQrToken: this._tableQrToken,
+      tableName: this._tableName,
     };
   },
 
@@ -100,7 +108,14 @@ const cart = {
 
   // ── Order metadata ──────────────────────────────────────────────────────────
   setOrderType(type) {
-    this._orderType = type === "pickup" ? "pickup" : "delivery";
+    this._orderType = (type === "pickup" || type === "dine_in") ? type : "delivery";
+    this._save();
+  },
+
+  setDineIn(tableQrToken, tableName) {
+    this._orderType = "dine_in";
+    this._tableQrToken = tableQrToken;
+    this._tableName = tableName;
     this._save();
   },
 
@@ -200,6 +215,8 @@ const cart = {
       promoCodeId: this._promo?.promoCodeId || null,
       discountAmount: this._discountAmount.toFixed(2),
       notes: this._notes,
+      tableQrToken: this._tableQrToken || null,
+      tableNumber: this._tableName || null,
       ...opts,
     };
   },

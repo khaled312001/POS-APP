@@ -299,6 +299,19 @@ export const tables = mysqlTable("tables", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const tableQrCodes = mysqlTable("table_qr_codes", {
+  id: serial("id").primaryKey(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  tableId: int("table_id").references(() => tables.id, { onDelete: 'cascade' }).notNull(),
+  branchId: int("branch_id").references(() => branches.id, { onDelete: 'cascade' }),
+  qrToken: varchar("qr_token", { length: 64 }).notNull().unique(),
+  tableName: text("table_name").notNull(),
+  isActive: boolean("is_active").default(true),
+  scannedCount: int("scanned_count").default(0),
+  lastScannedAt: timestamp("last_scanned_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const kitchenOrders = mysqlTable("kitchen_orders", {
   id: serial("id").primaryKey(),
   saleId: int("sale_id").references(() => sales.id, { onDelete: 'cascade' }).notNull(),
@@ -645,6 +658,9 @@ export const onlineOrders = mysqlTable("online_orders", {
   walletAmountUsed: decimal("wallet_amount_used", { precision: 10, scale: 2 }).default("0"),
   loyaltyPointsUsed: int("loyalty_points_used").default(0),
   loyaltyPointsEarned: int("loyalty_points_earned").default(0),
+  // ── Dine-in QR Code Extensions ──
+  tableNumber: text("table_number"),
+  tableQrToken: varchar("table_qr_token", { length: 64 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -985,6 +1001,16 @@ export const faqEntries = mysqlTable("faq_entries", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ========== Restaurant Aggregate Ratings ==========
+export const restaurantAggregateRatings = mysqlTable("restaurant_aggregate_ratings", {
+  id: serial("id").primaryKey(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  avgRating: decimal("avg_rating", { precision: 3, scale: 2 }).default("0"),
+  totalReviews: int("total_reviews").default(0),
+  avgDeliveryTime: int("avg_delivery_time").default(30),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // ========== Insert Schemas ==========
 
 export const insertBranchSchema = createInsertSchema(branches).omit({ id: true, createdAt: true, updatedAt: true });
@@ -1003,6 +1029,7 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
 export const insertCallSchema = createInsertSchema(calls).omit({ id: true, createdAt: true });
 export const insertTableSchema = createInsertSchema(tables).omit({ id: true, createdAt: true });
+export const insertTableQrCodeSchema = createInsertSchema(tableQrCodes).omit({ id: true, createdAt: true });
 export const insertKitchenOrderSchema = createInsertSchema(kitchenOrders).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true, createdAt: true });
 export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ id: true, createdAt: true });
@@ -1079,6 +1106,8 @@ export type Call = typeof calls.$inferSelect;
 export type InsertCall = z.infer<typeof insertCallSchema>;
 export type Table = typeof tables.$inferSelect;
 export type InsertTable = z.infer<typeof insertTableSchema>;
+export type TableQrCode = typeof tableQrCodes.$inferSelect;
+export type InsertTableQrCode = z.infer<typeof insertTableQrCodeSchema>;
 export type KitchenOrder = typeof kitchenOrders.$inferSelect;
 export type InsertKitchenOrder = z.infer<typeof insertKitchenOrderSchema>;
 export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;

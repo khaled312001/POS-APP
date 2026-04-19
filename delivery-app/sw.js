@@ -3,7 +3,7 @@
  * Caches static assets, serves offline fallback, and handles push notifications.
  */
 
-const CACHE_NAME = "barmagly-delivery-v1";
+const CACHE_NAME = "barmagly-delivery-v5";
 const STATIC_ASSETS = [
   "/api/delivery-app/css/base.css",
   "/api/delivery-app/css/components.css",
@@ -20,7 +20,21 @@ const STATIC_ASSETS = [
   "/api/delivery-app/js/pages/account.js",
   "/api/delivery-app/js/pages/offers.js",
   "/api/delivery-app/js/pages/login.js",
+  "/api/delivery-app/js/pages/search.js",
+  "/api/delivery-app/js/pages/favorites.js",
+  "/api/delivery-app/js/pages/help.js",
+  "/api/delivery-app/js/pages/reviews.js",
+  "/api/delivery-app/js/pages/rewards.js",
+  "/api/delivery-app/js/pages/stamps.js",
+  "/api/delivery-app/js/pages/giftcards.js",
+  "/api/delivery-app/js/pages/courier.js",
+  "/api/delivery-app/js/pages/partner.js",
 ];
+
+const API_CACHE_NAME = "barmagly-api-v1";
+const IMAGE_CACHE_NAME = "barmagly-images-v1";
+const API_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const IMAGE_CACHE_MAX = 200;
 
 // Install — cache static assets
 self.addEventListener("install", (event) => {
@@ -36,11 +50,12 @@ self.addEventListener("install", (event) => {
 
 // Activate — clean up old caches
 self.addEventListener("activate", (event) => {
+  const validCaches = [CACHE_NAME, API_CACHE_NAME, IMAGE_CACHE_NAME];
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== CACHE_NAME)
+          .filter((key) => !validCaches.includes(key))
           .map((key) => caches.delete(key))
       )
     )
@@ -55,8 +70,49 @@ self.addEventListener("fetch", (event) => {
   // Skip non-GET requests
   if (event.request.method !== "GET") return;
 
-  // API data requests — network only (don't cache dynamic data)
+  // API data requests — network-first with cache fallback for read-only endpoints
   if (url.pathname.startsWith("/api/delivery/")) {
+    // Cache menu and restaurant data (network-first)
+    if (
+      url.pathname.match(/\/api\/delivery\/store\/[^/]+\/menu$/) ||
+      url.pathname.match(/\/api\/delivery\/store\/[^/]+$/) ||
+      url.pathname === "/api/delivery/restaurants" ||
+      url.pathname.match(/\/api\/delivery\/help\/faq/)
+    ) {
+      event.respondWith(
+        fetch(event.request)
+          .then((response) => {
+            if (response.ok) {
+              const clone = response.clone();
+              caches.open(API_CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            }
+            return response;
+          })
+          .catch(() => caches.match(event.request))
+      );
+      return;
+    }
+    return;
+  }
+
+  // Image requests — cache-first with network fallback
+  if (
+    url.hostname.includes("unsplash.com") ||
+    url.hostname.includes("images.unsplash.com") ||
+    url.pathname.match(/\.(jpg|jpeg|png|webp|gif)$/i)
+  ) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(IMAGE_CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        }).catch(() => new Response("", { status: 404 }));
+      })
+    );
     return;
   }
 
@@ -95,7 +151,16 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() =>
+          caches.match(event.request).then((cached) => {
+            if (cached) return cached;
+            // Offline fallback page
+            return new Response(
+              '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#F8F9FA;color:#1A1A2E;text-align:center;padding:20px}h1{font-size:1.5rem;margin-bottom:8px}p{color:#6B7280}button{margin-top:16px;padding:12px 24px;background:#FF5722;color:#fff;border:none;border-radius:12px;font-size:1rem;cursor:pointer}</style></head><body><div><h1>You\'re offline</h1><p>Check your internet connection and try again</p><button onclick="location.reload()">Retry</button></div></body></html>',
+              { headers: { "Content-Type": "text/html; charset=utf-8" } }
+            );
+          })
+        )
     );
     return;
   }

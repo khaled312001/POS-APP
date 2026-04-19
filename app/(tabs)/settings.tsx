@@ -722,6 +722,7 @@ export default function SettingsScreen() {
             }} color={Colors.accent} rtl={isRTL} />
             <SettingRow icon="card" label={t("paymentGateways")} value={pgConfig?.stripe?.status === "connected" ? t("stripeConnected") : t("notConfigured")} onPress={() => { setPgTestResult(null); setShowPaymentGateway(true); }} color="#7C3AED" rtl={isRTL} />
             <SettingRow icon="cloud-upload" label={t("bulkImport")} value={t("importData")} onPress={() => { setImportResult(null); setShowBulkImport(true); }} color="#F59E0B" rtl={isRTL} />
+            <SettingRow icon="qr-code" label="QR Tables" value={t("manageTables" as any) || "Manage QR codes"} onPress={() => router.push("/table-qr")} color="#2FD3C6" rtl={isRTL} />
           </>
         )}
 

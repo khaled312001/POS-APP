@@ -38,35 +38,55 @@ __export(schema_exports, {
   calls: () => calls,
   cashDrawerOperations: () => cashDrawerOperations,
   categories: () => categories,
+  customerAddresses: () => customerAddresses,
+  customerFavorites: () => customerFavorites,
+  customerSessions: () => customerSessions,
   customers: () => customers,
   dailyClosings: () => dailyClosings,
   dailySequences: () => dailySequences,
+  deliveryZones: () => deliveryZones,
+  driverLocations: () => driverLocations,
   employeeCommissions: () => employeeCommissions,
   employees: () => employees,
   expenses: () => expenses,
+  faqEntries: () => faqEntries,
+  helpTickets: () => helpTickets,
   insertActivityLogSchema: () => insertActivityLogSchema,
   insertBranchSchema: () => insertBranchSchema,
   insertCallSchema: () => insertCallSchema,
   insertCashDrawerOperationSchema: () => insertCashDrawerOperationSchema,
   insertCategorySchema: () => insertCategorySchema,
+  insertCustomerAddressSchema: () => insertCustomerAddressSchema,
+  insertCustomerFavoriteSchema: () => insertCustomerFavoriteSchema,
   insertCustomerSchema: () => insertCustomerSchema,
+  insertCustomerSessionSchema: () => insertCustomerSessionSchema,
   insertDailyClosingSchema: () => insertDailyClosingSchema,
+  insertDeliveryZoneSchema: () => insertDeliveryZoneSchema,
+  insertDriverLocationSchema: () => insertDriverLocationSchema,
   insertEmployeeCommissionSchema: () => insertEmployeeCommissionSchema,
   insertEmployeeSchema: () => insertEmployeeSchema,
   insertExpenseSchema: () => insertExpenseSchema,
+  insertFaqEntrySchema: () => insertFaqEntrySchema,
+  insertHelpTicketSchema: () => insertHelpTicketSchema,
   insertInventoryMovementSchema: () => insertInventoryMovementSchema,
   insertInventorySchema: () => insertInventorySchema,
   insertKitchenOrderSchema: () => insertKitchenOrderSchema,
   insertLandingPageConfigSchema: () => insertLandingPageConfigSchema,
   insertLicenseKeySchema: () => insertLicenseKeySchema,
+  insertLoyaltyTransactionSchema: () => insertLoyaltyTransactionSchema,
   insertMonthlyClosingSchema: () => insertMonthlyClosingSchema,
   insertNotificationSchema: () => insertNotificationSchema,
   insertOnlineOrderSchema: () => insertOnlineOrderSchema,
+  insertOrderRatingSchema: () => insertOrderRatingSchema,
+  insertOtpVerificationSchema: () => insertOtpVerificationSchema,
   insertPlatformCommissionSchema: () => insertPlatformCommissionSchema,
   insertPlatformSettingSchema: () => insertPlatformSettingSchema,
   insertPrinterConfigSchema: () => insertPrinterConfigSchema,
   insertProductBatchSchema: () => insertProductBatchSchema,
+  insertProductDietaryTagSchema: () => insertProductDietaryTagSchema,
   insertProductSchema: () => insertProductSchema,
+  insertPromoCodeSchema: () => insertPromoCodeSchema,
+  insertPromoCodeUsageSchema: () => insertPromoCodeUsageSchema,
   insertPurchaseOrderItemSchema: () => insertPurchaseOrderItemSchema,
   insertPurchaseOrderSchema: () => insertPurchaseOrderSchema,
   insertReturnItemSchema: () => insertReturnItemSchema,
@@ -81,11 +101,13 @@ __export(schema_exports, {
   insertSuperAdminSchema: () => insertSuperAdminSchema,
   insertSupplierContractSchema: () => insertSupplierContractSchema,
   insertSupplierSchema: () => insertSupplierSchema,
+  insertTableQrCodeSchema: () => insertTableQrCodeSchema,
   insertTableSchema: () => insertTableSchema,
   insertTenantNotificationSchema: () => insertTenantNotificationSchema,
   insertTenantSchema: () => insertTenantSchema,
   insertTenantSubscriptionSchema: () => insertTenantSubscriptionSchema,
   insertVehicleSchema: () => insertVehicleSchema,
+  insertWalletTransactionSchema: () => insertWalletTransactionSchema,
   insertWarehouseSchema: () => insertWarehouseSchema,
   insertWarehouseTransferSchema: () => insertWarehouseTransferSchema,
   inventory: () => inventory,
@@ -93,16 +115,23 @@ __export(schema_exports, {
   kitchenOrders: () => kitchenOrders,
   landingPageConfig: () => landingPageConfig,
   licenseKeys: () => licenseKeys,
+  loyaltyTransactions: () => loyaltyTransactions,
   monthlyClosings: () => monthlyClosings,
   notifications: () => notifications,
   onlineOrders: () => onlineOrders,
+  orderRatings: () => orderRatings,
+  otpVerifications: () => otpVerifications,
   platformCommissions: () => platformCommissions,
   platformSettings: () => platformSettings,
   printerConfigs: () => printerConfigs,
   productBatches: () => productBatches,
+  productDietaryTags: () => productDietaryTags,
   products: () => products,
+  promoCodeUsages: () => promoCodeUsages,
+  promoCodes: () => promoCodes,
   purchaseOrderItems: () => purchaseOrderItems,
   purchaseOrders: () => purchaseOrders,
+  restaurantAggregateRatings: () => restaurantAggregateRatings,
   returnItems: () => returnItems,
   returns: () => returns,
   saleItems: () => saleItems,
@@ -116,15 +145,17 @@ __export(schema_exports, {
   supplierContracts: () => supplierContracts,
   suppliers: () => suppliers,
   syncQueue: () => syncQueue,
+  tableQrCodes: () => tableQrCodes,
   tables: () => tables,
   tenantNotifications: () => tenantNotifications,
   tenantSubscriptions: () => tenantSubscriptions,
   tenants: () => tenants,
   vehicles: () => vehicles,
+  walletTransactions: () => walletTransactions,
   warehouseTransfers: () => warehouseTransfers,
   warehouses: () => warehouses
 });
-var import_mysql_core, import_drizzle_zod, branches, employees, categories, products, inventory, customers, sales, saleItems, calls, suppliers, purchaseOrders, purchaseOrderItems, shifts, notifications, expenses, tables, kitchenOrders, subscriptionPlans, subscriptions, activityLog, returns, returnItems, syncQueue, cashDrawerOperations, warehouses, warehouseTransfers, productBatches, inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications, platformSettings, platformCommissions, onlineOrders, landingPageConfig, vehicles, printerConfigs, dailyClosings, monthlyClosings, dailySequences, insertBranchSchema, insertEmployeeSchema, insertCategorySchema, insertProductSchema, insertInventorySchema, insertCustomerSchema, insertSaleSchema, insertSaleItemSchema, insertSupplierSchema, insertPurchaseOrderSchema, insertPurchaseOrderItemSchema, insertShiftSchema, insertNotificationSchema, insertExpenseSchema, insertCallSchema, insertTableSchema, insertKitchenOrderSchema, insertSubscriptionPlanSchema, insertSubscriptionSchema, insertActivityLogSchema, insertReturnSchema, insertReturnItemSchema, insertCashDrawerOperationSchema, insertWarehouseSchema, insertWarehouseTransferSchema, insertProductBatchSchema, insertInventoryMovementSchema, insertStockCountSchema, insertStockCountItemSchema, insertSupplierContractSchema, insertEmployeeCommissionSchema, insertSuperAdminSchema, insertTenantSchema, insertTenantSubscriptionSchema, insertLicenseKeySchema, insertTenantNotificationSchema, insertOnlineOrderSchema, insertLandingPageConfigSchema, insertPlatformSettingSchema, insertPlatformCommissionSchema, insertVehicleSchema, insertPrinterConfigSchema, insertDailyClosingSchema, insertMonthlyClosingSchema;
+var import_mysql_core, import_drizzle_zod, branches, employees, categories, products, inventory, customers, sales, saleItems, calls, suppliers, purchaseOrders, purchaseOrderItems, shifts, notifications, expenses, tables, tableQrCodes, kitchenOrders, subscriptionPlans, subscriptions, activityLog, returns, returnItems, syncQueue, cashDrawerOperations, warehouses, warehouseTransfers, productBatches, inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications, platformSettings, platformCommissions, onlineOrders, landingPageConfig, vehicles, printerConfigs, dailyClosings, monthlyClosings, dailySequences, customerAddresses, promoCodes, promoCodeUsages, driverLocations, loyaltyTransactions, walletTransactions, orderRatings, customerSessions, otpVerifications, deliveryZones, customerFavorites, productDietaryTags, helpTickets, faqEntries, restaurantAggregateRatings, insertBranchSchema, insertEmployeeSchema, insertCategorySchema, insertProductSchema, insertInventorySchema, insertCustomerSchema, insertSaleSchema, insertSaleItemSchema, insertSupplierSchema, insertPurchaseOrderSchema, insertPurchaseOrderItemSchema, insertShiftSchema, insertNotificationSchema, insertExpenseSchema, insertCallSchema, insertTableSchema, insertTableQrCodeSchema, insertKitchenOrderSchema, insertSubscriptionPlanSchema, insertSubscriptionSchema, insertActivityLogSchema, insertReturnSchema, insertReturnItemSchema, insertCashDrawerOperationSchema, insertWarehouseSchema, insertWarehouseTransferSchema, insertProductBatchSchema, insertInventoryMovementSchema, insertStockCountSchema, insertStockCountItemSchema, insertSupplierContractSchema, insertEmployeeCommissionSchema, insertSuperAdminSchema, insertTenantSchema, insertTenantSubscriptionSchema, insertLicenseKeySchema, insertTenantNotificationSchema, insertOnlineOrderSchema, insertLandingPageConfigSchema, insertPlatformSettingSchema, insertPlatformCommissionSchema, insertVehicleSchema, insertPrinterConfigSchema, insertDailyClosingSchema, insertMonthlyClosingSchema, insertCustomerAddressSchema, insertPromoCodeSchema, insertPromoCodeUsageSchema, insertDriverLocationSchema, insertLoyaltyTransactionSchema, insertWalletTransactionSchema, insertOrderRatingSchema, insertCustomerSessionSchema, insertOtpVerificationSchema, insertDeliveryZoneSchema, insertCustomerFavoriteSchema, insertProductDietaryTagSchema, insertHelpTicketSchema, insertFaqEntrySchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -264,6 +295,19 @@ var init_schema = __esm({
       r18: (0, import_mysql_core.boolean)("r18").default(false),
       r19: (0, import_mysql_core.boolean)("r19").default(false),
       r20: (0, import_mysql_core.boolean)("r20").default(false),
+      // ── Delivery Platform Extensions ──
+      hasAccount: (0, import_mysql_core.boolean)("has_account").default(false),
+      passwordHash: (0, import_mysql_core.text)("password_hash"),
+      dateOfBirth: (0, import_mysql_core.text)("date_of_birth"),
+      gender: (0, import_mysql_core.text)("gender"),
+      preferredLanguage: (0, import_mysql_core.text)("preferred_language").default("en"),
+      walletBalance: (0, import_mysql_core.decimal)("wallet_balance", { precision: 10, scale: 2 }).default("0"),
+      totalOrdersDelivery: (0, import_mysql_core.int)("total_orders_delivery").default(0),
+      totalOrdersPickup: (0, import_mysql_core.int)("total_orders_pickup").default(0),
+      referralCode: (0, import_mysql_core.varchar)("referral_code", { length: 16 }),
+      referredByCode: (0, import_mysql_core.varchar)("referred_by_code", { length: 16 }),
+      fcmToken: (0, import_mysql_core.text)("fcm_token"),
+      loyaltyTier: (0, import_mysql_core.text)("loyalty_tier").default("bronze"),
       createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
       updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
@@ -401,6 +445,18 @@ var init_schema = __esm({
       currentOrderId: (0, import_mysql_core.int)("current_order_id"),
       posX: (0, import_mysql_core.int)("pos_x").default(0),
       posY: (0, import_mysql_core.int)("pos_y").default(0),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    });
+    tableQrCodes = (0, import_mysql_core.mysqlTable)("table_qr_codes", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      tableId: (0, import_mysql_core.int)("table_id").references(() => tables.id, { onDelete: "cascade" }).notNull(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      qrToken: (0, import_mysql_core.varchar)("qr_token", { length: 64 }).notNull().unique(),
+      tableName: (0, import_mysql_core.text)("table_name").notNull(),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      scannedCount: (0, import_mysql_core.int)("scanned_count").default(0),
+      lastScannedAt: (0, import_mysql_core.timestamp)("last_scanned_at"),
       createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
     kitchenOrders = (0, import_mysql_core.mysqlTable)("kitchen_orders", {
@@ -710,6 +766,31 @@ var init_schema = __esm({
       estimatedTime: (0, import_mysql_core.int)("estimated_time"),
       // minutes
       language: (0, import_mysql_core.text)("language").default("en"),
+      // ── Delivery Platform Extensions ──
+      driverId: (0, import_mysql_core.int)("driver_id"),
+      scheduledAt: (0, import_mysql_core.timestamp)("scheduled_at"),
+      promoCodeId: (0, import_mysql_core.int)("promo_code_id"),
+      discountAmount: (0, import_mysql_core.decimal)("discount_amount", { precision: 10, scale: 2 }).default("0"),
+      driverLat: (0, import_mysql_core.decimal)("driver_lat", { precision: 10, scale: 7 }),
+      driverLng: (0, import_mysql_core.decimal)("driver_lng", { precision: 10, scale: 7 }),
+      customerLat: (0, import_mysql_core.decimal)("customer_lat", { precision: 10, scale: 7 }),
+      customerLng: (0, import_mysql_core.decimal)("customer_lng", { precision: 10, scale: 7 }),
+      riderPickedUpAt: (0, import_mysql_core.timestamp)("rider_picked_up_at"),
+      riderDeliveredAt: (0, import_mysql_core.timestamp)("rider_delivered_at"),
+      rating: (0, import_mysql_core.int)("rating"),
+      ratingComment: (0, import_mysql_core.text)("rating_comment"),
+      trackingToken: (0, import_mysql_core.varchar)("tracking_token", { length: 64 }),
+      sourceChannel: (0, import_mysql_core.text)("source_channel").default("web"),
+      floor: (0, import_mysql_core.text)("floor"),
+      buildingName: (0, import_mysql_core.text)("building_name"),
+      addressNotes: (0, import_mysql_core.text)("address_notes"),
+      savedAddressId: (0, import_mysql_core.int)("saved_address_id"),
+      walletAmountUsed: (0, import_mysql_core.decimal)("wallet_amount_used", { precision: 10, scale: 2 }).default("0"),
+      loyaltyPointsUsed: (0, import_mysql_core.int)("loyalty_points_used").default(0),
+      loyaltyPointsEarned: (0, import_mysql_core.int)("loyalty_points_earned").default(0),
+      // ── Dine-in QR Code Extensions ──
+      tableNumber: (0, import_mysql_core.text)("table_number"),
+      tableQrToken: (0, import_mysql_core.varchar)("table_qr_token", { length: 64 }),
       createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
       updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
@@ -749,6 +830,25 @@ var init_schema = __esm({
       isPublished: (0, import_mysql_core.boolean)("is_published").default(true),
       language: (0, import_mysql_core.text)("language").default("en"),
       // System language: en | ar | de
+      // ── Delivery Platform Extensions ──
+      bannerImages: (0, import_mysql_core.json)("banner_images").$type().default([]),
+      featuredCategoryIds: (0, import_mysql_core.json)("featured_category_ids").$type().default([]),
+      promoText: (0, import_mysql_core.text)("promo_text"),
+      deliveryZonesJson: (0, import_mysql_core.json)("delivery_zones_json").$type().default([]),
+      minDeliveryTime: (0, import_mysql_core.int)("min_delivery_time").default(20),
+      maxDeliveryTime: (0, import_mysql_core.int)("max_delivery_time").default(45),
+      loyaltyPointsPerUnit: (0, import_mysql_core.decimal)("loyalty_points_per_unit", { precision: 5, scale: 2 }).default("1.00"),
+      loyaltyRedemptionRate: (0, import_mysql_core.decimal)("loyalty_redemption_rate", { precision: 5, scale: 2 }).default("0.01"),
+      enableLoyalty: (0, import_mysql_core.boolean)("enable_loyalty").default(true),
+      enableScheduledOrders: (0, import_mysql_core.boolean)("enable_scheduled_orders").default(true),
+      enablePromos: (0, import_mysql_core.boolean)("enable_promos").default(true),
+      enableWallet: (0, import_mysql_core.boolean)("enable_wallet").default(false),
+      metaTitle: (0, import_mysql_core.text)("meta_title"),
+      metaDescription: (0, import_mysql_core.text)("meta_description"),
+      googleAnalyticsId: (0, import_mysql_core.text)("google_analytics_id"),
+      supportPhone: (0, import_mysql_core.text)("support_phone"),
+      logomark: (0, import_mysql_core.text)("logomark"),
+      headerBgImage: (0, import_mysql_core.text)("header_bg_image"),
       createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
       updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
@@ -764,6 +864,17 @@ var init_schema = __esm({
       driverPhone: (0, import_mysql_core.text)("driver_phone"),
       isActive: (0, import_mysql_core.boolean)("is_active").default(true),
       notes: (0, import_mysql_core.text)("notes"),
+      // ── Delivery Platform Extensions ──
+      employeeId: (0, import_mysql_core.int)("employee_id"),
+      currentLat: (0, import_mysql_core.decimal)("current_lat", { precision: 10, scale: 7 }),
+      currentLng: (0, import_mysql_core.decimal)("current_lng", { precision: 10, scale: 7 }),
+      locationUpdatedAt: (0, import_mysql_core.timestamp)("location_updated_at"),
+      driverStatus: (0, import_mysql_core.text)("driver_status").default("offline"),
+      driverRating: (0, import_mysql_core.decimal)("driver_rating", { precision: 3, scale: 2 }).default("5.00"),
+      totalDeliveries: (0, import_mysql_core.int)("total_deliveries").default(0),
+      activeOrderId: (0, import_mysql_core.int)("active_order_id"),
+      deviceToken: (0, import_mysql_core.text)("device_token"),
+      driverAccessToken: (0, import_mysql_core.varchar)("driver_access_token", { length: 64 }),
       createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
     printerConfigs = (0, import_mysql_core.mysqlTable)("printer_configs", {
@@ -832,6 +943,188 @@ var init_schema = __esm({
     }, (table) => ({
       uniqScopeDate: (0, import_mysql_core.unique)("daily_seq_scope_date_unique").on(table.scopeKey, table.date)
     }));
+    customerAddresses = (0, import_mysql_core.mysqlTable)("customer_addresses", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      label: (0, import_mysql_core.text)("label").notNull().default("Home"),
+      street: (0, import_mysql_core.text)("street").notNull(),
+      buildingName: (0, import_mysql_core.text)("building_name"),
+      floor: (0, import_mysql_core.text)("floor"),
+      city: (0, import_mysql_core.text)("city").notNull(),
+      postalCode: (0, import_mysql_core.text)("postal_code"),
+      lat: (0, import_mysql_core.decimal)("lat", { precision: 10, scale: 7 }),
+      lng: (0, import_mysql_core.decimal)("lng", { precision: 10, scale: 7 }),
+      notes: (0, import_mysql_core.text)("notes"),
+      isDefault: (0, import_mysql_core.boolean)("is_default").default(false),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    });
+    promoCodes = (0, import_mysql_core.mysqlTable)("promo_codes", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      code: (0, import_mysql_core.varchar)("code", { length: 32 }).notNull(),
+      description: (0, import_mysql_core.text)("description"),
+      discountType: (0, import_mysql_core.text)("discount_type").notNull().default("percent"),
+      // percent | fixed | free_delivery
+      discountValue: (0, import_mysql_core.decimal)("discount_value", { precision: 10, scale: 2 }).notNull(),
+      minOrderAmount: (0, import_mysql_core.decimal)("min_order_amount", { precision: 10, scale: 2 }).default("0"),
+      maxDiscountCap: (0, import_mysql_core.decimal)("max_discount_cap", { precision: 10, scale: 2 }),
+      usageLimit: (0, import_mysql_core.int)("usage_limit"),
+      usageCount: (0, import_mysql_core.int)("usage_count").default(0),
+      perCustomerLimit: (0, import_mysql_core.int)("per_customer_limit").default(1),
+      validFrom: (0, import_mysql_core.timestamp)("valid_from"),
+      validUntil: (0, import_mysql_core.timestamp)("valid_until"),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      applicableOrderTypes: (0, import_mysql_core.json)("applicable_order_types").$type().default(["delivery", "pickup"]),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    }, (t) => ({
+      uniqTenantCode: (0, import_mysql_core.unique)("promo_tenant_code").on(t.tenantId, t.code)
+    }));
+    promoCodeUsages = (0, import_mysql_core.mysqlTable)("promo_code_usages", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      promoCodeId: (0, import_mysql_core.int)("promo_code_id").references(() => promoCodes.id, { onDelete: "cascade" }).notNull(),
+      customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "set null" }),
+      orderId: (0, import_mysql_core.int)("order_id").references(() => onlineOrders.id, { onDelete: "set null" }),
+      discountApplied: (0, import_mysql_core.decimal)("discount_applied", { precision: 10, scale: 2 }).notNull(),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    });
+    driverLocations = (0, import_mysql_core.mysqlTable)("driver_locations", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      vehicleId: (0, import_mysql_core.int)("vehicle_id").references(() => vehicles.id, { onDelete: "cascade" }).notNull(),
+      orderId: (0, import_mysql_core.int)("order_id").references(() => onlineOrders.id, { onDelete: "set null" }),
+      lat: (0, import_mysql_core.decimal)("lat", { precision: 10, scale: 7 }).notNull(),
+      lng: (0, import_mysql_core.decimal)("lng", { precision: 10, scale: 7 }).notNull(),
+      speed: (0, import_mysql_core.decimal)("speed", { precision: 5, scale: 2 }),
+      heading: (0, import_mysql_core.int)("heading"),
+      recordedAt: (0, import_mysql_core.timestamp)("recorded_at").defaultNow()
+    });
+    loyaltyTransactions = (0, import_mysql_core.mysqlTable)("loyalty_transactions", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      orderId: (0, import_mysql_core.int)("order_id").references(() => onlineOrders.id, { onDelete: "set null" }),
+      type: (0, import_mysql_core.text)("type").notNull(),
+      // earn | redeem | expire | bonus | referral
+      points: (0, import_mysql_core.int)("points").notNull(),
+      balanceBefore: (0, import_mysql_core.int)("balance_before").notNull(),
+      balanceAfter: (0, import_mysql_core.int)("balance_after").notNull(),
+      description: (0, import_mysql_core.text)("description"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    });
+    walletTransactions = (0, import_mysql_core.mysqlTable)("wallet_transactions", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      orderId: (0, import_mysql_core.int)("order_id").references(() => onlineOrders.id, { onDelete: "set null" }),
+      type: (0, import_mysql_core.text)("type").notNull(),
+      // top_up | payment | refund | bonus
+      amount: (0, import_mysql_core.decimal)("amount", { precision: 10, scale: 2 }).notNull(),
+      balanceBefore: (0, import_mysql_core.decimal)("balance_before", { precision: 10, scale: 2 }).notNull(),
+      balanceAfter: (0, import_mysql_core.decimal)("balance_after", { precision: 10, scale: 2 }).notNull(),
+      stripePaymentIntentId: (0, import_mysql_core.text)("stripe_payment_intent_id"),
+      description: (0, import_mysql_core.text)("description"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    });
+    orderRatings = (0, import_mysql_core.mysqlTable)("order_ratings", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      orderId: (0, import_mysql_core.int)("order_id").references(() => onlineOrders.id, { onDelete: "cascade" }).notNull().unique(),
+      customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "set null" }),
+      driverId: (0, import_mysql_core.int)("driver_id").references(() => vehicles.id, { onDelete: "set null" }),
+      foodRating: (0, import_mysql_core.int)("food_rating"),
+      deliveryRating: (0, import_mysql_core.int)("delivery_rating"),
+      overallRating: (0, import_mysql_core.int)("overall_rating").notNull(),
+      comment: (0, import_mysql_core.text)("comment"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    });
+    customerSessions = (0, import_mysql_core.mysqlTable)("customer_sessions", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      token: (0, import_mysql_core.varchar)("token", { length: 128 }).notNull().unique(),
+      deviceInfo: (0, import_mysql_core.text)("device_info"),
+      expiresAt: (0, import_mysql_core.timestamp)("expires_at").notNull(),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    });
+    otpVerifications = (0, import_mysql_core.mysqlTable)("otp_verifications", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      phone: (0, import_mysql_core.varchar)("phone", { length: 32 }).notNull(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      otp: (0, import_mysql_core.varchar)("otp", { length: 8 }).notNull(),
+      expiresAt: (0, import_mysql_core.timestamp)("expires_at").notNull(),
+      attempts: (0, import_mysql_core.int)("attempts").default(0),
+      verified: (0, import_mysql_core.boolean)("verified").default(false),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    });
+    deliveryZones = (0, import_mysql_core.mysqlTable)("delivery_zones", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      branchId: (0, import_mysql_core.int)("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+      name: (0, import_mysql_core.text)("name").notNull(),
+      nameAr: (0, import_mysql_core.text)("name_ar"),
+      polygon: (0, import_mysql_core.json)("polygon").$type(),
+      centerLat: (0, import_mysql_core.decimal)("center_lat", { precision: 10, scale: 7 }),
+      centerLng: (0, import_mysql_core.decimal)("center_lng", { precision: 10, scale: 7 }),
+      radiusKm: (0, import_mysql_core.decimal)("radius_km", { precision: 5, scale: 2 }),
+      deliveryFee: (0, import_mysql_core.decimal)("delivery_fee", { precision: 10, scale: 2 }).default("0"),
+      minOrderAmount: (0, import_mysql_core.decimal)("min_order_amount", { precision: 10, scale: 2 }).default("0"),
+      estimatedMinutes: (0, import_mysql_core.int)("estimated_minutes").default(30),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      sortOrder: (0, import_mysql_core.int)("sort_order").default(0),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    });
+    customerFavorites = (0, import_mysql_core.mysqlTable)("customer_favorites", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
+      productId: (0, import_mysql_core.int)("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    }, (t) => ({
+      uniqFav: (0, import_mysql_core.unique)("fav_tenant_customer_product").on(t.tenantId, t.customerId, t.productId)
+    }));
+    productDietaryTags = (0, import_mysql_core.mysqlTable)("product_dietary_tags", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      productId: (0, import_mysql_core.int)("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+      tag: (0, import_mysql_core.text)("tag").notNull()
+      // vegetarian, vegan, gluten_free, halal, spicy
+    });
+    helpTickets = (0, import_mysql_core.mysqlTable)("help_tickets", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "set null" }),
+      orderId: (0, import_mysql_core.int)("order_id").references(() => onlineOrders.id, { onDelete: "set null" }),
+      subject: (0, import_mysql_core.text)("subject").notNull(),
+      message: (0, import_mysql_core.text)("message").notNull(),
+      status: (0, import_mysql_core.text)("status").notNull().default("open"),
+      // open, in_progress, resolved, closed
+      priority: (0, import_mysql_core.text)("priority").default("normal"),
+      // low, normal, high, urgent
+      response: (0, import_mysql_core.text)("response"),
+      resolvedAt: (0, import_mysql_core.timestamp)("resolved_at"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
+    });
+    faqEntries = (0, import_mysql_core.mysqlTable)("faq_entries", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      question: (0, import_mysql_core.text)("question").notNull(),
+      questionAr: (0, import_mysql_core.text)("question_ar"),
+      answer: (0, import_mysql_core.text)("answer").notNull(),
+      answerAr: (0, import_mysql_core.text)("answer_ar"),
+      category: (0, import_mysql_core.text)("category").default("general"),
+      // general, orders, delivery, payment, account
+      sortOrder: (0, import_mysql_core.int)("sort_order").default(0),
+      isActive: (0, import_mysql_core.boolean)("is_active").default(true),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    });
+    restaurantAggregateRatings = (0, import_mysql_core.mysqlTable)("restaurant_aggregate_ratings", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+      avgRating: (0, import_mysql_core.decimal)("avg_rating", { precision: 3, scale: 2 }).default("0"),
+      totalReviews: (0, import_mysql_core.int)("total_reviews").default(0),
+      avgDeliveryTime: (0, import_mysql_core.int)("avg_delivery_time").default(30),
+      updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
+    });
     insertBranchSchema = (0, import_drizzle_zod.createInsertSchema)(branches).omit({ id: true, createdAt: true, updatedAt: true });
     insertEmployeeSchema = (0, import_drizzle_zod.createInsertSchema)(employees).omit({ id: true, createdAt: true, updatedAt: true });
     insertCategorySchema = (0, import_drizzle_zod.createInsertSchema)(categories).omit({ id: true, createdAt: true });
@@ -848,6 +1141,7 @@ var init_schema = __esm({
     insertExpenseSchema = (0, import_drizzle_zod.createInsertSchema)(expenses).omit({ id: true, createdAt: true });
     insertCallSchema = (0, import_drizzle_zod.createInsertSchema)(calls).omit({ id: true, createdAt: true });
     insertTableSchema = (0, import_drizzle_zod.createInsertSchema)(tables).omit({ id: true, createdAt: true });
+    insertTableQrCodeSchema = (0, import_drizzle_zod.createInsertSchema)(tableQrCodes).omit({ id: true, createdAt: true });
     insertKitchenOrderSchema = (0, import_drizzle_zod.createInsertSchema)(kitchenOrders).omit({ id: true, createdAt: true, updatedAt: true });
     insertSubscriptionPlanSchema = (0, import_drizzle_zod.createInsertSchema)(subscriptionPlans).omit({ id: true, createdAt: true });
     insertSubscriptionSchema = (0, import_drizzle_zod.createInsertSchema)(subscriptions).omit({ id: true, createdAt: true });
@@ -876,6 +1170,20 @@ var init_schema = __esm({
     insertPrinterConfigSchema = (0, import_drizzle_zod.createInsertSchema)(printerConfigs).omit({ id: true, updatedAt: true });
     insertDailyClosingSchema = (0, import_drizzle_zod.createInsertSchema)(dailyClosings).omit({ id: true, createdAt: true });
     insertMonthlyClosingSchema = (0, import_drizzle_zod.createInsertSchema)(monthlyClosings).omit({ id: true, createdAt: true });
+    insertCustomerAddressSchema = (0, import_drizzle_zod.createInsertSchema)(customerAddresses).omit({ id: true, createdAt: true });
+    insertPromoCodeSchema = (0, import_drizzle_zod.createInsertSchema)(promoCodes).omit({ id: true, createdAt: true });
+    insertPromoCodeUsageSchema = (0, import_drizzle_zod.createInsertSchema)(promoCodeUsages).omit({ id: true, createdAt: true });
+    insertDriverLocationSchema = (0, import_drizzle_zod.createInsertSchema)(driverLocations).omit({ id: true, recordedAt: true });
+    insertLoyaltyTransactionSchema = (0, import_drizzle_zod.createInsertSchema)(loyaltyTransactions).omit({ id: true, createdAt: true });
+    insertWalletTransactionSchema = (0, import_drizzle_zod.createInsertSchema)(walletTransactions).omit({ id: true, createdAt: true });
+    insertOrderRatingSchema = (0, import_drizzle_zod.createInsertSchema)(orderRatings).omit({ id: true, createdAt: true });
+    insertCustomerSessionSchema = (0, import_drizzle_zod.createInsertSchema)(customerSessions).omit({ id: true, createdAt: true });
+    insertOtpVerificationSchema = (0, import_drizzle_zod.createInsertSchema)(otpVerifications).omit({ id: true, createdAt: true });
+    insertDeliveryZoneSchema = (0, import_drizzle_zod.createInsertSchema)(deliveryZones).omit({ id: true, createdAt: true });
+    insertCustomerFavoriteSchema = (0, import_drizzle_zod.createInsertSchema)(customerFavorites).omit({ id: true, createdAt: true });
+    insertProductDietaryTagSchema = (0, import_drizzle_zod.createInsertSchema)(productDietaryTags).omit({ id: true });
+    insertHelpTicketSchema = (0, import_drizzle_zod.createInsertSchema)(helpTickets).omit({ id: true, createdAt: true, updatedAt: true });
+    insertFaqEntrySchema = (0, import_drizzle_zod.createInsertSchema)(faqEntries).omit({ id: true, createdAt: true });
   }
 });
 
@@ -1615,6 +1923,30 @@ var init_storage = __esm({
         const [table] = await db.update(tables).set(data).where((0, import_drizzle_orm.eq)(tables.id, id));
         return table;
       },
+      // Table QR Codes
+      async getTableQrCodes(tenantId) {
+        return db.select().from(tableQrCodes).where((0, import_drizzle_orm.eq)(tableQrCodes.tenantId, tenantId)).orderBy(tableQrCodes.tableName);
+      },
+      async getTableQrCodeByToken(token) {
+        const [qr] = await db.select().from(tableQrCodes).where((0, import_drizzle_orm.eq)(tableQrCodes.qrToken, token));
+        return qr;
+      },
+      async createTableQrCode(data) {
+        const _ins = await db.insert(tableQrCodes).values(data).$returningId();
+        const [qr] = await db.select().from(tableQrCodes).where((0, import_drizzle_orm.eq)(tableQrCodes.id, _ins[0]?.id ?? 0));
+        return qr;
+      },
+      async updateTableQrCode(id, data) {
+        await db.update(tableQrCodes).set(data).where((0, import_drizzle_orm.eq)(tableQrCodes.id, id));
+        const [qr] = await db.select().from(tableQrCodes).where((0, import_drizzle_orm.eq)(tableQrCodes.id, id));
+        return qr;
+      },
+      async deleteTableQrCode(id) {
+        await db.delete(tableQrCodes).where((0, import_drizzle_orm.eq)(tableQrCodes.id, id));
+      },
+      async incrementQrScanCount(token) {
+        await db.update(tableQrCodes).set({ scannedCount: import_drizzle_orm.sql`scanned_count + 1`, lastScannedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm.eq)(tableQrCodes.qrToken, token));
+      },
       // Kitchen Orders
       async getKitchenOrders(branchId) {
         if (branchId) {
@@ -2044,8 +2376,8 @@ var init_storage = __esm({
             return [];
           }
         }
-        const { and: and3 } = await import("drizzle-orm");
-        return db.select().from(productBatches).where(and3(...conditions)).orderBy(productBatches.expiryDate);
+        const { and: and5 } = await import("drizzle-orm");
+        return db.select().from(productBatches).where(and5(...conditions)).orderBy(productBatches.expiryDate);
       },
       async createProductBatch(data) {
         const _ins_batch = await db.insert(productBatches).values(data).$returningId();
@@ -2660,6 +2992,12 @@ var init_storage = __esm({
         const [config] = await db.select().from(landingPageConfig).where((0, import_drizzle_orm.eq)(landingPageConfig.slug, slug));
         return config;
       },
+      async getAllLandingPageConfigs(tenantId) {
+        if (tenantId) {
+          return db.select().from(landingPageConfig).where((0, import_drizzle_orm.eq)(landingPageConfig.tenantId, Number(tenantId)));
+        }
+        return db.select().from(landingPageConfig);
+      },
       async upsertLandingPageConfig(tenantId, data) {
         if (!data.slug) {
           const [tenant] = await db.select().from(tenants).where((0, import_drizzle_orm.eq)(tenants.id, tenantId));
@@ -2880,6 +3218,215 @@ var init_storage = __esm({
           return 1;
         }
         return Number(result?.insertId || 1);
+      },
+      // ═══════════════════════════════════════════════════════════════════════════
+      // ── Delivery Platform Storage Methods ──────────────────────────────────────
+      // ═══════════════════════════════════════════════════════════════════════════
+      // ── Delivery Zones ──────────────────────────────────────────────────────────
+      async getDeliveryZones(tenantId) {
+        return db.select().from(deliveryZones).where((0, import_drizzle_orm.eq)(deliveryZones.tenantId, tenantId)).orderBy(deliveryZones.sortOrder);
+      },
+      async createDeliveryZone(data) {
+        const [r] = await db.insert(deliveryZones).values(data).$returningId();
+        const [zone] = await db.select().from(deliveryZones).where((0, import_drizzle_orm.eq)(deliveryZones.id, r.id)).limit(1);
+        return zone;
+      },
+      async updateDeliveryZone(id, data) {
+        await db.update(deliveryZones).set(data).where((0, import_drizzle_orm.eq)(deliveryZones.id, id));
+        const [zone] = await db.select().from(deliveryZones).where((0, import_drizzle_orm.eq)(deliveryZones.id, id)).limit(1);
+        return zone;
+      },
+      async deleteDeliveryZone(id) {
+        await db.delete(deliveryZones).where((0, import_drizzle_orm.eq)(deliveryZones.id, id));
+      },
+      // ── Promo Codes ─────────────────────────────────────────────────────────────
+      async getPromoCodes(tenantId) {
+        return db.select().from(promoCodes).where((0, import_drizzle_orm.eq)(promoCodes.tenantId, tenantId)).orderBy((0, import_drizzle_orm.desc)(promoCodes.createdAt));
+      },
+      async getPromoCode(tenantId, code) {
+        const [promo] = await db.select().from(promoCodes).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(promoCodes.tenantId, tenantId), (0, import_drizzle_orm.eq)(promoCodes.code, code.toUpperCase()))).limit(1);
+        return promo ?? null;
+      },
+      async createPromoCode(data) {
+        const [r] = await db.insert(promoCodes).values({ ...data, code: data.code.toUpperCase() }).$returningId();
+        const [promo] = await db.select().from(promoCodes).where((0, import_drizzle_orm.eq)(promoCodes.id, r.id)).limit(1);
+        return promo;
+      },
+      async updatePromoCode(id, data) {
+        await db.update(promoCodes).set(data).where((0, import_drizzle_orm.eq)(promoCodes.id, id));
+        const [promo] = await db.select().from(promoCodes).where((0, import_drizzle_orm.eq)(promoCodes.id, id)).limit(1);
+        return promo;
+      },
+      async deletePromoCode(id) {
+        await db.delete(promoCodes).where((0, import_drizzle_orm.eq)(promoCodes.id, id));
+      },
+      // ── Customer Addresses ──────────────────────────────────────────────────────
+      async getCustomerAddresses(customerId) {
+        return db.select().from(customerAddresses).where((0, import_drizzle_orm.eq)(customerAddresses.customerId, customerId)).orderBy((0, import_drizzle_orm.desc)(customerAddresses.isDefault), (0, import_drizzle_orm.desc)(customerAddresses.id));
+      },
+      async createCustomerAddress(data) {
+        if (data.isDefault) {
+          await db.update(customerAddresses).set({ isDefault: false }).where((0, import_drizzle_orm.eq)(customerAddresses.customerId, data.customerId));
+        }
+        const [r] = await db.insert(customerAddresses).values(data).$returningId();
+        const [addr] = await db.select().from(customerAddresses).where((0, import_drizzle_orm.eq)(customerAddresses.id, r.id)).limit(1);
+        return addr;
+      },
+      async updateCustomerAddress(id, data) {
+        if (data.isDefault && data.customerId) {
+          await db.update(customerAddresses).set({ isDefault: false }).where((0, import_drizzle_orm.eq)(customerAddresses.customerId, data.customerId));
+        }
+        await db.update(customerAddresses).set(data).where((0, import_drizzle_orm.eq)(customerAddresses.id, id));
+        const [addr] = await db.select().from(customerAddresses).where((0, import_drizzle_orm.eq)(customerAddresses.id, id)).limit(1);
+        return addr;
+      },
+      async deleteCustomerAddress(id) {
+        await db.delete(customerAddresses).where((0, import_drizzle_orm.eq)(customerAddresses.id, id));
+      },
+      async setDefaultAddress(id, customerId) {
+        await db.update(customerAddresses).set({ isDefault: false }).where((0, import_drizzle_orm.eq)(customerAddresses.customerId, customerId));
+        await db.update(customerAddresses).set({ isDefault: true }).where((0, import_drizzle_orm.eq)(customerAddresses.id, id));
+      },
+      // ── Order Ratings ───────────────────────────────────────────────────────────
+      async createOrderRating(data) {
+        const [r] = await db.insert(orderRatings).values(data).$returningId();
+        await db.update(onlineOrders).set({ rating: data.overallRating, ratingComment: data.comment ?? null }).where((0, import_drizzle_orm.eq)(onlineOrders.id, data.orderId));
+        if (data.driverId && data.deliveryRating) {
+          await db.update(vehicles).set({ driverRating: import_drizzle_orm.sql`((driver_rating * total_deliveries) + ${data.deliveryRating}) / (total_deliveries + 1)` }).where((0, import_drizzle_orm.eq)(vehicles.id, data.driverId));
+        }
+        const [rating] = await db.select().from(orderRatings).where((0, import_drizzle_orm.eq)(orderRatings.id, r.id)).limit(1);
+        return rating;
+      },
+      async getOrderRatings(tenantId, limit = 50) {
+        return db.select().from(orderRatings).innerJoin(onlineOrders, (0, import_drizzle_orm.eq)(orderRatings.orderId, onlineOrders.id)).where((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId)).orderBy((0, import_drizzle_orm.desc)(orderRatings.createdAt)).limit(limit);
+      },
+      // ── Loyalty Transactions ────────────────────────────────────────────────────
+      async getLoyaltyTransactions(customerId, limit = 50) {
+        return db.select().from(loyaltyTransactions).where((0, import_drizzle_orm.eq)(loyaltyTransactions.customerId, customerId)).orderBy((0, import_drizzle_orm.desc)(loyaltyTransactions.createdAt)).limit(limit);
+      },
+      // ── Wallet Transactions ─────────────────────────────────────────────────────
+      async getWalletTransactions(customerId, limit = 50) {
+        return db.select().from(walletTransactions).where((0, import_drizzle_orm.eq)(walletTransactions.customerId, customerId)).orderBy((0, import_drizzle_orm.desc)(walletTransactions.createdAt)).limit(limit);
+      },
+      // ── Driver Location ─────────────────────────────────────────────────────────
+      async updateDriverLocation(vehicleId, lat, lng, orderId) {
+        await db.update(vehicles).set({
+          currentLat: lat.toFixed(7),
+          currentLng: lng.toFixed(7),
+          locationUpdatedAt: /* @__PURE__ */ new Date()
+        }).where((0, import_drizzle_orm.eq)(vehicles.id, vehicleId));
+        await db.insert(driverLocations).values({
+          vehicleId,
+          orderId: orderId ?? null,
+          lat: lat.toFixed(7),
+          lng: lng.toFixed(7),
+          speed: null,
+          heading: null
+        });
+      },
+      async getDriverLocation(vehicleId) {
+        const [vehicle] = await db.select({
+          id: vehicles.id,
+          driverName: vehicles.driverName,
+          driverPhone: vehicles.driverPhone,
+          currentLat: vehicles.currentLat,
+          currentLng: vehicles.currentLng,
+          locationUpdatedAt: vehicles.locationUpdatedAt,
+          driverStatus: vehicles.driverStatus,
+          driverRating: vehicles.driverRating
+        }).from(vehicles).where((0, import_drizzle_orm.eq)(vehicles.id, vehicleId)).limit(1);
+        return vehicle ?? null;
+      },
+      async getActiveDrivers(tenantId) {
+        return db.select().from(vehicles).where(
+          (0, import_drizzle_orm.and)(
+            (0, import_drizzle_orm.eq)(vehicles.tenantId, tenantId),
+            (0, import_drizzle_orm.eq)(vehicles.isActive, true),
+            import_drizzle_orm.sql`${vehicles.driverStatus} != 'offline'`
+          )
+        );
+      },
+      // ── Delivery Management ─────────────────────────────────────────────────────
+      async getDeliveryOrders(tenantId, filters) {
+        let q = db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId));
+        if (filters?.status) {
+          q = q.where((0, import_drizzle_orm.eq)(onlineOrders.status, filters.status));
+        }
+        if (filters?.orderType) {
+          q = q.where((0, import_drizzle_orm.eq)(onlineOrders.orderType, filters.orderType));
+        }
+        return q.orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
+      },
+      async assignDriverToOrder(orderId, vehicleId) {
+        await db.update(onlineOrders).set({ driverId: vehicleId }).where((0, import_drizzle_orm.eq)(onlineOrders.id, orderId));
+        await db.update(vehicles).set({ driverStatus: "on_delivery", activeOrderId: orderId }).where((0, import_drizzle_orm.eq)(vehicles.id, vehicleId));
+      },
+      async getDeliveryStats(tenantId) {
+        const today = /* @__PURE__ */ new Date();
+        today.setHours(0, 0, 0, 0);
+        const [totalRow] = await db.select({ count: import_drizzle_orm.sql`count(*)` }).from(onlineOrders).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId), (0, import_drizzle_orm.gte)(onlineOrders.createdAt, today)));
+        const [pendingRow] = await db.select({ count: import_drizzle_orm.sql`count(*)` }).from(onlineOrders).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId), (0, import_drizzle_orm.eq)(onlineOrders.status, "pending"), (0, import_drizzle_orm.gte)(onlineOrders.createdAt, today)));
+        const [deliveredRow] = await db.select({ count: import_drizzle_orm.sql`count(*)` }).from(onlineOrders).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId), (0, import_drizzle_orm.eq)(onlineOrders.status, "delivered"), (0, import_drizzle_orm.gte)(onlineOrders.createdAt, today)));
+        const [revenueRow] = await db.select({ total: import_drizzle_orm.sql`COALESCE(SUM(total_amount), 0)` }).from(onlineOrders).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId), (0, import_drizzle_orm.eq)(onlineOrders.status, "delivered"), (0, import_drizzle_orm.gte)(onlineOrders.createdAt, today)));
+        return {
+          todayOrders: totalRow?.count ?? 0,
+          pendingOrders: pendingRow?.count ?? 0,
+          deliveredToday: deliveredRow?.count ?? 0,
+          todayRevenue: parseFloat(revenueRow?.total ?? "0")
+        };
+      },
+      // ── Customer order history (delivery) ──────────────────────────────────────
+      async getCustomerOrderHistory(customerId, tenantId, limit = 20) {
+        return db.select().from(onlineOrders).where((0, import_drizzle_orm.and)(
+          import_drizzle_orm.sql`${onlineOrders.customerPhone} = (SELECT phone FROM customers WHERE id = ${customerId})`,
+          (0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId)
+        )).orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt)).limit(limit);
+      },
+      // ── Driver earnings ─────────────────────────────────────────────────────────
+      async getDriverEarnings(vehicleId, days = 7) {
+        const since = new Date(Date.now() - days * 24 * 60 * 60 * 1e3);
+        return db.select({
+          count: import_drizzle_orm.sql`count(*)`,
+          totalFees: import_drizzle_orm.sql`COALESCE(SUM(delivery_fee), 0)`
+        }).from(onlineOrders).where((0, import_drizzle_orm.and)(
+          (0, import_drizzle_orm.eq)(onlineOrders.driverId, vehicleId),
+          (0, import_drizzle_orm.eq)(onlineOrders.status, "delivered"),
+          (0, import_drizzle_orm.gte)(onlineOrders.createdAt, since)
+        ));
+      },
+      // ── Missing helpers used by delivery routes ─────────────────────────────────
+      async getVehicle(id) {
+        const [vehicle] = await db.select().from(vehicles).where((0, import_drizzle_orm.eq)(vehicles.id, id)).limit(1);
+        return vehicle ?? null;
+      },
+      async getVehicleByAccessToken(token) {
+        const [vehicle] = await db.select().from(vehicles).where((0, import_drizzle_orm.eq)(vehicles.driverAccessToken, token)).limit(1);
+        return vehicle ?? null;
+      },
+      async getOnlineOrderByTrackingToken(token) {
+        const [order] = await db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.trackingToken, token)).limit(1);
+        return order ?? null;
+      },
+      async getDriverActiveOrders(vehicleId, tenantId) {
+        return db.select().from(onlineOrders).where(
+          (0, import_drizzle_orm.and)(
+            (0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId),
+            (0, import_drizzle_orm.eq)(onlineOrders.driverId, vehicleId),
+            import_drizzle_orm.sql`${onlineOrders.status} NOT IN ('delivered', 'cancelled')`
+          )
+        ).orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
+      },
+      async getCustomerIdByPhone(phone, tenantId) {
+        const [customer] = await db.select({ id: customers.id }).from(customers).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(customers.phone, phone), (0, import_drizzle_orm.eq)(customers.tenantId, tenantId))).limit(1);
+        return customer?.id ?? null;
+      },
+      async getCustomerByReferralCode(code) {
+        const [customer] = await db.select().from(customers).where((0, import_drizzle_orm.eq)(customers.referralCode, code)).limit(1);
+        return customer ?? null;
+      },
+      async getLandingPageConfigByTenantId(tenantId) {
+        const [config] = await db.select().from(landingPageConfig).where((0, import_drizzle_orm.eq)(landingPageConfig.tenantId, tenantId)).limit(1);
+        return config ?? null;
       }
     };
   }
@@ -2980,17 +3527,17 @@ function slugify(name) {
 }
 async function seedPizzaLemon() {
   console.log("[PIZZA LEMON] Checking if Pizza Lemon store is properly configured...");
-  const [existingKey] = await db.select().from(licenseKeys).where((0, import_drizzle_orm3.eq)(licenseKeys.licenseKey, LICENSE_KEY));
+  const [existingKey] = await db.select().from(licenseKeys).where((0, import_drizzle_orm5.eq)(licenseKeys.licenseKey, LICENSE_KEY));
   const isAlreadySeeded = !!existingKey;
   if (isAlreadySeeded) {
     console.log("[PIZZA LEMON] License key already present \u2013 running full catalog update...");
   }
   let tenant;
-  const pizzaLemonTenants = await db.select().from(tenants).where((0, import_drizzle_orm3.eq)(tenants.id, 24));
+  const pizzaLemonTenants = await db.select().from(tenants).where((0, import_drizzle_orm5.eq)(tenants.id, 24));
   if (pizzaLemonTenants.length > 0) {
     tenant = pizzaLemonTenants[0];
     console.log(`[PIZZA LEMON] Found existing store (ID ${tenant.id}). Upgrading credentials and data...`);
-    const hash3 = await import_bcrypt.default.hash(STORE_PASSWORD, 10);
+    const hash3 = await import_bcrypt2.default.hash(STORE_PASSWORD, 10);
     await db.update(tenants).set({
       businessName: BUSINESS_NAME,
       ownerEmail: STORE_EMAIL,
@@ -2999,10 +3546,10 @@ async function seedPizzaLemon() {
       storeType: "restaurant",
       maxBranches: 3,
       maxEmployees: 20
-    }).where((0, import_drizzle_orm3.eq)(tenants.id, 24));
+    }).where((0, import_drizzle_orm5.eq)(tenants.id, 24));
   } else {
     console.log("[PIZZA LEMON] No Tenant ID 24 found. Creating new store with ID 24...");
-    const hash3 = await import_bcrypt.default.hash(STORE_PASSWORD, 10);
+    const hash3 = await import_bcrypt2.default.hash(STORE_PASSWORD, 10);
     const [newTenant] = await db.insert(tenants).values({
       id: 24,
       businessName: BUSINESS_NAME,
@@ -3017,7 +3564,7 @@ async function seedPizzaLemon() {
     }).$returningId();
     tenant = { id: newTenant.id };
   }
-  const subs = await db.select().from(tenantSubscriptions).where((0, import_drizzle_orm3.eq)(tenantSubscriptions.tenantId, tenant.id));
+  const subs = await db.select().from(tenantSubscriptions).where((0, import_drizzle_orm5.eq)(tenantSubscriptions.tenantId, tenant.id));
   const activeSub = subs.find((s) => s.status === "active");
   let subId;
   if (activeSub) {
@@ -3050,7 +3597,7 @@ async function seedPizzaLemon() {
     });
     console.log(`[PIZZA LEMON] License key added: ${LICENSE_KEY}`);
   }
-  let tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm3.eq)(branches.tenantId, tenant.id));
+  let tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm5.eq)(branches.tenantId, tenant.id));
   let branchId;
   if (tenantBranches.length > 0) {
     branchId = tenantBranches[0].id;
@@ -3073,7 +3620,7 @@ async function seedPizzaLemon() {
     }
     console.log(`[PIZZA LEMON] Created branch, warehouse, 8 tables.`);
   }
-  const existingEmps = await db.select().from(employees).where((0, import_drizzle_orm3.eq)(employees.branchId, branchId));
+  const existingEmps = await db.select().from(employees).where((0, import_drizzle_orm5.eq)(employees.branchId, branchId));
   const hasAdmin = existingEmps.some((e) => e.role === "admin" && e.pin === "1234");
   const hasCashier = existingEmps.some((e) => e.role === "cashier" && e.pin === "5678");
   if (!hasAdmin) {
@@ -3085,18 +3632,18 @@ async function seedPizzaLemon() {
   const shouldForceCatalogReset = ["1", "true", "yes"].includes(
     (process.env.PIZZA_LEMON_FORCE_RESET || "").toLowerCase()
   );
-  const existingProds = await db.select().from(products).where((0, import_drizzle_orm3.eq)(products.tenantId, tenant.id));
+  const existingProds = await db.select().from(products).where((0, import_drizzle_orm5.eq)(products.tenantId, tenant.id));
   if (existingProds.length > 0 && !shouldForceCatalogReset) {
     console.log(`[PIZZA LEMON] ${existingProds.length} products already exist \u2014 skipping catalog reset to protect existing data.`);
     return;
   }
   if (shouldForceCatalogReset) {
-    const existingCats = await db.select({ id: categories.id, name: categories.name }).from(categories).where((0, import_drizzle_orm3.eq)(categories.tenantId, tenant.id));
+    const existingCats = await db.select({ id: categories.id, name: categories.name }).from(categories).where((0, import_drizzle_orm5.eq)(categories.tenantId, tenant.id));
     if (existingProds.length > 0) {
-      await db.delete(products).where((0, import_drizzle_orm3.eq)(products.tenantId, tenant.id));
+      await db.delete(products).where((0, import_drizzle_orm5.eq)(products.tenantId, tenant.id));
     }
     if (existingCats.length > 0) {
-      await db.delete(categories).where((0, import_drizzle_orm3.eq)(categories.tenantId, tenant.id));
+      await db.delete(categories).where((0, import_drizzle_orm5.eq)(categories.tenantId, tenant.id));
     }
     console.log(
       `[PIZZA LEMON] Force reset enabled \u2014 cleared ${existingProds.length} products and ${existingCats.length} categories.`
@@ -3104,17 +3651,17 @@ async function seedPizzaLemon() {
   } else {
     console.log("[PIZZA LEMON] No products found \u2014 creating fresh product catalog...");
   }
-  const allCats = await db.select({ id: categories.id, name: categories.name }).from(categories).where((0, import_drizzle_orm3.eq)(categories.tenantId, tenant.id));
+  const allCats = await db.select({ id: categories.id, name: categories.name }).from(categories).where((0, import_drizzle_orm5.eq)(categories.tenantId, tenant.id));
   const catMap = {};
   for (const c of allCats) catMap[c.name] = c.id;
   if (catMap["Softgetr\xE4nke"] && !catMap["Getr\xE4nke"]) {
-    await db.update(categories).set({ name: "Getr\xE4nke" }).where((0, import_drizzle_orm3.eq)(categories.id, catMap["Softgetr\xE4nke"]));
+    await db.update(categories).set({ name: "Getr\xE4nke" }).where((0, import_drizzle_orm5.eq)(categories.id, catMap["Softgetr\xE4nke"]));
     catMap["Getr\xE4nke"] = catMap["Softgetr\xE4nke"];
     delete catMap["Softgetr\xE4nke"];
     console.log("[PIZZA LEMON] Renamed category Softgetr\xE4nke \u2192 Getr\xE4nke");
   }
   if (catMap["Tabakwaren"] && !catMap["Extra"]) {
-    await db.update(categories).set({ name: "Extra", icon: "add-circle" }).where((0, import_drizzle_orm3.eq)(categories.id, catMap["Tabakwaren"]));
+    await db.update(categories).set({ name: "Extra", icon: "add-circle" }).where((0, import_drizzle_orm5.eq)(categories.id, catMap["Tabakwaren"]));
     catMap["Extra"] = catMap["Tabakwaren"];
     delete catMap["Tabakwaren"];
     console.log("[PIZZA LEMON] Renamed category Tabakwaren \u2192 Extra");
@@ -3136,7 +3683,7 @@ async function seedPizzaLemon() {
         sortOrder: cat.sortOrder,
         color: cat.color,
         icon: cat.icon
-      }).where((0, import_drizzle_orm3.eq)(categories.id, catMap[cat.name]));
+      }).where((0, import_drizzle_orm5.eq)(categories.id, catMap[cat.name]));
     }
   }
   let idx = 0;
@@ -3239,7 +3786,7 @@ async function seedPizzaLemon() {
   console.log(
     `[PIZZA LEMON] \u2713 ${total} products inserted. Pizza ${PIZZAS.length}, Calzone ${CALZONES.length}, Pide ${PIDE.length}, Lahmacun ${LAHMACUN.length}, Tellergerichte ${TELLERGERICHTE.length}, Fingerfood ${FINGERFOOD.length}, Salat ${SALATE.length}, Dessert ${DESSERTS.length}, Getr\xE4nke ${GETRAENKE.length}, Bier ${BIER.length}, Alkohol ${ALKOHOL.length}, Extra ${EXTRAS.length}.`
   );
-  const [existingConfig] = await db.select().from(landingPageConfig).where((0, import_drizzle_orm3.eq)(landingPageConfig.tenantId, tenant.id));
+  const [existingConfig] = await db.select().from(landingPageConfig).where((0, import_drizzle_orm5.eq)(landingPageConfig.tenantId, tenant.id));
   const heroImage = IMG("pizzalemon_hero.png");
   if (!existingConfig) {
     await db.insert(landingPageConfig).values({
@@ -3280,7 +3827,7 @@ async function seedPizzaLemon() {
       openingHours: "Mo\u2013So: 10:00\u201323:00 | Lieferzeiten: 11:00\u201323:00",
       address: existingConfig.address || "Birchstrasse 120, CH-8050 Z\xFCrich-Oerlikon",
       deliveryRadius: "Zone 1 (ab 20.-): Affoltern, Seebach, Oerlikon | Zone 2 (ab 30.-): Kloten, Wallisellen | Zone 3 (ab 40.-): Regensdorf"
-    }).where((0, import_drizzle_orm3.eq)(landingPageConfig.tenantId, tenant.id));
+    }).where((0, import_drizzle_orm5.eq)(landingPageConfig.tenantId, tenant.id));
     console.log("[PIZZA LEMON] Landing page config updated.");
   }
   await db.insert(tenantNotifications).values({
@@ -3290,7 +3837,7 @@ async function seedPizzaLemon() {
     message: `Men\xFCpreise, Gr\xF6\xDFen und Getr\xE4nkemengen mit dem aktuellen Foto-Men\xFC abgeglichen. Email: ${STORE_EMAIL} | PIN: 1234/5678 | Lizenz: ${LICENSE_KEY}`,
     priority: "high"
   });
-  const existingVehicles = await db.select().from(vehicles).where((0, import_drizzle_orm3.eq)(vehicles.tenantId, tenant.id));
+  const existingVehicles = await db.select().from(vehicles).where((0, import_drizzle_orm5.eq)(vehicles.tenantId, tenant.id));
   if (existingVehicles.length === 0) {
     await db.insert(vehicles).values([
       { tenantId: tenant.id, branchId: null, licensePlate: "ZH 123456", make: "Mercedes", model: "Vito", color: "Wei\xDF", driverName: "Ahmed Ali", driverPhone: "+41791234567", isActive: true },
@@ -3308,14 +3855,14 @@ async function seedPizzaLemon() {
     `[PIZZA LEMON]    Menu: ${PIZZAS.length} Pizza, ${CALZONES.length} Calzone, ${PIDE.length} Pide, ${LAHMACUN.length} Lahmacun, ${TELLERGERICHTE.length} Tellergerichte, ${FINGERFOOD.length} Fingerfood, ${SALATE.length} Salat, ${DESSERTS.length} Dessert, ${GETRAENKE.length} Getr\xE4nke, ${BIER.length} Bier, ${ALKOHOL.length} Alkohol, ${EXTRAS.length} Extra = ${total} total`
   );
 }
-var import_drizzle_orm3, import_bcrypt, import_date_fns2, STORE_EMAIL, STORE_PASSWORD, LICENSE_KEY, BUSINESS_NAME, IMG, PIZZA_LEMON_CATEGORIES, PIZZAS, CALZONES, PIDE, LAHMACUN, TELLERGERICHTE, FINGERFOOD, SALATE, DESSERTS, GETRAENKE, BIER, ALKOHOL, EXTRAS;
+var import_drizzle_orm5, import_bcrypt2, import_date_fns2, STORE_EMAIL, STORE_PASSWORD, LICENSE_KEY, BUSINESS_NAME, IMG, PIZZA_LEMON_CATEGORIES, PIZZAS, CALZONES, PIDE, LAHMACUN, TELLERGERICHTE, FINGERFOOD, SALATE, DESSERTS, GETRAENKE, BIER, ALKOHOL, EXTRAS;
 var init_seedPizzaLemon = __esm({
   "server/seedPizzaLemon.ts"() {
     "use strict";
     init_db();
-    import_drizzle_orm3 = require("drizzle-orm");
+    import_drizzle_orm5 = require("drizzle-orm");
     init_schema();
-    import_bcrypt = __toESM(require("bcrypt"));
+    import_bcrypt2 = __toESM(require("bcrypt"));
     import_date_fns2 = require("date-fns");
     STORE_EMAIL = "admin@pizzalemon.ch";
     STORE_PASSWORD = "pizzalemon123";
@@ -3534,13 +4081,13 @@ function pick(arr) {
   return arr[rand(0, arr.length - 1)];
 }
 function uuid() {
-  return crypto2.randomUUID().split("-")[0].toUpperCase();
+  return crypto4.randomUUID().split("-")[0].toUpperCase();
 }
 async function seedAllDemoData() {
   console.log("[SEED] Starting comprehensive demo data seeding...");
-  const [saCount] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(superAdmins);
+  const [saCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(superAdmins);
   if (Number(saCount.count) === 0) {
-    const hash3 = await import_bcrypt2.default.hash("admin123", 10);
+    const hash3 = await import_bcrypt3.default.hash("admin123", 10);
     await db.insert(superAdmins).values({
       name: "System Admin",
       email: "admin@barmagly.com",
@@ -3550,10 +4097,10 @@ async function seedAllDemoData() {
     });
     console.log("[SEED] Created super admin: admin@barmagly.com / admin123");
   }
-  const [tenantCount] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(tenants);
+  const [tenantCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(tenants);
   if (Number(tenantCount.count) < 3) {
     for (const store of DEMO_STORES) {
-      const hash3 = await import_bcrypt2.default.hash("store123", 10);
+      const hash3 = await import_bcrypt3.default.hash("store123", 10);
       const [tenant] = await db.insert(tenants).values({
         businessName: store.biz,
         ownerName: store.owner,
@@ -3612,7 +4159,7 @@ async function seedAllDemoData() {
       }
     }
     const currentCategories = await db.select().from(categories);
-    let tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm4.eq)(branches.tenantId, t.id));
+    let tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm6.eq)(branches.tenantId, t.id));
     if (tenantBranches.length === 0) {
       const branchNames = ["Main Branch", "Downtown Branch", "Mall Branch"];
       for (let i = 0; i < rand(1, 3); i++) {
@@ -3628,12 +4175,12 @@ async function seedAllDemoData() {
           taxRate: "5.00"
         });
       }
-      tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm4.eq)(branches.tenantId, t.id));
+      tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm6.eq)(branches.tenantId, t.id));
     }
     const branchIds = tenantBranches.map((b) => b.id);
     if (branchIds.length === 0) continue;
     for (const bId of branchIds) {
-      const [existingWH] = await db.select().from(warehouses).where((0, import_drizzle_orm4.eq)(warehouses.branchId, bId)).limit(1);
+      const [existingWH] = await db.select().from(warehouses).where((0, import_drizzle_orm6.eq)(warehouses.branchId, bId)).limit(1);
       if (!existingWH) {
         await db.insert(warehouses).values({
           name: `Warehouse - Branch ${bId}`,
@@ -3643,7 +4190,7 @@ async function seedAllDemoData() {
         });
       }
     }
-    let tenantEmployees = await db.select().from(employees).where(import_drizzle_orm4.sql`${employees.branchId} IN (${import_drizzle_orm4.sql.join(branchIds, import_drizzle_orm4.sql`, `)})`);
+    let tenantEmployees = await db.select().from(employees).where(import_drizzle_orm6.sql`${employees.branchId} IN (${import_drizzle_orm6.sql.join(branchIds, import_drizzle_orm6.sql`, `)})`);
     if (tenantEmployees.length === 0) {
       const roles = ["admin", "manager", "cashier", "cashier"];
       const empNames = ["Ahmed Manager", "Fatima Cashier", "Omar Staff", "Sara Admin"];
@@ -3660,10 +4207,10 @@ async function seedAllDemoData() {
           commissionRate: "2.50"
         });
       }
-      tenantEmployees = await db.select().from(employees).where(import_drizzle_orm4.sql`${employees.branchId} IN (${import_drizzle_orm4.sql.join(branchIds, import_drizzle_orm4.sql`, `)})`);
+      tenantEmployees = await db.select().from(employees).where(import_drizzle_orm6.sql`${employees.branchId} IN (${import_drizzle_orm6.sql.join(branchIds, import_drizzle_orm6.sql`, `)})`);
     }
     const employeeIds = tenantEmployees.map((e) => e.id);
-    let tenantProducts = await db.select().from(products).where((0, import_drizzle_orm4.eq)(products.tenantId, t.id));
+    let tenantProducts = await db.select().from(products).where((0, import_drizzle_orm6.eq)(products.tenantId, t.id));
     if (tenantProducts.length === 0) {
       for (const cat of currentCategories) {
         const prods = PRODUCT_NAMES[cat.name] || [];
@@ -3684,12 +4231,12 @@ async function seedAllDemoData() {
           });
         }
       }
-      tenantProducts = await db.select().from(products).where((0, import_drizzle_orm4.eq)(products.tenantId, t.id));
+      tenantProducts = await db.select().from(products).where((0, import_drizzle_orm6.eq)(products.tenantId, t.id));
     }
     const productIds = tenantProducts.map((p) => p.id);
     for (const pId of productIds) {
       for (const bId of branchIds) {
-        const [existingInv] = await db.select().from(inventory).where(import_drizzle_orm4.sql`${inventory.productId} = ${pId} AND ${inventory.branchId} = ${bId}`);
+        const [existingInv] = await db.select().from(inventory).where(import_drizzle_orm6.sql`${inventory.productId} = ${pId} AND ${inventory.branchId} = ${bId}`);
         if (!existingInv) {
           await db.insert(inventory).values({
             productId: pId,
@@ -3702,7 +4249,7 @@ async function seedAllDemoData() {
         }
       }
     }
-    const [custCount] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(customers);
+    const [custCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(customers);
     if (Number(custCount.count) < 10) {
       for (const cust of CUSTOMER_NAMES) {
         await db.insert(customers).values({
@@ -3717,7 +4264,7 @@ async function seedAllDemoData() {
       }
     }
     const customerIds = (await db.select().from(customers)).map((c) => c.id);
-    const [supCount] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(suppliers);
+    const [supCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(suppliers);
     if (Number(supCount.count) < 5) {
       for (const sup of SUPPLIER_NAMES) {
         await db.insert(suppliers).values({
@@ -3730,7 +4277,7 @@ async function seedAllDemoData() {
       }
     }
     const supplierIds = (await db.select().from(suppliers)).map((s) => s.id);
-    const [saleCount] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(sales).where(import_drizzle_orm4.sql`${sales.branchId} IN (${import_drizzle_orm4.sql.join(branchIds, import_drizzle_orm4.sql`, `)})`);
+    const [saleCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(sales).where(import_drizzle_orm6.sql`${sales.branchId} IN (${import_drizzle_orm6.sql.join(branchIds, import_drizzle_orm6.sql`, `)})`);
     if (Number(saleCount.count) < 10) {
       for (let i = 0; i < rand(5, 15); i++) {
         const bId = pick(branchIds);
@@ -3800,7 +4347,7 @@ async function seedAllDemoData() {
       }
     }
     for (const eId of employeeIds) {
-      const [existingShift] = await db.select().from(shifts).where((0, import_drizzle_orm4.eq)(shifts.employeeId, eId)).limit(1);
+      const [existingShift] = await db.select().from(shifts).where((0, import_drizzle_orm6.eq)(shifts.employeeId, eId)).limit(1);
       if (!existingShift) {
         const bId = pick(branchIds);
         const [shift] = await db.insert(shifts).values({
@@ -3824,7 +4371,7 @@ async function seedAllDemoData() {
       }
     }
     for (const bId of branchIds) {
-      const [existingTable] = await db.select().from(tables).where((0, import_drizzle_orm4.eq)(tables.branchId, bId)).limit(1);
+      const [existingTable] = await db.select().from(tables).where((0, import_drizzle_orm6.eq)(tables.branchId, bId)).limit(1);
       if (!existingTable) {
         for (let i = 1; i <= 5; i++) {
           await db.insert(tables).values({
@@ -3836,7 +4383,7 @@ async function seedAllDemoData() {
         }
       }
     }
-    const [expCount] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(expenses).where(import_drizzle_orm4.sql`${expenses.branchId} IN (${import_drizzle_orm4.sql.join(branchIds, import_drizzle_orm4.sql`, `)})`);
+    const [expCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(expenses).where(import_drizzle_orm6.sql`${expenses.branchId} IN (${import_drizzle_orm6.sql.join(branchIds, import_drizzle_orm6.sql`, `)})`);
     if (Number(expCount.count) < 3) {
       for (let i = 0; i < 3; i++) {
         await db.insert(expenses).values({
@@ -3850,7 +4397,7 @@ async function seedAllDemoData() {
       }
     }
     for (const pId of productIds) {
-      const [existingBatch] = await db.select().from(productBatches).where((0, import_drizzle_orm4.eq)(productBatches.productId, pId)).limit(1);
+      const [existingBatch] = await db.select().from(productBatches).where((0, import_drizzle_orm6.eq)(productBatches.productId, pId)).limit(1);
       if (!existingBatch) {
         const bId = pick(branchIds);
         await db.insert(productBatches).values({
@@ -3874,7 +4421,7 @@ async function seedAllDemoData() {
       }
     }
     for (const bId of branchIds) {
-      const [existingSC] = await db.select().from(stockCounts).where((0, import_drizzle_orm4.eq)(stockCounts.branchId, bId)).limit(1);
+      const [existingSC] = await db.select().from(stockCounts).where((0, import_drizzle_orm6.eq)(stockCounts.branchId, bId)).limit(1);
       if (!existingSC) {
         const [sc] = await db.insert(stockCounts).values({
           branchId: bId,
@@ -3912,15 +4459,15 @@ async function seedAllDemoData() {
   }
   console.log("[SEED] \u2705 All demo data seeded successfully!");
 }
-var import_drizzle_orm4, crypto2, import_bcrypt2, import_date_fns3, DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
+var import_drizzle_orm6, crypto4, import_bcrypt3, import_date_fns3, DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
 var init_seedAllDemoData = __esm({
   "server/seedAllDemoData.ts"() {
     "use strict";
     init_db();
-    import_drizzle_orm4 = require("drizzle-orm");
+    import_drizzle_orm6 = require("drizzle-orm");
     init_schema();
-    crypto2 = __toESM(require("crypto"));
-    import_bcrypt2 = __toESM(require("bcrypt"));
+    crypto4 = __toESM(require("crypto"));
+    import_bcrypt3 = __toESM(require("bcrypt"));
     import_date_fns3 = require("date-fns");
     DEMO_STORES = [
       { biz: "Glow Beauty Salon", owner: "Sara Ahmed", email: "sara@glow.com", phone: "+201001234567" },
@@ -4023,8 +4570,63 @@ var PUBLIC_ROUTES = [
   // Public — needed for SW push subscription before auth
   "/api/push/subscribe",
   // Public — SW registers subscription before full auth
-  "/api/maintenance/fix-tenant-ids"
+  "/api/maintenance/fix-tenant-ids",
   // One-time migration fix (secured by secret header)
+  // ── Delivery Platform Public Routes ──
+  "/api/dine-in/validate/",
+  // Public QR token validation for dine-in
+  "/api/delivery/auth/",
+  // Customer OTP login/register
+  "/api/delivery/store/",
+  // Menu & store config browsing
+  "/api/delivery/restaurants",
+  // Multi-restaurant discovery listing
+  "/api/delivery/orders/track/",
+  // Public order tracking by token
+  "/api/delivery/orders/public",
+  // Public order placement
+  "/api/delivery/orders",
+  // Order creation (customer-facing)
+  "/api/delivery/promo/validate",
+  // Promo code validation
+  "/api/delivery/zones",
+  // Delivery zones for checkout map
+  "/api/delivery/referral/",
+  // Referral code lookup
+  "/api/delivery/driver/auth",
+  // Driver token login
+  "/api/delivery/search",
+  // Public product search
+  "/api/delivery/help/faq",
+  // Public FAQ listing
+  "/api/delivery/sitemap.xml",
+  // Dynamic sitemap XML
+  "/api/delivery/recommendations",
+  // Public recommendations
+  "/api/robots.txt",
+  // SEO robots.txt
+  // ── HTML pages served under /api/ prefix (Hostinger CDN compatibility) ──
+  "/api/order",
+  // Delivery listing (no-slug) + /api/order/
+  "/api/track/",
+  // Public tracking page HTML
+  "/api/driver",
+  // Driver PWA HTML (exact)
+  "/api/driver/",
+  // Driver PWA HTML (with slash/slug)
+  "/api/restaurants",
+  // Restaurant listing HTML
+  "/api/delivery-app/",
+  // Static assets (CSS, JS, images)
+  // ── Static files under /api/ prefix (CDN compatibility) ──
+  "/api/uploads/",
+  // Product images & media
+  "/api/assets/",
+  // App assets
+  "/api/objects/",
+  // Alias for uploads
+  "/api/sounds/"
+  // Notification sounds
 ];
 var PUBLIC_ROUTE_PATTERNS = [
   /^\/api\/store\/\d+\/menu$/
@@ -4152,8 +4754,12 @@ var requireSuperAdmin = async (req, res, next) => {
 var import_date_fns = require("date-fns");
 init_db();
 var import_drizzle_orm2 = require("drizzle-orm");
-var BACKUP_DIR = path.resolve(process.cwd(), "backups");
-if (!fs2.existsSync(BACKUP_DIR)) fs2.mkdirSync(BACKUP_DIR, { recursive: true });
+var BACKUP_DIR = process.env.VERCEL ? path.join("/tmp", "backups") : path.resolve(process.cwd(), "backups");
+try {
+  if (!fs2.existsSync(BACKUP_DIR)) fs2.mkdirSync(BACKUP_DIR, { recursive: true });
+} catch (err) {
+  console.warn("[superAdminRoutes] Could not create BACKUP_DIR:", err.message);
+}
 async function createTenantBackup(tenantId) {
   const tenant = await storage.getTenant(tenantId);
   if (!tenant) throw new Error("Tenant not found");
@@ -5808,6 +6414,44 @@ var CallerIDService = class extends import_events.EventEmitter {
   simulateCall(number = "0123456789", slot, tenantId) {
     this.handleIncomingCall(number, slot, tenantId);
   }
+  // ── Delivery Platform broadcast helpers ──────────────────────────────────────
+  /**
+   * Broadcast driver GPS location update to tenant POS clients
+   */
+  broadcastDriverLocation(tenantId, vehicleId, lat, lng, orderId) {
+    this.broadcast({
+      type: "driver_location_update",
+      vehicleId,
+      lat,
+      lng,
+      orderId: orderId ?? null,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    }, tenantId);
+  }
+  /**
+   * Broadcast delivery order status change to tenant POS clients
+   */
+  broadcastDeliveryStatus(tenantId, orderId, status2, driverName) {
+    this.broadcast({
+      type: "delivery_status_change",
+      orderId,
+      status: status2,
+      driverName: driverName ?? null,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    }, tenantId);
+  }
+  /**
+   * Broadcast a new scheduled order alert to tenant POS clients
+   */
+  broadcastScheduledOrder(tenantId, orderId, scheduledAt, customerName) {
+    this.broadcast({
+      type: "new_scheduled_order",
+      orderId,
+      scheduledAt,
+      customerName: customerName ?? null,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    }, tenantId);
+  }
 };
 var callerIdService = new CallerIDService();
 
@@ -6598,12 +7242,378 @@ var whatsappService = {
 
 ${text2}`;
     return this.sendText(customerPhone, msg);
+  },
+  // ── Delivery Platform Notifications ───────────────────────────────────────
+  /** Notify driver about new assignment + deep link to driver PWA */
+  async sendDriverAssignment(driverPhone, driverName, orderId, customerAddress, storeName, driverToken, baseUrl) {
+    const driverLink = `${baseUrl}/driver/${driverToken}`;
+    const msg = [
+      `\u{1F697} New Delivery Assignment \u2014 ${storeName}`,
+      ``,
+      `Hi ${driverName}!`,
+      `Order #${orderId} has been assigned to you.`,
+      ``,
+      `\u{1F4CD} Deliver to: ${customerAddress}`,
+      ``,
+      `Open the driver app to start navigation:`,
+      driverLink
+    ].join("\n");
+    return this.sendText(driverPhone, msg);
+  },
+  /** Send live tracking link to customer when driver picks up order */
+  async sendOrderTracking(customerPhone, orderNumber, storeName, trackingToken, baseUrl) {
+    const trackLink = `${baseUrl}/track/${trackingToken}`;
+    const msg = [
+      `\u{1F6F5} Your order is on the way! \u2014 ${storeName}`,
+      ``,
+      `Order ${orderNumber} has been picked up and is heading your way.`,
+      ``,
+      `Track your delivery in real time:`,
+      trackLink
+    ].join("\n");
+    return this.sendText(customerPhone, msg);
+  },
+  /** Request a rating after successful delivery */
+  async sendRatingRequest(customerPhone, orderNumber, storeName, orderId, baseUrl, slug) {
+    const rateLink = `${baseUrl}/order/${slug}#rate-${orderId}`;
+    const msg = [
+      `\u2B50 How was your order? \u2014 ${storeName}`,
+      ``,
+      `Your order ${orderNumber} has been delivered. We hope you enjoyed it!`,
+      ``,
+      `Please take a moment to rate your experience:`,
+      rateLink
+    ].join("\n");
+    return this.sendText(customerPhone, msg);
+  },
+  /** Broadcast a promotional message to a customer */
+  async sendPromoNotification(customerPhone, storeName, promoTitle, promoCode, expiryDate, baseUrl, slug) {
+    const storeLink = `${baseUrl}/order/${slug}`;
+    const msg = [
+      `\u{1F381} Special Offer from ${storeName}!`,
+      ``,
+      `${promoTitle}`,
+      ``,
+      `Use code: *${promoCode}*`,
+      `Valid until: ${expiryDate}`,
+      ``,
+      `Order now:`,
+      storeLink
+    ].join("\n");
+    return this.sendText(customerPhone, msg);
+  },
+  // ── Food Tracker™ automatic milestone messages ────────────────────────────
+  /** Sends the right WhatsApp message per order milestone (accepted/ready/on_way) */
+  async sendFoodTrackerUpdate(customerPhone, orderNumber, storeName, status2, trackingToken, baseUrl) {
+    if (status2 === "accepted") {
+      const msg = [
+        `\u2705 Order Received \u2014 ${storeName}`,
+        ``,
+        `Order ${orderNumber} has been accepted and is now being prepared.`,
+        `We'll notify you when it's on the way!`
+      ].join("\n");
+      return this.sendText(customerPhone, msg);
+    }
+    if (status2 === "ready") {
+      const msg = [
+        `\u{1F468}\u200D\u{1F373} Order Ready \u2014 ${storeName}`,
+        ``,
+        `Order ${orderNumber} is ready and waiting for the driver.`,
+        `Delivery is starting soon!`
+      ].join("\n");
+      return this.sendText(customerPhone, msg);
+    }
+    if (status2 === "on_way" && trackingToken && baseUrl) {
+      const trackLink = `${baseUrl}/track/${trackingToken}`;
+      const msg = [
+        `\u{1F6F5} On the Way! \u2014 ${storeName}`,
+        ``,
+        `Your driver has picked up order ${orderNumber} and is heading to you.`,
+        ``,
+        `Live tracking:`,
+        trackLink
+      ].join("\n");
+      return this.sendText(customerPhone, msg);
+    }
+    return false;
   }
 };
 
+// server/customerAuthService.ts
+var import_crypto2 = __toESM(require("crypto"));
+var import_bcrypt = __toESM(require("bcrypt"));
+init_db();
+init_schema();
+var import_drizzle_orm3 = require("drizzle-orm");
+var SESSION_TTL_DAYS = 30;
+var OTP_TTL_MINUTES = 10;
+var OTP_MAX_ATTEMPTS = 5;
+function generateToken2(bytes = 32) {
+  return import_crypto2.default.randomBytes(bytes).toString("hex");
+}
+function generateOtp() {
+  return Math.floor(1e5 + Math.random() * 9e5).toString();
+}
+async function createOtp(phone, tenantId) {
+  const otp = generateOtp();
+  const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1e3);
+  await db.update(otpVerifications).set({ verified: true }).where(
+    (0, import_drizzle_orm3.and)(
+      (0, import_drizzle_orm3.eq)(otpVerifications.phone, phone),
+      (0, import_drizzle_orm3.eq)(otpVerifications.tenantId, tenantId),
+      (0, import_drizzle_orm3.eq)(otpVerifications.verified, false)
+    )
+  );
+  await db.insert(otpVerifications).values({
+    phone,
+    tenantId,
+    otp,
+    expiresAt,
+    attempts: 0,
+    verified: false
+  });
+  return otp;
+}
+async function verifyOtp(phone, tenantId, inputOtp) {
+  const now = /* @__PURE__ */ new Date();
+  const [record] = await db.select().from(otpVerifications).where(
+    (0, import_drizzle_orm3.and)(
+      (0, import_drizzle_orm3.eq)(otpVerifications.phone, phone),
+      (0, import_drizzle_orm3.eq)(otpVerifications.tenantId, tenantId),
+      (0, import_drizzle_orm3.eq)(otpVerifications.verified, false),
+      (0, import_drizzle_orm3.gt)(otpVerifications.expiresAt, now)
+    )
+  ).orderBy(otpVerifications.id).limit(1);
+  if (!record) {
+    return { success: false, error: "OTP expired or not found" };
+  }
+  const attempts = (record.attempts ?? 0) + 1;
+  if (attempts > OTP_MAX_ATTEMPTS) {
+    await db.update(otpVerifications).set({ verified: true }).where((0, import_drizzle_orm3.eq)(otpVerifications.id, record.id));
+    return { success: false, error: "Too many attempts. Please request a new OTP." };
+  }
+  await db.update(otpVerifications).set({ attempts }).where((0, import_drizzle_orm3.eq)(otpVerifications.id, record.id));
+  if (record.otp !== inputOtp) {
+    return { success: false, error: "Invalid OTP" };
+  }
+  await db.update(otpVerifications).set({ verified: true }).where((0, import_drizzle_orm3.eq)(otpVerifications.id, record.id));
+  return { success: true };
+}
+async function findOrCreateCustomerByPhone(phone, tenantId) {
+  const [existing] = await db.select().from(customers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(customers.phone, phone), (0, import_drizzle_orm3.eq)(customers.tenantId, tenantId))).limit(1);
+  if (existing) return existing;
+  const referralCode = generateToken2(4).toUpperCase();
+  const [inserted] = await db.insert(customers).values({
+    tenantId,
+    name: phone,
+    phone,
+    hasAccount: true,
+    referralCode,
+    loyaltyPoints: 0,
+    loyaltyTier: "bronze"
+  }).$returningId();
+  const [newCustomer] = await db.select().from(customers).where((0, import_drizzle_orm3.eq)(customers.id, inserted.id)).limit(1);
+  return newCustomer;
+}
+async function findCustomerByEmail(email, tenantId) {
+  const [customer] = await db.select().from(customers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(customers.email, email), (0, import_drizzle_orm3.eq)(customers.tenantId, tenantId))).limit(1);
+  return customer ?? null;
+}
+async function verifyCustomerPassword(customer, password) {
+  if (!customer.passwordHash) return false;
+  return import_bcrypt.default.compare(password, customer.passwordHash);
+}
+async function setCustomerPassword(customerId, password) {
+  const hash3 = await import_bcrypt.default.hash(password, 10);
+  await db.update(customers).set({ passwordHash: hash3, hasAccount: true }).where((0, import_drizzle_orm3.eq)(customers.id, customerId));
+}
+async function createCustomerSession(customerId, tenantId, deviceInfo) {
+  const token = generateToken2(48);
+  const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1e3);
+  await db.insert(customerSessions).values({
+    customerId,
+    tenantId,
+    token,
+    deviceInfo: deviceInfo ?? null,
+    expiresAt
+  });
+  return token;
+}
+async function getCustomerBySession(token) {
+  const now = /* @__PURE__ */ new Date();
+  const [session] = await db.select().from(customerSessions).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(customerSessions.token, token), (0, import_drizzle_orm3.gt)(customerSessions.expiresAt, now))).limit(1);
+  if (!session) return null;
+  const [customer] = await db.select().from(customers).where((0, import_drizzle_orm3.eq)(customers.id, session.customerId)).limit(1);
+  return customer ?? null;
+}
+async function deleteCustomerSession(token) {
+  await db.delete(customerSessions).where((0, import_drizzle_orm3.eq)(customerSessions.token, token));
+}
+async function getAuthenticatedCustomer(authHeader) {
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const token = authHeader.split(" ")[1];
+  return getCustomerBySession(token);
+}
+
+// server/deliveryService.ts
+var import_crypto3 = __toESM(require("crypto"));
+init_db();
+init_schema();
+var import_drizzle_orm4 = require("drizzle-orm");
+function generateTrackingToken() {
+  return import_crypto3.default.randomBytes(20).toString("hex");
+}
+async function validatePromoCode(tenantId, code, orderTotal, orderType, customerId) {
+  const now = /* @__PURE__ */ new Date();
+  const [promo] = await db.select().from(promoCodes).where(
+    (0, import_drizzle_orm4.and)(
+      (0, import_drizzle_orm4.eq)(promoCodes.tenantId, tenantId),
+      (0, import_drizzle_orm4.eq)(promoCodes.code, code.toUpperCase()),
+      (0, import_drizzle_orm4.eq)(promoCodes.isActive, true)
+    )
+  ).limit(1);
+  if (!promo) return { valid: false, error: "Invalid promo code" };
+  if (promo.validFrom && new Date(promo.validFrom) > now)
+    return { valid: false, error: "Promo code is not active yet" };
+  if (promo.validUntil && new Date(promo.validUntil) < now)
+    return { valid: false, error: "Promo code has expired" };
+  if (promo.usageLimit !== null && promo.usageLimit !== void 0 && (promo.usageCount ?? 0) >= promo.usageLimit)
+    return { valid: false, error: "Promo code usage limit reached" };
+  const minAmount = parseFloat(promo.minOrderAmount ?? "0");
+  if (orderTotal < minAmount)
+    return {
+      valid: false,
+      error: `Minimum order amount is ${minAmount} to use this code`
+    };
+  const types = promo.applicableOrderTypes ?? ["delivery", "pickup"];
+  if (!types.includes(orderType))
+    return { valid: false, error: "Promo code not applicable for this order type" };
+  if (customerId && promo.perCustomerLimit) {
+    const [usageCount] = await db.select({ count: import_drizzle_orm4.sql`count(*)` }).from(promoCodeUsages).where(
+      (0, import_drizzle_orm4.and)(
+        (0, import_drizzle_orm4.eq)(promoCodeUsages.promoCodeId, promo.id),
+        (0, import_drizzle_orm4.eq)(promoCodeUsages.customerId, customerId)
+      )
+    );
+    if ((usageCount?.count ?? 0) >= promo.perCustomerLimit)
+      return { valid: false, error: "You have already used this promo code" };
+  }
+  let discountAmount = 0;
+  const value = parseFloat(promo.discountValue);
+  if (promo.discountType === "percent") {
+    discountAmount = orderTotal * value / 100;
+    if (promo.maxDiscountCap) {
+      discountAmount = Math.min(discountAmount, parseFloat(promo.maxDiscountCap));
+    }
+  } else if (promo.discountType === "fixed") {
+    discountAmount = Math.min(value, orderTotal);
+  } else if (promo.discountType === "free_delivery") {
+    discountAmount = 0;
+  }
+  return {
+    valid: true,
+    discountAmount: Math.round(discountAmount * 100) / 100,
+    discountType: promo.discountType,
+    promoCode: promo
+  };
+}
+async function recordPromoUsage(promoCodeId, customerId, orderId, discountApplied) {
+  await db.insert(promoCodeUsages).values({
+    promoCodeId,
+    customerId: customerId ?? null,
+    orderId,
+    discountApplied: discountApplied.toFixed(2)
+  });
+  await db.update(promoCodes).set({ usageCount: import_drizzle_orm4.sql`usage_count + 1` }).where((0, import_drizzle_orm4.eq)(promoCodes.id, promoCodeId));
+}
+async function getLoyaltyConfig(tenantId) {
+  const [config] = await db.select({
+    loyaltyPointsPerUnit: landingPageConfig.loyaltyPointsPerUnit,
+    loyaltyRedemptionRate: landingPageConfig.loyaltyRedemptionRate
+  }).from(landingPageConfig).where((0, import_drizzle_orm4.eq)(landingPageConfig.tenantId, tenantId)).limit(1);
+  return {
+    pointsPerUnit: parseFloat(config?.loyaltyPointsPerUnit ?? "1"),
+    redemptionRate: parseFloat(config?.loyaltyRedemptionRate ?? "0.01")
+  };
+}
+function calculateLoyaltyTier(points) {
+  if (points >= 5e3) return "platinum";
+  if (points >= 2e3) return "gold";
+  if (points >= 500) return "silver";
+  return "bronze";
+}
+async function awardLoyaltyPoints(customerId, tenantId, orderId, orderTotal) {
+  const config = await getLoyaltyConfig(tenantId);
+  const pointsToAdd = Math.floor(orderTotal * config.pointsPerUnit);
+  if (pointsToAdd <= 0) return 0;
+  const [customer] = await db.select({ loyaltyPoints: customers.loyaltyPoints }).from(customers).where((0, import_drizzle_orm4.eq)(customers.id, customerId)).limit(1);
+  const before = customer?.loyaltyPoints ?? 0;
+  const after = before + pointsToAdd;
+  const newTier = calculateLoyaltyTier(after);
+  await db.update(customers).set({ loyaltyPoints: after, loyaltyTier: newTier }).where((0, import_drizzle_orm4.eq)(customers.id, customerId));
+  await db.insert(loyaltyTransactions).values({
+    customerId,
+    tenantId,
+    orderId,
+    type: "earn",
+    points: pointsToAdd,
+    balanceBefore: before,
+    balanceAfter: after,
+    description: `Earned from order #${orderId}`
+  });
+  return pointsToAdd;
+}
+async function redeemLoyaltyPoints(customerId, tenantId, pointsToRedeem) {
+  const config = await getLoyaltyConfig(tenantId);
+  const [customer] = await db.select({ loyaltyPoints: customers.loyaltyPoints }).from(customers).where((0, import_drizzle_orm4.eq)(customers.id, customerId)).limit(1);
+  const available = customer?.loyaltyPoints ?? 0;
+  if (pointsToRedeem > available)
+    return { success: false, discountAmount: 0, error: "Insufficient loyalty points" };
+  const discountAmount = Math.round(pointsToRedeem * config.redemptionRate * 100) / 100;
+  const after = available - pointsToRedeem;
+  const newTier = calculateLoyaltyTier(after);
+  await db.update(customers).set({ loyaltyPoints: after, loyaltyTier: newTier }).where((0, import_drizzle_orm4.eq)(customers.id, customerId));
+  await db.insert(loyaltyTransactions).values({
+    customerId,
+    tenantId,
+    type: "redeem",
+    points: -pointsToRedeem,
+    balanceBefore: available,
+    balanceAfter: after,
+    description: `Redeemed ${pointsToRedeem} points for ${discountAmount} discount`
+  });
+  return { success: true, discountAmount };
+}
+async function assignDriverToOrder(orderId, vehicleId) {
+  await db.update(onlineOrders).set({ driverId: vehicleId }).where((0, import_drizzle_orm4.eq)(onlineOrders.id, orderId));
+  await db.update(vehicles).set({ driverStatus: "on_delivery", activeOrderId: orderId }).where((0, import_drizzle_orm4.eq)(vehicles.id, vehicleId));
+}
+async function releaseDriver(vehicleId) {
+  await db.update(vehicles).set({ driverStatus: "available", activeOrderId: null }).where((0, import_drizzle_orm4.eq)(vehicles.id, vehicleId));
+}
+async function deductWallet(customerId, tenantId, amount, orderId) {
+  const [customer] = await db.select({ walletBalance: customers.walletBalance }).from(customers).where((0, import_drizzle_orm4.eq)(customers.id, customerId)).limit(1);
+  const balance = parseFloat(customer?.walletBalance ?? "0");
+  if (amount > balance)
+    return { success: false, error: "Insufficient wallet balance" };
+  const after = Math.round((balance - amount) * 100) / 100;
+  await db.update(customers).set({ walletBalance: after.toFixed(2) }).where((0, import_drizzle_orm4.eq)(customers.id, customerId));
+  await db.insert(walletTransactions).values({
+    customerId,
+    tenantId,
+    orderId: orderId ?? null,
+    type: "payment",
+    amount: amount.toFixed(2),
+    balanceBefore: balance.toFixed(2),
+    balanceAfter: after.toFixed(2),
+    description: orderId ? `Payment for order #${orderId}` : "Wallet payment"
+  });
+  return { success: true };
+}
+
 // server/routes.ts
-var bcrypt4 = __toESM(require("bcrypt"));
-var crypto3 = __toESM(require("crypto"));
+var bcrypt5 = __toESM(require("bcrypt"));
+var crypto5 = __toESM(require("crypto"));
 var import_date_fns4 = require("date-fns");
 var import_google_auth_library = require("google-auth-library");
 var TIMESTAMP_FIELDS = [
@@ -6677,10 +7687,10 @@ async function registerRoutes(app2) {
     try {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { tenants: tenants2, licenseKeys: licenseKeys2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq5 } = await import("drizzle-orm");
-      const [tenant] = await db2.select().from(tenants2).where(eq5(tenants2.ownerEmail, "admin@pizzalemon.ch"));
+      const { eq: eq7 } = await import("drizzle-orm");
+      const [tenant] = await db2.select().from(tenants2).where(eq7(tenants2.ownerEmail, "admin@pizzalemon.ch"));
       if (!tenant) return res.json({ found: false, message: "Pizza Lemon not found in this database." });
-      const licenses = await db2.select().from(licenseKeys2).where(eq5(licenseKeys2.tenantId, tenant.id));
+      const licenses = await db2.select().from(licenseKeys2).where(eq7(licenseKeys2.tenantId, tenant.id));
       res.json({ found: true, tenantId: tenant.id, status: tenant.status, licenses: licenses.map((l) => ({ key: l.licenseKey, status: l.status })) });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -6775,7 +7785,7 @@ async function registerRoutes(app2) {
         }
       }
       const tempPassword = "Bpos" + Math.floor(1e5 + Math.random() * 9e5);
-      const passwordHash = await bcrypt4.hash(tempPassword, 10);
+      const passwordHash = await bcrypt5.hash(tempPassword, 10);
       const tenant = await storage.createTenant({
         businessName,
         ownerName,
@@ -6811,7 +7821,7 @@ async function registerRoutes(app2) {
       });
       const randomSegments = Array.from(
         { length: 4 },
-        () => crypto3.randomBytes(2).toString("hex").toUpperCase()
+        () => crypto5.randomBytes(2).toString("hex").toUpperCase()
       );
       const licenseKey = `BARMAGLY-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
@@ -6875,7 +7885,7 @@ async function registerRoutes(app2) {
       const isYearly = planType === "yearly";
       const priceChf = isYearly ? isAdvanced ? 4999 : 1999 : isAdvanced ? 499 : 199;
       const tempPassword = "Bpos" + Math.floor(1e5 + Math.random() * 9e5);
-      const passwordHash = await bcrypt4.hash(tempPassword, 10);
+      const passwordHash = await bcrypt5.hash(tempPassword, 10);
       const tenant = await storage.createTenant({
         businessName,
         ownerName,
@@ -6900,7 +7910,7 @@ async function registerRoutes(app2) {
         autoRenew: true,
         paymentMethod: "stripe"
       });
-      const randomSegments = Array.from({ length: 4 }, () => crypto3.randomBytes(2).toString("hex").toUpperCase());
+      const randomSegments = Array.from({ length: 4 }, () => crypto5.randomBytes(2).toString("hex").toUpperCase());
       const licenseKey = `BARMAGLY-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
         licenseKey,
@@ -6934,8 +7944,8 @@ async function registerRoutes(app2) {
       let isNew = false;
       if (!tenant) {
         isNew = true;
-        const tempPassword = "GAuth-" + crypto3.randomBytes(4).toString("hex");
-        const passwordHash = await bcrypt4.hash(tempPassword, 10);
+        const tempPassword = "GAuth-" + crypto5.randomBytes(4).toString("hex");
+        const passwordHash = await bcrypt5.hash(tempPassword, 10);
         tenant = await storage.createTenant({
           businessName: payload.name ? `${payload.name}'s Store` : "My New Store",
           ownerName: name,
@@ -6960,7 +7970,7 @@ async function registerRoutes(app2) {
         });
         const randomSegments = Array.from(
           { length: 4 },
-          () => crypto3.randomBytes(2).toString("hex").toUpperCase()
+          () => crypto5.randomBytes(2).toString("hex").toUpperCase()
         );
         const licenseKey = `TRIAL-${randomSegments.join("-")}`;
         await storage.createLicenseKey({
@@ -7038,12 +8048,12 @@ async function registerRoutes(app2) {
       } else {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { landingPageConfig: landingConfig } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq5 } = await import("drizzle-orm");
+        const { eq: eq7 } = await import("drizzle-orm");
         await db2.update(landingConfig).set({
           heroTitle: businessName,
           phone: ownerPhone,
           socialWhatsapp: ownerPhone
-        }).where(eq5(landingConfig.tenantId, tenantId));
+        }).where(eq7(landingConfig.tenantId, tenantId));
       }
       res.json({ success: true });
     } catch (e) {
@@ -7083,7 +8093,7 @@ async function registerRoutes(app2) {
           if (!tenant.passwordHash) {
             return res.json({ isValid: false, reason: "Account credentials not configured" });
           }
-          const passwordValid = await bcrypt4.compare(password, tenant.passwordHash);
+          const passwordValid = await bcrypt5.compare(password, tenant.passwordHash);
           if (!passwordValid) {
             return res.json({ isValid: false, reason: "Invalid password" });
           }
@@ -8194,6 +9204,92 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: e.message });
     }
   });
+  app2.get("/api/table-qr-codes", async (req, res) => {
+    try {
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      res.json(await storage.getTableQrCodes(tenantId));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/table-qr-codes", async (req, res) => {
+    try {
+      const { tenantId, tableId, branchId, tableName } = req.body;
+      if (!tenantId || !tableId || !tableName) return res.status(400).json({ error: "tenantId, tableId, tableName required" });
+      const qrToken = `TBL-${crypto5.randomBytes(16).toString("hex")}`;
+      const qr = await storage.createTableQrCode({
+        tenantId: Number(tenantId),
+        tableId: Number(tableId),
+        branchId: branchId ? Number(branchId) : null,
+        qrToken,
+        tableName,
+        isActive: true
+      });
+      res.status(201).json(qr);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/table-qr-codes/generate-all", async (req, res) => {
+    try {
+      const { tenantId, branchId } = req.body;
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      const allTables = await storage.getTables(branchId ? Number(branchId) : void 0);
+      const existing = await storage.getTableQrCodes(Number(tenantId));
+      const existingTableIds = new Set(existing.map((q) => q.tableId));
+      const created = [];
+      for (const table of allTables) {
+        if (existingTableIds.has(table.id)) continue;
+        const qrToken = `TBL-${crypto5.randomBytes(16).toString("hex")}`;
+        const qr = await storage.createTableQrCode({
+          tenantId: Number(tenantId),
+          tableId: table.id,
+          branchId: table.branchId ?? null,
+          qrToken,
+          tableName: table.name,
+          isActive: true
+        });
+        created.push(qr);
+      }
+      res.json({ created: created.length, qrCodes: created });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/table-qr-codes/:id", async (req, res) => {
+    try {
+      res.json(await storage.updateTableQrCode(Number(req.params.id), sanitizeDates(req.body)));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/table-qr-codes/:id", async (req, res) => {
+    try {
+      await storage.deleteTableQrCode(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/dine-in/validate/:token", async (req, res) => {
+    try {
+      const qr = await storage.getTableQrCodeByToken(req.params.token);
+      if (!qr || !qr.isActive) return res.status(404).json({ error: "Invalid or inactive QR code" });
+      await storage.incrementQrScanCount(req.params.token);
+      const config = await storage.getLandingPageConfigByTenantId(qr.tenantId);
+      res.json({
+        valid: true,
+        tableId: qr.tableId,
+        tableName: qr.tableName,
+        branchId: qr.branchId,
+        tenantId: qr.tenantId,
+        slug: config?.slug || null
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
   app2.get("/api/kitchen-orders", async (req, res) => {
     try {
       res.json(await storage.getKitchenOrders(req.query.branchId ? Number(req.query.branchId) : void 0));
@@ -8321,12 +9417,12 @@ async function registerRoutes(app2) {
   app2.get("/api/fix-schema-and-seed", async (_req, res) => {
     try {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { sql: sql4 } = await import("drizzle-orm");
+      const { sql: sql5 } = await import("drizzle-orm");
       console.log("[API-SEED] Fixing schema...");
       const tables2 = ["branches", "products", "employees", "sales", "inventory", "customers", "suppliers"];
       for (const table of tables2) {
         try {
-          await db2.execute(sql4.raw(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id integer`));
+          await db2.execute(sql5.raw(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id integer`));
           console.log(`[API-SEED] Table ${table} fixed`);
         } catch (e) {
           console.log(`[API-SEED] Table ${table} skip: ${e.message}`);
@@ -9026,8 +10122,11 @@ async function test(){
   app2.post("/api/push/subscribe", (req, res) => {
     const sub = req.body;
     if (!sub || !sub.endpoint) return res.status(400).json({ error: "Invalid subscription" });
-    const tenantId = req.tenantId;
-    if (!tenantId) return res.status(401).json({ error: "Tenant identification required" });
+    const rawTenantId = req.tenantId ?? req.body?.tenantId;
+    const tenantId = Number(rawTenantId);
+    if (!Number.isFinite(tenantId) || tenantId <= 0) {
+      return res.status(401).json({ error: "Tenant identification required" });
+    }
     pushService.subscribe(sub, tenantId);
     res.json({ success: true });
   });
@@ -9448,8 +10547,12 @@ async function test(){
       res.status(500).send("<h1>Server error</h1>");
     }
   });
-  const TENANT_BACKUP_DIR = import_node_path.default.resolve(process.cwd(), "backups");
-  if (!import_node_fs.default.existsSync(TENANT_BACKUP_DIR)) import_node_fs.default.mkdirSync(TENANT_BACKUP_DIR, { recursive: true });
+  const TENANT_BACKUP_DIR = process.env.VERCEL ? import_node_path.default.join("/tmp", "backups") : import_node_path.default.resolve(process.cwd(), "backups");
+  try {
+    if (!import_node_fs.default.existsSync(TENANT_BACKUP_DIR)) import_node_fs.default.mkdirSync(TENANT_BACKUP_DIR, { recursive: true });
+  } catch (err) {
+    console.warn("[routes] Could not create TENANT_BACKUP_DIR:", err.message);
+  }
   app2.get("/api/backup/list", async (req, res) => {
     try {
       const tenantId = req.tenantId;
@@ -9735,7 +10838,7 @@ async function test(){
     }
     try {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { sql: sql4 } = await import("drizzle-orm");
+      const { sql: sql5 } = await import("drizzle-orm");
       const firstTenant = (await storage.getTenants())[0];
       if (!firstTenant) {
         return res.status(404).json({ error: "No tenants found" });
@@ -9776,7 +10879,7 @@ async function test(){
       for (const table of tables2) {
         try {
           const r = await db2.execute(
-            sql4.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`)
+            sql5.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`)
           );
           results[table] = r[0]?.affectedRows ?? 0;
         } catch (e) {
@@ -9791,6 +10894,1239 @@ async function test(){
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
+  });
+  app2.post("/api/delivery/auth/request-otp", async (req, res) => {
+    try {
+      const { phone, tenantId } = req.body;
+      if (!phone || !tenantId) return res.status(400).json({ error: "phone and tenantId required" });
+      const otp = await createOtp(phone, Number(tenantId));
+      if (process.env.NODE_ENV === "development") {
+        return res.json({ success: true, otp });
+      }
+      await whatsappService.sendMessage(phone, `Your verification code is: *${otp}*
+Valid for 10 minutes.`);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/auth/verify-otp", async (req, res) => {
+    try {
+      const { phone, tenantId, otp } = req.body;
+      if (!phone || !tenantId || !otp) return res.status(400).json({ error: "phone, tenantId, otp required" });
+      const result = await verifyOtp(phone, Number(tenantId), otp);
+      if (!result.success) return res.status(400).json({ error: result.error });
+      const customer = await findOrCreateCustomerByPhone(phone, Number(tenantId));
+      const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
+      res.json({ success: true, token, customer: { id: customer.id, name: customer.name, phone: customer.phone, loyaltyPoints: customer.loyaltyPoints, loyaltyTier: customer.loyaltyTier, walletBalance: customer.walletBalance } });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/auth/login", async (req, res) => {
+    try {
+      const { email, password, tenantId } = req.body;
+      if (!email || !password || !tenantId) return res.status(400).json({ error: "email, password, tenantId required" });
+      const customer = await findCustomerByEmail(email, Number(tenantId));
+      if (!customer) return res.status(401).json({ error: "Invalid credentials" });
+      const valid = await verifyCustomerPassword(customer, password);
+      if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+      const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
+      res.json({ success: true, token, customer: { id: customer.id, name: customer.name, email: customer.email, loyaltyPoints: customer.loyaltyPoints, loyaltyTier: customer.loyaltyTier, walletBalance: customer.walletBalance } });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/auth/register", async (req, res) => {
+    try {
+      const { name, email, phone, password, tenantId, referralCode } = req.body;
+      if (!phone || !tenantId) return res.status(400).json({ error: "phone and tenantId required" });
+      const customer = await findOrCreateCustomerByPhone(phone, Number(tenantId));
+      const updates = { name: name || customer.name, hasAccount: true };
+      if (email) updates.email = email;
+      if (password) {
+        await setCustomerPassword(customer.id, password);
+      }
+      await storage.updateCustomer(customer.id, updates);
+      const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
+      res.json({ success: true, token, customer: { id: customer.id, name: updates.name, phone } });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/auth/logout", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        await deleteCustomerSession(authHeader.split(" ")[1]);
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/auth/me", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      res.json({ customer });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/auth/me", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { name, email, dateOfBirth, gender, preferredLanguage } = req.body;
+      const updates = {};
+      if (name) updates.name = name;
+      if (email) updates.email = email;
+      if (dateOfBirth) updates.dateOfBirth = dateOfBirth;
+      if (gender) updates.gender = gender;
+      if (preferredLanguage) updates.preferredLanguage = preferredLanguage;
+      await storage.updateCustomer(customer.id, updates);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/addresses", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const addresses = await storage.getCustomerAddresses(customer.id);
+      res.json(addresses);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/addresses", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const address = await storage.createCustomerAddress({ ...req.body, customerId: customer.id, tenantId: customer.tenantId });
+      res.status(201).json(address);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/addresses/:id", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const address = await storage.updateCustomerAddress(Number(req.params.id), req.body);
+      res.json(address);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/delivery/addresses/:id", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      await storage.deleteCustomerAddress(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/addresses/:id/default", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      await storage.setDefaultAddress(Number(req.params.id), customer.id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/restaurants", async (req, res) => {
+    try {
+      const tenantId = req.query.tenantId;
+      const configs = await storage.getAllLandingPageConfigs(tenantId);
+      const restaurants = (configs || []).map((c) => ({
+        id: c.tenantId,
+        slug: c.slug,
+        name: c.storeName || c.restaurantName || "Restaurant",
+        logo: c.logo || c.logomark || null,
+        coverImage: c.coverImage || c.headerBgImage || null,
+        cuisine: c.cuisineType || c.cuisine || "",
+        rating: c.rating || 4.5,
+        reviewCount: c.reviewCount || 0,
+        deliveryTime: c.minDeliveryTime || 25,
+        deliveryFee: c.deliveryFee || 0,
+        minOrder: c.minOrderAmount || 0,
+        isOpen: c.isOpen !== false,
+        primaryColor: c.primaryColor || "#FF5722"
+      }));
+      for (const r of restaurants) {
+        if (r.name === "Restaurant" && r.slug) {
+          r.name = r.slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+        }
+        if (!r.cuisine || !r.coverImage || !r.reviewCount) {
+          try {
+            const cats = await storage.getCategories(r.id);
+            if (!r.cuisine && cats.length > 0) {
+              const catNames = cats.filter((c) => c.isActive !== false).map((c) => c.name).slice(0, 3);
+              r.cuisine = catNames.join(", ");
+            }
+            if (!r.reviewCount) {
+              const prods = await storage.getProductsByTenant(r.id);
+              r.reviewCount = Math.max(50, prods.length * 3);
+            }
+          } catch {
+          }
+        }
+      }
+      res.json(restaurants);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  async function resolveSlugConfig(slug) {
+    if (slug === "barmagly") {
+      const config2 = await storage.getLandingPageConfigBySlug("pizza-lemon");
+      if (config2) {
+        config2.storeName = "Barmagly";
+        config2.heroTitle = "Barmagly Delivery";
+      }
+      return config2;
+    }
+    let config = await storage.getLandingPageConfigBySlug(slug);
+    if (config) return config;
+    config = await storage.getLandingPageConfigBySlug("pizza-lemon");
+    if (config) {
+      const displayName = slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+      config.storeName = displayName;
+      config.heroTitle = displayName;
+    }
+    return config;
+  }
+  app2.get("/api/delivery/store/:slug", async (req, res) => {
+    try {
+      const config = await resolveSlugConfig(req.params.slug);
+      if (!config) return res.status(404).json({ error: "Store not found" });
+      const tenant = await storage.getTenant(config.tenantId).catch(() => null);
+      const currency = config.currency || tenant?.currency || process.env.DEFAULT_CURRENCY || "CHF";
+      res.setHeader("Cache-Control", "public, max-age=300");
+      res.json({
+        slug: config.slug,
+        tenantId: config.tenantId,
+        storeName: config.storeName || config.heroTitle || tenant?.businessName || "Store",
+        name: config.storeName || config.heroTitle || tenant?.businessName || "Store",
+        primaryColor: config.primaryColor || "#FF5722",
+        accentColor: config.accentColor || "#2FD3C6",
+        currency,
+        phone: config.phone,
+        address: config.address,
+        openingHours: config.openingHours,
+        minOrderAmount: config.minOrderAmount,
+        deliveryFee: config.deliveryFee || 0,
+        estimatedDeliveryTime: config.estimatedDeliveryTime,
+        enableDelivery: config.enableDelivery !== false,
+        enablePickup: config.enablePickup !== false,
+        enableLoyalty: config.enableLoyalty ?? true,
+        enableWallet: config.enableWallet ?? false,
+        enableScheduledOrders: config.enableScheduledOrders ?? true,
+        enablePromos: config.enablePromos ?? true,
+        minDeliveryTime: config.minDeliveryTime ?? 20,
+        maxDeliveryTime: config.maxDeliveryTime ?? 45,
+        bannerImages: config.bannerImages ?? [],
+        promoText: config.promoText,
+        logo: config.heroImage || config.logo,
+        coverImage: config.coverImage || config.headerBgImage,
+        socialWhatsapp: config.socialWhatsapp,
+        supportPhone: config.supportPhone || config.phone || "",
+        rating: config.rating || 4.5,
+        reviewCount: config.reviewCount || 0,
+        cuisine: config.cuisineType || config.cuisine || ""
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/store/:slug/menu", async (req, res) => {
+    try {
+      const config = await resolveSlugConfig(req.params.slug);
+      if (!config) return res.status(404).json({ error: "Store not found" });
+      const [cats, prods] = await Promise.all([
+        storage.getCategories(config.tenantId),
+        storage.getProductsByTenant(config.tenantId)
+      ]);
+      const activeProds = prods.filter((p) => p.isActive !== false).map((p) => ({ ...p, imageUrl: p.imageUrl || p.image || null }));
+      const menu = cats.filter((c) => c.isActive !== false).map((cat) => ({
+        ...cat,
+        items: activeProds.filter((p) => p.categoryId === cat.id)
+      })).filter((cat) => cat.items.length > 0);
+      res.setHeader("Cache-Control", "public, max-age=300").json({ categories: menu, allProducts: activeProds });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/store/:slug/product/:id", async (req, res) => {
+    try {
+      const config = await resolveSlugConfig(req.params.slug);
+      if (!config) return res.status(404).json({ error: "Store not found" });
+      const product = await storage.getProduct(Number(req.params.id));
+      if (!product || product.tenantId !== config.tenantId) return res.status(404).json({ error: "Product not found" });
+      res.json({ ...product, imageUrl: product.imageUrl || product.image || null });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/store/:slug/promos", async (req, res) => {
+    try {
+      const config = await resolveSlugConfig(req.params.slug);
+      if (!config) return res.status(404).json({ error: "Store not found" });
+      const now = /* @__PURE__ */ new Date();
+      const codes = await storage.getPromoCodes ? await storage.getPromoCodes(config.tenantId) : [];
+      const active = codes.filter((c) => c.isActive && (!c.validFrom || new Date(c.validFrom) <= now) && (!c.validUntil || new Date(c.validUntil) >= now));
+      res.json({ promos: active, bannerImages: config.bannerImages ?? [], promoText: config.promoText });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/promo/validate", async (req, res) => {
+    try {
+      const { tenantId, code, orderTotal, orderType, customerId } = req.body;
+      if (!tenantId || !code || orderTotal === void 0) return res.status(400).json({ error: "tenantId, code, orderTotal required" });
+      const result = await validatePromoCode(Number(tenantId), code, Number(orderTotal), orderType || "delivery", customerId ? Number(customerId) : void 0);
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/zones", async (req, res) => {
+    try {
+      const { tenantId } = req.query;
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      const zones = await storage.getDeliveryZones(Number(tenantId));
+      res.json(zones);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/orders", async (req, res) => {
+    try {
+      const {
+        tenantId,
+        customerName,
+        customerPhone,
+        customerEmail,
+        customerAddress,
+        items,
+        subtotal,
+        deliveryFee,
+        totalAmount,
+        paymentMethod,
+        orderType,
+        notes,
+        promoCode,
+        promoCodeId,
+        discountAmount,
+        customerLat,
+        customerLng,
+        floor,
+        buildingName,
+        addressNotes,
+        scheduledAt,
+        loyaltyPointsUsed,
+        walletAmountUsed,
+        savedAddressId,
+        tableQrToken,
+        tableNumber
+      } = req.body;
+      if (!tenantId || !customerPhone || !items?.length) {
+        return res.status(400).json({ error: "tenantId, customerPhone, items required" });
+      }
+      const trackingToken = generateTrackingToken();
+      const isDineIn = orderType === "dine_in" && tableQrToken;
+      const orderNumber = isDineIn ? `DIN-${Date.now()}` : `DEL-${Date.now()}`;
+      let finalDiscount = Number(discountAmount ?? 0);
+      let resolvedPromoId = promoCodeId ? Number(promoCodeId) : null;
+      if (promoCode && !promoCodeId) {
+        const promoResult = await validatePromoCode(Number(tenantId), promoCode, Number(subtotal), orderType || "delivery");
+        if (promoResult.valid && promoResult.promoCode) {
+          finalDiscount = promoResult.discountAmount ?? 0;
+          resolvedPromoId = promoResult.promoCode.id;
+        }
+      }
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      let walletUsed = Number(walletAmountUsed ?? 0);
+      if (walletUsed > 0 && customer) {
+        const walletResult = await deductWallet(customer.id, Number(tenantId), walletUsed);
+        if (!walletResult.success) {
+          return res.status(400).json({ error: walletResult.error });
+        }
+      }
+      const order = await storage.createOnlineOrder({
+        tenantId: Number(tenantId),
+        orderNumber,
+        customerName: customerName || customerPhone,
+        customerPhone,
+        customerEmail: customerEmail ?? null,
+        customerAddress: customerAddress ?? null,
+        items: items || [],
+        subtotal: Number(subtotal).toFixed(2),
+        taxAmount: "0",
+        deliveryFee: Number(deliveryFee ?? 0).toFixed(2),
+        totalAmount: Number(totalAmount).toFixed(2),
+        paymentMethod: paymentMethod || "cash",
+        paymentStatus: "pending",
+        status: "pending",
+        orderType: orderType || "delivery",
+        notes: notes ?? null,
+        estimatedTime: 35,
+        language: req.body.language || "en",
+        trackingToken,
+        sourceChannel: isDineIn ? "dine_in_qr" : "web",
+        tableNumber: tableNumber ?? null,
+        tableQrToken: tableQrToken ?? null,
+        promoCodeId: resolvedPromoId ?? void 0,
+        discountAmount: finalDiscount.toFixed(2),
+        customerLat: customerLat ? String(customerLat) : null,
+        customerLng: customerLng ? String(customerLng) : null,
+        floor: floor ?? null,
+        buildingName: buildingName ?? null,
+        addressNotes: addressNotes ?? null,
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        walletAmountUsed: walletUsed.toFixed(2),
+        loyaltyPointsUsed: Number(loyaltyPointsUsed ?? 0),
+        savedAddressId: savedAddressId ? Number(savedAddressId) : null
+      });
+      if (resolvedPromoId && finalDiscount > 0) {
+        await recordPromoUsage(resolvedPromoId, customer?.id, order.id, finalDiscount);
+      }
+      try {
+        const config = await storage.getLandingPageConfigByTenantId(Number(tenantId));
+        if (config?.socialWhatsapp) {
+          await whatsappService.sendMessage(
+            config.socialWhatsapp,
+            isDineIn ? `\u{1F37D} New dine-in order #${orderNumber}
+Table: ${tableNumber || "N/A"}
+Customer: ${customerName || customerPhone}
+Total: ${totalAmount}` : `\u{1F6CE} New delivery order #${orderNumber}
+Customer: ${customerName || customerPhone}
+Total: ${totalAmount}
+Address: ${customerAddress || "Pickup"}`
+          );
+        }
+      } catch (_) {
+      }
+      try {
+        callerIdService.broadcastToTenant(Number(tenantId), {
+          type: "new_online_order",
+          order: { id: order.id, orderNumber, customerName, totalAmount, orderType }
+        });
+      } catch (_) {
+      }
+      res.status(201).json({ success: true, orderId: order.id, orderNumber, trackingToken });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/orders/track/:token", async (req, res) => {
+    try {
+      const order = await storage.getOnlineOrderByTrackingToken(req.params.token);
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      let driver = null;
+      if (order.driverId) {
+        driver = await storage.getDriverLocation(order.driverId);
+      }
+      let store = null;
+      try {
+        if (order.tenantId) {
+          const cfg = await storage.getLandingPageConfigByTenantId(Number(order.tenantId));
+          if (cfg) {
+            store = {
+              name: cfg.storeName || cfg.name,
+              primaryColor: cfg.primaryColor || "#FF5722",
+              currency: cfg.currency || process.env.DEFAULT_CURRENCY || "CHF",
+              logo: cfg.logo,
+              supportPhone: cfg.supportPhone,
+              slug: cfg.slug
+            };
+          }
+        }
+      } catch (_) {
+      }
+      res.json({ order, driver, store });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/orders/history", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const orders = await storage.getCustomerOrderHistory(customer.id, customer.tenantId);
+      res.json(orders);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/orders/:id/rate", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      const { overallRating, foodRating, deliveryRating, comment } = req.body;
+      if (!overallRating) return res.status(400).json({ error: "overallRating required" });
+      const orderId = Number(req.params.id);
+      const order = await storage.getOnlineOrder(orderId);
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      const rating = await storage.createOrderRating({
+        orderId,
+        customerId: customer?.id ?? null,
+        driverId: order.driverId ?? null,
+        overallRating: Number(overallRating),
+        foodRating: foodRating ? Number(foodRating) : null,
+        deliveryRating: deliveryRating ? Number(deliveryRating) : null,
+        comment: comment ?? null
+      });
+      res.json(rating);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/driver/auth", async (req, res) => {
+    try {
+      const { accessToken } = req.body;
+      if (!accessToken) return res.status(400).json({ error: "accessToken required" });
+      const driver = await storage.getVehicleByAccessToken(accessToken);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      res.json({ driver: { id: driver.id, driverName: driver.driverName, driverPhone: driver.driverPhone, driverStatus: driver.driverStatus } });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/driver/orders", async (req, res) => {
+    try {
+      const { token } = req.query;
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const orders = await storage.getDriverActiveOrders(driver.id, driver.tenantId);
+      res.json(orders);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/driver/orders/:id/accept", async (req, res) => {
+    try {
+      const { token } = req.body;
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const orderId = Number(req.params.id);
+      await assignDriverToOrder(orderId, driver.id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/driver/orders/:id/picked-up", async (req, res) => {
+    try {
+      const { token } = req.body;
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const orderId = Number(req.params.id);
+      await storage.updateOnlineOrder(orderId, { status: "on_way", riderPickedUpAt: /* @__PURE__ */ new Date() });
+      const order = await storage.getOnlineOrder(orderId);
+      if (order?.customerPhone && order.trackingToken) {
+        try {
+          await whatsappService.sendMessage(
+            order.customerPhone,
+            `\u{1F6F5} Your order is on the way!
+Track live: ${process.env.APP_URL || ""}/track/${order.trackingToken}`
+          );
+        } catch (_) {
+        }
+      }
+      callerIdService.broadcast({ type: "delivery_status_change", orderId, status: "on_way", driverName: driver.driverName }, driver.tenantId);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/driver/orders/:id/delivered", async (req, res) => {
+    try {
+      const { token } = req.body;
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const orderId = Number(req.params.id);
+      await storage.updateOnlineOrder(orderId, { status: "delivered", riderDeliveredAt: /* @__PURE__ */ new Date() });
+      await releaseDriver(driver.id);
+      const order = await storage.getOnlineOrder(orderId);
+      if (order) {
+        const customerId = await storage.getCustomerIdByPhone(order.customerPhone, driver.tenantId);
+        if (customerId) {
+          await awardLoyaltyPoints(customerId, driver.tenantId, orderId, Number(order.totalAmount));
+        }
+        if (order.customerPhone && order.trackingToken) {
+          setTimeout(async () => {
+            try {
+              await whatsappService.sendMessage(
+                order.customerPhone,
+                `\u2B50 How was your order?
+Leave a quick review: ${process.env.APP_URL || ""}/track/${order.trackingToken}#rate`
+              );
+            } catch (_) {
+            }
+          }, 10 * 60 * 1e3);
+        }
+      }
+      callerIdService.broadcast({ type: "delivery_status_change", orderId, status: "delivered", driverName: driver.driverName }, driver.tenantId);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/driver/location", async (req, res) => {
+    try {
+      const { token, lat, lng, orderId } = req.body;
+      if (!token || lat === void 0 || lng === void 0) return res.status(400).json({ error: "token, lat, lng required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      await storage.updateDriverLocation(driver.id, Number(lat), Number(lng), orderId ? Number(orderId) : void 0);
+      callerIdService.broadcastToTenant(driver.tenantId, {
+        type: "driver_location_update",
+        vehicleId: driver.id,
+        lat: Number(lat),
+        lng: Number(lng),
+        orderId: orderId || null
+      });
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/driver/earnings", async (req, res) => {
+    try {
+      const { token, days } = req.query;
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const earnings = await storage.getDriverEarnings(driver.id, Number(days ?? 7));
+      res.json(earnings);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/manage/orders", async (req, res) => {
+    try {
+      const { tenantId, status: status2, orderType } = req.query;
+      const tid = req.tenantId || Number(tenantId);
+      const orders = await storage.getDeliveryOrders(tid, { status: status2, orderType });
+      res.json(orders);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/manage/orders/:id/assign", async (req, res) => {
+    try {
+      const { vehicleId } = req.body;
+      if (!vehicleId) return res.status(400).json({ error: "vehicleId required" });
+      const orderId = Number(req.params.id);
+      await storage.assignDriverToOrder(orderId, Number(vehicleId));
+      const driver = await storage.getVehicle(Number(vehicleId));
+      const order = await storage.getOnlineOrder(orderId);
+      if (driver?.driverPhone && driver.driverAccessToken && order) {
+        try {
+          await whatsappService.sendMessage(
+            driver.driverPhone,
+            `\u{1F6F5} New delivery assignment!
+Order #${order.orderNumber}
+Customer: ${order.customerName}
+Address: ${order.customerAddress || "Pickup"}
+Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
+          );
+        } catch (_) {
+        }
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/manage/orders/:id/status", async (req, res) => {
+    try {
+      const { status: status2 } = req.body;
+      if (!status2) return res.status(400).json({ error: "status required" });
+      const orderId = Number(req.params.id);
+      await storage.updateOnlineOrder(orderId, { status: status2 });
+      const order = await storage.getOnlineOrder(orderId);
+      if (order?.customerPhone) {
+        const messages = {
+          accepted: "\u2705 Your order has been confirmed and is being prepared!",
+          preparing: "\u{1F468}\u200D\u{1F373} Your order is being prepared fresh for you!",
+          ready: "\u2705 Your order is ready! The driver is collecting it now.",
+          delivered: "\u{1F389} Your order has been delivered. Enjoy your meal!",
+          cancelled: "\u274C Your order has been cancelled. Contact us if you need help."
+        };
+        if (messages[status2]) {
+          try {
+            await whatsappService.sendMessage(order.customerPhone, messages[status2]);
+          } catch (_) {
+          }
+        }
+      }
+      if (order?.tenantId) {
+        callerIdService.broadcast({ type: "delivery_status_change", orderId, status: status2 }, order.tenantId);
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/manage/drivers", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      const drivers = await storage.getActiveDrivers(tid);
+      res.json(drivers);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/manage/stats", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      const stats = await storage.getDeliveryStats(tid);
+      res.json(stats);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/manage/zones", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      res.json(await storage.getDeliveryZones(tid));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/manage/zones", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      const zone = await storage.createDeliveryZone({ ...req.body, tenantId: tid });
+      res.status(201).json(zone);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/manage/zones/:id", async (req, res) => {
+    try {
+      const zone = await storage.updateDeliveryZone(Number(req.params.id), req.body);
+      res.json(zone);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/delivery/manage/zones/:id", async (req, res) => {
+    try {
+      await storage.deleteDeliveryZone(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/promos", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      res.json(await storage.getPromoCodes(tid));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/promos", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      const promo = await storage.createPromoCode({ ...req.body, tenantId: tid });
+      res.status(201).json(promo);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.put("/api/delivery/promos/:id", async (req, res) => {
+    try {
+      const promo = await storage.updatePromoCode(Number(req.params.id), req.body);
+      res.json(promo);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/delivery/promos/:id", async (req, res) => {
+    try {
+      await storage.deletePromoCode(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/loyalty/:customerId", async (req, res) => {
+    try {
+      const customerId = Number(req.params.customerId);
+      const [customer, transactions] = await Promise.all([
+        storage.getCustomer(customerId),
+        storage.getLoyaltyTransactions(customerId)
+      ]);
+      if (!customer) return res.status(404).json({ error: "Customer not found" });
+      res.json({ points: customer.loyaltyPoints, tier: customer.loyaltyTier, transactions });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/loyalty/redeem", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { points } = req.body;
+      const result = await redeemLoyaltyPoints(customer.id, customer.tenantId, Number(points));
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/wallet/:customerId", async (req, res) => {
+    try {
+      const customerId = Number(req.params.customerId);
+      const [customer, transactions] = await Promise.all([
+        storage.getCustomer(customerId),
+        storage.getWalletTransactions(customerId)
+      ]);
+      if (!customer) return res.status(404).json({ error: "Customer not found" });
+      res.json({ balance: customer.walletBalance, transactions });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/wallet/topup", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { amount } = req.body;
+      if (!amount || Number(amount) <= 0) return res.status(400).json({ error: "Valid amount required" });
+      const stripe = getUncachableStripeClient();
+      const intent = await stripe.paymentIntents.create({
+        amount: Math.round(Number(amount) * 100),
+        currency: "chf",
+        metadata: { type: "wallet_topup", customerId: customer.id, tenantId: customer.tenantId }
+      });
+      res.json({ clientSecret: intent.client_secret, paymentIntentId: intent.id });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/referral/:code", async (req, res) => {
+    try {
+      const customer = await storage.getCustomerByReferralCode(req.params.code);
+      if (!customer) return res.status(404).json({ error: "Referral code not found" });
+      res.json({ valid: true, referrerName: customer.name });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/orders/:idOrToken/status-stream", (req, res) => {
+    const idOrToken = req.params.idOrToken;
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(": heartbeat\n\n");
+      } catch (_) {
+      }
+    }, 25e3);
+    const resolveAndListen = async () => {
+      try {
+        let orderId;
+        if (/^\d+$/.test(idOrToken)) {
+          orderId = Number(idOrToken);
+        } else {
+          const order = await storage.getOnlineOrderByTrackingToken(idOrToken);
+          if (!order) {
+            res.write(`data: ${JSON.stringify({ type: "error", error: "Order not found" })}
+
+`);
+            clearInterval(heartbeat);
+            res.end();
+            return;
+          }
+          orderId = order.id;
+          res.write(`data: ${JSON.stringify({ type: "status_update", order: { id: order.id, status: order.status, orderNumber: order.orderNumber } })}
+
+`);
+        }
+        if (!app2._orderSseClients) {
+          app2._orderSseClients = /* @__PURE__ */ new Map();
+        }
+        const sseMap = app2._orderSseClients;
+        if (!sseMap.has(orderId)) sseMap.set(orderId, /* @__PURE__ */ new Set());
+        sseMap.get(orderId).add(res);
+        req.on("close", () => {
+          clearInterval(heartbeat);
+          sseMap.get(orderId)?.delete(res);
+          if (sseMap.get(orderId)?.size === 0) sseMap.delete(orderId);
+        });
+      } catch (err) {
+        clearInterval(heartbeat);
+        res.end();
+      }
+    };
+    resolveAndListen();
+  });
+  if (!app2._broadcastDeliveryStatus) {
+    app2._broadcastDeliveryStatus = (orderId, payload) => {
+      const sseMap = app2._orderSseClients;
+      if (!sseMap) return;
+      const clients = sseMap.get(orderId);
+      if (!clients) return;
+      const msg = `data: ${JSON.stringify(payload)}
+
+`;
+      clients.forEach((client2) => {
+        try {
+          client2.write(msg);
+        } catch (_) {
+          clients.delete(client2);
+        }
+      });
+    };
+  }
+  app2.post("/api/delivery/orders/:id/reorder", async (req, res) => {
+    try {
+      const orderId = Number(req.params.id);
+      const originalOrder = await storage.getOnlineOrder(orderId);
+      if (!originalOrder) return res.status(404).json({ error: "Order not found" });
+      const trackingToken = generateTrackingToken();
+      const orderNumber = `DEL-${Date.now()}`;
+      const newOrder = await storage.createOnlineOrder({
+        tenantId: originalOrder.tenantId,
+        orderNumber,
+        customerName: originalOrder.customerName,
+        customerPhone: originalOrder.customerPhone,
+        customerEmail: originalOrder.customerEmail ?? null,
+        customerAddress: originalOrder.customerAddress ?? null,
+        items: originalOrder.items,
+        subtotal: originalOrder.subtotal,
+        taxAmount: "0",
+        deliveryFee: originalOrder.deliveryFee ?? "0",
+        totalAmount: originalOrder.totalAmount,
+        paymentMethod: originalOrder.paymentMethod || "cash",
+        paymentStatus: "pending",
+        status: "pending",
+        orderType: originalOrder.orderType || "delivery",
+        notes: originalOrder.notes ?? null,
+        estimatedTime: 35,
+        language: originalOrder.language || "en",
+        trackingToken,
+        sourceChannel: "web"
+      });
+      try {
+        callerIdService.broadcast({
+          type: "new_online_order",
+          order: { id: newOrder.id, orderNumber, customerName: originalOrder.customerName, totalAmount: originalOrder.totalAmount, orderType: originalOrder.orderType }
+        }, originalOrder.tenantId);
+      } catch (_) {
+      }
+      res.status(201).json({ success: true, orderId: newOrder.id, orderNumber, trackingToken });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/favorites", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { customerFavorites: customerFavorites2, products: products2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq7, and: and5 } = await import("drizzle-orm");
+      const favs = await db2.select({
+        id: customerFavorites2.id,
+        productId: customerFavorites2.productId,
+        createdAt: customerFavorites2.createdAt,
+        productName: products2.name,
+        productNameAr: products2.nameAr,
+        productPrice: products2.price,
+        productImage: products2.image,
+        productDescription: products2.description
+      }).from(customerFavorites2).innerJoin(products2, eq7(products2.id, customerFavorites2.productId)).where(and5(eq7(customerFavorites2.customerId, customer.id), eq7(customerFavorites2.tenantId, customer.tenantId)));
+      res.json(favs);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/favorites", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { productId } = req.body;
+      if (!productId) return res.status(400).json({ error: "productId required" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { customerFavorites: customerFavorites2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const [fav] = await db2.insert(customerFavorites2).values({
+        tenantId: customer.tenantId,
+        customerId: customer.id,
+        productId: Number(productId)
+      }).$returningId();
+      res.status(201).json({ id: fav.id, productId: Number(productId) });
+    } catch (e) {
+      if (e.code === "ER_DUP_ENTRY") return res.status(409).json({ error: "Already in favorites" });
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.delete("/api/delivery/favorites/:id", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { customerFavorites: customerFavorites2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq7, and: and5 } = await import("drizzle-orm");
+      await db2.delete(customerFavorites2).where(
+        and5(eq7(customerFavorites2.id, Number(req.params.id)), eq7(customerFavorites2.customerId, customer.id))
+      );
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/search", async (req, res) => {
+    try {
+      const q = (req.query.q || "").trim();
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      if (!q) return res.json([]);
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { products: products2, categories: categories2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq7, and: and5, or: or3, like: like2, sql: sql5 } = await import("drizzle-orm");
+      const pattern = `%${q}%`;
+      const results = await db2.select({
+        id: products2.id,
+        name: products2.name,
+        nameAr: products2.nameAr,
+        description: products2.description,
+        price: products2.price,
+        image: products2.image,
+        categoryId: products2.categoryId,
+        categoryName: categories2.name
+      }).from(products2).leftJoin(categories2, eq7(categories2.id, products2.categoryId)).where(and5(
+        eq7(products2.tenantId, tenantId),
+        eq7(products2.isActive, true),
+        or3(
+          like2(products2.name, pattern),
+          like2(products2.nameAr, pattern),
+          like2(products2.description, pattern)
+        )
+      )).limit(50);
+      res.json(results);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/help/faq", async (req, res) => {
+    try {
+      const tenantId = Number(req.query.tenantId);
+      if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { faqEntries: faqEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq7, and: and5, asc } = await import("drizzle-orm");
+      const faqs = await db2.select().from(faqEntries2).where(and5(eq7(faqEntries2.tenantId, tenantId), eq7(faqEntries2.isActive, true))).orderBy(asc(faqEntries2.sortOrder));
+      res.json(faqs);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.post("/api/delivery/help/ticket", async (req, res) => {
+    try {
+      const { subject, message, orderId, tenantId } = req.body;
+      if (!subject || !message || !tenantId) return res.status(400).json({ error: "subject, message, tenantId required" });
+      const customer = await getAuthenticatedCustomer(req.headers.authorization).catch(() => null);
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { helpTickets: helpTickets2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const [ticket] = await db2.insert(helpTickets2).values({
+        tenantId: Number(tenantId),
+        customerId: customer?.id ?? null,
+        orderId: orderId ? Number(orderId) : null,
+        subject,
+        message,
+        status: "open",
+        priority: "normal"
+      }).$returningId();
+      res.status(201).json({ id: ticket.id, status: "open" });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/help/tickets", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { helpTickets: helpTickets2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq7, and: and5, desc: desc3 } = await import("drizzle-orm");
+      const tickets = await db2.select().from(helpTickets2).where(and5(eq7(helpTickets2.customerId, customer.id), eq7(helpTickets2.tenantId, customer.tenantId))).orderBy(desc3(helpTickets2.createdAt));
+      res.json(tickets);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/recently-ordered", async (req, res) => {
+    try {
+      const customer = await getAuthenticatedCustomer(req.headers.authorization);
+      if (!customer) return res.status(401).json({ error: "Not authenticated" });
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { onlineOrders: onlineOrders2, products: products2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq7, and: and5, desc: desc3 } = await import("drizzle-orm");
+      const orders = await db2.select({ items: onlineOrders2.items }).from(onlineOrders2).where(and5(
+        eq7(onlineOrders2.customerPhone, customer.phone),
+        eq7(onlineOrders2.tenantId, customer.tenantId)
+      )).orderBy(desc3(onlineOrders2.createdAt)).limit(20);
+      const seenIds = /* @__PURE__ */ new Set();
+      const recentItems = [];
+      for (const order of orders) {
+        const items = order.items || [];
+        for (const item of items) {
+          if (item.productId && !seenIds.has(item.productId)) {
+            seenIds.add(item.productId);
+            recentItems.push({ productId: item.productId, name: item.name, quantity: item.quantity, unitPrice: item.unitPrice });
+          }
+        }
+      }
+      const enriched = [];
+      for (const item of recentItems.slice(0, 20)) {
+        const [product] = await db2.select({ id: products2.id, name: products2.name, nameAr: products2.nameAr, price: products2.price, image: products2.image, isActive: products2.isActive }).from(products2).where(eq7(products2.id, item.productId)).limit(1);
+        enriched.push({
+          productId: item.productId,
+          name: product?.name || item.name,
+          nameAr: product?.nameAr || null,
+          price: product?.price || String(item.unitPrice),
+          image: product?.image || null,
+          isActive: product?.isActive ?? true,
+          lastOrderedQuantity: item.quantity
+        });
+      }
+      res.json(enriched);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/sitemap.xml", async (_req, res) => {
+    try {
+      const configs = await storage.getAllLandingPageConfigs();
+      const baseUrl = process.env.APP_URL || "https://pos.barmagly.tech";
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>
+`;
+      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+`;
+      for (const config of configs || []) {
+        if (!config.slug) continue;
+        xml += `  <url>
+`;
+        xml += `    <loc>${baseUrl}/order/${config.slug}</loc>
+`;
+        xml += `    <changefreq>daily</changefreq>
+`;
+        xml += `    <priority>0.8</priority>
+`;
+        xml += `  </url>
+`;
+      }
+      xml += `</urlset>`;
+      res.set("Content-Type", "application/xml");
+      res.send(xml);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/order-ratings", async (req, res) => {
+    try {
+      const tid = req.tenantId;
+      const ratings = await storage.getOrderRatings(tid);
+      res.json(ratings);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/delivery/store/:slug/reviews", async (req, res) => {
+    try {
+      const slug = req.params.slug;
+      const page = parseInt(req.query.page) || 1;
+      const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+      const config = await resolveSlugConfig(slug);
+      const tenant = config ? await storage.getTenant(config.tenantId).catch(() => null) : null;
+      if (!tenant) {
+        return res.json({ reviews: [], summary: { avgRating: 0, totalReviews: 0, distribution: {} } });
+      }
+      const ratings = await storage.getOrderRatings(tenant.id);
+      const total = ratings.length;
+      const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      let sum2 = 0;
+      for (const r of ratings) {
+        const star = Math.round(r.overallRating || r.foodRating || 0);
+        if (star >= 1 && star <= 5) distribution[star]++;
+        sum2 += r.overallRating || r.foodRating || 0;
+      }
+      const avgRating = total > 0 ? sum2 / total : 0;
+      const offset = (page - 1) * limit;
+      const pagedRatings = ratings.slice(offset, offset + limit);
+      const reviews = pagedRatings.map((r) => ({
+        id: r.id,
+        rating: r.overallRating || r.foodRating || 0,
+        comment: r.comment || "",
+        customerName: r.customerName || "Customer",
+        createdAt: r.createdAt,
+        orderItems: r.orderItems || ""
+      }));
+      res.json({
+        reviews,
+        summary: { avgRating: Math.round(avgRating * 10) / 10, totalReviews: total, distribution },
+        page,
+        limit,
+        hasMore: offset + limit < total
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  const _recoCache = /* @__PURE__ */ new Map();
+  const RECO_TTL = 5 * 60 * 1e3;
+  app2.get("/api/delivery/recommendations", async (req, res) => {
+    try {
+      const tid = parseInt(req.query.tenantId) || req.tenantId;
+      if (!tid) return res.json({ popular: [], recentlyOrdered: [] });
+      const cacheKey = `reco_${tid}`;
+      const cached = _recoCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < RECO_TTL) {
+        return res.json(cached.data);
+      }
+      const products2 = await storage.getProductsByTenant(tid);
+      const popular = products2.filter((p) => p.isActive !== false && parseFloat(p.price || "0") > 0).sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0)).slice(0, 10).map((p) => ({
+        id: p.id,
+        name: p.name,
+        nameAr: p.nameAr,
+        price: p.price,
+        imageUrl: p.imageUrl,
+        categoryId: p.categoryId
+      }));
+      const result = { popular, recentlyOrdered: [] };
+      _recoCache.set(cacheKey, { data: result, ts: Date.now() });
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/robots.txt", (_req, res) => {
+    res.type("text/plain").send(
+      `User-agent: *
+Allow: /api/order/
+Allow: /api/restaurants
+Disallow: /api/delivery/
+Sitemap: https://barmagly.tech/api/delivery/sitemap.xml
+`
+    );
   });
   const httpServer = (0, import_node_http.createServer)(app2);
   return httpServer;
@@ -9835,8 +12171,18 @@ var ready = (async () => {
     const message = err.message || "Internal Server Error";
     if (!res.headersSent) res.status(status2).json({ message });
   });
-})();
+})().catch((err) => {
+  console.error("[vercelHandler] Bootstrap failed:", err);
+  throw err;
+});
 async function handler(req, res) {
-  await ready;
+  try {
+    await ready;
+  } catch (err) {
+    return res.status(500).json({
+      error: "Server initialization failed",
+      message: err?.message || String(err)
+    });
+  }
   return app(req, res);
 }
