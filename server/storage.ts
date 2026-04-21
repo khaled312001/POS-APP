@@ -1457,7 +1457,14 @@ export const storage = {
     return db.select().from(vehicles).where(eq(vehicles.isActive, true)).orderBy(desc(vehicles.createdAt));
   },
   async createVehicle(data: InsertVehicle) {
-    const _ins_v = await db.insert(vehicles).values(data).$returningId();
+    // Auto-generate a driver access token when the vehicle has a driver,
+    // so the driver can open /driver/<token> immediately after creation.
+    const payload: any = { ...data };
+    if (!payload.driverAccessToken && (payload.driverName || payload.driverPhone)) {
+      const { randomBytes } = await import("crypto");
+      payload.driverAccessToken = randomBytes(24).toString("hex");
+    }
+    const _ins_v = await db.insert(vehicles).values(payload).$returningId();
     const [v] = await db.select().from(vehicles).where(eq(vehicles.id, _ins_v[0]?.id ?? 0));
     return v;
   },
@@ -2287,13 +2294,29 @@ export const storage = {
   },
 
   async getActiveDrivers(tenantId: number) {
-    return db.select().from(vehicles).where(
+    // Return ALL active vehicles that have a driver assigned — including
+    // offline ones. The Driver Management UI has its own Offline counter
+    // and status badges, so it needs the full roster, not just online.
+    const rows = await db.select().from(vehicles).where(
       and(
         eq(vehicles.tenantId, tenantId),
         eq(vehicles.isActive, true),
-        sql`${vehicles.driverStatus} != 'offline'`
+        sql`${vehicles.driverName} IS NOT NULL AND ${vehicles.driverName} != ''`,
       )
     );
+    // Backfill driverAccessToken for pre-existing vehicles created before the
+    // auto-generation landed, so every driver row has a usable PWA link.
+    const { randomBytes } = await import("crypto");
+    for (const r of rows as any[]) {
+      if (!r.driverAccessToken) {
+        const t = randomBytes(24).toString("hex");
+        try {
+          await db.update(vehicles).set({ driverAccessToken: t }).where(eq(vehicles.id, r.id));
+          r.driverAccessToken = t;
+        } catch {}
+      }
+    }
+    return rows;
   },
 
   // ── Delivery Management ─────────────────────────────────────────────────────
