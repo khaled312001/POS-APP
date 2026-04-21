@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" id="html-root">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+  <title>Quick Order — Barmagly Delivery</title>
+  <link rel="icon" href="/api/delivery-app/icons/icon-192.png" />
+  <link rel="stylesheet" href="/api/delivery-app/css/base.css?v=20260420" />
+  <link rel="stylesheet" href="/api/delivery-app/css/components.css?v=20260420" />
+  <style>
+    body { background: #0A0E17; color: #E6EEF8; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 0; min-height: 100vh; }
+    .bc-wrap { max-width: 680px; margin: 0 auto; padding: 20px; }
+    .bc-hdr { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-top: 12px; }
+    .bc-hdr__logo { width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #FF5722, #FF9800); display: grid; place-items: center; color: #fff; font-size: 22px; }
+    .bc-hdr__text h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .bc-hdr__text p { margin: 2px 0 0; font-size: 13px; color: #8B9BAE; }
+    .bc-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 18px; margin-bottom: 14px; }
+    .bc-lbl { display: block; font-size: 13px; font-weight: 600; color: #B8C4D4; margin-bottom: 6px; margin-top: 12px; }
+    .bc-lbl:first-child { margin-top: 0; }
+    .bc-inp, .bc-sel, .bc-txt { width: 100%; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: #E6EEF8; font-size: 15px; box-sizing: border-box; font-family: inherit; outline: none; }
+    .bc-inp:focus, .bc-sel:focus, .bc-txt:focus { border-color: #2FD3C6; }
+    .bc-txt { min-height: 90px; resize: vertical; }
+    .bc-row { display: grid; grid-template-columns: 1fr 110px; gap: 8px; align-items: end; margin-bottom: 8px; }
+    .bc-item-list { display: grid; gap: 8px; }
+    .bc-item { display: grid; grid-template-columns: 1fr 90px 90px 40px; gap: 6px; align-items: center; }
+    .bc-item__qty, .bc-item__price { text-align: center; }
+    .bc-item-del { background: transparent; border: none; color: #EF4444; font-size: 20px; cursor: pointer; padding: 4px; }
+    .bc-btn-add { width: 100%; padding: 10px; background: rgba(47,211,198,0.1); border: 1px dashed rgba(47,211,198,0.4); color: #2FD3C6; border-radius: 10px; cursor: pointer; margin-top: 10px; font-weight: 600; }
+    .bc-submit { width: 100%; padding: 16px; background: linear-gradient(135deg, #FF5722, #FF9800); color: white; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 16px; transition: transform 0.15s; }
+    .bc-submit:hover:not(:disabled) { transform: translateY(-1px); }
+    .bc-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    .bc-meta { display: flex; justify-content: space-between; font-size: 14px; color: #B8C4D4; padding: 12px 0; border-top: 1px solid rgba(255,255,255,0.06); margin-top: 16px; }
+    .bc-meta strong { color: #FF9800; font-size: 16px; }
+    .bc-info { background: rgba(47,211,198,0.08); border: 1px solid rgba(47,211,198,0.2); border-radius: 12px; padding: 14px; margin-bottom: 14px; font-size: 13px; color: #B8C4D4; line-height: 1.6; }
+    .bc-info strong { color: #2FD3C6; }
+
+    /* Tracking view */
+    .bc-status { text-align: center; padding: 40px 20px; }
+    .bc-spinner { width: 72px; height: 72px; margin: 0 auto 20px; border: 4px solid rgba(255,152,0,0.2); border-top-color: #FF9800; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .bc-status__title { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
+    .bc-status__sub { font-size: 15px; color: #8B9BAE; margin: 0 0 20px; line-height: 1.5; }
+    .bc-status__claimed { background: linear-gradient(135deg, rgba(47,211,198,0.15), rgba(99,102,241,0.15)); border: 1px solid rgba(47,211,198,0.3); border-radius: 16px; padding: 24px; margin-top: 16px; }
+    .bc-status__claimed h2 { color: #2FD3C6; margin: 0 0 8px; font-size: 20px; }
+    .bc-counter { display: inline-block; padding: 6px 14px; border-radius: 999px; background: rgba(255,152,0,0.15); color: #FF9800; font-weight: 700; font-size: 13px; margin-top: 8px; }
+    .bc-cancel { background: transparent; color: #EF4444; border: 1px solid rgba(239,68,68,0.3); padding: 10px 20px; border-radius: 10px; cursor: pointer; margin-top: 20px; font-weight: 600; }
+    .bc-track-link { display: inline-block; margin-top: 16px; padding: 12px 24px; background: #2FD3C6; color: #0A0E17; border-radius: 12px; text-decoration: none; font-weight: 700; }
+    .bc-hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="bc-wrap">
+    <!-- ─── FORM VIEW ──────────────────────────────────────── -->
+    <div id="form-view">
+      <div class="bc-hdr">
+        <div class="bc-hdr__logo">⚡</div>
+        <div class="bc-hdr__text">
+          <h1>Quick Order</h1>
+          <p>Tell us what you want. The first restaurant to accept will prepare it.</p>
+        </div>
+      </div>
+
+      <div class="bc-info">
+        <strong>How it works:</strong> Submit your order below. It gets broadcast to all partner restaurants — the first one to accept will prepare and deliver. You'll get a tracking link as soon as a restaurant accepts (usually within 1-2 minutes).
+      </div>
+
+      <div class="bc-card">
+        <label class="bc-lbl">Your Name *</label>
+        <input class="bc-inp" id="f-name" placeholder="Full name" />
+
+        <label class="bc-lbl">Phone Number *</label>
+        <input class="bc-inp" id="f-phone" type="tel" placeholder="+41 79 123 45 67" />
+
+        <label class="bc-lbl">Delivery Address *</label>
+        <input class="bc-inp" id="f-address" placeholder="Street, number, city" />
+
+        <label class="bc-lbl">Email (optional)</label>
+        <input class="bc-inp" id="f-email" type="email" placeholder="you@example.com" />
+      </div>
+
+      <div class="bc-card">
+        <label class="bc-lbl">What do you want to order?</label>
+        <div class="bc-item-list" id="items-list">
+          <!-- one empty item seeded by JS -->
+        </div>
+        <button class="bc-btn-add" id="btn-add-item" type="button">+ Add another item</button>
+
+        <label class="bc-lbl">Special Notes (optional)</label>
+        <textarea class="bc-txt" id="f-notes" placeholder="e.g. extra spicy, no onions, leave at door"></textarea>
+
+        <div class="bc-meta">
+          <span>Estimated Total</span>
+          <strong id="f-total">CHF 0.00</strong>
+        </div>
+      </div>
+
+      <div class="bc-card">
+        <label class="bc-lbl">Payment</label>
+        <select class="bc-sel" id="f-payment">
+          <option value="cash">💵 Cash on delivery</option>
+          <option value="card">💳 Card on delivery</option>
+        </select>
+      </div>
+
+      <button class="bc-submit" id="btn-submit">Submit Order — Find Me a Restaurant</button>
+    </div>
+
+    <!-- ─── STATUS VIEW (after submit) ──────────────────────── -->
+    <div id="status-view" class="bc-hidden">
+      <div class="bc-status" id="status-pending">
+        <div class="bc-spinner"></div>
+        <h1 class="bc-status__title">Finding a restaurant for you…</h1>
+        <p class="bc-status__sub">We've notified all partner restaurants. Waiting for the first one to accept.</p>
+        <div class="bc-counter" id="count-down">05:00</div>
+        <div style="margin-top: 24px;">
+          <button class="bc-cancel" id="btn-cancel">Cancel order</button>
+        </div>
+      </div>
+
+      <div class="bc-status bc-hidden" id="status-claimed">
+        <div style="font-size: 64px; margin-bottom: 12px;">🎉</div>
+        <h1 class="bc-status__title">A restaurant accepted your order!</h1>
+        <div class="bc-status__claimed">
+          <h2 id="claimed-name">Restaurant</h2>
+          <p style="margin: 0; color: #B8C4D4;">Order #<span id="claimed-num">—</span> is being prepared.</p>
+          <a class="bc-track-link" id="claimed-track" href="#">Track your order →</a>
+        </div>
+      </div>
+
+      <div class="bc-status bc-hidden" id="status-failed">
+        <div style="font-size: 64px; margin-bottom: 12px;">😔</div>
+        <h1 class="bc-status__title">No restaurant available</h1>
+        <p class="bc-status__sub" id="failed-reason">All restaurants are busy right now. Please try again in a few minutes.</p>
+        <a class="bc-track-link" href="/order">Try again</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/api/delivery-app/js/api.js?v=20260420"></script>
+  <script>
+  (function () {
+    var $ = function (id) { return document.getElementById(id); };
+    var itemsEl = $("items-list");
+    var totalEl = $("f-total");
+
+    function addItemRow() {
+      var row = document.createElement("div");
+      row.className = "bc-item";
+      row.innerHTML = ''
+        + '<input class="bc-inp" type="text" placeholder="Item name (e.g. Pepperoni pizza)" data-role="name" />'
+        + '<input class="bc-inp bc-item__qty" type="number" min="1" value="1" data-role="qty" />'
+        + '<input class="bc-inp bc-item__price" type="number" min="0" step="0.5" placeholder="Est. CHF" data-role="price" />'
+        + '<button class="bc-item-del" type="button" title="Remove">✕</button>';
+      row.querySelector(".bc-item-del").addEventListener("click", function () {
+        if (itemsEl.children.length > 1) { row.remove(); recalc(); }
+      });
+      row.querySelectorAll("input").forEach(function (i) {
+        i.addEventListener("input", recalc);
+      });
+      itemsEl.appendChild(row);
+    }
+
+    function recalc() {
+      var total = 0;
+      itemsEl.querySelectorAll(".bc-item").forEach(function (r) {
+        var q = parseFloat(r.querySelector("[data-role=qty]").value) || 0;
+        var p = parseFloat(r.querySelector("[data-role=price]").value) || 0;
+        total += q * p;
+      });
+      totalEl.textContent = "CHF " + total.toFixed(2);
+    }
+
+    function gatherItems() {
+      var items = [];
+      itemsEl.querySelectorAll(".bc-item").forEach(function (r) {
+        var name = r.querySelector("[data-role=name]").value.trim();
+        var qty = parseInt(r.querySelector("[data-role=qty]").value, 10) || 1;
+        var price = parseFloat(r.querySelector("[data-role=price]").value) || 0;
+        if (name) items.push({ name: name, quantity: qty, estimatedPrice: price });
+      });
+      return items;
+    }
+
+    function gatherTotal() {
+      var t = 0;
+      gatherItems().forEach(function (it) { t += (it.estimatedPrice || 0) * it.quantity; });
+      return t;
+    }
+
+    addItemRow();
+    $("btn-add-item").addEventListener("click", addItemRow);
+
+    // ── Submit ─────────────────────────────────────────────
+    $("btn-submit").addEventListener("click", function () {
+      var name = $("f-name").value.trim();
+      var phone = $("f-phone").value.trim();
+      var address = $("f-address").value.trim();
+      var email = $("f-email").value.trim();
+      var notes = $("f-notes").value.trim();
+      var paymentMethod = $("f-payment").value;
+      var items = gatherItems();
+      if (!name || !phone || !address) { alert("Please fill in name, phone, and address."); return; }
+      if (items.length === 0) { alert("Please add at least one item."); return; }
+
+      $("btn-submit").disabled = true;
+      $("btn-submit").textContent = "Submitting…";
+
+      fetch("/api/delivery/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: name,
+          customerPhone: phone,
+          customerAddress: address,
+          customerEmail: email || null,
+          items: items,
+          notes: notes || null,
+          estimatedTotal: gatherTotal(),
+          paymentMethod: paymentMethod,
+        }),
+      })
+        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(function (data) { showStatusView(data.token, new Date(data.expiresAt).getTime()); })
+        .catch(function (err) {
+          alert("Failed to submit: " + err.message);
+          $("btn-submit").disabled = false;
+          $("btn-submit").textContent = "Submit Order — Find Me a Restaurant";
+        });
+    });
+
+    // ── Status polling ─────────────────────────────────────
+    function showStatusView(token, expiresAtMs) {
+      $("form-view").classList.add("bc-hidden");
+      $("status-view").classList.remove("bc-hidden");
+      try { history.replaceState(null, "", "/broadcast?t=" + encodeURIComponent(token)); } catch (_) {}
+      startCountdown(expiresAtMs);
+      startPolling(token);
+      try { connectWS(token); } catch (_) {}
+    }
+
+    function startCountdown(expiresAtMs) {
+      var el = $("count-down");
+      function tick() {
+        var left = Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
+        var m = String(Math.floor(left / 60)).padStart(2, "0");
+        var s = String(left % 60).padStart(2, "0");
+        el.textContent = m + ":" + s;
+        if (left <= 0) clearInterval(iv);
+      }
+      tick();
+      var iv = setInterval(tick, 1000);
+    }
+
+    function markClaimed(data) {
+      $("status-pending").classList.add("bc-hidden");
+      $("status-claimed").classList.remove("bc-hidden");
+      $("claimed-name").textContent = data.claimedByName || "Restaurant";
+      $("claimed-num").textContent = data.orderNumber || "—";
+      var link = $("claimed-track");
+      if (data.trackingToken) {
+        link.href = "/track/" + data.trackingToken;
+      } else {
+        link.style.display = "none";
+      }
+    }
+
+    function markFailed(reason) {
+      $("status-pending").classList.add("bc-hidden");
+      $("status-failed").classList.remove("bc-hidden");
+      if (reason) $("failed-reason").textContent = reason;
+    }
+
+    function startPolling(token) {
+      var done = false;
+      function check() {
+        if (done) return;
+        fetch("/api/delivery/broadcast/" + token)
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.status === "claimed") { done = true; markClaimed(data); }
+            else if (data.status === "expired" || data.status === "cancelled") { done = true; markFailed(data.status === "expired" ? "No restaurant accepted in time. Please try again." : null); }
+          })
+          .catch(function () {});
+      }
+      check();
+      var iv = setInterval(function () { if (done) clearInterval(iv); else check(); }, 4000);
+    }
+
+    function connectWS(token) {
+      var proto = location.protocol === "https:" ? "wss:" : "ws:";
+      var ws = new WebSocket(proto + "//" + location.host + "/api/ws/caller-id");
+      ws.onmessage = function (e) {
+        try {
+          var m = JSON.parse(e.data);
+          if ((m.type === "broadcast_claimed" || m.type === "broadcast_cancelled") && m.token === token) {
+            if (m.type === "broadcast_claimed") {
+              fetch("/api/delivery/broadcast/" + token).then(function (r) { return r.json(); }).then(markClaimed);
+            } else {
+              markFailed(null);
+            }
+          }
+        } catch (_) {}
+      };
+    }
+
+    $("btn-cancel").addEventListener("click", function () {
+      var m = location.search.match(/[?&]t=([^&]+)/);
+      var token = m ? decodeURIComponent(m[1]) : null;
+      if (!token) return;
+      if (!confirm("Cancel this order?")) return;
+      fetch("/api/delivery/broadcast/" + token + "/cancel", { method: "POST" })
+        .finally(function () { location.href = "/order"; });
+    });
+
+    // ── Restore if returning via /broadcast?t=... ────────────
+    var urlToken = (function () { var m = location.search.match(/[?&]t=([^&]+)/); return m ? decodeURIComponent(m[1]) : null; })();
+    if (urlToken) {
+      fetch("/api/delivery/broadcast/" + urlToken).then(function (r) { return r.json(); }).then(function (data) {
+        if (data && data.status) {
+          showStatusView(urlToken, new Date(data.expiresAt).getTime());
+          if (data.status === "claimed") markClaimed(data);
+          if (data.status === "expired" || data.status === "cancelled") markFailed(data.status === "expired" ? "No restaurant accepted in time." : null);
+        }
+      }).catch(function () {});
+    }
+  })();
+  </script>
+</body>
+</html>

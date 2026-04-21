@@ -624,38 +624,52 @@ export default function SettingsScreen() {
   };
 
   const handleLogout = () => {
+    const isWeb = Platform.OS === "web";
+    const doLogout = () => {
+      // Clear license + tenant context so the app fully resets to the gate
+      import("@react-native-async-storage/async-storage").then(({ default: AS }) => {
+        AS.removeItem("barmagly_license_key").catch(() => {});
+        AS.removeItem("barmagly_tenant_id").catch(() => {});
+      }).catch(() => {});
+      logout();
+    };
+    const shiftMsg = t("shiftRequiredMsg") || "You must end your shift before logging out.";
+    const endAndLogoutLabel = t("endShift") + " & " + t("logout");
+
     if (activeShift) {
-      Alert.alert(
-        t("endShift"),
-        t("shiftRequiredMsg") || "You must end your shift before logging out.",
-        [
+      if (isWeb) {
+        if (!window.confirm(`${shiftMsg}\n\n${endAndLogoutLabel}?`)) return;
+        clockOutMutation.mutate({ id: activeShift.id, data: {} }, {
+          onSuccess: () => {
+            if (window.confirm(t("logoutConfirm"))) doLogout();
+          },
+        });
+      } else {
+        Alert.alert(t("endShift"), shiftMsg, [
           { text: t("cancel"), style: "cancel" },
           {
-            text: t("endShift") + " & " + t("logout"),
+            text: endAndLogoutLabel,
             style: "destructive",
             onPress: () => clockOutMutation.mutate({ id: activeShift.id, data: {} }, {
               onSuccess: () => {
-                if (Platform.OS === "web") {
-                  if (window.confirm(t("logoutConfirm"))) logout();
-                } else {
-                  Alert.alert(t("logoutConfirm"), "", [
-                    { text: t("cancel"), style: "cancel" },
-                    { text: t("logout"), style: "destructive", onPress: () => logout() },
-                  ]);
-                }
+                Alert.alert(t("logoutConfirm"), "", [
+                  { text: t("cancel"), style: "cancel" },
+                  { text: t("logout"), style: "destructive", onPress: doLogout },
+                ]);
               },
             }),
           },
-        ]
-      );
+        ]);
+      }
       return;
     }
-    if (Platform.OS === "web") {
-      if (window.confirm(t("logoutConfirm"))) logout();
+
+    if (isWeb) {
+      if (window.confirm(t("logoutConfirm"))) doLogout();
     } else {
       Alert.alert(t("logoutConfirm"), "", [
         { text: t("cancel"), style: "cancel" },
-        { text: t("logout"), style: "destructive", onPress: () => logout() },
+        { text: t("logout"), style: "destructive", onPress: doLogout },
       ]);
     }
   };

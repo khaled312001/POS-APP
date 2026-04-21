@@ -248,6 +248,47 @@ export default function OrdersScreen() {
     normalizedOnlineOrders.forEach(o => knownOrderIds.current.add(`online-${o.id}`));
   }, [normalizedOnlineOrders]);
 
+  // ── Broadcast Orders (marketplace / drop-shipping) ───────────────────
+  const { data: broadcastOrders = [], refetch: refetchBroadcasts } = useQuery<any[]>({
+    queryKey: ["/api/broadcast-orders/pending", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
+    refetchInterval: 10000,
+  });
+  const [bcBusyId, setBcBusyId] = useState<number | null>(null);
+  const [bcToast, setBcToast] = useState<string | null>(null);
+
+  const acceptBroadcast = async (bc: any) => {
+    if (!tenantId || bcBusyId) return;
+    setBcBusyId(bc.id);
+    try {
+      const res = await apiRequest("POST", `/api/broadcast-orders/${bc.id}/accept`, { tenantId });
+      const data = await res.json();
+      if (data?.success) {
+        playNotificationSound();
+        setBcToast(lbl("✅ Order accepted — now in your POS queue", "✅ تم قبول الطلب — موجود الآن في قائمتك", "✅ Bestellung angenommen"));
+        qc.invalidateQueries({ queryKey: ["/api/broadcast-orders/pending"] });
+        qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+      } else {
+        setBcToast(data?.error || lbl("Too late — another restaurant accepted first", "فات الوقت — مطعم آخر قبل الطلب أولاً", "Zu spät — ein anderes Restaurant hat zuerst angenommen"));
+        qc.invalidateQueries({ queryKey: ["/api/broadcast-orders/pending"] });
+      }
+    } catch (e: any) {
+      setBcToast(lbl("Failed: ", "فشل: ", "Fehlgeschlagen: ") + (e?.message || ""));
+    } finally {
+      setBcBusyId(null);
+      setTimeout(() => setBcToast(null), 4000);
+    }
+  };
+
+  const rejectBroadcast = async (bc: any) => {
+    if (!tenantId) return;
+    try {
+      await apiRequest("POST", `/api/broadcast-orders/${bc.id}/reject`, { tenantId });
+      qc.invalidateQueries({ queryKey: ["/api/broadcast-orders/pending"] });
+    } catch { }
+  };
+
   // WebSocket for instant notifications
   useEffect(() => {
     if (Platform.OS !== "web") return;
@@ -255,6 +296,11 @@ export default function OrdersScreen() {
     let ws: WebSocket;
     try {
       ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        if (tenantId) {
+          try { ws.send(JSON.stringify({ type: "register", tenantId })); } catch {}
+        }
+      };
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -264,12 +310,18 @@ export default function OrdersScreen() {
             setNewOrderIds(prev => { const next = new Set(prev); next.add(data.order?.id); return next; });
           } else if (data.type === "online_order_updated") {
             qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+          } else if (data.type === "broadcast_new" || data.type === "broadcast_claimed" || data.type === "broadcast_cancelled") {
+            if (data.type === "broadcast_new") playNotificationSound();
+            qc.invalidateQueries({ queryKey: ["/api/broadcast-orders/pending"] });
+            if (data.type === "broadcast_claimed" && data.claimedByTenantId === tenantId) {
+              qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+            }
           }
         } catch { }
       };
     } catch { }
     return () => ws?.close();
-  }, []);
+  }, [tenantId]);
 
   // Polling for native
   useEffect(() => {
@@ -1388,6 +1440,59 @@ export default function OrdersScreen() {
         keyExtractor={(item: any) => `${item._type} -${item.id} `}
         renderItem={renderOrder}
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          <>
+            {bcToast ? (
+              <View style={styles.bcToast}><Text style={styles.bcToastText}>{bcToast}</Text></View>
+            ) : null}
+            {(broadcastOrders as any[]).length > 0 ? (
+              <View style={styles.bcSection}>
+                <View style={styles.bcSectionHdr}>
+                  <Text style={styles.bcSectionTitle}>
+                    📣 {lbl("Incoming Broadcast Orders", "طلبات مفتوحة", "Eingehende Broadcast-Bestellungen")}
+                    {"  "}
+                    <Text style={styles.bcSectionCount}>({(broadcastOrders as any[]).length})</Text>
+                  </Text>
+                  <Text style={styles.bcSectionSub}>
+                    {lbl("First to accept wins. Tap Accept to take the order.", "أول من يقبل يفوز. اضغط قبول لاستلام الطلب.", "Wer zuerst annimmt, gewinnt. Tippe auf Annehmen.")}
+                  </Text>
+                </View>
+                {(broadcastOrders as any[]).map((bc: any) => {
+                  const expiresMs = new Date(bc.expiresAt).getTime() - Date.now();
+                  const secsLeft = Math.max(0, Math.floor(expiresMs / 1000));
+                  return (
+                    <View key={`bc-${bc.id}`} style={styles.bcCard}>
+                      <View style={styles.bcRow}>
+                        <Text style={styles.bcName}>👤 {bc.customerName}</Text>
+                        <Text style={styles.bcTimer}>⏱ {Math.floor(secsLeft / 60)}:{String(secsLeft % 60).padStart(2, "0")}</Text>
+                      </View>
+                      <Text style={styles.bcMeta}>📞 {bc.customerPhone}</Text>
+                      {bc.customerAddress ? <Text style={styles.bcMeta}>📍 {bc.customerAddress}</Text> : null}
+                      <View style={styles.bcItemsBox}>
+                        {(bc.items || []).map((it: any, idx: number) => (
+                          <Text key={idx} style={styles.bcItem}>• {it.quantity}× {it.name}{it.notes ? ` — ${it.notes}` : ""}</Text>
+                        ))}
+                      </View>
+                      {bc.notes ? <Text style={styles.bcNotes}>📝 {bc.notes}</Text> : null}
+                      <View style={styles.bcTotalRow}>
+                        <Text style={styles.bcTotalLbl}>{lbl("Est. Total", "الإجمالي المقدر", "Geschätzt")}</Text>
+                        <Text style={styles.bcTotalVal}>CHF {Number(bc.estimatedTotal || 0).toFixed(2)}</Text>
+                      </View>
+                      <View style={styles.bcActions}>
+                        <Pressable style={[styles.bcBtn, styles.bcBtnReject]} onPress={() => rejectBroadcast(bc)} disabled={bcBusyId === bc.id}>
+                          <Text style={styles.bcBtnRejectText}>{lbl("Reject", "رفض", "Ablehnen")}</Text>
+                        </Pressable>
+                        <Pressable style={[styles.bcBtn, styles.bcBtnAccept, bcBusyId === bc.id && { opacity: 0.6 }]} onPress={() => acceptBroadcast(bc)} disabled={bcBusyId === bc.id}>
+                          <Text style={styles.bcBtnAcceptText}>{bcBusyId === bc.id ? lbl("Accepting…", "جاري القبول…", "Wird angenommen…") : "✓ " + lbl("Accept", "قبول", "Annehmen")}</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
+          </>
+        }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
         ListEmptyComponent={
           <View style={styles.emptyState}>
@@ -1405,6 +1510,31 @@ export default function OrdersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  // ── Broadcast (marketplace) panel ─────────────────────────
+  bcToast: { backgroundColor: Colors.accent + "20", borderColor: Colors.accent + "60", borderWidth: 1, padding: 12, borderRadius: 10, marginBottom: 10 },
+  bcToastText: { color: Colors.accent, fontWeight: "600", textAlign: "center" as const },
+  bcSection: { marginBottom: 16, backgroundColor: "rgba(255,152,0,0.05)", borderWidth: 1, borderColor: "rgba(255,152,0,0.25)", borderRadius: 14, padding: 12 },
+  bcSectionHdr: { marginBottom: 8 },
+  bcSectionTitle: { color: "#FF9800", fontSize: 15, fontWeight: "800" },
+  bcSectionCount: { color: "#FF9800", fontWeight: "600", fontSize: 13 },
+  bcSectionSub: { color: Colors.textMuted, fontSize: 12, marginTop: 2 },
+  bcCard: { backgroundColor: Colors.surface, borderRadius: 12, padding: 14, marginTop: 8, borderLeftWidth: 4, borderLeftColor: "#FF9800" },
+  bcRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
+  bcName: { color: Colors.text, fontSize: 16, fontWeight: "700", flex: 1 },
+  bcTimer: { color: "#FF9800", fontWeight: "700", fontSize: 13 },
+  bcMeta: { color: Colors.textMuted, fontSize: 13, marginTop: 2 },
+  bcItemsBox: { marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" },
+  bcItem: { color: Colors.text, fontSize: 13, marginVertical: 2 },
+  bcNotes: { color: Colors.textMuted, fontSize: 12, fontStyle: "italic" as const, marginTop: 6 },
+  bcTotalRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" },
+  bcTotalLbl: { color: Colors.textMuted, fontSize: 13 },
+  bcTotalVal: { color: "#FF9800", fontWeight: "800", fontSize: 16 },
+  bcActions: { flexDirection: "row", gap: 8, marginTop: 12 },
+  bcBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: "center" as const },
+  bcBtnReject: { backgroundColor: "transparent", borderWidth: 1, borderColor: Colors.danger + "60" },
+  bcBtnRejectText: { color: Colors.danger, fontWeight: "600" },
+  bcBtnAccept: { backgroundColor: "#10B981" },
+  bcBtnAcceptText: { color: "#fff", fontWeight: "800" },
   pendingBadge: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.danger,
     justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: "rgba(255,255,255,0.3)",

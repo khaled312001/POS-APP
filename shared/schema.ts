@@ -665,6 +665,45 @@ export const onlineOrders = mysqlTable("online_orders", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ========== Broadcast / Marketplace Orders (drop-shipping style) ==========
+// Customer creates ONE broadcast order without picking a restaurant.
+// All active tenants see it in real-time via WS. First to accept wins via
+// atomic UPDATE. Winner gets a normal online_orders row auto-created.
+
+export const broadcastOrders = mysqlTable("broadcast_orders", {
+  id: serial("id").primaryKey(),
+  broadcastToken: varchar("broadcast_token", { length: 64 }).notNull().unique(),
+  customerName: text("customer_name").notNull(),
+  customerPhone: text("customer_phone").notNull(),
+  customerEmail: text("customer_email"),
+  customerAddress: text("customer_address"),
+  customerLat: decimal("customer_lat", { precision: 10, scale: 7 }),
+  customerLng: decimal("customer_lng", { precision: 10, scale: 7 }),
+  items: json("items").$type<{ name: string; quantity: number; notes?: string; estimatedPrice?: number }[]>().notNull().default([]),
+  notes: text("notes"),
+  estimatedTotal: decimal("estimated_total", { precision: 10, scale: 2 }).default("0"),
+  paymentMethod: text("payment_method").notNull().default("cash"), // cash, card
+  status: text("status").notNull().default("pending"), // pending, claimed, expired, cancelled
+  claimedByTenantId: int("claimed_by_tenant_id").references(() => tenants.id, { onDelete: 'set null' }),
+  claimedAt: timestamp("claimed_at"),
+  onlineOrderId: int("online_order_id"), // set once claimed — links to the normal online_orders row
+  expiresAt: timestamp("expires_at").notNull(),
+  cancelledReason: text("cancelled_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Track per-tenant visibility/response for each broadcast. Used to hide
+// broadcasts that a tenant has already rejected, and to audit response times.
+export const broadcastOrderRecipients = mysqlTable("broadcast_order_recipients", {
+  id: serial("id").primaryKey(),
+  broadcastOrderId: int("broadcast_order_id").references(() => broadcastOrders.id, { onDelete: 'cascade' }).notNull(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  response: text("response"), // null = pending, "rejected" | "accepted" | "missed"
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const landingPageConfig = mysqlTable("landing_page_config", {
   id: serial("id").primaryKey(),
   tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull().unique(),
@@ -1199,3 +1238,11 @@ export type HelpTicket = typeof helpTickets.$inferSelect;
 export type InsertHelpTicket = z.infer<typeof insertHelpTicketSchema>;
 export type FaqEntry = typeof faqEntries.$inferSelect;
 export type InsertFaqEntry = z.infer<typeof insertFaqEntrySchema>;
+
+// ── Broadcast Orders ──
+export const insertBroadcastOrderSchema = createInsertSchema(broadcastOrders).omit({ id: true, createdAt: true, updatedAt: true, claimedAt: true, claimedByTenantId: true, onlineOrderId: true });
+export const insertBroadcastOrderRecipientSchema = createInsertSchema(broadcastOrderRecipients).omit({ id: true, createdAt: true });
+export type BroadcastOrder = typeof broadcastOrders.$inferSelect;
+export type InsertBroadcastOrder = z.infer<typeof insertBroadcastOrderSchema>;
+export type BroadcastOrderRecipient = typeof broadcastOrderRecipients.$inferSelect;
+export type InsertBroadcastOrderRecipient = z.infer<typeof insertBroadcastOrderRecipientSchema>;

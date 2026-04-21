@@ -2,6 +2,7 @@ import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { registerSuperAdminRoutes } from "./superAdminRoutes";
+import { registerBroadcastRoutes } from "./broadcastRoutes";
 import { tenantAuthMiddleware } from "./tenantAuth";
 import { callerIdService } from "./callerIdService";
 import { whatsappService } from "./whatsappService";
@@ -341,6 +342,29 @@ function configureExpoAndLanding(app: express.Application) {
     }
 
     // ── General delivery landing page (no slug) ────────────────────────────
+    // /broadcast or /api/broadcast → Quick Order (drop-shipping marketplace)
+    if (req.path === "/broadcast" || req.path === "/broadcast/" || req.path === "/api/broadcast" || req.path === "/api/broadcast/") {
+      try {
+        const bcPath = path.resolve(process.cwd(), "delivery-app", "broadcast.html");
+        if (!fs.existsSync(bcPath)) {
+          return res.status(503).send("<h1>Broadcast page not yet deployed</h1>");
+        }
+        const isApiPrefixed = req.path.startsWith("/api/");
+        const basePath = isApiPrefixed ? "/api" : "";
+        let html = fs.readFileSync(bcPath, "utf-8");
+        if (basePath) {
+          html = html.replace(/href="\/(delivery-app\/)/g, `href="${basePath}/$1`);
+          html = html.replace(/src="\/(delivery-app\/)/g, `src="${basePath}/$1`);
+          html = html.replace(/"\/api\/delivery\/broadcast/g, `"${basePath}/delivery/broadcast`);
+        }
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.status(200).send(html);
+      } catch (err) {
+        console.error("[/broadcast] Error:", err);
+        return res.status(500).send("<h1>Server error</h1>");
+      }
+    }
+
     // /order or /api/order → shows landing page
     if (req.path === "/order" || req.path === "/order/" || req.path === "/api/order" || req.path === "/api/order/") {
       try {
@@ -954,6 +978,7 @@ function setupPaymentGatewayRoutes(app: express.Application) {
   configureExpoAndLanding(app);
 
   registerSuperAdminRoutes(app);
+  registerBroadcastRoutes(app);
   const server = await registerRoutes(app);
 
   setupErrorHandler(app);
