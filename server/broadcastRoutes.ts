@@ -8,16 +8,83 @@
  */
 import type { Express, Request, Response } from "express";
 import { randomBytes } from "crypto";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { broadcastOrders, broadcastOrderRecipients, onlineOrders, tenants } from "@shared/schema";
 import { eq, and, gt, sql, desc, inArray } from "drizzle-orm";
 import { callerIdService } from "./callerIdService";
 import { pushService } from "./pushService";
 
+// ── Auto-migration: ensure broadcast tables exist on boot ───────────────────
+// Runs once per process, idempotent. Skips cleanly if tables already exist.
+let broadcastMigrationRan = false;
+async function ensureBroadcastTables(): Promise<void> {
+  if (broadcastMigrationRan) return;
+  broadcastMigrationRan = true;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS broadcast_orders (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        broadcast_token VARCHAR(64) NOT NULL UNIQUE,
+        customer_name TEXT NOT NULL,
+        customer_phone TEXT NOT NULL,
+        customer_email TEXT NULL,
+        customer_address TEXT NULL,
+        customer_lat DECIMAL(10,7) NULL,
+        customer_lng DECIMAL(10,7) NULL,
+        items JSON NOT NULL,
+        notes TEXT NULL,
+        estimated_total DECIMAL(10,2) DEFAULT 0,
+        payment_method TEXT NOT NULL,
+        status TEXT NOT NULL,
+        claimed_by_tenant_id INT NULL,
+        claimed_at TIMESTAMP NULL,
+        online_order_id INT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        cancelled_reason TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_broadcast_status_expires (status(20), expires_at),
+        INDEX idx_broadcast_claimed_tenant (claimed_by_tenant_id),
+        INDEX idx_broadcast_token (broadcast_token)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS broadcast_order_recipients (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        broadcast_order_id BIGINT UNSIGNED NOT NULL,
+        tenant_id INT NOT NULL,
+        response TEXT NULL,
+        responded_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_broadcast_tenant (broadcast_order_id, tenant_id),
+        INDEX idx_recipient_tenant (tenant_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+    console.log("[BROADCAST] Migration check OK — broadcast tables ready.");
+  } catch (e: any) {
+    console.warn("[BROADCAST] Migration warning:", e.message);
+    // Reset flag so next call retries
+    broadcastMigrationRan = false;
+  }
+}
+
 const BROADCAST_TTL_MINUTES = 5; // how long restaurants have to claim
 
 function generateBroadcastToken(): string {
   return randomBytes(20).toString("hex");
+}
+
+function normalizeItems(items: unknown): any[] {
+  if (Array.isArray(items)) return items;
+  if (typeof items === "string") {
+    try { const p = JSON.parse(items); return Array.isArray(p) ? p : []; } catch { return []; }
+  }
+  return [];
+}
+
+function normalizeBroadcastRow(row: any): any {
+  if (!row) return row;
+  return { ...row, items: normalizeItems(row.items) };
 }
 
 function generateOrderNumber(tenantId: number): string {
@@ -28,8 +95,13 @@ function generateOrderNumber(tenantId: number): string {
 }
 
 export function registerBroadcastRoutes(app: Express) {
+  // Trigger auto-migration in the background (non-blocking). Tables will be
+  // ready by the time the first request lands.
+  ensureBroadcastTables().catch(() => {});
+
   // ── PUBLIC: Customer creates a broadcast order ────────────────────────────
   app.post("/api/delivery/broadcast", async (req: Request, res: Response) => {
+    await ensureBroadcastTables();
     try {
       const {
         customerName,
@@ -74,6 +146,7 @@ export function registerBroadcastRoutes(app: Express) {
       const [row] = await db.select().from(broadcastOrders).where(eq(broadcastOrders.broadcastToken, token)).limit(1);
 
       // Broadcast WS event to ALL connected POS clients
+      const normalizedItems = normalizeItems(row.items);
       const payload = {
         type: "broadcast_new",
         id: row.id,
@@ -81,7 +154,7 @@ export function registerBroadcastRoutes(app: Express) {
         customerName: row.customerName,
         customerPhone: row.customerPhone,
         customerAddress: row.customerAddress,
-        items: row.items,
+        items: normalizedItems,
         notes: row.notes,
         estimatedTotal: row.estimatedTotal,
         createdAt: row.createdAt,
@@ -132,7 +205,7 @@ export function registerBroadcastRoutes(app: Express) {
         onlineOrderId: row.onlineOrderId,
         orderNumber,
         trackingToken,
-        items: row.items,
+        items: normalizeItems(row.items),
         estimatedTotal: row.estimatedTotal,
         expiresAt: row.expiresAt,
         createdAt: row.createdAt,
@@ -193,7 +266,7 @@ export function registerBroadcastRoutes(app: Express) {
           inArray(broadcastOrderRecipients.broadcastOrderId, ids),
         ));
       const rejectedSet = new Set(rejected.map((r) => r.broadcastOrderId));
-      const visible = pending.filter((p) => !rejectedSet.has(p.id));
+      const visible = pending.filter((p) => !rejectedSet.has(p.id)).map(normalizeBroadcastRow);
       res.json(visible);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -253,7 +326,8 @@ export function registerBroadcastRoutes(app: Express) {
       const trackingToken = randomBytes(32).toString("hex");
 
       // Normalize items into the onlineOrders shape
-      const posItems = (bc.items || []).map((it: any, idx: number) => ({
+      const bcItems = normalizeItems(bc.items);
+      const posItems = bcItems.map((it: any, idx: number) => ({
         productId: it.productId || 0,
         name: it.name,
         quantity: Number(it.quantity) || 1,

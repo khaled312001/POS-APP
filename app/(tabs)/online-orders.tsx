@@ -1460,6 +1460,7 @@ export default function OrdersScreen() {
                 {(broadcastOrders as any[]).map((bc: any) => {
                   const expiresMs = new Date(bc.expiresAt).getTime() - Date.now();
                   const secsLeft = Math.max(0, Math.floor(expiresMs / 1000));
+                  const bcItems = Array.isArray(bc.items) ? bc.items : (typeof bc.items === "string" ? (() => { try { return JSON.parse(bc.items); } catch { return []; } })() : []);
                   return (
                     <View key={`bc-${bc.id}`} style={styles.bcCard}>
                       <View style={styles.bcRow}>
@@ -1469,7 +1470,7 @@ export default function OrdersScreen() {
                       <Text style={styles.bcMeta}>📞 {bc.customerPhone}</Text>
                       {bc.customerAddress ? <Text style={styles.bcMeta}>📍 {bc.customerAddress}</Text> : null}
                       <View style={styles.bcItemsBox}>
-                        {(bc.items || []).map((it: any, idx: number) => (
+                        {bcItems.map((it: any, idx: number) => (
                           <Text key={idx} style={styles.bcItem}>• {it.quantity}× {it.name}{it.notes ? ` — ${it.notes}` : ""}</Text>
                         ))}
                       </View>
