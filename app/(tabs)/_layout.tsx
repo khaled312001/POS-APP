@@ -122,6 +122,12 @@ export default function TabLayout() {
   if (!isLoggedIn) {
     return <Redirect href="/login" />;
   }
+  // Safety: if somehow the license/tenant was cleared while the employee is
+  // still logged in, every API call will 401. Route them back to the gate
+  // instead of leaving them on a half-broken tabs screen.
+  if (!tenantId) {
+    return <Redirect href="/license-gate" />;
+  }
 
   const showWarningUrl = "https://www.barmagly.tech/upgrade"; // Or a modal
 

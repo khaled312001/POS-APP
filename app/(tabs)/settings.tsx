@@ -626,11 +626,10 @@ export default function SettingsScreen() {
   const handleLogout = () => {
     const isWeb = Platform.OS === "web";
     const doLogout = () => {
-      // Clear license + tenant context so the app fully resets to the gate
-      import("@react-native-async-storage/async-storage").then(({ default: AS }) => {
-        AS.removeItem("barmagly_license_key").catch(() => {});
-        AS.removeItem("barmagly_tenant_id").catch(() => {});
-      }).catch(() => {});
+      // Employee logout: only clear the employee session. Do NOT clear the
+      // license or tenant — those are per-device and stay across employee
+      // switches. Clearing them caused every next API call to return 401
+      // because x-license-key was missing from AsyncStorage.
       logout();
     };
     const shiftMsg = t("shiftRequiredMsg") || "You must end your shift before logging out.";
