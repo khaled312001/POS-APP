@@ -3637,21 +3637,27 @@ async function test(){
 
   app.get("/api/delivery/orders/track/:token", async (req: Request, res: Response) => {
     try {
-      const order = await storage.getOnlineOrderByTrackingToken(req.params.token);
+      const order: any = await storage.getOnlineOrderByTrackingToken(req.params.token);
       if (!order) return res.status(404).json({ error: "Order not found" });
+      // Normalize items: MySQL JSON sometimes comes back as a raw string on
+      // this query path — the tracking page crashes on (order.items||[]).map
+      if (typeof order.items === "string") {
+        try { order.items = JSON.parse(order.items); } catch { order.items = []; }
+      }
+      if (!Array.isArray(order.items)) order.items = [];
       // Get driver info if assigned
       let driver = null;
-      if ((order as any).driverId) {
-        driver = await storage.getDriverLocation((order as any).driverId);
+      if (order.driverId) {
+        driver = await storage.getDriverLocation(order.driverId);
       }
       // Include store branding for the public tracking page
       let store: any = null;
       try {
-        if ((order as any).tenantId) {
-          const cfg = await storage.getLandingPageConfigByTenantId(Number((order as any).tenantId));
+        if (order.tenantId) {
+          const cfg = await storage.getLandingPageConfigByTenantId(Number(order.tenantId));
           if (cfg) {
             store = {
-              name: cfg.storeName || (cfg as any).name,
+              name: (cfg as any).storeName || (cfg as any).name,
               primaryColor: (cfg as any).primaryColor || "#FF5722",
               currency: (cfg as any).currency || process.env.DEFAULT_CURRENCY || "CHF",
               logo: (cfg as any).logo,
@@ -3784,19 +3790,44 @@ async function test(){
 
   app.post("/api/delivery/driver/location", async (req: Request, res: Response) => {
     try {
-      const { token, lat, lng, orderId } = req.body;
+      // Accept token from body (legacy) OR Authorization Bearer header (driver app)
+      const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+      const token = (req.body?.token || bearer || "").trim();
+      const { lat, lng, orderId } = req.body || {};
       if (!token || lat === undefined || lng === undefined) return res.status(400).json({ error: "token, lat, lng required" });
       const driver = await storage.getVehicleByAccessToken(token);
       if (!driver) return res.status(401).json({ error: "Invalid driver token" });
-      await storage.updateDriverLocation(driver.id, Number(lat), Number(lng), orderId ? Number(orderId) : undefined);
-      // Broadcast to POS clients
-      callerIdService.broadcastToTenant(driver.tenantId!, {
-        type: "driver_location_update",
-        vehicleId: driver.id,
-        lat: Number(lat),
-        lng: Number(lng),
-        orderId: orderId || null,
-      });
+      const oid = orderId ? Number(orderId) : undefined;
+
+      // Persist to vehicles + driver_locations history
+      await storage.updateDriverLocation(driver.id, Number(lat), Number(lng), oid);
+
+      // Mirror onto the active online_orders row so the tracking page sees
+      // an up-to-date marker even when it reloads (SSE may have dropped)
+      if (oid) {
+        try {
+          await storage.updateOnlineOrder(oid, {
+            driverLat: Number(lat).toFixed(7),
+            driverLng: Number(lng).toFixed(7),
+          } as any);
+        } catch (_) {}
+      }
+
+      // Broadcast to POS clients (tenant-scoped) — proper method
+      callerIdService.broadcastDriverLocation(driver.tenantId!, driver.id, Number(lat), Number(lng), oid);
+
+      // Push to customer tracking SSE stream (if any client is listening for this order)
+      if (oid) {
+        try {
+          const sseMap: Map<number, Set<any>> | undefined = (app as any)._orderSseClients;
+          const set = sseMap?.get(oid);
+          if (set && set.size) {
+            const msg = `data: ${JSON.stringify({ type: "driver_location_update", driverLat: Number(lat), driverLng: Number(lng), vehicleId: driver.id })}\n\n`;
+            set.forEach((c: any) => { try { c.write(msg); } catch {} });
+          }
+        } catch (_) {}
+      }
+
       res.json({ success: true });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });

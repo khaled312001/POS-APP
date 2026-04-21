@@ -294,10 +294,13 @@
         }
       }
 
-      // Items
+      // Items — defensive parse: MySQL sometimes returns JSON columns as strings
       const fmt = (v) => `${currency} ${parseFloat(v || 0).toFixed(2)}`;
       const itemsEl = document.getElementById("order-items");
-      itemsEl.innerHTML = (order.items || []).map(i => `
+      let _items = order.items;
+      if (typeof _items === "string") { try { _items = JSON.parse(_items); } catch { _items = []; } }
+      if (!Array.isArray(_items)) _items = [];
+      itemsEl.innerHTML = _items.map(i => `
         <div class="summary-row">
           <span>${i.productName || i.name || "—"} ×${i.quantity}</span>
           <span>${fmt(parseFloat(i.unitPrice || 0) * i.quantity)}</span>
