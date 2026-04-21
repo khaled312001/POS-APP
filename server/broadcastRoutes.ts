@@ -9,8 +9,8 @@
 import type { Express, Request, Response } from "express";
 import { randomBytes } from "crypto";
 import { db, pool } from "./db";
-import { broadcastOrders, broadcastOrderRecipients, onlineOrders, tenants } from "@shared/schema";
-import { eq, and, gt, sql, desc, inArray } from "drizzle-orm";
+import { broadcastOrders, broadcastOrderRecipients, onlineOrders, tenants, products, categories, landingPageConfig } from "@shared/schema";
+import { eq, and, gt, sql, desc, inArray, or, isNull } from "drizzle-orm";
 import { callerIdService } from "./callerIdService";
 import { pushService } from "./pushService";
 
@@ -98,6 +98,88 @@ export function registerBroadcastRoutes(app: Express) {
   // Trigger auto-migration in the background (non-blocking). Tables will be
   // ready by the time the first request lands.
   ensureBroadcastTables().catch(() => {});
+
+  // ── PUBLIC: Aggregated menu across all active restaurants ─────────────────
+  // Powers the /broadcast page so customers can pick concrete products rather
+  // than typing free-text item names.
+  app.get("/api/delivery/broadcast/menu", async (_req: Request, res: Response) => {
+    try {
+      // All active tenants that have a landing-page config (i.e. are listed publicly)
+      const activeTenants = await db.select({
+        id: tenants.id,
+        name: tenants.businessName,
+        logo: tenants.logo,
+        slug: landingPageConfig.slug,
+        primaryColor: landingPageConfig.primaryColor,
+      })
+      .from(tenants)
+      .innerJoin(landingPageConfig, eq(landingPageConfig.tenantId, tenants.id))
+      .where(and(
+        eq(tenants.status, "active"),
+        eq(landingPageConfig.enableOnlineOrdering, true),
+      ));
+
+      if (activeTenants.length === 0) return res.json({ restaurants: [], products: [], categories: [] });
+      const tenantIds = activeTenants.map((t) => t.id);
+
+      // Fetch products for those tenants (active, with price)
+      const allProducts = await db.select({
+        id: products.id,
+        tenantId: products.tenantId,
+        name: products.name,
+        nameAr: products.nameAr,
+        description: products.description,
+        price: products.price,
+        imageUrl: products.image,
+        categoryId: products.categoryId,
+        isActive: products.isActive,
+      })
+      .from(products)
+      .where(and(
+        inArray(products.tenantId, tenantIds),
+        or(eq(products.isActive, true), isNull(products.isActive)),
+      ))
+      .limit(1500);
+
+      const cats = await db.select({
+        id: categories.id,
+        tenantId: categories.tenantId,
+        name: categories.name,
+      })
+      .from(categories)
+      .where(inArray(categories.tenantId, tenantIds));
+      const catMap = new Map(cats.map((c) => [`${c.tenantId}:${c.id}`, c.name]));
+      const tMap = new Map(activeTenants.map((t) => [t.id, t]));
+
+      const payload = allProducts
+        .filter((p: any) => Number(p.price) > 0)
+        .map((p: any) => {
+          const t = tMap.get(p.tenantId);
+          return {
+            id: p.id,
+            tenantId: p.tenantId,
+            tenantName: t?.name || "",
+            tenantLogo: (t as any)?.logo || null,
+            tenantSlug: t?.slug || "",
+            tenantColor: t?.primaryColor || "#FF5722",
+            name: p.name,
+            nameAr: p.nameAr,
+            description: p.description,
+            price: Number(p.price),
+            imageUrl: p.imageUrl,
+            category: catMap.get(`${p.tenantId}:${p.categoryId}`) || "Other",
+          };
+        });
+      res.json({
+        restaurants: activeTenants,
+        products: payload,
+        categories: Array.from(new Set(payload.map((p) => p.category))).filter(Boolean).sort(),
+      });
+    } catch (e: any) {
+      console.error("[broadcast/menu] error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
 
   // ── PUBLIC: Customer creates a broadcast order ────────────────────────────
   app.post("/api/delivery/broadcast", async (req: Request, res: Response) => {

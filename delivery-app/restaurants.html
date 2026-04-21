@@ -221,6 +221,10 @@
     }
 
     /* ── Main Page Layout ────────────────────────────────────────────────── */
+    html, body { overflow-x: hidden; max-width: 100%; }
+    *, *::before, *::after { box-sizing: border-box; }
+    img, video { max-width: 100%; height: auto; }
+
     .je-page {
       max-width: var(--page-max, 1280px);
       margin: 0 auto;
@@ -229,7 +233,10 @@
       gap: var(--space-xl);
     }
     @media (min-width: 1024px) {
-      .je-page { grid-template-columns: 240px 1fr; align-items: start; }
+      .je-page { grid-template-columns: 240px minmax(0, 1fr); align-items: start; }
+    }
+    @media (max-width: 767px) {
+      .je-page { padding: 12px; gap: 16px; }
     }
 
     /* ── Sidebar Filters (Just Eat style) ────────────────────────────────── */
@@ -637,10 +644,13 @@
     .restaurants-grid {
       display: grid;
       gap: var(--space-md);
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
-    @media (max-width: 600px) {
-      .restaurants-grid { grid-template-columns: 1fr; }
+    @media (max-width: 1100px) {
+      .restaurants-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 640px) {
+      .restaurants-grid { grid-template-columns: 1fr; gap: 12px; }
     }
 
     .restaurant-card {
@@ -847,7 +857,13 @@
     /* ── Skeleton loading ────────────────────────────────────────────────── */
     .restaurants-skeleton {
       display: grid; gap: var(--space-md);
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    @media (max-width: 1100px) {
+      .restaurants-skeleton { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 640px) {
+      .restaurants-skeleton { grid-template-columns: 1fr; }
     }
     .skeleton-restaurant-card { background: var(--delivery-surface, #fff); border-radius: var(--radius-lg, 12px); border: 1px solid var(--delivery-border, #e0e0e0); overflow: hidden; }
     .skeleton-restaurant-card__cover { aspect-ratio: 16/9; background: linear-gradient(90deg, var(--delivery-border, #e0e0e0) 25%, var(--delivery-bg, #f5f5f5) 50%, var(--delivery-border, #e0e0e0) 75%); background-size: 400% 100%; animation: skeleton-wave 1.6s ease infinite; }

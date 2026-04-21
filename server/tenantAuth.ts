@@ -45,6 +45,7 @@ const PUBLIC_ROUTES = [
   "/api/delivery/sitemap.xml",     // Dynamic sitemap XML
   "/api/delivery/recommendations", // Public recommendations
   "/api/delivery/broadcast",        // Public broadcast order creation (drop-shipping)
+  "/api/delivery/broadcast/menu",   // Public aggregated menu for /broadcast page
   "/api/robots.txt",               // SEO robots.txt
   // ── HTML pages served under /api/ prefix (Hostinger CDN compatibility) ──
   "/api/order",                    // Delivery listing (no-slug) + /api/order/
