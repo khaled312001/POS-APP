@@ -742,10 +742,54 @@
     if (splashName) splashName.textContent = storeName;
 
     // ── Location label ───────────────────────────────────────────────────
+    var locLabel = document.getElementById("location-label");
     var savedLocation = localStorage.getItem("delivery_location_" + slug);
     if (savedLocation) {
-      var locLabel = document.getElementById("location-label");
       if (locLabel) locLabel.textContent = savedLocation;
+    } else if (locLabel && navigator.geolocation) {
+      // Auto-fetch GPS location on first visit and reverse-geocode it via
+      // OpenStreetMap Nominatim. We only attempt this once per slug — if
+      // the user denies or it fails we fall back silently to the manual
+      // "Select location" label.
+      locLabel.textContent = "Detecting location…";
+      navigator.geolocation.getCurrentPosition(
+        function (pos) {
+          var lat = pos.coords.latitude.toFixed(6);
+          var lng = pos.coords.longitude.toFixed(6);
+          // Save coordinates immediately for downstream use (zone match, etc)
+          try {
+            localStorage.setItem("delivery_location_lat_" + slug, lat);
+            localStorage.setItem("delivery_location_lng_" + slug, lng);
+          } catch (_) {}
+          // Reverse geocode → human-readable address
+          fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat + "&lon=" + lng + "&zoom=18&addressdetails=1", {
+            headers: { "Accept-Language": (cfg.language || "en") },
+          })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (j) {
+              if (!j) return;
+              var a = j.address || {};
+              var parts = [
+                a.road || a.pedestrian || a.footway,
+                a.house_number,
+                a.suburb || a.neighbourhood || a.village || a.town || a.city,
+              ].filter(Boolean);
+              var label = parts.length ? parts.join(" ") : (j.display_name || "").split(",").slice(0, 2).join(",");
+              if (label) {
+                locLabel.textContent = label;
+                try { localStorage.setItem("delivery_location_" + slug, label); } catch (_) {}
+              } else {
+                locLabel.textContent = "Select location";
+              }
+            })
+            .catch(function () { locLabel.textContent = "Select location"; });
+        },
+        function (err) {
+          // Permission denied or unavailable — keep label as-is
+          locLabel.textContent = err && err.code === 1 ? "Set delivery location" : "Select location";
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5 * 60 * 1000 }
+      );
     }
 
     // ── Init cart & router ───────────────────────────────────────────────

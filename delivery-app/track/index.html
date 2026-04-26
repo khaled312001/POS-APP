@@ -272,26 +272,62 @@
 
       updateStatus(order.status);
 
-      // Map
-      const hasDriverCoords = order.driverLat && order.driverLng;
-      const hasCustomerCoords = order.customerLat && order.customerLng;
-      if (hasDriverCoords || hasCustomerCoords) {
+      // Map: prefer DB coords, fall back to geocoding the customer address.
+      // This makes the map work even for broadcast orders that didn't capture
+      // GPS at checkout — we resolve the typed address into lat/lng on demand.
+      function showMap(custLat, custLng, drvLat, drvLng) {
         document.getElementById("map-placeholder").style.display = "none";
         const mapEl = document.getElementById("map");
         mapEl.style.display = "block";
-        const lat = hasCustomerCoords ? Number(order.customerLat) : Number(order.driverLat);
-        const lng = hasCustomerCoords ? Number(order.customerLng) : Number(order.driverLng);
-        map = L.map("map", { zoomControl: false }).setView([lat, lng], 14);
+        const lat = custLat != null ? Number(custLat) : Number(drvLat);
+        const lng = custLng != null ? Number(custLng) : Number(drvLng);
+        if (!isFinite(lat) || !isFinite(lng)) return;
+        map = L.map("map", { zoomControl: true }).setView([lat, lng], 14);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
-        if (hasCustomerCoords) {
-          customerMarker = L.marker([Number(order.customerLat), Number(order.customerLng)])
-            .addTo(map).bindPopup(IS_AR ? "موقعك" : "Your location");
+        if (custLat != null && custLng != null) {
+          customerMarker = L.marker([Number(custLat), Number(custLng)], {
+            icon: L.divIcon({
+              html: '<div style="background:#2FD3C6;color:#fff;border:3px solid #fff;border-radius:50%;width:28px;height:28px;display:grid;place-items:center;font-size:14px;box-shadow:0 4px 12px rgba(47,211,198,.5)">📍</div>',
+              className: "", iconSize: [28, 28], iconAnchor: [14, 14],
+            }),
+          }).addTo(map).bindPopup(IS_AR ? "موقع التسليم" : "Delivery location");
         }
-        if (hasDriverCoords) {
-          driverMarker = L.marker([Number(order.driverLat), Number(order.driverLng)], {
-            icon: L.divIcon({ html: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF5722" stroke-width="2"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>', className: "", iconSize: [24, 24] }),
+        if (drvLat != null && drvLng != null) {
+          driverMarker = L.marker([Number(drvLat), Number(drvLng)], {
+            icon: L.divIcon({
+              html: '<div style="background:#FF5722;color:#fff;border:3px solid #fff;border-radius:50%;width:32px;height:32px;display:grid;place-items:center;box-shadow:0 4px 14px rgba(255,87,34,.5)"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg></div>',
+              className: "", iconSize: [32, 32], iconAnchor: [16, 16],
+            }),
           }).addTo(map);
         }
+        // If both customer & driver: fit the bounds and draw a path
+        if (customerMarker && driverMarker) {
+          const bounds = L.latLngBounds([customerMarker.getLatLng(), driverMarker.getLatLng()]);
+          map.fitBounds(bounds.pad(0.4));
+          L.polyline([driverMarker.getLatLng(), customerMarker.getLatLng()], {
+            color: "#FF5722", weight: 3, opacity: 0.55, dashArray: "6,8",
+          }).addTo(map);
+        }
+      }
+
+      const hasDriverCoords = order.driverLat && order.driverLng;
+      const hasCustomerCoords = order.customerLat && order.customerLng;
+      if (hasDriverCoords || hasCustomerCoords) {
+        showMap(order.customerLat, order.customerLng, order.driverLat, order.driverLng);
+      } else if (order.customerAddress) {
+        // Last-ditch: try to geocode the typed address client-side via Nominatim
+        try {
+          fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(order.customerAddress), {
+            headers: { "Accept-Language": (currentStore?.language || "en") },
+          })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (j) {
+              if (!j || !j.length) return;
+              const lat = parseFloat(j[0].lat), lng = parseFloat(j[0].lon);
+              if (isFinite(lat) && isFinite(lng)) showMap(lat, lng, null, null);
+            })
+            .catch(function () {});
+        } catch (_) {}
       }
 
       // Items — defensive parse: MySQL sometimes returns JSON columns as strings
