@@ -954,6 +954,23 @@
       display: inline-block;
       flex-shrink: 0
     }
+
+    /* ── Mobile-friendly defaults (added for tablet/phone responsiveness) ── */
+    html, body { overflow-x: hidden; max-width: 100%; }
+    img, video, svg { max-width: 100%; height: auto; }
+    /* Make tables scrollable horizontally on small screens instead of overflowing */
+    table { max-width: 100%; }
+    .panel, .card, .body, .content { max-width: 100%; }
+    @media (max-width: 768px) {
+      table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .fr-row { grid-template-columns: 1fr !important; }
+      input, select, textarea { font-size: 16px; }  /* prevents iOS zoom-in */
+      button, .btn, [role="button"] { min-height: 44px; }
+    }
+    @media (max-width: 600px) {
+      body { font-size: 14px; }
+      .panel, .card { padding: 12px !important; }
+    }
   </style>
 </head>
 

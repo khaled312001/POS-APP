@@ -124,6 +124,8 @@ html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 body {
@@ -134,8 +136,20 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   overflow-x: hidden;
+  max-width: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Mobile-first responsive defaults ─────────────────────────────────── */
+img, video, svg, picture, iframe { max-width: 100%; height: auto; }
+input, select, textarea, button { font: inherit; max-width: 100%; }
+table { width: 100%; max-width: 100%; }
+pre, code { white-space: pre-wrap; word-wrap: break-word; }
+/* Tap targets ≥ 44px on phones */
+@media (max-width: 640px) {
+  button, .btn, [role="button"], input[type="submit"], input[type="button"] { min-height: 44px; }
+  input, select, textarea { font-size: 16px; /* prevents iOS auto-zoom */ }
 }
 
 body[dir="rtl"] {

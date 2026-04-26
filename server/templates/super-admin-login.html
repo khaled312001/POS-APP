@@ -23,12 +23,15 @@
             --border: rgba(47, 211, 198, 0.15);
         }
 
-        * {
+        *, *::before, *::after {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
             font-family: 'Inter', sans-serif;
         }
+
+        html, body { overflow-x: hidden; max-width: 100%; }
+        img, svg { max-width: 100%; height: auto; }
 
         body {
             background-color: var(--bg-dark);
@@ -38,6 +41,7 @@
             align-items: center;
             justify-content: center;
             position: relative;
+            padding: 16px;
             overflow: hidden;
         }
 
