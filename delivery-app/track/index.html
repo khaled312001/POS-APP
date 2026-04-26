@@ -44,8 +44,10 @@
   <!-- Main content -->
   <div id="track-content" class="hidden">
     <!-- Map or placeholder -->
-    <div id="map-placeholder"><span><i data-lucide="map" class="icon-2xl"></i></span></div>
-    <div id="map" style="display:none"></div>
+    <div class="map-wrap">
+      <div id="map-placeholder"><span><i data-lucide="map" class="icon-2xl"></i></span></div>
+      <div id="map" style="display:none"></div>
+    </div>
 
     <div class="track-body">
       <!-- Current status -->
@@ -93,9 +95,9 @@
     </div>
 
     <div class="track-footer">
-      <span id="footer-text">Live tracking updates every 10s</span>
-      <span> · </span>
-      <a id="support-link" href="#" id="support-link">Contact Support</a>
+      <span class="track-footer__live"><span class="live-dot"></span><span id="footer-text">Live · updates every 10s</span></span>
+      <span>·</span>
+      <a id="support-link" href="#">Contact Support</a>
     </div>
   </div>
 
@@ -239,12 +241,14 @@
       if (!store) return;
       currency = store.currency || currency;
 
-      // Primary color
+      // Primary color — used for the logo gradient + accents only.
+      // The header itself stays dark glass for the modern look; we tint the
+      // accent CSS variables so the rest of the page picks up the brand.
       const primary = store.primaryColor || "#FF5722";
       document.documentElement.style.setProperty("--primary", primary);
       document.documentElement.style.setProperty("--delivery-primary", primary);
+      document.documentElement.style.setProperty("--accent", primary);
       document.getElementById("theme-meta").content = primary;
-      document.getElementById("track-header").style.background = primary;
 
       // Logo / name
       if (store.logo) {
@@ -370,17 +374,32 @@
       const label = t.currentStatuses[status] || status;
 
       document.documentElement.style.setProperty("--status-color", color);
-      document.getElementById("status-icon").innerHTML = icon;
+      const statusIconEl = document.getElementById("status-icon");
+      statusIconEl.innerHTML = icon;
+      // "live" pulse ring while the order is actively in motion
+      const isLive = (status === "on_way" || status === "preparing" || status === "ready");
+      statusIconEl.classList.toggle("live", isLive);
       document.getElementById("status-text").textContent = label;
 
-      // ETA for on_way
+      // ETA / sublabel — include the live indicator dot for active states
+      const etaEl = document.getElementById("eta-text");
+      let sub = "";
       if (status === "on_way") {
-        document.getElementById("eta-text").textContent = t.minutes(currentOrder?.maxDeliveryTime || 30);
+        sub = t.minutes(currentOrder?.maxDeliveryTime || 30);
+      } else if (status === "preparing") {
+        sub = (IS_AR ? "المطعم يحضر طلبك الآن" : "Restaurant is preparing your order");
+      } else if (status === "ready") {
+        sub = (IS_AR ? "جاهز — في انتظار السائق" : "Ready — waiting for driver");
+      } else if (status === "accepted") {
+        sub = (IS_AR ? "تم تأكيد طلبك" : "Order confirmed");
       } else if (status === "delivered") {
-        document.getElementById("eta-text").textContent = IS_AR ? "تم التوصيل بنجاح" : "Successfully delivered";
-      } else {
-        document.getElementById("eta-text").textContent = "";
+        sub = (IS_AR ? "تم التوصيل بنجاح" : "Successfully delivered");
+      } else if (status === "pending") {
+        sub = (IS_AR ? "في انتظار تأكيد المطعم" : "Awaiting restaurant confirmation");
       }
+      etaEl.innerHTML = isLive
+        ? '<span class="live-dot"></span>' + sub
+        : sub;
 
       // Cancelled banner
       const cancelledBanner = document.getElementById("cancelled-banner");
