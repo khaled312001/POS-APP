@@ -231,6 +231,9 @@
       padding: var(--space-lg);
       display: grid;
       gap: var(--space-xl);
+      /* Mobile (default): 1 column. minmax(0,1fr) prevents grid items from
+         expanding to fit min-content of inner flex/scroll children. */
+      grid-template-columns: minmax(0, 1fr);
     }
     @media (min-width: 1024px) {
       .je-page { grid-template-columns: 240px minmax(0, 1fr); align-items: start; }
@@ -238,6 +241,10 @@
     @media (max-width: 767px) {
       .je-page { padding: 12px; gap: 16px; }
     }
+    /* Grid/flex children that contain horizontal-scroll inner boxes must not
+       expand to their min-content size — otherwise the whole page widens. */
+    .je-page > *, .je-main > * { min-width: 0; }
+    .je-main { min-width: 0; }
 
     /* ── Sidebar Filters (Just Eat style) ────────────────────────────────── */
     .je-sidebar {
@@ -650,8 +657,9 @@
       .restaurants-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 640px) {
-      .restaurants-grid { grid-template-columns: 1fr; gap: 12px; }
+      .restaurants-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
     }
+    .restaurants-grid > * { min-width: 0; max-width: 100%; }
 
     .restaurant-card {
       background: var(--delivery-surface, #fff);

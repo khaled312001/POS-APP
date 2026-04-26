@@ -30,7 +30,8 @@
             font-family: 'Inter', sans-serif;
         }
 
-        html, body { overflow-x: hidden; max-width: 100%; }
+        html, body { overflow-x: clip; max-width: 100%; }
+        @supports not (overflow-x: clip) { html, body { overflow-x: hidden; } }
         img, svg { max-width: 100%; height: auto; }
 
         body {
@@ -45,25 +46,26 @@
             overflow: hidden;
         }
 
-        /* Abstract Background Elements */
+        /* Abstract Background Elements — sized so they never push the
+           document width past the viewport on small screens. */
         .bg-glow {
             position: absolute;
-            width: 600px;
-            height: 600px;
+            width: min(600px, 90vw);
+            height: min(600px, 90vw);
             background: radial-gradient(circle, rgba(47, 211, 198, 0.15) 0%, rgba(10, 14, 23, 0) 70%);
-            top: -200px;
-            left: -200px;
+            top: clamp(-300px, -25vw, -100px);
+            left: clamp(-300px, -20vw, -50px);
             z-index: 0;
             pointer-events: none;
         }
 
         .bg-glow-2 {
             position: absolute;
-            width: 800px;
-            height: 800px;
+            width: min(800px, 95vw);
+            height: min(800px, 95vw);
             background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, rgba(10, 14, 23, 0) 70%);
-            bottom: -300px;
-            right: -200px;
+            bottom: clamp(-300px, -25vw, -120px);
+            right: clamp(-300px, -20vw, -50px);
             z-index: 0;
             pointer-events: none;
         }
@@ -266,8 +268,10 @@
 </head>
 
 <body>
-    <div class="bg-glow"></div>
-    <div class="bg-glow-2"></div>
+    <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0">
+      <div class="bg-glow"></div>
+      <div class="bg-glow-2"></div>
+    </div>
 
     <div class="login-container">
         <div class="logo-area">
