@@ -155,7 +155,10 @@
   .btn--ghost:hover:not(:disabled) { background: var(--surface); }
 
   /* ─── Intro splash ────────────────────────────────────────────────── */
-  #page-intro { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center; background:
+  /* IMPORTANT: scope all #page-intro layout rules under .active so the
+     ID-level styles never override the .page { display: none } default
+     (otherwise the intro stays painted over every other route). */
+  #page-intro.active { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center; background:
       radial-gradient(800px 500px at 50% 0%, rgba(255,87,34,0.18), transparent 60%),
       radial-gradient(700px 600px at 50% 100%, rgba(47,211,198,0.12), transparent 60%),
       var(--bg);
@@ -222,6 +225,47 @@
   .step__label { font-weight: 600; color: var(--text-dim); }
   .step.done .step__label, .step.active .step__label { color: var(--text); }
   .step__time { font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; }
+
+  /* ─── Modal dialog (replaces native alert/confirm/prompt) ───────────── */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+  }
+  .modal-backdrop.open { opacity: 1; pointer-events: auto; }
+  .modal {
+    background: var(--bg-2); border: 1px solid var(--border-2);
+    border-radius: var(--r-xl); padding: 22px;
+    width: 100%; max-width: 420px;
+    max-height: calc(100dvh - 40px); overflow-y: auto;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    transform: translateY(20px) scale(0.95); opacity: 0;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .modal-backdrop.open .modal { transform: none; opacity: 1; }
+  .modal__icon { width: 52px; height: 52px; border-radius: 16px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); display: grid; place-items: center; font-size: 24px; margin: 0 auto 14px; box-shadow: 0 12px 28px rgba(255,87,34,0.4); }
+  .modal__icon.warn { background: linear-gradient(135deg, var(--warn), var(--accent)); }
+  .modal__icon.danger { background: linear-gradient(135deg, var(--danger), #dc2626); box-shadow: 0 12px 28px rgba(239,68,68,0.4); }
+  .modal__title { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.3px; margin-bottom: 6px; text-align: center; }
+  .modal__msg { color: var(--text-2); font-size: 0.88rem; text-align: center; line-height: 1.5; margin-bottom: 16px; }
+  .modal__fields { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+  .modal__actions { display: flex; gap: 10px; }
+  /* Buttons must shrink if needed and never overflow the modal */
+  .modal__actions .btn {
+    padding: 12px 14px; font-size: 0.9rem; box-shadow: none;
+    min-width: 0; max-width: 100%;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .modal__actions .btn--ghost { flex: 1 1 auto; }
+  .modal__actions .btn:not(.btn--ghost) { flex: 1 1 auto; }
+  /* On very narrow phones, stack actions vertically — never let them clip */
+  @media (max-width: 420px) {
+    .modal { padding: 20px; }
+    .modal__actions { flex-direction: column-reverse; gap: 8px; }
+    .modal__actions .btn { width: 100%; }
+  }
 
   /* ─── Toast ────────────────────────────────────────────────────────── */
   .toast-wrap { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 6px; pointer-events: none; max-width: 90vw; }
@@ -466,6 +510,20 @@
 
 <!-- Toasts -->
 <div class="toast-wrap" id="toasts"></div>
+
+<!-- Modal dialog (alert/confirm/prompt/form) -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal__icon" id="modal-icon">⚡</div>
+    <h3 class="modal__title" id="modal-title">Title</h3>
+    <p class="modal__msg" id="modal-msg"></p>
+    <div class="modal__fields" id="modal-fields"></div>
+    <div class="modal__actions">
+      <button class="btn btn--ghost" id="modal-cancel" type="button">Cancel</button>
+      <button class="btn" id="modal-ok" type="button">OK</button>
+    </div>
+  </div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/customer/app.js"></script>

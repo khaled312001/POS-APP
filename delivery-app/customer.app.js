@@ -31,6 +31,132 @@
   function $(id) { return document.getElementById(id); }
   function $$(sel) { return document.querySelectorAll(sel); }
 
+  // ─── Dialog (replaces native alert/confirm/prompt) ─────────────────
+  // Returns a Promise that resolves with:
+  //   alert  → true on OK
+  //   confirm → true on OK, false on Cancel
+  //   prompt → string value on OK, null on Cancel
+  //   form   → object {field: value} on OK, null on Cancel
+  var dialog = (function () {
+    var bd = $("modal-backdrop");
+    var iconEl = $("modal-icon");
+    var titleEl = $("modal-title");
+    var msgEl = $("modal-msg");
+    var fieldsEl = $("modal-fields");
+    var okBtn = $("modal-ok");
+    var cancelBtn = $("modal-cancel");
+    var current = null;
+    function close(result) {
+      if (!current) return;
+      bd.classList.remove("open");
+      var resolve = current.resolve;
+      current = null;
+      // Allow CSS exit anim
+      setTimeout(function () { resolve(result); }, 220);
+    }
+    okBtn.addEventListener("click", function () {
+      if (!current) return;
+      if (current.kind === "alert") return close(true);
+      if (current.kind === "confirm") return close(true);
+      if (current.kind === "prompt") {
+        var inp = fieldsEl.querySelector("input");
+        var v = (inp && inp.value || "").trim();
+        if (current.required && !v) { inp.focus(); inp.style.borderColor = "var(--danger)"; return; }
+        return close(v);
+      }
+      if (current.kind === "form") {
+        var out = {};
+        var ok = true;
+        current.fields.forEach(function (f) {
+          var el = fieldsEl.querySelector('[data-fkey="' + f.key + '"]');
+          var v = (el && el.value || "").trim();
+          if (f.required && !v) { ok = false; el.focus(); el.style.borderColor = "var(--danger)"; }
+          out[f.key] = v;
+        });
+        if (!ok) return;
+        return close(out);
+      }
+    });
+    cancelBtn.addEventListener("click", function () {
+      if (!current) return;
+      if (current.kind === "alert") return close(true); // alerts only have OK
+      if (current.kind === "confirm") return close(false);
+      return close(null);
+    });
+    bd.addEventListener("click", function (e) {
+      if (e.target === bd && current && current.kind !== "alert") {
+        if (current.kind === "confirm") close(false);
+        else close(null);
+      }
+    });
+    document.addEventListener("keydown", function (e) {
+      if (!current) return;
+      if (e.key === "Escape" && current.kind !== "alert") {
+        e.preventDefault();
+        if (current.kind === "confirm") close(false);
+        else close(null);
+      } else if (e.key === "Enter" && (current.kind === "prompt" || current.kind === "alert")) {
+        e.preventDefault();
+        okBtn.click();
+      }
+    });
+
+    function open(opts) {
+      return new Promise(function (resolve) {
+        current = { kind: opts.kind, fields: opts.fields, required: opts.required, resolve: resolve };
+        iconEl.className = "modal__icon" + (opts.iconKind ? " " + opts.iconKind : "");
+        iconEl.textContent = opts.icon || "✨";
+        titleEl.textContent = opts.title || "";
+        msgEl.textContent = opts.msg || "";
+        msgEl.style.display = opts.msg ? "" : "none";
+        fieldsEl.innerHTML = "";
+        if (opts.kind === "prompt") {
+          var inp = document.createElement("input");
+          inp.className = "inp"; inp.type = opts.inputType || "text";
+          inp.placeholder = opts.placeholder || "";
+          inp.value = opts.defaultValue || "";
+          fieldsEl.appendChild(inp);
+          setTimeout(function () { inp.focus(); inp.select(); }, 30);
+        } else if (opts.kind === "form") {
+          (opts.fields || []).forEach(function (f) {
+            var label = document.createElement("label");
+            label.style.cssText = "font-size:0.72rem;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:-4px;display:block;";
+            label.textContent = f.label + (f.required ? " *" : "");
+            fieldsEl.appendChild(label);
+            var el;
+            if (f.type === "textarea") {
+              el = document.createElement("textarea"); el.className = "txt"; el.rows = 3;
+            } else {
+              el = document.createElement("input"); el.className = "inp"; el.type = f.type || "text";
+            }
+            el.setAttribute("data-fkey", f.key);
+            el.placeholder = f.placeholder || "";
+            el.value = f.defaultValue || "";
+            fieldsEl.appendChild(el);
+          });
+          setTimeout(function () { var first = fieldsEl.querySelector("input,textarea"); if (first) first.focus(); }, 30);
+        }
+        // Buttons
+        if (opts.kind === "alert") {
+          cancelBtn.style.display = "none";
+          okBtn.textContent = opts.okLabel || "OK";
+        } else {
+          cancelBtn.style.display = "";
+          cancelBtn.textContent = opts.cancelLabel || "Cancel";
+          okBtn.textContent = opts.okLabel || "Confirm";
+        }
+        bd.classList.add("open");
+      });
+    }
+
+    return {
+      alert:   function (title, msg, opts) { return open(Object.assign({ kind: "alert", icon: "ℹ️", title: title, msg: msg }, opts || {})); },
+      confirm: function (title, msg, opts) { return open(Object.assign({ kind: "confirm", icon: "❓", title: title, msg: msg }, opts || {})); },
+      prompt:  function (title, opts) { return open(Object.assign({ kind: "prompt", icon: "✏️", title: title }, opts || {})); },
+      form:    function (title, fields, opts) { return open(Object.assign({ kind: "form", icon: "📝", title: title, fields: fields }, opts || {})); },
+    };
+  })();
+
   // ─── Toast ──────────────────────────────────────────────────────────
   function toast(msg, kind) {
     var el = document.createElement("div");
@@ -156,23 +282,35 @@
   }
 
   function handleGuest() {
-    var name = prompt("What's your name? (we'll greet you with this)") || "Guest";
-    api("POST", "/api/delivery/auth/guest", { name: name, tenantId: 24 })
-      .then(function (data) {
-        state.auth = { token: data.token, customer: data.customer, isGuest: true };
-        save(); toast("Welcome, " + name, "success");
-        navigate("home");
-      })
-      .catch(function (err) { toast(err.message || "Guest login failed", "error"); });
+    dialog.prompt("Welcome!", {
+      msg: "What's your name? We'll greet you with it.",
+      placeholder: "Your name",
+      icon: "👋",
+      okLabel: "Continue",
+      required: true,
+    }).then(function (name) {
+      if (name === null) return; // cancelled
+      api("POST", "/api/delivery/auth/guest", { name: name, tenantId: 24 })
+        .then(function (data) {
+          state.auth = { token: data.token, customer: data.customer, isGuest: true };
+          save(); toast("Welcome, " + name, "success");
+          navigate("home");
+        })
+        .catch(function (err) { toast(err.message || "Guest login failed", "error"); });
+    });
   }
 
   function logout() {
-    if (!confirm("Log out?")) return;
-    api("POST", "/api/delivery/auth/logout", {}).catch(function () {});
-    localStorage.removeItem("bc_auth");
-    state.auth = null;
-    state.cart = []; save();
-    navigate("intro");
+    dialog.confirm("Log out?", "You'll need to sign in again to see your orders.", {
+      icon: "👋", iconKind: "warn", okLabel: "Log out", cancelLabel: "Stay",
+    }).then(function (ok) {
+      if (!ok) return;
+      api("POST", "/api/delivery/auth/logout", {}).catch(function () {});
+      localStorage.removeItem("bc_auth");
+      state.auth = null;
+      state.cart = []; save();
+      navigate("intro");
+    });
   }
 
   // ─── Pages ──────────────────────────────────────────────────────────
@@ -341,12 +479,22 @@
 
   // ─── Cart ───────────────────────────────────────────────────────────
   function addToCart(item) {
-    // If switching restaurants in non-broadcast mode, ask
+    // If switching restaurants in non-broadcast mode, ask before clearing cart
     var existingMode = state.cartMode;
     var newMode = state.currentRoute === "broadcast" ? "broadcast" : ("tenant:" + item.tenantId);
     if (state.cart.length > 0 && existingMode !== newMode && existingMode !== "broadcast") {
-      if (!confirm("Your cart has items from another restaurant. Replace?")) return;
-      state.cart = [];
+      dialog.confirm("Replace cart?", "Your cart has items from another restaurant. Adding this dish will clear them.", {
+        icon: "🛒", iconKind: "warn", okLabel: "Replace", cancelLabel: "Keep cart",
+      }).then(function (ok) {
+        if (!ok) return;
+        state.cart = [];
+        state.cartMode = newMode;
+        state.cart.push(item);
+        save(); refreshCart(); beep(700, 0.08);
+        if (state.currentRoute === "menu" && state.tenantMenu) renderMenu(state.tenantMenu.slug);
+        if (state.currentRoute === "broadcast") renderBroadcast();
+      });
+      return;
     }
     state.cartMode = newMode;
     var ex = state.cart.find(function (it) { return it.productId === item.productId && it.tenantId === item.tenantId; });
@@ -641,38 +789,51 @@
   // ─── Checkout ──────────────────────────────────────────────────────
   function startCheckout() {
     if (state.cart.length === 0) return;
-    var name = (state.auth.customer || {}).name || prompt("Your name?");
-    var phone = (state.auth.customer || {}).phone || prompt("Your phone? (+41…)");
-    var address = prompt("Delivery address?");
-    if (!name || !phone || !address) return toast("Name, phone, and address are required", "error");
-    var total = state.cart.reduce(function (s, it) { return s + it.quantity * Number(it.estimatedPrice || 0); }, 0);
+    var c = state.auth.customer || {};
+    var fields = [];
+    if (!c.name) fields.push({ key: "name", label: "Your name", placeholder: "John Doe", required: true });
+    if (!c.phone) fields.push({ key: "phone", label: "Phone", type: "tel", placeholder: "+41 79 …", required: true });
+    fields.push({ key: "address", label: "Delivery address", placeholder: "Street, number, city", required: true });
+    fields.push({ key: "notes", label: "Notes (optional)", type: "textarea", placeholder: "e.g. extra spicy, leave at door" });
 
-    if (state.cartMode === "broadcast") {
-      // Broadcast order — any restaurant can accept
-      api("POST", "/api/delivery/broadcast", {
-        customerName: name, customerPhone: phone, customerAddress: address,
-        items: state.cart.map(function (it) { return { productId: it.productId, name: it.name, quantity: it.quantity, estimatedPrice: it.estimatedPrice, tenantName: it.tenantName }; }),
-        estimatedTotal: total, paymentMethod: "cash",
-      }).then(function (data) {
-        state.cart = []; save(); refreshCart(); closeCart();
-        toast("Order broadcast! Waiting for a restaurant…", "success");
-        // Poll for claim
-        pollBroadcast(data.token);
-      }).catch(function (err) { toast(err.message || "Failed to place order", "error"); });
-    } else {
-      // Tenant-specific order
-      var tid = Number(state.cartMode.split(":")[1]);
-      api("POST", "/api/delivery/orders", {
-        tenantId: tid, customerName: name, customerPhone: phone, customerAddress: address,
-        items: state.cart.map(function (it) { return { productId: it.productId, name: it.name, quantity: it.quantity, unitPrice: it.estimatedPrice, total: it.quantity * it.estimatedPrice }; }),
-        subtotal: total, totalAmount: total, paymentMethod: "cash", orderType: "delivery",
-      }).then(function (data) {
-        state.cart = []; save(); refreshCart(); closeCart();
-        toast("Order placed!", "success");
-        if (data && data.trackingToken) navigate("track", [data.trackingToken]);
-        else navigate("orders");
-      }).catch(function (err) { toast(err.message || "Failed to place order", "error"); });
-    }
+    dialog.form("Checkout", fields, {
+      icon: "📦", iconKind: "", okLabel: "Place order", cancelLabel: "Cancel",
+      msg: "Enter your delivery details to complete the order.",
+    }).then(function (data) {
+      if (!data) return; // cancelled
+      var name = c.name || data.name;
+      var phone = c.phone || data.phone;
+      var address = data.address;
+      var notes = data.notes || null;
+      if (!name || !phone || !address) {
+        toast("Name, phone, and address are required", "error"); return;
+      }
+      var total = state.cart.reduce(function (s, it) { return s + it.quantity * Number(it.estimatedPrice || 0); }, 0);
+
+      if (state.cartMode === "broadcast") {
+        api("POST", "/api/delivery/broadcast", {
+          customerName: name, customerPhone: phone, customerAddress: address,
+          items: state.cart.map(function (it) { return { productId: it.productId, name: it.name, quantity: it.quantity, estimatedPrice: it.estimatedPrice, tenantName: it.tenantName }; }),
+          notes: notes, estimatedTotal: total, paymentMethod: "cash",
+        }).then(function (data) {
+          state.cart = []; save(); refreshCart(); closeCart();
+          toast("Order broadcast! Waiting for a restaurant…", "success");
+          pollBroadcast(data.token);
+        }).catch(function (err) { toast(err.message || "Failed to place order", "error"); });
+      } else {
+        var tid = Number(state.cartMode.split(":")[1]);
+        api("POST", "/api/delivery/orders", {
+          tenantId: tid, customerName: name, customerPhone: phone, customerAddress: address,
+          items: state.cart.map(function (it) { return { productId: it.productId, name: it.name, quantity: it.quantity, unitPrice: it.estimatedPrice, total: it.quantity * it.estimatedPrice }; }),
+          notes: notes, subtotal: total, totalAmount: total, paymentMethod: "cash", orderType: "delivery",
+        }).then(function (data) {
+          state.cart = []; save(); refreshCart(); closeCart();
+          toast("Order placed!", "success");
+          if (data && data.trackingToken) navigate("track", [data.trackingToken]);
+          else navigate("orders");
+        }).catch(function (err) { toast(err.message || "Failed to place order", "error"); });
+      }
+    });
   }
 
   function pollBroadcast(token) {
