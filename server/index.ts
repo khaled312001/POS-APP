@@ -406,8 +406,15 @@ function configureExpoAndLanding(app: express.Application) {
       }
     }
 
-    // /order or /api/order → shows landing page
+    // /order or /api/order → redirect to the unified Customer SPA. The
+    // legacy delivery-landing splash here is now superseded by /customer/.
     if (req.path === "/order" || req.path === "/order/" || req.path === "/api/order" || req.path === "/api/order/") {
+      return res.redirect(302, "/customer/");
+    }
+    // Keep the legacy block alive only as a no-op so subsequent code (which
+    // references the same path predicate later) still type-checks. The above
+    // `return` short-circuits before we reach it.
+    if (false && (req.path === "/order" || req.path === "/order/" || req.path === "/api/order" || req.path === "/api/order/")) {
       try {
         // Prefer landing page if available, fallback to restaurants listing
         const landingPath = path.resolve(process.cwd(), "delivery-app", "landing.html");

@@ -601,11 +601,16 @@ export const storage = {
     return shift;
   },
   async closeShift(id: number, data: { closingCash?: string; totalSales?: string; totalTransactions?: number }) {
-    const [shift] = await db.update(shifts).set({
+    // MySQL drizzle returns an OkPacket (not the row) from update().set().where()
+    // — destructuring it as `shift` left every downstream `shift.employeeId` /
+    // `shift.id` undefined and the route blew up with 500. Run UPDATE then
+    // SELECT the row.
+    await db.update(shifts).set({
       ...data,
       endTime: new Date(),
       status: "closed",
     }).where(eq(shifts.id, id));
+    const [shift] = await db.select().from(shifts).where(eq(shifts.id, id)).limit(1);
     return shift;
   },
   async getEmployeeAttendance(employeeId: number) {
