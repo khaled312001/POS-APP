@@ -60,7 +60,7 @@ const AnimatedProductImage = ({ uri }: { uri: string }) => {
 export default function POSScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { employee, isCashier, canManage, login } = useAuth();
+  const { employee, isCashier, canManage, login, logout } = useAuth();
   const { tenant } = useLicense();
   const qc = useQueryClient();
   const cart = useCart();
@@ -3379,6 +3379,46 @@ export default function POSScreen() {
                 {allEmployees.filter((e: any) => e.id !== employee?.id).length === 0 && (
                   <Text style={{ color: Colors.textMuted, fontSize: 14, textAlign: "center", marginTop: 20 }}>{t("noEmployees" as any)}</Text>
                 )}
+
+                {/* Log out button — full sign-out instead of switch */}
+                <Pressable
+                  onPress={() => {
+                    const doLogout = () => {
+                      setShowAccountSwitcher(false);
+                      logout();
+                    };
+                    if (myActiveShift) {
+                      const msg = language === "ar"
+                        ? "لديك وردية نشطة. أنهِها أولاً ثم سجّل الخروج."
+                        : language === "de"
+                          ? "Du hast eine aktive Schicht. Beende sie zuerst, bevor du dich abmeldest."
+                          : "You have an active shift. End it first, then log out.";
+                      if (Platform.OS === "web") { window.alert(msg); } else { Alert.alert("", msg); }
+                      return;
+                    }
+                    const confirmMsg = language === "ar" ? "تسجيل الخروج؟" : language === "de" ? "Abmelden?" : "Log out?";
+                    if (Platform.OS === "web") {
+                      if (window.confirm(confirmMsg)) doLogout();
+                    } else {
+                      Alert.alert(confirmMsg, "", [
+                        { text: language === "ar" ? "إلغاء" : language === "de" ? "Abbrechen" : "Cancel", style: "cancel" },
+                        { text: language === "ar" ? "تسجيل الخروج" : language === "de" ? "Abmelden" : "Log out", style: "destructive", onPress: doLogout },
+                      ]);
+                    }
+                  }}
+                  style={{
+                    marginTop: 16, marginBottom: 8,
+                    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                    padding: 14, borderRadius: 12,
+                    backgroundColor: Colors.danger + "15",
+                    borderWidth: 1, borderColor: Colors.danger + "40",
+                  }}
+                >
+                  <Ionicons name="log-out-outline" size={20} color={Colors.danger} />
+                  <Text style={{ color: Colors.danger, fontSize: 15, fontWeight: "700" }}>
+                    {language === "ar" ? "تسجيل الخروج" : language === "de" ? "Abmelden" : "Log out"}
+                  </Text>
+                </Pressable>
               </ScrollView>
             ) : (
               <View style={styles.switchPinSection}>
