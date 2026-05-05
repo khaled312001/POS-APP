@@ -1,39 +1,52 @@
 {
-    "cli": {
-        "version": ">= 13.0.0",
-        "appVersionSource": "remote"
+  "cli": {
+    "version": ">= 13.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://pos.barmagly.tech"
+      }
     },
-    "build": {
-        "development": {
-            "developmentClient": true,
-            "distribution": "internal",
-            "env": {
-                "EXPO_PUBLIC_API_URL": "https://identity-palette.replit.app"
-            }
-        },
-        "preview": {
-            "distribution": "internal",
-            "env": {
-                "EXPO_PUBLIC_API_URL": "https://identity-palette.replit.app"
-            }
-        },
-        "production": {
-            "autoIncrement": true,
-            "credentialsSource": "remote",
-            "android": {
-                "buildType": "app-bundle"
-            },
-            "env": {
-                "EXPO_PUBLIC_API_URL": "https://identity-palette.replit.app"
-            }
-        }
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://pos.barmagly.tech"
+      }
     },
-    "submit": {
-        "production": {
-            "android": {
-                "track": "internal",
-                "releaseStatus": "draft"
-            }
-        }
+    "preview-pos": {
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://pos.barmagly.tech",
+        "EXPO_PUBLIC_APP_VARIANT": "pos"
+      }
+    },
+    "preview-customer": {
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://pos.barmagly.tech",
+        "EXPO_PUBLIC_APP_VARIANT": "customer"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "credentialsSource": "remote",
+      "android": { "buildType": "app-bundle" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://pos.barmagly.tech"
+      }
     }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
+  }
 }
