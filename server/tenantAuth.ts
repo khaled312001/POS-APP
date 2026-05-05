@@ -46,6 +46,8 @@ const PUBLIC_ROUTES = [
   "/api/delivery/recommendations", // Public recommendations
   "/api/delivery/broadcast",        // Public broadcast order creation (drop-shipping)
   "/api/delivery/broadcast/menu",   // Public aggregated menu for /broadcast page
+  "/api/customer/chats",            // Customer chat list (auth via Bearer customer token)
+  "/api/customer/chats/",           // Customer chat single room + messages
   "/api/robots.txt",               // SEO robots.txt
   // ── HTML pages served under /api/ prefix (Hostinger CDN compatibility) ──
   "/api/order",                    // Delivery listing (no-slug) + /api/order/

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   StyleSheet, Text, View, FlatList, Pressable, ScrollView,
   Alert, Platform, Animated, RefreshControl, Modal, TextInput, KeyboardAvoidingView,
-  Image, useWindowDimensions,
+  Image, useWindowDimensions, ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -119,6 +119,50 @@ export default function OrdersScreen() {
     notes: "", estimatedTime: "", items: [],
     subtotal: 0, deliveryFee: 0, totalAmount: 0,
   });
+
+  // ── Chat state — restaurant-side chat for an active order ──
+  const [chatRoomOrderId, setChatRoomOrderId] = useState<number | null>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatRoomId, setChatRoomId] = useState<number | null>(null);
+  const [chatDraft, setChatDraft] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+
+  const openChat = async (order: any) => {
+    setChatRoomOrderId(order.id);
+    setChatMessages([]);
+    setChatRoomId(null);
+    setChatLoading(true);
+    if (!tenantId) { setChatLoading(false); return; }
+    try {
+      // Look up the room for this order. The room only exists once the customer
+      // posts a first message (we lazily create on POST). If not found, show empty.
+      // Ensure a room exists (creates one on demand if customer hasn't started yet)
+      const ensureRes = await apiRequest("POST", `/api/chat/order/${order.id}/ensure?tenantId=${tenantId}`);
+      const ensureData = await ensureRes.json();
+      const room = ensureData.room;
+      if (!room) { setChatLoading(false); return; }
+      setChatRoomId(room.id);
+      const msgsRes = await apiRequest("GET", `/api/chat/rooms/${room.id}/messages?tenantId=${tenantId}`);
+      const msgsData = await msgsRes.json();
+      setChatMessages(msgsData.messages || []);
+    } catch (e) { /* swallow */ } finally { setChatLoading(false); }
+  };
+
+  const sendChatMessage = async () => {
+    if (!chatDraft.trim() || !chatRoomId || !tenantId) return;
+    const body = chatDraft.trim();
+    setChatDraft("");
+    try {
+      await apiRequest("POST", `/api/chat/rooms/${chatRoomId}/messages?tenantId=${tenantId}`, {
+        body,
+        senderName: storeSettings?.storeName || "Restaurant",
+        senderType: "tenant",
+      });
+      setChatMessages((m) => [...m, { senderType: "tenant", senderName: storeSettings?.storeName || "Restaurant", body, createdAt: new Date().toISOString() }]);
+    } catch (e: any) {
+      Alert.alert("Failed", e.message || "Could not send");
+    }
+  };
 
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [pickerCategory, setPickerCategory] = useState<string>("all");
@@ -315,6 +359,14 @@ export default function OrdersScreen() {
             qc.invalidateQueries({ queryKey: ["/api/broadcast-orders/pending"] });
             if (data.type === "broadcast_claimed" && data.claimedByTenantId === tenantId) {
               qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+            }
+          } else if (data.type === "chat_new_message") {
+            // If the chat modal is open for this order, append the message live
+            if (chatRoomOrderId && data.orderId === chatRoomOrderId) {
+              setChatMessages((m) => [...m, { senderType: data.senderType, senderName: data.senderName, body: data.body, createdAt: data.createdAt }]);
+            } else if (data.senderType === "customer") {
+              // Customer message arrived for another order — gentle ping
+              playNotificationSound();
             }
           }
         } catch { }
@@ -710,6 +762,17 @@ export default function OrdersScreen() {
           <View style={{ marginBottom: 6 }}>
             <TrackingLinkButton trackingToken={item.trackingToken} label={lbl("Share Tracking", "رابط التتبع", "Tracking teilen")} />
           </View>
+        ) : null}
+
+        {/* Chat with customer (online orders only) */}
+        {!isPOS ? (
+          <Pressable
+            onPress={() => openChat(item)}
+            style={{ flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingVertical: 6, paddingHorizontal: 12, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.accent + "40", marginBottom: 6 }}
+          >
+            <Text style={{ fontSize: 14 }}>💬</Text>
+            <Text style={{ color: Colors.accent, fontWeight: "600", fontSize: 13 }}>{lbl("Chat", "محادثة", "Chat")}</Text>
+          </Pressable>
         ) : null}
 
         {/* Time + fee */}
@@ -1505,6 +1568,57 @@ export default function OrdersScreen() {
           </View>
         }
       />
+
+      {/* ===== Chat with customer modal ===== */}
+      <Modal visible={!!chatRoomOrderId} animationType="slide" onRequestClose={() => setChatRoomOrderId(null)} transparent>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: Colors.background, height: "85%", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+              <View>
+                <Text style={{ color: Colors.text, fontWeight: "800", fontSize: 16 }}>💬 {lbl("Chat with customer", "محادثة العميل", "Chat mit Kunde")}</Text>
+                <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>{lbl("Order #", "طلب #", "Bestellung #")}{chatRoomOrderId}</Text>
+              </View>
+              <Pressable onPress={() => setChatRoomOrderId(null)} style={{ padding: 8 }}>
+                <Text style={{ color: Colors.text, fontSize: 22 }}>✕</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={{ flex: 1, marginBottom: 8 }} contentContainerStyle={{ paddingBottom: 12 }}>
+              {chatLoading && chatMessages.length === 0 ? (
+                <View style={{ padding: 20, alignItems: "center" }}><ActivityIndicator color={Colors.accent} /></View>
+              ) : chatMessages.length === 0 ? (
+                <View style={{ padding: 30, alignItems: "center" }}>
+                  <Text style={{ fontSize: 40, marginBottom: 8, opacity: 0.5 }}>💬</Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 13, textAlign: "center" }}>
+                    {lbl("No messages yet — wait for the customer to start", "لا توجد رسائل — انتظر حتى يبدأ العميل المحادثة", "Noch keine Nachrichten")}
+                  </Text>
+                </View>
+              ) : chatMessages.map((m, i) => {
+                const mine = m.senderType !== "customer";
+                return (
+                  <View key={i} style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "78%", marginVertical: 4, padding: 10, paddingHorizontal: 14, borderRadius: 14, backgroundColor: mine ? Colors.accent : Colors.surface, borderBottomRightRadius: mine ? 4 : 14, borderBottomLeftRadius: mine ? 14 : 4 }}>
+                    {!mine ? <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 2, fontWeight: "700" }}>{m.senderName || "Customer"}</Text> : null}
+                    <Text style={{ color: mine ? "#fff" : Colors.text, fontSize: 14 }}>{m.body}</Text>
+                    <Text style={{ color: mine ? "rgba(255,255,255,0.7)" : Colors.textMuted, fontSize: 10, marginTop: 4 }}>{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+            <View style={{ flexDirection: "row", gap: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.border }}>
+              <TextInput
+                value={chatDraft}
+                onChangeText={setChatDraft}
+                placeholder={lbl("Type a reply…", "اكتب رداً…", "Antwort eingeben…")}
+                placeholderTextColor={Colors.textMuted}
+                style={{ flex: 1, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 10, padding: 10, color: Colors.text, fontSize: 14 }}
+                onSubmitEditing={sendChatMessage}
+              />
+              <Pressable onPress={sendChatMessage} style={{ backgroundColor: Colors.accent, paddingHorizontal: 18, justifyContent: "center", borderRadius: 10 }}>
+                <Text style={{ color: "#fff", fontWeight: "800" }}>{lbl("Send", "إرسال", "Senden")}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

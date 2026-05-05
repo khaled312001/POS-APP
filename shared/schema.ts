@@ -665,6 +665,37 @@ export const onlineOrders = mysqlTable("online_orders", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ========== Chat: live messaging between customer + restaurant + driver ====
+// One chat_room per online order. Either party can post into chat_messages.
+// POS subscribes via the existing /api/ws/caller-id WS channel (msg type
+// `chat_new_message`). Customer subscribes via the customer SPA.
+
+export const chatRooms = mysqlTable("chat_rooms", {
+  id: serial("id").primaryKey(),
+  orderId: int("order_id").references(() => onlineOrders.id, { onDelete: 'cascade' }).notNull().unique(),
+  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  customerId: int("customer_id").references(() => customers.id, { onDelete: 'set null' }),
+  customerName: text("customer_name"),
+  customerPhone: text("customer_phone"),
+  status: text("status").notNull().default("open"), // open | closed
+  lastMessageAt: timestamp("last_message_at"),
+  unreadByCustomer: int("unread_by_customer").default(0),
+  unreadByTenant: int("unread_by_tenant").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const chatMessages = mysqlTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  roomId: int("room_id").references(() => chatRooms.id, { onDelete: 'cascade' }).notNull(),
+  senderType: text("sender_type").notNull(), // customer | tenant | driver | system
+  senderId: int("sender_id"), // customer.id, employee.id, vehicle.id (nullable for system)
+  senderName: text("sender_name"),
+  body: text("body").notNull(),
+  attachmentUrl: text("attachment_url"),
+  readByOther: boolean("read_by_other").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // ========== Broadcast / Marketplace Orders (drop-shipping style) ==========
 // Customer creates ONE broadcast order without picking a restaurant.
 // All active tenants see it in real-time via WS. First to accept wins via
@@ -1238,6 +1269,14 @@ export type HelpTicket = typeof helpTickets.$inferSelect;
 export type InsertHelpTicket = z.infer<typeof insertHelpTicketSchema>;
 export type FaqEntry = typeof faqEntries.$inferSelect;
 export type InsertFaqEntry = z.infer<typeof insertFaqEntrySchema>;
+
+// ── Chat ──
+export const insertChatRoomSchema = createInsertSchema(chatRooms).omit({ id: true, createdAt: true, lastMessageAt: true, unreadByCustomer: true, unreadByTenant: true });
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true, readByOther: true });
+export type ChatRoom = typeof chatRooms.$inferSelect;
+export type InsertChatRoom = z.infer<typeof insertChatRoomSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 
 // ── Broadcast Orders ──
 export const insertBroadcastOrderSchema = createInsertSchema(broadcastOrders).omit({ id: true, createdAt: true, updatedAt: true, claimedAt: true, claimedByTenantId: true, onlineOrderId: true });

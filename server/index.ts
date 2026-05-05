@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { registerSuperAdminRoutes } from "./superAdminRoutes";
 import { registerBroadcastRoutes } from "./broadcastRoutes";
+import { registerCustomerExtraRoutes } from "./customerExtraRoutes";
 import { tenantAuthMiddleware } from "./tenantAuth";
 import { callerIdService } from "./callerIdService";
 import { whatsappService } from "./whatsappService";
@@ -339,6 +340,46 @@ function configureExpoAndLanding(app: express.Application) {
       const dbTemplate = fs.readFileSync(dashboardPath, "utf-8");
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(dbTemplate);
+    }
+
+    // ── Unified Customer SPA — single entry point for the whole customer app
+    // Handles both /customer/* (direct) and /api/customer/* (Hostinger CDN-prefixed)
+    // /customer/app.js → SPA JavaScript
+    // /customer/manifest.json → PWA manifest
+    // anything else under /customer → SPA shell (hash routes inside it)
+    {
+      const m = req.path.match(/^\/(?:api\/)?customer(\/.*)?$/);
+      if (m) {
+        try {
+          const sub = m[1] || "";
+          if (sub === "/app.js") {
+            const jsPath = path.resolve(process.cwd(), "delivery-app", "customer.app.js");
+            if (!fs.existsSync(jsPath)) return res.status(404).end();
+            res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+            res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+            return res.status(200).send(fs.readFileSync(jsPath, "utf-8"));
+          }
+          if (sub === "/manifest.json") {
+            res.setHeader("Content-Type", "application/manifest+json");
+            return res.status(200).json({
+              name: "Barmagly", short_name: "Barmagly",
+              start_url: "/customer/", display: "standalone", scope: "/customer/",
+              theme_color: "#FF5722", background_color: "#070A12",
+              icons: [{ src: "/api/delivery-app/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+                      { src: "/api/delivery-app/icons/icon-512.png", sizes: "512x512", type: "image/png" }],
+            });
+          }
+          // Otherwise serve the SPA shell — hash routing handles the path
+          const shellPath = path.resolve(process.cwd(), "delivery-app", "customer.html");
+          if (!fs.existsSync(shellPath)) return res.status(503).send("<h1>Customer app not deployed</h1>");
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          return res.status(200).send(fs.readFileSync(shellPath, "utf-8"));
+        } catch (err) {
+          console.error("[/customer] Error:", err);
+          return res.status(500).send("<h1>Server error</h1>");
+        }
+      }
     }
 
     // ── General delivery landing page (no slug) ────────────────────────────
@@ -979,6 +1020,7 @@ function setupPaymentGatewayRoutes(app: express.Application) {
 
   registerSuperAdminRoutes(app);
   registerBroadcastRoutes(app);
+  registerCustomerExtraRoutes(app);
   const server = await registerRoutes(app);
 
   setupErrorHandler(app);

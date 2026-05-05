@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" id="html-root">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#FF5722" />
+  <title>Barmagly — Order Food</title>
+  <link rel="icon" href="/api/delivery-app/icons/icon-192.png" />
+  <link rel="manifest" href="/customer/manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Kufi+Arabic:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+  /* ─── Reset + Tokens ──────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { overflow-x: clip; max-width: 100%; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: "Inter", "Noto Kufi Arabic", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #070A12; color: #ECF0F8; min-height: 100dvh; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  body[dir="rtl"] { font-family: "Noto Kufi Arabic", "Inter", sans-serif; }
+  img { max-width: 100%; display: block; }
+  button, a { font: inherit; cursor: pointer; }
+  input, select, textarea { font: inherit; color: inherit; max-width: 100%; }
+
+  :root {
+    --bg: #070A12; --bg-2: #0E1320;
+    --surface: rgba(255,255,255,0.05); --surface-2: rgba(255,255,255,0.08);
+    --border: rgba(255,255,255,0.10); --border-2: rgba(255,255,255,0.18);
+    --text: #ECF0F8; --text-2: #B6C0D0; --text-dim: #6F7B8E;
+    --accent: #FF5722; --accent-2: #FF9800;
+    --accent-soft: rgba(255,87,34,0.15);
+    --teal: #2FD3C6; --teal-soft: rgba(47,211,198,0.15);
+    --success: #10B981; --danger: #EF4444; --warn: #F59E0B;
+    --r-md: 12px; --r-lg: 18px; --r-xl: 24px;
+    --shadow-card: 0 16px 40px rgba(0,0,0,0.35);
+  }
+
+  /* ─── App shell ──────────────────────────────────────────────────── */
+  #app { min-height: 100dvh; max-width: 720px; margin: 0 auto; position: relative; padding-bottom: 76px; }
+
+  /* ─── Top bar ─────────────────────────────────────────────────────── */
+  .top {
+    position: sticky; top: 0; z-index: 30;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center;
+    padding: 12px 16px;
+    background: rgba(7,10,18,0.92);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+  }
+  .top__back { width: 40px; height: 40px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); color: var(--text); display: grid; place-items: center; }
+  .top__title { font-size: 1rem; font-weight: 800; letter-spacing: -0.2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .top__sub { font-size: 0.72rem; color: var(--text-dim); margin-top: 1px; }
+  .top__actions { display: flex; gap: 8px; }
+  .top__btn { width: 40px; height: 40px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); color: var(--text); display: grid; place-items: center; position: relative; }
+  .top__btn .dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 0 2px var(--bg); }
+
+  /* ─── Tab bar ─────────────────────────────────────────────────────── */
+  .tabs {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); z-index: 40;
+    width: 100%; max-width: 720px; padding: 8px 12px 12px;
+    background: rgba(7,10,18,0.96); backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border);
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;
+  }
+  .tab { background: transparent; border: 0; color: var(--text-dim); padding: 8px 6px; border-radius: var(--r-md); display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 0.7rem; font-weight: 600; min-height: 56px; transition: color 0.15s; position: relative; }
+  .tab svg { width: 22px; height: 22px; }
+  .tab.active { color: var(--accent); }
+  .tab.active::before { content: ""; position: absolute; top: 4px; left: 50%; transform: translateX(-50%); width: 22px; height: 3px; background: var(--accent); border-radius: 2px; }
+  .tab .badge { position: absolute; top: 2px; right: 22%; min-width: 18px; height: 18px; padding: 0 5px; background: var(--accent); color: #fff; border-radius: 99px; font-size: 0.65rem; font-weight: 800; display: grid; place-items: center; }
+
+  /* ─── Page ─────────────────────────────────────────────────────────── */
+  .page { padding: 16px; display: none; }
+  .page.active { display: block; animation: pageIn 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+  @keyframes pageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* ─── Hero ─────────────────────────────────────────────────────────── */
+  .hero {
+    border-radius: var(--r-xl);
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    padding: 22px 22px 26px; color: #fff; position: relative; overflow: hidden;
+    box-shadow: var(--shadow-card);
+  }
+  .hero::before { content: ""; position: absolute; right: -40px; top: -40px; width: 180px; height: 180px; border-radius: 50%; background: rgba(255,255,255,0.1); }
+  .hero h1 { font-size: 1.6rem; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 6px; }
+  .hero p { font-size: 0.92rem; opacity: 0.9; }
+  .hero__cta { margin-top: 16px; display: inline-flex; gap: 8px; padding: 10px 18px; background: #fff; color: var(--accent); border-radius: 999px; font-weight: 800; font-size: 0.9rem; text-decoration: none; border: 0; }
+
+  /* ─── Section ─────────────────────────────────────────────────────── */
+  .sec { margin-top: 22px; }
+  .sec__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .sec__title { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.2px; }
+  .sec__link { color: var(--accent-2); font-size: 0.85rem; font-weight: 600; text-decoration: none; }
+
+  /* ─── Cards ────────────────────────────────────────────────────────── */
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 380px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+    overflow: hidden; transition: transform 0.15s, border-color 0.15s; cursor: pointer;
+    display: flex; flex-direction: column;
+  }
+  .card:hover { transform: translateY(-3px); border-color: var(--border-2); }
+  .card__cover { aspect-ratio: 4/3; background: linear-gradient(135deg, var(--accent), var(--accent-2)); position: relative; overflow: hidden; }
+  .card__cover img { width: 100%; height: 100%; object-fit: cover; }
+  .card__cover-badges { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; justify-content: space-between; gap: 6px; }
+  .badge { padding: 3px 10px; background: rgba(0,0,0,0.55); color: #fff; border-radius: 99px; font-size: 10px; font-weight: 800; backdrop-filter: blur(6px); }
+  .badge.accent { background: var(--accent); }
+  .card__body { padding: 12px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .card__title { font-size: 0.95rem; font-weight: 700; line-height: 1.3; }
+  .card__sub { font-size: 0.78rem; color: var(--text-dim); }
+  .card__foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 8px; }
+  .card__price { font-size: 1.05rem; font-weight: 900; color: var(--accent-2); letter-spacing: -0.2px; }
+  .card__add { padding: 6px 14px; background: var(--accent); color: #fff; border: 0; border-radius: 99px; font-size: 0.8rem; font-weight: 800; }
+
+  /* ─── List item ─────────────────────────────────────────────────────── */
+  .list-item {
+    display: flex; gap: 12px; padding: 12px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-lg); align-items: center; cursor: pointer; transition: all 0.15s;
+  }
+  .list-item + .list-item { margin-top: 10px; }
+  .list-item:hover { border-color: var(--border-2); background: var(--surface-2); }
+  .list-item__img { width: 64px; height: 64px; border-radius: var(--r-md); flex-shrink: 0; background: var(--surface-2); object-fit: cover; }
+  .list-item__body { flex: 1; min-width: 0; }
+  .list-item__title { font-weight: 700; font-size: 0.95rem; }
+  .list-item__sub { font-size: 0.8rem; color: var(--text-dim); margin-top: 2px; }
+  .list-item__price { font-weight: 800; color: var(--accent-2); }
+  .qty { display: inline-flex; align-items: center; gap: 8px; padding: 4px; background: var(--accent-soft); border-radius: 999px; }
+  .qty__btn { width: 26px; height: 26px; border: 0; background: var(--accent); color: #fff; border-radius: 50%; font-weight: 800; }
+  .qty__num { font-weight: 800; min-width: 18px; text-align: center; color: var(--accent); }
+
+  /* ─── Form ─────────────────────────────────────────────────────────── */
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+  .inp, .txt, .sel {
+    width: 100%; padding: 12px 14px; border-radius: var(--r-md);
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    font-size: 16px; outline: none; transition: all 0.15s;
+  }
+  .inp:focus, .txt:focus, .sel:focus { border-color: var(--accent); background: var(--surface-2); }
+  .txt { min-height: 80px; resize: vertical; max-height: 200px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .btn {
+    width: 100%; padding: 14px; border-radius: var(--r-md); border: 0;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
+    font-size: 1rem; font-weight: 800; cursor: pointer; transition: transform 0.15s;
+    box-shadow: 0 8px 22px rgba(255,87,34,0.4);
+  }
+  .btn:hover:not(:disabled) { transform: translateY(-2px); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+  .btn--ghost { background: transparent; color: var(--text); border: 1px solid var(--border-2); box-shadow: none; }
+  .btn--ghost:hover:not(:disabled) { background: var(--surface); }
+
+  /* ─── Intro splash ────────────────────────────────────────────────── */
+  #page-intro { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center; background:
+      radial-gradient(800px 500px at 50% 0%, rgba(255,87,34,0.18), transparent 60%),
+      radial-gradient(700px 600px at 50% 100%, rgba(47,211,198,0.12), transparent 60%),
+      var(--bg);
+  }
+  #page-intro .logo { width: 92px; height: 92px; border-radius: 28px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); display: grid; place-items: center; font-size: 48px; box-shadow: 0 24px 48px rgba(255,87,34,0.45); margin-bottom: 24px; }
+  #page-intro h1 { font-size: 2rem; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 12px; line-height: 1.15; }
+  #page-intro h1 span { background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #page-intro p { font-size: 1rem; color: var(--text-2); max-width: 320px; margin-bottom: 32px; }
+  #page-intro .cta { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 320px; }
+
+  /* ─── Empty / loading ──────────────────────────────────────────────── */
+  .empty { padding: 60px 20px; text-align: center; color: var(--text-dim); }
+  .empty__icon { font-size: 56px; margin-bottom: 16px; opacity: 0.5; }
+  .empty__title { font-size: 1.05rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .skeleton { background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%); background-size: 200% 100%; animation: skel 1.5s linear infinite; border-radius: var(--r-md); }
+  @keyframes skel { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .skel-card { height: 220px; }
+
+  /* ─── Cart drawer ──────────────────────────────────────────────────── */
+  .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+  .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 440px; background: var(--bg-2); z-index: 51; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-shadow: -20px 0 60px rgba(0,0,0,0.5); }
+  body[dir="rtl"] .drawer { right: auto; left: 0; transform: translateX(-100%); }
+  .drawer.open { transform: translateX(0); }
+  .drawer__hdr { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .drawer__body { flex: 1; overflow-y: auto; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .drawer__foot { padding: 14px 18px; border-top: 1px solid var(--border); }
+
+  /* ─── Status pill (orders/tracking) ────────────────────────────────── */
+  .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; }
+  .status-pill[data-s=pending] { background: rgba(245,158,11,0.18); color: var(--warn); }
+  .status-pill[data-s=accepted] { background: rgba(59,130,246,0.18); color: #3B82F6; }
+  .status-pill[data-s=preparing] { background: rgba(139,92,246,0.18); color: #A78BFA; }
+  .status-pill[data-s=ready] { background: rgba(47,211,198,0.18); color: var(--teal); }
+  .status-pill[data-s=on_way] { background: rgba(255,87,34,0.18); color: var(--accent); }
+  .status-pill[data-s=delivered] { background: rgba(16,185,129,0.18); color: var(--success); }
+  .status-pill[data-s=cancelled] { background: rgba(239,68,68,0.18); color: var(--danger); }
+
+  /* ─── Map ─────────────────────────────────────────────────────────── */
+  #track-map { width: 100%; height: 280px; border-radius: var(--r-lg); overflow: hidden; }
+
+  /* ─── Chat ────────────────────────────────────────────────────────── */
+  .chat-msgs { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+  .chat-msg { max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 0.95rem; line-height: 1.4; word-break: break-word; }
+  .chat-msg.me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .chat-msg.them { align-self: flex-start; background: var(--surface-2); color: var(--text); border-bottom-left-radius: 4px; }
+  .chat-msg__time { display: block; font-size: 0.65rem; opacity: 0.7; margin-top: 4px; }
+  .chat-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); position: sticky; bottom: 0; background: var(--bg); }
+  .chat-input input { flex: 1; }
+  .chat-input button { padding: 10px 16px; background: var(--accent); color: #fff; border: 0; border-radius: var(--r-md); font-weight: 700; }
+
+  /* ─── Pipeline (mini, used on tracking page) ──────────────────────── */
+  .pipeline { display: flex; flex-direction: column; gap: 0; padding: 12px 0; }
+  .step { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 14px; position: relative; }
+  .step:last-child { padding-bottom: 0; }
+  .step::before { content: ""; position: absolute; left: 13px; top: 28px; width: 2px; height: calc(100% - 14px); background: var(--border); transition: background 0.4s; }
+  body[dir="rtl"] .step::before { left: auto; right: 13px; }
+  .step:last-child::before { display: none; }
+  .step.done::before { background: var(--success); }
+  .step.active::before { background: linear-gradient(180deg, var(--accent), var(--border)); }
+  .step__dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 0.72rem; font-weight: 800; flex-shrink: 0; background: var(--surface-2); border: 2px solid var(--border); color: var(--text-dim); position: relative; z-index: 1; }
+  .step.done .step__dot { background: var(--success); color: #fff; border-color: transparent; }
+  .step.active .step__dot { background: var(--accent); color: #fff; border-color: transparent; box-shadow: 0 0 0 5px var(--accent-soft); }
+  .step__label { font-weight: 600; color: var(--text-dim); }
+  .step.done .step__label, .step.active .step__label { color: var(--text); }
+  .step__time { font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; }
+
+  /* ─── Toast ────────────────────────────────────────────────────────── */
+  .toast-wrap { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 6px; pointer-events: none; max-width: 90vw; }
+  .toast { padding: 10px 18px; background: var(--bg-2); border: 1px solid var(--border); color: var(--text); border-radius: var(--r-md); font-size: 0.875rem; font-weight: 600; box-shadow: 0 8px 22px rgba(0,0,0,0.35); animation: tIn 0.25s ease, tOut 0.3s 2.7s forwards; }
+  .toast.error { border-left: 3px solid var(--danger); }
+  .toast.success { border-left: 3px solid var(--success); }
+  @keyframes tIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes tOut { to { opacity: 0; transform: translateY(10px); } }
+
+  .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <!-- ─── INTRO ─────────────────────────────────────────────────────────── -->
+  <section id="page-intro" class="page">
+    <div class="logo">⚡</div>
+    <h1>Welcome to <span>Barmagly</span></h1>
+    <p id="intro-tagline">Order from any partner restaurant — the first one to accept will deliver.</p>
+    <div class="cta">
+      <button class="btn" id="btn-go-login">Sign in</button>
+      <button class="btn btn--ghost" id="btn-go-register">Create account</button>
+      <button class="btn btn--ghost" id="btn-go-guest">Continue as guest</button>
+    </div>
+  </section>
+
+  <!-- ─── LOGIN ─────────────────────────────────────────────────────────── -->
+  <section id="page-login" class="page">
+    <div class="top">
+      <button class="top__back" data-nav="intro" aria-label="Back">‹</button>
+      <div><h1 class="top__title">Sign in</h1><p class="top__sub">Welcome back</p></div>
+      <span></span>
+    </div>
+    <div style="padding: 22px 16px;">
+      <form id="form-login">
+        <div class="field"><label>Email</label><input class="inp" type="email" id="login-email" required /></div>
+        <div class="field"><label>Password</label><input class="inp" type="password" id="login-password" required /></div>
+        <button class="btn" type="submit" id="btn-login-submit">Sign in</button>
+        <p style="text-align:center;margin-top:18px;color:var(--text-dim);font-size:0.875rem;">
+          Don't have an account? <a href="#" data-nav="register" style="color:var(--accent-2);font-weight:700;">Register</a>
+        </p>
+      </form>
+    </div>
+  </section>
+
+  <!-- ─── REGISTER ──────────────────────────────────────────────────────── -->
+  <section id="page-register" class="page">
+    <div class="top">
+      <button class="top__back" data-nav="intro" aria-label="Back">‹</button>
+      <div><h1 class="top__title">Create account</h1><p class="top__sub">Start ordering in seconds</p></div>
+      <span></span>
+    </div>
+    <div style="padding: 22px 16px;">
+      <form id="form-register">
+        <div class="field"><label>Full name *</label><input class="inp" id="reg-name" required /></div>
+        <div class="grid-2">
+          <div class="field"><label>Phone *</label><input class="inp" id="reg-phone" type="tel" required placeholder="+41 79 …" /></div>
+          <div class="field"><label>Email</label><input class="inp" id="reg-email" type="email" /></div>
+        </div>
+        <div class="field"><label>Password *</label><input class="inp" id="reg-password" type="password" required minlength="6" /></div>
+        <button class="btn" type="submit" id="btn-register-submit">Create account</button>
+        <p style="text-align:center;margin-top:18px;color:var(--text-dim);font-size:0.875rem;">
+          Already have an account? <a href="#" data-nav="login" style="color:var(--accent-2);font-weight:700;">Sign in</a>
+        </p>
+      </form>
+    </div>
+  </section>
+
+  <!-- ─── HOME (logged in) ──────────────────────────────────────────────── -->
+  <section id="page-home" class="page">
+    <div class="top">
+      <span></span>
+      <div><h1 class="top__title">Hello, <span id="home-greet-name">there</span></h1><p class="top__sub" id="home-greet-sub">What would you like today?</p></div>
+      <div class="top__actions">
+        <button class="top__btn" id="btn-open-chats" title="Chats"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
+      </div>
+    </div>
+    <div style="padding: 14px 16px 22px;">
+      <div class="hero">
+        <h1>Quick Order</h1>
+        <p>Pick from any restaurant — first to accept prepares your order.</p>
+        <button class="hero__cta" data-nav="broadcast">⚡ Order now →</button>
+      </div>
+
+      <div class="sec">
+        <div class="sec__head"><h2 class="sec__title">Restaurants</h2><a class="sec__link" data-nav="restaurants" href="#">View all</a></div>
+        <div class="grid" id="home-restaurants"><div class="skeleton skel-card"></div><div class="skeleton skel-card"></div></div>
+      </div>
+
+      <div class="sec">
+        <div class="sec__head"><h2 class="sec__title">Your recent orders</h2></div>
+        <div id="home-orders"><div class="empty"><div class="empty__icon">🛍️</div><div class="empty__title">No orders yet</div><div class="empty__sub">Place your first order to get started</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── RESTAURANTS LIST ──────────────────────────────────────────────── -->
+  <section id="page-restaurants" class="page">
+    <div class="top">
+      <button class="top__back" data-nav="home" aria-label="Back">‹</button>
+      <div><h1 class="top__title">Restaurants</h1><p class="top__sub" id="restaurants-count">Loading…</p></div>
+      <span></span>
+    </div>
+    <div style="padding: 16px;">
+      <input class="inp" id="restaurants-search" placeholder="🔎 Search restaurants…" style="margin-bottom: 14px;" />
+      <div id="restaurants-list"><div class="skeleton skel-card"></div></div>
+    </div>
+  </section>
+
+  <!-- ─── MENU ──────────────────────────────────────────────────────────── -->
+  <section id="page-menu" class="page">
+    <div class="top">
+      <button class="top__back" data-nav="restaurants" aria-label="Back">‹</button>
+      <div><h1 class="top__title" id="menu-title">Menu</h1><p class="top__sub" id="menu-sub">Loading…</p></div>
+      <span></span>
+    </div>
+    <div style="padding: 16px;">
+      <input class="inp" id="menu-search" placeholder="🔎 Search dishes…" style="margin-bottom: 12px;" />
+      <div id="menu-cats" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:none;"></div>
+      <div class="grid" id="menu-products"></div>
+    </div>
+  </section>
+
+  <!-- ─── BROADCAST ─────────────────────────────────────────────────────── -->
+  <section id="page-broadcast" class="page">
+    <div class="top">
+      <button class="top__back" data-nav="home" aria-label="Back">‹</button>
+      <div><h1 class="top__title">⚡ Quick Order</h1><p class="top__sub" id="broadcast-sub">Pick from any restaurant</p></div>
+      <span></span>
+    </div>
+    <div style="padding: 16px;">
+      <div style="background:var(--teal-soft);border:1px solid var(--teal);border-radius:var(--r-md);padding:12px 14px;font-size:0.85rem;color:var(--text-2);margin-bottom:14px;line-height:1.5;">
+        <strong style="color:var(--teal);">How it works:</strong> Add items from any partner restaurant. We'll broadcast your order — the first to accept will prepare it.
+      </div>
+      <input class="inp" id="bc-search" placeholder="🔎 Search dishes from any restaurant…" style="margin-bottom: 12px;" />
+      <div id="bc-cats" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:none;"></div>
+      <div class="grid" id="bc-products"><div class="skeleton skel-card"></div><div class="skeleton skel-card"></div></div>
+    </div>
+  </section>
+
+  <!-- ─── ORDERS LIST ───────────────────────────────────────────────────── -->
+  <section id="page-orders" class="page">
+    <div class="top">
+      <span></span>
+      <div><h1 class="top__title">My orders</h1><p class="top__sub">Tap an order to track</p></div>
+      <span></span>
+    </div>
+    <div style="padding: 16px;" id="orders-list">
+      <div class="empty"><div class="empty__icon">🛍️</div><div class="empty__title">No orders yet</div></div>
+    </div>
+  </section>
+
+  <!-- ─── ORDER TRACKING ────────────────────────────────────────────────── -->
+  <section id="page-track" class="page">
+    <div class="top">
+      <button class="top__back" data-nav="orders" aria-label="Back">‹</button>
+      <div><h1 class="top__title" id="track-title">Tracking</h1><p class="top__sub" id="track-sub">—</p></div>
+      <div class="top__actions">
+        <button class="top__btn" id="btn-open-chat" title="Chat with restaurant"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
+      </div>
+    </div>
+    <div style="padding: 16px;" id="track-content">
+      <div class="skeleton" style="height:280px;margin-bottom:14px;"></div>
+    </div>
+  </section>
+
+  <!-- ─── CHAT ──────────────────────────────────────────────────────────── -->
+  <section id="page-chat" class="page" style="padding-bottom:0;">
+    <div class="top">
+      <button class="top__back" id="btn-chat-back" aria-label="Back">‹</button>
+      <div><h1 class="top__title" id="chat-title">Chat</h1><p class="top__sub" id="chat-sub">Restaurant</p></div>
+      <span></span>
+    </div>
+    <div id="chat-box" style="padding:14px 16px 80px;min-height:60vh;"></div>
+    <div class="chat-input">
+      <input class="inp" id="chat-input" placeholder="Type a message…" />
+      <button id="btn-send-chat">Send</button>
+    </div>
+  </section>
+
+  <!-- ─── ACCOUNT ───────────────────────────────────────────────────────── -->
+  <section id="page-account" class="page">
+    <div class="top">
+      <span></span>
+      <div><h1 class="top__title">Account</h1><p class="top__sub" id="account-sub">—</p></div>
+      <span></span>
+    </div>
+    <div style="padding: 16px;">
+      <div id="account-info" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;margin-bottom:14px;"></div>
+      <button class="btn btn--ghost" id="btn-logout">Log out</button>
+    </div>
+  </section>
+</div>
+
+<!-- Bottom tab bar (hidden during onboarding) -->
+<nav class="tabs hidden" id="tab-bar">
+  <button class="tab" data-tab="home" data-nav="home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/></svg>
+    <span>Home</span>
+  </button>
+  <button class="tab" data-tab="restaurants" data-nav="restaurants">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 11h18l-1.5 9h-15z"/><path d="M5 11V7a7 7 0 0 1 14 0v4"/></svg>
+    <span>Restaurants</span>
+  </button>
+  <button class="tab" data-tab="broadcast" data-nav="broadcast">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+    <span>Quick</span>
+  </button>
+  <button class="tab" data-tab="orders" data-nav="orders">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+    <span>Orders</span>
+    <span class="badge hidden" id="tab-badge-orders">0</span>
+  </button>
+  <button class="tab" data-tab="account" data-nav="account">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    <span>Account</span>
+  </button>
+</nav>
+
+<!-- Cart drawer -->
+<div class="drawer-overlay" id="cart-overlay"></div>
+<aside class="drawer" id="cart-drawer">
+  <div class="drawer__hdr">
+    <strong id="cart-title">🛒 Your cart</strong>
+    <button class="top__btn" id="btn-close-cart">✕</button>
+  </div>
+  <div class="drawer__body" id="cart-body"></div>
+  <div class="drawer__foot">
+    <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:1.05rem;font-weight:700;">
+      <span>Total</span><span id="cart-total" style="color:var(--accent-2);">CHF 0.00</span>
+    </div>
+    <button class="btn" id="btn-checkout" disabled>Checkout</button>
+  </div>
+</aside>
+
+<!-- Floating cart button (visible when items in cart) -->
+<button id="cart-fab" class="hidden" style="position:fixed;bottom:80px;right:16px;left:16px;max-width:520px;margin:0 auto;padding:14px 18px;border:0;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font-weight:800;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:35;box-shadow:0 12px 28px rgba(255,87,34,0.45);cursor:pointer;">
+  <span>🛒 <span id="cart-fab-count">0</span> items</span>
+  <span id="cart-fab-total">CHF 0.00</span>
+</button>
+
+<!-- Toasts -->
+<div class="toast-wrap" id="toasts"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/customer/app.js"></script>
+</body>
+</html>
