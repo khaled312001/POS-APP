@@ -3,6 +3,7 @@ import {
   Modal, View, Text, TouchableOpacity, FlatList, ActivityIndicator, StyleSheet,
 } from "react-native";
 import { Colors } from "@/constants/colors";
+import { apiRequest } from "@/lib/query-client";
 
 interface Driver {
   id: number;
@@ -34,14 +35,13 @@ export default function DriverAssignModal({
   useEffect(() => {
     if (!visible) return;
     setLoading(true);
-    fetch(`${apiBase}/api/delivery/manage/drivers?tenantId=${tenantId}`, {
-      headers: { "x-license-key": licenseKey },
-    })
+    // Use apiRequest so the x-license-key header is auto-attached from
+    // AsyncStorage. The previous raw fetch relied on a `licenseKey` prop
+    // that was sometimes empty (TenantInfo doesn't carry it), so the
+    // request 401'd and the modal showed "No available drivers".
+    apiRequest("GET", `/api/delivery/manage/drivers?tenantId=${tenantId}`)
       .then(r => r.json())
-      // Show ALL drivers (available + offline + on_delivery) sorted by status —
-      // strict "available only" filter hid every driver until they happened to
-      // open the PWA. The UI shows status next to each name so you can still
-      // tell who's reachable. Excludes only deactivated rows.
+      // Show ALL drivers (available + offline + on_delivery) sorted by status.
       .then((data: Driver[]) => {
         const list = (data || []);
         const order: Record<string, number> = { available: 0, on_delivery: 1, offline: 2 };
@@ -55,15 +55,9 @@ export default function DriverAssignModal({
   const assignDriver = async (driverId: number) => {
     setAssigning(driverId);
     try {
-      const resp = await fetch(`${apiBase}/api/delivery/manage/orders/${orderId}/assign`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "x-license-key": licenseKey,
-        },
-        body: JSON.stringify({ vehicleId: driverId, tenantId }),
+      await apiRequest("PUT", `/api/delivery/manage/orders/${orderId}/assign`, {
+        vehicleId: driverId, tenantId,
       });
-      if (!resp.ok) throw new Error("Failed to assign");
       onAssigned(driverId);
       onClose();
     } catch (err) {
