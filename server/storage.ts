@@ -2294,6 +2294,11 @@ export const storage = {
       locationUpdatedAt: vehicles.locationUpdatedAt,
       driverStatus: vehicles.driverStatus,
       driverRating: vehicles.driverRating,
+      // Vehicle make/model lets the customer page pick the right cruising
+      // speed (motorcycle ≈ 40 km/h vs car/van ≈ 25 km/h in city traffic)
+      // when computing the distance-based ETA.
+      make: vehicles.make,
+      model: vehicles.model,
     }).from(vehicles).where(eq(vehicles.id, vehicleId)).limit(1);
     return vehicle ?? null;
   },

@@ -178,7 +178,7 @@ export default function OrdersScreen() {
   const [showToppingsStep, setShowToppingsStep] = useState(false);
 
   const isRTL = language === "ar";
-  const { topPad } = getChromeMetrics(width);
+  const { topPad, bottomPad } = getChromeMetrics(width);
   const lbl = (en: string, ar: string, de: string) =>
     language === "ar" ? ar : language === "de" ? de : en;
 
@@ -1502,7 +1502,7 @@ export default function OrdersScreen() {
         data={filteredOrders}
         keyExtractor={(item: any) => `${item._type} -${item.id} `}
         renderItem={renderOrder}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: bottomPad + 24 }]}
         ListHeaderComponent={
           <>
             {bcToast ? (

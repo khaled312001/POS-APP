@@ -4180,7 +4180,7 @@ const styles = StyleSheet.create({
 
   // ── Products
   productGrid: { padding: 6 },
-  productGridMobile: { paddingBottom: 96 },
+  productGridMobile: { paddingBottom: 140 },
   productCard: { flex: 1, margin: 3, backgroundColor: Colors.surface, borderRadius: 12, padding: 9, alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder, minWidth: 70, overflow: "hidden", position: "relative" as const },
   productCardTopBorder: { position: "absolute" as const, top: 0, left: 0, right: 0, height: 3, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
   productIcon: { width: 52, height: 52, borderRadius: 13, justifyContent: "center", alignItems: "center", marginBottom: 7, marginTop: 3, overflow: "hidden" as const },
