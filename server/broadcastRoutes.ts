@@ -157,38 +157,44 @@ export function registerBroadcastRoutes(app: Express) {
       const catMap = new Map(cats.map((c) => [`${c.tenantId}:${c.id}`, c.name]));
       const tMap = new Map(activeTenants.map((t) => [t.id, t]));
 
-      const payload = allProducts
-        .filter((p: any) => Number(p.price) > 0 && !p.isAddon)
-        .map((p: any) => {
-          const t = tMap.get(p.tenantId);
-          // modifiers/variants are stored as JSON; mysql2 already parses them,
-          // but stringly-typed rows can sneak in from older inserts — coerce.
-          const parseJson = (v: any) => {
-            if (Array.isArray(v) || (v && typeof v === "object")) return v;
-            if (typeof v === "string" && v.trim()) { try { return JSON.parse(v); } catch { return []; } }
-            return [];
-          };
-          return {
-            id: p.id,
-            tenantId: p.tenantId,
-            tenantName: t?.name || "",
-            tenantLogo: (t as any)?.logo || null,
-            tenantSlug: t?.slug || "",
-            tenantColor: t?.primaryColor || "#FF5722",
-            name: p.name,
-            nameAr: p.nameAr,
-            description: p.description,
-            price: Number(p.price),
-            imageUrl: p.imageUrl,
-            category: catMap.get(`${p.tenantId}:${p.categoryId}`) || "Other",
-            modifiers: parseJson(p.modifiers),
-            variants: parseJson(p.variants),
-          };
-        });
+      // modifiers/variants are stored as JSON; mysql2 already parses them,
+      // but stringly-typed rows can sneak in from older inserts — coerce.
+      const parseJson = (v: any) => {
+        if (Array.isArray(v) || (v && typeof v === "object")) return v;
+        if (typeof v === "string" && v.trim()) { try { return JSON.parse(v); } catch { return []; } }
+        return [];
+      };
+      const decorate = (p: any) => {
+        const t = tMap.get(p.tenantId);
+        return {
+          id: p.id,
+          tenantId: p.tenantId,
+          tenantName: t?.name || "",
+          tenantLogo: (t as any)?.logo || null,
+          tenantSlug: t?.slug || "",
+          tenantColor: t?.primaryColor || "#FF5722",
+          name: p.name,
+          nameAr: p.nameAr,
+          description: p.description,
+          price: Number(p.price),
+          imageUrl: p.imageUrl,
+          category: catMap.get(`${p.tenantId}:${p.categoryId}`) || "Other",
+          modifiers: parseJson(p.modifiers),
+          variants: parseJson(p.variants),
+          isAddon: !!p.isAddon,
+        };
+      };
+      const validProducts = allProducts.filter((p: any) => Number(p.price) > 0 || p.isAddon);
+      const main = validProducts.filter((p: any) => !p.isAddon).map(decorate);
+      // Addons are sold separately in POS — drinks, sauces, extras, sides.
+      // Customer broadcast UI shows them grouped under each main product so
+      // diners can stack them like in-restaurant ordering.
+      const addons = validProducts.filter((p: any) => p.isAddon).map(decorate);
       res.json({
         restaurants: activeTenants,
-        products: payload,
-        categories: Array.from(new Set(payload.map((p) => p.category))).filter(Boolean).sort(),
+        products: main,
+        addons,
+        categories: Array.from(new Set(main.map((p) => p.category))).filter(Boolean).sort(),
       });
     } catch (e: any) {
       console.error("[broadcast/menu] error:", e);

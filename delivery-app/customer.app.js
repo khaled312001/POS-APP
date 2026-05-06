@@ -20,6 +20,7 @@
     activeChatRoom: null,
     currentRoute: null,
     ws: null,
+    es: null,
   };
 
   function save() {
@@ -30,6 +31,68 @@
   function escHtml(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[c]; }); }
   function $(id) { return document.getElementById(id); }
   function $$(sel) { return document.querySelectorAll(sel); }
+
+  // ─── SVG Icon library ─────────────────────────────────────────────
+  // All visual glyphs in the customer SPA come from here so we can swap
+  // the entire iconography in one place. Each entry is the inner markup
+  // of an SVG (paths, circles, etc.); icon() wraps them with the standard
+  // viewBox + .ic class.
+  var ICONS = {
+    "lightning":  '<path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/>',
+    "cart":       '<circle cx="9" cy="21" r="1.5"/><circle cx="18" cy="21" r="1.5"/><path d="M3 3h2l3 12h11l3-8H6"/>',
+    "cart-plus":  '<circle cx="9" cy="21" r="1.5"/><circle cx="18" cy="21" r="1.5"/><path d="M3 3h2l3 12h11l3-8H6"/><path d="M14 7h6m-3-3v6"/>',
+    "store":      '<path d="M3 9l1.5-5h15L21 9M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9M3 9h18M9 21v-6h6v6"/>',
+    "menu":       '<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M8 6V4M16 6V4"/>',
+    "search":     '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+    "filter":     '<path d="M3 5h18M6 12h12M10 19h4"/>',
+    "sort":       '<path d="M3 6h13M3 12h9M3 18h5M17 8V20m0 0l4-4m-4 4l-4-4"/>',
+    "plus":       '<path d="M12 5v14M5 12h14"/>',
+    "minus":      '<path d="M5 12h14"/>',
+    "check":      '<path d="M5 12l5 5L20 7"/>',
+    "x":          '<path d="M18 6L6 18M6 6l12 12"/>',
+    "chevron-left":  '<path d="M15 18l-6-6 6-6"/>',
+    "chevron-right": '<path d="M9 18l6-6-6-6"/>',
+    "chevron-down":  '<path d="M6 9l6 6 6-6"/>',
+    "back":       '<path d="M19 12H5M12 19l-7-7 7-7"/>',
+    "user":       '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>',
+    "users":      '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16 11a4 4 0 0 0 0-8"/><path d="M22 21c0-3.5-2.4-6.4-5.6-7"/>',
+    "star":       '<path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/>',
+    "star-filled":'<path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z" fill="currentColor"/>',
+    "heart":      '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/>',
+    "phone":      '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.7.6 2.5a2 2 0 0 1-.5 2.1L8 9.6a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.8.3 1.6.5 2.5.6A2 2 0 0 1 22 17z"/>',
+    "mail":       '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/>',
+    "lock":       '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    "map-pin":    '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+    "navigation": '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
+    "clock":      '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    "bell":       '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+    "chat":       '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    "trash":      '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+    "edit":       '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 1 1 3 3L12 15l-4 1 1-4z"/>',
+    "settings":   '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+    "logout":     '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+    "list":       '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+    "package":    '<path d="M16 16l4-7-9-5-9 5 9 5 5-2.7M11 22V13M2 9v8l9 5 9-5V9"/>',
+    "delivery":   '<rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
+    "info":       '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+    "warning":    '<path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+    "credit-card":'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
+    "cash":       '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 12h.01M18 12h.01"/>',
+    "google":     '<path d="M22.6 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5 5 0 0 1-2.2 3.32v2.76h3.56a10.8 10.8 0 0 0 3.3-8.1z" fill="#4285F4" stroke="none"/><path d="M12 23c3 0 5.5-1 7.3-2.7l-3.6-2.7a6.6 6.6 0 0 1-9.9-3.5H2.2v2.8A11 11 0 0 0 12 23z" fill="#34A853" stroke="none"/><path d="M5.8 14.1a6.6 6.6 0 0 1 0-4.2V7.1H2.2a11 11 0 0 0 0 9.9l3.6-2.9z" fill="#FBBC05" stroke="none"/><path d="M12 5.4c1.6 0 3 .5 4.2 1.6l3.1-3.1A11 11 0 0 0 2.2 7.1l3.6 2.8A6.6 6.6 0 0 1 12 5.4z" fill="#EA4335" stroke="none"/>',
+    "sparkle":    '<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
+    "tune":       '<path d="M4 6h7M14 6h6M4 12h3M10 12h10M4 18h11M18 18h2"/><circle cx="13" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+    "shopping":   '<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 1 1-8 0"/>',
+    "fire":       '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-1.1-2.5-2.5-3-2-.7-4 .7-4 2.7 0 1.5 1 2.8 2.5 3 .9.1 1.7-.4 2-1 .2-.5-.3-1.2-.5-1.2"/><path d="M12 2c2 4 4 6 4 9a4 4 0 0 1-8 0c0-1 .5-1.5 1-2"/>',
+    "spinner":    '<circle cx="12" cy="12" r="9" stroke-dasharray="40 20"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle>',
+  };
+  function icon(name, opts) {
+    var inner = ICONS[name];
+    if (!inner) return "";
+    var cls = "ic" + (opts && opts.class ? " " + opts.class : "") + (opts && opts.size ? " ic--" + opts.size : "");
+    return '<svg class="' + cls + '" viewBox="0 0 24 24" aria-hidden="true">' + inner + '</svg>';
+  }
+  // Expose for inline HTML callers (e.g. broadcast page)
+  window.bcIcon = icon;
 
   // ─── Dialog (replaces native alert/confirm/prompt) ─────────────────
   // Returns a Promise that resolves with:
@@ -331,48 +394,167 @@
 
   function renderHome() {
     var c = state.auth.customer || {};
-    $("home-greet-name").textContent = (c.name || "there").split(" ")[0];
+    var firstName = (c.name || "there").split(" ")[0];
+    $("home-greet-name").textContent = firstName;
+    var hour = new Date().getHours();
+    var greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+    $("home-greet-sub").textContent = greet + " · what to eat?";
 
-    // Load restaurants if not cached
-    if (state.restaurants.length === 0) {
-      api("GET", "/api/delivery/restaurants").then(function (rs) {
-        state.restaurants = rs || []; renderHomeRestaurants();
-      }).catch(function () {});
+    // Always pull the broadcast aggregate menu (richest data: restaurants,
+    // products, addons, categories) — same source the broadcast page uses,
+    // so we get a real, populated home page even before /api/delivery/restaurants.
+    if (state.products.length === 0) {
+      api("GET", "/api/delivery/broadcast/menu").then(function (data) {
+        state.products = data.products || [];
+        if (!state.bc) state.bc = { activeCat: "all", sort: "popular", restaurants: [], categories: [], addons: [] };
+        state.bc.restaurants = data.restaurants || [];
+        state.bc.addons = data.addons || [];
+        state.bc.categories = ["all"].concat((data.categories || []).filter(Boolean));
+        // Mirror to legacy state.restaurants so other pages still work
+        state.restaurants = (data.restaurants || []).map(function (r) {
+          return Object.assign({}, r, { name: r.name, slug: r.slug, logo: r.logo });
+        });
+        renderHomeCuisines();
+        renderHomeRestaurants();
+        renderHomePopular();
+      }).catch(function () {
+        $("home-restaurants").innerHTML = homeEmpty("Restaurants unavailable", "Please try again later", "warning");
+      });
     } else {
+      renderHomeCuisines();
       renderHomeRestaurants();
+      renderHomePopular();
     }
 
-    // Load orders
     refreshOrders();
   }
 
-  function renderHomeRestaurants() {
-    var el = $("home-restaurants");
-    if (state.restaurants.length === 0) {
-      el.innerHTML = '<div class="empty"><div class="empty__icon">🏪</div><div class="empty__title">No restaurants yet</div></div>';
+  // Map common cuisine words to icons. Anything unmatched falls back to "menu".
+  var CUISINE_ICONS = {
+    "Pizza": "fire", "pizza": "fire",
+    "Burgers": "fire", "burger": "fire",
+    "Pasta": "menu", "pasta": "menu",
+    "Salad": "menu", "salads": "menu",
+    "Sushi": "menu",
+    "Dessert": "heart", "desserts": "heart", "Sweets": "heart",
+    "Drinks": "cash", "Beverages": "cash",
+    "Sauces": "tune",
+  };
+
+  function renderHomeCuisines() {
+    var el = $("home-cuisines"); if (!el) return;
+    var cats = (state.bc && state.bc.categories || []).filter(function (c) { return c !== "all"; });
+    if (cats.length === 0) {
+      el.innerHTML = '<div class="empty" style="flex:1;padding:20px;">No cuisines yet</div>';
       return;
     }
-    el.innerHTML = state.restaurants.slice(0, 4).map(function (r) {
-      return restaurantCard(r);
+    el.innerHTML = cats.slice(0, 12).map(function (cat) {
+      var count = state.products.filter(function (p) { return p.category === cat; }).length;
+      var ico = CUISINE_ICONS[cat] || "menu";
+      return '<div class="home-cuisine" data-cuisine="' + escHtml(cat) + '">'
+           + '  <div class="home-cuisine__icon">' + icon(ico, { size: "lg" }) + '</div>'
+           + '  <div class="home-cuisine__name">' + escHtml(cat) + '</div>'
+           + '  <div class="home-cuisine__count">' + count + ' dishes</div>'
+           + '</div>';
     }).join("");
-    bindRestaurantClicks(el);
+    el.querySelectorAll("[data-cuisine]").forEach(function (n) {
+      n.addEventListener("click", function () {
+        var c = n.getAttribute("data-cuisine");
+        if (state.bc) state.bc.activeCat = c;
+        navigate("broadcast");
+      });
+    });
   }
 
-  function restaurantCard(r) {
-    var img = r.coverImage || r.logo || "/api/delivery-app/icons/icon-192.png";
-    return '<div class="card" data-slug="' + escHtml(r.slug) + '">'
-         + '  <div class="card__cover"><img src="' + escHtml(img) + '" onerror="this.style.display=\'none\'" /></div>'
-         + '  <div class="card__body">'
-         + '    <div class="card__title">' + escHtml(r.name || "Restaurant") + '</div>'
-         + '    <div class="card__sub">' + escHtml(r.cuisine || "") + ' · ⭐ ' + (r.rating || "—") + '</div>'
+  function renderHomeRestaurants() {
+    var el = $("home-restaurants"); if (!el) return;
+    var rs = (state.bc && state.bc.restaurants) || state.restaurants || [];
+    if (rs.length === 0) {
+      el.innerHTML = homeEmpty("No restaurants yet", "Check back soon", "store");
+      return;
+    }
+    el.innerHTML = rs.slice(0, 4).map(function (r) { return homeRestaurantCard(r); }).join("");
+    el.querySelectorAll("[data-tenant]").forEach(function (n) {
+      n.addEventListener("click", function () {
+        var slug = n.getAttribute("data-slug");
+        if (slug) navigate("menu", [slug]);
+        else navigate("broadcast");
+      });
+    });
+  }
+
+  function homeRestaurantCard(r) {
+    var sample = state.products.find(function (p) { return p.tenantId === r.id && p.imageUrl; });
+    var img = r.coverImage || r.logo || (sample && sample.imageUrl) || "";
+    var dishCount = state.products.filter(function (p) { return p.tenantId === r.id; }).length;
+    var rating = r.rating ? Number(r.rating).toFixed(1) : "4.6";
+    var deliveryFee = "Free delivery";
+    var eta = "25–35 min";
+    return '<div class="home-rest" data-tenant="' + r.id + '" data-slug="' + escHtml(r.slug || "") + '">'
+         + '  <div class="home-rest__cover" style="' + (img ? 'background-image:url(\'' + escHtml(img) + '\');background-size:cover;background-position:center;' : '') + '">'
+         + '    <span class="home-rest__featured">' + icon("star-filled") + ' Featured</span>'
+         + '    <span class="home-rest__rating">' + icon("star-filled") + ' ' + rating + '</span>'
+         + '  </div>'
+         + '  <div class="home-rest__body">'
+         + '    <h3 class="home-rest__name">' + escHtml(r.name || "Restaurant") + '</h3>'
+         + '    <p class="home-rest__cuisine">' + escHtml(r.cuisine || "Mixed cuisine") + '</p>'
+         + '    <div class="home-rest__meta">'
+         + '      <span>' + icon("menu") + ' ' + dishCount + ' dishes</span>'
+         + '      <span class="dot"></span>'
+         + '      <span>' + icon("clock") + ' ' + eta + '</span>'
+         + '      <span class="dot"></span>'
+         + '      <span>' + icon("delivery") + ' ' + deliveryFee + '</span>'
+         + '    </div>'
          + '  </div>'
          + '</div>';
   }
 
-  function bindRestaurantClicks(el) {
-    el.querySelectorAll("[data-slug]").forEach(function (n) {
-      n.addEventListener("click", function () { navigate("menu", [n.getAttribute("data-slug")]); });
+  function renderHomePopular() {
+    var el = $("home-popular"); if (!el) return;
+    // "Popular" = priced, has image, is not addon. Sort newest tenant first
+    // for a varied feed across restaurants.
+    var pool = state.products.filter(function (p) { return p.imageUrl && p.price > 0; });
+    if (pool.length === 0) {
+      el.innerHTML = '<div class="empty" style="flex:1;padding:30px;">No popular dishes yet</div>';
+      return;
+    }
+    // Pick up to 12, deduped by name
+    var seen = {};
+    var picks = [];
+    for (var i = 0; i < pool.length && picks.length < 12; i++) {
+      var p = pool[i]; if (seen[p.name]) continue; seen[p.name] = 1; picks.push(p);
+    }
+    el.innerHTML = picks.map(function (p) {
+      return '<div class="home-pop" data-pid="' + p.id + '">'
+           + '  <div class="home-pop__cover">'
+           +      (p.tenantName ? '<span class="home-pop__tenant">' + escHtml(p.tenantName) + '</span>' : '')
+           + '    <img src="' + escHtml(p.imageUrl) + '" alt="' + escHtml(p.name) + '" onerror="this.style.display=\'none\'" />'
+           + '  </div>'
+           + '  <div class="home-pop__body">'
+           + '    <div class="home-pop__name">' + escHtml(p.name) + '</div>'
+           + '    <div class="home-pop__price">CHF ' + Number(p.price).toFixed(2) + '</div>'
+           + '  </div>'
+           + '</div>';
+    }).join("");
+    el.querySelectorAll("[data-pid]").forEach(function (n) {
+      n.addEventListener("click", function () {
+        var pid = Number(n.getAttribute("data-pid"));
+        var prod = state.products.find(function (x) { return x.id === pid; });
+        if (prod) {
+          navigate("broadcast");
+          // Defer the sheet open until the broadcast page renders
+          setTimeout(function () { openCustomizeSheet(prod); }, 200);
+        }
+      });
     });
+  }
+
+  function homeEmpty(title, sub, ico) {
+    return '<div class="empty">'
+         + '<div class="empty__icon">' + icon(ico || "menu", { size: "2xl" }) + '</div>'
+         + '<div class="empty__title">' + escHtml(title) + '</div>'
+         + (sub ? '<div class="empty__sub">' + escHtml(sub) + '</div>' : '')
+         + '</div>';
   }
 
   function renderRestaurants() {
@@ -394,11 +576,19 @@
                + '  <img class="list-item__img" src="' + escHtml(r.coverImage || r.logo || "/api/delivery-app/icons/icon-192.png") + '" onerror="this.style.display=\'none\'" />'
                + '  <div class="list-item__body">'
                + '    <div class="list-item__title">' + escHtml(r.name) + '</div>'
-               + '    <div class="list-item__sub">' + escHtml(r.cuisine || "") + ' · ⭐ ' + (r.rating || "—") + ' · 🕐 ' + (r.deliveryTime || "20") + ' min</div>'
+               + '    <div class="list-item__sub">' + escHtml(r.cuisine || "") + ' · ' + (r.rating || "—") + ' ★ · ' + (r.deliveryTime || "20") + ' min</div>'
                + '  </div>'
                + '</div>';
         }).join("");
-        bindRestaurantClicks(listEl);
+        // Inline restaurant-click binding (the helper function was removed
+        // when home was redesigned; keep the wiring local to avoid pulling
+        // a global helper that no longer exists).
+        listEl.querySelectorAll("[data-slug]").forEach(function (n) {
+          n.addEventListener("click", function () {
+            var slug = n.getAttribute("data-slug");
+            if (slug) navigate("menu", [slug]);
+          });
+        });
       };
       renderList("");
       $("restaurants-search").oninput = function (e) { renderList(e.target.value); };
@@ -582,12 +772,13 @@
   // ─── Broadcast ──────────────────────────────────────────────────────
   // Local state for the broadcast page (kept on `state.bc` so we can persist
   // chip/sort selection across re-renders triggered by search input).
-  if (!state.bc) state.bc = { activeCat: "all", sort: "popular", restaurants: [], categories: [] };
+  if (!state.bc) state.bc = { activeCat: "all", sort: "popular", restaurants: [], categories: [], addons: [] };
 
   function renderBroadcast() {
     if (state.products.length === 0 || !state.bc.restaurants.length) {
       api("GET", "/api/delivery/broadcast/menu").then(function (data) {
         state.products = data.products || [];
+        state.bc.addons = data.addons || [];
         state.bc.restaurants = data.restaurants || [];
         state.bc.categories = ["all"].concat((data.categories || []).filter(Boolean));
         wireBroadcastUI();
@@ -608,7 +799,39 @@
 
   function wireBroadcastUI() {
     var s = $("bc-search"); if (s && !s.__wired) { s.addEventListener("input", renderBroadcastProducts); s.__wired = true; }
-    var so = $("bc-sort"); if (so && !so.__wired) { so.addEventListener("change", function () { state.bc.sort = so.value; renderBroadcastProducts(); }); so.__wired = true; }
+
+    // Custom sort dropdown — toggle pop, pick option, close on outside click.
+    // Replaces the native <select> so the opened menu uses our dark palette
+    // (the OS-rendered options panel was white-on-white and clashed badly).
+    var sb = $("bc-sort-btn"); var sp = $("bc-sort-pop");
+    if (sb && sp && !sb.__wired) {
+      var SORT_LABELS = { "popular": "Popular", "price-asc": "Price ↑", "price-desc": "Price ↓", "name": "A – Z" };
+      function setSort(val) {
+        state.bc.sort = val;
+        $("bc-sort-label").textContent = SORT_LABELS[val] || "Popular";
+        sp.querySelectorAll(".bc-sort-opt").forEach(function (o) {
+          o.classList.toggle("selected", o.getAttribute("data-sort") === val);
+        });
+        renderBroadcastProducts();
+      }
+      sb.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var open = sb.classList.toggle("open");
+        sp.classList.toggle("open", open);
+      });
+      sp.querySelectorAll(".bc-sort-opt").forEach(function (o) {
+        o.addEventListener("click", function () {
+          setSort(o.getAttribute("data-sort"));
+          sb.classList.remove("open"); sp.classList.remove("open");
+        });
+      });
+      document.addEventListener("click", function (e) {
+        if (!sb.contains(e.target) && !sp.contains(e.target)) {
+          sb.classList.remove("open"); sp.classList.remove("open");
+        }
+      });
+      sb.__wired = true;
+    }
   }
 
   function renderBroadcastStats() {
@@ -631,9 +854,10 @@
         ? 'background-image: linear-gradient(135deg, rgba(7,11,20,0.25), rgba(7,11,20,0.55)), url("' + escHtml(img) + '");'
         : 'background: linear-gradient(135deg, ' + (r.primaryColor || "#FF5722") + ', #E64A19);';
       return '<div class="bc-rest" data-tenant="' + r.id + '" data-name="' + escHtml(r.name || "") + '" style="' + bgStyle + '">'
+           + '  <span class="bc-rest__featured">' + icon("star-filled") + ' Featured</span>'
            + '  <div class="bc-rest__body">'
            + '    <div class="bc-rest__name">' + escHtml(r.name || "Restaurant") + '</div>'
-           + '    <div class="bc-rest__meta"><span>🍽️ ' + dishes + ' dishes</span><span>⚡ Quick accept</span></div>'
+           + '    <div class="bc-rest__meta"><span>' + icon("menu") + ' ' + dishes + ' dishes</span><span>' + icon("lightning") + ' Quick</span></div>'
            + '  </div>'
            + '</div>';
     }).join("");
@@ -697,10 +921,10 @@
     return '<div class="card" data-pid="' + p.id + '">'
          + '  <div class="card__cover">' + img
          + '    <div class="card__badges">'
-         +        (p.tenantName ? '<span class="badge--tenant">🏪 ' + escHtml(p.tenantName) + '</span>' : '<span></span>')
+         +        (p.tenantName ? '<span class="badge--tenant">' + icon("store") + ' ' + escHtml(p.tenantName) + '</span>' : '<span></span>')
          +        (p.category ? '<span class="badge--cat">' + escHtml(p.category) + '</span>' : '<span></span>')
          + '    </div>'
-         +      (hasOptions ? '<div class="card__customize-hint">⚙️ Customize</div>' : '')
+         +      (hasOptions ? '<div class="card__customize-hint">' + icon("tune") + ' Customize</div>' : '')
          + '  </div>'
          + '  <div class="card__body">'
          + '    <div class="card__title">' + escHtml(p.name) + '</div>'
@@ -708,8 +932,8 @@
          + '    <div class="card__foot">'
          + '      <span class="card__price">CHF ' + Number(p.price).toFixed(2) + '</span>'
          + (qty > 0
-              ? '<button class="card__add" data-bc-pid="' + p.id + '" style="background:var(--success);">' + qty + ' in cart</button>'
-              : '<button class="card__add" data-bc-pid="' + p.id + '">+ Add</button>')
+              ? '<button class="card__add" data-bc-pid="' + p.id + '" data-incart="1">' + icon("check") + ' ' + qty + ' added</button>'
+              : '<button class="card__add" data-bc-pid="' + p.id + '">' + icon("plus") + ' Add</button>')
          + '    </div>'
          + '  </div>'
          + '</div>';
@@ -726,22 +950,42 @@
     });
   }
 
-  // ─── Customize sheet (variant + modifiers + qty + notes) ────────────
+  // ─── Customize sheet (variant + modifiers + addons + qty + notes) ───
+  // Addons (drinks/sauces/extras stored as separate `isAddon` products in
+  // the same tenant) are loaded from state.bc.addons and grouped by their
+  // category so the picker matches what cashiers see in the POS app.
   var custState = null;
+  function tenantAddons(tenantId) {
+    return (state.bc.addons || []).filter(function (a) { return a.tenantId === tenantId; });
+  }
+  function groupAddonsByCategory(list) {
+    var groups = {};
+    list.forEach(function (a) {
+      var k = a.category || "Add-ons";
+      if (!groups[k]) groups[k] = [];
+      groups[k].push(a);
+    });
+    return Object.keys(groups).map(function (k) { return { name: k, items: groups[k] }; });
+  }
   function openCustomizeSheet(product) {
     var hasVariants = product.variants && product.variants.length > 0;
-    var hasModifiers = product.modifiers && product.modifiers.length > 0;
+    var addons = tenantAddons(product.tenantId);
+    var addonGroups = groupAddonsByCategory(addons);
     custState = {
       product: product,
       qty: 1,
-      variant: hasVariants ? null : { name: "", price: Number(product.price) }, // null = none chosen yet
+      variant: hasVariants ? null : { name: "", price: Number(product.price) },
       // For each modifier group, store array of selected option indices
       mods: (product.modifiers || []).map(function () { return []; }),
+      // For each addon, store quantity (0 = not selected)
+      addonQty: {},
+      addonGroups: addonGroups,
       notes: "",
     };
 
     $("cust-name").textContent = product.name;
-    $("cust-tenant").textContent = "🏪 " + (product.tenantName || "");
+    var tEl = $("cust-tenant");
+    tEl.innerHTML = icon("store") + " " + escHtml(product.tenantName || "");
     var cover = $("cust-cover");
     if (product.imageUrl) {
       var existingImg = cover.querySelector("img");
@@ -761,14 +1005,20 @@
 
     $("cust-overlay").classList.add("open");
     $("cust-sheet").classList.add("open");
-    $("cust-sheet").setAttribute("aria-hidden", "false");
+    // `inert` is the modern replacement for `aria-hidden` on focusable
+    // ancestors — removing it makes the sheet interactive again.
+    $("cust-sheet").removeAttribute("inert");
     document.body.style.overflow = "hidden";
   }
 
   function closeCustomizeSheet() {
+    // Move focus out of the sheet *before* setting inert so the browser
+    // doesn't warn about hiding a focused element.
+    var active = document.activeElement;
+    if (active && $("cust-sheet").contains(active)) active.blur();
     $("cust-overlay").classList.remove("open");
     $("cust-sheet").classList.remove("open");
-    $("cust-sheet").setAttribute("aria-hidden", "true");
+    $("cust-sheet").setAttribute("inert", "");
     document.body.style.overflow = "";
     custState = null;
   }
@@ -802,7 +1052,7 @@
     // Modifiers (each group can be single or multi; default = multi for extras/sauces, single for "size"-like)
     (p.modifiers || []).forEach(function (m, gi) {
       var nameLower = String(m.name || "").toLowerCase();
-      var isSingle = /size|كبير|صغير|حجم/.test(nameLower); // size-like → single-select
+      var isSingle = /size|größe|kleine|grosse|kleines|grosses|كبير|صغير|حجم/.test(nameLower); // size-like → single-select
       html += '<div class="cust-section">';
       html += '  <div class="cust-section__head"><h4>' + escHtml(m.name || "Options") + '</h4><span class="opt">' + (isSingle ? "Pick one" : "Pick any") + '</span></div>';
       html += '  <div class="cust-options">';
@@ -812,6 +1062,35 @@
              +    '<div class="cust-opt__check"></div>'
              +    '<div class="cust-opt__label">' + escHtml(op.label || op.name || "Option") + '</div>'
              +    (Number(op.price) > 0 ? '<div class="cust-opt__price">+CHF ' + Number(op.price).toFixed(2) + '</div>' : '<div class="cust-opt__price" style="color:var(--text-dim);">Free</div>')
+             + '</div>';
+      });
+      html += '  </div></div>';
+    });
+
+    // Addons (separate products marked isAddon=true on this tenant — drinks,
+    // sauces, sides, extras). Each addon supports a quantity stepper so the
+    // customer can stack multiples (e.g. "2x Coke + 1x Sauce").
+    (custState.addonGroups || []).forEach(function (g) {
+      if (!g.items.length) return;
+      html += '<div class="cust-section">';
+      html += '  <div class="cust-section__head"><h4>' + escHtml(g.name) + '</h4><span class="opt">Optional · ' + g.items.length + ' available</span></div>';
+      html += '  <div class="cust-addons">';
+      g.items.forEach(function (a) {
+        var q = custState.addonQty[a.id] || 0;
+        var imgHtml = a.imageUrl ? '<img src="' + escHtml(a.imageUrl) + '" alt="" onerror="this.style.display=\'none\'" />' : icon("package", { class: "cust-addon__ph" });
+        html += '<div class="cust-addon' + (q > 0 ? " selected" : "") + '" data-aid="' + a.id + '">'
+             +    '<div class="cust-addon__img">' + imgHtml + '</div>'
+             +    '<div class="cust-addon__body">'
+             +      '<div class="cust-addon__name">' + escHtml(a.name) + '</div>'
+             +      '<div class="cust-addon__price">' + (Number(a.price) > 0 ? "CHF " + Number(a.price).toFixed(2) : "Free") + '</div>'
+             +    '</div>'
+             +    (q > 0
+                    ? '<div class="cust-addon__qty">'
+                       + '<button data-aact="dec" data-aid="' + a.id + '" type="button">' + icon("minus") + '</button>'
+                       + '<span>' + q + '</span>'
+                       + '<button data-aact="inc" data-aid="' + a.id + '" type="button">' + icon("plus") + '</button>'
+                     + '</div>'
+                    : '<button class="cust-addon__add" data-aact="inc" data-aid="' + a.id + '" type="button">' + icon("plus") + '</button>')
              + '</div>';
       });
       html += '  </div></div>';
@@ -861,6 +1140,19 @@
     // Wire qty
     var inc = $("cust-qty-inc"); if (inc) inc.addEventListener("click", function () { custState.qty = Math.min(99, custState.qty + 1); $("cust-qty-num").textContent = custState.qty; updateCustomizeTotal(); });
     var dec = $("cust-qty-dec"); if (dec) dec.addEventListener("click", function () { custState.qty = Math.max(1, custState.qty - 1); $("cust-qty-num").textContent = custState.qty; updateCustomizeTotal(); });
+    // Wire addon stepper (each addon has its own quantity)
+    $("cust-body").querySelectorAll("[data-aact]").forEach(function (b) {
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var aid = Number(b.getAttribute("data-aid"));
+        var act = b.getAttribute("data-aact");
+        var cur = custState.addonQty[aid] || 0;
+        if (act === "inc") cur = Math.min(20, cur + 1);
+        else if (act === "dec") cur = Math.max(0, cur - 1);
+        if (cur === 0) delete custState.addonQty[aid]; else custState.addonQty[aid] = cur;
+        renderCustomizeBody(); updateCustomizeTotal();
+      });
+    });
     // Wire notes
     var n = $("cust-notes-inp"); if (n) n.addEventListener("input", function () { custState.notes = n.value; });
   }
@@ -869,18 +1161,29 @@
     if (!custState) return 0;
     var p = custState.product;
     var base = (custState.variant && Number(custState.variant.price)) || Number(p.price);
-    var addons = 0;
+    var modAdd = 0;
     (custState.mods || []).forEach(function (sel, gi) {
       sel.forEach(function (oi) {
         var op = (p.modifiers[gi] && p.modifiers[gi].options && p.modifiers[gi].options[oi]) || null;
-        if (op) addons += Number(op.price || 0);
+        if (op) modAdd += Number(op.price || 0);
       });
     });
-    return base + addons;
+    return base + modAdd;
+  }
+  function customizeAddonsTotal() {
+    if (!custState) return 0;
+    var sum = 0;
+    Object.keys(custState.addonQty || {}).forEach(function (aid) {
+      var q = custState.addonQty[aid];
+      var a = (state.bc.addons || []).find(function (x) { return x.id === Number(aid); });
+      if (a && q) sum += q * Number(a.price || 0);
+    });
+    return sum;
   }
   function updateCustomizeTotal() {
     if (!custState) return;
-    $("cust-total").textContent = "CHF " + (customizeUnitPrice() * custState.qty).toFixed(2);
+    var grand = (customizeUnitPrice() * custState.qty) + customizeAddonsTotal();
+    $("cust-total").textContent = "CHF " + grand.toFixed(2);
   }
 
   function commitCustomize() {
@@ -915,8 +1218,29 @@
       modifiers: modSummary,
       notes: custState.notes || null,
     });
+    // Each selected addon is a separate cart line so the kitchen sees them
+    // as discrete products (matches how POS handles addon products).
+    var addedAddons = 0;
+    Object.keys(custState.addonQty || {}).forEach(function (aid) {
+      var q = custState.addonQty[aid];
+      var a = (state.bc.addons || []).find(function (x) { return x.id === Number(aid); });
+      if (!a || !q) return;
+      addToCart({
+        productId: a.id,
+        tenantId: a.tenantId,
+        tenantName: a.tenantName,
+        name: a.name,
+        quantity: q,
+        estimatedPrice: Number(a.price || 0),
+        imageUrl: a.imageUrl,
+        variant: null, modifiers: [], notes: null,
+        isAddon: true,
+      });
+      addedAddons += q;
+    });
     closeCustomizeSheet();
-    toast("Added to cart", "success");
+    var msg = "Added to cart" + (addedAddons ? " (+" + addedAddons + " add-on" + (addedAddons === 1 ? "" : "s") + ")" : "");
+    toast(msg, "success");
   }
 
   // ─── Orders + Tracking ─────────────────────────────────────────────
@@ -927,7 +1251,7 @@
       // Show recent on home
       var homeEl = $("home-orders");
       if (state.orders.length === 0) {
-        homeEl.innerHTML = '<div class="empty"><div class="empty__icon">🛍️</div><div class="empty__title">No orders yet</div><div class="empty__sub">Place your first order</div></div>';
+        homeEl.innerHTML = homeEmpty("No orders yet", "Place your first order", "shopping");
       } else {
         homeEl.innerHTML = state.orders.slice(0, 3).map(orderListItem).join("");
         bindOrderClicks(homeEl);
@@ -1188,9 +1512,17 @@
       api("GET", "/api/delivery/broadcast/" + token).then(function (data) {
         if (data.status === "claimed") {
           done = true;
-          toast("✨ " + (data.claimedByName || "A restaurant") + " accepted your order!", "success");
-          if (data.trackingToken) navigate("track", [data.trackingToken]);
+          toast((data.claimedByName || "A restaurant") + " accepted your order", "success");
+          // Refresh orders so the new chat thread shows up under "My orders".
           refreshOrders();
+          // After claim, the broadcast row carries the restaurant order id —
+          // open chat directly so the customer can talk to the restaurant.
+          // Tracking still works via the tab; chat is the priority surface.
+          if (data.orderId) {
+            setTimeout(function () { navigate("chat", [data.orderId]); }, 500);
+          } else if (data.trackingToken) {
+            navigate("track", [data.trackingToken]);
+          }
         } else if (data.status === "expired" || data.status === "cancelled") {
           done = true;
           toast("Order " + data.status + ". Please try again.", "error");
@@ -1201,37 +1533,68 @@
     var iv = setInterval(function () { if (done) clearInterval(iv); else tick(); }, 5000);
   }
 
-  // ─── WebSocket (chat updates) ───────────────────────────────────────
+  // ─── WebSocket / SSE (live updates) ─────────────────────────────────
+  // Hostinger CDN swallows WebSocket upgrades, so we race a 3 s WS attempt
+  // against an SSE fallback. Whichever connects first wins.
+  function handleLiveEvent(m) {
+    if (!m || !m.type) return;
+    if (m.type === "chat_new_message") {
+      if (state.activeChatRoom === m.orderId && state.currentRoute === "chat") {
+        var msgs = document.querySelector("#chat-msgs");
+        if (msgs) {
+          if (msgs.querySelector(".empty")) msgs.innerHTML = "";
+          msgs.insertAdjacentHTML("beforeend", chatMsgHtml({ senderType: m.senderType, senderName: m.senderName, body: m.body, createdAt: m.createdAt }));
+          msgs.scrollTop = msgs.scrollHeight;
+        }
+      } else if (m.senderType !== "customer") {
+        toast((m.senderName || "Restaurant") + ": " + String(m.body || "").slice(0, 60), "success");
+        beep(900, 0.12);
+      }
+    } else if (m.type === "broadcast_claimed" && state.cartMode === "broadcast") {
+      refreshOrders();
+    } else if (m.type === "delivery_status_change" && state.activeOrder && m.orderId === state.activeOrder.id) {
+      // Live status updates on the tracking page
+      if (state.currentRoute === "track" && state.activeOrder.trackingToken) {
+        renderTrack(state.activeOrder.trackingToken);
+      }
+    }
+  }
+
+  function startSse() {
+    if (state.es || typeof EventSource === "undefined") return;
+    try {
+      var es = new EventSource("/api/events");
+      state.es = es;
+      es.onmessage = function (ev) { try { handleLiveEvent(JSON.parse(ev.data)); } catch (_) {} };
+      es.onerror = function () { /* EventSource auto-reconnects */ };
+    } catch (e) { /* ignore */ }
+  }
+
   function connectWS() {
-    if (state.ws) return;
+    if (state.ws || state.es) return;
+    var wsTimeout = null;
     try {
       var proto = location.protocol === "https:" ? "wss:" : "ws:";
       var ws = new WebSocket(proto + "//" + location.host + "/api/ws/caller-id");
       state.ws = ws;
-      ws.onmessage = function (ev) {
-        try {
-          var m = JSON.parse(ev.data);
-          if (m.type === "chat_new_message") {
-            // If user is in chat for this order, append; else show toast
-            if (state.activeChatRoom === m.orderId && state.currentRoute === "chat") {
-              var msgs = document.querySelector("#chat-msgs");
-              if (msgs) {
-                if (msgs.querySelector(".empty")) msgs.innerHTML = "";
-                msgs.insertAdjacentHTML("beforeend", chatMsgHtml({ senderType: m.senderType, senderName: m.senderName, body: m.body, createdAt: m.createdAt }));
-                msgs.scrollTop = msgs.scrollHeight;
-              }
-            } else if (m.senderType !== "customer") {
-              toast("💬 " + (m.senderName || "Restaurant") + ": " + m.body.slice(0, 60), "success");
-              beep(900, 0.12);
-            }
-          } else if (m.type === "broadcast_claimed" && state.cartMode === "broadcast") {
-            // Customer's broadcast was claimed
-            refreshOrders();
-          }
-        } catch (e) {}
+      wsTimeout = setTimeout(function () {
+        if (ws.readyState !== WebSocket.OPEN) {
+          try { ws.close(); } catch (_) {}
+          state.ws = null;
+          startSse();
+        }
+      }, 3000);
+      ws.onopen = function () { clearTimeout(wsTimeout); };
+      ws.onmessage = function (ev) { try { handleLiveEvent(JSON.parse(ev.data)); } catch (_) {} };
+      ws.onerror = function () { try { ws.close(); } catch (_) {} };
+      ws.onclose = function () {
+        clearTimeout(wsTimeout);
+        state.ws = null;
+        if (!state.es) startSse();
       };
-      ws.onclose = function () { state.ws = null; setTimeout(connectWS, 4000); };
-    } catch (e) {}
+    } catch (e) {
+      startSse();
+    }
   }
 
   // ─── Init ───────────────────────────────────────────────────────────
@@ -1338,7 +1701,9 @@
   $("btn-checkout").onclick = startCheckout;
   $("btn-send-chat").onclick = sendChatMessage;
   $("chat-input").addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
-  $("btn-open-chats").onclick = function () { navigate("orders"); };
+  // btn-open-chats was removed when the home page was redesigned; guard the
+  // wiring so the rest of init still runs if it's missing in the markup.
+  var btnOpenChats = $("btn-open-chats"); if (btnOpenChats) btnOpenChats.onclick = function () { navigate("orders"); };
 
   // ─── Customize sheet ──────────────────────────────────────────────
   var custClose = $("cust-close"); if (custClose) custClose.addEventListener("click", closeCustomizeSheet);

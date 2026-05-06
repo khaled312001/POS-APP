@@ -61,6 +61,8 @@ const PUBLIC_ROUTES = [
   "/api/assets/",                  // App assets
   "/api/objects/",                 // Alias for uploads
   "/api/sounds/",                  // Notification sounds
+  "/api/ws/",                      // WebSocket upgrade — auth handled by ws server itself
+  "/api/events",                   // SSE fallback for the WS broadcast channel
 ];
 
 const PUBLIC_ROUTE_PATTERNS = [

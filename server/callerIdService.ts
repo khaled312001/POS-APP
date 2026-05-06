@@ -27,6 +27,15 @@ interface TenantWebSocket extends WebSocket {
   tenantId?: number;
 }
 
+// SSE client tracked per response. Express Response has .write() that we can
+// stream to. We keep an explicit interface so the broadcast loop can filter
+// by tenant in the same way as WebSocket clients.
+interface SseClient {
+  res: any;       // Response
+  tenantId?: number;
+  alive: boolean;
+}
+
 /**
  * CallerIDService handles incoming calls from hardware (FRITZ!Card via CAPI)
  * and broadcasts them to connected POS clients via WebSockets.
@@ -44,6 +53,9 @@ export class CallerIDService extends EventEmitter {
   // Key: "normalizedPhone-tenantId", Value: timestamp
   private recentCalls: Map<string, number> = new Map();
   private readonly DEDUP_WINDOW_MS = 5000; // 5 seconds
+  // SSE fallback — Hostinger CDN doesn't proxy WebSocket upgrades, so we
+  // mirror every broadcast to attached EventSource clients too.
+  private sseClients: Set<SseClient> = new Set();
 
   constructor() {
     super();
@@ -256,28 +268,51 @@ export class CallerIDService extends EventEmitter {
   }
 
   private broadcastToTenant(payload: string, tenantId?: number) {
-    if (!this.wss) return;
-    let total = 0, matched = 0;
-    const allOpen: TenantWebSocket[] = [];
-    this.wss.clients.forEach((client: TenantWebSocket) => {
-      if (client.readyState === WebSocket.OPEN) {
-        total++;
-        allOpen.push(client);
-        // Send to: unfiltered calls, unregistered clients (compat), or matching-tenant clients
-        if (!tenantId || !client.tenantId || client.tenantId === tenantId) {
-          matched++;
-          client.send(payload);
+    let wsTotal = 0, wsMatched = 0;
+    const allWsOpen: TenantWebSocket[] = [];
+    if (this.wss) {
+      this.wss.clients.forEach((client: TenantWebSocket) => {
+        if (client.readyState === WebSocket.OPEN) {
+          wsTotal++;
+          allWsOpen.push(client);
+          if (!tenantId || !client.tenantId || client.tenantId === tenantId) {
+            wsMatched++;
+            client.send(payload);
+          }
         }
+      });
+      if (tenantId && wsMatched === 0 && allWsOpen.length > 0) {
+        allWsOpen.forEach(c => c.send(payload));
+        wsMatched = allWsOpen.length;
+      }
+    }
+
+    // SSE mirror — required because Hostinger CDN doesn't tunnel WebSockets.
+    let sseTotal = 0, sseMatched = 0;
+    const sseAll: SseClient[] = [];
+    this.sseClients.forEach((sc) => {
+      if (!sc.alive) return;
+      sseTotal++; sseAll.push(sc);
+      if (!tenantId || !sc.tenantId || sc.tenantId === tenantId) {
+        sseMatched++;
+        try { sc.res.write(`data: ${payload}\n\n`); } catch { sc.alive = false; }
       }
     });
-    // Fallback: if bridge sent a tenantId but no client is registered for it,
-    // broadcast to ALL connected clients (handles misconfigured bridge tenantId)
-    if (tenantId && matched === 0 && allOpen.length > 0) {
-      console.log(`[CallerID] No clients for tenant=${tenantId}, falling back to broadcast all ${allOpen.length} clients`);
-      allOpen.forEach(c => c.send(payload));
-      matched = allOpen.length;
+    if (tenantId && sseMatched === 0 && sseAll.length > 0) {
+      sseAll.forEach((sc) => { try { sc.res.write(`data: ${payload}\n\n`); } catch { sc.alive = false; } });
+      sseMatched = sseAll.length;
     }
-    console.log(`[CallerID] Broadcast: ${matched}/${total} clients matched tenant=${tenantId}`);
+    console.log(`[CallerID] Broadcast: ws=${wsMatched}/${wsTotal} sse=${sseMatched}/${sseTotal} tenant=${tenantId}`);
+  }
+
+  /**
+   * Register a long-lived SSE response. Returns a teardown function the
+   * route handler should call from `req.on("close")`.
+   */
+  public addSseClient(res: any, tenantId?: number): () => void {
+    const sc: SseClient = { res, tenantId, alive: true };
+    this.sseClients.add(sc);
+    return () => { sc.alive = false; this.sseClients.delete(sc); };
   }
 
   /**

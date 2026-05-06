@@ -4806,6 +4806,9 @@ var CallerIDService = class extends import_events.EventEmitter {
   recentCalls = /* @__PURE__ */ new Map();
   DEDUP_WINDOW_MS = 5e3;
   // 5 seconds
+  // SSE fallback — Hostinger CDN doesn't proxy WebSocket upgrades, so we
+  // mirror every broadcast to attached EventSource clients too.
+  sseClients = /* @__PURE__ */ new Set();
   constructor() {
     super();
   }
@@ -4975,25 +4978,66 @@ var CallerIDService = class extends import_events.EventEmitter {
     return callInfo;
   }
   broadcastToTenant(payload, tenantId) {
-    if (!this.wss) return;
-    let total = 0, matched = 0;
-    const allOpen = [];
-    this.wss.clients.forEach((client2) => {
-      if (client2.readyState === import_ws.WebSocket.OPEN) {
-        total++;
-        allOpen.push(client2);
-        if (!tenantId || !client2.tenantId || client2.tenantId === tenantId) {
-          matched++;
-          client2.send(payload);
+    let wsTotal = 0, wsMatched = 0;
+    const allWsOpen = [];
+    if (this.wss) {
+      this.wss.clients.forEach((client2) => {
+        if (client2.readyState === import_ws.WebSocket.OPEN) {
+          wsTotal++;
+          allWsOpen.push(client2);
+          if (!tenantId || !client2.tenantId || client2.tenantId === tenantId) {
+            wsMatched++;
+            client2.send(payload);
+          }
+        }
+      });
+      if (tenantId && wsMatched === 0 && allWsOpen.length > 0) {
+        allWsOpen.forEach((c) => c.send(payload));
+        wsMatched = allWsOpen.length;
+      }
+    }
+    let sseTotal = 0, sseMatched = 0;
+    const sseAll = [];
+    this.sseClients.forEach((sc) => {
+      if (!sc.alive) return;
+      sseTotal++;
+      sseAll.push(sc);
+      if (!tenantId || !sc.tenantId || sc.tenantId === tenantId) {
+        sseMatched++;
+        try {
+          sc.res.write(`data: ${payload}
+
+`);
+        } catch {
+          sc.alive = false;
         }
       }
     });
-    if (tenantId && matched === 0 && allOpen.length > 0) {
-      console.log(`[CallerID] No clients for tenant=${tenantId}, falling back to broadcast all ${allOpen.length} clients`);
-      allOpen.forEach((c) => c.send(payload));
-      matched = allOpen.length;
+    if (tenantId && sseMatched === 0 && sseAll.length > 0) {
+      sseAll.forEach((sc) => {
+        try {
+          sc.res.write(`data: ${payload}
+
+`);
+        } catch {
+          sc.alive = false;
+        }
+      });
+      sseMatched = sseAll.length;
     }
-    console.log(`[CallerID] Broadcast: ${matched}/${total} clients matched tenant=${tenantId}`);
+    console.log(`[CallerID] Broadcast: ws=${wsMatched}/${wsTotal} sse=${sseMatched}/${sseTotal} tenant=${tenantId}`);
+  }
+  /**
+   * Register a long-lived SSE response. Returns a teardown function the
+   * route handler should call from `req.on("close")`.
+   */
+  addSseClient(res, tenantId) {
+    const sc = { res, tenantId, alive: true };
+    this.sseClients.add(sc);
+    return () => {
+      sc.alive = false;
+      this.sseClients.delete(sc);
+    };
   }
   /**
    * Broadcasts updated slot information to a specific tenant
@@ -8754,6 +8798,34 @@ async function test(){
     const calls2 = callerIdService.getActiveCallsForTenant(Number(tenantId));
     res.json({ calls: calls2 });
   });
+  app2.get("/api/events", (req, res) => {
+    const tenantIdRaw = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+    const tenantId = tenantIdRaw && !isNaN(tenantIdRaw) ? tenantIdRaw : void 0;
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-store, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders?.();
+    res.write(`: connected ${(/* @__PURE__ */ new Date()).toISOString()}
+
+`);
+    res.write(`data: ${JSON.stringify({ type: "sse_connected", tenantId: tenantId ?? null })}
+
+`);
+    const teardown = callerIdService.addSseClient(res, tenantId);
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`: hb ${Date.now()}
+
+`);
+      } catch {
+      }
+    }, 25e3);
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      teardown();
+    });
+  });
   app2.post("/api/caller-id/incoming", async (req, res) => {
     try {
       const secret = req.headers["x-bridge-secret"] || req.body.secret;
@@ -12194,19 +12266,19 @@ function registerBroadcastRoutes(app2) {
       }).from(categories).where((0, import_drizzle_orm7.inArray)(categories.tenantId, tenantIds));
       const catMap = new Map(cats.map((c) => [`${c.tenantId}:${c.id}`, c.name]));
       const tMap = new Map(activeTenants.map((t) => [t.id, t]));
-      const payload = allProducts.filter((p) => Number(p.price) > 0 && !p.isAddon).map((p) => {
-        const t = tMap.get(p.tenantId);
-        const parseJson = (v) => {
-          if (Array.isArray(v) || v && typeof v === "object") return v;
-          if (typeof v === "string" && v.trim()) {
-            try {
-              return JSON.parse(v);
-            } catch {
-              return [];
-            }
+      const parseJson = (v) => {
+        if (Array.isArray(v) || v && typeof v === "object") return v;
+        if (typeof v === "string" && v.trim()) {
+          try {
+            return JSON.parse(v);
+          } catch {
+            return [];
           }
-          return [];
-        };
+        }
+        return [];
+      };
+      const decorate = (p) => {
+        const t = tMap.get(p.tenantId);
         return {
           id: p.id,
           tenantId: p.tenantId,
@@ -12221,13 +12293,18 @@ function registerBroadcastRoutes(app2) {
           imageUrl: p.imageUrl,
           category: catMap.get(`${p.tenantId}:${p.categoryId}`) || "Other",
           modifiers: parseJson(p.modifiers),
-          variants: parseJson(p.variants)
+          variants: parseJson(p.variants),
+          isAddon: !!p.isAddon
         };
-      });
+      };
+      const validProducts = allProducts.filter((p) => Number(p.price) > 0 || p.isAddon);
+      const main = validProducts.filter((p) => !p.isAddon).map(decorate);
+      const addons = validProducts.filter((p) => p.isAddon).map(decorate);
       res.json({
         restaurants: activeTenants,
-        products: payload,
-        categories: Array.from(new Set(payload.map((p) => p.category))).filter(Boolean).sort()
+        products: main,
+        addons,
+        categories: Array.from(new Set(main.map((p) => p.category))).filter(Boolean).sort()
       });
     } catch (e) {
       console.error("[broadcast/menu] error:", e);
@@ -12900,8 +12977,12 @@ var PUBLIC_ROUTES = [
   // App assets
   "/api/objects/",
   // Alias for uploads
-  "/api/sounds/"
+  "/api/sounds/",
   // Notification sounds
+  "/api/ws/",
+  // WebSocket upgrade — auth handled by ws server itself
+  "/api/events"
+  // SSE fallback for the WS broadcast channel
 ];
 var PUBLIC_ROUTE_PATTERNS = [
   /^\/api\/store\/\d+\/menu$/

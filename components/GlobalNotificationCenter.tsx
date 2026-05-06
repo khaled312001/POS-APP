@@ -169,13 +169,52 @@ export default function GlobalNotificationCenter() {
     if (!tenantId) return;
     let mounted = true;
 
+    // We try WebSocket first; if it fails (Hostinger CDN strips the upgrade),
+    // we fall back to a Server-Sent-Events stream that mirrors the same
+    // broadcast events. SSE works through HTTP/2 proxies without any
+    // special server config.
+    let esRef: EventSource | null = null;
+    let wsFailed = false;
+
+    const startSse = () => {
+      if (typeof EventSource === "undefined") return;
+      try {
+        const base = getApiUrl().replace(/\/$/, "");
+        const es = new EventSource(`${base}/api/events?tenantId=${tenantId}`);
+        esRef = es;
+        es.onmessage = (ev) => {
+          try { handleEvent(JSON.parse(ev.data)); } catch {}
+        };
+        es.onerror = () => {
+          // EventSource auto-reconnects, but if the browser gives up we'll
+          // re-create after a short delay.
+          if (!mounted) return;
+          try { es.close(); } catch {}
+          esRef = null;
+          reconnectRef.current = setTimeout(startSse, 4000);
+        };
+      } catch {
+        reconnectRef.current = setTimeout(startSse, 4000);
+      }
+    };
+
     const connect = () => {
       try {
         const base = getApiUrl().replace(/^http/, "ws");
         const ws = new WebSocket(`${base}/api/ws/caller-id`);
         wsRef.current = ws;
 
+        // If the WS doesn't open within 3s (CDN swallowed the upgrade),
+        // give up and use SSE — without this, we'd just spin forever.
+        const wsTimeout = setTimeout(() => {
+          if (ws.readyState !== WebSocket.OPEN) {
+            try { ws.close(); } catch {}
+            if (!wsFailed) { wsFailed = true; startSse(); }
+          }
+        }, 3000);
+
         ws.onopen = () => {
+          clearTimeout(wsTimeout);
           try { ws.send(JSON.stringify({ type: "register", tenantId })); } catch {}
         };
 
@@ -187,12 +226,17 @@ export default function GlobalNotificationCenter() {
         };
 
         ws.onclose = () => {
+          clearTimeout(wsTimeout);
           if (!mounted) return;
+          if (wsFailed) return; // SSE already taking over
           reconnectRef.current = setTimeout(connect, 4000);
         };
-        ws.onerror = () => { try { ws.close(); } catch {} };
+        ws.onerror = () => {
+          try { ws.close(); } catch {}
+          if (!wsFailed) { wsFailed = true; startSse(); }
+        };
       } catch {
-        reconnectRef.current = setTimeout(connect, 4000);
+        if (!wsFailed) { wsFailed = true; startSse(); }
       }
     };
 
@@ -294,6 +338,7 @@ export default function GlobalNotificationCenter() {
       mounted = false;
       if (reconnectRef.current) clearTimeout(reconnectRef.current);
       try { wsRef.current?.close(); } catch {}
+      try { esRef?.close(); } catch {}
     };
   }, [tenantId, push]);
 

@@ -175,11 +175,12 @@
   #page-intro .logo {
     width: 96px; height: 96px; border-radius: 30px;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    display: grid; place-items: center; font-size: 50px;
+    display: grid; place-items: center; color: #fff;
     box-shadow: 0 24px 48px rgba(255,87,34,0.45), inset 0 -8px 20px rgba(255,255,255,0.08);
     margin-bottom: 22px; position: relative;
     animation: introLogoIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
+  #page-intro .logo svg { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25)); }
   @keyframes introLogoIn { from { opacity: 0; transform: scale(0.7) rotate(-12deg); } to { opacity: 1; transform: none; } }
   #page-intro .logo::before { content: ""; position: absolute; inset: -4px; border-radius: 32px; background: conic-gradient(from 0deg, var(--accent), var(--accent-2), var(--teal), var(--accent)); z-index: -1; opacity: 0.55; filter: blur(10px); }
   #page-intro .brand-name { font-size: 0.78rem; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; color: var(--accent-2); margin-bottom: 6px; }
@@ -357,49 +358,373 @@
 
   .hidden { display: none !important; }
 
+  /* ─── Home page (food-app style) ────────────────────────────────── */
+  #page-home.active {
+    background:
+      radial-gradient(700px 400px at 0% -5%, rgba(255,87,34,0.12), transparent 50%),
+      radial-gradient(600px 400px at 100% 0%, rgba(47,211,198,0.08), transparent 50%),
+      var(--bg);
+  }
+  .home-top {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 16px 16px 10px; gap: 12px;
+  }
+  .home-greet { flex: 1; min-width: 0; }
+  .home-greet__hi { margin: 0 0 2px; font-size: 0.78rem; color: var(--text-dim); font-weight: 600; }
+  .home-greet__hi span { color: var(--accent-2); font-weight: 800; }
+  .home-greet__line { margin: 0; font-size: 1.2rem; font-weight: 800; letter-spacing: -0.4px; line-height: 1.25; }
+  .home-top__actions { display: flex; gap: 6px; }
+  .home-top__btn {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); display: grid; place-items: center;
+    cursor: pointer; transition: all 0.18s;
+  }
+  .home-top__btn:hover { background: var(--surface-2); border-color: var(--border-2); }
+
+  .home-wrap { padding: 6px 16px 100px; display: flex; flex-direction: column; gap: 18px; }
+
+  .home-search-wrap {
+    display: flex; align-items: center; gap: 10px;
+    padding: 13px 16px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 99px;
+    color: var(--text-dim); font-size: 0.88rem; font-weight: 500;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .home-search-wrap:hover { border-color: var(--accent); color: var(--text); background: var(--surface-2); }
+  .home-search-wrap .ic { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.85; }
+  .home-search-text { flex: 1; }
+
+  .home-banner {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 18px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-radius: var(--r-xl);
+    cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 16px 36px rgba(255,87,34,0.4);
+    color: #fff; position: relative; overflow: hidden;
+  }
+  .home-banner::before {
+    content: ""; position: absolute; right: -30px; top: -30px;
+    width: 140px; height: 140px; border-radius: 50%;
+    background: rgba(255,255,255,0.12); pointer-events: none;
+  }
+  .home-banner::after {
+    content: ""; position: absolute; right: -10px; bottom: -40px;
+    width: 100px; height: 100px; border-radius: 50%;
+    background: rgba(255,255,255,0.08); pointer-events: none;
+  }
+  .home-banner:hover { transform: translateY(-2px); box-shadow: 0 22px 44px rgba(255,87,34,0.5); }
+  .home-banner__icon {
+    width: 56px; height: 56px; border-radius: 16px;
+    background: rgba(255,255,255,0.22); color: #fff;
+    display: grid; place-items: center; flex-shrink: 0;
+    backdrop-filter: blur(8px);
+    box-shadow: inset 0 -3px 10px rgba(0,0,0,0.15);
+    position: relative; z-index: 1;
+  }
+  .home-banner__body { flex: 1; min-width: 0; position: relative; z-index: 1; }
+  .home-banner__body h3 { margin: 0 0 3px; font-size: 1.05rem; font-weight: 800; letter-spacing: -0.2px; }
+  .home-banner__body p { margin: 0; font-size: 0.78rem; opacity: 0.95; line-height: 1.35; }
+  .home-banner__chev { width: 20px; height: 20px; opacity: 0.9; flex-shrink: 0; position: relative; z-index: 1; }
+
+  .home-section { display: flex; flex-direction: column; gap: 10px; }
+  .home-section__head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 2px; }
+  .home-section__head h2 { margin: 0; font-size: 1.05rem; font-weight: 800; letter-spacing: -0.3px; display: inline-flex; align-items: center; gap: 8px; }
+  .home-section__head h2::before { content: ""; width: 4px; height: 18px; background: linear-gradient(180deg, var(--accent), var(--accent-2)); border-radius: 2px; }
+  .home-link { color: var(--accent-2); font-size: 0.82rem; font-weight: 700; text-decoration: none; }
+  .home-link:hover { color: var(--accent); }
+
+  /* Cuisines (round category icons) */
+  .home-cuisines {
+    display: flex; gap: 10px; overflow-x: auto;
+    padding: 4px 2px 8px; scrollbar-width: none;
+    scroll-snap-type: x mandatory;
+  }
+  .home-cuisines::-webkit-scrollbar { display: none; }
+  .home-cuisine {
+    flex: 0 0 90px; display: flex; flex-direction: column;
+    align-items: center; gap: 6px; padding: 10px 6px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-lg); cursor: pointer; transition: all 0.18s;
+    scroll-snap-align: start;
+  }
+  .home-cuisine:hover { border-color: var(--accent); background: var(--surface-2); transform: translateY(-2px); }
+  .home-cuisine__icon {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-soft), rgba(47,211,198,0.18));
+    color: var(--accent-2); display: grid; place-items: center;
+    box-shadow: inset 0 -2px 6px rgba(0,0,0,0.15);
+  }
+  .home-cuisine__name { font-size: 0.74rem; font-weight: 700; color: var(--text); text-align: center; line-height: 1.15; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .home-cuisine__count { font-size: 0.65rem; color: var(--text-dim); font-weight: 600; }
+
+  /* Restaurants — richer card */
+  .home-restaurants {
+    display: grid; grid-template-columns: 1fr; gap: 12px;
+  }
+  @media (min-width: 600px) { .home-restaurants { grid-template-columns: 1fr 1fr; } }
+  .home-rest {
+    display: flex; flex-direction: column; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--r-lg);
+    overflow: hidden; cursor: pointer; transition: all 0.2s;
+  }
+  .home-rest:hover { transform: translateY(-3px); border-color: var(--border-2); box-shadow: 0 12px 28px rgba(0,0,0,0.35); }
+  .home-rest__cover {
+    aspect-ratio: 21/9; position: relative;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    overflow: hidden;
+  }
+  .home-rest__cover img { width: 100%; height: 100%; object-fit: cover; }
+  .home-rest__cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.55) 100%); }
+  .home-rest__featured {
+    position: absolute; top: 10px; left: 10px; z-index: 1;
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; background: var(--accent); color: #fff;
+    border-radius: 99px; font-size: 0.62rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    box-shadow: 0 4px 12px rgba(255,87,34,0.45);
+  }
+  .home-rest__rating {
+    position: absolute; top: 10px; right: 10px; z-index: 1;
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 4px 10px; background: rgba(7,10,18,0.72);
+    backdrop-filter: blur(8px); border-radius: 99px;
+    color: #fff; font-size: 0.74rem; font-weight: 800;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .home-rest__rating .ic { width: 12px; height: 12px; color: #FBBC05; }
+  .home-rest__body { padding: 12px 14px; }
+  .home-rest__name { margin: 0 0 4px; font-size: 1rem; font-weight: 800; letter-spacing: -0.2px; line-height: 1.25; }
+  .home-rest__cuisine { margin: 0 0 8px; font-size: 0.78rem; color: var(--text-dim); }
+  .home-rest__meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 0.74rem; color: var(--text-2); }
+  .home-rest__meta span { display: inline-flex; align-items: center; gap: 4px; }
+  .home-rest__meta .ic { width: 12px; height: 12px; opacity: 0.85; }
+  .home-rest__meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-dim); }
+
+  /* Popular dishes carousel */
+  .home-popular {
+    display: flex; gap: 12px; overflow-x: auto;
+    padding: 4px 2px 10px; scrollbar-width: none;
+    scroll-snap-type: x mandatory;
+  }
+  .home-popular::-webkit-scrollbar { display: none; }
+  .home-pop {
+    flex: 0 0 170px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--r-lg);
+    overflow: hidden; display: flex; flex-direction: column;
+    cursor: pointer; transition: all 0.2s; scroll-snap-align: start;
+  }
+  .home-pop:hover { transform: translateY(-3px); border-color: var(--border-2); box-shadow: 0 12px 28px rgba(0,0,0,0.35); }
+  .home-pop__cover {
+    aspect-ratio: 4/3; position: relative;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    overflow: hidden;
+  }
+  .home-pop__cover img { width: 100%; height: 100%; object-fit: cover; }
+  .home-pop__tenant {
+    position: absolute; top: 6px; left: 6px; z-index: 1;
+    padding: 3px 8px; background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px); border-radius: 99px;
+    color: #fff; font-size: 0.6rem; font-weight: 800;
+    max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .home-pop__body { padding: 10px 12px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .home-pop__name { font-size: 0.85rem; font-weight: 700; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .home-pop__price { font-size: 0.95rem; font-weight: 900; color: var(--accent-2); margin-top: auto; }
+
+  /* ─── SVG icon system (replaces emojis throughout) ─────────────────── */
+  .ic { width: 1em; height: 1em; vertical-align: -0.15em; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  .ic--filled { fill: currentColor; stroke: none; }
+  .ic--lg { width: 1.4em; height: 1.4em; }
+  .ic--xl { width: 1.8em; height: 1.8em; }
+  .ic--2xl { width: 2.4em; height: 2.4em; }
+  .ic--3xl { width: 3.5em; height: 3.5em; }
+
   /* ─── Broadcast page ───────────────────────────────────────────────── */
-  .bc-wrap { padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 14px; }
-  .bc-hero { display: flex; gap: 14px; padding: 16px; background: linear-gradient(135deg, rgba(255,87,34,0.18), rgba(255,152,0,0.10)); border: 1px solid rgba(255,87,34,0.35); border-radius: var(--r-lg); }
-  .bc-hero__icon { width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; display: grid; place-items: center; font-size: 24px; flex-shrink: 0; box-shadow: 0 6px 18px rgba(255,87,34,0.4); }
-  .bc-hero__body { flex: 1; min-width: 0; }
-  .bc-hero__title { margin: 0 0 4px; font-size: 1.05rem; font-weight: 800; letter-spacing: -0.3px; line-height: 1.25; }
+  .bc-wrap {
+    padding: 16px 16px 100px; display: flex; flex-direction: column; gap: 16px;
+    background:
+      radial-gradient(700px 400px at 0% -5%, rgba(255,87,34,0.10), transparent 55%),
+      radial-gradient(600px 400px at 100% 0%, rgba(47,211,198,0.07), transparent 50%);
+  }
+
+  .bc-hero {
+    display: flex; gap: 14px; padding: 18px;
+    background: linear-gradient(135deg, rgba(255,87,34,0.16), rgba(255,152,0,0.06));
+    border: 1px solid rgba(255,87,34,0.35); border-radius: var(--r-xl);
+    box-shadow: 0 12px 30px rgba(255,87,34,0.12);
+    position: relative; overflow: hidden;
+  }
+  .bc-hero::before { content: ""; position: absolute; right: -30px; top: -30px; width: 140px; height: 140px; border-radius: 50%; background: radial-gradient(circle, rgba(255,152,0,0.18), transparent 70%); pointer-events: none; }
+  .bc-hero__icon {
+    width: 52px; height: 52px; border-radius: 16px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff; display: grid; place-items: center; font-size: 26px; flex-shrink: 0;
+    box-shadow: 0 10px 22px rgba(255,87,34,0.45), inset 0 -4px 10px rgba(255,255,255,0.1);
+  }
+  .bc-hero__body { flex: 1; min-width: 0; position: relative; z-index: 1; }
+  .bc-hero__title { margin: 0 0 4px; font-size: 1.1rem; font-weight: 800; letter-spacing: -0.3px; line-height: 1.25; }
   .bc-hero__title span { background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .bc-hero__text { margin: 0 0 10px; font-size: 0.78rem; color: var(--text-2); line-height: 1.45; }
-  .bc-stats { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 99px; font-size: 0.72rem; }
+  .bc-hero__text { margin: 0 0 12px; font-size: 0.8rem; color: var(--text-2); line-height: 1.5; }
+  .bc-stats { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 7px 14px; background: rgba(7,10,18,0.55); border: 1px solid var(--border); border-radius: 99px; font-size: 0.72rem; backdrop-filter: blur(8px); }
   .bc-stat b { color: var(--accent-2); font-weight: 800; }
   .bc-stat__dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-dim); }
 
-  .bc-section-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 2px; }
-  .bc-section-head h3 { margin: 0; font-size: 0.95rem; font-weight: 800; letter-spacing: -0.2px; }
-  .bc-section-head span { color: var(--text-dim); font-size: 0.78rem; font-weight: 600; }
+  .bc-section-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px; gap: 10px; }
+  .bc-section-head h3 { margin: 0; font-size: 1rem; font-weight: 800; letter-spacing: -0.2px; display: inline-flex; align-items: center; gap: 6px; }
+  .bc-section-head h3::before { content: ""; width: 4px; height: 18px; background: linear-gradient(180deg, var(--accent), var(--accent-2)); border-radius: 2px; }
+  .bc-section-head span { color: var(--text-dim); font-size: 0.78rem; font-weight: 700; padding: 3px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 99px; }
 
-  .bc-rest-strip { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .bc-rest-strip {
+    display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 10px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+  }
   .bc-rest-strip::-webkit-scrollbar { display: none; }
   .bc-rest {
-    flex: 0 0 220px; height: 130px; border-radius: var(--r-lg); position: relative;
+    flex: 0 0 230px; height: 140px; border-radius: var(--r-lg); position: relative;
     overflow: hidden; cursor: pointer; background-size: cover; background-position: center;
-    border: 1px solid var(--border); transition: transform 0.2s, border-color 0.2s;
+    border: 1px solid var(--border); transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+    scroll-snap-align: start;
   }
-  .bc-rest:hover { transform: translateY(-2px); border-color: var(--accent); }
-  .bc-rest::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.85) 100%); }
+  .bc-rest:hover, .bc-rest:active { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 16px 36px rgba(255,87,34,0.25); }
+  .bc-rest::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 25%, rgba(0,0,0,0.55) 65%, rgba(0,0,0,0.92) 100%); }
   .bc-rest__body { position: absolute; left: 12px; right: 12px; bottom: 10px; z-index: 1; color: #fff; }
-  .bc-rest__name { font-size: 0.95rem; font-weight: 800; letter-spacing: -0.2px; text-shadow: 0 2px 6px rgba(0,0,0,0.5); margin-bottom: 2px; line-height: 1.2; }
-  .bc-rest__meta { font-size: 0.68rem; opacity: 0.95; display: flex; gap: 8px; }
+  .bc-rest__name { font-size: 1rem; font-weight: 800; letter-spacing: -0.2px; text-shadow: 0 2px 6px rgba(0,0,0,0.5); margin-bottom: 4px; line-height: 1.2; }
+  .bc-rest__meta { font-size: 0.7rem; opacity: 0.95; display: flex; gap: 10px; align-items: center; }
+  .bc-rest__meta span { display: inline-flex; align-items: center; gap: 3px; }
+  .bc-rest__featured { position: absolute; top: 10px; left: 10px; z-index: 1; padding: 3px 9px; background: var(--accent); color: #fff; border-radius: 99px; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; box-shadow: 0 4px 10px rgba(255,87,34,0.4); }
 
-  .bc-toolbar { display: flex; gap: 8px; align-items: center; }
-  .bc-search-inp { flex: 1; }
-  .bc-sort { padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 99px; font-size: 0.78rem; font-weight: 600; outline: none; }
+  .bc-toolbar {
+    display: flex; gap: 8px; align-items: stretch;
+    padding: 4px 0;
+  }
+  .bc-search-wrap {
+    flex: 1; position: relative; min-width: 0;
+  }
+  .bc-search-wrap::before {
+    content: "🔎"; position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    font-size: 14px; pointer-events: none; opacity: 0.7;
+  }
+  .bc-search-inp {
+    width: 100%; padding: 11px 14px 11px 38px;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); border-radius: 99px;
+    font-size: 0.85rem; font-weight: 500; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .bc-search-inp::placeholder { color: var(--text-dim); }
+  .bc-search-inp:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(255,87,34,0.12); }
 
-  .bc-chips { display: flex; gap: 6px; overflow-x: auto; padding: 0 2px 6px; scrollbar-width: none; }
+  /* Custom sort dropdown — native <select> styling is inconsistent and the
+     opened options panel uses the OS palette (white-on-white). Replace
+     with a button + popup so the colors match the rest of the page. */
+  .bc-sort-wrap { position: relative; flex-shrink: 0; }
+  .bc-sort-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 11px 14px; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); border-radius: 99px;
+    font-size: 0.82rem; font-weight: 700; outline: none; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    white-space: nowrap;
+  }
+  .bc-sort-btn:hover { background: var(--surface-2); border-color: var(--border-2); }
+  .bc-sort-btn.open { border-color: var(--accent); background: var(--surface-2); }
+  .bc-sort-btn::after {
+    content: ""; width: 0; height: 0;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 5px solid var(--text-2);
+    transition: transform 0.2s;
+  }
+  .bc-sort-btn.open::after { transform: rotate(180deg); }
+  .bc-sort-pop {
+    position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+    min-width: 160px; background: var(--bg-2); border: 1px solid var(--border-2);
+    border-radius: var(--r-md); box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+    padding: 6px; display: none; flex-direction: column; gap: 2px;
+    animation: bcSortIn 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .bc-sort-pop.open { display: flex; }
+  @keyframes bcSortIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  .bc-sort-opt {
+    padding: 9px 12px; background: transparent; border: 0;
+    color: var(--text-2); font-size: 0.85rem; font-weight: 600;
+    text-align: left; border-radius: var(--r-sm, 8px); cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .bc-sort-opt:hover { background: var(--surface); color: var(--text); }
+  .bc-sort-opt.selected { background: var(--accent-soft); color: var(--accent); font-weight: 800; }
+  .bc-sort-opt.selected::after { content: "✓"; font-weight: 800; }
+
+  .bc-chips {
+    display: flex; gap: 6px; overflow-x: auto;
+    padding: 0 2px 6px; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
   .bc-chips::-webkit-scrollbar { display: none; }
-  .bc-chip { flex-shrink: 0; padding: 7px 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); border-radius: 99px; font-size: 0.78rem; font-weight: 700; white-space: nowrap; transition: all 0.15s; }
-  .bc-chip.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; color: #fff; box-shadow: 0 4px 12px rgba(255,87,34,0.3); }
+  .bc-chip {
+    flex-shrink: 0; padding: 8px 16px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text-2); border-radius: 99px;
+    font-size: 0.8rem; font-weight: 700; white-space: nowrap;
+    transition: all 0.18s; cursor: pointer;
+  }
+  .bc-chip:hover { background: var(--surface-2); color: var(--text); border-color: var(--border-2); }
+  .bc-chip.active {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-color: transparent; color: #fff;
+    box-shadow: 0 6px 16px rgba(255,87,34,0.35);
+    transform: translateY(-1px);
+  }
 
+  /* Product grid overrides for broadcast */
+  .bc-grid { gap: 12px; }
+  .bc-grid .card { transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; }
+  .bc-grid .card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0,0,0,0.4); }
   .bc-grid .card__cover { aspect-ratio: 4/3; }
-  .card__badges { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; gap: 4px; justify-content: space-between; z-index: 1; pointer-events: none; }
-  .badge--tenant { background: rgba(0,0,0,0.6); color: #fff; padding: 3px 8px; border-radius: 99px; font-size: 0.62rem; font-weight: 800; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; backdrop-filter: blur(6px); }
-  .badge--cat { background: rgba(47,211,198,0.85); color: #0A0E17; padding: 3px 8px; border-radius: 99px; font-size: 0.6rem; font-weight: 800; backdrop-filter: blur(6px); }
-  .card__customize-hint { position: absolute; bottom: 6px; right: 6px; background: rgba(255,87,34,0.92); color: #fff; padding: 2px 7px; border-radius: 99px; font-size: 0.6rem; font-weight: 800; box-shadow: 0 4px 10px rgba(255,87,34,0.4); }
+  .card__badges {
+    position: absolute; top: 8px; left: 8px; right: 8px;
+    display: flex; gap: 4px; justify-content: space-between;
+    z-index: 1; pointer-events: none;
+  }
+  .badge--tenant {
+    background: rgba(0,0,0,0.65); color: #fff;
+    padding: 4px 9px; border-radius: 99px;
+    font-size: 0.62rem; font-weight: 800;
+    max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .badge--cat {
+    background: rgba(47,211,198,0.92); color: #0A0E17;
+    padding: 4px 9px; border-radius: 99px;
+    font-size: 0.6rem; font-weight: 800;
+    backdrop-filter: blur(8px);
+  }
+  .card__customize-hint {
+    position: absolute; bottom: 8px; right: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
+    padding: 3px 10px; border-radius: 99px;
+    font-size: 0.62rem; font-weight: 800;
+    box-shadow: 0 4px 12px rgba(255,87,34,0.45);
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .bc-grid .card__title { font-size: 0.95rem; font-weight: 700; }
+  .bc-grid .card__sub { font-size: 0.75rem; color: var(--text-dim); line-height: 1.4; -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+  .bc-grid .card__price { font-size: 1.1rem; font-weight: 900; color: var(--accent-2); letter-spacing: -0.3px; }
+  .bc-grid .card__add {
+    padding: 7px 14px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff; border: 0; border-radius: 99px;
+    font-size: 0.78rem; font-weight: 800;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 12px rgba(255,87,34,0.3);
+  }
+  .bc-grid .card__add:hover { transform: scale(1.05); box-shadow: 0 6px 16px rgba(255,87,34,0.45); }
+  .bc-grid .card__add:active { transform: scale(0.96); }
+  .bc-grid .card__add[data-incart="1"] { background: linear-gradient(135deg, #10B981, #059669); box-shadow: 0 4px 12px rgba(16,185,129,0.35); }
 
   /* ─── Customize sheet (variant/modifiers) ──────────────────────────── */
   .cust-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(6px); z-index: 250; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
@@ -458,8 +783,45 @@
   .cust-foot__total { flex: 1; display: flex; flex-direction: column; }
   .cust-foot__total small { font-size: 0.65rem; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
   .cust-foot__total b { font-size: 1.25rem; color: var(--accent-2); font-weight: 900; }
-  .cust-foot__add { padding: 12px 22px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: 0; border-radius: var(--r-md); font-weight: 800; font-size: 0.92rem; box-shadow: 0 8px 22px rgba(255,87,34,0.35); transition: transform 0.15s; }
+  .cust-foot__add { padding: 12px 22px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: 0; border-radius: var(--r-md); font-weight: 800; font-size: 0.92rem; box-shadow: 0 8px 22px rgba(255,87,34,0.35); transition: transform 0.15s; display: inline-flex; align-items: center; gap: 6px; }
   .cust-foot__add:active { transform: scale(0.97); }
+
+  /* Addons (drinks/sauces/extras as separate products) inside the sheet */
+  .cust-addons { display: flex; flex-direction: column; gap: 6px; }
+  .cust-addon {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-md); transition: all 0.15s;
+  }
+  .cust-addon.selected { background: var(--accent-soft); border-color: var(--accent); box-shadow: 0 4px 12px rgba(255,87,34,0.15); }
+  .cust-addon__img {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: var(--surface-2); flex-shrink: 0;
+    display: grid; place-items: center; overflow: hidden; color: var(--text-dim);
+  }
+  .cust-addon__img img { width: 100%; height: 100%; object-fit: cover; }
+  .cust-addon__ph { width: 22px; height: 22px; }
+  .cust-addon__body { flex: 1; min-width: 0; }
+  .cust-addon__name { font-size: 0.85rem; font-weight: 700; line-height: 1.2; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cust-addon__price { font-size: 0.74rem; font-weight: 700; color: var(--accent-2); }
+  .cust-addon__add {
+    width: 32px; height: 32px; border-radius: 99px; border: 0;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
+    display: grid; place-items: center; cursor: pointer;
+    box-shadow: 0 4px 10px rgba(255,87,34,0.35); transition: transform 0.15s;
+  }
+  .cust-addon__add:active { transform: scale(0.92); }
+  .cust-addon__qty {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px; background: rgba(255,87,34,0.18); border-radius: 99px;
+  }
+  .cust-addon__qty button {
+    width: 26px; height: 26px; border-radius: 50%; border: 0;
+    background: var(--accent); color: #fff; display: grid; place-items: center;
+    cursor: pointer; transition: transform 0.15s;
+  }
+  .cust-addon__qty button:active { transform: scale(0.92); }
+  .cust-addon__qty span { min-width: 20px; text-align: center; font-weight: 800; color: var(--accent); font-size: 0.85rem; }
   </style>
 </head>
 <body>
@@ -468,10 +830,12 @@
   <!-- ─── INTRO ─────────────────────────────────────────────────────────── -->
   <section id="page-intro" class="page">
     <div class="intro-shell">
-      <div class="logo">⚡</div>
+      <div class="logo">
+        <svg viewBox="0 0 24 24" width="50" height="50" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+      </div>
       <div class="brand-name">Barmagly Delivery</div>
       <h1>Order from <span>any restaurant</span></h1>
-      <p id="intro-tagline">Add what you want from partner restaurants — the first one to accept prepares & delivers.</p>
+      <p id="intro-tagline">Add what you want from partner restaurants — the first one to accept prepares &amp; delivers.</p>
 
       <div class="features">
         <span class="feat feat--orange"><span class="feat__dot"></span> Quick accept</span>
@@ -491,7 +855,8 @@
       </div>
 
       <a class="partner-link" href="https://pos.barmagly.tech/" target="_blank" rel="noopener">
-        🏪 Are you a restaurant? <b>Open POS dashboard →</b>
+        <svg class="ic" viewBox="0 0 24 24"><path d="M3 9l1.5-5h15L21 9M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9M3 9h18M9 21v-6h6v6"/></svg>
+        Are you a restaurant? <b>Open POS dashboard →</b>
       </a>
     </div>
   </section>
@@ -506,7 +871,9 @@
     <div class="auth-shell">
       <div class="auth-card">
         <div class="auth-head">
-          <div class="auth-head__icon">⚡</div>
+          <div class="auth-head__icon">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+          </div>
           <h2>Welcome back</h2>
           <p>Sign in to keep ordering from your favorite restaurants</p>
         </div>
@@ -529,7 +896,8 @@
       </div>
 
       <a class="auth-partner" href="https://pos.barmagly.tech/" target="_blank" rel="noopener">
-        🏪 Are you a restaurant? <b>Open POS dashboard →</b>
+        <svg class="ic" viewBox="0 0 24 24" style="margin-right:4px;vertical-align:-3px;"><path d="M3 9l1.5-5h15L21 9M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9M3 9h18M9 21v-6h6v6"/></svg>
+        Are you a restaurant? <b>Open POS dashboard →</b>
       </a>
     </div>
   </section>
@@ -544,7 +912,9 @@
     <div class="auth-shell">
       <div class="auth-card">
         <div class="auth-head">
-          <div class="auth-head__icon">🎉</div>
+          <div class="auth-head__icon">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+          </div>
           <h2>Create your account</h2>
           <p>Track orders, save addresses, earn loyalty points</p>
         </div>
@@ -571,35 +941,99 @@
       </div>
 
       <a class="auth-partner" href="https://pos.barmagly.tech/" target="_blank" rel="noopener">
-        🏪 Are you a restaurant? <b>Open POS dashboard →</b>
+        <svg class="ic" viewBox="0 0 24 24" style="margin-right:4px;vertical-align:-3px;"><path d="M3 9l1.5-5h15L21 9M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9M3 9h18M9 21v-6h6v6"/></svg>
+        Are you a restaurant? <b>Open POS dashboard →</b>
       </a>
     </div>
   </section>
 
   <!-- ─── HOME (logged in) ──────────────────────────────────────────────── -->
   <section id="page-home" class="page">
-    <div class="top">
-      <span></span>
-      <div><h1 class="top__title">Hello, <span id="home-greet-name">there</span></h1><p class="top__sub" id="home-greet-sub">What would you like today?</p></div>
-      <div class="top__actions">
-        <button class="top__btn" id="btn-open-chats" title="Chats"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
+    <div class="home-top">
+      <div class="home-greet">
+        <p class="home-greet__hi">Hello, <span id="home-greet-name">there</span></p>
+        <h1 class="home-greet__line" id="home-greet-sub">What would you like today?</h1>
+      </div>
+      <div class="home-top__actions">
+        <button class="home-top__btn" data-nav="orders" title="My orders" type="button">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M16 16l4-7-9-5-9 5 9 5 5-2.7M11 22V13M2 9v8l9 5 9-5V9"/></svg>
+        </button>
+        <button class="home-top__btn" data-nav="account" title="Account" type="button">
+          <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+        </button>
       </div>
     </div>
-    <div style="padding: 14px 16px 22px;">
-      <div class="hero">
-        <h1>Quick Order</h1>
-        <p>Pick from any restaurant — first to accept prepares your order.</p>
-        <button class="hero__cta" data-nav="broadcast">⚡ Order now →</button>
+
+    <div class="home-wrap">
+      <!-- Search box -->
+      <div class="home-search-wrap" data-nav="restaurants">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span class="home-search-text">Search dishes, restaurants…</span>
       </div>
 
-      <div class="sec">
-        <div class="sec__head"><h2 class="sec__title">Restaurants</h2><a class="sec__link" data-nav="restaurants" href="#">View all</a></div>
-        <div class="grid" id="home-restaurants"><div class="skeleton skel-card"></div><div class="skeleton skel-card"></div></div>
+      <!-- Quick-order banner (broadcast) -->
+      <div class="home-banner" data-nav="broadcast">
+        <div class="home-banner__icon">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+        </div>
+        <div class="home-banner__body">
+          <h3>Quick Order</h3>
+          <p>Pick dishes from any restaurant — first to accept delivers</p>
+        </div>
+        <svg class="ic home-banner__chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
       </div>
 
-      <div class="sec">
-        <div class="sec__head"><h2 class="sec__title">Your recent orders</h2></div>
-        <div id="home-orders"><div class="empty"><div class="empty__icon">🛍️</div><div class="empty__title">No orders yet</div><div class="empty__sub">Place your first order to get started</div></div></div>
+      <!-- Cuisine chips -->
+      <div class="home-section">
+        <div class="home-section__head">
+          <h2>Cuisines</h2>
+        </div>
+        <div class="home-cuisines" id="home-cuisines">
+          <div class="skeleton" style="flex:0 0 90px;height:70px;"></div>
+          <div class="skeleton" style="flex:0 0 90px;height:70px;"></div>
+          <div class="skeleton" style="flex:0 0 90px;height:70px;"></div>
+        </div>
+      </div>
+
+      <!-- Featured restaurants (rich card grid) -->
+      <div class="home-section">
+        <div class="home-section__head">
+          <h2>Featured restaurants</h2>
+          <a class="home-link" data-nav="restaurants" href="#">View all →</a>
+        </div>
+        <div class="home-restaurants" id="home-restaurants">
+          <div class="skeleton skel-card"></div>
+          <div class="skeleton skel-card"></div>
+        </div>
+      </div>
+
+      <!-- Popular dishes carousel -->
+      <div class="home-section">
+        <div class="home-section__head">
+          <h2>Popular dishes</h2>
+          <a class="home-link" data-nav="broadcast" href="#">See all →</a>
+        </div>
+        <div class="home-popular" id="home-popular">
+          <div class="skeleton" style="flex:0 0 160px;height:200px;"></div>
+          <div class="skeleton" style="flex:0 0 160px;height:200px;"></div>
+        </div>
+      </div>
+
+      <!-- Recent orders -->
+      <div class="home-section">
+        <div class="home-section__head">
+          <h2>Your recent orders</h2>
+          <a class="home-link" data-nav="orders" href="#">All →</a>
+        </div>
+        <div id="home-orders">
+          <div class="empty">
+            <div class="empty__icon">
+              <svg class="ic" viewBox="0 0 24 24" style="width:48px;height:48px;"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 1 1-8 0"/></svg>
+            </div>
+            <div class="empty__title">No orders yet</div>
+            <div class="empty__sub">Place your first order to get started</div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -634,14 +1068,16 @@
   <!-- ─── BROADCAST ─────────────────────────────────────────────────────── -->
   <section id="page-broadcast" class="page">
     <div class="top">
-      <button class="top__back" data-nav="home" aria-label="Back">‹</button>
-      <div><h1 class="top__title">⚡ Quick Order</h1><p class="top__sub" id="broadcast-sub">Pick from any restaurant</p></div>
+      <button class="top__back" data-nav="home" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div><h1 class="top__title">Quick Order</h1><p class="top__sub" id="broadcast-sub">Pick from any restaurant</p></div>
       <span></span>
     </div>
     <div class="bc-wrap">
       <!-- Hero / how-it-works -->
       <div class="bc-hero">
-        <div class="bc-hero__icon">⚡</div>
+        <div class="bc-hero__icon">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+        </div>
         <div class="bc-hero__body">
           <h2 class="bc-hero__title">Order from <span>any restaurant</span></h2>
           <p class="bc-hero__text">Add dishes from anywhere. The first restaurant to accept prepares your order.</p>
@@ -657,7 +1093,7 @@
 
       <!-- Restaurant strip (horizontal scroll) -->
       <div class="bc-section-head">
-        <h3>🏪 Featured restaurants</h3>
+        <h3>Featured restaurants</h3>
       </div>
       <div class="bc-rest-strip" id="bc-rest-strip">
         <div class="skeleton" style="flex:0 0 220px;height:130px;"></div>
@@ -666,13 +1102,18 @@
 
       <!-- Search + sort -->
       <div class="bc-toolbar">
-        <input class="inp bc-search-inp" id="bc-search" placeholder="🔎 Search dishes…" />
-        <select class="sel bc-sort" id="bc-sort">
-          <option value="popular">Popular</option>
-          <option value="price-asc">Price ↑</option>
-          <option value="price-desc">Price ↓</option>
-          <option value="name">A – Z</option>
-        </select>
+        <div class="bc-search-wrap">
+          <input class="bc-search-inp" id="bc-search" placeholder="Search dishes…" />
+        </div>
+        <div class="bc-sort-wrap">
+          <button class="bc-sort-btn" id="bc-sort-btn" type="button"><span id="bc-sort-label">Popular</span></button>
+          <div class="bc-sort-pop" id="bc-sort-pop">
+            <button class="bc-sort-opt selected" data-sort="popular" type="button"><span>Popular</span></button>
+            <button class="bc-sort-opt" data-sort="price-asc" type="button"><span>Price ↑</span></button>
+            <button class="bc-sort-opt" data-sort="price-desc" type="button"><span>Price ↓</span></button>
+            <button class="bc-sort-opt" data-sort="name" type="button"><span>A – Z</span></button>
+          </div>
+        </div>
       </div>
 
       <!-- Category chips -->
@@ -814,9 +1255,11 @@
 
 <!-- ─── PRODUCT CUSTOMIZE SHEET ───────────────────────────────────────── -->
 <div class="cust-overlay" id="cust-overlay"></div>
-<aside class="cust-sheet" id="cust-sheet" aria-hidden="true">
+<aside class="cust-sheet" id="cust-sheet" inert>
   <div class="cust-cover" id="cust-cover">
-    <button class="cust-close" id="cust-close" aria-label="Close">✕</button>
+    <button class="cust-close" id="cust-close" aria-label="Close">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
     <div class="cust-cover__title">
       <h3 id="cust-name">Product</h3>
       <p id="cust-tenant">Restaurant</p>
@@ -829,7 +1272,10 @@
       <small>Total</small>
       <b id="cust-total">CHF 0.00</b>
     </div>
-    <button class="cust-foot__add" id="cust-add" type="button">+ Add to cart</button>
+    <button class="cust-foot__add" id="cust-add" type="button">
+      <svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1.5"/><circle cx="18" cy="21" r="1.5"/><path d="M3 3h2l3 12h11l3-8H6"/><path d="M14 7h6m-3-3v6"/></svg>
+      Add to cart
+    </button>
   </div>
 </aside>
 

@@ -2398,6 +2398,36 @@ async function test(){
     res.json({ calls });
   });
 
+  // SSE fallback for the WebSocket events. Hostinger's CDN/LiteSpeed proxy
+  // doesn't tunnel WebSocket upgrades, so we expose the same broadcast
+  // stream as a long-lived `text/event-stream`. Both POS and customer SPA
+  // can subscribe with `new EventSource("/api/events?tenantId=24")`.
+  app.get("/api/events", (req, res) => {
+    const tenantIdRaw = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+    const tenantId = tenantIdRaw && !isNaN(tenantIdRaw) ? tenantIdRaw : undefined;
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-store, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders?.();
+
+    res.write(`: connected ${new Date().toISOString()}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: "sse_connected", tenantId: tenantId ?? null })}\n\n`);
+
+    const teardown = callerIdService.addSseClient(res, tenantId);
+
+    // Heartbeat every 25s so proxies don't kill idle connections.
+    const heartbeat = setInterval(() => {
+      try { res.write(`: hb ${Date.now()}\n\n`); } catch { /* ignore */ }
+    }, 25000);
+
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      teardown();
+    });
+  });
+
   // Incoming call from local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)
   app.post("/api/caller-id/incoming", async (req, res) => {
     try {

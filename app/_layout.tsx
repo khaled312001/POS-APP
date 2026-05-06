@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import BroadcastToaster from "@/components/BroadcastToaster";
+import GlobalNotificationCenter from "@/components/GlobalNotificationCenter";
 import { queryClient } from "@/lib/query-client";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider } from "@/lib/auth-context";
@@ -147,6 +148,7 @@ export default function RootLayout() {
                       <StatusBar style="light" />
                       <RootLayoutNav />
                       <BroadcastToaster />
+                      <GlobalNotificationCenter />
                     </CartProvider>
                   </NotificationProvider>
                 </AuthProvider>
