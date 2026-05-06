@@ -276,6 +276,110 @@
   @keyframes tOut { to { opacity: 0; transform: translateY(10px); } }
 
   .hidden { display: none !important; }
+
+  /* ─── Broadcast page ───────────────────────────────────────────────── */
+  .bc-wrap { padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .bc-hero { display: flex; gap: 14px; padding: 16px; background: linear-gradient(135deg, rgba(255,87,34,0.18), rgba(255,152,0,0.10)); border: 1px solid rgba(255,87,34,0.35); border-radius: var(--r-lg); }
+  .bc-hero__icon { width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; display: grid; place-items: center; font-size: 24px; flex-shrink: 0; box-shadow: 0 6px 18px rgba(255,87,34,0.4); }
+  .bc-hero__body { flex: 1; min-width: 0; }
+  .bc-hero__title { margin: 0 0 4px; font-size: 1.05rem; font-weight: 800; letter-spacing: -0.3px; line-height: 1.25; }
+  .bc-hero__title span { background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .bc-hero__text { margin: 0 0 10px; font-size: 0.78rem; color: var(--text-2); line-height: 1.45; }
+  .bc-stats { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 99px; font-size: 0.72rem; }
+  .bc-stat b { color: var(--accent-2); font-weight: 800; }
+  .bc-stat__dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-dim); }
+
+  .bc-section-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 2px; }
+  .bc-section-head h3 { margin: 0; font-size: 0.95rem; font-weight: 800; letter-spacing: -0.2px; }
+  .bc-section-head span { color: var(--text-dim); font-size: 0.78rem; font-weight: 600; }
+
+  .bc-rest-strip { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .bc-rest-strip::-webkit-scrollbar { display: none; }
+  .bc-rest {
+    flex: 0 0 220px; height: 130px; border-radius: var(--r-lg); position: relative;
+    overflow: hidden; cursor: pointer; background-size: cover; background-position: center;
+    border: 1px solid var(--border); transition: transform 0.2s, border-color 0.2s;
+  }
+  .bc-rest:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .bc-rest::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.85) 100%); }
+  .bc-rest__body { position: absolute; left: 12px; right: 12px; bottom: 10px; z-index: 1; color: #fff; }
+  .bc-rest__name { font-size: 0.95rem; font-weight: 800; letter-spacing: -0.2px; text-shadow: 0 2px 6px rgba(0,0,0,0.5); margin-bottom: 2px; line-height: 1.2; }
+  .bc-rest__meta { font-size: 0.68rem; opacity: 0.95; display: flex; gap: 8px; }
+
+  .bc-toolbar { display: flex; gap: 8px; align-items: center; }
+  .bc-search-inp { flex: 1; }
+  .bc-sort { padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 99px; font-size: 0.78rem; font-weight: 600; outline: none; }
+
+  .bc-chips { display: flex; gap: 6px; overflow-x: auto; padding: 0 2px 6px; scrollbar-width: none; }
+  .bc-chips::-webkit-scrollbar { display: none; }
+  .bc-chip { flex-shrink: 0; padding: 7px 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); border-radius: 99px; font-size: 0.78rem; font-weight: 700; white-space: nowrap; transition: all 0.15s; }
+  .bc-chip.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; color: #fff; box-shadow: 0 4px 12px rgba(255,87,34,0.3); }
+
+  .bc-grid .card__cover { aspect-ratio: 4/3; }
+  .card__badges { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; gap: 4px; justify-content: space-between; z-index: 1; pointer-events: none; }
+  .badge--tenant { background: rgba(0,0,0,0.6); color: #fff; padding: 3px 8px; border-radius: 99px; font-size: 0.62rem; font-weight: 800; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; backdrop-filter: blur(6px); }
+  .badge--cat { background: rgba(47,211,198,0.85); color: #0A0E17; padding: 3px 8px; border-radius: 99px; font-size: 0.6rem; font-weight: 800; backdrop-filter: blur(6px); }
+  .card__customize-hint { position: absolute; bottom: 6px; right: 6px; background: rgba(255,87,34,0.92); color: #fff; padding: 2px 7px; border-radius: 99px; font-size: 0.6rem; font-weight: 800; box-shadow: 0 4px 10px rgba(255,87,34,0.4); }
+
+  /* ─── Customize sheet (variant/modifiers) ──────────────────────────── */
+  .cust-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(6px); z-index: 250; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .cust-overlay.open { opacity: 1; pointer-events: auto; }
+  .cust-sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 251;
+    background: var(--bg-2); border-top: 1px solid var(--border-2);
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 -20px 60px rgba(0,0,0,0.5);
+  }
+  .cust-sheet.open { transform: translateY(0); }
+  @media (min-width: 720px) { .cust-sheet { left: 50%; right: auto; bottom: 4vh; transform: translate(-50%, 100vh); width: 480px; border-radius: var(--r-xl); } .cust-sheet.open { transform: translate(-50%, 0); } }
+  .cust-handle { width: 40px; height: 4px; background: rgba(255,255,255,0.25); border-radius: 2px; margin: 8px auto 0; }
+  .cust-cover { aspect-ratio: 16/9; max-height: 200px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); position: relative; overflow: hidden; flex: 0 0 auto; }
+  .cust-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .cust-cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.7) 100%); }
+  .cust-cover__title { position: absolute; left: 16px; right: 16px; bottom: 12px; z-index: 1; color: #fff; }
+  .cust-cover__title h3 { margin: 0; font-size: 1.15rem; font-weight: 800; line-height: 1.2; text-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+  .cust-cover__title p { margin: 3px 0 0; font-size: 0.78rem; opacity: 0.9; }
+  .cust-close { position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.55); border: 0; color: #fff; font-size: 18px; z-index: 2; display: grid; place-items: center; backdrop-filter: blur(6px); }
+
+  .cust-body { flex: 1 1 auto; overflow-y: auto; padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 16px; }
+  .cust-body::-webkit-scrollbar { width: 6px; }
+  .cust-body::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+  .cust-section { display: flex; flex-direction: column; gap: 8px; }
+  .cust-section__head { display: flex; align-items: baseline; gap: 8px; }
+  .cust-section__head h4 { margin: 0; font-size: 0.92rem; font-weight: 800; letter-spacing: -0.2px; }
+  .cust-section__head .req { color: var(--danger); font-size: 0.7rem; font-weight: 700; }
+  .cust-section__head .opt { color: var(--text-dim); font-size: 0.7rem; font-weight: 600; }
+  .cust-options { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .cust-opt {
+    display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+    cursor: pointer; transition: all 0.15s; user-select: none;
+  }
+  .cust-opt:hover { background: var(--surface-2); border-color: var(--border-2); }
+  .cust-opt.selected { background: var(--accent-soft); border-color: var(--accent); box-shadow: 0 4px 12px rgba(255,87,34,0.18); }
+  .cust-opt__check { width: 18px; height: 18px; border: 2px solid var(--border-2); border-radius: 4px; flex-shrink: 0; display: grid; place-items: center; transition: all 0.15s; }
+  .cust-opt[data-kind="single"] .cust-opt__check { border-radius: 50%; }
+  .cust-opt.selected .cust-opt__check { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .cust-opt.selected .cust-opt__check::after { content: "✓"; font-size: 12px; font-weight: 900; }
+  .cust-opt[data-kind="single"].selected .cust-opt__check::after { content: ""; width: 8px; height: 8px; background: #fff; border-radius: 50%; }
+  .cust-opt__label { flex: 1; min-width: 0; font-size: 0.82rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cust-opt__price { font-size: 0.72rem; color: var(--accent-2); font-weight: 800; flex-shrink: 0; }
+
+  .cust-qty { display: inline-flex; align-items: center; gap: 12px; padding: 4px; background: var(--accent-soft); border-radius: 99px; align-self: flex-start; }
+  .cust-qty button { width: 32px; height: 32px; border-radius: 50%; border: 0; background: var(--accent); color: #fff; font-size: 18px; font-weight: 900; }
+  .cust-qty span { min-width: 28px; text-align: center; font-weight: 800; color: var(--accent); font-size: 1rem; }
+
+  .cust-notes textarea { width: 100%; min-height: 60px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: var(--r-md); font-size: 0.85rem; font-family: inherit; resize: vertical; outline: none; }
+  .cust-notes textarea:focus { border-color: var(--accent); }
+
+  .cust-foot { flex: 0 0 auto; padding: 12px 18px 16px; border-top: 1px solid var(--border); background: var(--bg); display: flex; gap: 10px; align-items: center; }
+  .cust-foot__total { flex: 1; display: flex; flex-direction: column; }
+  .cust-foot__total small { font-size: 0.65rem; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+  .cust-foot__total b { font-size: 1.25rem; color: var(--accent-2); font-weight: 900; }
+  .cust-foot__add { padding: 12px 22px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: 0; border-radius: var(--r-md); font-weight: 800; font-size: 0.92rem; box-shadow: 0 8px 22px rgba(255,87,34,0.35); transition: transform 0.15s; }
+  .cust-foot__add:active { transform: scale(0.97); }
   </style>
 </head>
 <body>
@@ -397,13 +501,59 @@
       <div><h1 class="top__title">⚡ Quick Order</h1><p class="top__sub" id="broadcast-sub">Pick from any restaurant</p></div>
       <span></span>
     </div>
-    <div style="padding: 16px;">
-      <div style="background:var(--teal-soft);border:1px solid var(--teal);border-radius:var(--r-md);padding:12px 14px;font-size:0.85rem;color:var(--text-2);margin-bottom:14px;line-height:1.5;">
-        <strong style="color:var(--teal);">How it works:</strong> Add items from any partner restaurant. We'll broadcast your order — the first to accept will prepare it.
+    <div class="bc-wrap">
+      <!-- Hero / how-it-works -->
+      <div class="bc-hero">
+        <div class="bc-hero__icon">⚡</div>
+        <div class="bc-hero__body">
+          <h2 class="bc-hero__title">Order from <span>any restaurant</span></h2>
+          <p class="bc-hero__text">Add dishes from anywhere. The first restaurant to accept prepares your order.</p>
+          <div class="bc-stats" id="bc-stats">
+            <span class="bc-stat"><b id="bc-stat-dishes">0</b> dishes</span>
+            <span class="bc-stat__dot"></span>
+            <span class="bc-stat"><b id="bc-stat-rest">0</b> restaurants</span>
+            <span class="bc-stat__dot"></span>
+            <span class="bc-stat"><b id="bc-stat-cats">0</b> categories</span>
+          </div>
+        </div>
       </div>
-      <input class="inp" id="bc-search" placeholder="🔎 Search dishes from any restaurant…" style="margin-bottom: 12px;" />
-      <div id="bc-cats" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:none;"></div>
-      <div class="grid" id="bc-products"><div class="skeleton skel-card"></div><div class="skeleton skel-card"></div></div>
+
+      <!-- Restaurant strip (horizontal scroll) -->
+      <div class="bc-section-head">
+        <h3>🏪 Featured restaurants</h3>
+      </div>
+      <div class="bc-rest-strip" id="bc-rest-strip">
+        <div class="skeleton" style="flex:0 0 220px;height:130px;"></div>
+        <div class="skeleton" style="flex:0 0 220px;height:130px;"></div>
+      </div>
+
+      <!-- Search + sort -->
+      <div class="bc-toolbar">
+        <input class="inp bc-search-inp" id="bc-search" placeholder="🔎 Search dishes…" />
+        <select class="sel bc-sort" id="bc-sort">
+          <option value="popular">Popular</option>
+          <option value="price-asc">Price ↑</option>
+          <option value="price-desc">Price ↓</option>
+          <option value="name">A – Z</option>
+        </select>
+      </div>
+
+      <!-- Category chips -->
+      <div class="bc-chips" id="bc-cats"></div>
+
+      <!-- Section title + count -->
+      <div class="bc-section-head">
+        <h3 id="bc-section-title">All Dishes</h3>
+        <span id="bc-section-count">0 items</span>
+      </div>
+
+      <!-- Product grid -->
+      <div class="grid bc-grid" id="bc-products">
+        <div class="skeleton skel-card"></div>
+        <div class="skeleton skel-card"></div>
+        <div class="skeleton skel-card"></div>
+        <div class="skeleton skel-card"></div>
+      </div>
     </div>
   </section>
 
@@ -524,6 +674,27 @@
     </div>
   </div>
 </div>
+
+<!-- ─── PRODUCT CUSTOMIZE SHEET ───────────────────────────────────────── -->
+<div class="cust-overlay" id="cust-overlay"></div>
+<aside class="cust-sheet" id="cust-sheet" aria-hidden="true">
+  <div class="cust-cover" id="cust-cover">
+    <button class="cust-close" id="cust-close" aria-label="Close">✕</button>
+    <div class="cust-cover__title">
+      <h3 id="cust-name">Product</h3>
+      <p id="cust-tenant">Restaurant</p>
+    </div>
+  </div>
+  <div class="cust-handle"></div>
+  <div class="cust-body" id="cust-body"></div>
+  <div class="cust-foot">
+    <div class="cust-foot__total">
+      <small>Total</small>
+      <b id="cust-total">CHF 0.00</b>
+    </div>
+    <button class="cust-foot__add" id="cust-add" type="button">+ Add to cart</button>
+  </div>
+</aside>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/customer/app.js"></script>

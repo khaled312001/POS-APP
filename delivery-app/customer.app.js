@@ -478,6 +478,12 @@
   }
 
   // ─── Cart ───────────────────────────────────────────────────────────
+  // Cart items with variants/modifiers/notes need a unique signature so
+  // ordering "Pizza (Large) + Cheese" and "Pizza (Small)" creates two lines.
+  function cartSig(it) {
+    return [it.productId, it.tenantId, it.variant || "", (it.modifiers || []).join("|"), it.notes || ""].join("§");
+  }
+
   function addToCart(item) {
     // If switching restaurants in non-broadcast mode, ask before clearing cart
     var existingMode = state.cartMode;
@@ -497,9 +503,10 @@
       return;
     }
     state.cartMode = newMode;
-    var ex = state.cart.find(function (it) { return it.productId === item.productId && it.tenantId === item.tenantId; });
-    if (ex) ex.quantity += 1;
-    else state.cart.push(item);
+    var sig = cartSig(item);
+    var ex = state.cart.find(function (it) { return cartSig(it) === sig; });
+    if (ex) ex.quantity += (item.quantity || 1);
+    else state.cart.push(Object.assign({ quantity: 1 }, item));
     save(); refreshCart(); beep(700, 0.08);
     if (state.currentRoute === "menu" && state.tenantMenu) renderMenu(state.tenantMenu.slug);
     if (state.currentRoute === "broadcast") renderBroadcast();
@@ -565,34 +572,343 @@
   function closeCart() { $("cart-drawer").classList.remove("open"); $("cart-overlay").classList.remove("open"); }
 
   // ─── Broadcast ──────────────────────────────────────────────────────
+  // Local state for the broadcast page (kept on `state.bc` so we can persist
+  // chip/sort selection across re-renders triggered by search input).
+  if (!state.bc) state.bc = { activeCat: "all", sort: "popular", restaurants: [], categories: [] };
+
   function renderBroadcast() {
-    if (state.products.length === 0) {
+    if (state.products.length === 0 || !state.bc.restaurants.length) {
       api("GET", "/api/delivery/broadcast/menu").then(function (data) {
         state.products = data.products || [];
+        state.bc.restaurants = data.restaurants || [];
+        state.bc.categories = ["all"].concat((data.categories || []).filter(Boolean));
+        wireBroadcastUI();
+        renderBroadcastStats();
+        renderBroadcastRestaurants();
+        renderBroadcastChips();
         renderBroadcastProducts();
+      }).catch(function (err) {
+        $("bc-products").innerHTML = '<div class="empty"><div class="empty__icon">⚠️</div><div class="empty__title">Menu unavailable</div><div class="empty__sub">' + escHtml(err.message || "") + '</div></div>';
       });
     } else {
+      renderBroadcastStats();
+      renderBroadcastRestaurants();
+      renderBroadcastChips();
       renderBroadcastProducts();
     }
+  }
+
+  function wireBroadcastUI() {
+    var s = $("bc-search"); if (s && !s.__wired) { s.addEventListener("input", renderBroadcastProducts); s.__wired = true; }
+    var so = $("bc-sort"); if (so && !so.__wired) { so.addEventListener("change", function () { state.bc.sort = so.value; renderBroadcastProducts(); }); so.__wired = true; }
+  }
+
+  function renderBroadcastStats() {
+    var rCount = state.bc.restaurants.length;
+    var cCount = Math.max(0, state.bc.categories.length - 1);
+    $("bc-stat-dishes").textContent = state.products.length;
+    $("bc-stat-rest").textContent = rCount;
+    $("bc-stat-cats").textContent = cCount;
+    $("broadcast-sub").textContent = state.products.length + " dishes from " + rCount + " restaurant" + (rCount === 1 ? "" : "s");
+  }
+
+  function renderBroadcastRestaurants() {
+    var strip = $("bc-rest-strip");
+    if (!state.bc.restaurants.length) { strip.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem;">No restaurants yet</div>'; return; }
+    strip.innerHTML = state.bc.restaurants.map(function (r) {
+      var sample = state.products.find(function (p) { return p.tenantId === r.id && p.imageUrl; });
+      var img = r.logo || (sample && sample.imageUrl) || "";
+      var dishes = state.products.filter(function (p) { return p.tenantId === r.id; }).length;
+      var bgStyle = img
+        ? 'background-image: linear-gradient(135deg, rgba(7,11,20,0.25), rgba(7,11,20,0.55)), url("' + escHtml(img) + '");'
+        : 'background: linear-gradient(135deg, ' + (r.primaryColor || "#FF5722") + ', #E64A19);';
+      return '<div class="bc-rest" data-tenant="' + r.id + '" data-name="' + escHtml(r.name || "") + '" style="' + bgStyle + '">'
+           + '  <div class="bc-rest__body">'
+           + '    <div class="bc-rest__name">' + escHtml(r.name || "Restaurant") + '</div>'
+           + '    <div class="bc-rest__meta"><span>🍽️ ' + dishes + ' dishes</span><span>⚡ Quick accept</span></div>'
+           + '  </div>'
+           + '</div>';
+    }).join("");
+    strip.querySelectorAll(".bc-rest").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var name = el.getAttribute("data-name") || "";
+        $("bc-search").value = name;
+        renderBroadcastProducts();
+        var grid = $("bc-products"); if (grid) grid.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+  }
+
+  function renderBroadcastChips() {
+    var el = $("bc-cats");
+    el.innerHTML = state.bc.categories.map(function (c) {
+      var active = c === state.bc.activeCat ? " active" : "";
+      var label = c === "all" ? (state.lang === "ar" ? "الكل" : state.lang === "de" ? "Alle" : "All") : c;
+      return '<button class="bc-chip' + active + '" data-cat="' + escHtml(c) + '">' + escHtml(label) + '</button>';
+    }).join("");
+    el.querySelectorAll(".bc-chip").forEach(function (b) {
+      b.addEventListener("click", function () {
+        state.bc.activeCat = b.getAttribute("data-cat");
+        renderBroadcastChips();
+        renderBroadcastProducts();
+      });
+    });
   }
 
   function renderBroadcastProducts() {
     var q = ($("bc-search").value || "").toLowerCase().trim();
     var filtered = state.products.filter(function (p) {
+      if (state.bc.activeCat !== "all" && p.category !== state.bc.activeCat) return false;
       if (!q) return true;
-      var h = (p.name + " " + (p.tenantName || "") + " " + (p.category || "")).toLowerCase();
+      var h = (p.name + " " + (p.tenantName || "") + " " + (p.category || "") + " " + (p.nameAr || "") + " " + (p.description || "")).toLowerCase();
       return h.indexOf(q) > -1;
     });
-    $("broadcast-sub").textContent = filtered.length + " items from " + new Set(state.products.map(function (p) { return p.tenantId; })).size + " restaurants";
+    if (state.bc.sort === "price-asc") filtered.sort(function (a, b) { return a.price - b.price; });
+    else if (state.bc.sort === "price-desc") filtered.sort(function (a, b) { return b.price - a.price; });
+    else if (state.bc.sort === "name") filtered.sort(function (a, b) { return (a.name || "").localeCompare(b.name || ""); });
+
+    $("bc-section-title").textContent = state.bc.activeCat === "all" ? "All Dishes" : state.bc.activeCat;
+    $("bc-section-count").textContent = filtered.length + (filtered.length === 1 ? " item" : " items");
+
     if (filtered.length === 0) {
-      $("bc-products").innerHTML = '<div class="empty"><div class="empty__icon">🍽️</div><div class="empty__title">No dishes match</div></div>';
+      $("bc-products").innerHTML = '<div class="empty" style="grid-column:1 / -1;"><div class="empty__icon">🔍</div><div class="empty__title">No dishes match</div><div class="empty__sub">Try a different search</div></div>';
       return;
     }
-    $("bc-products").innerHTML = filtered.slice(0, 60).map(function (p) {
-      return productCard(p, p.tenantId, p.tenantName);
+    $("bc-products").innerHTML = filtered.slice(0, 120).map(function (p) {
+      return broadcastProductCard(p);
     }).join("");
-    bindProductClicks($("bc-products"));
-    $("bc-search").oninput = renderBroadcastProducts;
+    bindBroadcastProductClicks();
+  }
+
+  function broadcastProductCard(p) {
+    // Sum item across variants under same product+tenant for the qty badge
+    var qty = state.cart.filter(function (it) { return it.productId === p.id && it.tenantId === p.tenantId; })
+                       .reduce(function (s, it) { return s + (it.quantity || 0); }, 0);
+    var hasOptions = (p.modifiers && p.modifiers.length) || (p.variants && p.variants.length);
+    var img = p.imageUrl ? '<img src="' + escHtml(p.imageUrl) + '" alt="' + escHtml(p.name) + '" onerror="this.style.display=\'none\'" />' : "";
+    return '<div class="card" data-pid="' + p.id + '">'
+         + '  <div class="card__cover">' + img
+         + '    <div class="card__badges">'
+         +        (p.tenantName ? '<span class="badge--tenant">🏪 ' + escHtml(p.tenantName) + '</span>' : '<span></span>')
+         +        (p.category ? '<span class="badge--cat">' + escHtml(p.category) + '</span>' : '<span></span>')
+         + '    </div>'
+         +      (hasOptions ? '<div class="card__customize-hint">⚙️ Customize</div>' : '')
+         + '  </div>'
+         + '  <div class="card__body">'
+         + '    <div class="card__title">' + escHtml(p.name) + '</div>'
+         + (p.description ? '<div class="card__sub">' + escHtml(String(p.description).slice(0, 70)) + '</div>' : '')
+         + '    <div class="card__foot">'
+         + '      <span class="card__price">CHF ' + Number(p.price).toFixed(2) + '</span>'
+         + (qty > 0
+              ? '<button class="card__add" data-bc-pid="' + p.id + '" style="background:var(--success);">' + qty + ' in cart</button>'
+              : '<button class="card__add" data-bc-pid="' + p.id + '">+ Add</button>')
+         + '    </div>'
+         + '  </div>'
+         + '</div>';
+  }
+
+  function bindBroadcastProductClicks() {
+    $("bc-products").querySelectorAll("[data-bc-pid]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var id = Number(b.getAttribute("data-bc-pid"));
+        var p = state.products.find(function (x) { return x.id === id; });
+        if (!p) return;
+        openCustomizeSheet(p);
+      });
+    });
+  }
+
+  // ─── Customize sheet (variant + modifiers + qty + notes) ────────────
+  var custState = null;
+  function openCustomizeSheet(product) {
+    var hasVariants = product.variants && product.variants.length > 0;
+    var hasModifiers = product.modifiers && product.modifiers.length > 0;
+    custState = {
+      product: product,
+      qty: 1,
+      variant: hasVariants ? null : { name: "", price: Number(product.price) }, // null = none chosen yet
+      // For each modifier group, store array of selected option indices
+      mods: (product.modifiers || []).map(function () { return []; }),
+      notes: "",
+    };
+
+    $("cust-name").textContent = product.name;
+    $("cust-tenant").textContent = "🏪 " + (product.tenantName || "");
+    var cover = $("cust-cover");
+    if (product.imageUrl) {
+      var existingImg = cover.querySelector("img");
+      if (existingImg) existingImg.remove();
+      var img = document.createElement("img");
+      img.src = product.imageUrl;
+      img.alt = product.name;
+      img.onerror = function () { img.style.display = "none"; };
+      cover.insertBefore(img, cover.firstChild);
+    } else {
+      var existingImg2 = cover.querySelector("img");
+      if (existingImg2) existingImg2.remove();
+    }
+
+    renderCustomizeBody();
+    updateCustomizeTotal();
+
+    $("cust-overlay").classList.add("open");
+    $("cust-sheet").classList.add("open");
+    $("cust-sheet").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeCustomizeSheet() {
+    $("cust-overlay").classList.remove("open");
+    $("cust-sheet").classList.remove("open");
+    $("cust-sheet").setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    custState = null;
+  }
+
+  function renderCustomizeBody() {
+    if (!custState) return;
+    var p = custState.product;
+    var html = "";
+
+    // Description
+    if (p.description) {
+      html += '<div style="font-size:0.82rem;color:var(--text-2);line-height:1.5;">' + escHtml(p.description) + '</div>';
+    }
+
+    // Variants (single-select, required if exists)
+    if (p.variants && p.variants.length > 0) {
+      html += '<div class="cust-section">';
+      html += '  <div class="cust-section__head"><h4>Choose size</h4><span class="req">Required</span></div>';
+      html += '  <div class="cust-options">';
+      p.variants.forEach(function (v, i) {
+        var sel = custState.variant && custState.variant.__idx === i ? " selected" : "";
+        html += '<div class="cust-opt' + sel + '" data-kind="single" data-vidx="' + i + '">'
+             +    '<div class="cust-opt__check"></div>'
+             +    '<div class="cust-opt__label">' + escHtml(v.name || ("Option " + (i + 1))) + '</div>'
+             +    '<div class="cust-opt__price">CHF ' + Number(v.price || p.price).toFixed(2) + '</div>'
+             + '</div>';
+      });
+      html += '  </div></div>';
+    }
+
+    // Modifiers (each group can be single or multi; default = multi for extras/sauces, single for "size"-like)
+    (p.modifiers || []).forEach(function (m, gi) {
+      var nameLower = String(m.name || "").toLowerCase();
+      var isSingle = /size|كبير|صغير|حجم/.test(nameLower); // size-like → single-select
+      html += '<div class="cust-section">';
+      html += '  <div class="cust-section__head"><h4>' + escHtml(m.name || "Options") + '</h4><span class="opt">' + (isSingle ? "Pick one" : "Pick any") + '</span></div>';
+      html += '  <div class="cust-options">';
+      (m.options || []).forEach(function (op, oi) {
+        var sel = custState.mods[gi].indexOf(oi) > -1 ? " selected" : "";
+        html += '<div class="cust-opt' + sel + '" data-kind="' + (isSingle ? "single" : "multi") + '" data-gi="' + gi + '" data-oi="' + oi + '">'
+             +    '<div class="cust-opt__check"></div>'
+             +    '<div class="cust-opt__label">' + escHtml(op.label || op.name || "Option") + '</div>'
+             +    (Number(op.price) > 0 ? '<div class="cust-opt__price">+CHF ' + Number(op.price).toFixed(2) + '</div>' : '<div class="cust-opt__price" style="color:var(--text-dim);">Free</div>')
+             + '</div>';
+      });
+      html += '  </div></div>';
+    });
+
+    // Quantity
+    html += '<div class="cust-section">';
+    html += '  <div class="cust-section__head"><h4>Quantity</h4></div>';
+    html += '  <div class="cust-qty"><button id="cust-qty-dec" type="button">−</button><span id="cust-qty-num">' + custState.qty + '</span><button id="cust-qty-inc" type="button">+</button></div>';
+    html += '</div>';
+
+    // Notes
+    html += '<div class="cust-section cust-notes">';
+    html += '  <div class="cust-section__head"><h4>Notes</h4><span class="opt">Optional</span></div>';
+    html += '  <textarea id="cust-notes-inp" placeholder="e.g. extra spicy, no onions, leave at door…">' + escHtml(custState.notes) + '</textarea>';
+    html += '</div>';
+
+    $("cust-body").innerHTML = html;
+
+    // Wire variants
+    $("cust-body").querySelectorAll("[data-vidx]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var idx = Number(el.getAttribute("data-vidx"));
+        var v = custState.product.variants[idx];
+        custState.variant = { __idx: idx, name: v.name, price: Number(v.price || custState.product.price) };
+        renderCustomizeBody();
+        updateCustomizeTotal();
+      });
+    });
+    // Wire modifier options
+    $("cust-body").querySelectorAll("[data-gi][data-oi]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var gi = Number(el.getAttribute("data-gi"));
+        var oi = Number(el.getAttribute("data-oi"));
+        var kind = el.getAttribute("data-kind");
+        var arr = custState.mods[gi];
+        if (kind === "single") {
+          custState.mods[gi] = arr[0] === oi ? [] : [oi];
+        } else {
+          var pos = arr.indexOf(oi);
+          if (pos > -1) arr.splice(pos, 1); else arr.push(oi);
+        }
+        renderCustomizeBody();
+        updateCustomizeTotal();
+      });
+    });
+    // Wire qty
+    var inc = $("cust-qty-inc"); if (inc) inc.addEventListener("click", function () { custState.qty = Math.min(99, custState.qty + 1); $("cust-qty-num").textContent = custState.qty; updateCustomizeTotal(); });
+    var dec = $("cust-qty-dec"); if (dec) dec.addEventListener("click", function () { custState.qty = Math.max(1, custState.qty - 1); $("cust-qty-num").textContent = custState.qty; updateCustomizeTotal(); });
+    // Wire notes
+    var n = $("cust-notes-inp"); if (n) n.addEventListener("input", function () { custState.notes = n.value; });
+  }
+
+  function customizeUnitPrice() {
+    if (!custState) return 0;
+    var p = custState.product;
+    var base = (custState.variant && Number(custState.variant.price)) || Number(p.price);
+    var addons = 0;
+    (custState.mods || []).forEach(function (sel, gi) {
+      sel.forEach(function (oi) {
+        var op = (p.modifiers[gi] && p.modifiers[gi].options && p.modifiers[gi].options[oi]) || null;
+        if (op) addons += Number(op.price || 0);
+      });
+    });
+    return base + addons;
+  }
+  function updateCustomizeTotal() {
+    if (!custState) return;
+    $("cust-total").textContent = "CHF " + (customizeUnitPrice() * custState.qty).toFixed(2);
+  }
+
+  function commitCustomize() {
+    if (!custState) return;
+    var p = custState.product;
+    if (p.variants && p.variants.length > 0 && !custState.variant) {
+      toast("Please choose a size", "error"); return;
+    }
+    var unit = customizeUnitPrice();
+    var modSummary = [];
+    (custState.mods || []).forEach(function (sel, gi) {
+      var grp = p.modifiers[gi];
+      if (!grp || sel.length === 0) return;
+      var picked = sel.map(function (oi) { return grp.options[oi] && (grp.options[oi].label || grp.options[oi].name); }).filter(Boolean);
+      if (picked.length) modSummary.push(grp.name + ": " + picked.join(", "));
+    });
+    var customLabel = [
+      custState.variant && custState.variant.name ? custState.variant.name : "",
+      modSummary.join(" · "),
+    ].filter(Boolean).join(" · ");
+    var displayName = customLabel ? (p.name + " (" + customLabel + ")") : p.name;
+
+    addToCart({
+      productId: p.id,
+      tenantId: p.tenantId,
+      tenantName: p.tenantName,
+      name: displayName,
+      quantity: custState.qty,
+      estimatedPrice: unit,
+      imageUrl: p.imageUrl,
+      variant: custState.variant ? custState.variant.name : null,
+      modifiers: modSummary,
+      notes: custState.notes || null,
+    });
+    closeCustomizeSheet();
+    toast("Added to cart", "success");
   }
 
   // ─── Orders + Tracking ─────────────────────────────────────────────
@@ -789,22 +1105,31 @@
   // ─── Checkout ──────────────────────────────────────────────────────
   function startCheckout() {
     if (state.cart.length === 0) return;
-    var c = state.auth.customer || {};
+    var c = (state.auth && state.auth.customer) || {};
     var fields = [];
-    if (!c.name) fields.push({ key: "name", label: "Your name", placeholder: "John Doe", required: true });
-    if (!c.phone) fields.push({ key: "phone", label: "Phone", type: "tel", placeholder: "+41 79 …", required: true });
-    fields.push({ key: "address", label: "Delivery address", placeholder: "Street, number, city", required: true });
-    fields.push({ key: "notes", label: "Notes (optional)", type: "textarea", placeholder: "e.g. extra spicy, leave at door" });
+    fields.push({ key: "name", label: "Full name", placeholder: "John Smith", required: true, value: c.name || "" });
+    fields.push({ key: "phone", label: "Phone", type: "tel", placeholder: "+41 79 123 45 67", required: true, value: c.phone || "" });
+    fields.push({ key: "email", label: "Email (optional)", type: "email", placeholder: "you@example.com", value: c.email || "" });
+    fields.push({ key: "address", label: "Delivery address", placeholder: "Street, number, city", required: true, value: c.address || "" });
+    fields.push({ key: "notes", label: "Order notes", type: "textarea", placeholder: "e.g. apartment number, gate code, leave at door" });
+    fields.push({ key: "payment", label: "Payment method", type: "select", options: [
+      { value: "cash", label: "💵 Cash on delivery" },
+      { value: "card", label: "💳 Card on delivery" },
+    ], value: "cash" });
 
     dialog.form("Checkout", fields, {
-      icon: "📦", iconKind: "", okLabel: "Place order", cancelLabel: "Cancel",
-      msg: "Enter your delivery details to complete the order.",
+      icon: "📦", iconKind: "", okLabel: "Place order →", cancelLabel: "Cancel",
+      msg: state.cartMode === "broadcast"
+           ? "We'll broadcast your order — the first restaurant to accept prepares it."
+           : "Enter your delivery details to complete the order.",
     }).then(function (data) {
       if (!data) return; // cancelled
-      var name = c.name || data.name;
-      var phone = c.phone || data.phone;
-      var address = data.address;
-      var notes = data.notes || null;
+      var name = (data.name || c.name || "").trim();
+      var phone = (data.phone || c.phone || "").trim();
+      var email = (data.email || "").trim() || null;
+      var address = (data.address || "").trim();
+      var notes = (data.notes || "").trim() || null;
+      var payment = data.payment || "cash";
       if (!name || !phone || !address) {
         toast("Name, phone, and address are required", "error"); return;
       }
@@ -812,24 +1137,36 @@
 
       if (state.cartMode === "broadcast") {
         api("POST", "/api/delivery/broadcast", {
-          customerName: name, customerPhone: phone, customerAddress: address,
-          items: state.cart.map(function (it) { return { productId: it.productId, name: it.name, quantity: it.quantity, estimatedPrice: it.estimatedPrice, tenantName: it.tenantName }; }),
-          notes: notes, estimatedTotal: total, paymentMethod: "cash",
-        }).then(function (data) {
+          customerName: name, customerPhone: phone, customerEmail: email, customerAddress: address,
+          items: state.cart.map(function (it) {
+            return {
+              productId: it.productId, name: it.name, quantity: it.quantity,
+              estimatedPrice: it.estimatedPrice, tenantName: it.tenantName,
+              variant: it.variant || null, modifiers: it.modifiers || [], notes: it.notes || null,
+            };
+          }),
+          notes: notes, estimatedTotal: total, paymentMethod: payment,
+        }).then(function (resp) {
           state.cart = []; save(); refreshCart(); closeCart();
           toast("Order broadcast! Waiting for a restaurant…", "success");
-          pollBroadcast(data.token);
+          pollBroadcast(resp.token);
         }).catch(function (err) { toast(err.message || "Failed to place order", "error"); });
       } else {
         var tid = Number(state.cartMode.split(":")[1]);
         api("POST", "/api/delivery/orders", {
-          tenantId: tid, customerName: name, customerPhone: phone, customerAddress: address,
-          items: state.cart.map(function (it) { return { productId: it.productId, name: it.name, quantity: it.quantity, unitPrice: it.estimatedPrice, total: it.quantity * it.estimatedPrice }; }),
-          notes: notes, subtotal: total, totalAmount: total, paymentMethod: "cash", orderType: "delivery",
-        }).then(function (data) {
+          tenantId: tid, customerName: name, customerPhone: phone, customerEmail: email, customerAddress: address,
+          items: state.cart.map(function (it) {
+            return {
+              productId: it.productId, name: it.name, quantity: it.quantity,
+              unitPrice: it.estimatedPrice, total: it.quantity * it.estimatedPrice,
+              variant: it.variant || null, modifiers: it.modifiers || [], notes: it.notes || null,
+            };
+          }),
+          notes: notes, subtotal: total, totalAmount: total, paymentMethod: payment, orderType: "delivery",
+        }).then(function (resp) {
           state.cart = []; save(); refreshCart(); closeCart();
           toast("Order placed!", "success");
-          if (data && data.trackingToken) navigate("track", [data.trackingToken]);
+          if (resp && resp.trackingToken) navigate("track", [resp.trackingToken]);
           else navigate("orders");
         }).catch(function (err) { toast(err.message || "Failed to place order", "error"); });
       }
@@ -908,6 +1245,12 @@
   $("btn-send-chat").onclick = sendChatMessage;
   $("chat-input").addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
   $("btn-open-chats").onclick = function () { navigate("orders"); };
+
+  // ─── Customize sheet ──────────────────────────────────────────────
+  var custClose = $("cust-close"); if (custClose) custClose.addEventListener("click", closeCustomizeSheet);
+  var custOverlay = $("cust-overlay"); if (custOverlay) custOverlay.addEventListener("click", closeCustomizeSheet);
+  var custAdd = $("cust-add"); if (custAdd) custAdd.addEventListener("click", commitCustomize);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && custState) closeCustomizeSheet(); });
 
   window.addEventListener("hashchange", applyRoute);
 

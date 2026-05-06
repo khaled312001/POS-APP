@@ -3266,6 +3266,73 @@ async function test(){
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // Google Sign-In via the GIS One-Tap / Sign-in-button flow.
+  // Client posts the JWT credential it got from `google.accounts.id.initialize`,
+  // we verify it against Google's tokeninfo endpoint, then upsert the customer
+  // by email and return our own session token. We also accept an optional
+  // tenantId so the multi-tenant DB still works (defaults to 24, the platform
+  // tenant the rest of the SPA uses).
+  app.post("/api/delivery/auth/google", async (req: Request, res: Response) => {
+    try {
+      const { credential, tenantId } = req.body || {};
+      if (!credential) return res.status(400).json({ error: "credential required" });
+      const tid = Number(tenantId) || 24;
+
+      // Verify the JWT against Google. tokeninfo also validates the audience
+      // when we pass our client_id so we don't need to install jsonwebtoken.
+      const expectedAud = process.env.GOOGLE_CLIENT_ID || "";
+      const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+      if (!verifyRes.ok) return res.status(401).json({ error: "Invalid Google credential" });
+      const payload: any = await verifyRes.json();
+      if (expectedAud && payload.aud !== expectedAud) {
+        return res.status(401).json({ error: "Token audience mismatch" });
+      }
+      if (!payload.email) return res.status(400).json({ error: "Email not present in token" });
+      const email = String(payload.email).toLowerCase();
+      const name = payload.name || payload.given_name || email.split("@")[0];
+      const picture = payload.picture || null;
+
+      // Upsert customer by email within the tenant.
+      const { db } = await import("./db");
+      const { customers } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      let customer = await findCustomerByEmail(email, tid);
+      if (!customer) {
+        const [inserted] = await db.insert(customers).values({
+          tenantId: tid,
+          name,
+          email,
+          hasAccount: true,
+          loyaltyPoints: 0,
+          loyaltyTier: "bronze",
+        }).$returningId();
+        const [created] = await db.select().from(customers).where(eq(customers.id, inserted.id)).limit(1);
+        customer = created as any;
+      } else if (!customer.name || customer.name === customer.email) {
+        // Backfill name from Google if we never had one
+        await storage.updateCustomer(customer.id, { name });
+      }
+
+      const token = await createCustomerSession(customer.id, tid, req.headers["user-agent"]);
+      res.json({
+        success: true,
+        token,
+        customer: {
+          id: customer.id,
+          name: customer.name || name,
+          email: customer.email,
+          picture,
+          loyaltyPoints: customer.loyaltyPoints,
+          loyaltyTier: customer.loyaltyTier,
+          walletBalance: customer.walletBalance,
+        },
+      });
+    } catch (e: any) {
+      console.error("[google-auth]", e);
+      res.status(500).json({ error: e.message || "Google sign-in failed" });
+    }
+  });
+
   app.post("/api/delivery/auth/logout", async (req: Request, res: Response) => {
     try {
       const authHeader = req.headers.authorization;

@@ -122,7 +122,10 @@ export function registerBroadcastRoutes(app: Express) {
       if (activeTenants.length === 0) return res.json({ restaurants: [], products: [], categories: [] });
       const tenantIds = activeTenants.map((t) => t.id);
 
-      // Fetch products for those tenants (active, with price)
+      // Fetch products for those tenants (active, with price). Modifiers
+      // (extras/sauces/drinks/toppings) + variants (sizes) are included so the
+      // customer-side broadcast UI can present an "Customize" sheet before
+      // adding the item to the cart, mirroring the in-restaurant ordering UX.
       const allProducts = await db.select({
         id: products.id,
         tenantId: products.tenantId,
@@ -133,6 +136,9 @@ export function registerBroadcastRoutes(app: Express) {
         imageUrl: products.image,
         categoryId: products.categoryId,
         isActive: products.isActive,
+        modifiers: products.modifiers,
+        variants: products.variants,
+        isAddon: products.isAddon,
       })
       .from(products)
       .where(and(
@@ -152,9 +158,16 @@ export function registerBroadcastRoutes(app: Express) {
       const tMap = new Map(activeTenants.map((t) => [t.id, t]));
 
       const payload = allProducts
-        .filter((p: any) => Number(p.price) > 0)
+        .filter((p: any) => Number(p.price) > 0 && !p.isAddon)
         .map((p: any) => {
           const t = tMap.get(p.tenantId);
+          // modifiers/variants are stored as JSON; mysql2 already parses them,
+          // but stringly-typed rows can sneak in from older inserts — coerce.
+          const parseJson = (v: any) => {
+            if (Array.isArray(v) || (v && typeof v === "object")) return v;
+            if (typeof v === "string" && v.trim()) { try { return JSON.parse(v); } catch { return []; } }
+            return [];
+          };
           return {
             id: p.id,
             tenantId: p.tenantId,
@@ -168,6 +181,8 @@ export function registerBroadcastRoutes(app: Express) {
             price: Number(p.price),
             imageUrl: p.imageUrl,
             category: catMap.get(`${p.tenantId}:${p.categoryId}`) || "Other",
+            modifiers: parseJson(p.modifiers),
+            variants: parseJson(p.variants),
           };
         });
       res.json({
