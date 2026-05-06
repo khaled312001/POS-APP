@@ -106,8 +106,11 @@ export default function SettingsScreen() {
   const tenantId = tenant?.id;
 
   // Landing page config for slug
+  // The default queryFn joins queryKey with "/", so we must format the second
+  // element as a query string ("?tenantId=…"), NOT a bare ID — otherwise the
+  // URL becomes /api/landing-page-config/24 (no route) and 404s in a loop.
   const { data: landingConfigData } = useQuery({
-    queryKey: ["/api/landing-page-config", tenantId],
+    queryKey: ["/api/landing-page-config", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: !!tenantId,
   });
