@@ -3713,11 +3713,18 @@ async function test(){
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // Helper: accept driver token from either Authorization Bearer (PWA),
+  // body.token (legacy POSTs), or query.token (legacy GETs).
+  const driverTokenFromRequest = (req: Request): string => {
+    const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+    return (bearer || (req.body && req.body.token) || (req.query && (req.query.token as string)) || "").trim();
+  };
+
   app.get("/api/delivery/driver/orders", async (req: Request, res: Response) => {
     try {
-      const { token } = req.query;
+      const token = driverTokenFromRequest(req);
       if (!token) return res.status(401).json({ error: "Driver token required" });
-      const driver = await storage.getVehicleByAccessToken(token as string);
+      const driver = await storage.getVehicleByAccessToken(token);
       if (!driver) return res.status(401).json({ error: "Invalid driver token" });
       const orders = await storage.getDriverActiveOrders(driver.id, driver.tenantId!);
       res.json(orders);
@@ -3726,7 +3733,7 @@ async function test(){
 
   app.post("/api/delivery/driver/orders/:id/accept", async (req: Request, res: Response) => {
     try {
-      const { token } = req.body;
+      const token = driverTokenFromRequest(req);
       if (!token) return res.status(401).json({ error: "Driver token required" });
       const driver = await storage.getVehicleByAccessToken(token);
       if (!driver) return res.status(401).json({ error: "Invalid driver token" });
@@ -3738,7 +3745,7 @@ async function test(){
 
   app.post("/api/delivery/driver/orders/:id/picked-up", async (req: Request, res: Response) => {
     try {
-      const { token } = req.body;
+      const token = driverTokenFromRequest(req);
       if (!token) return res.status(401).json({ error: "Driver token required" });
       const driver = await storage.getVehicleByAccessToken(token);
       if (!driver) return res.status(401).json({ error: "Invalid driver token" });
@@ -3759,7 +3766,7 @@ async function test(){
 
   app.post("/api/delivery/driver/orders/:id/delivered", async (req: Request, res: Response) => {
     try {
-      const { token } = req.body;
+      const token = driverTokenFromRequest(req);
       if (!token) return res.status(401).json({ error: "Driver token required" });
       const driver = await storage.getVehicleByAccessToken(token);
       if (!driver) return res.status(401).json({ error: "Invalid driver token" });
@@ -3834,9 +3841,10 @@ async function test(){
 
   app.get("/api/delivery/driver/earnings", async (req: Request, res: Response) => {
     try {
-      const { token, days } = req.query;
+      const token = driverTokenFromRequest(req);
+      const days = (req.query.days as string) || "7";
       if (!token) return res.status(401).json({ error: "Driver token required" });
-      const driver = await storage.getVehicleByAccessToken(token as string);
+      const driver = await storage.getVehicleByAccessToken(token);
       if (!driver) return res.status(401).json({ error: "Invalid driver token" });
       const earnings = await storage.getDriverEarnings(driver.id, Number(days ?? 7));
       res.json(earnings);

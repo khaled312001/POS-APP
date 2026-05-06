@@ -39,7 +39,7 @@ const PUBLIC_ROUTES = [
   "/api/delivery/promo/validate",  // Promo code validation
   "/api/delivery/zones",           // Delivery zones for checkout map
   "/api/delivery/referral/",       // Referral code lookup
-  "/api/delivery/driver/auth",     // Driver token login
+  "/api/delivery/driver/",         // All driver endpoints (auth via Bearer driver token)
   "/api/delivery/search",          // Public product search
   "/api/delivery/help/faq",        // Public FAQ listing
   "/api/delivery/sitemap.xml",     // Dynamic sitemap XML
