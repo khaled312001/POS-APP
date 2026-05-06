@@ -229,10 +229,11 @@ const driverApp = {
     driverApp.initMap();
     if (window.lucide) lucide.createIcons();
 
-    // Refresh orders every 30s
-    setInterval(() => {
-      if (driverApp.isOnline) driverApp.loadOrders();
-    }, 30000);
+    // Refresh orders every 30s — keep polling even while offline so
+    // the driver still sees an order assigned to them by the restaurant
+    // (offline only stops accepting *new* deliveries, but assigned ones
+    // should remain visible).
+    setInterval(() => { driverApp.loadOrders(); }, 30000);
   },
 
   // ── Online toggle ──────────────────────────────────────────────────────────
@@ -338,8 +339,8 @@ const driverApp = {
       list.innerHTML = `
         <div class="empty-state" style="padding:40px 24px">
           <div class="empty-state__icon"><i data-lucide="inbox" class="icon-2xl"></i></div>
-          <h2 class="empty-state__title">${driverApp.isOnline ? "No orders yet" : "You're offline"}</h2>
-          <p class="empty-state__text">${driverApp.isOnline ? "New assignments will appear here" : "Go online to receive deliveries"}</p>
+          <h2 class="empty-state__title">No orders yet</h2>
+          <p class="empty-state__text">${driverApp.isOnline ? "New assignments will appear here" : "Go online to start receiving new deliveries — assigned orders will still show here."}</p>
         </div>`;
       if (window.lucide) lucide.createIcons();
       return;

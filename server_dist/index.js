@@ -7676,7 +7676,7 @@ async function registerRoutes(app2) {
         "sale",
         sale.id
       );
-      if (saleData.orderType === "delivery" && saleData.vehicleId) {
+      if (saleData.vehicleId) {
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { onlineOrders: onlineOrders2, customers: customers2, vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));

@@ -1405,12 +1405,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sale.id
       );
 
-      // ── Mirror POS delivery sales into online_orders so the assigned ──
+      // ── Mirror POS sales-with-driver into online_orders so the assigned ──
       // driver sees the order in their PWA. The driver's order list reads
       // `online_orders WHERE driver_id = :vehicleId`, so without this mirror
       // a sale created at the till with a vehicle picked never reaches the
-      // driver app at /driver/<accessToken>.
-      if (saleData.orderType === "delivery" && saleData.vehicleId) {
+      // driver app at /driver/<accessToken>. We trigger on ANY vehicleId,
+      // not just orderType=delivery, because cashiers sometimes leave the
+      // type as dine_in/takeaway but still hand off the order to a driver.
+      if (saleData.vehicleId) {
         try {
           const { db } = await import("./db");
           const { onlineOrders, customers, vehicles } = await import("@shared/schema");

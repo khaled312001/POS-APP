@@ -32,6 +32,14 @@
         "EXPO_PUBLIC_APP_VARIANT": "customer"
       }
     },
+    "simulator-pos": {
+      "extends": "preview-pos",
+      "ios": { "simulator": true },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://pos.barmagly.tech",
+        "EXPO_PUBLIC_APP_VARIANT": "pos"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "credentialsSource": "remote",
