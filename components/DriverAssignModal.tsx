@@ -38,7 +38,16 @@ export default function DriverAssignModal({
       headers: { "x-license-key": licenseKey },
     })
       .then(r => r.json())
-      .then(data => setDrivers(data?.filter((d: Driver) => d.driverStatus === "available") || []))
+      // Show ALL drivers (available + offline + on_delivery) sorted by status —
+      // strict "available only" filter hid every driver until they happened to
+      // open the PWA. The UI shows status next to each name so you can still
+      // tell who's reachable. Excludes only deactivated rows.
+      .then((data: Driver[]) => {
+        const list = (data || []);
+        const order: Record<string, number> = { available: 0, on_delivery: 1, offline: 2 };
+        list.sort((a, b) => (order[a.driverStatus] ?? 9) - (order[b.driverStatus] ?? 9));
+        setDrivers(list);
+      })
       .catch(() => setDrivers([]))
       .finally(() => setLoading(false));
   }, [visible]);
@@ -88,7 +97,10 @@ export default function DriverAssignModal({
               data={drivers}
               keyExtractor={d => String(d.id)}
               contentContainerStyle={{ paddingBottom: 16 }}
-              renderItem={({ item: driver }) => (
+              renderItem={({ item: driver }) => {
+                const statusColor = driver.driverStatus === "available" ? "#10B981" : driver.driverStatus === "on_delivery" ? "#F59E0B" : "#9CA3AF";
+                const statusLabel = driver.driverStatus === "available" ? "Online" : driver.driverStatus === "on_delivery" ? "On Delivery" : "Offline";
+                return (
                 <TouchableOpacity
                   style={styles.driverCard}
                   onPress={() => assignDriver(driver.id)}
@@ -98,7 +110,12 @@ export default function DriverAssignModal({
                     <Text style={styles.avatarText}>🚗</Text>
                   </View>
                   <View style={styles.driverInfo}>
-                    <Text style={styles.driverName}>{driver.driverName || "Driver"}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                      <Text style={styles.driverName}>{driver.driverName || "Driver"}</Text>
+                      <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, backgroundColor: statusColor + "22" }}>
+                        <Text style={{ color: statusColor, fontSize: 11, fontWeight: "700" }}>{statusLabel}</Text>
+                      </View>
+                    </View>
                     <Text style={styles.driverMeta}>
                       {driver.vehicleType} · {driver.plateNumber} · ⭐ {parseFloat(String(driver.driverRating || 5)).toFixed(1)}
                     </Text>
@@ -114,7 +131,8 @@ export default function DriverAssignModal({
                     </View>
                   )}
                 </TouchableOpacity>
-              )}
+                );
+              }}
             />
           )}
         </View>

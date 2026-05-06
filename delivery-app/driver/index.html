@@ -209,9 +209,21 @@ const driverApp = {
     }
 
     // Driver name
-    const driverName = driverApp.driver?.name || driverApp.driver?.employeeName || "Driver";
+    const driverName = driverApp.driver?.name || driverApp.driver?.driverName || driverApp.driver?.employeeName || "Driver";
     document.getElementById("topbar-name").textContent = driverName;
     document.getElementById("page-title").textContent  = `${driverName} — Driver App`;
+
+    // Restore the online toggle from server state — driver was logged in
+    // before refresh, server has driverStatus persisted on the vehicle row.
+    const savedStatus = driverApp.driver?.driverStatus || "offline";
+    if (savedStatus === "available" || savedStatus === "on_delivery") {
+      driverApp.isOnline = true;
+      const pill  = document.getElementById("online-pill");
+      const label = document.getElementById("online-label");
+      pill.classList.add("is-online");
+      label.textContent = "Online";
+      driverApp.startGps();
+    }
 
     driverApp.loadOrders();
     driverApp.initMap();
@@ -240,14 +252,24 @@ const driverApp = {
       showToast("You're now offline");
     }
 
-    // Notify server of status change
+    // Persist status on the server so a refresh keeps the toggle
     try {
-      await fetch("/api/delivery/driver/location", {
+      await fetch("/api/delivery/driver/status", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${driverApp.token}` },
-        body: JSON.stringify({ lat: driverApp.gpsLat, lng: driverApp.gpsLng, status: driverApp.isOnline ? "available" : "offline" }),
+        body: JSON.stringify({ status: driverApp.isOnline ? "available" : "offline" }),
       });
     } catch (_) {}
+    // Persist last-known coords if we have them
+    if (driverApp.gpsLat != null && driverApp.gpsLng != null) {
+      try {
+        await fetch("/api/delivery/driver/location", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${driverApp.token}` },
+          body: JSON.stringify({ lat: driverApp.gpsLat, lng: driverApp.gpsLng }),
+        });
+      } catch (_) {}
+    }
   },
 
   // ── Orders ─────────────────────────────────────────────────────────────────

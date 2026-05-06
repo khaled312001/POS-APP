@@ -3795,15 +3795,53 @@ async function test(){
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // Toggle driver online/offline status — persists driverStatus on vehicles row
+  app.post("/api/delivery/driver/status", async (req: Request, res: Response) => {
+    try {
+      const token = driverTokenFromRequest(req);
+      if (!token) return res.status(401).json({ error: "Driver token required" });
+      const driver = await storage.getVehicleByAccessToken(token);
+      if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+      const status = String(req.body?.status || "").trim();
+      if (!["available", "offline", "on_delivery"].includes(status)) {
+        return res.status(400).json({ error: "status must be available | offline | on_delivery" });
+      }
+      const { db } = await import("./db");
+      const { vehicles } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.update(vehicles).set({ driverStatus: status, locationUpdatedAt: new Date() } as any).where(eq(vehicles.id, driver.id));
+      // Notify the tenant's POS so the available-drivers list refreshes live
+      try { callerIdService.broadcast({ type: "driver_status_change", vehicleId: driver.id, status }, driver.tenantId!); } catch {}
+      res.json({ success: true, driverStatus: status });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   app.post("/api/delivery/driver/location", async (req: Request, res: Response) => {
     try {
       // Accept token from body (legacy) OR Authorization Bearer header (driver app)
       const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
       const token = (req.body?.token || bearer || "").trim();
-      const { lat, lng, orderId } = req.body || {};
-      if (!token || lat === undefined || lng === undefined) return res.status(400).json({ error: "token, lat, lng required" });
+      const { lat, lng, orderId, status } = req.body || {};
+      if (!token) return res.status(401).json({ error: "Driver token required" });
       const driver = await storage.getVehicleByAccessToken(token);
       if (!driver) return res.status(401).json({ error: "Invalid driver token" });
+
+      // If status is sent (driver app's online toggle includes it), persist it
+      // even if lat/lng are still null because GPS hasn't locked yet.
+      if (status && ["available", "offline", "on_delivery"].includes(status)) {
+        try {
+          const { db } = await import("./db");
+          const { vehicles } = await import("@shared/schema");
+          const { eq } = await import("drizzle-orm");
+          await db.update(vehicles).set({ driverStatus: status, locationUpdatedAt: new Date() } as any).where(eq(vehicles.id, driver.id));
+          try { callerIdService.broadcast({ type: "driver_status_change", vehicleId: driver.id, status }, driver.tenantId!); } catch {}
+        } catch (_) {}
+      }
+
+      // No coordinates yet (going online before GPS lock) — just acknowledge
+      if (lat === undefined || lat === null || lng === undefined || lng === null) {
+        return res.json({ success: true, statusOnly: true });
+      }
       const oid = orderId ? Number(orderId) : undefined;
 
       // Persist to vehicles + driver_locations history
