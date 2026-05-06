@@ -1,0 +1,87 @@
+# EAS Build ignore — keep the upload archive small.
+# EAS already respects .gitignore; this file adds extra exclusions that are
+# safe to drop for a mobile build (server source, web build artifacts, big
+# media folders that aren't bundled into the app).
+
+# VCS / dev metadata
+.git/
+.github/
+.vscode/
+.idea/
+.cache/
+.expo/
+
+# Heavy directories not needed by the mobile build
+node_modules/
+dist/
+dist_next/
+server_dist/
+uploads/
+backups/
+brochure_screenshots/
+attached_assets/
+pos-next/
+
+# Server source — Express runs separately on Hostinger; mobile app talks to
+# it over HTTPS. Including it just bloats the upload.
+server/
+shared/
+caller-id-bridge/
+delivery-app/
+
+# Build artifacts
+android/build/
+android/app/build/
+ios/build/
+ios/Pods/
+*.apk
+*.aab
+*.ipa
+
+# Misc local assets / docs / scratch
+*.docx
+*.pdf
+*.csv
+*.zip
+*.tar.gz
+*.log
+*_output.txt
+final_*.txt
+*.bak
+*.bak-*
+
+# One-off scripts
+deploy*.py
+diagnose*.py
+debug*.py
+check_*.py
+check_*.ts
+seed*.ts
+seed*.js
+runPizzaLemonSeed.ts
+verifyPizzaLemonFull.ts
+showActiveLicenses.ts
+testLicenseValidation.ts
+import-*.ts
+import-*.mjs
+scrape-*.ts
+scrape-*.mjs
+scrape-*.js
+make_screenshots.js
+take_*_screenshots.js
+add_is_addon_column.js
+manual-map.ts
+match-images.ts
+migrate*.cjs
+migrate*.py
+purge-tenants.ts
+list-tenants.ts
+cleanup_cat.ts
+cleanup-all-except.ts
+copy_images.*
+find-missing-images.ts
+checkDB.ts
+checkTenants.ts
+debugDB.ts
+directDBCheck.js
+directSeed.js

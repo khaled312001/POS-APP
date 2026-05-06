@@ -1404,6 +1404,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "sale",
         sale.id
       );
+
+      // ── Mirror POS delivery sales into online_orders so the assigned ──
+      // driver sees the order in their PWA. The driver's order list reads
+      // `online_orders WHERE driver_id = :vehicleId`, so without this mirror
+      // a sale created at the till with a vehicle picked never reaches the
+      // driver app at /driver/<accessToken>.
+      if (saleData.orderType === "delivery" && saleData.vehicleId) {
+        try {
+          const { db } = await import("./db");
+          const { onlineOrders, customers, vehicles } = await import("@shared/schema");
+          const { eq } = await import("drizzle-orm");
+          const [cust] = saleData.customerId
+            ? await db.select().from(customers).where(eq(customers.id, saleData.customerId)).limit(1)
+            : [null];
+          const customerName = cust?.name || saleData.customerName || "Walk-in";
+          const customerPhone = cust?.phone || "";
+          const customerAddress = cust?.address
+            || [cust?.street, cust?.streetNr || cust?.houseNr, cust?.postalCode, cust?.city].filter(Boolean).join(" ")
+            || "";
+          const onlineItems = (items || []).map((it: any) => ({
+            productId: it.productId,
+            name: it.productName || it.name,
+            quantity: it.quantity,
+            unitPrice: Number(it.unitPrice),
+            total: Number(it.total),
+            notes: it.notes || undefined,
+          }));
+          const trackingToken = require("crypto").randomBytes(24).toString("hex");
+          const orderNumber = sale.receiptNumber || `POS-${sale.id}`;
+          const [inserted] = await db.insert(onlineOrders).values({
+            tenantId: saleData.tenantId || (saleEmp as any)?.tenantId || 24,
+            orderNumber,
+            customerName,
+            customerPhone: customerPhone || "—",
+            customerAddress: customerAddress || null,
+            customerEmail: cust?.email || null,
+            items: onlineItems as any,
+            subtotal: String(saleData.subtotal || 0),
+            taxAmount: String(saleData.taxAmount || 0),
+            deliveryFee: "0",
+            totalAmount: String(saleData.totalAmount || 0),
+            paymentMethod: saleData.paymentMethod || "cash",
+            paymentStatus: saleData.paymentStatus === "completed" ? "paid" : "pending",
+            status: "accepted",        // POS already confirmed it
+            orderType: "delivery",
+            notes: saleData.notes || null,
+            driverId: saleData.vehicleId,
+            sourceChannel: "pos",
+            trackingToken,
+          } as any).$returningId();
+
+          // Notify the driver via the WS/SSE channel so the PWA reloads.
+          try {
+            const { callerIdService } = await import("./callerIdService");
+            callerIdService.broadcast({
+              type: "delivery_status_change",
+              orderId: (inserted as any).id,
+              vehicleId: saleData.vehicleId,
+              status: "accepted",
+              orderNumber,
+            }, saleData.tenantId);
+          } catch { /* non-fatal */ }
+        } catch (mirrorErr) {
+          console.error("[/api/sales] online_orders mirror failed:", mirrorErr);
+          // Don't fail the sale just because the mirror failed.
+        }
+      }
+
       res.json(sale);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });

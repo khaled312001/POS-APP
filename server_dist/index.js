@@ -3527,6 +3527,338 @@ var init_storage = __esm({
   }
 });
 
+// server/callerIdService.ts
+var callerIdService_exports = {};
+__export(callerIdService_exports, {
+  CallerIDService: () => CallerIDService,
+  callerIdService: () => callerIdService
+});
+var import_events, import_ws, SLOT_EXPIRY_MS, CallerIDService, callerIdService;
+var init_callerIdService = __esm({
+  "server/callerIdService.ts"() {
+    "use strict";
+    import_events = require("events");
+    import_ws = require("ws");
+    init_phoneUtils();
+    SLOT_EXPIRY_MS = 5 * 60 * 1e3;
+    CallerIDService = class extends import_events.EventEmitter {
+      wss = null;
+      isSimulation = true;
+      // Key: "tenantId-slot"
+      activeCallSlots = /* @__PURE__ */ new Map();
+      slotTimeouts = /* @__PURE__ */ new Map();
+      // Deduplication: track recent calls to prevent double-counting
+      // Key: "normalizedPhone-tenantId", Value: timestamp
+      recentCalls = /* @__PURE__ */ new Map();
+      DEDUP_WINDOW_MS = 5e3;
+      // 5 seconds
+      // SSE fallback — Hostinger CDN doesn't proxy WebSocket upgrades, so we
+      // mirror every broadcast to attached EventSource clients too.
+      sseClients = /* @__PURE__ */ new Set();
+      constructor() {
+        super();
+      }
+      /**
+       * Initialize the service and start listening for calls
+       */
+      async init(server) {
+        console.log("[CallerID] Initializing Service...");
+        this.wss = new import_ws.WebSocketServer({ server, path: "/api/ws/caller-id" });
+        this.wss.on("connection", (ws) => {
+          console.log("[CallerID] Client connected to WebSocket");
+          ws.send(JSON.stringify({ type: "connected", status: "ready", mode: this.isSimulation ? "simulation" : "hardware" }));
+          ws.on("message", (message) => {
+            try {
+              const data = JSON.parse(message.toString());
+              if (data.type === "register") {
+                const tenantId = Number(data.tenantId);
+                if (!isNaN(tenantId)) {
+                  ws.tenantId = tenantId;
+                  console.log(`[CallerID] Client registered for tenant: ${tenantId}`);
+                  const activeCalls = Array.from(this.activeCallSlots.values()).filter((c) => c.tenantId === tenantId);
+                  if (activeCalls.length > 0) {
+                    ws.send(JSON.stringify({ type: "active_calls", calls: activeCalls }));
+                  }
+                }
+              } else if (data.type === "simulate_call") {
+                const tenantId = data.tenantId || ws.tenantId;
+                this.handleIncomingCall(data.phoneNumber || "0123456789", data.slot, tenantId);
+              } else if (data.type === "call_answered" || data.type === "call_ended") {
+                const slot = Number(data.slot);
+                const tenantId = ws.tenantId;
+                if (slot && tenantId) {
+                  const key = `${tenantId}-${slot}`;
+                  const call = this.activeCallSlots.get(key);
+                  if (call?.dbCallId) {
+                    Promise.resolve().then(() => (init_storage(), storage_exports)).then(({ storage: storage2 }) => {
+                      storage2.updateCall(call.dbCallId, { status: "answered" }).catch(() => {
+                      });
+                    });
+                  }
+                  this.activeCallSlots.delete(key);
+                  const t = this.slotTimeouts.get(key);
+                  if (t) {
+                    clearTimeout(t);
+                    this.slotTimeouts.delete(key);
+                  }
+                  this.broadcastCallSlotUpdate(tenantId);
+                }
+              }
+            } catch (e) {
+              console.error("[CallerID] WS message error:", e);
+            }
+          });
+          ws.on("close", () => {
+            console.log("[CallerID] Client disconnected");
+          });
+        });
+        console.log("[CallerID] WebSocket server listening on /api/ws/caller-id");
+      }
+      /**
+       * Main entry point when a call is detected
+       */
+      async handleIncomingCall(phoneNumber, preferredSlot, tenantId) {
+        const normalized = normalizePhone(phoneNumber);
+        let resolvedTenantId = tenantId || null;
+        if (this.wss && resolvedTenantId) {
+          const hasClientForTenant = Array.from(this.wss.clients).some(
+            (c) => c.readyState === import_ws.WebSocket.OPEN && c.tenantId === resolvedTenantId
+          );
+          if (!hasClientForTenant) {
+            const firstRegistered = Array.from(this.wss.clients).find(
+              (c) => c.readyState === import_ws.WebSocket.OPEN && c.tenantId
+            );
+            if (firstRegistered?.tenantId) {
+              console.log(`[CallerID] Bridge tenantId=${resolvedTenantId} has no clients. Remapping to tenant=${firstRegistered.tenantId}`);
+              resolvedTenantId = firstRegistered.tenantId;
+            }
+          }
+        }
+        console.log(`[CallerID] Incoming call for tenant ${resolvedTenantId}: ${phoneNumber} (Normalized: ${normalized})`);
+        const dedupKey = `${normalized}-${resolvedTenantId}`;
+        const now = Date.now();
+        const lastSeen = this.recentCalls.get(dedupKey);
+        if (lastSeen && now - lastSeen < this.DEDUP_WINDOW_MS) {
+          console.log(`[CallerID] Duplicate call from ${normalized} within ${this.DEDUP_WINDOW_MS}ms \u2014 skipping`);
+          const existing = Array.from(this.activeCallSlots.values()).find((c) => c.normalizedPhone === normalized && c.tenantId === resolvedTenantId);
+          return existing || null;
+        }
+        this.recentCalls.set(dedupKey, now);
+        if (this.recentCalls.size > 100) {
+          for (const [k, ts] of this.recentCalls) {
+            if (now - ts > this.DEDUP_WINDOW_MS * 2) this.recentCalls.delete(k);
+          }
+        }
+        let slot = preferredSlot || 0;
+        if (slot < 1 || slot > 4) {
+          for (let i = 1; i <= 4; i++) {
+            const key2 = `${resolvedTenantId}-${i}`;
+            if (!this.activeCallSlots.has(key2)) {
+              slot = i;
+              break;
+            }
+          }
+        }
+        if (slot === 0) {
+          console.log(`[CallerID] No slots available for tenant ${resolvedTenantId}, dropping call notification`);
+          return null;
+        }
+        const key = `${resolvedTenantId}-${slot}`;
+        const existingTimeout = this.slotTimeouts.get(key);
+        if (existingTimeout) {
+          clearTimeout(existingTimeout);
+          this.slotTimeouts.delete(key);
+        }
+        const callInfo = {
+          phoneNumber,
+          normalizedPhone: normalized,
+          slot,
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          tenantId: resolvedTenantId,
+          customer: null
+        };
+        this.activeCallSlots.set(key, callInfo);
+        const timeout = setTimeout(() => {
+          console.log(`[CallerID] Auto-expiring slot ${slot} for tenant ${resolvedTenantId}`);
+          this.activeCallSlots.delete(key);
+          this.slotTimeouts.delete(key);
+          if (resolvedTenantId) this.broadcastCallSlotUpdate(resolvedTenantId);
+        }, SLOT_EXPIRY_MS);
+        this.slotTimeouts.set(key, timeout);
+        try {
+          const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+          const customers2 = await storage2.findCustomerByPhone(normalized, resolvedTenantId);
+          if (customers2 && customers2.length > 0) {
+            callInfo.customer = customers2[0];
+            console.log(`[CallerID] Matched customer: ${callInfo.customer?.name}`);
+          }
+        } catch (e) {
+          console.error("[CallerID] Customer lookup error:", e);
+        }
+        try {
+          const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+          const dbCall = await storage2.createCall({
+            tenantId: resolvedTenantId,
+            phoneNumber,
+            customerId: callInfo.customer?.id || null,
+            status: "missed"
+          });
+          callInfo.dbCallId = dbCall.id;
+          console.log(`[CallerID] Call recorded in DB with ID: ${dbCall.id} for tenant ${resolvedTenantId}`);
+        } catch (e) {
+          console.error("[CallerID] DB save error:", e);
+        }
+        const tenantActiveCalls = Array.from(this.activeCallSlots.values()).filter((c) => c.tenantId === resolvedTenantId);
+        const payload = JSON.stringify({
+          type: "incoming_call",
+          phoneNumber,
+          normalizedPhone: normalized,
+          slot,
+          timestamp: callInfo.timestamp,
+          customer: callInfo.customer,
+          totalActiveCalls: tenantActiveCalls.length,
+          allActiveCalls: tenantActiveCalls
+        });
+        this.broadcastToTenant(payload, resolvedTenantId || void 0);
+        this.emit("call", phoneNumber, slot, callInfo.customer, resolvedTenantId);
+        return callInfo;
+      }
+      broadcastToTenant(payload, tenantId) {
+        let wsTotal = 0, wsMatched = 0;
+        const allWsOpen = [];
+        if (this.wss) {
+          this.wss.clients.forEach((client2) => {
+            if (client2.readyState === import_ws.WebSocket.OPEN) {
+              wsTotal++;
+              allWsOpen.push(client2);
+              if (!tenantId || !client2.tenantId || client2.tenantId === tenantId) {
+                wsMatched++;
+                client2.send(payload);
+              }
+            }
+          });
+          if (tenantId && wsMatched === 0 && allWsOpen.length > 0) {
+            allWsOpen.forEach((c) => c.send(payload));
+            wsMatched = allWsOpen.length;
+          }
+        }
+        let sseTotal = 0, sseMatched = 0;
+        const sseAll = [];
+        this.sseClients.forEach((sc) => {
+          if (!sc.alive) return;
+          sseTotal++;
+          sseAll.push(sc);
+          if (!tenantId || !sc.tenantId || sc.tenantId === tenantId) {
+            sseMatched++;
+            try {
+              sc.res.write(`data: ${payload}
+
+`);
+            } catch {
+              sc.alive = false;
+            }
+          }
+        });
+        if (tenantId && sseMatched === 0 && sseAll.length > 0) {
+          sseAll.forEach((sc) => {
+            try {
+              sc.res.write(`data: ${payload}
+
+`);
+            } catch {
+              sc.alive = false;
+            }
+          });
+          sseMatched = sseAll.length;
+        }
+        console.log(`[CallerID] Broadcast: ws=${wsMatched}/${wsTotal} sse=${sseMatched}/${sseTotal} tenant=${tenantId}`);
+      }
+      /**
+       * Register a long-lived SSE response. Returns a teardown function the
+       * route handler should call from `req.on("close")`.
+       */
+      addSseClient(res, tenantId) {
+        const sc = { res, tenantId, alive: true };
+        this.sseClients.add(sc);
+        return () => {
+          sc.alive = false;
+          this.sseClients.delete(sc);
+        };
+      }
+      /**
+       * Broadcasts updated slot information to a specific tenant
+       */
+      broadcastCallSlotUpdate(tenantId) {
+        const tenantActiveCalls = Array.from(this.activeCallSlots.values()).filter((c) => c.tenantId === tenantId);
+        const payload = JSON.stringify({
+          type: "calls_update",
+          allActiveCalls: tenantActiveCalls,
+          totalActiveCalls: tenantActiveCalls.length
+        });
+        this.broadcastToTenant(payload, tenantId);
+      }
+      /**
+       * Broadcast any arbitrary message to a specific tenant
+       */
+      broadcast(payload, tenantId) {
+        const msg = JSON.stringify(payload);
+        this.broadcastToTenant(msg, tenantId);
+      }
+      /**
+       * Returns all currently active calls for a given tenant (for HTTP polling fallback).
+       */
+      getActiveCallsForTenant(tenantId) {
+        return Array.from(this.activeCallSlots.values()).filter((c) => c.tenantId === tenantId);
+      }
+      /**
+       * Mock function to trigger a call (for testing)
+       */
+      simulateCall(number = "0123456789", slot, tenantId) {
+        this.handleIncomingCall(number, slot, tenantId);
+      }
+      // ── Delivery Platform broadcast helpers ──────────────────────────────────────
+      /**
+       * Broadcast driver GPS location update to tenant POS clients
+       */
+      broadcastDriverLocation(tenantId, vehicleId, lat, lng, orderId) {
+        this.broadcast({
+          type: "driver_location_update",
+          vehicleId,
+          lat,
+          lng,
+          orderId: orderId ?? null,
+          timestamp: (/* @__PURE__ */ new Date()).toISOString()
+        }, tenantId);
+      }
+      /**
+       * Broadcast delivery order status change to tenant POS clients
+       */
+      broadcastDeliveryStatus(tenantId, orderId, status2, driverName) {
+        this.broadcast({
+          type: "delivery_status_change",
+          orderId,
+          status: status2,
+          driverName: driverName ?? null,
+          timestamp: (/* @__PURE__ */ new Date()).toISOString()
+        }, tenantId);
+      }
+      /**
+       * Broadcast a new scheduled order alert to tenant POS clients
+       */
+      broadcastScheduledOrder(tenantId, orderId, scheduledAt, customerName) {
+        this.broadcast({
+          type: "new_scheduled_order",
+          orderId,
+          scheduledAt,
+          customerName: customerName ?? null,
+          timestamp: (/* @__PURE__ */ new Date()).toISOString()
+        }, tenantId);
+      }
+    };
+    callerIdService = new CallerIDService();
+  }
+});
+
 // server/seedPizzaLemon.ts
 var seedPizzaLemon_exports = {};
 __export(seedPizzaLemon_exports, {
@@ -4790,326 +5122,8 @@ async function signObjectURL({ bucketName, objectName, method, ttlSec }) {
   return signedURL;
 }
 
-// server/callerIdService.ts
-var import_events = require("events");
-var import_ws = require("ws");
-init_phoneUtils();
-var SLOT_EXPIRY_MS = 5 * 60 * 1e3;
-var CallerIDService = class extends import_events.EventEmitter {
-  wss = null;
-  isSimulation = true;
-  // Key: "tenantId-slot"
-  activeCallSlots = /* @__PURE__ */ new Map();
-  slotTimeouts = /* @__PURE__ */ new Map();
-  // Deduplication: track recent calls to prevent double-counting
-  // Key: "normalizedPhone-tenantId", Value: timestamp
-  recentCalls = /* @__PURE__ */ new Map();
-  DEDUP_WINDOW_MS = 5e3;
-  // 5 seconds
-  // SSE fallback — Hostinger CDN doesn't proxy WebSocket upgrades, so we
-  // mirror every broadcast to attached EventSource clients too.
-  sseClients = /* @__PURE__ */ new Set();
-  constructor() {
-    super();
-  }
-  /**
-   * Initialize the service and start listening for calls
-   */
-  async init(server) {
-    console.log("[CallerID] Initializing Service...");
-    this.wss = new import_ws.WebSocketServer({ server, path: "/api/ws/caller-id" });
-    this.wss.on("connection", (ws) => {
-      console.log("[CallerID] Client connected to WebSocket");
-      ws.send(JSON.stringify({ type: "connected", status: "ready", mode: this.isSimulation ? "simulation" : "hardware" }));
-      ws.on("message", (message) => {
-        try {
-          const data = JSON.parse(message.toString());
-          if (data.type === "register") {
-            const tenantId = Number(data.tenantId);
-            if (!isNaN(tenantId)) {
-              ws.tenantId = tenantId;
-              console.log(`[CallerID] Client registered for tenant: ${tenantId}`);
-              const activeCalls = Array.from(this.activeCallSlots.values()).filter((c) => c.tenantId === tenantId);
-              if (activeCalls.length > 0) {
-                ws.send(JSON.stringify({ type: "active_calls", calls: activeCalls }));
-              }
-            }
-          } else if (data.type === "simulate_call") {
-            const tenantId = data.tenantId || ws.tenantId;
-            this.handleIncomingCall(data.phoneNumber || "0123456789", data.slot, tenantId);
-          } else if (data.type === "call_answered" || data.type === "call_ended") {
-            const slot = Number(data.slot);
-            const tenantId = ws.tenantId;
-            if (slot && tenantId) {
-              const key = `${tenantId}-${slot}`;
-              const call = this.activeCallSlots.get(key);
-              if (call?.dbCallId) {
-                Promise.resolve().then(() => (init_storage(), storage_exports)).then(({ storage: storage2 }) => {
-                  storage2.updateCall(call.dbCallId, { status: "answered" }).catch(() => {
-                  });
-                });
-              }
-              this.activeCallSlots.delete(key);
-              const t = this.slotTimeouts.get(key);
-              if (t) {
-                clearTimeout(t);
-                this.slotTimeouts.delete(key);
-              }
-              this.broadcastCallSlotUpdate(tenantId);
-            }
-          }
-        } catch (e) {
-          console.error("[CallerID] WS message error:", e);
-        }
-      });
-      ws.on("close", () => {
-        console.log("[CallerID] Client disconnected");
-      });
-    });
-    console.log("[CallerID] WebSocket server listening on /api/ws/caller-id");
-  }
-  /**
-   * Main entry point when a call is detected
-   */
-  async handleIncomingCall(phoneNumber, preferredSlot, tenantId) {
-    const normalized = normalizePhone(phoneNumber);
-    let resolvedTenantId = tenantId || null;
-    if (this.wss && resolvedTenantId) {
-      const hasClientForTenant = Array.from(this.wss.clients).some(
-        (c) => c.readyState === import_ws.WebSocket.OPEN && c.tenantId === resolvedTenantId
-      );
-      if (!hasClientForTenant) {
-        const firstRegistered = Array.from(this.wss.clients).find(
-          (c) => c.readyState === import_ws.WebSocket.OPEN && c.tenantId
-        );
-        if (firstRegistered?.tenantId) {
-          console.log(`[CallerID] Bridge tenantId=${resolvedTenantId} has no clients. Remapping to tenant=${firstRegistered.tenantId}`);
-          resolvedTenantId = firstRegistered.tenantId;
-        }
-      }
-    }
-    console.log(`[CallerID] Incoming call for tenant ${resolvedTenantId}: ${phoneNumber} (Normalized: ${normalized})`);
-    const dedupKey = `${normalized}-${resolvedTenantId}`;
-    const now = Date.now();
-    const lastSeen = this.recentCalls.get(dedupKey);
-    if (lastSeen && now - lastSeen < this.DEDUP_WINDOW_MS) {
-      console.log(`[CallerID] Duplicate call from ${normalized} within ${this.DEDUP_WINDOW_MS}ms \u2014 skipping`);
-      const existing = Array.from(this.activeCallSlots.values()).find((c) => c.normalizedPhone === normalized && c.tenantId === resolvedTenantId);
-      return existing || null;
-    }
-    this.recentCalls.set(dedupKey, now);
-    if (this.recentCalls.size > 100) {
-      for (const [k, ts] of this.recentCalls) {
-        if (now - ts > this.DEDUP_WINDOW_MS * 2) this.recentCalls.delete(k);
-      }
-    }
-    let slot = preferredSlot || 0;
-    if (slot < 1 || slot > 4) {
-      for (let i = 1; i <= 4; i++) {
-        const key2 = `${resolvedTenantId}-${i}`;
-        if (!this.activeCallSlots.has(key2)) {
-          slot = i;
-          break;
-        }
-      }
-    }
-    if (slot === 0) {
-      console.log(`[CallerID] No slots available for tenant ${resolvedTenantId}, dropping call notification`);
-      return null;
-    }
-    const key = `${resolvedTenantId}-${slot}`;
-    const existingTimeout = this.slotTimeouts.get(key);
-    if (existingTimeout) {
-      clearTimeout(existingTimeout);
-      this.slotTimeouts.delete(key);
-    }
-    const callInfo = {
-      phoneNumber,
-      normalizedPhone: normalized,
-      slot,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-      tenantId: resolvedTenantId,
-      customer: null
-    };
-    this.activeCallSlots.set(key, callInfo);
-    const timeout = setTimeout(() => {
-      console.log(`[CallerID] Auto-expiring slot ${slot} for tenant ${resolvedTenantId}`);
-      this.activeCallSlots.delete(key);
-      this.slotTimeouts.delete(key);
-      if (resolvedTenantId) this.broadcastCallSlotUpdate(resolvedTenantId);
-    }, SLOT_EXPIRY_MS);
-    this.slotTimeouts.set(key, timeout);
-    try {
-      const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
-      const customers2 = await storage2.findCustomerByPhone(normalized, resolvedTenantId);
-      if (customers2 && customers2.length > 0) {
-        callInfo.customer = customers2[0];
-        console.log(`[CallerID] Matched customer: ${callInfo.customer?.name}`);
-      }
-    } catch (e) {
-      console.error("[CallerID] Customer lookup error:", e);
-    }
-    try {
-      const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
-      const dbCall = await storage2.createCall({
-        tenantId: resolvedTenantId,
-        phoneNumber,
-        customerId: callInfo.customer?.id || null,
-        status: "missed"
-      });
-      callInfo.dbCallId = dbCall.id;
-      console.log(`[CallerID] Call recorded in DB with ID: ${dbCall.id} for tenant ${resolvedTenantId}`);
-    } catch (e) {
-      console.error("[CallerID] DB save error:", e);
-    }
-    const tenantActiveCalls = Array.from(this.activeCallSlots.values()).filter((c) => c.tenantId === resolvedTenantId);
-    const payload = JSON.stringify({
-      type: "incoming_call",
-      phoneNumber,
-      normalizedPhone: normalized,
-      slot,
-      timestamp: callInfo.timestamp,
-      customer: callInfo.customer,
-      totalActiveCalls: tenantActiveCalls.length,
-      allActiveCalls: tenantActiveCalls
-    });
-    this.broadcastToTenant(payload, resolvedTenantId || void 0);
-    this.emit("call", phoneNumber, slot, callInfo.customer, resolvedTenantId);
-    return callInfo;
-  }
-  broadcastToTenant(payload, tenantId) {
-    let wsTotal = 0, wsMatched = 0;
-    const allWsOpen = [];
-    if (this.wss) {
-      this.wss.clients.forEach((client2) => {
-        if (client2.readyState === import_ws.WebSocket.OPEN) {
-          wsTotal++;
-          allWsOpen.push(client2);
-          if (!tenantId || !client2.tenantId || client2.tenantId === tenantId) {
-            wsMatched++;
-            client2.send(payload);
-          }
-        }
-      });
-      if (tenantId && wsMatched === 0 && allWsOpen.length > 0) {
-        allWsOpen.forEach((c) => c.send(payload));
-        wsMatched = allWsOpen.length;
-      }
-    }
-    let sseTotal = 0, sseMatched = 0;
-    const sseAll = [];
-    this.sseClients.forEach((sc) => {
-      if (!sc.alive) return;
-      sseTotal++;
-      sseAll.push(sc);
-      if (!tenantId || !sc.tenantId || sc.tenantId === tenantId) {
-        sseMatched++;
-        try {
-          sc.res.write(`data: ${payload}
-
-`);
-        } catch {
-          sc.alive = false;
-        }
-      }
-    });
-    if (tenantId && sseMatched === 0 && sseAll.length > 0) {
-      sseAll.forEach((sc) => {
-        try {
-          sc.res.write(`data: ${payload}
-
-`);
-        } catch {
-          sc.alive = false;
-        }
-      });
-      sseMatched = sseAll.length;
-    }
-    console.log(`[CallerID] Broadcast: ws=${wsMatched}/${wsTotal} sse=${sseMatched}/${sseTotal} tenant=${tenantId}`);
-  }
-  /**
-   * Register a long-lived SSE response. Returns a teardown function the
-   * route handler should call from `req.on("close")`.
-   */
-  addSseClient(res, tenantId) {
-    const sc = { res, tenantId, alive: true };
-    this.sseClients.add(sc);
-    return () => {
-      sc.alive = false;
-      this.sseClients.delete(sc);
-    };
-  }
-  /**
-   * Broadcasts updated slot information to a specific tenant
-   */
-  broadcastCallSlotUpdate(tenantId) {
-    const tenantActiveCalls = Array.from(this.activeCallSlots.values()).filter((c) => c.tenantId === tenantId);
-    const payload = JSON.stringify({
-      type: "calls_update",
-      allActiveCalls: tenantActiveCalls,
-      totalActiveCalls: tenantActiveCalls.length
-    });
-    this.broadcastToTenant(payload, tenantId);
-  }
-  /**
-   * Broadcast any arbitrary message to a specific tenant
-   */
-  broadcast(payload, tenantId) {
-    const msg = JSON.stringify(payload);
-    this.broadcastToTenant(msg, tenantId);
-  }
-  /**
-   * Returns all currently active calls for a given tenant (for HTTP polling fallback).
-   */
-  getActiveCallsForTenant(tenantId) {
-    return Array.from(this.activeCallSlots.values()).filter((c) => c.tenantId === tenantId);
-  }
-  /**
-   * Mock function to trigger a call (for testing)
-   */
-  simulateCall(number = "0123456789", slot, tenantId) {
-    this.handleIncomingCall(number, slot, tenantId);
-  }
-  // ── Delivery Platform broadcast helpers ──────────────────────────────────────
-  /**
-   * Broadcast driver GPS location update to tenant POS clients
-   */
-  broadcastDriverLocation(tenantId, vehicleId, lat, lng, orderId) {
-    this.broadcast({
-      type: "driver_location_update",
-      vehicleId,
-      lat,
-      lng,
-      orderId: orderId ?? null,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    }, tenantId);
-  }
-  /**
-   * Broadcast delivery order status change to tenant POS clients
-   */
-  broadcastDeliveryStatus(tenantId, orderId, status2, driverName) {
-    this.broadcast({
-      type: "delivery_status_change",
-      orderId,
-      status: status2,
-      driverName: driverName ?? null,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    }, tenantId);
-  }
-  /**
-   * Broadcast a new scheduled order alert to tenant POS clients
-   */
-  broadcastScheduledOrder(tenantId, orderId, scheduledAt, customerName) {
-    this.broadcast({
-      type: "new_scheduled_order",
-      orderId,
-      scheduledAt,
-      customerName: customerName ?? null,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    }, tenantId);
-  }
-};
-var callerIdService = new CallerIDService();
+// server/routes.ts
+init_callerIdService();
 
 // server/pushService.ts
 var import_web_push = __toESM(require("web-push"));
@@ -7662,6 +7676,62 @@ async function registerRoutes(app2) {
         "sale",
         sale.id
       );
+      if (saleData.orderType === "delivery" && saleData.vehicleId) {
+        try {
+          const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const { onlineOrders: onlineOrders2, customers: customers2, vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+          const { eq: eq9 } = await import("drizzle-orm");
+          const [cust] = saleData.customerId ? await db2.select().from(customers2).where(eq9(customers2.id, saleData.customerId)).limit(1) : [null];
+          const customerName = cust?.name || saleData.customerName || "Walk-in";
+          const customerPhone = cust?.phone || "";
+          const customerAddress = cust?.address || [cust?.street, cust?.streetNr || cust?.houseNr, cust?.postalCode, cust?.city].filter(Boolean).join(" ") || "";
+          const onlineItems = (items || []).map((it) => ({
+            productId: it.productId,
+            name: it.productName || it.name,
+            quantity: it.quantity,
+            unitPrice: Number(it.unitPrice),
+            total: Number(it.total),
+            notes: it.notes || void 0
+          }));
+          const trackingToken = require("crypto").randomBytes(24).toString("hex");
+          const orderNumber = sale.receiptNumber || `POS-${sale.id}`;
+          const [inserted] = await db2.insert(onlineOrders2).values({
+            tenantId: saleData.tenantId || saleEmp?.tenantId || 24,
+            orderNumber,
+            customerName,
+            customerPhone: customerPhone || "\u2014",
+            customerAddress: customerAddress || null,
+            customerEmail: cust?.email || null,
+            items: onlineItems,
+            subtotal: String(saleData.subtotal || 0),
+            taxAmount: String(saleData.taxAmount || 0),
+            deliveryFee: "0",
+            totalAmount: String(saleData.totalAmount || 0),
+            paymentMethod: saleData.paymentMethod || "cash",
+            paymentStatus: saleData.paymentStatus === "completed" ? "paid" : "pending",
+            status: "accepted",
+            // POS already confirmed it
+            orderType: "delivery",
+            notes: saleData.notes || null,
+            driverId: saleData.vehicleId,
+            sourceChannel: "pos",
+            trackingToken
+          }).$returningId();
+          try {
+            const { callerIdService: callerIdService2 } = await Promise.resolve().then(() => (init_callerIdService(), callerIdService_exports));
+            callerIdService2.broadcast({
+              type: "delivery_status_change",
+              orderId: inserted.id,
+              vehicleId: saleData.vehicleId,
+              status: "accepted",
+              orderNumber
+            }, saleData.tenantId);
+          } catch {
+          }
+        } catch (mirrorErr) {
+          console.error("[/api/sales] online_orders mirror failed:", mirrorErr);
+        }
+      }
       res.json(sale);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -12150,6 +12220,7 @@ var import_crypto4 = require("crypto");
 init_db();
 init_schema();
 var import_drizzle_orm7 = require("drizzle-orm");
+init_callerIdService();
 var broadcastMigrationRan = false;
 async function ensureBroadcastTables() {
   if (broadcastMigrationRan) return;
@@ -12597,6 +12668,7 @@ init_db();
 init_schema();
 var import_drizzle_orm8 = require("drizzle-orm");
 init_storage();
+init_callerIdService();
 var chatMigrationRan = false;
 async function ensureChatTables() {
   if (chatMigrationRan) return;
@@ -13068,6 +13140,9 @@ function tenantAuthMiddleware() {
     }
   };
 }
+
+// server/index.ts
+init_callerIdService();
 
 // server/webhookHandlers.ts
 var WebhookHandlers = class {
