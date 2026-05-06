@@ -69,8 +69,9 @@
         var ok = true;
         current.fields.forEach(function (f) {
           var el = fieldsEl.querySelector('[data-fkey="' + f.key + '"]');
-          var v = (el && el.value || "").trim();
-          if (f.required && !v) { ok = false; el.focus(); el.style.borderColor = "var(--danger)"; }
+          var raw = (el && el.value) || "";
+          var v = (typeof raw === "string") ? raw.trim() : raw;
+          if (f.required && !v) { ok = false; if (el) { el.focus(); el.style.borderColor = "var(--danger)"; } }
           out[f.key] = v;
         });
         if (!ok) return;
@@ -126,15 +127,22 @@
             var el;
             if (f.type === "textarea") {
               el = document.createElement("textarea"); el.className = "txt"; el.rows = 3;
+            } else if (f.type === "select") {
+              el = document.createElement("select"); el.className = "inp";
+              (f.options || []).forEach(function (o) {
+                var op = document.createElement("option");
+                op.value = o.value; op.textContent = o.label || o.value;
+                el.appendChild(op);
+              });
             } else {
               el = document.createElement("input"); el.className = "inp"; el.type = f.type || "text";
             }
             el.setAttribute("data-fkey", f.key);
-            el.placeholder = f.placeholder || "";
-            el.value = f.defaultValue || "";
+            if (el.tagName !== "SELECT") el.placeholder = f.placeholder || "";
+            el.value = (f.value !== undefined ? f.value : (f.defaultValue || ""));
             fieldsEl.appendChild(el);
           });
-          setTimeout(function () { var first = fieldsEl.querySelector("input,textarea"); if (first) first.focus(); }, 30);
+          setTimeout(function () { var first = fieldsEl.querySelector("input,textarea,select"); if (first) first.focus(); }, 30);
         }
         // Buttons
         if (opts.kind === "alert") {
@@ -1237,6 +1245,92 @@
   $("btn-go-guest").onclick = handleGuest;
   $("form-login").addEventListener("submit", handleLogin);
   $("form-register").addEventListener("submit", handleRegister);
+
+  // ─── Google Sign-In ───────────────────────────────────────────────
+  // Three entry points (intro / login / register) all reuse the same flow.
+  // GIS gives us a JWT credential; the server verifies it and issues our
+  // own session token, so we never see the user's password.
+  var GOOGLE_CLIENT_ID = "1052668409317-el9e1cccc8607h6tud82b8hqetm9jpkl.apps.googleusercontent.com";
+  function handleGoogleCredential(resp) {
+    if (!resp || !resp.credential) { toast("Google sign-in failed", "error"); return; }
+    api("POST", "/api/delivery/auth/google", { credential: resp.credential, tenantId: 24 })
+      .then(function (data) {
+        state.auth = { token: data.token, customer: data.customer, isGuest: false };
+        save();
+        toast("Welcome, " + (data.customer.name || "friend"), "success");
+        navigate("home");
+      })
+      .catch(function (err) { toast(err.message || "Google sign-in failed", "error"); });
+  }
+  function startGoogleSignIn() {
+    if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+      toast("Google sign-in is loading… please try again", "error"); return;
+    }
+    try {
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogleCredential,
+        ux_mode: "popup",
+        auto_select: false,
+        cancel_on_tap_outside: false,
+      });
+      window.google.accounts.id.prompt(function (notification) {
+        // If One-Tap is suppressed (cookies blocked / dismissed before),
+        // fall back to the OAuth-style popup so the user still gets in.
+        if (notification && (notification.isNotDisplayed && notification.isNotDisplayed()) ||
+            (notification && notification.isSkippedMoment && notification.isSkippedMoment())) {
+          openGooglePopup();
+        }
+      });
+    } catch (e) {
+      console.error("Google init", e);
+      openGooglePopup();
+    }
+  }
+  function openGooglePopup() {
+    // Fallback: redirect-style OAuth using the OAuth2 token endpoint via
+    // popup. Uses Google's `oauth2.initTokenClient` (implicit-style) and
+    // then exchanges the access_token via /userinfo, posting that to our
+    // server. Implemented as a JWT-only path is simpler — keep One-Tap path
+    // as the primary; popup is a graceful degradation for blocked cookies.
+    if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+      toast("Google sign-in unavailable", "error"); return;
+    }
+    var client = window.google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: "openid email profile",
+      callback: function (tokenResp) {
+        if (!tokenResp || !tokenResp.access_token) { toast("Sign-in cancelled", "error"); return; }
+        // Fetch userinfo, then send to our /auth/google endpoint as a
+        // pseudo-credential. Server handles either id_token or { profile }.
+        fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: "Bearer " + tokenResp.access_token } })
+          .then(function (r) { return r.json(); })
+          .then(function (profile) {
+            // Server accepts {credential} (JWT) OR {profile} (verified by access_token).
+            return api("POST", "/api/delivery/auth/google", { profile: profile, accessToken: tokenResp.access_token, tenantId: 24 });
+          })
+          .then(function (data) {
+            state.auth = { token: data.token, customer: data.customer, isGuest: false };
+            save();
+            toast("Welcome, " + (data.customer.name || "friend"), "success");
+            navigate("home");
+          })
+          .catch(function (err) { toast(err.message || "Sign-in failed", "error"); });
+      },
+    });
+    client.requestAccessToken({ prompt: "consent" });
+  }
+  ["btn-intro-google", "btn-login-google", "btn-register-google"].forEach(function (id) {
+    var b = $(id); if (b) b.addEventListener("click", startGoogleSignIn);
+  });
+
+  // ─── /customer/login redirect target ──────────────────────────────
+  // When Google redirects to /customer/login (the OAuth-listed URI), the
+  // SPA loads from /customer/ via .htaccess rewrite. Push the user to the
+  // login route so they see the form.
+  if (location.pathname === "/customer/login" || location.pathname === "/customer/login/") {
+    if (location.hash !== "#/login") location.hash = "#/login";
+  }
   $("btn-logout").onclick = logout;
   $("cart-fab").onclick = openCart;
   $("btn-close-cart").onclick = closeCart;

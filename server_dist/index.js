@@ -9611,6 +9611,71 @@ Valid for 10 minutes.`);
       res.status(500).json({ error: e.message });
     }
   });
+  app2.post("/api/delivery/auth/google", async (req, res) => {
+    try {
+      const { credential, accessToken, profile, tenantId } = req.body || {};
+      const tid = Number(tenantId) || 24;
+      const expectedAud = process.env.GOOGLE_CLIENT_ID || "";
+      let payload = null;
+      if (credential) {
+        const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+        if (!verifyRes.ok) return res.status(401).json({ error: "Invalid Google credential" });
+        payload = await verifyRes.json();
+        if (expectedAud && payload.aud !== expectedAud) {
+          return res.status(401).json({ error: "Token audience mismatch" });
+        }
+      } else if (accessToken) {
+        const ui = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (!ui.ok) return res.status(401).json({ error: "Invalid Google access token" });
+        payload = await ui.json();
+      } else if (profile && profile.email) {
+        return res.status(400).json({ error: "credential or accessToken required" });
+      } else {
+        return res.status(400).json({ error: "credential or accessToken required" });
+      }
+      if (!payload || !payload.email) return res.status(400).json({ error: "Email not present in token" });
+      const email = String(payload.email).toLowerCase();
+      const name = payload.name || payload.given_name || email.split("@")[0];
+      const picture = payload.picture || null;
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { customers: customers2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq9 } = await import("drizzle-orm");
+      let customer = await findCustomerByEmail(email, tid);
+      if (!customer) {
+        const [inserted] = await db2.insert(customers2).values({
+          tenantId: tid,
+          name,
+          email,
+          hasAccount: true,
+          loyaltyPoints: 0,
+          loyaltyTier: "bronze"
+        }).$returningId();
+        const [created] = await db2.select().from(customers2).where(eq9(customers2.id, inserted.id)).limit(1);
+        customer = created;
+      } else if (!customer.name || customer.name === customer.email) {
+        await storage.updateCustomer(customer.id, { name });
+      }
+      const token = await createCustomerSession(customer.id, tid, req.headers["user-agent"]);
+      res.json({
+        success: true,
+        token,
+        customer: {
+          id: customer.id,
+          name: customer.name || name,
+          email: customer.email,
+          picture,
+          loyaltyPoints: customer.loyaltyPoints,
+          loyaltyTier: customer.loyaltyTier,
+          walletBalance: customer.walletBalance
+        }
+      });
+    } catch (e) {
+      console.error("[google-auth]", e);
+      res.status(500).json({ error: e.message || "Google sign-in failed" });
+    }
+  });
   app2.post("/api/delivery/auth/logout", async (req, res) => {
     try {
       const authHeader = req.headers.authorization;
@@ -12114,7 +12179,10 @@ function registerBroadcastRoutes(app2) {
         price: products.price,
         imageUrl: products.image,
         categoryId: products.categoryId,
-        isActive: products.isActive
+        isActive: products.isActive,
+        modifiers: products.modifiers,
+        variants: products.variants,
+        isAddon: products.isAddon
       }).from(products).where((0, import_drizzle_orm7.and)(
         (0, import_drizzle_orm7.inArray)(products.tenantId, tenantIds),
         (0, import_drizzle_orm7.or)((0, import_drizzle_orm7.eq)(products.isActive, true), (0, import_drizzle_orm7.isNull)(products.isActive))
@@ -12126,8 +12194,19 @@ function registerBroadcastRoutes(app2) {
       }).from(categories).where((0, import_drizzle_orm7.inArray)(categories.tenantId, tenantIds));
       const catMap = new Map(cats.map((c) => [`${c.tenantId}:${c.id}`, c.name]));
       const tMap = new Map(activeTenants.map((t) => [t.id, t]));
-      const payload = allProducts.filter((p) => Number(p.price) > 0).map((p) => {
+      const payload = allProducts.filter((p) => Number(p.price) > 0 && !p.isAddon).map((p) => {
         const t = tMap.get(p.tenantId);
+        const parseJson = (v) => {
+          if (Array.isArray(v) || v && typeof v === "object") return v;
+          if (typeof v === "string" && v.trim()) {
+            try {
+              return JSON.parse(v);
+            } catch {
+              return [];
+            }
+          }
+          return [];
+        };
         return {
           id: p.id,
           tenantId: p.tenantId,
@@ -12140,7 +12219,9 @@ function registerBroadcastRoutes(app2) {
           description: p.description,
           price: Number(p.price),
           imageUrl: p.imageUrl,
-          category: catMap.get(`${p.tenantId}:${p.categoryId}`) || "Other"
+          category: catMap.get(`${p.tenantId}:${p.categoryId}`) || "Other",
+          modifiers: parseJson(p.modifiers),
+          variants: parseJson(p.variants)
         };
       });
       res.json({

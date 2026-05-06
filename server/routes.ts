@@ -3274,20 +3274,38 @@ async function test(){
   // tenant the rest of the SPA uses).
   app.post("/api/delivery/auth/google", async (req: Request, res: Response) => {
     try {
-      const { credential, tenantId } = req.body || {};
-      if (!credential) return res.status(400).json({ error: "credential required" });
+      const { credential, accessToken, profile, tenantId } = req.body || {};
       const tid = Number(tenantId) || 24;
-
-      // Verify the JWT against Google. tokeninfo also validates the audience
-      // when we pass our client_id so we don't need to install jsonwebtoken.
       const expectedAud = process.env.GOOGLE_CLIENT_ID || "";
-      const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
-      if (!verifyRes.ok) return res.status(401).json({ error: "Invalid Google credential" });
-      const payload: any = await verifyRes.json();
-      if (expectedAud && payload.aud !== expectedAud) {
-        return res.status(401).json({ error: "Token audience mismatch" });
+
+      let payload: any = null;
+
+      if (credential) {
+        // Path 1: One-Tap / Sign-In button gives a signed JWT (id_token).
+        // tokeninfo validates the signature for us and returns the parsed claims.
+        const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+        if (!verifyRes.ok) return res.status(401).json({ error: "Invalid Google credential" });
+        payload = await verifyRes.json();
+        if (expectedAud && payload.aud !== expectedAud) {
+          return res.status(401).json({ error: "Token audience mismatch" });
+        }
+      } else if (accessToken) {
+        // Path 2: OAuth popup fallback. We can't trust the JSON the client
+        // POSTs us; re-fetch userinfo using the access_token straight from
+        // Google so the server sees authoritative claims.
+        const ui = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!ui.ok) return res.status(401).json({ error: "Invalid Google access token" });
+        payload = await ui.json();
+      } else if (profile && profile.email) {
+        // Path 3 (legacy/test): client posted profile. Reject in production.
+        return res.status(400).json({ error: "credential or accessToken required" });
+      } else {
+        return res.status(400).json({ error: "credential or accessToken required" });
       }
-      if (!payload.email) return res.status(400).json({ error: "Email not present in token" });
+
+      if (!payload || !payload.email) return res.status(400).json({ error: "Email not present in token" });
       const email = String(payload.email).toLowerCase();
       const name = payload.name || payload.given_name || email.split("@")[0];
       const picture = payload.picture || null;
