@@ -3387,24 +3387,51 @@ export default function POSScreen() {
                       setShowAccountSwitcher(false);
                       logout();
                     };
+                    const finishLogoutAfterShift = () => {
+                      // After shift closes, ask once for final logout confirmation
+                      const confirmMsg = language === "ar"
+                        ? "إنهاء الجلسة؟"
+                        : language === "de" ? "Sitzung beenden?" : "Log out now?";
+                      if (Platform.OS === "web") {
+                        if (window.confirm(confirmMsg)) doLogout();
+                      } else {
+                        Alert.alert(confirmMsg, "", [
+                          { text: language === "ar" ? "إلغاء" : language === "de" ? "Abbrechen" : "Cancel", style: "cancel" },
+                          { text: language === "ar" ? "تسجيل الخروج" : language === "de" ? "Abmelden" : "Log out", style: "destructive", onPress: doLogout },
+                        ]);
+                      }
+                    };
+
                     if (myActiveShift) {
+                      // Auto-end the active shift, then log out — same UX as Settings
                       const msg = language === "ar"
-                        ? "لديك وردية نشطة. أنهِها أولاً ثم سجّل الخروج."
+                        ? "إنهاء الوردية وتسجيل الخروج؟"
                         : language === "de"
-                          ? "Du hast eine aktive Schicht. Beende sie zuerst, bevor du dich abmeldest."
-                          : "You have an active shift. End it first, then log out.";
-                      if (Platform.OS === "web") { window.alert(msg); } else { Alert.alert("", msg); }
+                          ? "Schicht beenden und abmelden?"
+                          : "End your shift and log out?";
+                      const proceed = () => {
+                        endShiftMutation.mutate(myActiveShift.id, {
+                          onSuccess: finishLogoutAfterShift,
+                          onError: (err: any) => {
+                            const failMsg = (err?.message || "Failed to end shift");
+                            if (Platform.OS === "web") window.alert(failMsg);
+                            else Alert.alert("", failMsg);
+                          },
+                        });
+                      };
+                      if (Platform.OS === "web") {
+                        if (window.confirm(msg)) proceed();
+                      } else {
+                        Alert.alert(msg, "", [
+                          { text: language === "ar" ? "إلغاء" : language === "de" ? "Abbrechen" : "Cancel", style: "cancel" },
+                          { text: language === "ar" ? "متابعة" : language === "de" ? "Weiter" : "Continue", style: "destructive", onPress: proceed },
+                        ]);
+                      }
                       return;
                     }
-                    const confirmMsg = language === "ar" ? "تسجيل الخروج؟" : language === "de" ? "Abmelden?" : "Log out?";
-                    if (Platform.OS === "web") {
-                      if (window.confirm(confirmMsg)) doLogout();
-                    } else {
-                      Alert.alert(confirmMsg, "", [
-                        { text: language === "ar" ? "إلغاء" : language === "de" ? "Abbrechen" : "Cancel", style: "cancel" },
-                        { text: language === "ar" ? "تسجيل الخروج" : language === "de" ? "Abmelden" : "Log out", style: "destructive", onPress: doLogout },
-                      ]);
-                    }
+
+                    // No active shift — direct logout confirm
+                    finishLogoutAfterShift();
                   }}
                   style={{
                     marginTop: 16, marginBottom: 8,
