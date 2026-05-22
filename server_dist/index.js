@@ -7679,8 +7679,17 @@ async function registerRoutes(app2) {
       if (saleData.vehicleId) {
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-          const { onlineOrders: onlineOrders2, customers: customers2, vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+          const { onlineOrders: onlineOrders2, customers: customers2, branches: branches2, vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
           const { eq: eq9 } = await import("drizzle-orm");
+          let resolvedTenantId = saleData.tenantId;
+          if (!resolvedTenantId && saleData.branchId) {
+            const [br] = await db2.select({ tenantId: branches2.tenantId }).from(branches2).where(eq9(branches2.id, saleData.branchId)).limit(1);
+            resolvedTenantId = br?.tenantId ?? void 0;
+          }
+          if (!resolvedTenantId) {
+            const [veh] = await db2.select({ tenantId: vehicles2.tenantId }).from(vehicles2).where(eq9(vehicles2.id, saleData.vehicleId)).limit(1);
+            resolvedTenantId = veh?.tenantId ?? void 0;
+          }
           const [cust] = saleData.customerId ? await db2.select().from(customers2).where(eq9(customers2.id, saleData.customerId)).limit(1) : [null];
           const customerName = cust?.name || saleData.customerName || "Walk-in";
           const customerPhone = cust?.phone || "";
@@ -7696,7 +7705,7 @@ async function registerRoutes(app2) {
           const trackingToken = require("crypto").randomBytes(24).toString("hex");
           const orderNumber = sale.receiptNumber || `POS-${sale.id}`;
           const [inserted] = await db2.insert(onlineOrders2).values({
-            tenantId: saleData.tenantId || saleEmp?.tenantId || 24,
+            tenantId: resolvedTenantId || 24,
             orderNumber,
             customerName,
             customerPhone: customerPhone || "\u2014",
@@ -7724,8 +7733,9 @@ async function registerRoutes(app2) {
               orderId: inserted.id,
               vehicleId: saleData.vehicleId,
               status: "accepted",
-              orderNumber
-            }, saleData.tenantId);
+              orderNumber,
+              customerName
+            }, resolvedTenantId);
           } catch {
           }
         } catch (mirrorErr) {

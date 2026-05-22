@@ -139,6 +139,60 @@ function vibrate(pattern) {
   try { navigator.vibrate?.(pattern); } catch (_) {}
 }
 
+// ── Audio (notification beep) ─────────────────────────────────────────────────
+// Synthesized so we don't need to ship a wav. Plays a 3-tone "ding" so it
+// cuts through ambient noise in a moving vehicle. We share one AudioContext
+// across calls — Safari/iOS only allows playback after a user gesture, so
+// on first login we prime it from the login button click.
+let _audioCtx = null;
+function getAudioCtx() {
+  if (_audioCtx) return _audioCtx;
+  try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
+  return _audioCtx;
+}
+function primeAudio() {
+  const ctx = getAudioCtx();
+  if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+}
+function playNotificationSound(kind = "new-order") {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  // Different cadences per event so the driver can tell them apart by ear.
+  const tones = {
+    "new-order":   [[880, 0.18], [660, 0.18], [990, 0.32]],
+    "status":      [[660, 0.12], [880, 0.18]],
+    "delivered":   [[660, 0.1], [880, 0.1], [1100, 0.22]],
+    "error":       [[260, 0.3]],
+  }[kind] || [[800, 0.2]];
+  let t = ctx.currentTime;
+  tones.forEach(([freq, dur]) => {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+    t += dur + 0.04;
+  });
+}
+function showSystemNotification(title, body) {
+  // Fire a real OS notification too, so an offline driver with the tab in
+  // the background still sees a popup. Permission is requested lazily.
+  try {
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "granted") {
+      new Notification(title, { body, icon: "/api/delivery-app/icons/icon-192.png", tag: "driver-alert" });
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission().then((p) => {
+        if (p === "granted") new Notification(title, { body, icon: "/api/delivery-app/icons/icon-192.png", tag: "driver-alert" });
+      });
+    }
+  } catch (_) {}
+}
+
 // ── Driver App ────────────────────────────────────────────────────────────────
 const driverApp = {
   token: PATH_TOKEN || localStorage.getItem("driver_token") || "",
@@ -165,6 +219,13 @@ const driverApp = {
     document.getElementById("auth-loader").style.display = "flex";
 
     try {
+      // Prime audio + ask for notification permission on this very tap so
+      // browsers / iOS allow us to play the alert sound later without a
+      // direct user gesture each time.
+      primeAudio();
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
       const resp = await fetch("/api/delivery/driver/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,6 +238,7 @@ const driverApp = {
       driverApp.token  = token;
       localStorage.setItem("driver_token", token);
       driverApp.showDriverScreen();
+      driverApp.startLiveStream();
     } catch (err) {
       driverApp.showLoginError(err.message);
     } finally {
@@ -232,8 +294,49 @@ const driverApp = {
     // Refresh orders every 30s — keep polling even while offline so
     // the driver still sees an order assigned to them by the restaurant
     // (offline only stops accepting *new* deliveries, but assigned ones
-    // should remain visible).
+    // should remain visible). The SSE stream below triggers an instant
+    // refresh on `delivery_status_change`, so 30 s is the worst case.
     setInterval(() => { driverApp.loadOrders(); }, 30000);
+  },
+
+  // ── Live stream (SSE) — instant push from server ────────────────────────────
+  // Hostinger CDN doesn't tunnel WebSocket upgrades, so the server exposes
+  // an EventSource feed at /api/events. Whenever a sale is mirrored or
+  // an order's delivery status changes, the server broadcasts it here and
+  // we refresh the local list immediately — no manual refresh required.
+  _es: null,
+  startLiveStream() {
+    if (driverApp._es) return;
+    if (typeof EventSource === "undefined") return;
+    const tenantId = driverApp.driver?.tenantId || driverApp.driver?.tenant_id || "";
+    const url = `/api/events${tenantId ? `?tenantId=${tenantId}` : ""}`;
+    try {
+      const es = new EventSource(url);
+      driverApp._es = es;
+      es.onmessage = (ev) => {
+        let m; try { m = JSON.parse(ev.data); } catch { return; }
+        if (!m || !m.type) return;
+        // We only care about events that affect *this* driver's orders.
+        const myId = driverApp.driver?.id;
+        if (m.type === "delivery_status_change") {
+          // The server now broadcasts vehicleId on POS-mirrored events;
+          // for safety we also reload if the change touches an order we
+          // currently show.
+          if (myId && m.vehicleId && m.vehicleId !== myId) {
+            // Not for me — but the order list is keyed by driverId so a
+            // refresh is cheap; skip to save bandwidth on busy stores.
+            return;
+          }
+          driverApp.loadOrders();
+        } else if (m.type === "new_online_order") {
+          // Customer placed a new online order — the restaurant assigns
+          // a driver next. We don't react until it's mirrored to us.
+        } else if (m.type === "broadcast_claimed") {
+          driverApp.loadOrders();
+        }
+      };
+      es.onerror = () => { /* EventSource auto-reconnects */ };
+    } catch (_) { /* ignore */ }
   },
 
   // ── Online toggle ──────────────────────────────────────────────────────────
@@ -315,10 +418,13 @@ const driverApp = {
   },
 
   checkNewOrders() {
-    const newIds = new Set(driverApp.activeOrders.map(o => o.id));
     const hasNew = driverApp.activeOrders.some(o => !driverApp.lastOrderIds.has(o.id));
     if (hasNew && driverApp.lastOrderIds.size > 0) {
+      const newOrder = driverApp.activeOrders.find(o => !driverApp.lastOrderIds.has(o.id));
       vibrate([200, 100, 200, 100, 200]);
+      playNotificationSound("new-order");
+      showSystemNotification("New delivery assigned", `Order #${newOrder?.orderNumber || newOrder?.id} — ${newOrder?.customerName || ""}`);
+      showToast("New delivery assigned!", "success");
       const alert = document.getElementById("new-order-alert");
       alert.style.display = "block";
       setTimeout(() => { alert.style.display = "none"; }, 8000);
@@ -397,6 +503,7 @@ const driverApp = {
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data.error || `Failed to update (${resp.status})`);
       vibrate(newStatus === "delivered" ? [100,50,100,50,300] : [100]);
+      playNotificationSound(newStatus === "delivered" ? "delivered" : "status");
       showToast(newStatus === "delivered" ? "Order delivered!" : "Picked up!", "success");
       await driverApp.loadOrders();
     } catch (err) {

@@ -1415,8 +1415,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (saleData.vehicleId) {
         try {
           const { db } = await import("./db");
-          const { onlineOrders, customers, vehicles } = await import("@shared/schema");
+          const { onlineOrders, customers, branches, vehicles } = await import("@shared/schema");
           const { eq } = await import("drizzle-orm");
+          // Resolve tenantId via branch since POS sales table doesn't carry it.
+          let resolvedTenantId: number | undefined = saleData.tenantId;
+          if (!resolvedTenantId && saleData.branchId) {
+            const [br] = await db.select({ tenantId: branches.tenantId }).from(branches).where(eq(branches.id, saleData.branchId)).limit(1);
+            resolvedTenantId = br?.tenantId ?? undefined;
+          }
+          if (!resolvedTenantId) {
+            const [veh] = await db.select({ tenantId: vehicles.tenantId }).from(vehicles).where(eq(vehicles.id, saleData.vehicleId)).limit(1);
+            resolvedTenantId = veh?.tenantId ?? undefined;
+          }
           const [cust] = saleData.customerId
             ? await db.select().from(customers).where(eq(customers.id, saleData.customerId)).limit(1)
             : [null];
@@ -1436,7 +1446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const trackingToken = require("crypto").randomBytes(24).toString("hex");
           const orderNumber = sale.receiptNumber || `POS-${sale.id}`;
           const [inserted] = await db.insert(onlineOrders).values({
-            tenantId: saleData.tenantId || (saleEmp as any)?.tenantId || 24,
+            tenantId: resolvedTenantId || 24,
             orderNumber,
             customerName,
             customerPhone: customerPhone || "—",
@@ -1466,7 +1476,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               vehicleId: saleData.vehicleId,
               status: "accepted",
               orderNumber,
-            }, saleData.tenantId);
+              customerName,
+            }, resolvedTenantId);
           } catch { /* non-fatal */ }
         } catch (mirrorErr) {
           console.error("[/api/sales] online_orders mirror failed:", mirrorErr);
