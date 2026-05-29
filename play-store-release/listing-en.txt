@@ -1,0 +1,104 @@
+=== APP NAME ===
+Barmagly POS
+
+=== SHORT DESCRIPTION ===
+Tablet POS & mini-ERP for pharmacies, retail, cafes & restaurants. CHF-ready.
+
+=== FULL DESCRIPTION ===
+Running a busy counter shouldn't mean juggling three apps, a spreadsheet, and a notebook. Barmagly POS replaces them all with one tablet-first point of sale and mini-ERP built for pharmacies, retail shops, cafes, restaurants, and growing small businesses across Switzerland and Europe.
+
+Sell faster, track every item, understand your numbers, and accept the payment methods your customers actually use — including TWINT, card, and cash — from a single screen.
+
+POINT OF SALE
+- Lightning-fast tablet checkout with a clean, dark-mode interface
+- Item modifiers, sizes, add-ons, and order notes
+- Line-item and order-level discounts
+- Camera barcode scanning — no extra hardware required
+- Park, recall, split, and merge orders
+- Table management for restaurants and cafes
+
+INVENTORY MANAGEMENT
+- Unlimited products, categories, and variants
+- Real-time stock levels across branches
+- Low-stock alerts and reorder thresholds
+- Expiry tracking for pharmacy and grocery
+- Bulk import and image uploads
+- Cost, margin, and supplier tracking
+
+CUSTOMERS & CRM
+- Customer profiles with full order history
+- Loyalty-ready data: phone, email, addresses
+- Delivery contacts saved for one-tap reorders
+- Notes and tags for VIPs and regulars
+
+REPORTS & ANALYTICS
+- Daily, weekly, and custom-range sales reports
+- Inventory, returns, finance, and staff activity reports
+- Top products, top categories, and peak hours
+- Cashier shift and Z-reports
+- Export-ready data for your accountant
+
+ONLINE ORDERS & DELIVERY
+- QR-code table ordering for cafes and restaurants
+- Online menu with live availability
+- Delivery zones with per-area pricing
+- Promo codes and scheduled offers
+- Built-in driver management and dispatch
+- WhatsApp and email order notifications
+
+MULTI-BRANCH & TEAM
+- Run multiple locations from one account
+- Role-based access for Admin, Manager, and Cashier
+- PIN login for staff — fast and secure
+- Centralized menu and pricing with per-branch overrides
+- Activity log for full accountability
+
+PAYMENTS & RECEIPTS
+- Cash, card, TWINT, and Stripe
+- Multi-currency with Swiss Franc (CHF) as default
+- Split payments and partial refunds
+- Bluetooth and network receipt printing
+- Digital receipts via email or WhatsApp
+
+SECURITY & RELIABILITY
+- Each store is fully isolated — multi-tenant by design
+- License-key activation (BARMAGLY-XXXX-XXXX-XXXX-XXXX)
+- Encrypted HTTPS connection to pos.barmagly.tech
+- No third-party advertising, no analytics SDKs by default
+- Hosted on Barmagly's own European infrastructure
+
+WHO IT'S FOR
+- Pharmacies needing batch and expiry control
+- Retail stores managing stock across shelves and branches
+- Cafes and restaurants running tables, takeaway, and delivery
+- Independent businesses ready to go digital without enterprise complexity
+
+LANGUAGES
+English, German, and Arabic — switch instantly from settings.
+
+PRICING
+Free to download. Activate your store with a license key from barmagly.tech. Transparent plans, no hidden fees, no per-transaction surcharges from us.
+
+REQUIREMENTS
+- Android tablet or phone (Android 8.0+)
+- Internet connection
+- Optional: receipt printer, barcode scanner, cash drawer
+
+ABOUT BARMAGLY
+Barmagly builds practical software for real businesses. From the corner pharmacy in Zurich to a multi-branch restaurant group in Geneva, our tools are designed to be opened on day one and still loved on day one thousand.
+
+Questions or a custom setup? Reach us at support@barmagly.tech or visit www.barmagly.tech.
+
+Barmagly Smart POS — sell smarter, run leaner, grow faster.
+
+=== APP CATEGORY ===
+Business
+
+=== TAGS / KEYWORDS ===
+POS system, point of sale, tablet POS, pharmacy POS, restaurant POS, cafe POS, retail POS, TWINT payment, Swiss POS, inventory management, barcode scanner, table ordering, QR menu, delivery management, multi-branch POS
+
+=== CONTACT EMAIL ===
+support@barmagly.tech
+
+=== WEBSITE ===
+https://barmagly.tech
