@@ -4,10 +4,10 @@ import paramiko
 import os
 import sys
 
-HOST = "82.198.227.175"
+HOST = "147.93.54.132"
 PORT = 65002
 USER = "u492425110"
-PASS = "support@Passord123"
+PASS = "support@Passord123support@Passord123"
 REMOTE_BASE = f"/home/{USER}/domains/barmagly.tech"
 REMOTE_APP = f"/home/{USER}/pos-app"
 REMOTE_PUBLIC = f"{REMOTE_BASE}/public_html/pos"

@@ -19,6 +19,7 @@ import { getDisplayNumber } from "@/lib/api-config";
 import { playClickSound } from "@/lib/sound";
 import { getChromeMetrics } from "@/lib/responsive";
 import TabPageHeader from "@/components/tab-page-header";
+import { FlagIcon } from "@/components/FlagIcon";
 
 function printHtmlViaIframe(html: string, onDone?: () => void) {
   if (typeof document === "undefined") return;
@@ -831,7 +832,7 @@ export default function SettingsScreen() {
                   </View>
                   <View style={styles.empInfo}>
                     <Text style={styles.empName}>{item.name}</Text>
-                    <Text style={styles.empMeta}>PIN: {item.pin} | {item.email || t("noEmail")}</Text>
+                    <Text style={styles.empMeta}>{(item.hasPin || item.pin) ? "•••• PIN set" : "No PIN"} | {item.email || t("noEmail")}</Text>
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <View style={[styles.roleBadge, { backgroundColor: (roleColors[item.role] || Colors.info) + "20" }]}>
@@ -874,8 +875,8 @@ export default function SettingsScreen() {
             <ScrollView>
               <Text style={styles.label}>{t("name")} *</Text>
               <TextInput style={styles.input} value={empForm.name} onChangeText={(v) => setEmpForm({ ...empForm, name: v })} placeholderTextColor={Colors.textMuted} placeholder={t("employeeName2")} />
-              <Text style={styles.label}>{t("pin")} *</Text>
-              <TextInput style={styles.input} value={empForm.pin} onChangeText={(v) => setEmpForm({ ...empForm, pin: v })} keyboardType="number-pad" placeholderTextColor={Colors.textMuted} placeholder={t("fourDigitPin")} maxLength={4} />
+              <Text style={styles.label}>{t("pin")}{editEmployee ? "" : " *"}</Text>
+              <TextInput style={styles.input} value={empForm.pin} onChangeText={(v) => setEmpForm({ ...empForm, pin: v })} keyboardType="number-pad" placeholderTextColor={Colors.textMuted} placeholder={editEmployee ? "•••• (leave blank to keep)" : t("fourDigitPin")} maxLength={4} />
               <Text style={styles.label}>{t("role")}</Text>
               <View style={styles.roleRow}>
                 {["cashier", "manager", "admin", "owner"].map((r) => (
@@ -887,9 +888,12 @@ export default function SettingsScreen() {
               <Text style={styles.label}>{t("email")}</Text>
               <TextInput style={styles.input} value={empForm.email} onChangeText={(v) => setEmpForm({ ...empForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" />
               <Pressable style={styles.saveBtn} onPress={() => {
-                if (!empForm.name || !empForm.pin) return Alert.alert(t("error"), t("namePinRequired"));
+                if (!empForm.name || (!editEmployee && !empForm.pin)) return Alert.alert(t("error"), t("namePinRequired"));
                 if (editEmployee) {
-                  updateEmpMutation.mutate({ id: editEmployee.id, data: { name: empForm.name, pin: empForm.pin, role: empForm.role, email: empForm.email || undefined, permissions: empForm.role === "admin" ? ["all"] : ["pos"] } });
+                  // Only send pin when the admin typed a new one — blank keeps the existing PIN.
+                  const upd: any = { name: empForm.name, role: empForm.role, email: empForm.email || undefined, permissions: empForm.role === "admin" ? ["all"] : ["pos"] };
+                  if (empForm.pin) upd.pin = empForm.pin;
+                  updateEmpMutation.mutate({ id: editEmployee.id, data: upd });
                 } else {
                   createEmpMutation.mutate({ name: empForm.name, pin: empForm.pin, role: empForm.role, email: empForm.email || undefined, tenantId: tenant?.id, branchId: branches[0]?.id ?? null, permissions: empForm.role === "admin" ? ["all"] : ["pos"] });
                 }
@@ -1818,7 +1822,7 @@ export default function SettingsScreen() {
               onPress={() => { setLanguage("en"); setShowLanguagePicker(false); apiRequest("PUT", "/api/system-language", { language: "en" }).catch(() => {}); }}
             >
               <View style={[styles.empAvatar, { backgroundColor: Colors.info + "30" }]}>
-                <Text style={{ fontSize: 20 }}>🇺🇸</Text>
+                <FlagIcon code="en" width={24} height={17} />
               </View>
               <View style={styles.empInfo}>
                 <Text style={styles.empName}>English</Text>
@@ -1832,7 +1836,7 @@ export default function SettingsScreen() {
               onPress={() => { setLanguage("ar"); setShowLanguagePicker(false); apiRequest("PUT", "/api/system-language", { language: "ar" }).catch(() => {}); }}
             >
               <View style={[styles.empAvatar, { backgroundColor: Colors.success + "30" }]}>
-                <Text style={{ fontSize: 20 }}>🇸🇦</Text>
+                <FlagIcon code="ar" width={24} height={17} />
               </View>
               <View style={styles.empInfo}>
                 <Text style={styles.empName}>العربية</Text>
@@ -1846,7 +1850,7 @@ export default function SettingsScreen() {
               onPress={() => { setLanguage("de"); setShowLanguagePicker(false); apiRequest("PUT", "/api/system-language", { language: "de" }).catch(() => {}); }}
             >
               <View style={[styles.empAvatar, { backgroundColor: Colors.warning + "30" }]}>
-                <Text style={{ fontSize: 20 }}>🇩🇪</Text>
+                <FlagIcon code="de" width={24} height={17} />
               </View>
               <View style={styles.empInfo}>
                 <Text style={styles.empName}>Deutsch</Text>

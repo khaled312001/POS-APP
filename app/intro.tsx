@@ -7,13 +7,14 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/lib/language-context';
+import { FlagIcon } from '@/components/FlagIcon';
 
 type Lang = 'en' | 'ar' | 'de';
 
-const LANGUAGES: { code: Lang; flag: string; label: string; nativeLabel: string }[] = [
-    { code: 'en', flag: '🇬🇧', label: 'English', nativeLabel: 'English' },
-    { code: 'ar', flag: '🇸🇦', label: 'Arabic', nativeLabel: 'العربية' },
-    { code: 'de', flag: '🇩🇪', label: 'German', nativeLabel: 'Deutsch' },
+const LANGUAGES: { code: Lang; label: string; nativeLabel: string }[] = [
+    { code: 'en', label: 'English', nativeLabel: 'English' },
+    { code: 'ar', label: 'Arabic', nativeLabel: 'العربية' },
+    { code: 'de', label: 'German', nativeLabel: 'Deutsch' },
 ];
 
 const TABLET_BANNER: Record<Lang, string> = {
@@ -193,7 +194,7 @@ export default function IntroScreen() {
                                                 end={{ x: 1, y: 1 }}
                                             />
                                         )}
-                                        <Text style={styles.languageFlag}>{lang.flag}</Text>
+                                        <View style={styles.languageFlag}><FlagIcon code={lang.code} width={30} height={21} /></View>
                                         <Text style={[styles.languageNativeLabel, selected && styles.languageNativeLabelSelected]}>
                                             {lang.nativeLabel}
                                         </Text>
@@ -460,7 +461,9 @@ const styles = StyleSheet.create({
         borderColor: Colors.primary,
     },
     languageFlag: {
-        fontSize: 26,
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 26,
     },
     languageNativeLabel: {
         fontSize: 13,

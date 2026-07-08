@@ -14,10 +14,10 @@ import sys
 import time
 
 # ── Connection ────────────────────────────────────────────────────────────────
-HOST = "82.198.227.175"
+HOST = "147.93.54.132"
 PORT = 65002
 USER = "u492425110"
-PASS = "support@Passord123"
+PASS = "support@Passord123support@Passord123"
 
 # ── Remote paths ──────────────────────────────────────────────────────────────
 REMOTE_BASE   = f"/home/{USER}/pos-app"

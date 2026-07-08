@@ -1,0 +1,192 @@
+<section id="barmagly-customer-app" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; line-height: 1.7; color: #1a1a1a; max-width: 860px; margin: 2rem auto; padding: 0 1rem;">
+
+  <h2 style="font-size: 1.75rem; color: #FF5722; border-bottom: 2px solid #FF5722; padding-bottom: 0.5rem; margin-top: 3rem;">
+    Section 12 — Barmagly Customer App (consumer-facing companion app)
+  </h2>
+
+  <p style="font-style: italic; color: #555; background: #fff5f0; padding: 0.75rem 1rem; border-left: 4px solid #FF5722; border-radius: 4px;">
+    <strong>Scope notice:</strong> This section applies <em>specifically</em> to individuals (diners, end customers) who download and use the <strong>Barmagly Customer</strong> mobile application (Android package <code>com.barmagly.customer</code>, and its iOS equivalent) to browse menus, place orders, track deliveries, and communicate with restaurants. It does <em>not</em> apply to restaurant operators, cashiers, or merchant staff who use the separate Barmagly POS application — their data handling is covered in the preceding sections of this policy. Where this section conflicts with the general policy above, this section prevails for Customer App users.
+  </p>
+
+  <h3 style="font-size: 1.3rem; color: #070A12; margin-top: 2rem;">12.1 Who we are and what the app does</h3>
+  <p>
+    The Barmagly Customer App is a free mobile application published by <strong>Barmagly</strong> (<a href="https://www.barmagly.tech" style="color: #FF5722;">www.barmagly.tech</a>), the same company that operates the Barmagly point-of-sale platform used by participating restaurants. The app is a native shell (built on Expo / React Native) that renders our consumer web experience at <a href="https://pos.barmagly.tech/customer/" style="color: #FF5722;">pos.barmagly.tech/customer/</a> inside a hardened in-app browser. It lets you:
+  </p>
+  <ul>
+    <li>Browse the live menus of restaurants that use Barmagly POS;</li>
+    <li>Place pickup or delivery orders;</li>
+    <li>Track the real-time status of a delivery on a map;</li>
+    <li>View your past order history and re-order favourites;</li>
+    <li>Chat directly with the restaurant about an open order;</li>
+    <li>Sign in quickly with a Google account;</li>
+    <li>Save one or more delivery addresses for future use.</li>
+  </ul>
+  <p>
+    Orders you place in the Customer App are transmitted to the merchant's Barmagly POS in real time so the restaurant can prepare and dispatch them. The menu, prices, and availability you see in the app are likewise synchronised from the restaurant's POS.
+  </p>
+
+  <h3 style="font-size: 1.3rem; color: #070A12; margin-top: 2rem;">12.2 Data we collect from you as a consumer</h3>
+  <p>We collect only what is necessary to deliver food to you and to operate the service. Specifically:</p>
+
+  <table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+    <thead>
+      <tr style="background: #070A12; color: #fff;">
+        <th style="padding: 0.75rem; text-align: left; border: 1px solid #070A12;">Data category</th>
+        <th style="padding: 0.75rem; text-align: left; border: 1px solid #070A12;">Examples</th>
+        <th style="padding: 0.75rem; text-align: left; border: 1px solid #070A12;">Why we need it</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">Identity</td>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">Full name, email address, mobile phone number</td>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">To create your account, identify you to the restaurant, and contact you about your order</td>
+      </tr>
+      <tr style="background: #fafafa;">
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">Delivery addresses</td>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">Street, building number, floor, postcode, city, country, optional delivery notes</td>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">To route the driver to you</td>
+      </tr>
+      <tr>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">Order history</td>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">Items ordered, totals, restaurant, date and time, status</td>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">To show your past orders and enable quick re-ordering, and for tax/accounting records on the restaurant's side</td>
+      </tr>
+      <tr style="background: #fafafa;">
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">Precise location <em>(only with permission)</em></td>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">GPS coordinates while the app is in the foreground</td>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">To auto-fill your delivery address and to centre the live tracking map on you</td>
+      </tr>
+      <tr>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">Profile photo <em>(optional)</em></td>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">A single image you upload from the camera or photo library</td>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">Personalises your account; never shared publicly</td>
+      </tr>
+      <tr style="background: #fafafa;">
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">Device and diagnostic data</td>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">Device model, OS version, app version, anonymous crash logs, push-notification token</td>
+        <td style="padding: 0.75rem; border: 1px solid #ddd;">To keep the app stable, fix bugs, and deliver order-status notifications</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>
+    <strong>What we deliberately do not collect:</strong> we do not collect advertising identifiers, we do not embed third-party advertising SDKs, we do not sell or rent your personal information to data brokers, and we do not build cross-app behavioural profiles of you.
+  </p>
+
+  <h3 style="font-size: 1.3rem; color: #070A12; margin-top: 2rem;">12.3 Google Sign-In</h3>
+  <p>
+    If you choose to sign in with Google, our app uses the standard Google Identity Services flow. We receive only the following profile fields from Google, and only because you have explicitly consented in Google's own consent screen:
+  </p>
+  <ul>
+    <li>Your <strong>full name</strong> as it appears on your Google account;</li>
+    <li>Your primary <strong>email address</strong>;</li>
+    <li>A <strong>URL pointing to your Google profile photo</strong> (we display the image; we do not copy or republish it).</li>
+  </ul>
+  <p>
+    We do <em>not</em> receive your Google password, your contacts, your calendar, your Gmail, your Drive files, or any other Google service data. You can revoke our access at any time from <a href="https://myaccount.google.com/permissions" style="color: #FF5722;">myaccount.google.com/permissions</a>. Revoking access does not by itself delete the account you created with us — see Section 12.7 below for full account deletion.
+  </p>
+
+  <h3 style="font-size: 1.3rem; color: #070A12; margin-top: 2rem;">12.4 How we use your data</h3>
+  <p>Your data is used solely to operate the ordering service. Concretely, we use it to:</p>
+  <ol>
+    <li><strong>Process and fulfil your order</strong> — pass the order details to the restaurant, calculate the total, apply any discounts;</li>
+    <li><strong>Coordinate delivery</strong> — share the delivery address and a contact number with the assigned driver;</li>
+    <li><strong>Send order-status updates</strong> — push notifications when the order is accepted, prepared, dispatched, and delivered, plus the occasional in-app chat message from the restaurant;</li>
+    <li><strong>Provide customer support</strong> — investigate problems you report, issue refunds where applicable;</li>
+    <li><strong>Detect fraud and abuse</strong> — block fake accounts, repeated chargebacks, or attempts to manipulate the platform;</li>
+    <li><strong>Meet legal obligations</strong> — retain transaction records for the period required by Swiss, EU, and local tax law in the merchant's country.</li>
+  </ol>
+  <p>
+    We do <strong>not</strong> use your data to send you marketing from third parties, and we do not use the contents of your in-app chats to train AI models.
+  </p>
+
+  <h3 style="font-size: 1.3rem; color: #070A12; margin-top: 2rem;">12.5 Who we share your data with</h3>
+  <p>
+    Sharing is strictly limited to the parties that need the information in order to get food to your door:
+  </p>
+  <ul>
+    <li><strong>The restaurant you ordered from</strong> (the merchant): receives your name, phone number, delivery address (for delivery orders only), order contents, and any notes you added. The restaurant is an independent data controller for the order it receives and is bound by its own privacy obligations as well as by our merchant agreement.</li>
+    <li><strong>The delivery driver assigned to your order</strong>: receives only the minimum needed to find you — your <em>first name</em>, your <em>phone number</em>, and your <em>delivery address</em>. The driver does not see your email, full name, order history, or profile photo. Driver access to your contact details is revoked once the delivery is marked complete.</li>
+    <li><strong>Payment processors</strong> (e.g., Stripe, Twint, or a regional equivalent selected by the merchant) when you pay in-app. Card data is entered directly into the processor's secure form and is never stored on Barmagly servers.</li>
+    <li><strong>Map and geolocation providers</strong> (e.g., Google Maps, OpenStreetMap) to render maps and resolve addresses. Only the coordinates necessary for the current map view are transmitted.</li>
+    <li><strong>Push-notification gateways</strong> (Apple Push Notification service, Firebase Cloud Messaging) to deliver order-status alerts. Only an opaque device token plus the short notification text is transmitted.</li>
+    <li><strong>Cloud infrastructure providers</strong> that host <code>pos.barmagly.tech</code> on our behalf, under contractual confidentiality and data-processing terms.</li>
+    <li><strong>Authorities</strong>, where we are legally compelled to disclose information by a binding court order or equivalent legal process.</li>
+  </ul>
+  <p>
+    We never sell your personal data, and we never share it with advertising networks.
+  </p>
+
+  <h3 style="font-size: 1.3rem; color: #070A12; margin-top: 2rem;">12.6 Your rights as a consumer</h3>
+  <p>
+    Regardless of where you live, you can exercise the following rights over the data we hold about you:
+  </p>
+  <ul>
+    <li><strong>Right of access</strong> — request a copy of the personal data we hold about you;</li>
+    <li><strong>Right to rectification</strong> — correct inaccurate details (name, phone, address) directly inside the app under <em>Profile &rarr; Edit</em>, or by contacting us;</li>
+    <li><strong>Right to erasure</strong> — ask us to delete your account and associated personal data (see Section 12.7);</li>
+    <li><strong>Right to data portability</strong> — receive your order history in a structured, machine-readable format;</li>
+    <li><strong>Right to object / restrict processing</strong> — ask us to limit how we process your data;</li>
+    <li><strong>Right to withdraw consent</strong> — turn off location, camera, or notification permissions at any time from your device's system settings, without affecting the lawfulness of earlier processing;</li>
+    <li><strong>Right to opt out of notifications</strong> — toggle push notifications off from <em>Profile &rarr; Notifications</em> inside the app, or from your device settings;</li>
+    <li><strong>Right to lodge a complaint</strong> with your local data-protection authority (e.g., the Swiss FDPIC for Swiss residents, your national DPA for EU residents).</li>
+  </ul>
+  <p>
+    To exercise any of these rights, email <a href="mailto:privacy@barmagly.tech" style="color: #FF5722;">privacy@barmagly.tech</a>. We will respond within 30 days. Verifying your identity may be required to prevent unauthorised disclosure.
+  </p>
+
+  <h3 style="font-size: 1.3rem; color: #070A12; margin-top: 2rem;">12.7 How to delete your Customer App account</h3>
+  <p>
+    You can delete your account and all associated personal data at any time. We offer two equivalent methods:
+  </p>
+  <ol>
+    <li><strong>Inside the app:</strong> open <em>Profile &rarr; Settings &rarr; Delete my account</em>, confirm with your password or Google sign-in, and the deletion will be queued immediately.</li>
+    <li><strong>Via the web:</strong> visit <a href="https://www.barmagly.tech/delete-account" style="color: #FF5722;"><strong>www.barmagly.tech/delete-account</strong></a> and submit the deletion form using the email associated with your account.</li>
+  </ol>
+  <p>
+    Once we receive a deletion request, your profile, saved addresses, profile photo, push tokens, and chat history are erased from our production systems within <strong>30 days</strong>. Backups containing any residual data are purged within a further 90 days. Note that we are legally obliged to retain a minimal record of your past <em>transactions</em> (order ID, date, amount, restaurant) for tax-compliance purposes — typically 10 years in Switzerland and similar in other jurisdictions — but this record is pseudonymised so it can no longer be linked to you as a living individual once your profile has been deleted.
+  </p>
+
+  <h3 style="font-size: 1.3rem; color: #070A12; margin-top: 2rem;">12.8 Data retention</h3>
+  <p>
+    We keep your data only as long as it is needed:
+  </p>
+  <ul>
+    <li><strong>Active account data</strong> — for as long as you keep the account open;</li>
+    <li><strong>Order history</strong> — for the legally required tax-retention period (commonly 10 years), after which it is anonymised;</li>
+    <li><strong>Chat messages</strong> — for 12 months after the related order is closed, then deleted;</li>
+    <li><strong>Diagnostic / crash logs</strong> — 90 days, then deleted;</li>
+    <li><strong>Push-notification tokens</strong> — until you uninstall the app or disable notifications.</li>
+  </ul>
+
+  <h3 style="font-size: 1.3rem; color: #070A12; margin-top: 2rem;">12.9 Security</h3>
+  <p>
+    All traffic between the app and our servers is encrypted in transit using TLS 1.2 or higher with certificate pinning where supported by the platform. Passwords, when used, are stored as salted hashes (bcrypt). Profile photos are stored in object storage with private access controls. We perform periodic security reviews and patch the WebView, native shell, and server dependencies on a regular cadence.
+  </p>
+
+  <h3 style="font-size: 1.3rem; color: #070A12; margin-top: 2rem;">12.10 International transfers</h3>
+  <p>
+    Our primary servers are located in the European Union and Switzerland. Where data is transferred outside the EEA / Switzerland (for example, to a payment processor or push-notification gateway), we rely on adequacy decisions, Standard Contractual Clauses, or equivalent legal safeguards.
+  </p>
+
+  <h3 style="font-size: 1.3rem; color: #070A12; margin-top: 2rem;">12.11 Children</h3>
+  <p>
+    The Barmagly Customer App is rated for users aged <strong>13 and over</strong> and is not directed at children under 13. We do not knowingly collect personal data from children under 13. If you are a parent or guardian and believe your child has created an account, please contact <a href="mailto:privacy@barmagly.tech" style="color: #FF5722;">privacy@barmagly.tech</a> and we will delete the account and any associated data promptly. In jurisdictions where the digital age of consent is higher than 13 (for example 16 in parts of the EU), users below that age must obtain a parent's or guardian's consent before using the app.
+  </p>
+
+  <h3 style="font-size: 1.3rem; color: #070A12; margin-top: 2rem;">12.12 Changes to this section</h3>
+  <p>
+    We may update this section as the Customer App evolves. Material changes will be announced in the app at least 14 days before they take effect, and you will be asked to acknowledge them on your next sign-in. The "last updated" date at the top of the main privacy policy reflects the most recent change to any section, including this one.
+  </p>
+
+  <h3 style="font-size: 1.3rem; color: #070A12; margin-top: 2rem;">12.13 Contact</h3>
+  <p style="background: #fff5f0; padding: 1rem; border-radius: 6px; border-left: 4px solid #FF5722;">
+    Questions specific to the Barmagly Customer App can be addressed to:<br><br>
+    <strong>Barmagly &mdash; Privacy Team</strong><br>
+    Email: <a href="mailto:privacy@barmagly.tech" style="color: #FF5722;">privacy@barmagly.tech</a><br>
+    Website: <a href="https://www.barmagly.tech" style="color: #FF5722;">www.barmagly.tech</a><br>
+    Account deletion: <a href="https://www.barmagly.tech/delete-account" style="color: #FF5722;">www.barmagly.tech/delete-account</a>
+  </p>
+
+</section>

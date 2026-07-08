@@ -51,12 +51,21 @@ export async function apiRequest(
 
   const headers = await getAuthHeaders(data ? { "Content-Type": "application/json" } : {});
 
-  const res = await fetch(url.toString(), {
-    method,
-    headers,
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  // Abort hung requests (checkout must never spin forever on a dead network).
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      method,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   await throwIfResNotOk(res);
   return res;
@@ -92,8 +101,15 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      refetchOnReconnect: true,
+      staleTime: 5 * 60 * 1000, // 5 min — stop serving stale prices/stock forever
+      retry: (failureCount, error: any) => {
+        // Don't retry auth/client errors; retry transient network/5xx up to 2×.
+        const msg = String(error?.message || "");
+        if (/^4\d\d:/.test(msg)) return false;
+        return failureCount < 2;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
     },
     mutations: {
       retry: false,

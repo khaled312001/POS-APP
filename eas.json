@@ -42,7 +42,7 @@
     },
     "production": {
       "autoIncrement": true,
-      "credentialsSource": "remote",
+      "credentialsSource": "local",
       "android": { "buildType": "app-bundle" },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://pos.barmagly.tech"

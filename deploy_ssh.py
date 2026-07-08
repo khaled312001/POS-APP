@@ -2,10 +2,10 @@ import paramiko
 import os
 import sys
 
-HOST = "82.198.227.175"
+HOST = "147.93.54.132"
 PORT = 65002
 USER = "u492425110"
-PASS = "support@Passord123"
+PASS = "support@Passord123support@Passord123"
 LOCAL_FILE = r"F:\POS-APP\server_dist\index.js"
 REMOTE_FILE = "/home/u492425110/pos-app/server_dist/index.js"
 

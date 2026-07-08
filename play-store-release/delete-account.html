@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delete Your Account — Barmagly POS</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.65;
+    color: #1f2937;
+    background: #f9fafb;
+    margin: 0;
+    padding: 0;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+    background: #ffffff;
+  }
+  header {
+    border-bottom: 3px solid #2FD3C6;
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+  h1 { color: #0A0E27; font-size: 32px; margin: 0 0 8px; }
+  .subtitle { color: #6b7280; font-size: 16px; margin: 0; }
+  h2 { color: #0A0E27; font-size: 22px; margin-top: 40px; padding-top: 8px; }
+  h3 { color: #374151; font-size: 18px; margin-top: 28px; }
+  p, li { font-size: 16px; }
+  a { color: #2FD3C6; }
+  a:hover { text-decoration: underline; }
+  .card {
+    background: #f3f4f6;
+    border-left: 4px solid #2FD3C6;
+    padding: 16px 20px;
+    border-radius: 6px;
+    margin: 20px 0;
+  }
+  .card.warn {
+    border-left-color: #f59e0b;
+    background: #fffbeb;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+  }
+  th, td {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  th { background: #f9fafb; color: #374151; }
+  code {
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 14px;
+    color: #c026d3;
+  }
+  .button {
+    display: inline-block;
+    background: #2FD3C6;
+    color: #0A0E27;
+    padding: 12px 24px;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+    margin-top: 12px;
+  }
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid #e5e7eb;
+    color: #6b7280;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Delete Your Account &amp; Data</h1>
+  <p class="subtitle">Barmagly POS — Account &amp; data deletion request</p>
+</header>
+
+<p>This page explains how to permanently delete your <strong>Barmagly POS</strong> account, all data associated with it, and what is retained for legal and accounting reasons after deletion.</p>
+
+<div class="card">
+  <strong>Developer name shown on Google Play:</strong> Barmagly<br>
+  <strong>App:</strong> Barmagly POS (<code>com.barmagly.pos</code>)
+</div>
+
+<h2>1. How to request deletion</h2>
+
+<p>You can request account and data deletion in any of these ways:</p>
+
+<h3>Option A — Email (recommended)</h3>
+<ol>
+  <li>Send an email from your registered admin address to <a href="mailto:privacy@barmagly.tech?subject=Account%20Deletion%20Request">privacy@barmagly.tech</a></li>
+  <li>Use the subject line: <code>Account Deletion Request</code></li>
+  <li>Include in the body:
+    <ul>
+      <li>Your store name</li>
+      <li>Your license key (<code>BARMAGLY-XXXX-XXXX-XXXX-XXXX</code>)</li>
+      <li>The admin email registered with the account</li>
+    </ul>
+  </li>
+  <li>You will receive confirmation within <strong>3 business days</strong> and full deletion within <strong>30 days</strong>.</li>
+</ol>
+
+<p><a class="button" href="mailto:privacy@barmagly.tech?subject=Account%20Deletion%20Request">Email a deletion request</a></p>
+
+<h3>Option B — Web form</h3>
+<ol>
+  <li>Sign in at <a href="https://barmagly.tech/login">barmagly.tech/login</a></li>
+  <li>Go to <strong>Settings → Account → Delete account</strong></li>
+  <li>Confirm with your password and the one-time code sent to your email</li>
+</ol>
+
+<h3>Option C — Inside the app</h3>
+<ol>
+  <li>Open Barmagly POS on your device</li>
+  <li>Tap the <strong>Settings</strong> tab (admin role required)</li>
+  <li>Scroll to <strong>Danger zone → Request account deletion</strong></li>
+  <li>Follow the on-screen confirmation steps</li>
+</ol>
+
+<h2>2. What gets deleted</h2>
+
+<p>When your deletion request is processed, the following data is permanently removed from our active systems:</p>
+
+<table>
+  <tr><th>Data category</th><th>Action</th><th>When</th></tr>
+  <tr><td>Admin and employee account profiles (names, emails, PINs)</td><td>Permanently deleted</td><td>Within 30 days</td></tr>
+  <tr><td>Customer CRM records (names, phones, addresses)</td><td>Permanently deleted</td><td>Within 30 days</td></tr>
+  <tr><td>Product catalog and images</td><td>Permanently deleted</td><td>Within 30 days</td></tr>
+  <tr><td>Online order history</td><td>Permanently deleted</td><td>Within 30 days</td></tr>
+  <tr><td>Cached files, session tokens, license activation records</td><td>Permanently deleted</td><td>Within 30 days</td></tr>
+  <tr><td>Backups</td><td>Permanently deleted</td><td>Within 90 days (rolling backup expiry)</td></tr>
+</table>
+
+<h2>3. What is retained</h2>
+
+<div class="card warn">
+  <strong>Important:</strong> Some data must be retained to comply with legal, tax, and accounting obligations even after you request deletion.
+</div>
+
+<table>
+  <tr><th>Data category</th><th>Retention period</th><th>Reason</th></tr>
+  <tr><td>Sales transaction records (totals, dates, payment method — anonymised)</td><td>10 years</td><td>Swiss/EU/Egyptian tax and bookkeeping laws (OR Art. 957a, GDPR Art. 6(1)(c))</td></tr>
+  <tr><td>VAT / invoice records</td><td>10 years</td><td>Tax compliance</td></tr>
+  <tr><td>Payment processor logs (tokenised, no card numbers)</td><td>As required by Stripe / TWINT</td><td>Fraud prevention, processor compliance</td></tr>
+  <tr><td>Anonymised aggregate analytics</td><td>Indefinite</td><td>Aggregated data cannot be re-identified to you</td></tr>
+</table>
+
+<p>Personal identifiers are scrubbed from retained records wherever legally permissible.</p>
+
+<h2>4. Partial deletion (without closing the account)</h2>
+
+<p>If you want to delete <em>some</em> data but keep your account active, you can:</p>
+<ul>
+  <li>Delete individual customers from <strong>Customers → [tap row] → Delete</strong></li>
+  <li>Delete employee accounts from <strong>Settings → Employees → Remove</strong></li>
+  <li>Delete products from <strong>Products → [edit] → Delete</strong></li>
+  <li>Request a bulk export and selective deletion by emailing <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a></li>
+</ul>
+
+<h2>5. After deletion — what to expect</h2>
+
+<ul>
+  <li>Your license key is deactivated and cannot be reused</li>
+  <li>You will be signed out of all devices</li>
+  <li>The app will return to its initial state on next launch</li>
+  <li>If you change your mind, contact us within 7 days of the deletion request to attempt restoration (no guarantee after that)</li>
+</ul>
+
+<h2>6. Questions</h2>
+
+<p>If you have any questions about the deletion process or what data is retained:</p>
+<ul>
+  <li>Privacy questions: <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a></li>
+  <li>General support: <a href="mailto:support@barmagly.tech">support@barmagly.tech</a></li>
+  <li>Website: <a href="https://barmagly.tech">barmagly.tech</a></li>
+</ul>
+
+<footer>
+  <p><strong>Last updated:</strong> 29 May 2026<br>
+  <strong>Operated by:</strong> Barmagly · Egypt<br>
+  See also our <a href="/privacy">Privacy Policy</a>.</p>
+</footer>
+
+</div>
+</body>
+</html>

@@ -129,6 +129,16 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                     await AsyncStorage.setItem("barmagly_tenant_id", String(data.tenant.id));
                 }
 
+                // Cache the last successful validation so the POS keeps working
+                // during a transient internet/server outage (offline grace).
+                try {
+                    await AsyncStorage.setItem("barmagly_last_valid", JSON.stringify({
+                        at: Date.now(),
+                        tenant: data.tenant,
+                        subscription: data.subscription,
+                    }));
+                } catch { /* ignore */ }
+
                 setIsValid(true);
                 setTenant(data.tenant);
                 setSubscription(data.subscription);
@@ -144,11 +154,28 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                 return false;
             }
         } catch (err: any) {
+            // Network/server error (NOT an explicit isValid:false). If this device
+            // validated successfully recently, keep the POS usable within a grace
+            // window instead of locking the merchant out during an outage.
             console.error("License validation failed:", err);
+            const GRACE_MS = 72 * 60 * 60 * 1000; // 72 hours
+            try {
+                const cachedRaw = await AsyncStorage.getItem("barmagly_last_valid");
+                if (cachedRaw) {
+                    const cached = JSON.parse(cachedRaw);
+                    if (cached?.at && (Date.now() - cached.at) < GRACE_MS && cached.tenant) {
+                        console.warn("[License] Offline grace active — using last successful validation.");
+                        setIsValid(true);
+                        setTenant(cached.tenant);
+                        setSubscription(cached.subscription ?? null);
+                        setErrorReason(null);
+                        return true;
+                    }
+                }
+            } catch { /* fall through to locked state */ }
+
             setIsValid(false);
-
-            let targetUrl = getApiUrl();
-
+            const targetUrl = getApiUrl();
             setErrorReason(`Could not connect to validation server (${targetUrl}). Check your internet connection or server status. Details: ${err.message}`);
             return false;
         }

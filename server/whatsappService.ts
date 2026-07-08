@@ -500,6 +500,11 @@ export const whatsappService = {
         log("Disconnected (manual)");
     },
 
+    /** Alias — several routes historically call sendMessage(). */
+    async sendMessage(phone: string, text: string): Promise<boolean> {
+        return this.sendText(phone, text);
+    },
+
     async sendText(phone: string, text: string, _attempt = 1): Promise<boolean> {
         if (!client || !clientReady || status !== "connected") {
             log(`Cannot send — not ready (status="${status}"). Queuing message for ${phone}`);

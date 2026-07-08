@@ -12,7 +12,7 @@ import sys
 HOST = "147.93.54.132"
 PORT = 65002
 USER = "u492425110"
-PASS = "support@Passord123"
+PASS = "support@Passord123support@Passord123"
 BASE  = f"/home/{USER}/domains/barmagly.tech"
 APP   = f"{BASE}/nodejs/app"
 POS_NODE = f"{BASE}/pos-nodejs"

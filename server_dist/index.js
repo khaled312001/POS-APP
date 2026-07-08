@@ -3724,31 +3724,24 @@ var init_callerIdService = __esm({
         return callInfo;
       }
       broadcastToTenant(payload, tenantId) {
+        const matches = (clientTenantId) => tenantId ? clientTenantId === tenantId : true;
         let wsTotal = 0, wsMatched = 0;
-        const allWsOpen = [];
         if (this.wss) {
           this.wss.clients.forEach((client2) => {
             if (client2.readyState === import_ws.WebSocket.OPEN) {
               wsTotal++;
-              allWsOpen.push(client2);
-              if (!tenantId || !client2.tenantId || client2.tenantId === tenantId) {
+              if (matches(client2.tenantId)) {
                 wsMatched++;
                 client2.send(payload);
               }
             }
           });
-          if (tenantId && wsMatched === 0 && allWsOpen.length > 0) {
-            allWsOpen.forEach((c) => c.send(payload));
-            wsMatched = allWsOpen.length;
-          }
         }
         let sseTotal = 0, sseMatched = 0;
-        const sseAll = [];
         this.sseClients.forEach((sc) => {
           if (!sc.alive) return;
           sseTotal++;
-          sseAll.push(sc);
-          if (!tenantId || !sc.tenantId || sc.tenantId === tenantId) {
+          if (matches(sc.tenantId)) {
             sseMatched++;
             try {
               sc.res.write(`data: ${payload}
@@ -3759,18 +3752,6 @@ var init_callerIdService = __esm({
             }
           }
         });
-        if (tenantId && sseMatched === 0 && sseAll.length > 0) {
-          sseAll.forEach((sc) => {
-            try {
-              sc.res.write(`data: ${payload}
-
-`);
-            } catch {
-              sc.alive = false;
-            }
-          });
-          sseMatched = sseAll.length;
-        }
         console.log(`[CallerID] Broadcast: ws=${wsMatched}/${wsTotal} sse=${sseMatched}/${sseTotal} tenant=${tenantId}`);
       }
       /**
@@ -4508,7 +4489,7 @@ function pick(arr) {
   return arr[rand(0, arr.length - 1)];
 }
 function uuid() {
-  return crypto3.randomUUID().split("-")[0].toUpperCase();
+  return crypto4.randomUUID().split("-")[0].toUpperCase();
 }
 async function seedAllDemoData() {
   console.log("[SEED] Starting comprehensive demo data seeding...");
@@ -4886,14 +4867,14 @@ async function seedAllDemoData() {
   }
   console.log("[SEED] \u2705 All demo data seeded successfully!");
 }
-var import_drizzle_orm5, crypto3, import_bcrypt3, import_date_fns2, DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
+var import_drizzle_orm5, crypto4, import_bcrypt3, import_date_fns2, DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
 var init_seedAllDemoData = __esm({
   "server/seedAllDemoData.ts"() {
     "use strict";
     init_db();
     import_drizzle_orm5 = require("drizzle-orm");
     init_schema();
-    crypto3 = __toESM(require("crypto"));
+    crypto4 = __toESM(require("crypto"));
     import_bcrypt3 = __toESM(require("bcrypt"));
     import_date_fns2 = require("date-fns");
     DEMO_STORES = [
@@ -5196,7 +5177,22 @@ var pushService = {
 // server/superAdminAuth.ts
 var import_jsonwebtoken = __toESM(require("jsonwebtoken"));
 init_storage();
-var JWT_SECRET = process.env.JWT_SECRET || "barmagly-super-admin-secret-key-2024";
+
+// server/jwtSecret.ts
+var import_crypto2 = __toESM(require("crypto"));
+function resolveSecret() {
+  const fromEnv = process.env.JWT_SECRET;
+  if (fromEnv && fromEnv.length >= 32) return fromEnv;
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "[SECURITY] JWT_SECRET is not set (or too short). Using a random per-process secret; all sessions will be invalidated on restart. Set a strong JWT_SECRET (>=32 chars) in the environment."
+    );
+  }
+  return import_crypto2.default.randomBytes(48).toString("hex");
+}
+var JWT_SECRET = resolveSecret();
+
+// server/superAdminAuth.ts
 function generateToken(adminId, email, role) {
   return import_jsonwebtoken.default.sign({ id: adminId, email, role }, JWT_SECRET, { expiresIn: "24h" });
 }
@@ -5863,6 +5859,10 @@ var whatsappService = {
     pendingMessages = [];
     log("Disconnected (manual)");
   },
+  /** Alias — several routes historically call sendMessage(). */
+  async sendMessage(phone, text2) {
+    return this.sendText(phone, text2);
+  },
   async sendText(phone, text2, _attempt = 1) {
     if (!client || !clientReady || status !== "connected") {
       log(`Cannot send \u2014 not ready (status="${status}"). Queuing message for ${phone}`);
@@ -6059,7 +6059,7 @@ ${text2}`;
 };
 
 // server/customerAuthService.ts
-var import_crypto2 = __toESM(require("crypto"));
+var import_crypto3 = __toESM(require("crypto"));
 var import_bcrypt = __toESM(require("bcrypt"));
 init_db();
 init_schema();
@@ -6068,7 +6068,7 @@ var SESSION_TTL_DAYS = 30;
 var OTP_TTL_MINUTES = 10;
 var OTP_MAX_ATTEMPTS = 5;
 function generateToken2(bytes = 32) {
-  return import_crypto2.default.randomBytes(bytes).toString("hex");
+  return import_crypto3.default.randomBytes(bytes).toString("hex");
 }
 function generateOtp() {
   return Math.floor(1e5 + Math.random() * 9e5).toString();
@@ -6175,12 +6175,12 @@ async function getAuthenticatedCustomer(authHeader) {
 }
 
 // server/deliveryService.ts
-var import_crypto3 = __toESM(require("crypto"));
+var import_crypto4 = __toESM(require("crypto"));
 init_db();
 init_schema();
 var import_drizzle_orm3 = require("drizzle-orm");
 function generateTrackingToken() {
-  return import_crypto3.default.randomBytes(20).toString("hex");
+  return import_crypto4.default.randomBytes(20).toString("hex");
 }
 async function validatePromoCode(tenantId, code, orderTotal, orderType, customerId) {
   const now = /* @__PURE__ */ new Date();
@@ -6332,7 +6332,7 @@ async function deductWallet(customerId, tenantId, amount, orderId) {
 
 // server/routes.ts
 var bcrypt4 = __toESM(require("bcrypt"));
-var crypto4 = __toESM(require("crypto"));
+var crypto5 = __toESM(require("crypto"));
 var import_date_fns3 = require("date-fns");
 var import_google_auth_library = require("google-auth-library");
 var TIMESTAMP_FIELDS = [
@@ -6379,8 +6379,12 @@ async function registerRoutes(app2) {
       }
       const storePath = import_node_path.default.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
       let html = import_node_fs.default.readFileSync(storePath, "utf-8");
+      const storeName = String(tenant.businessName || "Barmagly Store").replace(/[<>"]/g, "");
+      const storeLogo = String(config.logoUrl || tenant.logo || "https://pos.barmagly.tech/app/assets/images/icon.png").replace(/"/g, "");
       html = html.replace(/\{\{SLUG\}\}/g, slug);
       html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
+      html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
+      html = html.replace(/\{\{STORE_LOGO\}\}/g, storeLogo);
       html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
       html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
       html = html.replace(/\{\{CURRENCY\}\}/g, tenant.currency || "CHF");
@@ -6540,7 +6544,7 @@ async function registerRoutes(app2) {
       });
       const randomSegments = Array.from(
         { length: 4 },
-        () => crypto4.randomBytes(2).toString("hex").toUpperCase()
+        () => crypto5.randomBytes(2).toString("hex").toUpperCase()
       );
       const licenseKey = `BARMAGLY-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
@@ -6629,7 +6633,7 @@ async function registerRoutes(app2) {
         autoRenew: true,
         paymentMethod: "stripe"
       });
-      const randomSegments = Array.from({ length: 4 }, () => crypto4.randomBytes(2).toString("hex").toUpperCase());
+      const randomSegments = Array.from({ length: 4 }, () => crypto5.randomBytes(2).toString("hex").toUpperCase());
       const licenseKey = `BARMAGLY-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
         licenseKey,
@@ -6663,7 +6667,7 @@ async function registerRoutes(app2) {
       let isNew = false;
       if (!tenant) {
         isNew = true;
-        const tempPassword = "GAuth-" + crypto4.randomBytes(4).toString("hex");
+        const tempPassword = "GAuth-" + crypto5.randomBytes(4).toString("hex");
         const passwordHash = await bcrypt4.hash(tempPassword, 10);
         tenant = await storage.createTenant({
           businessName: payload.name ? `${payload.name}'s Store` : "My New Store",
@@ -6689,7 +6693,7 @@ async function registerRoutes(app2) {
         });
         const randomSegments = Array.from(
           { length: 4 },
-          () => crypto4.randomBytes(2).toString("hex").toUpperCase()
+          () => crypto5.randomBytes(2).toString("hex").toUpperCase()
         );
         const licenseKey = `TRIAL-${randomSegments.join("-")}`;
         await storage.createLicenseKey({
@@ -7029,7 +7033,7 @@ async function registerRoutes(app2) {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
       if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
       const emps = await storage.getEmployeesByTenant(tenantId);
-      res.json(emps);
+      res.json(emps.map(({ pin, ...rest }) => ({ ...rest, hasPin: !!pin })));
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -7038,7 +7042,8 @@ async function registerRoutes(app2) {
     try {
       const emp = await storage.getEmployee(Number(req.params.id));
       if (!emp) return res.status(404).json({ error: "Employee not found" });
-      res.json(emp);
+      const { pin, ...safe } = emp;
+      res.json({ ...safe, hasPin: !!pin });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -8002,7 +8007,7 @@ async function registerRoutes(app2) {
     try {
       const { tenantId, tableId, branchId, tableName } = req.body;
       if (!tenantId || !tableId || !tableName) return res.status(400).json({ error: "tenantId, tableId, tableName required" });
-      const qrToken = `TBL-${crypto4.randomBytes(16).toString("hex")}`;
+      const qrToken = `TBL-${crypto5.randomBytes(16).toString("hex")}`;
       const qr = await storage.createTableQrCode({
         tenantId: Number(tenantId),
         tableId: Number(tableId),
@@ -8026,7 +8031,7 @@ async function registerRoutes(app2) {
       const created = [];
       for (const table of allTables) {
         if (existingTableIds.has(table.id)) continue;
-        const qrToken = `TBL-${crypto4.randomBytes(16).toString("hex")}`;
+        const qrToken = `TBL-${crypto5.randomBytes(16).toString("hex")}`;
         const qr = await storage.createTableQrCode({
           tenantId: Number(tenantId),
           tableId: table.id,
@@ -8909,7 +8914,8 @@ async function test(){
   app2.post("/api/caller-id/incoming", async (req, res) => {
     try {
       const secret = req.headers["x-bridge-secret"] || req.body.secret;
-      if (process.env.CALLER_ID_BRIDGE_SECRET && secret !== process.env.CALLER_ID_BRIDGE_SECRET) {
+      const expectedSecret = process.env.CALLER_ID_BRIDGE_SECRET;
+      if (!expectedSecret || secret !== expectedSecret) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const { phoneNumber, slot } = req.body;
@@ -9017,7 +9023,19 @@ async function test(){
       const categories2 = sortCategoriesByPriority(await storage.getCategories(config.tenantId));
       const categoryOrder = categories2.map((c) => c.id);
       products2.sort((a, b) => categoryOrder.indexOf(a.categoryId) - categoryOrder.indexOf(b.categoryId));
-      res.json({ config, tenant, products: products2, categories: categories2 });
+      const publicTenant = tenant ? {
+        id: tenant.id,
+        businessName: tenant.businessName,
+        name: tenant.businessName,
+        logo: tenant.logo,
+        storeType: tenant.storeType,
+        currency: tenant.currency,
+        address: tenant.address,
+        city: tenant.city,
+        country: tenant.country,
+        phone: tenant.businessPhone ?? tenant.phone ?? null
+      } : null;
+      res.json({ config, tenant: publicTenant, products: products2, categories: categories2 });
     } catch (e) {
       console.error(`[API] Public store error for ${req.params.slug}:`, e);
       res.status(500).json({ error: "Internal server error" });
@@ -9347,8 +9365,13 @@ async function test(){
       let html = import_node_fs.default.readFileSync(templatePath, "utf8");
       const branches2 = await storage.getBranchesByTenant(config.tenantId);
       const currency = branches2?.[0]?.currency || "CHF";
+      const storeTenant = await storage.getTenant(config.tenantId);
+      const storeName = String(storeTenant?.businessName || config.businessName || "Barmagly Store").replace(/[<>"]/g, "");
+      const storeLogo = String(config.logoUrl || storeTenant?.logo || "https://pos.barmagly.tech/app/assets/images/icon.png").replace(/"/g, "");
       html = html.replace(/\{\{SLUG\}\}/g, slug);
       html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
+      html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
+      html = html.replace(/\{\{STORE_LOGO\}\}/g, storeLogo);
       html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
       html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
       html = html.replace(/\{\{CURRENCY\}\}/g, currency);
@@ -10189,10 +10212,10 @@ Address: ${customerAddress || "Pickup"}`
       } catch (_) {
       }
       try {
-        callerIdService.broadcastToTenant(Number(tenantId), {
+        callerIdService.broadcast({
           type: "new_online_order",
           order: { id: order.id, orderNumber, customerName, totalAmount, orderType }
-        });
+        }, Number(tenantId));
       } catch (_) {
       }
       res.status(201).json({ success: true, orderId: order.id, orderNumber, trackingToken });
@@ -11084,7 +11107,7 @@ Sitemap: https://barmagly.tech/api/delivery/sitemap.xml
 
 // server/superAdminRoutes.ts
 var bcrypt5 = __toESM(require("bcrypt"));
-var crypto5 = __toESM(require("crypto"));
+var crypto6 = __toESM(require("crypto"));
 var fs4 = __toESM(require("fs"));
 var path3 = __toESM(require("path"));
 init_storage();
@@ -11437,7 +11460,7 @@ function registerSuperAdminRoutes(app2) {
       });
       const randomSegments = Array.from(
         { length: 4 },
-        () => crypto5.randomBytes(2).toString("hex").toUpperCase()
+        () => crypto6.randomBytes(2).toString("hex").toUpperCase()
       );
       const licenseKey = `TRIAL-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
@@ -11567,7 +11590,7 @@ function registerSuperAdminRoutes(app2) {
   app2.post("/api/super-admin/licenses/generate", requireSuperAdmin, async (req, res) => {
     try {
       const { tenantId, subscriptionId, maxActivations, expiresAt, notes, customKey } = req.body;
-      const segments = Array.from({ length: 4 }, () => crypto5.randomBytes(2).toString("hex").toUpperCase());
+      const segments = Array.from({ length: 4 }, () => crypto6.randomBytes(2).toString("hex").toUpperCase());
       const licenseKey = customKey || `BARMAGLY-${segments.join("-")}`;
       const key = await storage.createLicenseKey({
         licenseKey,
@@ -12226,7 +12249,7 @@ function registerSuperAdminRoutes(app2) {
 }
 
 // server/broadcastRoutes.ts
-var import_crypto4 = require("crypto");
+var import_crypto5 = require("crypto");
 init_db();
 init_schema();
 var import_drizzle_orm7 = require("drizzle-orm");
@@ -12283,7 +12306,7 @@ async function ensureBroadcastTables() {
 }
 var BROADCAST_TTL_MINUTES = 5;
 function generateBroadcastToken() {
-  return (0, import_crypto4.randomBytes)(20).toString("hex");
+  return (0, import_crypto5.randomBytes)(20).toString("hex");
 }
 function normalizeItems(items) {
   if (Array.isArray(items)) return items;
@@ -12303,7 +12326,7 @@ function normalizeBroadcastRow(row) {
 }
 function generateOrderNumber(tenantId) {
   const stamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10).replace(/-/g, "");
-  const suffix = (0, import_crypto4.randomBytes)(3).toString("hex").toUpperCase();
+  const suffix = (0, import_crypto5.randomBytes)(3).toString("hex").toUpperCase();
   return `BC-${tenantId}-${stamp}-${suffix}`;
 }
 function registerBroadcastRoutes(app2) {
@@ -12578,7 +12601,7 @@ function registerBroadcastRoutes(app2) {
       const [bc] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm7.eq)(broadcastOrders.id, id)).limit(1);
       if (!bc) return res.status(500).json({ error: "Post-claim read failed" });
       const orderNumber = generateOrderNumber(tenantId);
-      const trackingToken = (0, import_crypto4.randomBytes)(32).toString("hex");
+      const trackingToken = (0, import_crypto5.randomBytes)(32).toString("hex");
       const bcItems = normalizeItems(bc.items);
       const posItems = bcItems.map((it, idx) => ({
         productId: it.productId || 0,
@@ -12973,7 +12996,6 @@ function registerCustomerExtraRoutes(app2) {
 // server/tenantAuth.ts
 var import_jsonwebtoken2 = __toESM(require("jsonwebtoken"));
 init_storage();
-var JWT_SECRET2 = process.env.JWT_SECRET || "barmagly-super-admin-secret-key-2024";
 var PUBLIC_ROUTES = [
   "/api/health",
   "/api/license/validate",
@@ -13104,7 +13126,7 @@ function tenantAuthMiddleware() {
     if (authHeader && authHeader.startsWith("Bearer ")) {
       try {
         const token = authHeader.split(" ")[1];
-        const decoded = import_jsonwebtoken2.default.verify(token, JWT_SECRET2);
+        const decoded = import_jsonwebtoken2.default.verify(token, JWT_SECRET);
         const admin = await storage.getSuperAdmin(decoded.id);
         if (admin && admin.isActive) {
           const tenantId2 = req.query.tenantId ? Number(req.query.tenantId) : req.body?.tenantId ? Number(req.body.tenantId) : void 0;
@@ -13166,6 +13188,557 @@ var WebhookHandlers = class {
     await sync.processWebhook(payload, signature);
   }
 };
+
+// server/legal-pages.ts
+var DELETE_ACCOUNT_HTML = String.raw`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delete Your Account — Barmagly POS</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.65;
+    color: #1f2937;
+    background: #f9fafb;
+    margin: 0;
+    padding: 0;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+    background: #ffffff;
+  }
+  header {
+    border-bottom: 3px solid #2FD3C6;
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+  h1 { color: #0A0E27; font-size: 32px; margin: 0 0 8px; }
+  .subtitle { color: #6b7280; font-size: 16px; margin: 0; }
+  h2 { color: #0A0E27; font-size: 22px; margin-top: 40px; padding-top: 8px; }
+  h3 { color: #374151; font-size: 18px; margin-top: 28px; }
+  p, li { font-size: 16px; }
+  a { color: #2FD3C6; }
+  a:hover { text-decoration: underline; }
+  .card {
+    background: #f3f4f6;
+    border-left: 4px solid #2FD3C6;
+    padding: 16px 20px;
+    border-radius: 6px;
+    margin: 20px 0;
+  }
+  .card.warn {
+    border-left-color: #f59e0b;
+    background: #fffbeb;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+  }
+  th, td {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  th { background: #f9fafb; color: #374151; }
+  code {
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 14px;
+    color: #c026d3;
+  }
+  .button {
+    display: inline-block;
+    background: #2FD3C6;
+    color: #0A0E27;
+    padding: 12px 24px;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+    margin-top: 12px;
+  }
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid #e5e7eb;
+    color: #6b7280;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Delete Your Account &amp; Data</h1>
+  <p class="subtitle">Barmagly POS — Account &amp; data deletion request</p>
+</header>
+
+<p>This page explains how to permanently delete your <strong>Barmagly POS</strong> account, all data associated with it, and what is retained for legal and accounting reasons after deletion.</p>
+
+<div class="card">
+  <strong>Developer name shown on Google Play:</strong> Barmagly<br>
+  <strong>App:</strong> Barmagly POS (<code>com.barmagly.pos</code>)
+</div>
+
+<h2>1. How to request deletion</h2>
+
+<p>You can request account and data deletion in any of these ways:</p>
+
+<h3>Option A — Email (recommended)</h3>
+<ol>
+  <li>Send an email from your registered admin address to <a href="mailto:privacy@barmagly.tech?subject=Account%20Deletion%20Request">privacy@barmagly.tech</a></li>
+  <li>Use the subject line: <code>Account Deletion Request</code></li>
+  <li>Include in the body:
+    <ul>
+      <li>Your store name</li>
+      <li>Your license key (<code>BARMAGLY-XXXX-XXXX-XXXX-XXXX</code>)</li>
+      <li>The admin email registered with the account</li>
+    </ul>
+  </li>
+  <li>You will receive confirmation within <strong>3 business days</strong> and full deletion within <strong>30 days</strong>.</li>
+</ol>
+
+<p><a class="button" href="mailto:privacy@barmagly.tech?subject=Account%20Deletion%20Request">Email a deletion request</a></p>
+
+<h3>Option B — Web form</h3>
+<ol>
+  <li>Sign in at <a href="https://barmagly.tech/login">barmagly.tech/login</a></li>
+  <li>Go to <strong>Settings → Account → Delete account</strong></li>
+  <li>Confirm with your password and the one-time code sent to your email</li>
+</ol>
+
+<h3>Option C — Inside the app</h3>
+<ol>
+  <li>Open Barmagly POS on your device</li>
+  <li>Tap the <strong>Settings</strong> tab (admin role required)</li>
+  <li>Scroll to <strong>Danger zone → Request account deletion</strong></li>
+  <li>Follow the on-screen confirmation steps</li>
+</ol>
+
+<h2>2. What gets deleted</h2>
+
+<p>When your deletion request is processed, the following data is permanently removed from our active systems:</p>
+
+<table>
+  <tr><th>Data category</th><th>Action</th><th>When</th></tr>
+  <tr><td>Admin and employee account profiles (names, emails, PINs)</td><td>Permanently deleted</td><td>Within 30 days</td></tr>
+  <tr><td>Customer CRM records (names, phones, addresses)</td><td>Permanently deleted</td><td>Within 30 days</td></tr>
+  <tr><td>Product catalog and images</td><td>Permanently deleted</td><td>Within 30 days</td></tr>
+  <tr><td>Online order history</td><td>Permanently deleted</td><td>Within 30 days</td></tr>
+  <tr><td>Cached files, session tokens, license activation records</td><td>Permanently deleted</td><td>Within 30 days</td></tr>
+  <tr><td>Backups</td><td>Permanently deleted</td><td>Within 90 days (rolling backup expiry)</td></tr>
+</table>
+
+<h2>3. What is retained</h2>
+
+<div class="card warn">
+  <strong>Important:</strong> Some data must be retained to comply with legal, tax, and accounting obligations even after you request deletion.
+</div>
+
+<table>
+  <tr><th>Data category</th><th>Retention period</th><th>Reason</th></tr>
+  <tr><td>Sales transaction records (totals, dates, payment method — anonymised)</td><td>10 years</td><td>Swiss/EU/Egyptian tax and bookkeeping laws (OR Art. 957a, GDPR Art. 6(1)(c))</td></tr>
+  <tr><td>VAT / invoice records</td><td>10 years</td><td>Tax compliance</td></tr>
+  <tr><td>Payment processor logs (tokenised, no card numbers)</td><td>As required by Stripe / TWINT</td><td>Fraud prevention, processor compliance</td></tr>
+  <tr><td>Anonymised aggregate analytics</td><td>Indefinite</td><td>Aggregated data cannot be re-identified to you</td></tr>
+</table>
+
+<p>Personal identifiers are scrubbed from retained records wherever legally permissible.</p>
+
+<h2>4. Partial deletion (without closing the account)</h2>
+
+<p>If you want to delete <em>some</em> data but keep your account active, you can:</p>
+<ul>
+  <li>Delete individual customers from <strong>Customers → [tap row] → Delete</strong></li>
+  <li>Delete employee accounts from <strong>Settings → Employees → Remove</strong></li>
+  <li>Delete products from <strong>Products → [edit] → Delete</strong></li>
+  <li>Request a bulk export and selective deletion by emailing <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a></li>
+</ul>
+
+<h2>5. After deletion — what to expect</h2>
+
+<ul>
+  <li>Your license key is deactivated and cannot be reused</li>
+  <li>You will be signed out of all devices</li>
+  <li>The app will return to its initial state on next launch</li>
+  <li>If you change your mind, contact us within 7 days of the deletion request to attempt restoration (no guarantee after that)</li>
+</ul>
+
+<h2>6. Questions</h2>
+
+<p>If you have any questions about the deletion process or what data is retained:</p>
+<ul>
+  <li>Privacy questions: <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a></li>
+  <li>General support: <a href="mailto:support@barmagly.tech">support@barmagly.tech</a></li>
+  <li>Website: <a href="https://barmagly.tech">barmagly.tech</a></li>
+</ul>
+
+<footer>
+  <p><strong>Last updated:</strong> 29 May 2026<br>
+  <strong>Operated by:</strong> Barmagly · Egypt<br>
+  See also our <a href="/privacy">Privacy Policy</a>.</p>
+</footer>
+
+</div>
+</body>
+</html>
+`;
+var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Barmagly POS</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.65;
+    color: #1f2937;
+    background: #f9fafb;
+    margin: 0;
+    padding: 0;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+    background: #ffffff;
+  }
+  header {
+    border-bottom: 3px solid #2FD3C6;
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+  h1 {
+    color: #0f172a;
+    font-size: 32px;
+    margin: 0 0 8px 0;
+    font-weight: 700;
+  }
+  h2 {
+    color: #0f172a;
+    font-size: 22px;
+    margin-top: 40px;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 600;
+  }
+  h3 {
+    color: #1f2937;
+    font-size: 17px;
+    margin-top: 24px;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  p, li {
+    font-size: 16px;
+    color: #374151;
+  }
+  ul, ol {
+    padding-left: 24px;
+  }
+  li {
+    margin-bottom: 6px;
+  }
+  a {
+    color: #0d9488;
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+  .meta {
+    color: #6b7280;
+    font-size: 14px;
+    margin: 0;
+  }
+  .callout {
+    background: #f0fdfa;
+    border-left: 4px solid #2FD3C6;
+    padding: 14px 18px;
+    margin: 20px 0;
+    border-radius: 4px;
+    font-size: 15px;
+  }
+  .contact-box {
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 18px 22px;
+    margin-top: 16px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 15px;
+  }
+  th, td {
+    border: 1px solid #e5e7eb;
+    padding: 10px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #f9fafb;
+    font-weight: 600;
+    color: #111827;
+  }
+  footer {
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+    color: #6b7280;
+    font-size: 14px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Privacy Policy — Barmagly POS</h1>
+  <p class="meta"><strong>Effective date:</strong> 29 May 2026</p>
+  <p class="meta"><strong>Last updated:</strong> 29 May 2026</p>
+</header>
+
+<h2>1. Introduction</h2>
+<p>
+  This Privacy Policy explains how <strong>Barmagly</strong> ("Barmagly", "we", "us", or "our"), a company based in Egypt operating at
+  <a href="https://www.barmagly.tech">www.barmagly.tech</a>, handles information in connection with the
+  <strong>Barmagly POS</strong> mobile application (package <code>com.barmagly.pos</code>) and its supporting backend services at
+  <code>pos.barmagly.tech</code>.
+</p>
+<p>
+  Barmagly POS is a tablet-optimized Point of Sale and mini-ERP application for pharmacies, retail stores, cafes,
+  restaurants, and small businesses. It provides cart and checkout, inventory and product management, customer CRM,
+  reporting, table and online ordering, delivery management, and multi-currency payments. Each merchant ("Store")
+  operates an isolated workspace activated via a license key.
+</p>
+<div class="callout">
+  <strong>Who is the data controller?</strong> When a merchant uses Barmagly POS to run their business, the merchant
+  is the <em>controller</em> of customer and transaction data they enter. Barmagly acts as a <em>processor</em> on
+  the merchant's behalf. For account holders (merchants, owners, managers, cashiers), Barmagly is the controller of
+  the account information needed to provide the service.
+</div>
+
+<h2>2. Data We Collect</h2>
+
+<h3>2.1 Information merchants enter into the app</h3>
+<p>Merchants and their staff voluntarily enter business data into Barmagly POS, which may include:</p>
+<ul>
+  <li>Account and staff information: employee names, PINs (stored hashed), email addresses for administrators, and roles (Admin/Owner, Manager, Cashier).</li>
+  <li>Store information: store name, branches, addresses, tax IDs, logos, operating hours, and currency configuration.</li>
+  <li>Product and inventory data: product names, prices, categories, modifiers, sizes, addons, stock levels, and barcodes.</li>
+  <li>Customer data entered by the merchant: customer name, phone number, delivery address, and order history (used for CRM and delivery).</li>
+  <li>Order and transaction records: cart contents, discounts, payment method (Cash, Card, TWINT, Stripe), receipts, returns, and notes.</li>
+  <li>Operational data: delivery zones, promo codes, driver assignments, table layouts, QR-based online orders.</li>
+</ul>
+
+<h3>2.2 Information collected automatically</h3>
+<ul>
+  <li>Authentication tokens and session identifiers associated with the merchant's license key.</li>
+  <li>Technical logs from the backend (IP address, timestamps, request paths, HTTP status codes, app version, device OS) used for security, abuse prevention, and debugging.</li>
+  <li>Crash and error events generated by the app or server, used to diagnose issues.</li>
+</ul>
+
+<h3>2.3 What we do <u>not</u> collect</h3>
+<ul>
+  <li>We do not embed third-party analytics or advertising SDKs by default.</li>
+  <li>We do not collect contacts, SMS, call logs, photos, or files outside the app's own storage.</li>
+  <li>We do not sell personal data to anyone, for any purpose.</li>
+  <li>We do not use customer or transaction data for advertising or profiling.</li>
+  <li>We do not track precise location in the background.</li>
+</ul>
+
+<h2>3. Permissions</h2>
+<p>Barmagly POS requests only the permissions required for its features:</p>
+<table>
+  <thead>
+    <tr><th>Permission</th><th>Why it is used</th><th>Optional?</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>INTERNET</strong> / <strong>ACCESS_NETWORK_STATE</strong></td>
+      <td>To synchronize with the Barmagly backend (pos.barmagly.tech), receive online orders, and process payments.</td>
+      <td>Required</td>
+    </tr>
+    <tr>
+      <td><strong>CAMERA</strong></td>
+      <td>To scan product barcodes during checkout and inventory entry. Camera frames are processed on-device and are not uploaded or stored.</td>
+      <td>Required for barcode scanning only</td>
+    </tr>
+    <tr>
+      <td><strong>Location</strong> (runtime, foreground)</td>
+      <td>Used optionally to determine the store's delivery zone or to help configure delivery boundaries. Location is only read when the merchant explicitly invokes a location-related feature.</td>
+      <td>Optional — the app works without it</td>
+    </tr>
+    <tr>
+      <td><strong>VIBRATE</strong></td>
+      <td>To provide haptic feedback (e.g., scan confirmation, button presses). No data is collected.</td>
+      <td>Required for UI feedback</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>4. How We Use Data</h2>
+<p>We process data to:</p>
+<ul>
+  <li>Provide the core POS, inventory, CRM, reporting, and delivery features of the app.</li>
+  <li>Authenticate users and enforce role-based access (Admin/Owner, Manager, Cashier).</li>
+  <li>Activate and validate license keys (format <code>BARMAGLY-XXXX-XXXX-XXXX-XXXX</code>).</li>
+  <li>Generate receipts, reports, and merchant communications.</li>
+  <li>Process payments through merchant-configured providers (Stripe, TWINT, Card, Cash).</li>
+  <li>Send transactional notifications (WhatsApp, email) when the merchant configures them.</li>
+  <li>Maintain system security, prevent fraud, and debug technical issues.</li>
+  <li>Comply with applicable legal, accounting, and tax obligations.</li>
+</ul>
+<p>We do not use merchant or customer data for advertising, profiling, or training third-party AI models.</p>
+
+<h2>5. Data Sharing and Sub-Processors</h2>
+<p>We do not sell personal data. We share data only with the limited sub-processors necessary to operate the service:</p>
+<table>
+  <thead>
+    <tr><th>Sub-processor</th><th>Purpose</th><th>Region</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Google Cloud Storage</strong></td>
+      <td>Stores product images, store logos, and receipt assets uploaded by merchants. Access is server-side and authenticated.</td>
+      <td>EU / Global</td>
+    </tr>
+    <tr>
+      <td><strong>Stripe</strong></td>
+      <td>Processes card payments — only if the merchant explicitly configures Stripe. Cardholder data is sent directly to Stripe and is not stored on our servers.</td>
+      <td>Global</td>
+    </tr>
+    <tr>
+      <td><strong>Barmagly infrastructure</strong> (pos.barmagly.tech)</td>
+      <td>Hosts the application backend and PostgreSQL database. Operated by Barmagly under HTTPS.</td>
+      <td>EU</td>
+    </tr>
+  </tbody>
+</table>
+<p>
+  We may also disclose information if required by law, court order, or to protect the rights, safety, or property of
+  Barmagly, our users, or the public. In the event of a corporate transaction (merger, acquisition), data may be
+  transferred to the successor entity under equivalent protections.
+</p>
+
+<h2>6. Data Retention</h2>
+<p>
+  We retain merchant and transaction data for as long as the merchant maintains an active Barmagly POS license, so
+  the merchant can access historical reports and comply with accounting and tax laws.
+</p>
+<ul>
+  <li>On verified request from the merchant (the data controller), we will delete or anonymize personal data within <strong>30 days</strong>, except where longer retention is required by law (e.g., financial records).</li>
+  <li>Backups containing deleted data are rotated out within a reasonable additional period and are not restored to live systems.</li>
+  <li>Technical logs are typically retained for up to 90 days for security and debugging.</li>
+</ul>
+<p>To request deletion, email <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a>.</p>
+
+<h2>7. Children's Privacy</h2>
+<p>
+  Barmagly POS is a business tool intended for use by adults aged <strong>18 or older</strong>. It is not directed at
+  children, and we do not knowingly collect personal information from anyone under 18. If you believe a child has
+  provided personal information through the app, please contact us and we will delete it.
+</p>
+
+<h2>8. Your Rights</h2>
+<p>
+  Depending on where you live, you may have rights under the EU General Data Protection Regulation (<strong>GDPR</strong>),
+  the Swiss Federal Act on Data Protection (<strong>FADP / nFADP</strong>), the Egyptian Personal Data Protection Law
+  (<strong>PDPL — Law No. 151 of 2020</strong>), or other applicable laws. These rights generally include:
+</p>
+<ul>
+  <li><strong>Access</strong> — request a copy of the personal data we hold about you.</li>
+  <li><strong>Rectification</strong> — ask us to correct inaccurate or incomplete data.</li>
+  <li><strong>Erasure</strong> ("right to be forgotten") — request deletion of personal data.</li>
+  <li><strong>Restriction</strong> — ask us to limit how we process your data.</li>
+  <li><strong>Portability</strong> — receive your data in a structured, machine-readable format.</li>
+  <li><strong>Objection</strong> — object to certain processing activities.</li>
+  <li><strong>Withdraw consent</strong> — where processing relies on consent, withdraw it at any time.</li>
+  <li><strong>Lodge a complaint</strong> with your local data protection authority (e.g., the Swiss FDPIC, an EU supervisory authority, or the Egyptian Personal Data Protection Center).</li>
+</ul>
+<p>
+  Because merchants control the data they enter about their own customers, end-customers should first contact the
+  merchant. If you cannot reach them or need our help, contact
+  <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a> and we will assist or route the request appropriately.
+</p>
+
+<h2>9. Cookies</h2>
+<p>
+  The Barmagly POS mobile app does <strong>not</strong> use cookies. It uses secure tokens stored locally on the device
+  to keep the merchant signed in.
+</p>
+<p>
+  Our website (<a href="https://www.barmagly.tech">www.barmagly.tech</a>) uses only essential cookies required for the
+  site to function and for basic security. We do not use advertising or cross-site tracking cookies. If we ever
+  introduce optional analytics cookies, we will request your consent first.
+</p>
+
+<h2>10. International Transfers</h2>
+<p>
+  Barmagly is based in Egypt, our primary infrastructure is hosted in the EU, and our sub-processors (Google Cloud
+  Storage, Stripe) operate globally. As a result, your information may be transferred to and processed in countries
+  outside your own, including Egypt, Switzerland, the European Union, and the United States.
+</p>
+<p>
+  When we transfer personal data internationally, we rely on appropriate safeguards such as the European Commission's
+  <strong>Standard Contractual Clauses (SCCs)</strong>, equivalent Swiss FADP safeguards, adequacy decisions where
+  available, and our sub-processors' own certifications and data processing agreements.
+</p>
+
+<h2>11. Security</h2>
+<p>We apply industry-standard technical and organizational measures to protect your data, including:</p>
+<ul>
+  <li><strong>HTTPS / TLS</strong> encryption for all traffic between the app and pos.barmagly.tech.</li>
+  <li><strong>bcrypt</strong> hashing for passwords and employee PINs — we never store them in plain text.</li>
+  <li><strong>License-key authentication</strong> with per-store isolation and signed session tokens.</li>
+  <li>Role-based access control (Admin/Owner, Manager, Cashier) inside each store.</li>
+  <li>Server-side validation, rate-limiting, and audit logging of sensitive actions.</li>
+  <li>Encrypted backups and least-privilege access for our engineering team.</li>
+</ul>
+<p>
+  No system is perfectly secure. If we become aware of a personal-data breach that is likely to affect you, we will
+  notify you and the relevant authorities as required by applicable law.
+</p>
+
+<h2>12. Changes to This Policy</h2>
+<p>
+  We may update this Privacy Policy from time to time to reflect changes in the app, our services, or applicable law.
+  When we do, we will update the "Effective date" above and, for material changes, we will notify merchants in-app or
+  by email before the changes take effect. The current version is always available at
+  <a href="https://barmagly.tech/privacy">https://barmagly.tech/privacy</a>.
+</p>
+
+<h2>13. Contact Us</h2>
+<p>If you have questions, requests, or concerns about this Privacy Policy or your personal data, please contact:</p>
+<div class="contact-box">
+  <strong>Barmagly</strong><br>
+  Privacy team<br>
+  Egypt<br>
+  Email: <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a><br>
+  Website: <a href="https://www.barmagly.tech">www.barmagly.tech</a>
+</div>
+
+<footer>
+  &copy; 2026 Barmagly. All rights reserved.
+</footer>
+
+</div>
+</body>
+</html>`;
 
 // server/index.ts
 var fs5 = __toESM(require("fs"));
@@ -13354,6 +13927,14 @@ function configureExpoAndLanding(app2) {
     if (req.path === "/pos") {
       return res.redirect(301, "/app");
     }
+    if (req.path === "/delete-account" || req.path === "/delete-account/") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(DELETE_ACCOUNT_HTML);
+    }
+    if (req.path === "/privacy" || req.path === "/privacy/") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(PRIVACY_POLICY_HTML);
+    }
     if (req.path === "/" || req.path === "/index.html") {
       return serveLandingPage({ req, res, appName });
     }
@@ -13378,20 +13959,25 @@ function configureExpoAndLanding(app2) {
     }
     const superAdminPagePaths = [
       "/super-admin",
+      "/super-admin/",
       "/super-admin/login",
       "/super-admin/dashboard",
       "/super_admin",
+      "/super_admin/",
       "/super_admin/login",
       "/super_admin/dashboard",
       "/api/super-admin",
+      "/api/super-admin/",
       "/api/super-admin/login",
       "/api/super-admin/dashboard",
       "/api/super_admin",
+      "/api/super_admin/",
       "/api/super_admin/login",
       "/api/super_admin/dashboard"
     ];
     if (req.method === "GET" && superAdminPagePaths.includes(req.path)) {
-      const isLogin = req.path.endsWith("/login") || req.path === "/super_admin" || req.path === "/super-admin" || req.path === "/api/super-admin" || req.path === "/api/super_admin";
+      const normalized = req.path.replace(/\/$/, "");
+      const isLogin = normalized.endsWith("/login") || normalized === "/super_admin" || normalized === "/super-admin" || normalized === "/api/super-admin" || normalized === "/api/super_admin";
       const superAdminTemplatePath = path4.resolve(
         process.cwd(),
         "server",
@@ -13665,8 +14251,12 @@ function configureExpoAndLanding(app2) {
         const config = await storage2.getLandingPageConfig(tenantId);
         const storePath = path4.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
         let html = fs5.readFileSync(storePath, "utf-8");
+        const storeName = String(tenant.businessName || "Barmagly Store").replace(/[<>"]/g, "");
+        const storeLogo = String(config?.logoUrl || tenant.logo || "https://pos.barmagly.tech/app/assets/images/icon.png").replace(/"/g, "");
         html = html.replace(/\{\{SLUG\}\}/g, slug);
         html = html.replace(/\{\{TENANT_ID\}\}/g, String(tenantId));
+        html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
+        html = html.replace(/\{\{STORE_LOGO\}\}/g, storeLogo);
         html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config?.primaryColor || "#2FD3C6");
         html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config?.accentColor || "#6366F1");
         html = html.replace(/\{\{CURRENCY\}\}/g, tenant.currency || "CHF");

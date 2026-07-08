@@ -7,6 +7,29 @@
     <title>Barmagly POS | Cloud-Kassensystem für moderne Unternehmen</title>
     <meta name="description"
         content="Barmagly POS — Das All-in-One Cloud-Kassensystem für Restaurants, Cafés und Einzelhandel. Multi-Filiale, mehrsprachig, Stripe-Zahlungen, Inventar, CRM und mehr.">
+    <meta name="theme-color" content="#0A0E27">
+    <link rel="canonical" href="https://pos.barmagly.tech/">
+    <link rel="alternate" hreflang="de" href="https://pos.barmagly.tech/?lang=de">
+    <link rel="alternate" hreflang="en" href="https://pos.barmagly.tech/?lang=en">
+    <link rel="alternate" hreflang="ar" href="https://pos.barmagly.tech/?lang=ar">
+    <link rel="alternate" hreflang="x-default" href="https://pos.barmagly.tech/">
+    <!-- Open Graph / social preview -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Barmagly POS">
+    <meta property="og:title" content="Barmagly POS — Cloud-Kassensystem für moderne Unternehmen">
+    <meta property="og:description" content="All-in-One Cloud-POS für Restaurants, Cafés & Einzelhandel: Multi-Filiale, mehrsprachig, TWINT/Stripe, Inventar & CRM.">
+    <meta property="og:url" content="https://pos.barmagly.tech/">
+    <meta property="og:image" content="https://pos.barmagly.tech/app/assets/images/icon.png">
+    <meta property="og:locale" content="de_DE">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="ar_AR">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Barmagly POS — Cloud-Kassensystem">
+    <meta name="twitter:description" content="All-in-One Cloud-POS für Restaurants, Cafés & Einzelhandel.">
+    <meta name="twitter:image" content="https://pos.barmagly.tech/app/assets/images/icon.png">
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Barmagly POS","applicationCategory":"BusinessApplication","operatingSystem":"Android, iOS, Web","offers":{"@type":"Offer","price":"0","priceCurrency":"CHF"},"publisher":{"@type":"Organization","name":"Barmagly","url":"https://barmagly.tech"}}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -1137,7 +1160,7 @@
         <div class="nav-right">
             <div class="lang-dropdown" id="langDropdown">
                 <button class="lang-trigger" onclick="toggleLangMenu()">
-                    <span class="lang-flag" id="langFlag">🇩🇪</span>
+                    <span class="lang-flag" id="langFlag"><svg width="18" height="13" viewBox="0 0 18 13" style="border-radius:2px;display:block"><rect width="18" height="4.33" fill="#000"/><rect y="4.33" width="18" height="4.33" fill="#DD0000"/><rect y="8.66" width="18" height="4.34" fill="#FFCE00"/></svg></span>
                     <span id="langLabel">DE</span>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <path d="M6 9l6 6 6-6" />
@@ -1145,11 +1168,11 @@
                 </button>
                 <div class="lang-menu" id="langMenu">
                     <div class="lang-option active" data-lang="de" onclick="switchLang('de')"><span
-                            class="lang-flag">🇩🇪</span> Deutsch</div>
+                            class="lang-flag"><svg width="18" height="13" viewBox="0 0 18 13" style="border-radius:2px;display:block"><rect width="18" height="4.33" fill="#000"/><rect y="4.33" width="18" height="4.33" fill="#DD0000"/><rect y="8.66" width="18" height="4.34" fill="#FFCE00"/></svg></span> Deutsch</div>
                     <div class="lang-option" data-lang="en" onclick="switchLang('en')"><span
-                            class="lang-flag">🇬🇧</span> English</div>
+                            class="lang-flag"><svg width="18" height="13" viewBox="0 0 60 40" style="border-radius:2px;display:block"><rect width="60" height="40" fill="#012169"/><path d="M0,0 60,40 M60,0 0,40" stroke="#fff" stroke-width="8"/><path d="M0,0 60,40 M60,0 0,40" stroke="#C8102E" stroke-width="4"/><path d="M30,0 V40 M0,20 H60" stroke="#fff" stroke-width="13"/><path d="M30,0 V40 M0,20 H60" stroke="#C8102E" stroke-width="8"/></svg></span> English</div>
                     <div class="lang-option" data-lang="ar" onclick="switchLang('ar')"><span
-                            class="lang-flag">🇸🇦</span> العربية</div>
+                            class="lang-flag"><svg width="18" height="13" viewBox="0 0 18 13" style="border-radius:2px;display:block"><rect width="18" height="13" fill="#165d31"/><text x="9" y="8.5" font-size="6" fill="#fff" text-anchor="middle" font-family="sans-serif">ع</text></svg></span> العربية</div>
                 </div>
             </div>
             <a class="btn-nav btn-nav-primary" href="#pricing" data-de="Jetzt starten" data-en="Get Started"
@@ -1899,7 +1922,6 @@
         const LANGS = ['de', 'en', 'ar'];
         let lang = localStorage.getItem('barmagly_lang') || 'de';
         const DIR = { en: 'ltr', ar: 'rtl', de: 'ltr' };
-        const FLAGS = { de: '🇩🇪', en: '🇬🇧', ar: '🇸🇦' };
         const LABELS = { de: 'DE', en: 'EN', ar: 'AR' };
 
         function applyLang(l) {
@@ -1911,7 +1933,9 @@
                 var txt = el.getAttribute('data-' + l);
                 if (txt) el.textContent = txt;
             });
-            document.getElementById('langFlag').textContent = FLAGS[l];
+            var srcOpt = document.querySelector('.lang-option[data-lang="' + l + '"] .lang-flag svg');
+            var flagEl = document.getElementById('langFlag');
+            if (srcOpt && flagEl) { flagEl.innerHTML = ''; flagEl.appendChild(srcOpt.cloneNode(true)); }
             document.getElementById('langLabel').textContent = LABELS[l];
             document.querySelectorAll('.lang-option').forEach(function (o) {
                 o.classList.toggle('active', o.dataset.lang === l);

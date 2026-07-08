@@ -150,11 +150,15 @@ function DonutChart({ data, size = 140 }: { data: { label: string; value: number
 }
 
 function MiniLineChart({ data, height = 140, color = Colors.accent }: { data: number[]; height?: number; color?: string }) {
+  // Hooks must run unconditionally and in the same order every render — the
+  // early `if (data.length < 2) return null` must NOT precede useState, or
+  // React throws "Rendered more hooks than during the previous render" the
+  // moment the sales array crosses the <2 → >=2 threshold.
+  const [chartWidth, setChartWidth] = useState(Dimensions.get("window").width - 60);
   if (data.length < 2) return null;
   const maxVal = Math.max(...data, 1);
   const minVal = Math.min(...data, 0);
   const range = maxVal - minVal || 1;
-  const [chartWidth, setChartWidth] = useState(Dimensions.get("window").width - 60);
   const stepX = chartWidth / (data.length - 1);
 
   const points = data.map((v, i) => ({

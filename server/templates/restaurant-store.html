@@ -4,8 +4,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Loading...</title>
-  <meta name="description" content="Order delicious food online - fast delivery and pickup available">
+  <title>{{STORE_NAME}} — Order Food Online</title>
+  <meta name="description" content="Order from {{STORE_NAME}} online — fast delivery and pickup. Browse the menu and order in seconds.">
+  <meta name="theme-color" content="{{PRIMARY_COLOR}}">
+  <link rel="canonical" href="https://pos.barmagly.tech/store/{{SLUG}}">
+  <meta property="og:type" content="restaurant.restaurant">
+  <meta property="og:site_name" content="Barmagly">
+  <meta property="og:title" content="{{STORE_NAME}} — Order Food Online">
+  <meta property="og:description" content="Order from {{STORE_NAME}} online — fast delivery and pickup.">
+  <meta property="og:url" content="https://pos.barmagly.tech/store/{{SLUG}}">
+  <meta property="og:image" content="{{STORE_LOGO}}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{STORE_NAME}} — Order Food Online">
+  <meta name="twitter:image" content="{{STORE_LOGO}}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
@@ -2608,9 +2619,9 @@
           <span id="lang-label">EN</span>
         </button>
         <div class="lang-menu" id="lang-menu">
-          <button class="lang-opt" id="lang-opt-en" onclick="changeLang('en')">🇺🇸 English</button>
-          <button class="lang-opt" id="lang-opt-ar" onclick="changeLang('ar')">🇸🇦 العربية</button>
-          <button class="lang-opt" id="lang-opt-de" onclick="changeLang('de')">🇩🇪 Deutsch</button>
+          <button class="lang-opt" id="lang-opt-en" onclick="changeLang('en')"><svg width="16" height="12" viewBox="0 0 60 40" style="border-radius:2px;vertical-align:-1px"><rect width="60" height="40" fill="#012169"/><path d="M0,0 60,40 M60,0 0,40" stroke="#fff" stroke-width="8"/><path d="M0,0 60,40 M60,0 0,40" stroke="#C8102E" stroke-width="4"/><path d="M30,0 V40 M0,20 H60" stroke="#fff" stroke-width="13"/><path d="M30,0 V40 M0,20 H60" stroke="#C8102E" stroke-width="8"/></svg> English</button>
+          <button class="lang-opt" id="lang-opt-ar" onclick="changeLang('ar')"><svg width="16" height="12" viewBox="0 0 18 13" style="border-radius:2px;vertical-align:-1px"><rect width="18" height="13" fill="#165d31"/><text x="9" y="9" font-size="7" fill="#fff" text-anchor="middle" font-family="sans-serif">ع</text></svg> العربية</button>
+          <button class="lang-opt" id="lang-opt-de" onclick="changeLang('de')"><svg width="16" height="12" viewBox="0 0 18 13" style="border-radius:2px;vertical-align:-1px"><rect width="18" height="4.33" fill="#000"/><rect y="4.33" width="18" height="4.33" fill="#DD0000"/><rect y="8.66" width="18" height="4.34" fill="#FFCE00"/></svg> Deutsch</button>
         </div>
       </div>
       <button class="nav-btn" onclick="toggleTheme()" id="theme-btn" aria-label="Toggle theme">

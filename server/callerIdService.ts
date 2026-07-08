@@ -268,40 +268,38 @@ export class CallerIDService extends EventEmitter {
   }
 
   private broadcastToTenant(payload: string, tenantId?: number) {
+    // SECURITY: when a tenantId is given, deliver ONLY to clients that
+    // registered that exact tenantId. Clients without a registered tenantId
+    // (e.g. the public /customer SPA) must never receive tenant-scoped POS
+    // events — the previous "broadcast to everyone when no match" fallback
+    // leaked caller-ID / order data across tenants. If no client matches, the
+    // event is simply dropped (POS reconnect + REST refetch recovers state).
+    const matches = (clientTenantId?: number) =>
+      tenantId ? clientTenantId === tenantId : true;
+
     let wsTotal = 0, wsMatched = 0;
-    const allWsOpen: TenantWebSocket[] = [];
     if (this.wss) {
       this.wss.clients.forEach((client: TenantWebSocket) => {
         if (client.readyState === WebSocket.OPEN) {
           wsTotal++;
-          allWsOpen.push(client);
-          if (!tenantId || !client.tenantId || client.tenantId === tenantId) {
+          if (matches(client.tenantId)) {
             wsMatched++;
             client.send(payload);
           }
         }
       });
-      if (tenantId && wsMatched === 0 && allWsOpen.length > 0) {
-        allWsOpen.forEach(c => c.send(payload));
-        wsMatched = allWsOpen.length;
-      }
     }
 
     // SSE mirror — required because Hostinger CDN doesn't tunnel WebSockets.
     let sseTotal = 0, sseMatched = 0;
-    const sseAll: SseClient[] = [];
     this.sseClients.forEach((sc) => {
       if (!sc.alive) return;
-      sseTotal++; sseAll.push(sc);
-      if (!tenantId || !sc.tenantId || sc.tenantId === tenantId) {
+      sseTotal++;
+      if (matches(sc.tenantId)) {
         sseMatched++;
         try { sc.res.write(`data: ${payload}\n\n`); } catch { sc.alive = false; }
       }
     });
-    if (tenantId && sseMatched === 0 && sseAll.length > 0) {
-      sseAll.forEach((sc) => { try { sc.res.write(`data: ${payload}\n\n`); } catch { sc.alive = false; } });
-      sseMatched = sseAll.length;
-    }
     console.log(`[CallerID] Broadcast: ws=${wsMatched}/${wsTotal} sse=${sseMatched}/${sseTotal} tenant=${tenantId}`);
   }
 

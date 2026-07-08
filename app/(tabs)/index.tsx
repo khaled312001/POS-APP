@@ -1784,7 +1784,7 @@ export default function POSScreen() {
 
           <FlatList
             data={cart.items}
-            keyExtractor={(item) => String(item.productId)}
+            keyExtractor={(item) => String(item.id)}
             scrollEnabled={!!cart.items.length}
             style={styles.cartList}
             renderItem={({ item, index }) => (
@@ -1983,7 +1983,7 @@ export default function POSScreen() {
 
                 <FlatList
                   data={cart.items}
-                  keyExtractor={(item) => String(item.productId)}
+                  keyExtractor={(item) => String(item.id)}
                   style={styles.cartList}
                   contentContainerStyle={!cart.items.length ? { flexGrow: 1, justifyContent: "center" } : { paddingBottom: 8 }}
                   renderItem={({ item }) => (
@@ -2411,7 +2411,7 @@ export default function POSScreen() {
 
               <Text style={[styles.sectionLabel, rtlTextAlign]}>{t("orderSummary")}</Text>
               {cart.items.map((item) => (
-                <View key={item.productId} style={[styles.checkoutItem, isRTL && { flexDirection: "row-reverse" }]}>
+                <View key={String(item.id)} style={[styles.checkoutItem, isRTL && { flexDirection: "row-reverse" }]}>
                   <Text style={[styles.checkoutItemName, rtlTextAlign]}>{item.name} x{item.quantity}</Text>
                   <Text style={[styles.checkoutItemTotal, rtlTextAlign]}>CHF {(item.price * item.quantity).toFixed(2)}</Text>
                 </View>

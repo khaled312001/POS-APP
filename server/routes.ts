@@ -69,8 +69,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const storePath = path.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
       let html = fs.readFileSync(storePath, "utf-8");
+      const storeName = String((tenant as any).businessName || "Barmagly Store").replace(/[<>"]/g, "");
+      const storeLogo = String((config as any).logoUrl || (tenant as any).logo || "https://pos.barmagly.tech/app/assets/images/icon.png").replace(/"/g, "");
       html = html.replace(/\{\{SLUG\}\}/g, slug);
       html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
+      html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
+      html = html.replace(/\{\{STORE_LOGO\}\}/g, storeLogo);
       html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
       html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
       html = html.replace(/\{\{CURRENCY\}\}/g, (tenant as any).currency || "CHF");
@@ -793,14 +797,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
       if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
       const emps = await storage.getEmployeesByTenant(tenantId);
-      res.json(emps);
+      // SECURITY: never expose PINs to clients. PIN auth is validated server-
+      // side via POST /api/employees/login; the list is only for selection.
+      res.json(emps.map(({ pin, ...rest }: any) => ({ ...rest, hasPin: !!pin })));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.get("/api/employees/:id", async (req, res) => {
     try {
-      const emp = await storage.getEmployee(Number(req.params.id));
+      const emp: any = await storage.getEmployee(Number(req.params.id));
       if (!emp) return res.status(404).json({ error: "Employee not found" });
-      res.json(emp);
+      const { pin, ...safe } = emp;
+      res.json({ ...safe, hasPin: !!pin });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/employees", async (req, res) => {
@@ -2513,7 +2520,10 @@ async function test(){
   app.post("/api/caller-id/incoming", async (req, res) => {
     try {
       const secret = (req.headers["x-bridge-secret"] as string) || req.body.secret;
-      if (process.env.CALLER_ID_BRIDGE_SECRET && secret !== process.env.CALLER_ID_BRIDGE_SECRET) {
+      // Fail closed: if no bridge secret is configured, reject all callers
+      // rather than accepting anonymous caller-ID injections.
+      const expectedSecret = process.env.CALLER_ID_BRIDGE_SECRET;
+      if (!expectedSecret || secret !== expectedSecret) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const { phoneNumber, slot } = req.body;
@@ -2649,7 +2659,23 @@ async function test(){
       const categoryOrder = categories.map((c: any) => c.id);
       products.sort((a: any, b: any) => categoryOrder.indexOf(a.categoryId) - categoryOrder.indexOf(b.categoryId));
 
-      res.json({ config, tenant, products, categories });
+      // SECURITY: never serialise the raw tenant row to an unauthenticated
+      // caller — it holds passwordHash, ownerEmail, ownerPhone and a metadata
+      // blob (whatsappAdminPhone etc.). Return only public storefront fields.
+      const publicTenant = tenant ? {
+        id: tenant.id,
+        businessName: tenant.businessName,
+        name: tenant.businessName,
+        logo: tenant.logo,
+        storeType: tenant.storeType,
+        currency: tenant.currency,
+        address: tenant.address,
+        city: tenant.city,
+        country: tenant.country,
+        phone: tenant.businessPhone ?? tenant.phone ?? null,
+      } : null;
+
+      res.json({ config, tenant: publicTenant, products, categories });
     } catch (e: any) {
       console.error(`[API] Public store error for ${req.params.slug}:`, e);
       res.status(500).json({ error: "Internal server error" });
@@ -2999,9 +3025,14 @@ async function test(){
 
       const branches = await storage.getBranchesByTenant(config.tenantId);
       const currency = branches?.[0]?.currency || "CHF";
+      const storeTenant: any = await storage.getTenant(config.tenantId);
+      const storeName = String(storeTenant?.businessName || (config as any).businessName || "Barmagly Store").replace(/[<>"]/g, "");
+      const storeLogo = String((config as any).logoUrl || storeTenant?.logo || "https://pos.barmagly.tech/app/assets/images/icon.png").replace(/"/g, "");
 
       html = html.replace(/\{\{SLUG\}\}/g, slug);
       html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
+      html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
+      html = html.replace(/\{\{STORE_LOGO\}\}/g, storeLogo);
       html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config.primaryColor || "#2FD3C6");
       html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config.accentColor || "#6366F1");
       html = html.replace(/\{\{CURRENCY\}\}/g, currency);
@@ -3819,12 +3850,12 @@ async function test(){
         }
       } catch (_) {}
 
-      // Broadcast to POS via WebSocket
+      // Broadcast to POS via WebSocket (public broadcast: (payload, tenantId))
       try {
-        callerIdService.broadcastToTenant(Number(tenantId), {
+        callerIdService.broadcast({
           type: "new_online_order",
           order: { id: order.id, orderNumber, customerName, totalAmount, orderType }
-        });
+        }, Number(tenantId));
       } catch (_) {}
 
       res.status(201).json({ success: true, orderId: order.id, orderNumber, trackingToken });

@@ -1,0 +1,76 @@
+=== APP NAME ===
+Barmagly Customer
+
+=== SHORT DESCRIPTION ===
+Order food, track delivery live, and reorder favorites from local restaurants.
+
+=== FULL DESCRIPTION ===
+Hungry? Barmagly Customer brings your favorite local restaurants right to your pocket. Browse menus, place an order in seconds, and watch your food make its way to your door in real time.
+
+Barmagly Customer is the diner-friendly companion to the Barmagly POS system used by restaurants across Switzerland, Germany, Egypt, and Saudi Arabia. When you order through the app, your request lands instantly on the restaurant's till — no phone calls, no misheard orders, no waiting on hold. You see live menu availability, accurate prices, and honest prep times pulled straight from the kitchen.
+
+Whether you're grabbing a quick takeaway on the way home, ordering family dinner for delivery, or rediscovering that dish you loved last month, Barmagly Customer makes the whole experience smooth, fast, and stress-free. One app, every restaurant on the Barmagly network, every order in one place.
+
+Why diners love Barmagly Customer:
+
+BROWSE AND ORDER
+- Explore full restaurant menus with photos, descriptions, and allergen info
+- See what's available right now — no more "sorry, we're out of that"
+- Customize your meal: sizes, extras, sauces, special requests
+- Quick add to cart with a single tap
+- Switch between pickup and delivery on the fly
+
+LIVE ORDER TRACKING
+- Watch your order move from "received" to "in the kitchen" to "on the way"
+- Real-time map tracking for delivery — see your driver approach
+- Accurate ETAs based on actual kitchen and traffic conditions
+- Push notifications at every stage, so you're never left wondering
+- Chat directly with the restaurant if you need to add a note or change an order
+
+LOYALTY AND REORDER
+- One-tap reorder of your favorite meals
+- Full order history at your fingertips
+- Save favorite restaurants for instant access
+- Collect loyalty rewards from participating restaurants
+- Personalized suggestions based on what you actually love
+
+PAYMENTS MADE EASY
+- Pay securely in-app or on delivery — your choice
+- Multiple payment methods supported
+- Clear receipts saved automatically to your history
+- No hidden fees, no surprises at checkout
+
+SAFETY AND PRIVACY
+- Google Sign-In for fast, secure login
+- Your delivery address stays private and is only shared with the restaurant fulfilling your order
+- Optional precise location for accurate delivery — turn it on only when you need it
+- Profile photo is optional and never shared publicly
+- No advertising trackers, ever — we don't sell your data
+
+WHO IT'S FOR
+- Diners who love discovering and reordering from neighborhood restaurants
+- Busy families who want dinner sorted without the phone calls
+- Office workers planning lunch breaks
+- Takeaway fans who hate waiting in line
+- Delivery customers who want to know exactly when food arrives
+
+PRICING
+Barmagly Customer is completely free to download and free to use. You only pay for the food you order — the restaurants cover the technology behind the scenes. No subscriptions, no membership fees, no premium tier.
+
+Designed in a clean, modern dark theme that's easy on the eyes day or night. Optimized for fast networks and slow ones alike.
+
+Got questions, feedback, or a great idea? We'd love to hear from you at support@barmagly.tech.
+
+Tap, order, enjoy. Welcome to Barmagly Customer — your shortcut to good food.
+
+=== APP CATEGORY ===
+Food & Drink
+
+=== TAGS / KEYWORDS ===
+food delivery, online food ordering, restaurant app, takeaway, takeout, order food, food tracker, delivery tracking, menu browser, reorder favorites, local restaurants, pickup food, restaurant menu, food near me, dinner delivery
+
+=== CONTACT EMAIL ===
+support@barmagly.tech
+
+=== WEBSITE ===
+https://barmagly.tech

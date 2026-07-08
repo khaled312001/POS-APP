@@ -1,8 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { storage } from "./storage";
-
-const JWT_SECRET = process.env.JWT_SECRET || "barmagly-super-admin-secret-key-2024";
+import { JWT_SECRET } from "./jwtSecret";
 
 export interface TenantAuthRequest extends Request {
   tenantId?: number;

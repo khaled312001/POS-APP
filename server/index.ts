@@ -12,6 +12,7 @@ import { whatsappService } from "./whatsappService";
 let runMigrations: any = null;
 import { getStripeSync, getStripePublishableKey, getUncachableStripeClient, getStripeSecretKey } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
+import { DELETE_ACCOUNT_HTML, PRIVACY_POLICY_HTML } from "./legal-pages";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -279,6 +280,16 @@ function configureExpoAndLanding(app: express.Application) {
       return res.redirect(301, "/app");
     }
 
+    // Static legal pages required by Google Play (privacy policy + account deletion)
+    if (req.path === "/delete-account" || req.path === "/delete-account/") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(DELETE_ACCOUNT_HTML);
+    }
+    if (req.path === "/privacy" || req.path === "/privacy/") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(PRIVACY_POLICY_HTML);
+    }
+
     if (req.path === "/" || req.path === "/index.html") {
       return serveLandingPage({ req, res, appName });
     }
@@ -312,15 +323,18 @@ function configureExpoAndLanding(app: express.Application) {
     // Serve super-admin HTML pages (login + dashboard) — GET only on exact page paths
     // API calls like /api/super-admin/tenants pass through to the registered routes
     const superAdminPagePaths = [
-      "/super-admin", "/super-admin/login", "/super-admin/dashboard",
-      "/super_admin", "/super_admin/login", "/super_admin/dashboard",
-      "/api/super-admin", "/api/super-admin/login", "/api/super-admin/dashboard",
-      "/api/super_admin", "/api/super_admin/login", "/api/super_admin/dashboard",
+      "/super-admin", "/super-admin/", "/super-admin/login", "/super-admin/dashboard",
+      "/super_admin", "/super_admin/", "/super_admin/login", "/super_admin/dashboard",
+      "/api/super-admin", "/api/super-admin/", "/api/super-admin/login", "/api/super-admin/dashboard",
+      "/api/super_admin", "/api/super_admin/", "/api/super_admin/login", "/api/super_admin/dashboard",
     ];
     if (req.method === "GET" && superAdminPagePaths.includes(req.path)) {
-      const isLogin = req.path.endsWith("/login") || req.path === "/super_admin"
-        || req.path === "/super-admin" || req.path === "/api/super-admin"
-        || req.path === "/api/super_admin";
+      const normalized = req.path.replace(/\/$/, "");
+      const isLogin = normalized.endsWith("/login")
+        || normalized === "/super_admin"
+        || normalized === "/super-admin"
+        || normalized === "/api/super-admin"
+        || normalized === "/api/super_admin";
       const superAdminTemplatePath = path.resolve(
         process.cwd(),
         "server",
@@ -635,8 +649,12 @@ function configureExpoAndLanding(app: express.Application) {
         const config = await storage.getLandingPageConfig(tenantId);
         const storePath = path.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
         let html = fs.readFileSync(storePath, "utf-8");
+        const storeName = String((tenant as any).businessName || "Barmagly Store").replace(/[<>"]/g, "");
+        const storeLogo = String((config as any)?.logoUrl || (tenant as any).logo || "https://pos.barmagly.tech/app/assets/images/icon.png").replace(/"/g, "");
         html = html.replace(/\{\{SLUG\}\}/g, slug!);
         html = html.replace(/\{\{TENANT_ID\}\}/g, String(tenantId));
+        html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
+        html = html.replace(/\{\{STORE_LOGO\}\}/g, storeLogo);
         html = html.replace(/\{\{PRIMARY_COLOR\}\}/g, config?.primaryColor || "#2FD3C6");
         html = html.replace(/\{\{ACCENT_COLOR\}\}/g, config?.accentColor || "#6366F1");
         html = html.replace(/\{\{CURRENCY\}\}/g, (tenant as any).currency || "CHF");
