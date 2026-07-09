@@ -49,3 +49,11 @@ backups/
 # EAS local credentials (contain secrets)
 credentials.json
 upload-keystore.jks
+
+# Local signed app builds (too large for GitHub — keep only in play-store-release locally)
+play-store-release/local-builds/
+*.aab
+*.apk
+*.jks
+*.keystore
+wsl-build-pos.log

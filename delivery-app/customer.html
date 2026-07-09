@@ -13,6 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Kufi+Arabic:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
   /* ─── Reset + Tokens ──────────────────────────────────────────────── */
@@ -604,7 +605,7 @@
     flex: 1; position: relative; min-width: 0;
   }
   .bc-search-wrap::before {
-    content: "🔎"; position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    content: "<i class="fa-solid fa-magnifying-glass"></i>"; position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
     font-size: 14px; pointer-events: none; opacity: 0.7;
   }
   .bc-search-inp {
@@ -1046,7 +1047,7 @@
       <span></span>
     </div>
     <div style="padding: 16px;">
-      <input class="inp" id="restaurants-search" placeholder="🔎 Search restaurants…" style="margin-bottom: 14px;" />
+      <input class="inp" id="restaurants-search" placeholder="Search restaurants…" style="margin-bottom: 14px;" />
       <div id="restaurants-list"><div class="skeleton skel-card"></div></div>
     </div>
   </section>
@@ -1059,7 +1060,7 @@
       <span></span>
     </div>
     <div style="padding: 16px;">
-      <input class="inp" id="menu-search" placeholder="🔎 Search dishes…" style="margin-bottom: 12px;" />
+      <input class="inp" id="menu-search" placeholder="Search dishes…" style="margin-bottom: 12px;" />
       <div id="menu-cats" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:none;"></div>
       <div class="grid" id="menu-products"></div>
     </div>
@@ -1143,7 +1144,7 @@
       <span></span>
     </div>
     <div style="padding: 16px;" id="orders-list">
-      <div class="empty"><div class="empty__icon">🛍️</div><div class="empty__title">No orders yet</div></div>
+      <div class="empty"><div class="empty__icon"><i class="fa-solid fa-bag-shopping"></i>️</div><div class="empty__title">No orders yet</div></div>
     </div>
   </section>
 
@@ -1218,7 +1219,7 @@
 <div class="drawer-overlay" id="cart-overlay"></div>
 <aside class="drawer" id="cart-drawer">
   <div class="drawer__hdr">
-    <strong id="cart-title">🛒 Your cart</strong>
+    <strong id="cart-title"><i class="fa-solid fa-cart-shopping"></i> Your cart</strong>
     <button class="top__btn" id="btn-close-cart">✕</button>
   </div>
   <div class="drawer__body" id="cart-body"></div>
@@ -1232,7 +1233,7 @@
 
 <!-- Floating cart button (visible when items in cart) -->
 <button id="cart-fab" class="hidden" style="position:fixed;bottom:80px;right:16px;left:16px;max-width:520px;margin:0 auto;padding:14px 18px;border:0;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font-weight:800;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:35;box-shadow:0 12px 28px rgba(255,87,34,0.45);cursor:pointer;">
-  <span>🛒 <span id="cart-fab-count">0</span> items</span>
+  <span><i class="fa-solid fa-cart-shopping"></i> <span id="cart-fab-count">0</span> items</span>
   <span id="cart-fab-total">CHF 0.00</span>
 </button>
 
@@ -1242,7 +1243,7 @@
 <!-- Modal dialog (alert/confirm/prompt/form) -->
 <div class="modal-backdrop" id="modal-backdrop">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <div class="modal__icon" id="modal-icon">⚡</div>
+    <div class="modal__icon" id="modal-icon"><i class="fa-solid fa-bolt"></i></div>
     <h3 class="modal__title" id="modal-title">Title</h3>
     <p class="modal__msg" id="modal-msg"></p>
     <div class="modal__fields" id="modal-fields"></div>

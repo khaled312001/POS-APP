@@ -344,6 +344,9 @@ function configureExpoAndLanding(app: express.Application) {
       try {
         const superAdminTemplate = fs.readFileSync(superAdminTemplatePath, "utf-8");
         res.setHeader("Content-Type", "text/html; charset=utf-8");
+        // Auth pages must never be cached by the browser — a stale cached copy
+        // reintroduces old redirect logic after a fix/deploy.
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
         return res.status(200).send(superAdminTemplate);
       } catch (err) {
         return res.status(404).send("Super Admin Template not found");
@@ -1027,6 +1030,23 @@ function setupPaymentGatewayRoutes(app: express.Application) {
     await db.execute(sql.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS language text DEFAULT 'en'`));
   } catch (e: any) {
     console.log("[Migration] landing_page_config.language:", e.message);
+  }
+
+  // Auto-migrate: storefront payment/bank fields
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    for (const col of [
+      "payment_instructions text",
+      "bank_name text",
+      "bank_account_holder text",
+      "bank_iban text",
+      "twint_number text",
+    ]) {
+      await db.execute(sql.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS ${col}`));
+    }
+  } catch (e: any) {
+    console.log("[Migration] landing_page_config payment fields:", e.message);
   }
 
   setupCors(app);

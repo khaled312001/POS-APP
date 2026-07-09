@@ -917,6 +917,14 @@ var init_schema = __esm({
       supportPhone: (0, import_mysql_core.text)("support_phone"),
       logomark: (0, import_mysql_core.text)("logomark"),
       headerBgImage: (0, import_mysql_core.text)("header_bg_image"),
+      // ── Payment / bank details shown on the public storefront ──
+      paymentInstructions: (0, import_mysql_core.text)("payment_instructions"),
+      // free text: "Pay on delivery / bank transfer…"
+      bankName: (0, import_mysql_core.text)("bank_name"),
+      bankAccountHolder: (0, import_mysql_core.text)("bank_account_holder"),
+      bankIban: (0, import_mysql_core.text)("bank_iban"),
+      twintNumber: (0, import_mysql_core.text)("twint_number"),
+      // TWINT phone/number for mobile payment
       createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
       updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
@@ -4477,6 +4485,1140 @@ var init_seedPizzaLemon = __esm({
   }
 });
 
+// server/seedZurichRestaurants.ts
+var seedZurichRestaurants_exports = {};
+__export(seedZurichRestaurants_exports, {
+  seedZurichRestaurants: () => seedZurichRestaurants
+});
+async function seedZurichRestaurants() {
+  console.log(`[ZURICH] Seeding ${RESTAURANTS.length} Z\xFCrich restaurants...`);
+  try {
+    const pizzaCover = U("1513104890138-7c749659a591");
+    const pizzaLogo = U("1565299624946-b28f40a0ae38");
+    await db.update(landingPageConfig).set({ headerBgImage: pizzaCover, logomark: pizzaLogo, heroImage: pizzaCover }).where((0, import_drizzle_orm5.eq)(landingPageConfig.slug, "pizza-lemon"));
+    console.log("[ZURICH] \u2713 Pizza Lemon cover/logo image set.");
+  } catch (e) {
+    console.log("[ZURICH] Pizza Lemon image update skipped:", e.message);
+  }
+  let createdCount = 0;
+  let skippedCount = 0;
+  let totalProducts = 0;
+  for (const r of RESTAURANTS) {
+    try {
+      const [existing] = await db.select().from(landingPageConfig).where((0, import_drizzle_orm5.eq)(landingPageConfig.slug, r.slug));
+      if (existing) {
+        console.log(`[ZURICH] \u23ED  "${r.businessName}" (slug ${r.slug}) already seeded \u2014 skipping.`);
+        skippedCount++;
+        continue;
+      }
+      console.log(`[ZURICH] \u25B6  Creating "${r.businessName}" (tenant ${r.id})...`);
+      const passwordHash = await import_bcrypt3.default.hash(r.password, 10);
+      await db.insert(tenants).values({
+        id: r.id,
+        businessName: r.businessName,
+        ownerName: r.ownerName,
+        ownerEmail: r.ownerEmail,
+        ownerPhone: r.ownerPhone,
+        passwordHash,
+        status: "active",
+        storeType: "restaurant",
+        maxBranches: 3,
+        maxEmployees: 20
+      });
+      const endDate = (0, import_date_fns2.addYears)(/* @__PURE__ */ new Date(), 2);
+      const [sub] = await db.insert(tenantSubscriptions).values({
+        tenantId: r.id,
+        planType: "yearly",
+        planName: "Professional",
+        price: "79.00",
+        status: "active",
+        startDate: /* @__PURE__ */ new Date(),
+        endDate,
+        autoRenew: true
+      }).$returningId();
+      await db.insert(licenseKeys).values({
+        licenseKey: r.licenseKey,
+        tenantId: r.id,
+        subscriptionId: sub.id,
+        status: "active",
+        activatedAt: /* @__PURE__ */ new Date(),
+        expiresAt: endDate,
+        maxActivations: 5,
+        currentActivations: 0
+      });
+      const [branch] = await db.insert(branches).values({
+        tenantId: r.id,
+        name: r.branchName,
+        address: r.address,
+        phone: r.ownerPhone,
+        email: r.ownerEmail,
+        isActive: true,
+        isMain: true,
+        currency: "CHF",
+        taxRate: "7.70"
+      }).$returningId();
+      const branchId = branch.id;
+      await db.insert(warehouses).values({
+        name: "Hauptlager",
+        branchId,
+        isDefault: true,
+        isActive: true
+      });
+      for (let i = 1; i <= 6; i++) {
+        const capacity = i <= 2 ? 2 : i <= 4 ? 4 : 6;
+        await db.insert(tables).values({
+          branchId,
+          name: `Tisch ${i}`,
+          capacity,
+          status: "available"
+        });
+      }
+      await db.insert(employees).values({
+        tenantId: r.id,
+        name: "Admin",
+        email: `admin@${r.domain}`,
+        pin: "1234",
+        role: "admin",
+        branchId,
+        isActive: true
+      });
+      await db.insert(employees).values({
+        tenantId: r.id,
+        name: "Kasse",
+        email: `kasse@${r.domain}`,
+        pin: "5678",
+        role: "cashier",
+        branchId,
+        isActive: true
+      });
+      let productSku = 0;
+      let restaurantProducts = 0;
+      let sortOrder = 0;
+      for (const cat of r.categories) {
+        sortOrder++;
+        const [insertedCat] = await db.insert(categories).values({
+          tenantId: r.id,
+          name: cat.name,
+          color: cat.color,
+          icon: cat.icon,
+          isActive: true,
+          sortOrder
+        }).$returningId();
+        const categoryId = insertedCat.id;
+        for (const item of cat.items) {
+          productSku++;
+          const [prod] = await db.insert(products).values({
+            tenantId: r.id,
+            name: item.name,
+            description: item.description,
+            sku: `ZR${r.id}-${productSku}`,
+            categoryId,
+            price: String(item.price.toFixed(2)),
+            costPrice: String((item.price * 0.35).toFixed(2)),
+            unit: "piece",
+            taxable: true,
+            trackInventory: false,
+            isActive: true,
+            modifiers: [],
+            image: item.image
+          }).$returningId();
+          await db.insert(inventory).values({
+            productId: prod.id,
+            branchId,
+            quantity: 999,
+            lowStockThreshold: 0,
+            reorderPoint: 0
+          });
+          restaurantProducts++;
+        }
+      }
+      await db.insert(landingPageConfig).values({
+        tenantId: r.id,
+        slug: r.slug,
+        heroTitle: r.heroTitle,
+        heroSubtitle: r.heroSubtitle,
+        heroImage: r.heroImage,
+        headerBgImage: r.headerBgImage,
+        logomark: r.logomark,
+        aboutText: r.aboutText,
+        primaryColor: r.primaryColor,
+        accentColor: r.accentColor,
+        enableOnlineOrdering: true,
+        enableDelivery: true,
+        enablePickup: true,
+        acceptCard: true,
+        acceptMobile: true,
+        acceptCash: true,
+        minOrderAmount: "20.00",
+        estimatedDeliveryTime: r.estimatedDeliveryTime,
+        minDeliveryTime: r.minDeliveryTime,
+        maxDeliveryTime: r.maxDeliveryTime,
+        footerText: r.footerText,
+        phone: r.ownerPhone,
+        email: r.ownerEmail,
+        address: r.address,
+        openingHours: r.openingHours,
+        isPublished: true,
+        language: "de"
+      });
+      createdCount++;
+      totalProducts += restaurantProducts;
+      console.log(
+        `[ZURICH] \u2713  "${r.businessName}" done \u2014 ${r.categories.length} categories, ${restaurantProducts} products. Login: ${r.ownerEmail} / ${r.password} \xB7 License: ${r.licenseKey} \xB7 URL: /store/${r.slug}`
+      );
+    } catch (err) {
+      console.error(`[ZURICH] \u2717  Failed to seed "${r.businessName}" (tenant ${r.id}):`, err);
+    }
+  }
+  console.log(
+    `[ZURICH] \u2713 Finished. Created ${createdCount}, skipped ${skippedCount}, total products inserted this run: ${totalProducts}.`
+  );
+}
+var import_drizzle_orm5, import_bcrypt3, import_date_fns2, U, IMG2, HERO, RESTAURANTS;
+var init_seedZurichRestaurants = __esm({
+  "server/seedZurichRestaurants.ts"() {
+    "use strict";
+    init_db();
+    import_drizzle_orm5 = require("drizzle-orm");
+    init_schema();
+    import_bcrypt3 = __toESM(require("bcrypt"));
+    import_date_fns2 = require("date-fns");
+    U = (id) => `https://images.unsplash.com/photo-${id}?w=800&q=80&auto=format&fit=crop`;
+    IMG2 = {
+      // Italian / pizza / pasta
+      pizza: U("1513104890138-7c749659a591"),
+      pasta: U("1621996346565-e3dbc646d9a9"),
+      pasta_cheese: U("1551183053-bf91a1d81141"),
+      caprese: U("1608039755401-742074f0548d"),
+      // Generic plated / meat
+      plated: U("1600891964599-f61ba0e24092"),
+      steak: U("1546241072-48010ad2862c"),
+      steak2: U("1600891964092-4316c288032e"),
+      steak3: U("1573821663912-6df460f9c684"),
+      // Soups
+      soup: U("1547592166-23ac45744acd"),
+      soup2: U("1476718406336-bb5a9690ee2a"),
+      miso_soup: U("1547592166-23ac45744acd"),
+      tom_yum: U("1476718406336-bb5a9690ee2a"),
+      // Japanese
+      sushi: U("1579584425555-c3ce17fd4351"),
+      nigiri: U("1611143669185-af224c5e3252"),
+      maki: U("1617093727343-374698b1b08d"),
+      sashimi: U("1606491956689-2ea866880c84"),
+      rice: U("1512058564366-18510be2db19"),
+      bowl: U("1546069901-ba9599a7e63c"),
+      poke: U("1546793665-c74683f339c1"),
+      ramen: U("1569718212165-3a8278d5f624"),
+      noodles: U("1585032226651-759b368d7246"),
+      noodles2: U("1557872943-16a5ac26437e"),
+      dumplings: U("1626509653291-18d9a934b9db"),
+      // Poultry
+      chicken: U("1598103442097-8b74394b95c6"),
+      grilled_chicken: U("1610057099431-d73a1c9d2f2f"),
+      wings: U("1598103442097-8b74394b95c6"),
+      // Salads
+      salad: U("1512621776951-a57141f2eefd"),
+      greek_salad: U("1503764654157-72d979d9af2f"),
+      tabbouleh: U("1512621776951-a57141f2eefd"),
+      // Indian
+      curry: U("1585937421612-70a008356fbe"),
+      curry2: U("1607301405390-d831c242f59b"),
+      tandoori: U("1626700051175-6818013e1d4f"),
+      biryani: U("1633945274405-b6c8069047b0"),
+      naan: U("1626074353765-517a681e40be"),
+      samosa: U("1604908176997-125f25cc6f3d"),
+      // Middle Eastern
+      kebab: U("1529006557810-274b9b2fc783"),
+      shawarma: U("1529006557810-274b9b2fc783"),
+      falafel: U("1541518763669-27fef04b14ea"),
+      hummus: U("1512152272829-e3139592d56f"),
+      mezze: U("1544982503-9f984c14501a"),
+      baklava: U("1615870216519-2f9fa575fa5c"),
+      // Thai / Vietnamese
+      thai_food: U("1601050690597-df0568f70950"),
+      thai_curry: U("1601050690117-94f5f6fa8bd7"),
+      pad_thai: U("1541592106381-b31e9677c0e5"),
+      spring_rolls: U("1548943487-a2e4e43b4853"),
+      pho: U("1589301760014-d929f3979dbc"),
+      sandwich: U("1553909489-cd47e0907980"),
+      // Burgers / American
+      burger: U("1568901346375-23c9450c58cd"),
+      burger_deluxe: U("1571091718767-18b5b1457add"),
+      cheeseburger: U("1553979459-d2229ba7433b"),
+      fries: U("1578985545062-69928b1d9587"),
+      // Mexican
+      tacos: U("1565299624946-b28f40a0ae38"),
+      tacos2: U("1552332386-f8dd00dc2f85"),
+      quesadilla: U("1618040996337-56904b7850b9"),
+      burrito: U("1618040996337-56904b7850b9"),
+      nachos: U("1626200419199-391ae4be7a41"),
+      guacamole: U("1521305916504-4a1121188589"),
+      // Swiss / French
+      roesti: U("1600628421055-4d30de868b8f"),
+      fondue: U("1541014741259-de529411b96a"),
+      // Seafood
+      fish: U("1467003909585-2f8a72700288"),
+      seafood: U("1559737558-2f5a35f4523b"),
+      shrimp: U("1615141982883-c7ad0e69fd62"),
+      // Brunch / café
+      breakfast: U("1533089860892-a7c6f0a88666"),
+      eggs: U("1484723091739-30a097e8f929"),
+      eggs_benedict: U("1550317138-10000687a72b"),
+      pancakes: U("1482049016688-2d3e1b311543"),
+      avocado_toast: U("1521305916504-4a1121188589"),
+      granola: U("1490474418585-ba9bad8fd0ea"),
+      croissant: U("1555126634-323283e090fa"),
+      churros: U("1541529086526-db283c563270"),
+      // Desserts
+      cake: U("1563805042-7684c019e1cb"),
+      cheesecake: U("1551024506-0bccd828d307"),
+      brownie: U("1551024601-bec78aea704b"),
+      chocolate_cake: U("1551024601-bec78aea704b"),
+      tiramisu: U("1607330289024-1535c6b4e1c1"),
+      panna_cotta: U("1563805042-7684c019e1cb"),
+      icecream: U("1563805042-7684c019e1cb"),
+      // Drinks
+      coffee: U("1509042239860-f550ce710b93"),
+      espresso: U("1447279506476-3faec8071eee"),
+      latte: U("1495474472287-4d71bcdd2085"),
+      cappuccino: U("1551538827-9c037cb4f32a"),
+      tea: U("1556679343-c7306c1976bc"),
+      green_tea: U("1497534446932-c925b458314e"),
+      wine: U("1510812431401-41d2bd2722f3"),
+      wine_white: U("1553361371-9b22f78e8b1d"),
+      beer: U("1513558161293-cdaf765ed2fd"),
+      beer2: U("1544145945-f90425340c7e"),
+      cocktail: U("1571613316887-6f8d5cbf7ef7"),
+      margarita: U("1621263764928-df1444c5e859"),
+      cola: U("1622483767028-3f66f32aef97"),
+      juice: U("1600271886742-f049cd451bba"),
+      orange_juice: U("1437418747212-8d9709afab22"),
+      smoothie: U("1560508180-03f285f67ded"),
+      lassi: U("1560508180-03f285f67ded")
+    };
+    HERO = {
+      sushi: U("1517248135467-4c7edcad34c4"),
+      italian: U("1414235077428-338989a2e8c0"),
+      indian: U("1590846406792-0adc7f938f1d"),
+      burger: U("1552566626-52f8b828add9"),
+      thai: U("1550966871-3ed3cdb5ed0c"),
+      bistro: U("1424847651672-bf20a4b0982b"),
+      lebanese: U("1428515613728-6b4607e44363"),
+      vietnamese: U("1559339352-11d035aa65de"),
+      mexican: U("1544025162-d76694265947"),
+      cafe: U("1466978913421-dad2ebd01d17")
+    };
+    RESTAURANTS = [
+      // ── 1 · Sushi Zen (Japanese) ─────────────────────────────────────────────
+      {
+        id: 101,
+        businessName: "Sushi Zen",
+        ownerName: "Kenji Tanaka",
+        ownerEmail: "info@sushizen.ch",
+        ownerPhone: "+41 44 251 10 01",
+        password: "sushizen123",
+        licenseKey: "BARMAGLY-ZRH1-SUSH-0101-2026",
+        slug: "sushi-zen-zurich",
+        domain: "sushizen.ch",
+        branchName: "Sushi Zen \u2013 Niederdorf",
+        address: "Niederdorfstrasse 22, 8001 Z\xFCrich",
+        heroTitle: "Sushi Zen",
+        heroSubtitle: "Frische Nigiri, Maki & Sashimi im Herzen des Niederdorfs",
+        heroImage: IMG2.sushi,
+        headerBgImage: HERO.sushi,
+        logomark: IMG2.nigiri,
+        aboutText: "Authentische japanische K\xFCche mit t\xE4glich frischem Fisch. Unsere Sushi-Meister bereiten Nigiri, Maki und Sashimi nach traditioneller Art zu.",
+        primaryColor: "#C53030",
+        accentColor: "#1A202C",
+        openingHours: "Mo\u2013So: 11:30\u201314:00 & 17:30\u201322:30",
+        footerText: "\xA9 2026 Sushi Zen \xB7 Niederdorf Z\xFCrich",
+        estimatedDeliveryTime: 35,
+        minDeliveryTime: 25,
+        maxDeliveryTime: 50,
+        categories: [
+          {
+            name: "Nigiri & Sashimi",
+            color: "#C53030",
+            icon: "fish",
+            items: [
+              { name: "Lachs Nigiri (2 Stk)", description: "Frischer Lachs auf Sushi-Reis", price: 8.5, image: IMG2.nigiri },
+              { name: "Thunfisch Nigiri (2 Stk)", description: "Roter Thunfisch (Maguro) auf Reis", price: 9.5, image: IMG2.nigiri },
+              { name: "Garnelen Nigiri (2 Stk)", description: "Gekochte Garnele auf Sushi-Reis", price: 8, image: IMG2.nigiri },
+              { name: "Sashimi Mix (12 Stk)", description: "Auswahl von Lachs, Thunfisch und Butterfisch", price: 32, image: IMG2.sashimi },
+              { name: "Lachs Sashimi (6 Stk)", description: "Sechs Scheiben frischer Lachs", price: 22, image: IMG2.sashimi }
+            ]
+          },
+          {
+            name: "Maki & Rolls",
+            color: "#2B6CB0",
+            icon: "restaurant",
+            items: [
+              { name: "California Roll (8 Stk)", description: "Surimi, Avocado, Gurke, Sesam", price: 16, image: IMG2.maki },
+              { name: "Spicy Tuna Maki (8 Stk)", description: "Thunfisch mit scharfer Mayo", price: 17.5, image: IMG2.maki },
+              { name: "Avocado Maki (6 Stk)", description: "Vegetarische Maki mit Avocado", price: 12, image: IMG2.maki },
+              { name: "Dragon Roll (8 Stk)", description: "Tempura-Garnele, Avocado, Unagi-Sauce", price: 22, image: IMG2.maki }
+            ]
+          },
+          {
+            name: "Warme K\xFCche",
+            color: "#276749",
+            icon: "restaurant",
+            items: [
+              { name: "Chicken Teriyaki Bowl", description: "Gegrilltes Poulet mit Teriyaki auf Reis", price: 24, image: IMG2.rice },
+              { name: "Lachs Poke Bowl", description: "Marinierter Lachs, Edamame, Avocado, Reis", price: 26, image: IMG2.poke },
+              { name: "Miso Ramen", description: "Ramen-Nudeln in w\xFCrziger Miso-Br\xFChe", price: 23, image: IMG2.ramen },
+              { name: "Gyoza (5 Stk)", description: "Gebratene Teigtaschen mit Poulet-F\xFCllung", price: 12, image: IMG2.dumplings },
+              { name: "Chicken Katsu", description: "Paniertes Poulet mit Curry-Sauce und Reis", price: 25, image: IMG2.chicken }
+            ]
+          },
+          {
+            name: "Vorspeisen",
+            color: "#38A169",
+            icon: "leaf",
+            items: [
+              { name: "Miso Suppe", description: "Traditionelle Sojabohnenpasten-Suppe", price: 6.5, image: IMG2.miso_soup },
+              { name: "Edamame", description: "Ged\xE4mpfte Sojabohnen mit Meersalz", price: 7.5, image: IMG2.bowl },
+              { name: "Wakame Salat", description: "Marinierter Algensalat mit Sesam", price: 9, image: IMG2.salad }
+            ]
+          },
+          {
+            name: "Getr\xE4nke & Dessert",
+            color: "#2C7A7B",
+            icon: "cafe",
+            items: [
+              { name: "Gr\xFCner Tee", description: "Japanischer Sencha, heiss", price: 4.5, image: IMG2.green_tea },
+              { name: "Sake (100ml)", description: "Japanischer Reiswein, warm serviert", price: 8, image: IMG2.wine },
+              { name: "Mochi Eis (3 Stk)", description: "Reiskuchen mit Eiscreme-F\xFCllung", price: 9, image: IMG2.icecream }
+            ]
+          }
+        ]
+      },
+      // ── 2 · Trattoria Bella Vista (Italian) ──────────────────────────────────
+      {
+        id: 102,
+        businessName: "Trattoria Bella Vista",
+        ownerName: "Marco Rossi",
+        ownerEmail: "info@bellavista.ch",
+        ownerPhone: "+41 44 241 20 02",
+        password: "bellavista123",
+        licenseKey: "BARMAGLY-ZRH1-BELL-0102-2026",
+        slug: "trattoria-bella-vista-zurich",
+        domain: "bellavista.ch",
+        branchName: "Trattoria Bella Vista \u2013 Langstrasse",
+        address: "Langstrasse 88, 8004 Z\xFCrich",
+        heroTitle: "Trattoria Bella Vista",
+        heroSubtitle: "Hausgemachte Pasta & Pizza aus dem Holzofen",
+        heroImage: IMG2.pasta,
+        headerBgImage: HERO.italian,
+        logomark: IMG2.pizza,
+        aboutText: "Ein St\xFCck Italien an der Langstrasse. Wir kochen mit Leidenschaft und den besten Zutaten aus Italien \u2013 von hausgemachter Pasta bis zur Pizza aus dem Holzofen.",
+        primaryColor: "#276749",
+        accentColor: "#C53030",
+        openingHours: "Mo\u2013Sa: 11:00\u201323:00 \xB7 So: 17:00\u201322:30",
+        footerText: "\xA9 2026 Trattoria Bella Vista \xB7 Langstrasse Z\xFCrich",
+        estimatedDeliveryTime: 40,
+        minDeliveryTime: 30,
+        maxDeliveryTime: 55,
+        categories: [
+          {
+            name: "Antipasti",
+            color: "#38A169",
+            icon: "leaf",
+            items: [
+              { name: "Bruschetta", description: "Ger\xF6stetes Brot mit Tomaten, Basilikum, Knoblauch", price: 11, image: IMG2.caprese },
+              { name: "Insalata Caprese", description: "B\xFCffelmozzarella, Tomaten, Basilikum", price: 14, image: IMG2.caprese },
+              { name: "Vitello Tonnato", description: "Kalbfleisch mit Thunfischsauce", price: 16, image: IMG2.plated },
+              { name: "Minestrone", description: "Klassische italienische Gem\xFCsesuppe", price: 9.5, image: IMG2.soup }
+            ]
+          },
+          {
+            name: "Pasta",
+            color: "#D69E2E",
+            icon: "restaurant",
+            items: [
+              { name: "Spaghetti Carbonara", description: "Speck, Ei, Pecorino, schwarzer Pfeffer", price: 22, image: IMG2.pasta },
+              { name: "Penne all'Arrabbiata", description: "Scharfe Tomatensauce mit Knoblauch und Chili", price: 20, image: IMG2.pasta },
+              { name: "Lasagne al Forno", description: "Hausgemachte Lasagne mit Rindsrag\xF9", price: 24, image: IMG2.pasta_cheese },
+              { name: "Tagliatelle al Rag\xF9", description: "Bandnudeln mit Bologneser Fleischsauce", price: 25, image: IMG2.pasta },
+              { name: "Gnocchi Gorgonzola", description: "Kartoffelgnocchi in cremiger Gorgonzolasauce", price: 23, image: IMG2.pasta_cheese }
+            ]
+          },
+          {
+            name: "Pizza",
+            color: "#E53E3E",
+            icon: "pizza",
+            items: [
+              { name: "Pizza Margherita", description: "Tomaten, Mozzarella, frisches Basilikum", price: 17, image: IMG2.pizza },
+              { name: "Pizza Diavola", description: "Scharfe Salami, Peperoncini, Mozzarella", price: 21, image: IMG2.pizza },
+              { name: "Pizza Quattro Formaggi", description: "Vier-K\xE4se: Mozzarella, Gorgonzola, Parmesan, Fontina", price: 22, image: IMG2.pizza }
+            ]
+          },
+          {
+            name: "Secondi",
+            color: "#C05621",
+            icon: "restaurant",
+            items: [
+              { name: "Saltimbocca alla Romana", description: "Kalbsschnitzel mit Salbei und Rohschinken", price: 34, image: IMG2.steak2 },
+              { name: "Ossobuco", description: "Geschmorte Kalbshaxe mit Gremolata", price: 36, image: IMG2.steak3 }
+            ]
+          },
+          {
+            name: "Dolci & Getr\xE4nke",
+            color: "#B7791F",
+            icon: "ice-cream",
+            items: [
+              { name: "Tiramis\xF9", description: "Mascarpone, Espresso, L\xF6ffelbiskuit", price: 9, image: IMG2.tiramisu },
+              { name: "Panna Cotta", description: "Sahnedessert mit Beerencoulis", price: 8.5, image: IMG2.panna_cotta },
+              { name: "Espresso", description: "Italienischer Espresso", price: 4.5, image: IMG2.espresso },
+              { name: "Rotwein Chianti (1dl)", description: "Toskanischer Rotwein im Glas", price: 7.5, image: IMG2.wine }
+            ]
+          }
+        ]
+      },
+      // ── 3 · Bombay Palace (Indian) ───────────────────────────────────────────
+      {
+        id: 103,
+        businessName: "Bombay Palace",
+        ownerName: "Rajesh Kumar",
+        ownerEmail: "info@bombaypalace.ch",
+        ownerPhone: "+41 44 291 30 03",
+        password: "bombay123",
+        licenseKey: "BARMAGLY-ZRH1-BOMB-0103-2026",
+        slug: "bombay-palace-zurich",
+        domain: "bombaypalace.ch",
+        branchName: "Bombay Palace \u2013 Milit\xE4rstrasse",
+        address: "Milit\xE4rstrasse 12, 8004 Z\xFCrich",
+        heroTitle: "Bombay Palace",
+        heroSubtitle: "Authentische indische Tandoori, Curries & Biryani",
+        heroImage: IMG2.curry,
+        headerBgImage: HERO.indian,
+        logomark: IMG2.tandoori,
+        aboutText: "Erleben Sie die Aromen Indiens. Unsere Gerichte werden mit frisch gemahlenen Gew\xFCrzen und im traditionellen Tandoori-Ofen zubereitet.",
+        primaryColor: "#C05621",
+        accentColor: "#276749",
+        openingHours: "Mo\u2013So: 11:30\u201314:30 & 17:30\u201323:00",
+        footerText: "\xA9 2026 Bombay Palace \xB7 Milit\xE4rstrasse Z\xFCrich",
+        estimatedDeliveryTime: 40,
+        minDeliveryTime: 30,
+        maxDeliveryTime: 55,
+        categories: [
+          {
+            name: "Vorspeisen",
+            color: "#38A169",
+            icon: "leaf",
+            items: [
+              { name: "Samosa (2 Stk)", description: "Frittierte Teigtaschen mit Gem\xFCsef\xFCllung", price: 9, image: IMG2.samosa },
+              { name: "Onion Bhaji", description: "Knusprige Zwiebelb\xE4llchen aus Kichererbsenmehl", price: 8.5, image: IMG2.samosa },
+              { name: "Papadam mit Chutney", description: "Knusprige Linsen-Cracker mit Mango-Chutney", price: 6.5, image: IMG2.naan }
+            ]
+          },
+          {
+            name: "Tandoori",
+            color: "#C05621",
+            icon: "flame",
+            items: [
+              { name: "Tandoori Chicken", description: "Mariniertes Poulet aus dem Tandoori-Ofen", price: 26, image: IMG2.tandoori },
+              { name: "Chicken Tikka", description: "Gegrillte Pouletw\xFCrfel in Joghurt-Gew\xFCrzmarinade", price: 24, image: IMG2.tandoori },
+              { name: "Seekh Kebab", description: "Gew\xFCrztes Lammhackfleisch am Spiess", price: 25, image: IMG2.kebab }
+            ]
+          },
+          {
+            name: "Curries",
+            color: "#D69E2E",
+            icon: "restaurant",
+            items: [
+              { name: "Butter Chicken", description: "Poulet in cremiger Tomaten-Butter-Sauce", price: 27, image: IMG2.curry },
+              { name: "Chicken Tikka Masala", description: "Pouletw\xFCrfel in w\xFCrziger Masala-Sauce", price: 26, image: IMG2.curry2 },
+              { name: "Lamm Rogan Josh", description: "Zartes Lamm in aromatischer Curry-Sauce", price: 29, image: IMG2.curry },
+              { name: "Palak Paneer", description: "Frischk\xE4se in cremigem Spinat-Curry", price: 23, image: IMG2.curry2 },
+              { name: "Dal Makhani", description: "Schwarze Linsen in Butter und Sahne", price: 20, image: IMG2.curry }
+            ]
+          },
+          {
+            name: "Biryani & Reis",
+            color: "#276749",
+            icon: "restaurant",
+            items: [
+              { name: "Chicken Biryani", description: "Basmati-Reis mit Poulet und Safran", price: 25, image: IMG2.biryani },
+              { name: "Gem\xFCse Biryani", description: "Aromatischer Reis mit Saisongem\xFCse", price: 22, image: IMG2.biryani },
+              { name: "Basmati Reis", description: "Ged\xE4mpfter Basmati-Reis", price: 6, image: IMG2.rice }
+            ]
+          },
+          {
+            name: "Naan & Dessert",
+            color: "#B7791F",
+            icon: "ice-cream",
+            items: [
+              { name: "Butter Naan", description: "Fladenbrot aus dem Tandoori-Ofen mit Butter", price: 5.5, image: IMG2.naan },
+              { name: "Garlic Naan", description: "Naan mit frischem Knoblauch und Koriander", price: 6.5, image: IMG2.naan },
+              { name: "Mango Lassi", description: "Erfrischendes Joghurtgetr\xE4nk mit Mango", price: 6.5, image: IMG2.lassi },
+              { name: "Gulab Jamun", description: "In Sirup getr\xE4nkte Milchb\xE4llchen", price: 7.5, image: IMG2.cake }
+            ]
+          }
+        ]
+      },
+      // ── 4 · Zürich Burger Co. (Burgers / American) ───────────────────────────
+      {
+        id: 104,
+        businessName: "Z\xFCrich Burger Co.",
+        ownerName: "Luca Meier",
+        ownerEmail: "info@zurichburger.ch",
+        ownerPhone: "+41 44 271 40 04",
+        password: "burger123",
+        licenseKey: "BARMAGLY-ZRH1-BURG-0104-2026",
+        slug: "zurich-burger-co",
+        domain: "zurichburger.ch",
+        branchName: "Z\xFCrich Burger Co. \u2013 Europaallee",
+        address: "Europaallee 21, 8004 Z\xFCrich",
+        heroTitle: "Z\xFCrich Burger Co.",
+        heroSubtitle: "Handgemachte Burger aus Schweizer Rindfleisch",
+        heroImage: IMG2.burger,
+        headerBgImage: HERO.burger,
+        logomark: IMG2.cheeseburger,
+        aboutText: "Saftige Burger aus 100% Schweizer Rindfleisch, hausgemachte Saucen und knusprige Pommes. Frisch gegrillt, direkt an der Europaallee.",
+        primaryColor: "#C53030",
+        accentColor: "#D69E2E",
+        openingHours: "Mo\u2013So: 11:00\u201323:00",
+        footerText: "\xA9 2026 Z\xFCrich Burger Co. \xB7 Europaallee",
+        estimatedDeliveryTime: 30,
+        minDeliveryTime: 20,
+        maxDeliveryTime: 45,
+        categories: [
+          {
+            name: "Burgers",
+            color: "#C53030",
+            icon: "fast-food",
+            items: [
+              { name: "Classic Cheeseburger", description: "Rindfleisch, Cheddar, Salat, Tomate, Burgersauce", price: 18.5, image: IMG2.cheeseburger },
+              { name: "Double Bacon Burger", description: "Doppeltes Rindfleisch, knuspriger Speck, Cheddar", price: 24, image: IMG2.burger_deluxe },
+              { name: "Z\xFCrich Signature Burger", description: "Rindfleisch, Raclettek\xE4se, karamellisierte Zwiebeln", price: 25, image: IMG2.burger },
+              { name: "Veggie Burger", description: "Hausgemachtes Gem\xFCse-Patty mit Avocado", price: 19.5, image: IMG2.burger },
+              { name: "Spicy Jalape\xF1o Burger", description: "Rindfleisch, Jalape\xF1os, Pepperjack, scharfe Mayo", price: 21, image: IMG2.cheeseburger }
+            ]
+          },
+          {
+            name: "Sides",
+            color: "#D69E2E",
+            icon: "restaurant",
+            items: [
+              { name: "Pommes Frites", description: "Knusprige Pommes mit Meersalz", price: 8, image: IMG2.fries },
+              { name: "S\xFCsskartoffel Pommes", description: "S\xFCsskartoffel-Pommes mit Chipotle-Dip", price: 10, image: IMG2.fries },
+              { name: "Onion Rings", description: "Frittierte Zwiebelringe im Bierteig", price: 9, image: IMG2.fries },
+              { name: "Coleslaw", description: "Cremiger Krautsalat", price: 6.5, image: IMG2.salad }
+            ]
+          },
+          {
+            name: "Chicken",
+            color: "#276749",
+            icon: "restaurant",
+            items: [
+              { name: "Crispy Chicken Burger", description: "Knuspriges Pouletfilet, Salat, Honig-Senf", price: 20, image: IMG2.chicken },
+              { name: "Chicken Wings (8 Stk)", description: "Marinierte Pouletfl\xFCgel mit BBQ-Sauce", price: 16, image: IMG2.wings },
+              { name: "Chicken Tenders", description: "Panierte Pouletstreifen mit Dip", price: 15, image: IMG2.chicken }
+            ]
+          },
+          {
+            name: "Desserts",
+            color: "#B7791F",
+            icon: "ice-cream",
+            items: [
+              { name: "New York Cheesecake", description: "Cremiger K\xE4sekuchen mit Beerensauce", price: 9.5, image: IMG2.cheesecake },
+              { name: "Brownie mit Eis", description: "Warmer Schokoladenbrownie mit Vanilleeis", price: 10, image: IMG2.brownie }
+            ]
+          },
+          {
+            name: "Getr\xE4nke",
+            color: "#2C7A7B",
+            icon: "cafe",
+            items: [
+              { name: "Cola", description: "Coca-Cola 0.5l", price: 4.5, image: IMG2.cola },
+              { name: "Craft Beer", description: "Lokales Z\xFCrcher Craft Beer 0.33l", price: 7.5, image: IMG2.beer },
+              { name: "Milkshake", description: "Hausgemachter Shake (Vanille/Schoko/Erdbeer)", price: 8, image: IMG2.smoothie }
+            ]
+          }
+        ]
+      },
+      // ── 5 · Bangkok Thai House (Thai) ────────────────────────────────────────
+      {
+        id: 105,
+        businessName: "Bangkok Thai House",
+        ownerName: "Somchai Phan",
+        ownerEmail: "info@bangkokthai.ch",
+        ownerPhone: "+41 44 252 50 05",
+        password: "bangkok123",
+        licenseKey: "BARMAGLY-ZRH1-BANG-0105-2026",
+        slug: "bangkok-thai-house-zurich",
+        domain: "bangkokthai.ch",
+        branchName: "Bangkok Thai House \u2013 Z\xE4hringerstrasse",
+        address: "Z\xE4hringerstrasse 41, 8001 Z\xFCrich",
+        heroTitle: "Bangkok Thai House",
+        heroSubtitle: "Authentische thail\xE4ndische Currys, Woks & Suppen",
+        heroImage: IMG2.thai_food,
+        headerBgImage: HERO.thai,
+        logomark: IMG2.thai_curry,
+        aboutText: "Original thail\xE4ndische K\xFCche mitten in Z\xFCrich. Wir verwenden frische Kr\xE4uter, Zitronengras und hausgemachte Currypasten f\xFCr authentische Aromen.",
+        primaryColor: "#276749",
+        accentColor: "#D69E2E",
+        openingHours: "Mo\u2013So: 11:30\u201314:30 & 17:30\u201322:30",
+        footerText: "\xA9 2026 Bangkok Thai House \xB7 Z\xFCrich",
+        estimatedDeliveryTime: 40,
+        minDeliveryTime: 30,
+        maxDeliveryTime: 55,
+        categories: [
+          {
+            name: "Vorspeisen",
+            color: "#38A169",
+            icon: "leaf",
+            items: [
+              { name: "Fr\xFChlingsrollen (4 Stk)", description: "Knusprige Rollen mit Gem\xFCse und s\xFCsser Chilisauce", price: 10, image: IMG2.spring_rolls },
+              { name: "Satay Gai", description: "H\xE4hnchenspiesse mit Erdnusssauce", price: 13, image: IMG2.kebab },
+              { name: "Thai Fischcakes", description: "Frittierte Fischk\xFCchlein mit Gurkendip", price: 12, image: IMG2.fish }
+            ]
+          },
+          {
+            name: "Suppen",
+            color: "#C05621",
+            icon: "restaurant",
+            items: [
+              { name: "Tom Yum Goong", description: "Scharf-saure Suppe mit Garnelen und Zitronengras", price: 14, image: IMG2.tom_yum },
+              { name: "Tom Kha Gai", description: "Kokossuppe mit Poulet und Galgant", price: 13, image: IMG2.soup2 }
+            ]
+          },
+          {
+            name: "Currys",
+            color: "#276749",
+            icon: "restaurant",
+            items: [
+              { name: "Gr\xFCnes Curry (Gaeng Keow Wan)", description: "Gr\xFCnes Curry mit Poulet, Bambus und Basilikum", price: 24, image: IMG2.thai_curry },
+              { name: "Rotes Curry", description: "Rotes Curry mit Rindfleisch und Gem\xFCse", price: 24, image: IMG2.thai_curry },
+              { name: "Massaman Curry", description: "Mildes Curry mit Rind, Kartoffeln und Erdn\xFCssen", price: 26, image: IMG2.curry }
+            ]
+          },
+          {
+            name: "Wok & Nudeln",
+            color: "#D69E2E",
+            icon: "restaurant",
+            items: [
+              { name: "Pad Thai", description: "Gebratene Reisnudeln mit Ei, Tofu und Erdn\xFCssen", price: 22, image: IMG2.pad_thai },
+              { name: "Pad See Ew", description: "Breite Reisnudeln mit Ei und Brokkoli", price: 21, image: IMG2.noodles },
+              { name: "Khao Pad", description: "Gebratener Reis mit Gem\xFCse und Poulet", price: 20, image: IMG2.rice },
+              { name: "Rindfleisch mit Basilikum", description: "Wok-Rindfleisch mit Thai-Basilikum, scharf", price: 25, image: IMG2.thai_food }
+            ]
+          },
+          {
+            name: "Dessert & Getr\xE4nke",
+            color: "#B7791F",
+            icon: "ice-cream",
+            items: [
+              { name: "Mango Sticky Rice", description: "Klebreis mit frischer Mango und Kokosmilch", price: 10, image: IMG2.cake },
+              { name: "Thai Eistee", description: "S\xFCsser thail\xE4ndischer Eistee mit Kondensmilch", price: 5.5, image: IMG2.tea },
+              { name: "Singha Bier", description: "Thail\xE4ndisches Lagerbier 0.33l", price: 6.5, image: IMG2.beer2 }
+            ]
+          }
+        ]
+      },
+      // ── 6 · Le Bistrot Suisse (Swiss / French) ───────────────────────────────
+      {
+        id: 106,
+        businessName: "Le Bistrot Suisse",
+        ownerName: "Pierre Dubois",
+        ownerEmail: "info@bistrotsuisse.ch",
+        ownerPhone: "+41 44 211 60 06",
+        password: "bistrot123",
+        licenseKey: "BARMAGLY-ZRH1-BIST-0106-2026",
+        slug: "le-bistrot-suisse-zurich",
+        domain: "bistrotsuisse.ch",
+        branchName: "Le Bistrot Suisse \u2013 Rennweg",
+        address: "Rennweg 7, 8001 Z\xFCrich",
+        heroTitle: "Le Bistrot Suisse",
+        heroSubtitle: "Schweizer Klassiker & franz\xF6sische Bistro-K\xFCche",
+        heroImage: IMG2.steak2,
+        headerBgImage: HERO.bistro,
+        logomark: IMG2.steak,
+        aboutText: "Ein charmantes Bistro am Rennweg mit Schweizer Spezialit\xE4ten wie Z\xFCrcher Geschnetzeltem und K\xE4sefondue sowie feiner franz\xF6sischer K\xFCche.",
+        primaryColor: "#9B2C2C",
+        accentColor: "#2C5282",
+        openingHours: "Mo\u2013Sa: 11:30\u201314:30 & 18:00\u201323:00 \xB7 So geschlossen",
+        footerText: "\xA9 2026 Le Bistrot Suisse \xB7 Rennweg Z\xFCrich",
+        estimatedDeliveryTime: 45,
+        minDeliveryTime: 35,
+        maxDeliveryTime: 60,
+        categories: [
+          {
+            name: "Entr\xE9es",
+            color: "#38A169",
+            icon: "leaf",
+            items: [
+              { name: "Franz\xF6sische Zwiebelsuppe", description: "Gratinierte Zwiebelsuppe mit K\xE4secro\xFBton", price: 12, image: IMG2.soup },
+              { name: "Salade Ni\xE7oise", description: "Salat mit Thunfisch, Ei, Oliven und Bohnen", price: 16, image: IMG2.salad },
+              { name: "Escargots (6 Stk)", description: "Weinbergschnecken in Kr\xE4uterbutter", price: 15, image: IMG2.plated }
+            ]
+          },
+          {
+            name: "Schweizer Klassiker",
+            color: "#C05621",
+            icon: "restaurant",
+            items: [
+              { name: "Z\xFCrcher Geschnetzeltes mit R\xF6sti", description: "Kalbsgeschnetzeltes an Rahmsauce mit R\xF6sti", price: 32, image: IMG2.roesti },
+              { name: "K\xE4sefondue (pro Person)", description: "Traditionelles Fondue Moiti\xE9-Moiti\xE9", price: 28, image: IMG2.fondue },
+              { name: "Raclette Teller", description: "Geschmolzener Raclettek\xE4se mit Kartoffeln und Gurken", price: 29, image: IMG2.fondue }
+            ]
+          },
+          {
+            name: "Plats",
+            color: "#276749",
+            icon: "restaurant",
+            items: [
+              { name: "Entrec\xF4te Caf\xE9 de Paris", description: "Rindsentrec\xF4te mit Kr\xE4uterbutter und Pommes", price: 38, image: IMG2.steak },
+              { name: "Coq au Vin", description: "In Rotwein geschmortes Poulet mit Champignons", price: 30, image: IMG2.grilled_chicken },
+              { name: "Filet de B\u0153uf", description: "Rinderfilet mit Rotweinjus und Gratin", price: 36, image: IMG2.steak2 },
+              { name: "Lammkoteletts", description: "Gegrillte Lammkoteletts mit Kr\xE4uterkruste", price: 35, image: IMG2.steak3 }
+            ]
+          },
+          {
+            name: "Desserts",
+            color: "#B7791F",
+            icon: "ice-cream",
+            items: [
+              { name: "Cr\xE8me Br\xFBl\xE9e", description: "Vanillecreme mit karamellisierter Zuckerkruste", price: 11, image: IMG2.panna_cotta },
+              { name: "Mousse au Chocolat", description: "Luftige dunkle Schokoladenmousse", price: 9.5, image: IMG2.chocolate_cake }
+            ]
+          },
+          {
+            name: "Vins & Boissons",
+            color: "#6B46C1",
+            icon: "wine",
+            items: [
+              { name: "Rotwein Pinot Noir (1dl)", description: "Schweizer Pinot Noir im Glas", price: 8, image: IMG2.wine },
+              { name: "Weisswein Chasselas (1dl)", description: "Waadtl\xE4nder Weisswein im Glas", price: 7.5, image: IMG2.wine_white },
+              { name: "Espresso", description: "Kr\xE4ftiger Espresso", price: 4.5, image: IMG2.espresso }
+            ]
+          }
+        ]
+      },
+      // ── 7 · Beirut Mezze (Lebanese) ──────────────────────────────────────────
+      {
+        id: 107,
+        businessName: "Beirut Mezze",
+        ownerName: "Karim Haddad",
+        ownerEmail: "info@beirutmezze.ch",
+        ownerPhone: "+41 44 271 70 07",
+        password: "beirut123",
+        licenseKey: "BARMAGLY-ZRH1-BEIR-0107-2026",
+        slug: "beirut-mezze-zurich",
+        domain: "beirutmezze.ch",
+        branchName: "Beirut Mezze \u2013 Josefstrasse",
+        address: "Josefstrasse 102, 8005 Z\xFCrich",
+        heroTitle: "Beirut Mezze",
+        heroSubtitle: "Libanesische Mezze, Grillspezialit\xE4ten & Baklava",
+        heroImage: IMG2.mezze,
+        headerBgImage: HERO.lebanese,
+        logomark: IMG2.hummus,
+        aboutText: "Geniessen Sie die Gastfreundschaft des Libanons mit einer reichen Auswahl an warmen und kalten Mezze, frisch gegrilltem Fleisch und hausgemachtem Baklava.",
+        primaryColor: "#276749",
+        accentColor: "#C05621",
+        openingHours: "Mo\u2013So: 11:30\u201323:00",
+        footerText: "\xA9 2026 Beirut Mezze \xB7 Josefstrasse Z\xFCrich",
+        estimatedDeliveryTime: 40,
+        minDeliveryTime: 30,
+        maxDeliveryTime: 55,
+        categories: [
+          {
+            name: "Kalte Mezze",
+            color: "#38A169",
+            icon: "leaf",
+            items: [
+              { name: "Hummus", description: "Kichererbsenp\xFCree mit Tahini und Oliven\xF6l", price: 9, image: IMG2.hummus },
+              { name: "Baba Ghanoush", description: "Ger\xE4uchertes Auberginenp\xFCree mit Tahini", price: 9.5, image: IMG2.hummus },
+              { name: "Tabbouleh", description: "Petersiliensalat mit Bulgur, Tomaten und Minze", price: 10, image: IMG2.tabbouleh },
+              { name: "Fattoush Salat", description: "Gemischter Salat mit frittiertem Fladenbrot und Sumak", price: 11, image: IMG2.salad }
+            ]
+          },
+          {
+            name: "Warme Mezze",
+            color: "#C05621",
+            icon: "flame",
+            items: [
+              { name: "Falafel (6 Stk)", description: "Frittierte Kichererbsenb\xE4llchen mit Tahini", price: 11, image: IMG2.falafel },
+              { name: "K\xE4se Sambousek", description: "Frittierte Teigtaschen mit K\xE4sef\xFCllung", price: 10, image: IMG2.samosa },
+              { name: "Grillhalloumi", description: "Gegrillter Halloumi-K\xE4se mit Zaatar", price: 12, image: IMG2.mezze }
+            ]
+          },
+          {
+            name: "Grill",
+            color: "#276749",
+            icon: "restaurant",
+            items: [
+              { name: "Shish Taouk", description: "Marinierte Pouletspiesse mit Knoblauchsauce", price: 26, image: IMG2.grilled_chicken },
+              { name: "Lamm Kofta", description: "Gew\xFCrzte Lammhackspiesse vom Grill", price: 27, image: IMG2.kebab },
+              { name: "Gemischte Grillplatte", description: "Auswahl von Shish Taouk, Kofta und Lammspiessen", price: 34, image: IMG2.mezze },
+              { name: "Shawarma Teller", description: "Mariniertes Fleisch mit Reis und Salat", price: 25, image: IMG2.shawarma }
+            ]
+          },
+          {
+            name: "Dessert",
+            color: "#B7791F",
+            icon: "ice-cream",
+            items: [
+              { name: "Baklava (4 Stk)", description: "Bl\xE4tterteig mit Pistazien und Honigsirup", price: 9, image: IMG2.baklava },
+              { name: "Muhalabia", description: "Libanesischer Milchpudding mit Rosenwasser", price: 8, image: IMG2.panna_cotta }
+            ]
+          },
+          {
+            name: "Getr\xE4nke",
+            color: "#2C7A7B",
+            icon: "cafe",
+            items: [
+              { name: "Ayran", description: "Erfrischendes Joghurtgetr\xE4nk", price: 4.5, image: IMG2.lassi },
+              { name: "Libanesischer Wein (1dl)", description: "Rotwein aus dem Bekaa-Tal", price: 8, image: IMG2.wine },
+              { name: "Minztee", description: "Frischer Minztee, heiss", price: 5, image: IMG2.tea }
+            ]
+          }
+        ]
+      },
+      // ── 8 · Pho Saigon (Vietnamese) ──────────────────────────────────────────
+      {
+        id: 108,
+        businessName: "Pho Saigon",
+        ownerName: "Nguyen Van An",
+        ownerEmail: "info@phosaigon.ch",
+        ownerPhone: "+41 44 291 80 08",
+        password: "phosaigon123",
+        licenseKey: "BARMAGLY-ZRH1-PHOS-0108-2026",
+        slug: "pho-saigon-zurich",
+        domain: "phosaigon.ch",
+        branchName: "Pho Saigon \u2013 Badenerstrasse",
+        address: "Badenerstrasse 156, 8004 Z\xFCrich",
+        heroTitle: "Pho Saigon",
+        heroSubtitle: "Dampfende Pho, frische Sommerrollen & B\xE1nh M\xEC",
+        heroImage: IMG2.pho,
+        headerBgImage: HERO.vietnamese,
+        logomark: IMG2.noodles,
+        aboutText: "Vietnamesische Stra\xDFenk\xFCche in Z\xFCrich. Unsere Pho-Br\xFChe k\xF6chelt 12 Stunden, unsere Kr\xE4uter sind t\xE4glich frisch \u2013 f\xFCr ein authentisches Saigon-Erlebnis.",
+        primaryColor: "#C05621",
+        accentColor: "#276749",
+        openingHours: "Mo\u2013So: 11:00\u201322:00",
+        footerText: "\xA9 2026 Pho Saigon \xB7 Badenerstrasse Z\xFCrich",
+        estimatedDeliveryTime: 35,
+        minDeliveryTime: 25,
+        maxDeliveryTime: 50,
+        categories: [
+          {
+            name: "Vorspeisen",
+            color: "#38A169",
+            icon: "leaf",
+            items: [
+              { name: "Sommerrollen (G\u1ECFi cu\u1ED1n)", description: "Frische Reispapierrollen mit Garnelen und Kr\xE4utern", price: 11, image: IMG2.spring_rolls },
+              { name: "Fr\xFChlingsrollen (Ch\u1EA3 gi\xF2)", description: "Knusprige frittierte Rollen mit Schweinefleisch", price: 10, image: IMG2.spring_rolls },
+              { name: "Gyoza", description: "Gebratene Teigtaschen mit Dip", price: 10.5, image: IMG2.dumplings }
+            ]
+          },
+          {
+            name: "Pho & Suppen",
+            color: "#C05621",
+            icon: "restaurant",
+            items: [
+              { name: "Pho B\xF2", description: "Rindfleisch-Nudelsuppe mit frischen Kr\xE4utern", price: 22, image: IMG2.pho },
+              { name: "Pho G\xE0", description: "Poulet-Nudelsuppe in aromatischer Br\xFChe", price: 21, image: IMG2.pho },
+              { name: "B\xFAn B\xF2 Hu\u1EBF", description: "Scharfe Nudelsuppe nach Hu\u1EBF-Art", price: 23, image: IMG2.pho }
+            ]
+          },
+          {
+            name: "Bowls & Reis",
+            color: "#276749",
+            icon: "restaurant",
+            items: [
+              { name: "B\xFAn Th\u1ECBt N\u01B0\u1EDBng", description: "Reisnudelsalat mit gegrilltem Schweinefleisch", price: 21, image: IMG2.bowl },
+              { name: "Com T\u1EA5m", description: "Gebrochener Reis mit gegrilltem Schweinefleisch", price: 22, image: IMG2.rice },
+              { name: "Vegetarische Buddha Bowl", description: "Reis, Tofu, Gem\xFCse und Erdnusssauce", price: 20, image: IMG2.poke }
+            ]
+          },
+          {
+            name: "Nudeln & Sandwich",
+            color: "#D69E2E",
+            icon: "restaurant",
+            items: [
+              { name: "B\xE1nh M\xEC Sandwich", description: "Baguette mit Fleisch, Pickles und Koriander", price: 14, image: IMG2.sandwich },
+              { name: "Gebratene Nudeln mit Rind", description: "Wok-Nudeln mit Rindfleisch und Gem\xFCse", price: 23, image: IMG2.noodles },
+              { name: "Pad-Style Reisnudeln", description: "Gebratene Reisnudeln mit Ei und Sprossen", price: 21, image: IMG2.noodles2 }
+            ]
+          },
+          {
+            name: "Getr\xE4nke & Dessert",
+            color: "#2C7A7B",
+            icon: "cafe",
+            items: [
+              { name: "Vietnamesischer Eiskaffee", description: "C\xE0 ph\xEA s\u1EEFa \u0111\xE1 mit Kondensmilch", price: 6.5, image: IMG2.coffee },
+              { name: "Frische Kokosnuss", description: "Junge Kokosnuss mit Trinkhalm", price: 6, image: IMG2.juice },
+              { name: "Ch\xE8", description: "S\xFCsses Dessert mit Kokosmilch und Bohnen", price: 8, image: IMG2.cake }
+            ]
+          }
+        ]
+      },
+      // ── 9 · El Mariachi (Mexican) ────────────────────────────────────────────
+      {
+        id: 109,
+        businessName: "El Mariachi",
+        ownerName: "Carlos Hern\xE1ndez",
+        ownerEmail: "info@elmariachi.ch",
+        ownerPhone: "+41 44 241 90 09",
+        password: "mariachi123",
+        licenseKey: "BARMAGLY-ZRH1-MARI-0109-2026",
+        slug: "el-mariachi-zurich",
+        domain: "elmariachi.ch",
+        branchName: "El Mariachi \u2013 Stauffacherstrasse",
+        address: "Stauffacherstrasse 60, 8004 Z\xFCrich",
+        heroTitle: "El Mariachi",
+        heroSubtitle: "Tacos, Burritos & Margaritas \u2013 \xA1Viva M\xE9xico!",
+        heroImage: IMG2.tacos,
+        headerBgImage: HERO.mexican,
+        logomark: IMG2.quesadilla,
+        aboutText: "Lebendige mexikanische K\xFCche mit hausgemachten Tortillas, frischer Guacamole und feurigen Salsas. Dazu die besten Margaritas der Stadt.",
+        primaryColor: "#C05621",
+        accentColor: "#276749",
+        openingHours: "Mo\u2013So: 12:00\u201323:00",
+        footerText: "\xA9 2026 El Mariachi \xB7 Stauffacherstrasse Z\xFCrich",
+        estimatedDeliveryTime: 35,
+        minDeliveryTime: 25,
+        maxDeliveryTime: 50,
+        categories: [
+          {
+            name: "Antojitos",
+            color: "#38A169",
+            icon: "leaf",
+            items: [
+              { name: "Guacamole mit Nachos", description: "Frische Guacamole mit knusprigen Tortilla-Chips", price: 12, image: IMG2.guacamole },
+              { name: "Quesadilla", description: "Gef\xFCllte Tortilla mit K\xE4se und Poulet", price: 14, image: IMG2.quesadilla },
+              { name: "Jalape\xF1o Poppers", description: "Frittierte Jalape\xF1os mit Frischk\xE4sef\xFCllung", price: 11, image: IMG2.nachos }
+            ]
+          },
+          {
+            name: "Tacos & Burritos",
+            color: "#C05621",
+            icon: "fast-food",
+            items: [
+              { name: "Tacos al Pastor (3 Stk)", description: "Marinierter Schweinebauch mit Ananas und Koriander", price: 18, image: IMG2.tacos },
+              { name: "Tacos de Carnitas (3 Stk)", description: "Zart geschmortes Schweinefleisch", price: 18, image: IMG2.tacos2 },
+              { name: "Burrito Grande", description: "Grosser Burrito mit Rindfleisch, Reis und Bohnen", price: 22, image: IMG2.burrito },
+              { name: "Veggie Burrito", description: "Burrito mit Gem\xFCse, Bohnen und Guacamole", price: 19, image: IMG2.burrito }
+            ]
+          },
+          {
+            name: "Hauptgerichte",
+            color: "#276749",
+            icon: "restaurant",
+            items: [
+              { name: "Enchiladas Verdes", description: "\xDCberbackene Tortillas mit gr\xFCner Salsa", price: 24, image: IMG2.quesadilla },
+              { name: "Fajitas de Pollo", description: "Gegrilltes Poulet mit Paprika und Tortillas", price: 26, image: IMG2.grilled_chicken },
+              { name: "Chili con Carne", description: "W\xFCrziger Bohnen-Rindfleisch-Eintopf", price: 22, image: IMG2.nachos }
+            ]
+          },
+          {
+            name: "Dessert",
+            color: "#B7791F",
+            icon: "ice-cream",
+            items: [
+              { name: "Churros mit Schokolade", description: "Frittierte Teigstangen mit Schokoladensauce", price: 9.5, image: IMG2.churros },
+              { name: "Flan", description: "Mexikanischer Karamellpudding", price: 8.5, image: IMG2.panna_cotta }
+            ]
+          },
+          {
+            name: "Getr\xE4nke",
+            color: "#6B46C1",
+            icon: "wine",
+            items: [
+              { name: "Margarita", description: "Klassische Margarita mit Tequila und Limette", price: 13, image: IMG2.margarita },
+              { name: "Corona Bier", description: "Mexikanisches Lagerbier mit Limette", price: 6.5, image: IMG2.beer },
+              { name: "Horchata", description: "S\xFCsses Reisgetr\xE4nk mit Zimt", price: 5.5, image: IMG2.smoothie }
+            ]
+          }
+        ]
+      },
+      // ── 10 · Kraftwerk Coffee & Brunch (Café / Brunch) ───────────────────────
+      {
+        id: 110,
+        businessName: "Kraftwerk Coffee & Brunch",
+        ownerName: "Sarah Keller",
+        ownerEmail: "info@kraftwerkcoffee.ch",
+        ownerPhone: "+41 44 272 10 10",
+        password: "kraftwerk123",
+        licenseKey: "BARMAGLY-ZRH1-KRAF-0110-2026",
+        slug: "kraftwerk-coffee-brunch-zurich",
+        domain: "kraftwerkcoffee.ch",
+        branchName: "Kraftwerk Coffee & Brunch \u2013 Viadukt",
+        address: "Viadukt 12, 8005 Z\xFCrich",
+        heroTitle: "Kraftwerk Coffee & Brunch",
+        heroSubtitle: "All-Day-Brunch, Specialty Coffee & Healthy Bowls",
+        heroImage: IMG2.breakfast,
+        headerBgImage: HERO.cafe,
+        logomark: IMG2.coffee,
+        aboutText: "Dein Lieblingsort f\xFCr Brunch unter den Viadukt-B\xF6gen. Specialty Coffee, frische Bowls und herzhafte Fr\xFChst\xFCcksklassiker \u2013 den ganzen Tag serviert.",
+        primaryColor: "#B7791F",
+        accentColor: "#276749",
+        openingHours: "Mo\u2013Fr: 07:30\u201317:00 \xB7 Sa\u2013So: 08:30\u201317:00",
+        footerText: "\xA9 2026 Kraftwerk Coffee & Brunch \xB7 Im Viadukt Z\xFCrich",
+        estimatedDeliveryTime: 30,
+        minDeliveryTime: 20,
+        maxDeliveryTime: 45,
+        categories: [
+          {
+            name: "Fr\xFChst\xFCck",
+            color: "#C05621",
+            icon: "cafe",
+            items: [
+              { name: "Eggs Benedict", description: "Pochierte Eier, Sauce Hollandaise auf English Muffin", price: 18, image: IMG2.eggs_benedict },
+              { name: "Avocado Toast", description: "Sauerteigbrot mit Avocado, Ei und Chili-Flocken", price: 16, image: IMG2.avocado_toast },
+              { name: "Pancakes Stack", description: "Fluffige Pancakes mit Ahornsirup und Beeren", price: 15, image: IMG2.pancakes },
+              { name: "French Toast", description: "Gebackenes Brioche mit Puderzucker und Fr\xFCchten", price: 15.5, image: IMG2.pancakes }
+            ]
+          },
+          {
+            name: "Brunch Klassiker",
+            color: "#276749",
+            icon: "restaurant",
+            items: [
+              { name: "Full English Breakfast", description: "Eier, Speck, W\xFCrstchen, Bohnen, Toast", price: 22, image: IMG2.breakfast },
+              { name: "Shakshuka", description: "Pochierte Eier in w\xFCrziger Tomatensauce", price: 17, image: IMG2.eggs },
+              { name: "Croque Madame", description: "\xDCberbackenes Schinken-K\xE4se-Sandwich mit Spiegelei", price: 16.5, image: IMG2.sandwich }
+            ]
+          },
+          {
+            name: "Bowls & Healthy",
+            color: "#38A169",
+            icon: "leaf",
+            items: [
+              { name: "A\xE7a\xED Bowl", description: "A\xE7a\xED, Banane, Granola und frische Fr\xFCchte", price: 14, image: IMG2.smoothie },
+              { name: "Granola & Joghurt", description: "Hausgemachtes Granola mit Joghurt und Honig", price: 12, image: IMG2.granola },
+              { name: "Poke Bowl", description: "Reis, Lachs, Edamame, Avocado und Sesam", price: 18, image: IMG2.poke }
+            ]
+          },
+          {
+            name: "Kaffee & Getr\xE4nke",
+            color: "#2C7A7B",
+            icon: "cafe",
+            items: [
+              { name: "Cappuccino", description: "Espresso mit cremigem Milchschaum", price: 5, image: IMG2.cappuccino },
+              { name: "Flat White", description: "Doppelter Espresso mit samtiger Milch", price: 5.5, image: IMG2.latte },
+              { name: "Frisch gepresster O-Saft", description: "Frisch gepresster Orangensaft", price: 6.5, image: IMG2.orange_juice },
+              { name: "Matcha Latte", description: "Japanischer Matcha mit aufgesch\xE4umter Milch", price: 6, image: IMG2.green_tea }
+            ]
+          },
+          {
+            name: "S\xFCsses",
+            color: "#B7791F",
+            icon: "ice-cream",
+            items: [
+              { name: "Butter Croissant", description: "Frisch gebackenes Buttercroissant", price: 4.5, image: IMG2.croissant },
+              { name: "Karottenkuchen", description: "Hausgemachter R\xFCeblikuchen mit Frischk\xE4se-Frosting", price: 8, image: IMG2.cake },
+              { name: "Cheesecake", description: "Cremiger New-York-Cheesecake", price: 8.5, image: IMG2.cheesecake }
+            ]
+          }
+        ]
+      }
+    ];
+  }
+});
+
 // server/seedAllDemoData.ts
 var seedAllDemoData_exports = {};
 __export(seedAllDemoData_exports, {
@@ -4493,9 +5635,9 @@ function uuid() {
 }
 async function seedAllDemoData() {
   console.log("[SEED] Starting comprehensive demo data seeding...");
-  const [saCount] = await db.select({ count: import_drizzle_orm5.sql`count(*)` }).from(superAdmins);
+  const [saCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(superAdmins);
   if (Number(saCount.count) === 0) {
-    const hash3 = await import_bcrypt3.default.hash("admin123", 10);
+    const hash3 = await import_bcrypt4.default.hash("admin123", 10);
     await db.insert(superAdmins).values({
       name: "System Admin",
       email: "admin@barmagly.com",
@@ -4505,10 +5647,10 @@ async function seedAllDemoData() {
     });
     console.log("[SEED] Created super admin: admin@barmagly.com / admin123");
   }
-  const [tenantCount] = await db.select({ count: import_drizzle_orm5.sql`count(*)` }).from(tenants);
+  const [tenantCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(tenants);
   if (Number(tenantCount.count) < 3) {
     for (const store of DEMO_STORES) {
-      const hash3 = await import_bcrypt3.default.hash("store123", 10);
+      const hash3 = await import_bcrypt4.default.hash("store123", 10);
       const [tenant] = await db.insert(tenants).values({
         businessName: store.biz,
         ownerName: store.owner,
@@ -4519,7 +5661,7 @@ async function seedAllDemoData() {
         maxBranches: 5,
         maxEmployees: 20
       }).returning();
-      const endDate = (0, import_date_fns2.addMonths)(/* @__PURE__ */ new Date(), 12);
+      const endDate = (0, import_date_fns3.addMonths)(/* @__PURE__ */ new Date(), 12);
       const [sub] = await db.insert(tenantSubscriptions).values({
         tenantId: tenant.id,
         planType: pick(["monthly", "yearly", "trial"]),
@@ -4567,7 +5709,7 @@ async function seedAllDemoData() {
       }
     }
     const currentCategories = await db.select().from(categories);
-    let tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm5.eq)(branches.tenantId, t.id));
+    let tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm6.eq)(branches.tenantId, t.id));
     if (tenantBranches.length === 0) {
       const branchNames = ["Main Branch", "Downtown Branch", "Mall Branch"];
       for (let i = 0; i < rand(1, 3); i++) {
@@ -4583,12 +5725,12 @@ async function seedAllDemoData() {
           taxRate: "5.00"
         });
       }
-      tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm5.eq)(branches.tenantId, t.id));
+      tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm6.eq)(branches.tenantId, t.id));
     }
     const branchIds = tenantBranches.map((b) => b.id);
     if (branchIds.length === 0) continue;
     for (const bId of branchIds) {
-      const [existingWH] = await db.select().from(warehouses).where((0, import_drizzle_orm5.eq)(warehouses.branchId, bId)).limit(1);
+      const [existingWH] = await db.select().from(warehouses).where((0, import_drizzle_orm6.eq)(warehouses.branchId, bId)).limit(1);
       if (!existingWH) {
         await db.insert(warehouses).values({
           name: `Warehouse - Branch ${bId}`,
@@ -4598,7 +5740,7 @@ async function seedAllDemoData() {
         });
       }
     }
-    let tenantEmployees = await db.select().from(employees).where(import_drizzle_orm5.sql`${employees.branchId} IN (${import_drizzle_orm5.sql.join(branchIds, import_drizzle_orm5.sql`, `)})`);
+    let tenantEmployees = await db.select().from(employees).where(import_drizzle_orm6.sql`${employees.branchId} IN (${import_drizzle_orm6.sql.join(branchIds, import_drizzle_orm6.sql`, `)})`);
     if (tenantEmployees.length === 0) {
       const roles = ["admin", "manager", "cashier", "cashier"];
       const empNames = ["Ahmed Manager", "Fatima Cashier", "Omar Staff", "Sara Admin"];
@@ -4615,10 +5757,10 @@ async function seedAllDemoData() {
           commissionRate: "2.50"
         });
       }
-      tenantEmployees = await db.select().from(employees).where(import_drizzle_orm5.sql`${employees.branchId} IN (${import_drizzle_orm5.sql.join(branchIds, import_drizzle_orm5.sql`, `)})`);
+      tenantEmployees = await db.select().from(employees).where(import_drizzle_orm6.sql`${employees.branchId} IN (${import_drizzle_orm6.sql.join(branchIds, import_drizzle_orm6.sql`, `)})`);
     }
     const employeeIds = tenantEmployees.map((e) => e.id);
-    let tenantProducts = await db.select().from(products).where((0, import_drizzle_orm5.eq)(products.tenantId, t.id));
+    let tenantProducts = await db.select().from(products).where((0, import_drizzle_orm6.eq)(products.tenantId, t.id));
     if (tenantProducts.length === 0) {
       for (const cat of currentCategories) {
         const prods = PRODUCT_NAMES[cat.name] || [];
@@ -4639,12 +5781,12 @@ async function seedAllDemoData() {
           });
         }
       }
-      tenantProducts = await db.select().from(products).where((0, import_drizzle_orm5.eq)(products.tenantId, t.id));
+      tenantProducts = await db.select().from(products).where((0, import_drizzle_orm6.eq)(products.tenantId, t.id));
     }
     const productIds = tenantProducts.map((p) => p.id);
     for (const pId of productIds) {
       for (const bId of branchIds) {
-        const [existingInv] = await db.select().from(inventory).where(import_drizzle_orm5.sql`${inventory.productId} = ${pId} AND ${inventory.branchId} = ${bId}`);
+        const [existingInv] = await db.select().from(inventory).where(import_drizzle_orm6.sql`${inventory.productId} = ${pId} AND ${inventory.branchId} = ${bId}`);
         if (!existingInv) {
           await db.insert(inventory).values({
             productId: pId,
@@ -4657,7 +5799,7 @@ async function seedAllDemoData() {
         }
       }
     }
-    const [custCount] = await db.select({ count: import_drizzle_orm5.sql`count(*)` }).from(customers);
+    const [custCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(customers);
     if (Number(custCount.count) < 10) {
       for (const cust of CUSTOMER_NAMES) {
         await db.insert(customers).values({
@@ -4672,7 +5814,7 @@ async function seedAllDemoData() {
       }
     }
     const customerIds = (await db.select().from(customers)).map((c) => c.id);
-    const [supCount] = await db.select({ count: import_drizzle_orm5.sql`count(*)` }).from(suppliers);
+    const [supCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(suppliers);
     if (Number(supCount.count) < 5) {
       for (const sup of SUPPLIER_NAMES) {
         await db.insert(suppliers).values({
@@ -4685,7 +5827,7 @@ async function seedAllDemoData() {
       }
     }
     const supplierIds = (await db.select().from(suppliers)).map((s) => s.id);
-    const [saleCount] = await db.select({ count: import_drizzle_orm5.sql`count(*)` }).from(sales).where(import_drizzle_orm5.sql`${sales.branchId} IN (${import_drizzle_orm5.sql.join(branchIds, import_drizzle_orm5.sql`, `)})`);
+    const [saleCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(sales).where(import_drizzle_orm6.sql`${sales.branchId} IN (${import_drizzle_orm6.sql.join(branchIds, import_drizzle_orm6.sql`, `)})`);
     if (Number(saleCount.count) < 10) {
       for (let i = 0; i < rand(5, 15); i++) {
         const bId = pick(branchIds);
@@ -4708,7 +5850,7 @@ async function seedAllDemoData() {
           paymentMethod: pick(["cash", "card", "mobile"]),
           paymentStatus: "completed",
           status: "completed",
-          createdAt: (0, import_date_fns2.addDays)(/* @__PURE__ */ new Date(), -rand(0, 30))
+          createdAt: (0, import_date_fns3.addDays)(/* @__PURE__ */ new Date(), -rand(0, 30))
         }).returning();
         await db.insert(saleItems).values({
           saleId: sale.id,
@@ -4755,13 +5897,13 @@ async function seedAllDemoData() {
       }
     }
     for (const eId of employeeIds) {
-      const [existingShift] = await db.select().from(shifts).where((0, import_drizzle_orm5.eq)(shifts.employeeId, eId)).limit(1);
+      const [existingShift] = await db.select().from(shifts).where((0, import_drizzle_orm6.eq)(shifts.employeeId, eId)).limit(1);
       if (!existingShift) {
         const bId = pick(branchIds);
         const [shift] = await db.insert(shifts).values({
           employeeId: eId,
           branchId: bId,
-          startTime: (0, import_date_fns2.addDays)(/* @__PURE__ */ new Date(), -1),
+          startTime: (0, import_date_fns3.addDays)(/* @__PURE__ */ new Date(), -1),
           endTime: /* @__PURE__ */ new Date(),
           openingCash: "500.00",
           closingCash: "1200.00",
@@ -4779,7 +5921,7 @@ async function seedAllDemoData() {
       }
     }
     for (const bId of branchIds) {
-      const [existingTable] = await db.select().from(tables).where((0, import_drizzle_orm5.eq)(tables.branchId, bId)).limit(1);
+      const [existingTable] = await db.select().from(tables).where((0, import_drizzle_orm6.eq)(tables.branchId, bId)).limit(1);
       if (!existingTable) {
         for (let i = 1; i <= 5; i++) {
           await db.insert(tables).values({
@@ -4791,7 +5933,7 @@ async function seedAllDemoData() {
         }
       }
     }
-    const [expCount] = await db.select({ count: import_drizzle_orm5.sql`count(*)` }).from(expenses).where(import_drizzle_orm5.sql`${expenses.branchId} IN (${import_drizzle_orm5.sql.join(branchIds, import_drizzle_orm5.sql`, `)})`);
+    const [expCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(expenses).where(import_drizzle_orm6.sql`${expenses.branchId} IN (${import_drizzle_orm6.sql.join(branchIds, import_drizzle_orm6.sql`, `)})`);
     if (Number(expCount.count) < 3) {
       for (let i = 0; i < 3; i++) {
         await db.insert(expenses).values({
@@ -4799,13 +5941,13 @@ async function seedAllDemoData() {
           category: pick(["Rent", "Utilities", "Supplies"]),
           amount: String(rand(100, 500)),
           description: "Demo expense",
-          date: (0, import_date_fns2.addDays)(/* @__PURE__ */ new Date(), -rand(0, 30)),
+          date: (0, import_date_fns3.addDays)(/* @__PURE__ */ new Date(), -rand(0, 30)),
           employeeId: pick(employeeIds)
         });
       }
     }
     for (const pId of productIds) {
-      const [existingBatch] = await db.select().from(productBatches).where((0, import_drizzle_orm5.eq)(productBatches.productId, pId)).limit(1);
+      const [existingBatch] = await db.select().from(productBatches).where((0, import_drizzle_orm6.eq)(productBatches.productId, pId)).limit(1);
       if (!existingBatch) {
         const bId = pick(branchIds);
         await db.insert(productBatches).values({
@@ -4829,7 +5971,7 @@ async function seedAllDemoData() {
       }
     }
     for (const bId of branchIds) {
-      const [existingSC] = await db.select().from(stockCounts).where((0, import_drizzle_orm5.eq)(stockCounts.branchId, bId)).limit(1);
+      const [existingSC] = await db.select().from(stockCounts).where((0, import_drizzle_orm6.eq)(stockCounts.branchId, bId)).limit(1);
       if (!existingSC) {
         const [sc] = await db.insert(stockCounts).values({
           branchId: bId,
@@ -4867,16 +6009,16 @@ async function seedAllDemoData() {
   }
   console.log("[SEED] \u2705 All demo data seeded successfully!");
 }
-var import_drizzle_orm5, crypto4, import_bcrypt3, import_date_fns2, DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
+var import_drizzle_orm6, crypto4, import_bcrypt4, import_date_fns3, DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
 var init_seedAllDemoData = __esm({
   "server/seedAllDemoData.ts"() {
     "use strict";
     init_db();
-    import_drizzle_orm5 = require("drizzle-orm");
+    import_drizzle_orm6 = require("drizzle-orm");
     init_schema();
     crypto4 = __toESM(require("crypto"));
-    import_bcrypt3 = __toESM(require("bcrypt"));
-    import_date_fns2 = require("date-fns");
+    import_bcrypt4 = __toESM(require("bcrypt"));
+    import_date_fns3 = require("date-fns");
     DEMO_STORES = [
       { biz: "Glow Beauty Salon", owner: "Sara Ahmed", email: "sara@glow.com", phone: "+201001234567" },
       { biz: "The Gentlemen's Barber", owner: "Mohamed Ali", email: "mohamed@barber.com", phone: "+201009876543" },
@@ -6331,9 +7473,9 @@ async function deductWallet(customerId, tenantId, amount, orderId) {
 }
 
 // server/routes.ts
-var bcrypt4 = __toESM(require("bcrypt"));
+var bcrypt5 = __toESM(require("bcrypt"));
 var crypto5 = __toESM(require("crypto"));
-var import_date_fns3 = require("date-fns");
+var import_date_fns4 = require("date-fns");
 var import_google_auth_library = require("google-auth-library");
 var TIMESTAMP_FIELDS = [
   "createdAt",
@@ -6406,14 +7548,24 @@ async function registerRoutes(app2) {
       res.status(500).json({ success: false, error: e.message });
     }
   });
+  app2.post("/api/admin/seed-zurich-restaurants", async (_req, res) => {
+    try {
+      const { seedZurichRestaurants: seedZurichRestaurants2 } = await Promise.resolve().then(() => (init_seedZurichRestaurants(), seedZurichRestaurants_exports));
+      await seedZurichRestaurants2();
+      res.json({ success: true, message: "Z\xFCrich restaurants seeded (idempotent)." });
+    } catch (e) {
+      console.error("[SEED ZURICH] Error:", e);
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
   app2.get("/api/admin/check-pizza-lemon", async (_req, res) => {
     try {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { tenants: tenants2, licenseKeys: licenseKeys2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq9 } = await import("drizzle-orm");
-      const [tenant] = await db2.select().from(tenants2).where(eq9(tenants2.ownerEmail, "admin@pizzalemon.ch"));
+      const { eq: eq10 } = await import("drizzle-orm");
+      const [tenant] = await db2.select().from(tenants2).where(eq10(tenants2.ownerEmail, "admin@pizzalemon.ch"));
       if (!tenant) return res.json({ found: false, message: "Pizza Lemon not found in this database." });
-      const licenses = await db2.select().from(licenseKeys2).where(eq9(licenseKeys2.tenantId, tenant.id));
+      const licenses = await db2.select().from(licenseKeys2).where(eq10(licenseKeys2.tenantId, tenant.id));
       res.json({ found: true, tenantId: tenant.id, status: tenant.status, licenses: licenses.map((l) => ({ key: l.licenseKey, status: l.status })) });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -6508,7 +7660,7 @@ async function registerRoutes(app2) {
         }
       }
       const tempPassword = "Bpos" + Math.floor(1e5 + Math.random() * 9e5);
-      const passwordHash = await bcrypt4.hash(tempPassword, 10);
+      const passwordHash = await bcrypt5.hash(tempPassword, 10);
       const tenant = await storage.createTenant({
         businessName,
         ownerName,
@@ -6527,9 +7679,9 @@ async function registerRoutes(app2) {
       const startDate = /* @__PURE__ */ new Date();
       let endDate = /* @__PURE__ */ new Date();
       if (isYearly) {
-        endDate = (0, import_date_fns3.addYears)(startDate, 1);
+        endDate = (0, import_date_fns4.addYears)(startDate, 1);
       } else {
-        endDate = (0, import_date_fns3.addMonths)(startDate, 1);
+        endDate = (0, import_date_fns4.addMonths)(startDate, 1);
       }
       const subscription = await storage.createTenantSubscription({
         tenantId: tenant.id,
@@ -6608,7 +7760,7 @@ async function registerRoutes(app2) {
       const isYearly = planType === "yearly";
       const priceChf = isYearly ? isAdvanced ? 4999 : 1999 : isAdvanced ? 499 : 199;
       const tempPassword = "Bpos" + Math.floor(1e5 + Math.random() * 9e5);
-      const passwordHash = await bcrypt4.hash(tempPassword, 10);
+      const passwordHash = await bcrypt5.hash(tempPassword, 10);
       const tenant = await storage.createTenant({
         businessName,
         ownerName,
@@ -6621,7 +7773,7 @@ async function registerRoutes(app2) {
         metadata: { stripeChargeId: paymentIntentId }
       });
       const startDate = /* @__PURE__ */ new Date();
-      const endDate = isYearly ? (0, import_date_fns3.addYears)(startDate, 1) : (0, import_date_fns3.addMonths)(startDate, 1);
+      const endDate = isYearly ? (0, import_date_fns4.addYears)(startDate, 1) : (0, import_date_fns4.addMonths)(startDate, 1);
       const subscription = await storage.createTenantSubscription({
         tenantId: tenant.id,
         planType,
@@ -6668,7 +7820,7 @@ async function registerRoutes(app2) {
       if (!tenant) {
         isNew = true;
         const tempPassword = "GAuth-" + crypto5.randomBytes(4).toString("hex");
-        const passwordHash = await bcrypt4.hash(tempPassword, 10);
+        const passwordHash = await bcrypt5.hash(tempPassword, 10);
         tenant = await storage.createTenant({
           businessName: payload.name ? `${payload.name}'s Store` : "My New Store",
           ownerName: name,
@@ -6680,7 +7832,7 @@ async function registerRoutes(app2) {
           metadata: { signupMethod: "google", signupDate: (/* @__PURE__ */ new Date()).toISOString() }
         });
         const startDate = /* @__PURE__ */ new Date();
-        const endDate = (0, import_date_fns3.addDays)(startDate, 14);
+        const endDate = (0, import_date_fns4.addDays)(startDate, 14);
         const sub = await storage.createTenantSubscription({
           tenantId: tenant.id,
           planType: "trial",
@@ -6771,12 +7923,12 @@ async function registerRoutes(app2) {
       } else {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { landingPageConfig: landingConfig } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq9 } = await import("drizzle-orm");
+        const { eq: eq10 } = await import("drizzle-orm");
         await db2.update(landingConfig).set({
           heroTitle: businessName,
           phone: ownerPhone,
           socialWhatsapp: ownerPhone
-        }).where(eq9(landingConfig.tenantId, tenantId));
+        }).where(eq10(landingConfig.tenantId, tenantId));
       }
       res.json({ success: true });
     } catch (e) {
@@ -6816,7 +7968,7 @@ async function registerRoutes(app2) {
           if (!tenant.passwordHash) {
             return res.json({ isValid: false, reason: "Account credentials not configured" });
           }
-          const passwordValid = await bcrypt4.compare(password, tenant.passwordHash);
+          const passwordValid = await bcrypt5.compare(password, tenant.passwordHash);
           if (!passwordValid) {
             return res.json({ isValid: false, reason: "Invalid password" });
           }
@@ -7685,17 +8837,17 @@ async function registerRoutes(app2) {
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { onlineOrders: onlineOrders2, customers: customers2, branches: branches2, vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq9 } = await import("drizzle-orm");
+          const { eq: eq10 } = await import("drizzle-orm");
           let resolvedTenantId = saleData.tenantId;
           if (!resolvedTenantId && saleData.branchId) {
-            const [br] = await db2.select({ tenantId: branches2.tenantId }).from(branches2).where(eq9(branches2.id, saleData.branchId)).limit(1);
+            const [br] = await db2.select({ tenantId: branches2.tenantId }).from(branches2).where(eq10(branches2.id, saleData.branchId)).limit(1);
             resolvedTenantId = br?.tenantId ?? void 0;
           }
           if (!resolvedTenantId) {
-            const [veh] = await db2.select({ tenantId: vehicles2.tenantId }).from(vehicles2).where(eq9(vehicles2.id, saleData.vehicleId)).limit(1);
+            const [veh] = await db2.select({ tenantId: vehicles2.tenantId }).from(vehicles2).where(eq10(vehicles2.id, saleData.vehicleId)).limit(1);
             resolvedTenantId = veh?.tenantId ?? void 0;
           }
-          const [cust] = saleData.customerId ? await db2.select().from(customers2).where(eq9(customers2.id, saleData.customerId)).limit(1) : [null];
+          const [cust] = saleData.customerId ? await db2.select().from(customers2).where(eq10(customers2.id, saleData.customerId)).limit(1) : [null];
           const customerName = cust?.name || saleData.customerName || "Walk-in";
           const customerPhone = cust?.phone || "";
           const customerAddress = cust?.address || [cust?.street, cust?.streetNr || cust?.houseNr, cust?.postalCode, cust?.city].filter(Boolean).join(" ") || "";
@@ -9296,6 +10448,17 @@ async function test(){
       res.status(500).json({ error: e.message });
     }
   });
+  app2.put("/api/tenant/landing-config", async (req, res) => {
+    try {
+      const tenantId = req.tenantId;
+      if (!tenantId) return res.status(401).json({ error: "License authentication required" });
+      const { tenantId: _t, id: _i, createdAt: _c, updatedAt: _u, ...data } = req.body;
+      const config = await storage.upsertLandingPageConfig(Number(tenantId), data);
+      res.json(config);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
   app2.get("/api/store-public/commission-rate", async (_req, res) => {
     try {
       const rate = await storage.getCommissionRate();
@@ -9816,7 +10979,7 @@ Valid for 10 minutes.`);
       const picture = payload.picture || null;
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { customers: customers2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq9 } = await import("drizzle-orm");
+      const { eq: eq10 } = await import("drizzle-orm");
       let customer = await findCustomerByEmail(email, tid);
       if (!customer) {
         const [inserted] = await db2.insert(customers2).values({
@@ -9827,7 +10990,7 @@ Valid for 10 minutes.`);
           loyaltyPoints: 0,
           loyaltyTier: "bronze"
         }).$returningId();
-        const [created] = await db2.select().from(customers2).where(eq9(customers2.id, inserted.id)).limit(1);
+        const [created] = await db2.select().from(customers2).where(eq10(customers2.id, inserted.id)).limit(1);
         customer = created;
       } else if (!customer.name || customer.name === customer.email) {
         await storage.updateCustomer(customer.id, { name });
@@ -10404,8 +11567,8 @@ Leave a quick review: ${process.env.APP_URL || ""}/track/${order.trackingToken}#
       }
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq9 } = await import("drizzle-orm");
-      await db2.update(vehicles2).set({ driverStatus: status2, locationUpdatedAt: /* @__PURE__ */ new Date() }).where(eq9(vehicles2.id, driver.id));
+      const { eq: eq10 } = await import("drizzle-orm");
+      await db2.update(vehicles2).set({ driverStatus: status2, locationUpdatedAt: /* @__PURE__ */ new Date() }).where(eq10(vehicles2.id, driver.id));
       try {
         callerIdService.broadcast({ type: "driver_status_change", vehicleId: driver.id, status: status2 }, driver.tenantId);
       } catch {
@@ -10427,8 +11590,8 @@ Leave a quick review: ${process.env.APP_URL || ""}/track/${order.trackingToken}#
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq9 } = await import("drizzle-orm");
-          await db2.update(vehicles2).set({ driverStatus: status2, locationUpdatedAt: /* @__PURE__ */ new Date() }).where(eq9(vehicles2.id, driver.id));
+          const { eq: eq10 } = await import("drizzle-orm");
+          await db2.update(vehicles2).set({ driverStatus: status2, locationUpdatedAt: /* @__PURE__ */ new Date() }).where(eq10(vehicles2.id, driver.id));
           try {
             callerIdService.broadcast({ type: "driver_status_change", vehicleId: driver.id, status: status2 }, driver.tenantId);
           } catch {
@@ -10816,7 +11979,7 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { customerFavorites: customerFavorites2, products: products2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq9, and: and7 } = await import("drizzle-orm");
+      const { eq: eq10, and: and7 } = await import("drizzle-orm");
       const favs = await db2.select({
         id: customerFavorites2.id,
         productId: customerFavorites2.productId,
@@ -10826,7 +11989,7 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
         productPrice: products2.price,
         productImage: products2.image,
         productDescription: products2.description
-      }).from(customerFavorites2).innerJoin(products2, eq9(products2.id, customerFavorites2.productId)).where(and7(eq9(customerFavorites2.customerId, customer.id), eq9(customerFavorites2.tenantId, customer.tenantId)));
+      }).from(customerFavorites2).innerJoin(products2, eq10(products2.id, customerFavorites2.productId)).where(and7(eq10(customerFavorites2.customerId, customer.id), eq10(customerFavorites2.tenantId, customer.tenantId)));
       res.json(favs);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -10857,9 +12020,9 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { customerFavorites: customerFavorites2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq9, and: and7 } = await import("drizzle-orm");
+      const { eq: eq10, and: and7 } = await import("drizzle-orm");
       await db2.delete(customerFavorites2).where(
-        and7(eq9(customerFavorites2.id, Number(req.params.id)), eq9(customerFavorites2.customerId, customer.id))
+        and7(eq10(customerFavorites2.id, Number(req.params.id)), eq10(customerFavorites2.customerId, customer.id))
       );
       res.json({ success: true });
     } catch (e) {
@@ -10874,7 +12037,7 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
       if (!q) return res.json([]);
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { products: products2, categories: categories2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq9, and: and7, or: or4, like: like2, sql: sql7 } = await import("drizzle-orm");
+      const { eq: eq10, and: and7, or: or4, like: like2, sql: sql7 } = await import("drizzle-orm");
       const pattern = `%${q}%`;
       const results = await db2.select({
         id: products2.id,
@@ -10885,9 +12048,9 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
         image: products2.image,
         categoryId: products2.categoryId,
         categoryName: categories2.name
-      }).from(products2).leftJoin(categories2, eq9(categories2.id, products2.categoryId)).where(and7(
-        eq9(products2.tenantId, tenantId),
-        eq9(products2.isActive, true),
+      }).from(products2).leftJoin(categories2, eq10(categories2.id, products2.categoryId)).where(and7(
+        eq10(products2.tenantId, tenantId),
+        eq10(products2.isActive, true),
         or4(
           like2(products2.name, pattern),
           like2(products2.nameAr, pattern),
@@ -10905,8 +12068,8 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { faqEntries: faqEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq9, and: and7, asc } = await import("drizzle-orm");
-      const faqs = await db2.select().from(faqEntries2).where(and7(eq9(faqEntries2.tenantId, tenantId), eq9(faqEntries2.isActive, true))).orderBy(asc(faqEntries2.sortOrder));
+      const { eq: eq10, and: and7, asc } = await import("drizzle-orm");
+      const faqs = await db2.select().from(faqEntries2).where(and7(eq10(faqEntries2.tenantId, tenantId), eq10(faqEntries2.isActive, true))).orderBy(asc(faqEntries2.sortOrder));
       res.json(faqs);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -10939,8 +12102,8 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { helpTickets: helpTickets2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq9, and: and7, desc: desc5 } = await import("drizzle-orm");
-      const tickets = await db2.select().from(helpTickets2).where(and7(eq9(helpTickets2.customerId, customer.id), eq9(helpTickets2.tenantId, customer.tenantId))).orderBy(desc5(helpTickets2.createdAt));
+      const { eq: eq10, and: and7, desc: desc5 } = await import("drizzle-orm");
+      const tickets = await db2.select().from(helpTickets2).where(and7(eq10(helpTickets2.customerId, customer.id), eq10(helpTickets2.tenantId, customer.tenantId))).orderBy(desc5(helpTickets2.createdAt));
       res.json(tickets);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -10952,10 +12115,10 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { onlineOrders: onlineOrders2, products: products2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq9, and: and7, desc: desc5 } = await import("drizzle-orm");
+      const { eq: eq10, and: and7, desc: desc5 } = await import("drizzle-orm");
       const orders = await db2.select({ items: onlineOrders2.items }).from(onlineOrders2).where(and7(
-        eq9(onlineOrders2.customerPhone, customer.phone),
-        eq9(onlineOrders2.tenantId, customer.tenantId)
+        eq10(onlineOrders2.customerPhone, customer.phone),
+        eq10(onlineOrders2.tenantId, customer.tenantId)
       )).orderBy(desc5(onlineOrders2.createdAt)).limit(20);
       const seenIds = /* @__PURE__ */ new Set();
       const recentItems = [];
@@ -10970,7 +12133,7 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
       }
       const enriched = [];
       for (const item of recentItems.slice(0, 20)) {
-        const [product] = await db2.select({ id: products2.id, name: products2.name, nameAr: products2.nameAr, price: products2.price, image: products2.image, isActive: products2.isActive }).from(products2).where(eq9(products2.id, item.productId)).limit(1);
+        const [product] = await db2.select({ id: products2.id, name: products2.name, nameAr: products2.nameAr, price: products2.price, image: products2.image, isActive: products2.isActive }).from(products2).where(eq10(products2.id, item.productId)).limit(1);
         enriched.push({
           productId: item.productId,
           name: product?.name || item.name,
@@ -11106,14 +12269,14 @@ Sitemap: https://barmagly.tech/api/delivery/sitemap.xml
 }
 
 // server/superAdminRoutes.ts
-var bcrypt5 = __toESM(require("bcrypt"));
+var bcrypt6 = __toESM(require("bcrypt"));
 var crypto6 = __toESM(require("crypto"));
 var fs4 = __toESM(require("fs"));
 var path3 = __toESM(require("path"));
 init_storage();
-var import_date_fns4 = require("date-fns");
+var import_date_fns5 = require("date-fns");
 init_db();
-var import_drizzle_orm6 = require("drizzle-orm");
+var import_drizzle_orm7 = require("drizzle-orm");
 var BACKUP_DIR = path3.resolve(process.cwd(), "backups");
 if (!fs4.existsSync(BACKUP_DIR)) fs4.mkdirSync(BACKUP_DIR, { recursive: true });
 async function createTenantBackup(tenantId) {
@@ -11210,7 +12373,7 @@ function registerSuperAdminRoutes(app2) {
       if (!admin || !admin.isActive) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
-      const valid = await bcrypt5.compare(password, admin.passwordHash);
+      const valid = await bcrypt6.compare(password, admin.passwordHash);
       if (!valid) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
@@ -11232,23 +12395,23 @@ function registerSuperAdminRoutes(app2) {
   app2.get("/api/super-admin/analytics/overview", requireSuperAdmin, async (_req, res) => {
     try {
       const { tenants: tenants2, tenantSubscriptions: tenantSubscriptions2, licenseKeys: licenseKeys2, branches: branches2, employees: employees2, products: products2, sales: sales2, customers: customers2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const [totalTenants] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(tenants2);
-      const [activeTenants] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(tenants2).where((0, import_drizzle_orm6.eq)(tenants2.status, "active"));
-      const [totalSubs] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(tenantSubscriptions2);
-      const [activeSubs] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(tenantSubscriptions2).where((0, import_drizzle_orm6.eq)(tenantSubscriptions2.status, "active"));
-      const [totalLicenses] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(licenseKeys2);
-      const [activeLicenses] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(licenseKeys2).where((0, import_drizzle_orm6.eq)(licenseKeys2.status, "active"));
-      const [totalBranches] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(branches2);
-      const [totalEmployees] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(employees2);
-      const [totalProducts] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(products2);
-      const [totalSales] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(sales2);
-      const [totalCustomers] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(customers2);
-      const [revenueRow] = await db.select({ total: import_drizzle_orm6.sql`cast(coalesce(sum(cast(price as decimal(10,2))), 0) as char)` }).from(tenantSubscriptions2).where((0, import_drizzle_orm6.eq)(tenantSubscriptions2.status, "active"));
-      const [salesRevenue] = await db.select({ total: import_drizzle_orm6.sql`cast(coalesce(sum(cast(total_amount as decimal(12,2))), 0) as char)` }).from(sales2);
+      const [totalTenants] = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(tenants2);
+      const [activeTenants] = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(tenants2).where((0, import_drizzle_orm7.eq)(tenants2.status, "active"));
+      const [totalSubs] = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(tenantSubscriptions2);
+      const [activeSubs] = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(tenantSubscriptions2).where((0, import_drizzle_orm7.eq)(tenantSubscriptions2.status, "active"));
+      const [totalLicenses] = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(licenseKeys2);
+      const [activeLicenses] = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(licenseKeys2).where((0, import_drizzle_orm7.eq)(licenseKeys2.status, "active"));
+      const [totalBranches] = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(branches2);
+      const [totalEmployees] = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(employees2);
+      const [totalProducts] = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(products2);
+      const [totalSales] = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(sales2);
+      const [totalCustomers] = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(customers2);
+      const [revenueRow] = await db.select({ total: import_drizzle_orm7.sql`cast(coalesce(sum(cast(price as decimal(10,2))), 0) as char)` }).from(tenantSubscriptions2).where((0, import_drizzle_orm7.eq)(tenantSubscriptions2.status, "active"));
+      const [salesRevenue] = await db.select({ total: import_drizzle_orm7.sql`cast(coalesce(sum(cast(total_amount as decimal(12,2))), 0) as char)` }).from(sales2);
       const in7Days = /* @__PURE__ */ new Date();
       in7Days.setDate(in7Days.getDate() + 7);
       const now = /* @__PURE__ */ new Date();
-      const [expiringSubs] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(tenantSubscriptions2).where((0, import_drizzle_orm6.and)((0, import_drizzle_orm6.eq)(tenantSubscriptions2.status, "active"), (0, import_drizzle_orm6.lte)(tenantSubscriptions2.endDate, in7Days), (0, import_drizzle_orm6.gte)(tenantSubscriptions2.endDate, now)));
+      const [expiringSubs] = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(tenantSubscriptions2).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(tenantSubscriptions2.status, "active"), (0, import_drizzle_orm7.lte)(tenantSubscriptions2.endDate, in7Days), (0, import_drizzle_orm7.gte)(tenantSubscriptions2.endDate, now)));
       res.json({
         totalTenants: Number(totalTenants?.count || 0),
         activeTenants: Number(activeTenants?.count || 0),
@@ -11433,7 +12596,7 @@ function registerSuperAdminRoutes(app2) {
   app2.post("/api/super-admin/tenants", requireSuperAdmin, async (req, res) => {
     try {
       const { businessName, ownerName, ownerEmail, ownerPhone, status: status2, maxBranches, maxEmployees, storeType, address } = req.body;
-      const passwordHash = await bcrypt5.hash("admin123", 10);
+      const passwordHash = await bcrypt6.hash("admin123", 10);
       const tenant = await storage.createTenant({
         businessName,
         ownerName,
@@ -11447,7 +12610,7 @@ function registerSuperAdminRoutes(app2) {
         storeType: storeType || "supermarket"
       });
       const startDate = /* @__PURE__ */ new Date();
-      const endDate = (0, import_date_fns4.addDays)(startDate, 14);
+      const endDate = (0, import_date_fns5.addDays)(startDate, 14);
       const sub = await storage.createTenantSubscription({
         tenantId: tenant.id,
         planType: "trial",
@@ -11500,7 +12663,7 @@ function registerSuperAdminRoutes(app2) {
     try {
       const id = parseInt(req.params.id);
       const { newPassword } = req.body;
-      const passwordHash = await bcrypt5.hash(newPassword || "admin123", 10);
+      const passwordHash = await bcrypt6.hash(newPassword || "admin123", 10);
       await storage.updateTenant(id, { passwordHash });
       res.json({ success: true, message: "Password reset successfully" });
     } catch (e) {
@@ -11523,9 +12686,9 @@ function registerSuperAdminRoutes(app2) {
       const { tenantId, planType, planName, price, status: status2, autoRenew, paymentMethod } = req.body;
       const startDate = /* @__PURE__ */ new Date();
       let endDate = /* @__PURE__ */ new Date();
-      if (planType === "monthly") endDate = (0, import_date_fns4.addMonths)(startDate, 1);
-      else if (planType === "yearly") endDate = (0, import_date_fns4.addYears)(startDate, 1);
-      else endDate = (0, import_date_fns4.addDays)(startDate, 30);
+      if (planType === "monthly") endDate = (0, import_date_fns5.addMonths)(startDate, 1);
+      else if (planType === "yearly") endDate = (0, import_date_fns5.addYears)(startDate, 1);
+      else endDate = (0, import_date_fns5.addDays)(startDate, 30);
       const sub = await storage.createTenantSubscription({
         tenantId,
         planType: planType || "trial",
@@ -11568,8 +12731,8 @@ function registerSuperAdminRoutes(app2) {
       if (!sub) return res.status(404).json({ error: "Subscription not found" });
       const currentEnd = sub.endDate ? new Date(sub.endDate) : /* @__PURE__ */ new Date();
       let newEnd = currentEnd;
-      if (months) newEnd = (0, import_date_fns4.addMonths)(currentEnd, months);
-      else if (days) newEnd = (0, import_date_fns4.addDays)(currentEnd, days);
+      if (months) newEnd = (0, import_date_fns5.addMonths)(currentEnd, months);
+      else if (days) newEnd = (0, import_date_fns5.addDays)(currentEnd, days);
       const updated = await storage.updateTenantSubscription(id, { endDate: newEnd, status: "active" });
       res.json(updated);
     } catch (e) {
@@ -11598,7 +12761,7 @@ function registerSuperAdminRoutes(app2) {
         subscriptionId: subscriptionId || null,
         status: "active",
         maxActivations: maxActivations || 3,
-        expiresAt: expiresAt ? new Date(expiresAt) : (0, import_date_fns4.addYears)(/* @__PURE__ */ new Date(), 1),
+        expiresAt: expiresAt ? new Date(expiresAt) : (0, import_date_fns5.addYears)(/* @__PURE__ */ new Date(), 1),
         notes: notes || null
       });
       res.json(key);
@@ -11628,7 +12791,7 @@ function registerSuperAdminRoutes(app2) {
     try {
       const id = parseInt(req.params.id);
       const { licenseKeys: licenseKeys2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      await db.delete(licenseKeys2).where((0, import_drizzle_orm6.eq)(licenseKeys2.id, id));
+      await db.delete(licenseKeys2).where((0, import_drizzle_orm7.eq)(licenseKeys2.id, id));
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -12016,7 +13179,7 @@ function registerSuperAdminRoutes(app2) {
   app2.get("/api/super-admin/expenses", requireSuperAdmin, async (_req, res) => {
     try {
       const { expenses: expenses2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const rows = await db.select().from(expenses2).orderBy((0, import_drizzle_orm6.desc)(expenses2.createdAt)).limit(500);
+      const rows = await db.select().from(expenses2).orderBy((0, import_drizzle_orm7.desc)(expenses2.createdAt)).limit(500);
       res.json(rows);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -12046,7 +13209,7 @@ function registerSuperAdminRoutes(app2) {
   app2.get("/api/super-admin/shifts/all", requireSuperAdmin, async (_req, res) => {
     try {
       const { shifts: shifts2, employees: employees2, branches: branches2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const rows = await db.select().from(shifts2).orderBy((0, import_drizzle_orm6.desc)(shifts2.startTime)).limit(200);
+      const rows = await db.select().from(shifts2).orderBy((0, import_drizzle_orm7.desc)(shifts2.startTime)).limit(200);
       res.json(rows);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -12236,9 +13399,9 @@ function registerSuperAdminRoutes(app2) {
       if (!adminId) return res.status(401).json({ error: "Unauthorized" });
       const admin = await storage.getSuperAdminByEmail(req.admin.email);
       if (!admin) return res.status(404).json({ error: "Admin not found" });
-      const valid = await bcrypt5.compare(currentPassword, admin.passwordHash);
+      const valid = await bcrypt6.compare(currentPassword, admin.passwordHash);
       if (!valid) return res.status(400).json({ error: "Current password is incorrect" });
-      const newHash = await bcrypt5.hash(newPassword, 10);
+      const newHash = await bcrypt6.hash(newPassword, 10);
       await storage.updateSuperAdmin(adminId, { passwordHash: newHash });
       res.json({ success: true, message: "Password changed successfully" });
     } catch (e) {
@@ -12252,7 +13415,7 @@ function registerSuperAdminRoutes(app2) {
 var import_crypto5 = require("crypto");
 init_db();
 init_schema();
-var import_drizzle_orm7 = require("drizzle-orm");
+var import_drizzle_orm8 = require("drizzle-orm");
 init_callerIdService();
 var broadcastMigrationRan = false;
 async function ensureBroadcastTables() {
@@ -12340,9 +13503,9 @@ function registerBroadcastRoutes(app2) {
         logo: tenants.logo,
         slug: landingPageConfig.slug,
         primaryColor: landingPageConfig.primaryColor
-      }).from(tenants).innerJoin(landingPageConfig, (0, import_drizzle_orm7.eq)(landingPageConfig.tenantId, tenants.id)).where((0, import_drizzle_orm7.and)(
-        (0, import_drizzle_orm7.eq)(tenants.status, "active"),
-        (0, import_drizzle_orm7.eq)(landingPageConfig.enableOnlineOrdering, true)
+      }).from(tenants).innerJoin(landingPageConfig, (0, import_drizzle_orm8.eq)(landingPageConfig.tenantId, tenants.id)).where((0, import_drizzle_orm8.and)(
+        (0, import_drizzle_orm8.eq)(tenants.status, "active"),
+        (0, import_drizzle_orm8.eq)(landingPageConfig.enableOnlineOrdering, true)
       ));
       if (activeTenants.length === 0) return res.json({ restaurants: [], products: [], categories: [] });
       const tenantIds = activeTenants.map((t) => t.id);
@@ -12359,15 +13522,15 @@ function registerBroadcastRoutes(app2) {
         modifiers: products.modifiers,
         variants: products.variants,
         isAddon: products.isAddon
-      }).from(products).where((0, import_drizzle_orm7.and)(
-        (0, import_drizzle_orm7.inArray)(products.tenantId, tenantIds),
-        (0, import_drizzle_orm7.or)((0, import_drizzle_orm7.eq)(products.isActive, true), (0, import_drizzle_orm7.isNull)(products.isActive))
+      }).from(products).where((0, import_drizzle_orm8.and)(
+        (0, import_drizzle_orm8.inArray)(products.tenantId, tenantIds),
+        (0, import_drizzle_orm8.or)((0, import_drizzle_orm8.eq)(products.isActive, true), (0, import_drizzle_orm8.isNull)(products.isActive))
       )).limit(1500);
       const cats = await db.select({
         id: categories.id,
         tenantId: categories.tenantId,
         name: categories.name
-      }).from(categories).where((0, import_drizzle_orm7.inArray)(categories.tenantId, tenantIds));
+      }).from(categories).where((0, import_drizzle_orm8.inArray)(categories.tenantId, tenantIds));
       const catMap = new Map(cats.map((c) => [`${c.tenantId}:${c.id}`, c.name]));
       const tMap = new Map(activeTenants.map((t) => [t.id, t]));
       const parseJson = (v) => {
@@ -12453,7 +13616,7 @@ function registerBroadcastRoutes(app2) {
         status: "pending",
         expiresAt
       });
-      const [row] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm7.eq)(broadcastOrders.broadcastToken, token)).limit(1);
+      const [row] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm8.eq)(broadcastOrders.broadcastToken, token)).limit(1);
       const normalizedItems = normalizeItems(row.items);
       const payload = {
         type: "broadcast_new",
@@ -12490,16 +13653,16 @@ function registerBroadcastRoutes(app2) {
   app2.get("/api/delivery/broadcast/:token", async (req, res) => {
     try {
       const { token } = req.params;
-      const [row] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm7.eq)(broadcastOrders.broadcastToken, token)).limit(1);
+      const [row] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm8.eq)(broadcastOrders.broadcastToken, token)).limit(1);
       if (!row) return res.status(404).json({ error: "Broadcast order not found" });
       let claimedByName = null;
       let trackingToken = null;
       let orderNumber = null;
       if (row.claimedByTenantId) {
-        const [t] = await db.select({ businessName: tenants.businessName }).from(tenants).where((0, import_drizzle_orm7.eq)(tenants.id, row.claimedByTenantId)).limit(1);
+        const [t] = await db.select({ businessName: tenants.businessName }).from(tenants).where((0, import_drizzle_orm8.eq)(tenants.id, row.claimedByTenantId)).limit(1);
         claimedByName = t?.businessName || null;
         if (row.onlineOrderId) {
-          const [oo] = await db.select({ orderNumber: onlineOrders.orderNumber, trackingToken: onlineOrders.trackingToken, status: onlineOrders.status }).from(onlineOrders).where((0, import_drizzle_orm7.eq)(onlineOrders.id, row.onlineOrderId)).limit(1);
+          const [oo] = await db.select({ orderNumber: onlineOrders.orderNumber, trackingToken: onlineOrders.trackingToken, status: onlineOrders.status }).from(onlineOrders).where((0, import_drizzle_orm8.eq)(onlineOrders.id, row.onlineOrderId)).limit(1);
           orderNumber = oo?.orderNumber || null;
           trackingToken = oo?.trackingToken || null;
         }
@@ -12525,14 +13688,14 @@ function registerBroadcastRoutes(app2) {
   app2.post("/api/delivery/broadcast/:token/cancel", async (req, res) => {
     try {
       const { token } = req.params;
-      const [row] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm7.eq)(broadcastOrders.broadcastToken, token)).limit(1);
+      const [row] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm8.eq)(broadcastOrders.broadcastToken, token)).limit(1);
       if (!row) return res.status(404).json({ error: "Not found" });
       if (row.status !== "pending") return res.status(409).json({ error: "Already " + row.status });
       await db.update(broadcastOrders).set({
         status: "cancelled",
         cancelledReason: "customer_cancelled",
         updatedAt: /* @__PURE__ */ new Date()
-      }).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(broadcastOrders.id, row.id), (0, import_drizzle_orm7.eq)(broadcastOrders.status, "pending")));
+      }).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(broadcastOrders.id, row.id), (0, import_drizzle_orm8.eq)(broadcastOrders.status, "pending")));
       try {
         callerIdService.broadcast({ type: "broadcast_cancelled", id: row.id, token: row.broadcastToken, reason: "customer_cancelled" });
       } catch (_) {
@@ -12547,14 +13710,14 @@ function registerBroadcastRoutes(app2) {
       const tenantId = Number(req.query.tenantId);
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
       const now = /* @__PURE__ */ new Date();
-      await db.update(broadcastOrders).set({ status: "expired", updatedAt: now }).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(broadcastOrders.status, "pending"), import_drizzle_orm7.sql`${broadcastOrders.expiresAt} <= ${now}`));
-      const pending = await db.select().from(broadcastOrders).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(broadcastOrders.status, "pending"), (0, import_drizzle_orm7.gt)(broadcastOrders.expiresAt, now))).orderBy((0, import_drizzle_orm7.desc)(broadcastOrders.createdAt)).limit(50);
+      await db.update(broadcastOrders).set({ status: "expired", updatedAt: now }).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(broadcastOrders.status, "pending"), import_drizzle_orm8.sql`${broadcastOrders.expiresAt} <= ${now}`));
+      const pending = await db.select().from(broadcastOrders).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(broadcastOrders.status, "pending"), (0, import_drizzle_orm8.gt)(broadcastOrders.expiresAt, now))).orderBy((0, import_drizzle_orm8.desc)(broadcastOrders.createdAt)).limit(50);
       if (pending.length === 0) return res.json([]);
       const ids = pending.map((p) => p.id);
-      const rejected = await db.select({ broadcastOrderId: broadcastOrderRecipients.broadcastOrderId }).from(broadcastOrderRecipients).where((0, import_drizzle_orm7.and)(
-        (0, import_drizzle_orm7.eq)(broadcastOrderRecipients.tenantId, tenantId),
-        (0, import_drizzle_orm7.eq)(broadcastOrderRecipients.response, "rejected"),
-        (0, import_drizzle_orm7.inArray)(broadcastOrderRecipients.broadcastOrderId, ids)
+      const rejected = await db.select({ broadcastOrderId: broadcastOrderRecipients.broadcastOrderId }).from(broadcastOrderRecipients).where((0, import_drizzle_orm8.and)(
+        (0, import_drizzle_orm8.eq)(broadcastOrderRecipients.tenantId, tenantId),
+        (0, import_drizzle_orm8.eq)(broadcastOrderRecipients.response, "rejected"),
+        (0, import_drizzle_orm8.inArray)(broadcastOrderRecipients.broadcastOrderId, ids)
       ));
       const rejectedSet = new Set(rejected.map((r) => r.broadcastOrderId));
       const visible = pending.filter((p) => !rejectedSet.has(p.id)).map(normalizeBroadcastRow);
@@ -12569,7 +13732,7 @@ function registerBroadcastRoutes(app2) {
       const tenantId = Number(req.body?.tenantId || req.tenantId);
       if (!id || !tenantId) return res.status(400).json({ error: "id + tenantId required" });
       const now = /* @__PURE__ */ new Date();
-      const result = await db.execute(import_drizzle_orm7.sql`
+      const result = await db.execute(import_drizzle_orm8.sql`
         UPDATE ${broadcastOrders}
         SET status = 'claimed',
             claimed_by_tenant_id = ${tenantId},
@@ -12581,7 +13744,7 @@ function registerBroadcastRoutes(app2) {
       `);
       const affected = result?.affectedRows ?? result?.[0]?.affectedRows ?? 0;
       if (!affected) {
-        const [row] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm7.eq)(broadcastOrders.id, id)).limit(1);
+        const [row] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm8.eq)(broadcastOrders.id, id)).limit(1);
         return res.status(409).json({
           error: "Too late \u2014 order already " + (row?.status || "unavailable"),
           status: row?.status,
@@ -12596,9 +13759,9 @@ function registerBroadcastRoutes(app2) {
           respondedAt: now
         });
       } catch (_) {
-        await db.update(broadcastOrderRecipients).set({ response: "accepted", respondedAt: now }).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(broadcastOrderRecipients.broadcastOrderId, id), (0, import_drizzle_orm7.eq)(broadcastOrderRecipients.tenantId, tenantId)));
+        await db.update(broadcastOrderRecipients).set({ response: "accepted", respondedAt: now }).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(broadcastOrderRecipients.broadcastOrderId, id), (0, import_drizzle_orm8.eq)(broadcastOrderRecipients.tenantId, tenantId)));
       }
-      const [bc] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm7.eq)(broadcastOrders.id, id)).limit(1);
+      const [bc] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm8.eq)(broadcastOrders.id, id)).limit(1);
       if (!bc) return res.status(500).json({ error: "Post-claim read failed" });
       const orderNumber = generateOrderNumber(tenantId);
       const trackingToken = (0, import_crypto5.randomBytes)(32).toString("hex");
@@ -12633,12 +13796,12 @@ function registerBroadcastRoutes(app2) {
         trackingToken,
         sourceChannel: "broadcast"
       });
-      const [newOo] = await db.select({ id: onlineOrders.id }).from(onlineOrders).where((0, import_drizzle_orm7.eq)(onlineOrders.orderNumber, orderNumber)).limit(1);
+      const [newOo] = await db.select({ id: onlineOrders.id }).from(onlineOrders).where((0, import_drizzle_orm8.eq)(onlineOrders.orderNumber, orderNumber)).limit(1);
       const onlineOrderId = newOo?.id;
       if (onlineOrderId) {
-        await db.update(broadcastOrders).set({ onlineOrderId, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm7.eq)(broadcastOrders.id, id));
+        await db.update(broadcastOrders).set({ onlineOrderId, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm8.eq)(broadcastOrders.id, id));
       }
-      const [tenantRow] = await db.select({ businessName: tenants.businessName }).from(tenants).where((0, import_drizzle_orm7.eq)(tenants.id, tenantId)).limit(1);
+      const [tenantRow] = await db.select({ businessName: tenants.businessName }).from(tenants).where((0, import_drizzle_orm8.eq)(tenants.id, tenantId)).limit(1);
       const claimPayload = {
         type: "broadcast_claimed",
         id: bc.id,
@@ -12686,7 +13849,7 @@ function registerBroadcastRoutes(app2) {
           respondedAt: /* @__PURE__ */ new Date()
         });
       } catch (_) {
-        await db.update(broadcastOrderRecipients).set({ response: "rejected", respondedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(broadcastOrderRecipients.broadcastOrderId, id), (0, import_drizzle_orm7.eq)(broadcastOrderRecipients.tenantId, tenantId)));
+        await db.update(broadcastOrderRecipients).set({ response: "rejected", respondedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(broadcastOrderRecipients.broadcastOrderId, id), (0, import_drizzle_orm8.eq)(broadcastOrderRecipients.tenantId, tenantId)));
       }
       res.json({ success: true });
     } catch (e) {
@@ -12699,7 +13862,7 @@ function registerBroadcastRoutes(app2) {
 // server/customerExtraRoutes.ts
 init_db();
 init_schema();
-var import_drizzle_orm8 = require("drizzle-orm");
+var import_drizzle_orm9 = require("drizzle-orm");
 init_storage();
 init_callerIdService();
 var chatMigrationRan = false;
@@ -12747,9 +13910,9 @@ async function ensureChatTables() {
 }
 async function getOrCreateRoom(orderId) {
   await ensureChatTables();
-  const [existing] = await db.select().from(chatRooms).where((0, import_drizzle_orm8.eq)(chatRooms.orderId, orderId)).limit(1);
+  const [existing] = await db.select().from(chatRooms).where((0, import_drizzle_orm9.eq)(chatRooms.orderId, orderId)).limit(1);
   if (existing) return existing;
-  const [order] = await db.select().from(onlineOrders).where((0, import_drizzle_orm8.eq)(onlineOrders.id, orderId)).limit(1);
+  const [order] = await db.select().from(onlineOrders).where((0, import_drizzle_orm9.eq)(onlineOrders.id, orderId)).limit(1);
   if (!order) return null;
   let custId = null;
   try {
@@ -12765,7 +13928,7 @@ async function getOrCreateRoom(orderId) {
     customerPhone: order.customerPhone,
     status: "open"
   });
-  const [created] = await db.select().from(chatRooms).where((0, import_drizzle_orm8.eq)(chatRooms.orderId, orderId)).limit(1);
+  const [created] = await db.select().from(chatRooms).where((0, import_drizzle_orm9.eq)(chatRooms.orderId, orderId)).limit(1);
   return created;
 }
 function registerCustomerExtraRoutes(app2) {
@@ -12784,7 +13947,7 @@ function registerCustomerExtraRoutes(app2) {
           phone: guestPhone,
           hasAccount: false
         });
-        const [c] = await db.select().from(customers).where((0, import_drizzle_orm8.eq)(customers.phone, guestPhone)).limit(1);
+        const [c] = await db.select().from(customers).where((0, import_drizzle_orm9.eq)(customers.phone, guestPhone)).limit(1);
         return c;
       });
       if (!customer) return res.status(500).json({ error: "Failed to create guest" });
@@ -12827,7 +13990,7 @@ function registerCustomerExtraRoutes(app2) {
         tenantName: tenants.businessName,
         orderNumber: onlineOrders.orderNumber,
         orderStatus: onlineOrders.status
-      }).from(chatRooms).leftJoin(tenants, (0, import_drizzle_orm8.eq)(tenants.id, chatRooms.tenantId)).leftJoin(onlineOrders, (0, import_drizzle_orm8.eq)(onlineOrders.id, chatRooms.orderId)).where((0, import_drizzle_orm8.eq)(chatRooms.customerId, customer.id)).orderBy((0, import_drizzle_orm8.desc)(chatRooms.lastMessageAt)).limit(50);
+      }).from(chatRooms).leftJoin(tenants, (0, import_drizzle_orm9.eq)(tenants.id, chatRooms.tenantId)).leftJoin(onlineOrders, (0, import_drizzle_orm9.eq)(onlineOrders.id, chatRooms.orderId)).where((0, import_drizzle_orm9.eq)(chatRooms.customerId, customer.id)).orderBy((0, import_drizzle_orm9.desc)(chatRooms.lastMessageAt)).limit(50);
       res.json(rooms);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -12844,9 +14007,9 @@ function registerCustomerExtraRoutes(app2) {
       if (room.customerId && room.customerId !== customer.id) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      const messages = await db.select().from(chatMessages).where((0, import_drizzle_orm8.eq)(chatMessages.roomId, room.id)).orderBy(chatMessages.createdAt).limit(200);
+      const messages = await db.select().from(chatMessages).where((0, import_drizzle_orm9.eq)(chatMessages.roomId, room.id)).orderBy(chatMessages.createdAt).limit(200);
       try {
-        await db.update(chatRooms).set({ unreadByCustomer: 0 }).where((0, import_drizzle_orm8.eq)(chatRooms.id, room.id));
+        await db.update(chatRooms).set({ unreadByCustomer: 0 }).where((0, import_drizzle_orm9.eq)(chatRooms.id, room.id));
       } catch {
       }
       res.json({ room, messages });
@@ -12877,8 +14040,8 @@ function registerCustomerExtraRoutes(app2) {
       const now = /* @__PURE__ */ new Date();
       await db.update(chatRooms).set({
         lastMessageAt: now,
-        unreadByTenant: import_drizzle_orm8.sql`${chatRooms.unreadByTenant} + 1`
-      }).where((0, import_drizzle_orm8.eq)(chatRooms.id, room.id));
+        unreadByTenant: import_drizzle_orm9.sql`${chatRooms.unreadByTenant} + 1`
+      }).where((0, import_drizzle_orm9.eq)(chatRooms.id, room.id));
       const payload = {
         type: "chat_new_message",
         roomId: room.id,
@@ -12913,7 +14076,7 @@ function registerCustomerExtraRoutes(app2) {
         unreadByTenant: chatRooms.unreadByTenant,
         orderNumber: onlineOrders.orderNumber,
         orderStatus: onlineOrders.status
-      }).from(chatRooms).leftJoin(onlineOrders, (0, import_drizzle_orm8.eq)(onlineOrders.id, chatRooms.orderId)).where((0, import_drizzle_orm8.eq)(chatRooms.tenantId, tenantId)).orderBy((0, import_drizzle_orm8.desc)(chatRooms.lastMessageAt)).limit(100);
+      }).from(chatRooms).leftJoin(onlineOrders, (0, import_drizzle_orm9.eq)(onlineOrders.id, chatRooms.orderId)).where((0, import_drizzle_orm9.eq)(chatRooms.tenantId, tenantId)).orderBy((0, import_drizzle_orm9.desc)(chatRooms.lastMessageAt)).limit(100);
       res.json(rooms);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -12936,12 +14099,12 @@ function registerCustomerExtraRoutes(app2) {
       await ensureChatTables();
       const id = Number(req.params.id);
       const tenantId = Number(req.query.tenantId || req.tenantId);
-      const [room] = await db.select().from(chatRooms).where((0, import_drizzle_orm8.eq)(chatRooms.id, id)).limit(1);
+      const [room] = await db.select().from(chatRooms).where((0, import_drizzle_orm9.eq)(chatRooms.id, id)).limit(1);
       if (!room) return res.status(404).json({ error: "Room not found" });
       if (tenantId && room.tenantId !== tenantId) return res.status(403).json({ error: "Forbidden" });
-      const messages = await db.select().from(chatMessages).where((0, import_drizzle_orm8.eq)(chatMessages.roomId, id)).orderBy(chatMessages.createdAt).limit(500);
+      const messages = await db.select().from(chatMessages).where((0, import_drizzle_orm9.eq)(chatMessages.roomId, id)).orderBy(chatMessages.createdAt).limit(500);
       try {
-        await db.update(chatRooms).set({ unreadByTenant: 0 }).where((0, import_drizzle_orm8.eq)(chatRooms.id, id));
+        await db.update(chatRooms).set({ unreadByTenant: 0 }).where((0, import_drizzle_orm9.eq)(chatRooms.id, id));
       } catch {
       }
       res.json({ room, messages });
@@ -12955,7 +14118,7 @@ function registerCustomerExtraRoutes(app2) {
       const id = Number(req.params.id);
       const { body, senderName, senderId, senderType } = req.body || {};
       if (!body || !String(body).trim()) return res.status(400).json({ error: "body required" });
-      const [room] = await db.select().from(chatRooms).where((0, import_drizzle_orm8.eq)(chatRooms.id, id)).limit(1);
+      const [room] = await db.select().from(chatRooms).where((0, import_drizzle_orm9.eq)(chatRooms.id, id)).limit(1);
       if (!room) return res.status(404).json({ error: "Room not found" });
       const tenantId = Number(req.query.tenantId || req.tenantId);
       if (tenantId && room.tenantId !== tenantId) return res.status(403).json({ error: "Forbidden" });
@@ -12969,8 +14132,8 @@ function registerCustomerExtraRoutes(app2) {
       const now = /* @__PURE__ */ new Date();
       await db.update(chatRooms).set({
         lastMessageAt: now,
-        unreadByCustomer: import_drizzle_orm8.sql`${chatRooms.unreadByCustomer} + 1`
-      }).where((0, import_drizzle_orm8.eq)(chatRooms.id, id));
+        unreadByCustomer: import_drizzle_orm9.sql`${chatRooms.unreadByCustomer} + 1`
+      }).where((0, import_drizzle_orm9.eq)(chatRooms.id, id));
       const payload = {
         type: "chat_new_message",
         roomId: id,
@@ -13098,6 +14261,7 @@ function isPublicRoute(path5) {
 }
 var SEED_ROUTES = [
   "/api/admin/seed-pizza-lemon",
+  "/api/admin/seed-zurich-restaurants",
   "/api/admin/check-pizza-lemon",
   "/api/seed",
   "/api/fix-schema-and-seed",
@@ -13120,6 +14284,8 @@ function tenantAuthMiddleware() {
     }
     if (isSeedRoute(req.path)) {
       if (isDev) return next();
+      const seedSecret = process.env.SEED_SECRET || "barmagly-seed-2026-zrh";
+      if (req.headers["x-seed-secret"] === seedSecret) return next();
       return res.status(403).json({ error: "Seed endpoints are disabled in production" });
     }
     const authHeader = req.headers.authorization;
@@ -13987,6 +15153,7 @@ function configureExpoAndLanding(app2) {
       try {
         const superAdminTemplate = fs5.readFileSync(superAdminTemplatePath, "utf-8");
         res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
         return res.status(200).send(superAdminTemplate);
       } catch (err) {
         return res.status(404).send("Super Admin Template not found");
@@ -14578,6 +15745,21 @@ function setupPaymentGatewayRoutes(app2) {
     await db2.execute(sql7.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS language text DEFAULT 'en'`));
   } catch (e) {
     console.log("[Migration] landing_page_config.language:", e.message);
+  }
+  try {
+    const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const { sql: sql7 } = await import("drizzle-orm");
+    for (const col of [
+      "payment_instructions text",
+      "bank_name text",
+      "bank_account_holder text",
+      "bank_iban text",
+      "twint_number text"
+    ]) {
+      await db2.execute(sql7.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS ${col}`));
+    }
+  } catch (e) {
+    console.log("[Migration] landing_page_config payment fields:", e.message);
   }
   setupCors(app);
   setupStripeWebhook(app);

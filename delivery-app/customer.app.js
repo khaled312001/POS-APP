@@ -169,7 +169,7 @@
       return new Promise(function (resolve) {
         current = { kind: opts.kind, fields: opts.fields, required: opts.required, resolve: resolve };
         iconEl.className = "modal__icon" + (opts.iconKind ? " " + opts.iconKind : "");
-        iconEl.textContent = opts.icon || "✨";
+        iconEl.innerHTML = opts.icon || '<i class="fa-solid fa-wand-magic-sparkles"></i>';
         titleEl.textContent = opts.title || "";
         msgEl.textContent = opts.msg || "";
         msgEl.style.display = opts.msg ? "" : "none";
@@ -221,10 +221,10 @@
     }
 
     return {
-      alert:   function (title, msg, opts) { return open(Object.assign({ kind: "alert", icon: "ℹ️", title: title, msg: msg }, opts || {})); },
-      confirm: function (title, msg, opts) { return open(Object.assign({ kind: "confirm", icon: "❓", title: title, msg: msg }, opts || {})); },
-      prompt:  function (title, opts) { return open(Object.assign({ kind: "prompt", icon: "✏️", title: title }, opts || {})); },
-      form:    function (title, fields, opts) { return open(Object.assign({ kind: "form", icon: "📝", title: title, fields: fields }, opts || {})); },
+      alert:   function (title, msg, opts) { return open(Object.assign({ kind: "alert", icon: '<i class="fa-solid fa-circle-info"></i>', title: title, msg: msg }, opts || {})); },
+      confirm: function (title, msg, opts) { return open(Object.assign({ kind: "confirm", icon: '<i class="fa-solid fa-circle-question"></i>', title: title, msg: msg }, opts || {})); },
+      prompt:  function (title, opts) { return open(Object.assign({ kind: "prompt", icon: '<i class="fa-solid fa-pen"></i>', title: title }, opts || {})); },
+      form:    function (title, fields, opts) { return open(Object.assign({ kind: "form", icon: '<i class="fa-solid fa-note-sticky"></i>', title: title, fields: fields }, opts || {})); },
     };
   })();
 
@@ -356,7 +356,7 @@
     dialog.prompt("Welcome!", {
       msg: "What's your name? We'll greet you with it.",
       placeholder: "Your name",
-      icon: "👋",
+      icon: '<i class="fa-solid fa-hand"></i>',
       okLabel: "Continue",
       required: true,
     }).then(function (name) {
@@ -373,7 +373,7 @@
 
   function logout() {
     dialog.confirm("Log out?", "You'll need to sign in again to see your orders.", {
-      icon: "👋", iconKind: "warn", okLabel: "Log out", cancelLabel: "Stay",
+      icon: '<i class="fa-solid fa-hand"></i>', iconKind: "warn", okLabel: "Log out", cancelLabel: "Stay",
     }).then(function (ok) {
       if (!ok) return;
       api("POST", "/api/delivery/auth/logout", {}).catch(function () {});
@@ -568,7 +568,7 @@
           return hay.indexOf(q.toLowerCase()) > -1;
         }) : state.restaurants;
         if (filtered.length === 0) {
-          listEl.innerHTML = '<div class="empty"><div class="empty__icon">🔍</div><div class="empty__title">No results</div></div>';
+          listEl.innerHTML = '<div class="empty"><div class="empty__icon"><i class="fa-solid fa-magnifying-glass"></i></div><div class="empty__title">No results</div></div>';
           return;
         }
         listEl.innerHTML = filtered.map(function (r) {
@@ -603,7 +603,22 @@
       api("GET", "/api/delivery/store/" + encodeURIComponent(slug)),
       api("GET", "/api/delivery/store/" + encodeURIComponent(slug) + "/menu"),
     ]).then(function (out) {
-      var store = out[0], menu = out[1];
+      var store = out[0];
+      var menuResp = out[1];
+      // The /menu endpoint returns { categories:[{...,items}], allProducts:[...] }.
+      // Normalise to a flat products array and attach each product's category
+      // NAME (the render/filter code below keys off p.category, not categoryId).
+      var catNameById = {};
+      if (menuResp && Array.isArray(menuResp.categories)) {
+        menuResp.categories.forEach(function (c) { catNameById[c.id] = c.name; });
+      }
+      var menu = Array.isArray(menuResp) ? menuResp
+               : (menuResp && Array.isArray(menuResp.allProducts)) ? menuResp.allProducts
+               : (menuResp && Array.isArray(menuResp.products)) ? menuResp.products
+               : [];
+      menu = menu.map(function (p) {
+        return p.category ? p : Object.assign({}, p, { category: catNameById[p.categoryId] || "" });
+      });
       state.tenantMenu = { slug: slug, store: store, menu: menu };
       $("menu-title").textContent = store.storeName || store.name || "Menu";
       $("menu-sub").textContent = (store.cuisine || "") + " · " + (menu.length || 0) + " items";
@@ -619,7 +634,7 @@
           return true;
         });
         if (filtered.length === 0) {
-          $("menu-products").innerHTML = '<div class="empty"><div class="empty__icon">🍽️</div><div class="empty__title">No items</div></div>';
+          $("menu-products").innerHTML = '<div class="empty"><div class="empty__icon"><i class="fa-solid fa-utensils"></i></div><div class="empty__title">No items</div></div>';
           return;
         }
         $("menu-products").innerHTML = filtered.map(function (p) {
@@ -636,7 +651,7 @@
       $("menu-search").oninput = renderProducts;
       renderProducts();
     }).catch(function (err) {
-      $("menu-products").innerHTML = '<div class="empty"><div class="empty__icon">⚠️</div><div class="empty__title">' + escHtml(err.message) + '</div></div>';
+      $("menu-products").innerHTML = '<div class="empty"><div class="empty__icon"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="empty__title">' + escHtml(err.message) + '</div></div>';
     });
   }
 
@@ -688,7 +703,7 @@
     var newMode = state.currentRoute === "broadcast" ? "broadcast" : ("tenant:" + item.tenantId);
     if (state.cart.length > 0 && existingMode !== newMode && existingMode !== "broadcast") {
       dialog.confirm("Replace cart?", "Your cart has items from another restaurant. Adding this dish will clear them.", {
-        icon: "🛒", iconKind: "warn", okLabel: "Replace", cancelLabel: "Keep cart",
+        icon: '<i class="fa-solid fa-cart-shopping"></i>', iconKind: "warn", okLabel: "Replace", cancelLabel: "Keep cart",
       }).then(function (ok) {
         if (!ok) return;
         state.cart = [];
@@ -738,13 +753,13 @@
     // Drawer body
     var body = $("cart-body");
     if (state.cart.length === 0) {
-      body.innerHTML = '<div class="empty"><div class="empty__icon">🛍️</div><div class="empty__title">Cart is empty</div></div>';
+      body.innerHTML = '<div class="empty"><div class="empty__icon"><i class="fa-solid fa-bag-shopping"></i></div><div class="empty__title">Cart is empty</div></div>';
     } else {
       body.innerHTML = state.cart.map(function (it) {
         return '<div class="list-item">'
              + '  <div class="list-item__body">'
              + '    <div class="list-item__title">' + escHtml(it.name) + '</div>'
-             + '    <div class="list-item__sub">🏪 ' + escHtml(it.tenantName || "") + ' · CHF ' + Number(it.estimatedPrice).toFixed(2) + '</div>'
+             + '    <div class="list-item__sub"><i class="fa-solid fa-store"></i> ' + escHtml(it.tenantName || "") + ' · CHF ' + Number(it.estimatedPrice).toFixed(2) + '</div>'
              + '  </div>'
              + '  <div style="display:flex;flex-direction:column;align-items:end;gap:4px;">'
              + '    <span class="list-item__price">CHF ' + (it.quantity * Number(it.estimatedPrice)).toFixed(2) + '</span>'
@@ -787,7 +802,7 @@
         renderBroadcastChips();
         renderBroadcastProducts();
       }).catch(function (err) {
-        $("bc-products").innerHTML = '<div class="empty"><div class="empty__icon">⚠️</div><div class="empty__title">Menu unavailable</div><div class="empty__sub">' + escHtml(err.message || "") + '</div></div>';
+        $("bc-products").innerHTML = '<div class="empty"><div class="empty__icon"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="empty__title">Menu unavailable</div><div class="empty__sub">' + escHtml(err.message || "") + '</div></div>';
       });
     } else {
       renderBroadcastStats();
@@ -903,7 +918,7 @@
     $("bc-section-count").textContent = filtered.length + (filtered.length === 1 ? " item" : " items");
 
     if (filtered.length === 0) {
-      $("bc-products").innerHTML = '<div class="empty" style="grid-column:1 / -1;"><div class="empty__icon">🔍</div><div class="empty__title">No dishes match</div><div class="empty__sub">Try a different search</div></div>';
+      $("bc-products").innerHTML = '<div class="empty" style="grid-column:1 / -1;"><div class="empty__icon"><i class="fa-solid fa-magnifying-glass"></i></div><div class="empty__title">No dishes match</div><div class="empty__sub">Try a different search</div></div>';
       return;
     }
     $("bc-products").innerHTML = filtered.slice(0, 120).map(function (p) {
@@ -920,10 +935,7 @@
     var img = p.imageUrl ? '<img src="' + escHtml(p.imageUrl) + '" alt="' + escHtml(p.name) + '" onerror="this.style.display=\'none\'" />' : "";
     return '<div class="card" data-pid="' + p.id + '">'
          + '  <div class="card__cover">' + img
-         + '    <div class="card__badges">'
-         +        (p.tenantName ? '<span class="badge--tenant">' + icon("store") + ' ' + escHtml(p.tenantName) + '</span>' : '<span></span>')
-         +        (p.category ? '<span class="badge--cat">' + escHtml(p.category) + '</span>' : '<span></span>')
-         + '    </div>'
+         + (p.tenantName ? '    <div class="card__badges"><span class="badge--tenant">' + icon("store") + ' ' + escHtml(p.tenantName) + '</span></div>' : '')
          +      (hasOptions ? '<div class="card__customize-hint">' + icon("tune") + ' Customize</div>' : '')
          + '  </div>'
          + '  <div class="card__body">'
@@ -1287,7 +1299,7 @@
     refreshOrders();
     var el = $("orders-list");
     if (state.orders.length === 0) {
-      el.innerHTML = '<div class="empty"><div class="empty__icon">🛍️</div><div class="empty__title">No orders yet</div></div>';
+      el.innerHTML = '<div class="empty"><div class="empty__icon"><i class="fa-solid fa-bag-shopping"></i></div><div class="empty__title">No orders yet</div></div>';
       return;
     }
     el.innerHTML = state.orders.map(orderListItem).join("");
@@ -1317,7 +1329,7 @@
           L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OSM" }).addTo(map);
           if (hasC) L.marker([Number(order.customerLat), Number(order.customerLng)]).addTo(map).bindPopup("You");
           if (hasD) L.marker([Number(order.driverLat), Number(order.driverLng)], {
-            icon: L.divIcon({ html: '<div style="background:#FF5722;border:3px solid #fff;color:#fff;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;box-shadow:0 4px 14px rgba(255,87,34,.5)">🛵</div>', className: "", iconSize: [32, 32], iconAnchor: [16, 16] }),
+            icon: L.divIcon({ html: '<div style="background:#FF5722;border:3px solid #fff;color:#fff;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;box-shadow:0 4px 14px rgba(255,87,34,.5)"><i class="fa-solid fa-motorcycle"></i></div>', className: "", iconSize: [32, 32], iconAnchor: [16, 16] }),
           }).addTo(map);
         } catch (e) {}
       } else if (order.customerAddress) {
@@ -1335,7 +1347,7 @@
           }).catch(function () {});
       }
     }).catch(function (err) {
-      $("track-content").innerHTML = '<div class="empty"><div class="empty__icon">⚠️</div><div class="empty__title">' + escHtml(err.message) + '</div></div>';
+      $("track-content").innerHTML = '<div class="empty"><div class="empty__icon"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="empty__title">' + escHtml(err.message) + '</div></div>';
     });
   }
 
@@ -1383,13 +1395,13 @@
       $("chat-sub").textContent = msgs.length + " messages";
       $("chat-box").innerHTML = '<div class="chat-msgs" id="chat-msgs">' + (
         msgs.length === 0
-          ? '<div class="empty"><div class="empty__icon">💬</div><div class="empty__title">No messages yet</div><div class="empty__sub">Start a conversation</div></div>'
+          ? '<div class="empty"><div class="empty__icon"><i class="fa-solid fa-comment"></i></div><div class="empty__title">No messages yet</div><div class="empty__sub">Start a conversation</div></div>'
           : msgs.map(chatMsgHtml).join("")
       ) + '</div>';
       var box = document.querySelector("#chat-box");
       if (box) box.scrollTop = box.scrollHeight;
     }).catch(function (err) {
-      $("chat-box").innerHTML = '<div class="empty"><div class="empty__icon">⚠️</div><div class="empty__title">' + escHtml(err.message) + '</div></div>';
+      $("chat-box").innerHTML = '<div class="empty"><div class="empty__icon"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="empty__title">' + escHtml(err.message) + '</div></div>';
     });
     // Back button: go to track instead of last hash
     $("btn-chat-back").onclick = function () {
@@ -1445,12 +1457,12 @@
     fields.push({ key: "address", label: "Delivery address", placeholder: "Street, number, city", required: true, value: c.address || "" });
     fields.push({ key: "notes", label: "Order notes", type: "textarea", placeholder: "e.g. apartment number, gate code, leave at door" });
     fields.push({ key: "payment", label: "Payment method", type: "select", options: [
-      { value: "cash", label: "💵 Cash on delivery" },
-      { value: "card", label: "💳 Card on delivery" },
+      { value: "cash", label: "<i class='fa-solid fa-money-bill-wave'></i> Cash on delivery" },
+      { value: "card", label: "<i class='fa-solid fa-credit-card'></i> Card on delivery" },
     ], value: "cash" });
 
     dialog.form("Checkout", fields, {
-      icon: "📦", iconKind: "", okLabel: "Place order →", cancelLabel: "Cancel",
+      icon: '<i class="fa-solid fa-box"></i>', iconKind: "", okLabel: "Place order →", cancelLabel: "Cancel",
       msg: state.cartMode === "broadcast"
            ? "We'll broadcast your order — the first restaurant to accept prepares it."
            : "Enter your delivery details to complete the order.",

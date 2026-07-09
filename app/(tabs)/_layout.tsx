@@ -13,8 +13,10 @@ import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter } from "expo-router";
 import { getQueryFn, getApiUrl } from "@/lib/query-client";
 import { getChromeMetrics, WEB_TOOLBAR_DESKTOP_H, WEB_TOOLBAR_MOBILE_H } from "@/lib/responsive";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
   const { isLoggedIn, isCashier } = useAuth();
   const { t, isRTL } = useLanguage();
   const { subscription, tenant } = useLicense();
@@ -151,8 +153,9 @@ export default function TabLayout() {
             backgroundColor: Platform.OS === "ios" ? "transparent" : Colors.tabBar,
             borderTopWidth: 0,
             elevation: 0,
-            height: Platform.OS === "web" ? (isMobileWeb ? 0 : 84) : 60,
-            paddingBottom: Platform.OS === "web" ? (isMobileWeb ? 0 : 34) : 6,
+            // Native: lift the bar above the Android gesture/nav bar (insets.bottom).
+            height: Platform.OS === "web" ? (isMobileWeb ? 0 : 84) : 60 + insets.bottom,
+            paddingBottom: Platform.OS === "web" ? (isMobileWeb ? 0 : 34) : 6 + insets.bottom,
             paddingTop: 6,
             position: "absolute" as const,
             direction: isRTL ? "rtl" : "ltr",

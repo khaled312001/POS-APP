@@ -28,7 +28,7 @@ export default function CustomerWebView() {
   }, [canGoBack]);
 
   return (
-    <SafeAreaView style={styles.root} edges={["top", "left", "right"]}>
+    <SafeAreaView style={styles.root} edges={["top", "bottom", "left", "right"]}>
       <WebView
         ref={webRef}
         source={{ uri: CUSTOMER_URL }}

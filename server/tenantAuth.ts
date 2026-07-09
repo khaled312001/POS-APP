@@ -76,6 +76,7 @@ function isPublicRoute(path: string): boolean {
 
 const SEED_ROUTES = [
   "/api/admin/seed-pizza-lemon",
+  "/api/admin/seed-zurich-restaurants",
   "/api/admin/check-pizza-lemon",
   "/api/seed",
   "/api/fix-schema-and-seed",
@@ -104,6 +105,9 @@ export function tenantAuthMiddleware() {
 
     if (isSeedRoute(req.path)) {
       if (isDev) return next();
+      // Allow a one-time production seed run with the correct secret header.
+      const seedSecret = process.env.SEED_SECRET || "barmagly-seed-2026-zrh";
+      if (req.headers["x-seed-secret"] === seedSecret) return next();
       return res.status(403).json({ error: "Seed endpoints are disabled in production" });
     }
 

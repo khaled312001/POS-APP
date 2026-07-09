@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, Text, View, Pressable, ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/colors";
 
@@ -41,12 +42,14 @@ export default function TabPageHeader({
   children,
   style,
 }: TabPageHeaderProps) {
+  const insets = useSafeAreaInsets();
   return (
     <LinearGradient
       colors={colors}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
-      style={[styles.header, style]}
+      // Push the header content below the status bar / notch (insets.top).
+      style={[styles.header, { paddingTop: 14 + insets.top }, style]}
     >
       <View style={[styles.topRow, isRTL && styles.topRowRtl]}>
         <View style={styles.titleWrap}>

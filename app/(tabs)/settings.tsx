@@ -20,38 +20,8 @@ import { playClickSound } from "@/lib/sound";
 import { getChromeMetrics } from "@/lib/responsive";
 import TabPageHeader from "@/components/tab-page-header";
 import { FlagIcon } from "@/components/FlagIcon";
-
-function printHtmlViaIframe(html: string, onDone?: () => void) {
-  if (typeof document === "undefined") return;
-  const frameId = `_rp_${Date.now()}`;
-  const iframe = document.createElement("iframe");
-  iframe.id = frameId;
-  Object.assign(iframe.style, { position: "fixed", right: "0", bottom: "0", width: "1px", height: "1px", border: "none", opacity: "0", pointerEvents: "none", zIndex: "-1" });
-  document.body.appendChild(iframe);
-  const cleanup = (url: string) => { URL.revokeObjectURL(url); setTimeout(() => iframe?.remove(), 1000); };
-  try {
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    iframe.src = url;
-    iframe.onload = () => {
-      setTimeout(() => {
-        try {
-          const win = iframe.contentWindow;
-          if (!win) return;
-          win.focus();
-          if (onDone) {
-            win.addEventListener("afterprint", () => { cleanup(url); onDone(); }, { once: true });
-            setTimeout(() => { try { onDone(); } catch (_) {} }, 8000);
-          } else {
-            win.addEventListener("afterprint", () => cleanup(url), { once: true });
-            setTimeout(() => cleanup(url), 8000);
-          }
-          win.print();
-        } catch (_) { onDone?.(); }
-      }, 400);
-    };
-  } catch (_) { iframe.remove(); onDone?.(); }
-}
+// Platform-aware printer: native → expo-print (Save-as-PDF), web → hidden iframe.
+import { printHtmlViaIframe } from "@/utils/printing";
 
 function SettingRow({ icon, label, value, onPress, color, rtl }: { icon: string; label: string; value?: string; onPress?: () => void; color?: string; rtl?: boolean }) {
   return (
@@ -166,6 +136,19 @@ export default function SettingsScreen() {
   const [storeForm, setStoreForm] = useState({ name: "", address: "", phone: "", email: "", storeType: "supermarket", taxRate: "", deliveryFee: "", whatsappAdminPhone: "" });
   const [storeLogo, setStoreLogo] = useState<string | null>(null);
   const [storeLogoUploading, setStoreLogoUploading] = useState(false);
+
+  // Public Storefront editor (edits the public store page shown at /store/<slug>)
+  const [showStorefront, setShowStorefront] = useState(false);
+  const [storefrontForm, setStorefrontForm] = useState({
+    heroTitle: "", heroSubtitle: "", aboutText: "", promoText: "",
+    primaryColor: "#2FD3C6", accentColor: "#6366F1",
+    enableDelivery: true, enablePickup: true, enableOnlineOrdering: true,
+    acceptCard: true, acceptCash: true, acceptMobile: true,
+    minOrderAmount: "", estimatedDeliveryTime: "", deliveryRadius: "", openingHours: "",
+    phone: "", email: "", address: "", footerText: "",
+    socialWhatsapp: "", socialInstagram: "", socialFacebook: "",
+    paymentInstructions: "", bankName: "", bankAccountHolder: "", bankIban: "", twintNumber: "",
+  });
 
   const [showShiftMonitor, setShowShiftMonitor] = useState(false);
   const [shiftMonitorTab, setShiftMonitorTab] = useState<"active" | "history" | "settings">("active");
@@ -327,6 +310,52 @@ export default function SettingsScreen() {
   const deleteExpenseMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/expenses/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/expenses?tenantId=${tenant.id}` : "/api/expenses"] }); },
+    onError: (e: any) => Alert.alert(t("error"), e.message),
+  });
+
+  // Populate the Public Storefront editor whenever the landing config loads.
+  useEffect(() => {
+    const c: any = landingConfigData;
+    if (!c) return;
+    setStorefrontForm({
+      heroTitle: c.heroTitle || "",
+      heroSubtitle: c.heroSubtitle || "",
+      aboutText: c.aboutText || "",
+      promoText: c.promoText || "",
+      primaryColor: c.primaryColor || "#2FD3C6",
+      accentColor: c.accentColor || "#6366F1",
+      enableDelivery: c.enableDelivery !== false,
+      enablePickup: c.enablePickup !== false,
+      enableOnlineOrdering: c.enableOnlineOrdering !== false,
+      acceptCard: c.acceptCard !== false,
+      acceptCash: c.acceptCash !== false,
+      acceptMobile: c.acceptMobile !== false,
+      minOrderAmount: c.minOrderAmount != null ? String(c.minOrderAmount) : "",
+      estimatedDeliveryTime: c.estimatedDeliveryTime != null ? String(c.estimatedDeliveryTime) : "",
+      deliveryRadius: c.deliveryRadius || "",
+      openingHours: c.openingHours || "",
+      phone: c.phone || "",
+      email: c.email || "",
+      address: c.address || "",
+      footerText: c.footerText || "",
+      socialWhatsapp: c.socialWhatsapp || "",
+      socialInstagram: c.socialInstagram || "",
+      socialFacebook: c.socialFacebook || "",
+      paymentInstructions: c.paymentInstructions || "",
+      bankName: c.bankName || "",
+      bankAccountHolder: c.bankAccountHolder || "",
+      bankIban: c.bankIban || "",
+      twintNumber: c.twintNumber || "",
+    });
+  }, [landingConfigData]);
+
+  const saveStorefrontMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("PUT", "/api/tenant/landing-config", data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/landing-page-config", tenantId ? `?tenantId=${tenantId}` : ""] });
+      setShowStorefront(false);
+      Alert.alert(t("saved") || "Saved", t("storefrontUpdated") || "Storefront updated");
+    },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
@@ -775,6 +804,9 @@ export default function SettingsScreen() {
         <SettingRow icon="bicycle" label={t("deliveryZones")} value={t("addDeliveryZone")} onPress={() => router.push("/delivery-zones")} color={Colors.deliveryPrimary} rtl={isRTL} />
         <SettingRow icon="pricetag" label={t("promoCodes")} value={t("addPromoCode")} onPress={() => router.push("/promo-codes")} color="#8B5CF6" rtl={isRTL} />
         <SettingRow icon="car" label={t("driverManagement")} value={t("activeDrivers")} onPress={() => router.push("/driver-management")} color={Colors.driverOnline} rtl={isRTL} />
+        {isAdmin && (
+          <SettingRow icon="globe-outline" label={t("editStorefront") || "Edit Storefront"} value={t("storefrontDesc") || "Name, offers, delivery, payments"} onPress={() => setShowStorefront(true)} color={Colors.accent} rtl={isRTL} />
+        )}
         <SettingRow icon="storefront" label={t("storefrontPreview")} value={slug || "—"} onPress={() => { if (slug) require("react-native").Linking.openURL(getApiUrl() + `/order/${slug}`); }} color={Colors.accent} rtl={isRTL} />
         <SettingRow icon="star" label={t("loyaltyConfiguration")} value={t("loyaltyPoints")} onPress={() => setShowLoyaltyConfig(true)} color={Colors.loyaltyGold} rtl={isRTL} />
 
@@ -1781,16 +1813,9 @@ export default function SettingsScreen() {
 
               <Pressable style={styles.saveBtn} onPress={() => {
                 const sampleReceipt = `================================\n        SAMPLE RECEIPT\n================================\nDate: ${new Date().toLocaleString()}\nReceipt #: TEST-001\n--------------------------------\nItem 1        x2  CHF 10.00\nItem 2        x1   CHF 5.50\n--------------------------------\nSubtotal:          CHF 15.50\nTax (10%):          CHF 1.55\n--------------------------------\nTOTAL:             CHF 17.05\n================================\n      Thank you!\n================================`;
-                if (Platform.OS === "web") {
-                  const printWindow = window.open("", "_blank", "width=300,height=600");
-                  if (printWindow) {
-                    printWindow.document.write(`<pre style="font-family:monospace;font-size:12px;">${sampleReceipt}</pre>`);
-                    printWindow.document.close();
-                    printWindow.print();
-                  }
-                } else {
-                  Alert.alert(t("testPrint"), sampleReceipt);
-                }
+                // Both web and native go through the shared printer so the
+                // test print produces a real print / Save-as-PDF sheet in the app.
+                printHtmlViaIframe(`<pre style="font-family:monospace;font-size:12px;">${sampleReceipt}</pre>`);
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
                   <Text style={styles.saveBtnText}>{t("testPrint")}</Text>
@@ -2174,6 +2199,139 @@ export default function SettingsScreen() {
               <Pressable style={{ marginTop: 16 }} onPress={handleSaveStoreSettings}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ paddingVertical: 14, borderRadius: 12, alignItems: "center" }}>
                   <Text style={{ color: Colors.white, fontSize: 16, fontWeight: "700" }}>{storeLogoUploading ? t("imageUploading") : t("save")}</Text>
+                </LinearGradient>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Public Storefront editor ─────────────────────────────────────────── */}
+      <Modal visible={showStorefront} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={[styles.modalTitle, rtlTextAlign]}>{t("editStorefront") || "Edit Storefront"}</Text>
+              <Pressable onPress={() => setShowStorefront(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+
+              {/* Store Identity */}
+              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("storeIdentity") || "Store Identity"}</Text>
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("storeName") || "Store Name"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.heroTitle} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, heroTitle: v })} placeholderTextColor={Colors.textMuted} placeholder="Pizza Lemon" />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("tagline") || "Tagline"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.heroSubtitle} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, heroSubtitle: v })} placeholderTextColor={Colors.textMuted} placeholder={t("tagline") || "Short catchy line"} />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("aboutText") || "About"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign, { height: 100, textAlignVertical: "top" }]} value={storefrontForm.aboutText} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, aboutText: v })} placeholderTextColor={Colors.textMuted} placeholder={t("aboutText") || "Tell customers about your store"} multiline numberOfLines={4} />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("primaryColor") || "Primary Color"}</Text>
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+                <TextInput style={[styles.input, rtlTextAlign, { flex: 1 }]} value={storefrontForm.primaryColor} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, primaryColor: v })} placeholderTextColor={Colors.textMuted} placeholder="#2FD3C6" autoCapitalize="none" />
+                <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: storefrontForm.primaryColor || "#2FD3C6" }} />
+              </View>
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("accentColor") || "Accent Color"}</Text>
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+                <TextInput style={[styles.input, rtlTextAlign, { flex: 1 }]} value={storefrontForm.accentColor} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, accentColor: v })} placeholderTextColor={Colors.textMuted} placeholder="#6366F1" autoCapitalize="none" />
+                <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: storefrontForm.accentColor || "#6366F1" }} />
+              </View>
+
+              {/* Offers */}
+              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("offers") || "Offers"}</Text>
+              <Text style={[styles.label, rtlTextAlign]}>{t("promoText") || "Promotion Text"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign, { height: 80, textAlignVertical: "top" }]} value={storefrontForm.promoText} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, promoText: v })} placeholderTextColor={Colors.textMuted} placeholder={t("promoTextHint") || "e.g. 10% off on app orders"} multiline numberOfLines={3} />
+
+              {/* Ordering & Delivery */}
+              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("orderingDelivery") || "Ordering & Delivery"}</Text>
+
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("enableOnlineOrdering") || "Online Ordering"}</Text>
+                <Switch value={storefrontForm.enableOnlineOrdering} onValueChange={(v) => setStorefrontForm({ ...storefrontForm, enableOnlineOrdering: v })} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={storefrontForm.enableOnlineOrdering ? Colors.accent : Colors.textMuted} />
+              </View>
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("enableDelivery") || "Delivery"}</Text>
+                <Switch value={storefrontForm.enableDelivery} onValueChange={(v) => setStorefrontForm({ ...storefrontForm, enableDelivery: v })} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={storefrontForm.enableDelivery ? Colors.accent : Colors.textMuted} />
+              </View>
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("enablePickup") || "Pickup"}</Text>
+                <Switch value={storefrontForm.enablePickup} onValueChange={(v) => setStorefrontForm({ ...storefrontForm, enablePickup: v })} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={storefrontForm.enablePickup ? Colors.accent : Colors.textMuted} />
+              </View>
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("minOrderAmount") || "Minimum Order Amount"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.minOrderAmount} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, minOrderAmount: v })} placeholderTextColor={Colors.textMuted} placeholder="e.g. 20.00" keyboardType="decimal-pad" />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("estimatedDeliveryTime") || "Estimated Delivery Time (min)"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.estimatedDeliveryTime} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, estimatedDeliveryTime: v })} placeholderTextColor={Colors.textMuted} placeholder="e.g. 30" keyboardType="number-pad" />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("deliveryRadius") || "Delivery Radius"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.deliveryRadius} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, deliveryRadius: v })} placeholderTextColor={Colors.textMuted} placeholder="e.g. within 10km" />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("openingHours") || "Opening Hours"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.openingHours} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, openingHours: v })} placeholderTextColor={Colors.textMuted} placeholder="e.g. Mon-Sun 11:00–22:00" />
+
+              {/* Payment Methods */}
+              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("paymentMethods") || "Payment Methods"}</Text>
+              <Text style={[{ color: Colors.textMuted, fontSize: 12, lineHeight: 18, marginBottom: 8 }, rtlTextAlign]}>{t("paymentMethodsHint") || "These appear on your public store page so customers know how to pay."}</Text>
+
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("acceptCard") || "Card"}</Text>
+                <Switch value={storefrontForm.acceptCard} onValueChange={(v) => setStorefrontForm({ ...storefrontForm, acceptCard: v })} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={storefrontForm.acceptCard ? Colors.accent : Colors.textMuted} />
+              </View>
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("acceptCash") || "Cash"}</Text>
+                <Switch value={storefrontForm.acceptCash} onValueChange={(v) => setStorefrontForm({ ...storefrontForm, acceptCash: v })} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={storefrontForm.acceptCash ? Colors.accent : Colors.textMuted} />
+              </View>
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("acceptMobile") || "Mobile / TWINT"}</Text>
+                <Switch value={storefrontForm.acceptMobile} onValueChange={(v) => setStorefrontForm({ ...storefrontForm, acceptMobile: v })} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={storefrontForm.acceptMobile ? Colors.accent : Colors.textMuted} />
+              </View>
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("paymentInstructions") || "Payment Instructions"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign, { height: 80, textAlignVertical: "top" }]} value={storefrontForm.paymentInstructions} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, paymentInstructions: v })} placeholderTextColor={Colors.textMuted} placeholder={t("paymentInstructionsHint") || "e.g. Pay on delivery or by bank transfer"} multiline numberOfLines={3} />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("bankName") || "Bank Name"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.bankName} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, bankName: v })} placeholderTextColor={Colors.textMuted} placeholder={t("bankName") || "Bank Name"} />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("bankAccountHolder") || "Account Holder"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.bankAccountHolder} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, bankAccountHolder: v })} placeholderTextColor={Colors.textMuted} placeholder={t("bankAccountHolder") || "Account Holder"} />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("bankIban") || "IBAN"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.bankIban} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, bankIban: v })} placeholderTextColor={Colors.textMuted} placeholder="CH00 0000 0000 0000 0000 0" autoCapitalize="characters" />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("twintNumber") || "TWINT Number"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.twintNumber} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, twintNumber: v })} placeholderTextColor={Colors.textMuted} placeholder="e.g. 079 123 45 67" keyboardType="phone-pad" />
+
+              {/* Contact & Social */}
+              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("contactSocial") || "Contact & Social"}</Text>
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("storePhone") || "Phone"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.phone} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, phone: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storePhone") || "Phone"} keyboardType="phone-pad" />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("storeEmail") || "Email"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.email} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storeEmail") || "Email"} keyboardType="email-address" autoCapitalize="none" />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("storeAddress") || "Address"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.address} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, address: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storeAddress") || "Address"} />
+
+              <Text style={[styles.label, rtlTextAlign]}>WhatsApp</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.socialWhatsapp} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, socialWhatsapp: v })} placeholderTextColor={Colors.textMuted} placeholder="e.g. 41791234567" keyboardType="phone-pad" />
+
+              <Text style={[styles.label, rtlTextAlign]}>Instagram</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.socialInstagram} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, socialInstagram: v })} placeholderTextColor={Colors.textMuted} placeholder="@handle or URL" autoCapitalize="none" />
+
+              <Text style={[styles.label, rtlTextAlign]}>Facebook</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.socialFacebook} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, socialFacebook: v })} placeholderTextColor={Colors.textMuted} placeholder="Page name or URL" autoCapitalize="none" />
+
+              <Text style={[styles.label, rtlTextAlign]}>{t("footerText") || "Footer Text"}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.footerText} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, footerText: v })} placeholderTextColor={Colors.textMuted} placeholder={t("footerText") || "e.g. © 2026 Pizza Lemon"} />
+
+              <Pressable style={styles.saveBtn} onPress={() => saveStorefrontMutation.mutate(storefrontForm)}>
+                <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
+                  <Text style={styles.saveBtnText}>{t("save") || "Save"}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>

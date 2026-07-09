@@ -1,11 +1,34 @@
 import { Platform } from "react-native";
+import * as Print from "expo-print";
 import { getApiUrl } from "@/lib/query-client";
 import { getDisplayNumber } from "@/lib/api-config";
+
+// ── Native receipt printing via expo-print ──────────────────────────────────
+// On iOS/Android there is no window.print(); the old iframe path silently did
+// nothing in the app. Route native printing through the OS print dialog, which
+// lets the user pick a printer OR "Save as PDF" / "Share".
+async function printHtmlNative(html: string, onDone?: () => void) {
+  try {
+    await Print.printAsync({ html });
+  } catch (e) {
+    // Fallback: generate a PDF file the user can open/share.
+    try {
+      await Print.printToFileAsync({ html });
+    } catch (_) { /* ignore */ }
+  } finally {
+    onDone?.();
+  }
+}
 
 // ── Web receipt printing via hidden iframe (no popup-blocking) ──────────────
 // onDone fires after the print dialog is dismissed (afterprint event).
 // Use it to chain sequential jobs so each job ends with an auto-cut.
 export function printHtmlViaIframe(html: string, onDone?: () => void) {
+  // Native platforms: use expo-print (the OS print / Save-as-PDF sheet).
+  if (Platform.OS !== "web") {
+    void printHtmlNative(html, onDone);
+    return;
+  }
   if (typeof document === "undefined") return;
   const frameId = `_rp_${Date.now()}`;
   const iframe = document.createElement("iframe");
@@ -248,11 +271,27 @@ export function autoPrint3Copies(
       ${devFooter}
     </body></html>`;
 
-    printHtmlViaIframe(job1, () =>
-      printHtmlViaIframe(job2, () =>
-        printHtmlViaIframe(job3)
-      )
-    );
+    if (Platform.OS !== "web") {
+      // Native: combine all three copies into ONE PDF with page breaks so the
+      // user only sees a single print/Save-as-PDF sheet (not three in a row).
+      const innerBody = (h: string) => {
+        const m = h.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+        return m ? m[1] : h;
+      };
+      const combined = job1.replace(
+        /<\/body><\/html>\s*$/i,
+        `<div style="page-break-before:always"></div>${innerBody(job2)}` +
+          `<div style="page-break-before:always"></div>${innerBody(job3)}` +
+          `</body></html>`,
+      );
+      printHtmlViaIframe(combined);
+    } else {
+      printHtmlViaIframe(job1, () =>
+        printHtmlViaIframe(job2, () =>
+          printHtmlViaIframe(job3)
+        )
+      );
+    }
   };
 
   buildAndPrint();

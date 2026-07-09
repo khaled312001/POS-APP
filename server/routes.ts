@@ -101,6 +101,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Seed 10 real Zürich restaurants (idempotent — skips any whose slug exists).
+  app.post("/api/admin/seed-zurich-restaurants", async (_req, res) => {
+    try {
+      const { seedZurichRestaurants } = await import("./seedZurichRestaurants");
+      await seedZurichRestaurants();
+      res.json({ success: true, message: "Zürich restaurants seeded (idempotent)." });
+    } catch (e: any) {
+      console.error("[SEED ZURICH] Error:", e);
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
   // ── DB health check (returns license key status) ──────────────────────────
   app.get("/api/admin/check-pizza-lemon", async (_req, res) => {
     try {
@@ -2951,6 +2963,19 @@ async function test(){
     try {
       const { tenantId, ...data } = req.body;
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
+      const config = await storage.upsertLandingPageConfig(Number(tenantId), data);
+      res.json(config);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Tenant-scoped storefront editor: the POS admin edits ONLY their own store's
+  // public page (name, content, offers, delivery, payment methods, bank).
+  // tenantId is taken from the license-key middleware — client cannot spoof it.
+  app.put("/api/tenant/landing-config", async (req: any, res: any) => {
+    try {
+      const tenantId = req.tenantId;
+      if (!tenantId) return res.status(401).json({ error: "License authentication required" });
+      const { tenantId: _t, id: _i, createdAt: _c, updatedAt: _u, ...data } = req.body;
       const config = await storage.upsertLandingPageConfig(Number(tenantId), data);
       res.json(config);
     } catch (e: any) { res.status(500).json({ error: e.message }); }

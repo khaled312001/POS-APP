@@ -785,6 +785,12 @@ export const landingPageConfig = mysqlTable("landing_page_config", {
   supportPhone: text("support_phone"),
   logomark: text("logomark"),
   headerBgImage: text("header_bg_image"),
+  // ── Payment / bank details shown on the public storefront ──
+  paymentInstructions: text("payment_instructions"), // free text: "Pay on delivery / bank transfer…"
+  bankName: text("bank_name"),
+  bankAccountHolder: text("bank_account_holder"),
+  bankIban: text("bank_iban"),
+  twintNumber: text("twint_number"), // TWINT phone/number for mobile payment
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

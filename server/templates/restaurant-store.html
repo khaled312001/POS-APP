@@ -2921,6 +2921,8 @@
                 <option value="cash" data-i18n-opt="cashOnDelivery">Cash on Delivery</option>
                 <option value="card" data-i18n-opt="cardOpt">Card</option>
               </select>
+              <!-- Bank / TWINT details from the store's storefront settings -->
+              <div id="co-payment-details" style="display:none;margin-top:10px;padding:12px 14px;border-radius:12px;background:rgba(47,211,198,0.08);border:1px solid rgba(47,211,198,0.25);font-size:0.85rem;line-height:1.6"></div>
             </div>
           </div>
           <div class="form-group" id="co-address-group">
@@ -3837,6 +3839,40 @@
         if (c?.acceptCard) feats.push(`<div class="hero-feature"><i class="fa-solid fa-credit-card"></i> ${tr('cardFeat')}</div>`);
         if (c?.estimatedDeliveryTime) feats.push(`<div class="hero-feature"><i class="fa-regular fa-clock"></i> ${c.estimatedDeliveryTime} min</div>`);
         setHtml('hero-features', feats.join(''));
+
+        // ── Payment methods + bank/TWINT details (from storefront settings) ──
+        try {
+          const paySel = document.getElementById('co-payment');
+          const payDet = document.getElementById('co-payment-details');
+          if (paySel) {
+            // Reflect the store's accepted methods in the dropdown
+            const opts = [];
+            if (c?.acceptCash !== false) opts.push('<option value="cash">' + (tr('cashOnDelivery') || 'Cash on Delivery') + '</option>');
+            if (c?.acceptCard) opts.push('<option value="card">' + (tr('cardOpt') || 'Card') + '</option>');
+            if (c?.acceptMobile && c?.twintNumber) opts.push('<option value="twint">TWINT</option>');
+            if (c?.bankIban) opts.push('<option value="bank">' + (tr('bankTransfer') || 'Bank Transfer') + '</option>');
+            if (opts.length) paySel.innerHTML = opts.join('');
+          }
+          const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, m => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[m]));
+          const renderPayDetails = () => {
+            if (!payDet) return;
+            const v = paySel ? paySel.value : '';
+            let html = '';
+            if (v === 'bank' && (c?.bankIban || c?.bankName)) {
+              html = '<strong><i class="fa-solid fa-building-columns"></i> ' + (tr('bankTransfer') || 'Bank Transfer') + '</strong><br>'
+                   + (c.bankAccountHolder ? esc(c.bankAccountHolder) + '<br>' : '')
+                   + (c.bankName ? esc(c.bankName) + '<br>' : '')
+                   + (c.bankIban ? 'IBAN: <b>' + esc(c.bankIban) + '</b>' : '');
+            } else if (v === 'twint' && c?.twintNumber) {
+              html = '<strong><i class="fa-solid fa-mobile-screen"></i> TWINT</strong><br>' + esc(c.twintNumber);
+            }
+            if (!html && c?.paymentInstructions) html = esc(c.paymentInstructions);
+            payDet.innerHTML = html;
+            payDet.style.display = html ? 'block' : 'none';
+          };
+          if (paySel) paySel.addEventListener('change', renderPayDetails);
+          renderPayDetails();
+        } catch (e) { /* non-fatal */ }
 
         // Stats bar
         setTxt('stat-items', allProducts.filter(x => x.isActive).length);

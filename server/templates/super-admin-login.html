@@ -327,10 +327,31 @@
     </div>
 
     <script>
-        // Check if already logged in
-        if (localStorage.getItem('super_admin_token')) {
-            window.location.href = '/super-admin/dashboard';
-        }
+        // Check if already logged in — but VALIDATE the token before redirecting.
+        // A stale token (e.g. after a server JWT-secret rotation) used to cause a
+        // dashboard→login bounce loop: the login page redirected blindly, the
+        // dashboard's first API call 401'd, and it bounced back here. Now we
+        // verify the token and clear it if invalid, showing the login form.
+        (async function () {
+            const token = localStorage.getItem('super_admin_token');
+            if (!token) return;
+            const base = location.pathname.startsWith('/api/') ? '/api' : '';
+            try {
+                const res = await fetch('/api/super-admin/stats', {
+                    headers: { 'Authorization': 'Bearer ' + token },
+                    cache: 'no-store'
+                });
+                if (res.ok) {
+                    window.location.href = base + '/super-admin/dashboard';
+                } else {
+                    localStorage.removeItem('super_admin_token');
+                    localStorage.removeItem('super_admin_user');
+                }
+            } catch (e) {
+                localStorage.removeItem('super_admin_token');
+                localStorage.removeItem('super_admin_user');
+            }
+        })();
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
