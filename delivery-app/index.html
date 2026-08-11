@@ -10,7 +10,7 @@
   <meta name="description" content="Order food online — fast delivery to your door" />
   <link rel="manifest" href="/api/delivery-app/manifest.json" />
 
-  <title>Barmagly Delivery</title>
+  <title>Kassenta Delivery</title>
 
   <!-- CSS -->
   <link rel="stylesheet" href="/api/delivery-app/css/base.css?v=20260412h" />
@@ -318,7 +318,7 @@
   <!-- ── Splash screen ─────────────────────────────────────────────────── -->
   <div id="splash" role="status" aria-label="Loading">
     <div id="splash-logo"><i data-lucide="utensils" class="icon-2xl" style="color:#fff"></i></div>
-    <div id="splash-name">Barmagly</div>
+    <div id="splash-name">Kassenta</div>
     <div id="splash-loading"></div>
   </div>
 
@@ -330,7 +330,7 @@
         <div class="onboarding-slide__illustration slide-bg-1">
           <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h18v20H3z"/><path d="M9 22V12h6v10"/><path d="M3 12l9-7 9 7"/></svg>
         </div>
-        <div class="onboarding-slide__title" data-i18n-key="onb_title_1">Welcome to Barmagly</div>
+        <div class="onboarding-slide__title" data-i18n-key="onb_title_1">Welcome to Kassenta</div>
         <div class="onboarding-slide__desc" data-i18n-key="onb_desc_1">Your favorite restaurants, delivered fast to your door. Browse menus, customize orders, and enjoy!</div>
       </div>
       <!-- Slide 2: Browse & Order -->
@@ -382,10 +382,10 @@
     </div>
     <div class="terms-body" id="terms-body">
       <h3>1. Acceptance of Terms</h3>
-      <p>By accessing or using the Barmagly Delivery service, you agree to be bound by these Terms and Conditions. If you do not agree, please do not use the service.</p>
+      <p>By accessing or using the Kassenta Delivery service, you agree to be bound by these Terms and Conditions. If you do not agree, please do not use the service.</p>
 
       <h3>2. Service Description</h3>
-      <p>Barmagly Delivery provides an online food ordering and delivery platform connecting customers with restaurant partners. We facilitate orders but are not responsible for food preparation.</p>
+      <p>Kassenta Delivery provides an online food ordering and delivery platform connecting customers with restaurant partners. We facilitate orders but are not responsible for food preparation.</p>
 
       <h3>3. Account & Orders</h3>
       <ul>
@@ -412,7 +412,7 @@
       <p>Orders may be cancelled before the restaurant begins preparation. Once preparation starts, cancellation may not be possible. Contact support for assistance.</p>
 
       <h3>8. Liability</h3>
-      <p>Barmagly Delivery acts as an intermediary. We are not liable for food quality, allergens, or hygiene — these are the responsibility of the restaurant partner.</p>
+      <p>Kassenta Delivery acts as an intermediary. We are not liable for food quality, allergens, or hygiene — these are the responsibility of the restaurant partner.</p>
     </div>
     <div class="terms-footer">
       <div class="terms-checkbox-row" onclick="toggleTerms()">
@@ -436,7 +436,7 @@
         <!-- Logo -->
         <a class="site-logo" href="#" onclick="router.navigate('home'); return false;">
           <div class="site-logo__icon" id="header-logo-icon"><i data-lucide="utensils" class="icon-lg"></i></div>
-          <span class="site-logo__text" id="header-store-name">Barmagly</span>
+          <span class="site-logo__text" id="header-store-name">Kassenta</span>
         </a>
 
         <!-- Location -->
@@ -602,7 +602,7 @@
           <i data-lucide="bike" class="icon-md"></i> <span>Become a courier</span>
         </button>
         <button class="side-menu__item" onclick="closeSideMenu();router.navigate('partner')">
-          <i data-lucide="store" class="icon-md"></i> <span>Barmagly for business</span>
+          <i data-lucide="store" class="icon-md"></i> <span>Kassenta for business</span>
         </button>
         <button class="side-menu__item" onclick="closeSideMenu();router.navigate('partner')">
           <i data-lucide="handshake" class="icon-md"></i> <span>Partner with us</span>
@@ -702,7 +702,7 @@
   (async function bootstrap() {
     var cfg = window.DELIVERY_CONFIG || {};
     var slug = cfg.slug || "";
-    var storeName = cfg.storeName || "Barmagly";
+    var storeName = cfg.storeName || "Kassenta";
     var lang = cfg.language || "en";
     var currency = cfg.currency || "CHF";
 

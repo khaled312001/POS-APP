@@ -1,6 +1,8 @@
 import React from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { View, Text, StyleSheet } from "react-native";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 
 interface Props {
   scheduledAt: string | Date;
@@ -19,7 +21,7 @@ export default function ScheduledOrderBadge({ scheduledAt, isRtl = false }: Prop
 
   return (
     <View style={styles.badge}>
-      <Text style={styles.icon}>📅</Text>
+      <Ionicons name="calendar-outline" size={12} color={Colors.warning} />
       <Text style={styles.text}>
         {isRtl ? `مجدول: ${formatted}` : `Scheduled: ${formatted}`}
       </Text>
@@ -27,7 +29,7 @@ export default function ScheduledOrderBadge({ scheduledAt, isRtl = false }: Prop
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   badge: {
     flexDirection: "row",
     alignItems: "center",
@@ -44,4 +46,4 @@ const styles = StyleSheet.create({
     color: Colors.statusPending,
     fontWeight: "600",
   },
-});
+}));

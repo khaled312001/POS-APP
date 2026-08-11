@@ -4,7 +4,7 @@ export const DELETE_ACCOUNT_HTML = String.raw`<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Delete Your Account — Barmagly POS</title>
+<title>Delete Your Account — Kassenta POS</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -86,14 +86,14 @@ export const DELETE_ACCOUNT_HTML = String.raw`<!DOCTYPE html>
 
 <header>
   <h1>Delete Your Account &amp; Data</h1>
-  <p class="subtitle">Barmagly POS — Account &amp; data deletion request</p>
+  <p class="subtitle">Kassenta POS — Account &amp; data deletion request</p>
 </header>
 
-<p>This page explains how to permanently delete your <strong>Barmagly POS</strong> account, all data associated with it, and what is retained for legal and accounting reasons after deletion.</p>
+<p>This page explains how to permanently delete your <strong>Kassenta POS</strong> account, all data associated with it, and what is retained for legal and accounting reasons after deletion.</p>
 
 <div class="card">
-  <strong>Developer name shown on Google Play:</strong> Barmagly<br>
-  <strong>App:</strong> Barmagly POS (<code>com.barmagly.pos</code>)
+  <strong>Developer name shown on Google Play:</strong> Kassenta<br>
+  <strong>App:</strong> Kassenta POS (<code>com.barmagly.pos</code>)
 </div>
 
 <h2>1. How to request deletion</h2>
@@ -102,30 +102,30 @@ export const DELETE_ACCOUNT_HTML = String.raw`<!DOCTYPE html>
 
 <h3>Option A — Email (recommended)</h3>
 <ol>
-  <li>Send an email from your registered admin address to <a href="mailto:privacy@barmagly.tech?subject=Account%20Deletion%20Request">privacy@barmagly.tech</a></li>
+  <li>Send an email from your registered admin address to <a href="mailto:privacy@kassenta.com?subject=Account%20Deletion%20Request">privacy@kassenta.com</a></li>
   <li>Use the subject line: <code>Account Deletion Request</code></li>
   <li>Include in the body:
     <ul>
       <li>Your store name</li>
-      <li>Your license key (<code>BARMAGLY-XXXX-XXXX-XXXX-XXXX</code>)</li>
+      <li>Your license key (<code>KASSENTA-XXXX-XXXX-XXXX-XXXX</code>)</li>
       <li>The admin email registered with the account</li>
     </ul>
   </li>
   <li>You will receive confirmation within <strong>3 business days</strong> and full deletion within <strong>30 days</strong>.</li>
 </ol>
 
-<p><a class="button" href="mailto:privacy@barmagly.tech?subject=Account%20Deletion%20Request">Email a deletion request</a></p>
+<p><a class="button" href="mailto:privacy@kassenta.com?subject=Account%20Deletion%20Request">Email a deletion request</a></p>
 
 <h3>Option B — Web form</h3>
 <ol>
-  <li>Sign in at <a href="https://barmagly.tech/login">barmagly.tech/login</a></li>
+  <li>Sign in at <a href="https://kassenta.com/login">kassenta.com/login</a></li>
   <li>Go to <strong>Settings → Account → Delete account</strong></li>
   <li>Confirm with your password and the one-time code sent to your email</li>
 </ol>
 
 <h3>Option C — Inside the app</h3>
 <ol>
-  <li>Open Barmagly POS on your device</li>
+  <li>Open Kassenta POS on your device</li>
   <li>Tap the <strong>Settings</strong> tab (admin role required)</li>
   <li>Scroll to <strong>Danger zone → Request account deletion</strong></li>
   <li>Follow the on-screen confirmation steps</li>
@@ -168,7 +168,7 @@ export const DELETE_ACCOUNT_HTML = String.raw`<!DOCTYPE html>
   <li>Delete individual customers from <strong>Customers → [tap row] → Delete</strong></li>
   <li>Delete employee accounts from <strong>Settings → Employees → Remove</strong></li>
   <li>Delete products from <strong>Products → [edit] → Delete</strong></li>
-  <li>Request a bulk export and selective deletion by emailing <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a></li>
+  <li>Request a bulk export and selective deletion by emailing <a href="mailto:privacy@kassenta.com">privacy@kassenta.com</a></li>
 </ul>
 
 <h2>5. After deletion — what to expect</h2>
@@ -184,14 +184,14 @@ export const DELETE_ACCOUNT_HTML = String.raw`<!DOCTYPE html>
 
 <p>If you have any questions about the deletion process or what data is retained:</p>
 <ul>
-  <li>Privacy questions: <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a></li>
-  <li>General support: <a href="mailto:support@barmagly.tech">support@barmagly.tech</a></li>
-  <li>Website: <a href="https://barmagly.tech">barmagly.tech</a></li>
+  <li>Privacy questions: <a href="mailto:privacy@kassenta.com">privacy@kassenta.com</a></li>
+  <li>General support: <a href="mailto:support@kassenta.com">support@kassenta.com</a></li>
+  <li>Website: <a href="https://kassenta.com">kassenta.com</a></li>
 </ul>
 
 <footer>
   <p><strong>Last updated:</strong> 29 May 2026<br>
-  <strong>Operated by:</strong> Barmagly · Egypt<br>
+  <strong>Operated by:</strong> Kassenta · Egypt<br>
   See also our <a href="/privacy">Privacy Policy</a>.</p>
 </footer>
 
@@ -204,7 +204,7 @@ export const PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Privacy Policy — Barmagly POS</title>
+<title>Privacy Policy — Kassenta POS</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -316,35 +316,35 @@ export const PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 <div class="container">
 
 <header>
-  <h1>Privacy Policy — Barmagly POS</h1>
+  <h1>Privacy Policy — Kassenta POS</h1>
   <p class="meta"><strong>Effective date:</strong> 29 May 2026</p>
   <p class="meta"><strong>Last updated:</strong> 29 May 2026</p>
 </header>
 
 <h2>1. Introduction</h2>
 <p>
-  This Privacy Policy explains how <strong>Barmagly</strong> ("Barmagly", "we", "us", or "our"), a company based in Egypt operating at
-  <a href="https://www.barmagly.tech">www.barmagly.tech</a>, handles information in connection with the
-  <strong>Barmagly POS</strong> mobile application (package <code>com.barmagly.pos</code>) and its supporting backend services at
-  <code>pos.barmagly.tech</code>.
+  This Privacy Policy explains how <strong>Kassenta</strong> ("Kassenta", "we", "us", or "our"), a company based in Egypt operating at
+  <a href="https://www.kassenta.com">www.kassenta.com</a>, handles information in connection with the
+  <strong>Kassenta POS</strong> mobile application (package <code>com.barmagly.pos</code>) and its supporting backend services at
+  <code>kassenta.com</code>.
 </p>
 <p>
-  Barmagly POS is a tablet-optimized Point of Sale and mini-ERP application for pharmacies, retail stores, cafes,
+  Kassenta POS is a tablet-optimized Point of Sale and mini-ERP application for pharmacies, retail stores, cafes,
   restaurants, and small businesses. It provides cart and checkout, inventory and product management, customer CRM,
   reporting, table and online ordering, delivery management, and multi-currency payments. Each merchant ("Store")
   operates an isolated workspace activated via a license key.
 </p>
 <div class="callout">
-  <strong>Who is the data controller?</strong> When a merchant uses Barmagly POS to run their business, the merchant
-  is the <em>controller</em> of customer and transaction data they enter. Barmagly acts as a <em>processor</em> on
-  the merchant's behalf. For account holders (merchants, owners, managers, cashiers), Barmagly is the controller of
+  <strong>Who is the data controller?</strong> When a merchant uses Kassenta POS to run their business, the merchant
+  is the <em>controller</em> of customer and transaction data they enter. Kassenta acts as a <em>processor</em> on
+  the merchant's behalf. For account holders (merchants, owners, managers, cashiers), Kassenta is the controller of
   the account information needed to provide the service.
 </div>
 
 <h2>2. Data We Collect</h2>
 
 <h3>2.1 Information merchants enter into the app</h3>
-<p>Merchants and their staff voluntarily enter business data into Barmagly POS, which may include:</p>
+<p>Merchants and their staff voluntarily enter business data into Kassenta POS, which may include:</p>
 <ul>
   <li>Account and staff information: employee names, PINs (stored hashed), email addresses for administrators, and roles (Admin/Owner, Manager, Cashier).</li>
   <li>Store information: store name, branches, addresses, tax IDs, logos, operating hours, and currency configuration.</li>
@@ -371,7 +371,7 @@ export const PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 </ul>
 
 <h2>3. Permissions</h2>
-<p>Barmagly POS requests only the permissions required for its features:</p>
+<p>Kassenta POS requests only the permissions required for its features:</p>
 <table>
   <thead>
     <tr><th>Permission</th><th>Why it is used</th><th>Optional?</th></tr>
@@ -379,7 +379,7 @@ export const PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
   <tbody>
     <tr>
       <td><strong>INTERNET</strong> / <strong>ACCESS_NETWORK_STATE</strong></td>
-      <td>To synchronize with the Barmagly backend (pos.barmagly.tech), receive online orders, and process payments.</td>
+      <td>To synchronize with the Kassenta backend (kassenta.com), receive online orders, and process payments.</td>
       <td>Required</td>
     </tr>
     <tr>
@@ -405,7 +405,7 @@ export const PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 <ul>
   <li>Provide the core POS, inventory, CRM, reporting, and delivery features of the app.</li>
   <li>Authenticate users and enforce role-based access (Admin/Owner, Manager, Cashier).</li>
-  <li>Activate and validate license keys (format <code>BARMAGLY-XXXX-XXXX-XXXX-XXXX</code>).</li>
+  <li>Activate and validate license keys (format <code>KASSENTA-XXXX-XXXX-XXXX-XXXX</code>).</li>
   <li>Generate receipts, reports, and merchant communications.</li>
   <li>Process payments through merchant-configured providers (Stripe, TWINT, Card, Cash).</li>
   <li>Send transactional notifications (WhatsApp, email) when the merchant configures them.</li>
@@ -432,21 +432,21 @@ export const PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
       <td>Global</td>
     </tr>
     <tr>
-      <td><strong>Barmagly infrastructure</strong> (pos.barmagly.tech)</td>
-      <td>Hosts the application backend and PostgreSQL database. Operated by Barmagly under HTTPS.</td>
+      <td><strong>Kassenta infrastructure</strong> (kassenta.com)</td>
+      <td>Hosts the application backend and PostgreSQL database. Operated by Kassenta under HTTPS.</td>
       <td>EU</td>
     </tr>
   </tbody>
 </table>
 <p>
   We may also disclose information if required by law, court order, or to protect the rights, safety, or property of
-  Barmagly, our users, or the public. In the event of a corporate transaction (merger, acquisition), data may be
+  Kassenta, our users, or the public. In the event of a corporate transaction (merger, acquisition), data may be
   transferred to the successor entity under equivalent protections.
 </p>
 
 <h2>6. Data Retention</h2>
 <p>
-  We retain merchant and transaction data for as long as the merchant maintains an active Barmagly POS license, so
+  We retain merchant and transaction data for as long as the merchant maintains an active Kassenta POS license, so
   the merchant can access historical reports and comply with accounting and tax laws.
 </p>
 <ul>
@@ -454,11 +454,11 @@ export const PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
   <li>Backups containing deleted data are rotated out within a reasonable additional period and are not restored to live systems.</li>
   <li>Technical logs are typically retained for up to 90 days for security and debugging.</li>
 </ul>
-<p>To request deletion, email <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a>.</p>
+<p>To request deletion, email <a href="mailto:privacy@kassenta.com">privacy@kassenta.com</a>.</p>
 
 <h2>7. Children's Privacy</h2>
 <p>
-  Barmagly POS is a business tool intended for use by adults aged <strong>18 or older</strong>. It is not directed at
+  Kassenta POS is a business tool intended for use by adults aged <strong>18 or older</strong>. It is not directed at
   children, and we do not knowingly collect personal information from anyone under 18. If you believe a child has
   provided personal information through the app, please contact us and we will delete it.
 </p>
@@ -482,23 +482,23 @@ export const PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 <p>
   Because merchants control the data they enter about their own customers, end-customers should first contact the
   merchant. If you cannot reach them or need our help, contact
-  <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a> and we will assist or route the request appropriately.
+  <a href="mailto:privacy@kassenta.com">privacy@kassenta.com</a> and we will assist or route the request appropriately.
 </p>
 
 <h2>9. Cookies</h2>
 <p>
-  The Barmagly POS mobile app does <strong>not</strong> use cookies. It uses secure tokens stored locally on the device
+  The Kassenta POS mobile app does <strong>not</strong> use cookies. It uses secure tokens stored locally on the device
   to keep the merchant signed in.
 </p>
 <p>
-  Our website (<a href="https://www.barmagly.tech">www.barmagly.tech</a>) uses only essential cookies required for the
+  Our website (<a href="https://www.kassenta.com">www.kassenta.com</a>) uses only essential cookies required for the
   site to function and for basic security. We do not use advertising or cross-site tracking cookies. If we ever
   introduce optional analytics cookies, we will request your consent first.
 </p>
 
 <h2>10. International Transfers</h2>
 <p>
-  Barmagly is based in Egypt, our primary infrastructure is hosted in the EU, and our sub-processors (Google Cloud
+  Kassenta is based in Egypt, our primary infrastructure is hosted in the EU, and our sub-processors (Google Cloud
   Storage, Stripe) operate globally. As a result, your information may be transferred to and processed in countries
   outside your own, including Egypt, Switzerland, the European Union, and the United States.
 </p>
@@ -511,7 +511,7 @@ export const PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 <h2>11. Security</h2>
 <p>We apply industry-standard technical and organizational measures to protect your data, including:</p>
 <ul>
-  <li><strong>HTTPS / TLS</strong> encryption for all traffic between the app and pos.barmagly.tech.</li>
+  <li><strong>HTTPS / TLS</strong> encryption for all traffic between the app and kassenta.com.</li>
   <li><strong>bcrypt</strong> hashing for passwords and employee PINs — we never store them in plain text.</li>
   <li><strong>License-key authentication</strong> with per-store isolation and signed session tokens.</li>
   <li>Role-based access control (Admin/Owner, Manager, Cashier) inside each store.</li>
@@ -528,21 +528,21 @@ export const PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
   We may update this Privacy Policy from time to time to reflect changes in the app, our services, or applicable law.
   When we do, we will update the "Effective date" above and, for material changes, we will notify merchants in-app or
   by email before the changes take effect. The current version is always available at
-  <a href="https://barmagly.tech/privacy">https://barmagly.tech/privacy</a>.
+  <a href="https://kassenta.com/privacy">https://kassenta.com/privacy</a>.
 </p>
 
 <h2>13. Contact Us</h2>
 <p>If you have questions, requests, or concerns about this Privacy Policy or your personal data, please contact:</p>
 <div class="contact-box">
-  <strong>Barmagly</strong><br>
+  <strong>Kassenta</strong><br>
   Privacy team<br>
   Egypt<br>
-  Email: <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a><br>
-  Website: <a href="https://www.barmagly.tech">www.barmagly.tech</a>
+  Email: <a href="mailto:privacy@kassenta.com">privacy@kassenta.com</a><br>
+  Website: <a href="https://www.kassenta.com">www.kassenta.com</a>
 </div>
 
 <footer>
-  &copy; 2026 Barmagly. All rights reserved.
+  &copy; 2026 Kassenta. All rights reserved.
 </footer>
 
 </div>

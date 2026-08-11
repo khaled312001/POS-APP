@@ -1053,8 +1053,8 @@ var init_schema = __esm({
       isActive: (0, import_mysql_core.boolean)("is_active").default(true),
       applicableOrderTypes: (0, import_mysql_core.json)("applicable_order_types").$type().default(["delivery", "pickup"]),
       createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
-    }, (t) => ({
-      uniqTenantCode: (0, import_mysql_core.unique)("promo_tenant_code").on(t.tenantId, t.code)
+    }, (t2) => ({
+      uniqTenantCode: (0, import_mysql_core.unique)("promo_tenant_code").on(t2.tenantId, t2.code)
     }));
     promoCodeUsages = (0, import_mysql_core.mysqlTable)("promo_code_usages", {
       id: (0, import_mysql_core.serial)("id").primaryKey(),
@@ -1154,8 +1154,8 @@ var init_schema = __esm({
       customerId: (0, import_mysql_core.int)("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
       productId: (0, import_mysql_core.int)("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
       createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
-    }, (t) => ({
-      uniqFav: (0, import_mysql_core.unique)("fav_tenant_customer_product").on(t.tenantId, t.customerId, t.productId)
+    }, (t2) => ({
+      uniqFav: (0, import_mysql_core.unique)("fav_tenant_customer_product").on(t2.tenantId, t2.customerId, t2.productId)
     }));
     productDietaryTags = (0, import_mysql_core.mysqlTable)("product_dietary_tags", {
       id: (0, import_mysql_core.serial)("id").primaryKey(),
@@ -1666,7 +1666,7 @@ var init_storage = __esm({
       async getLowStockItems(branchId) {
         const { inArray: inArray2, notInArray, lte: ltEq } = await import("drizzle-orm");
         const restaurantTenants = await db.select({ id: tenants.id }).from(tenants).where((0, import_drizzle_orm.eq)(tenants.storeType, "restaurant"));
-        const restaurantTenantIds = restaurantTenants.map((t) => t.id);
+        const restaurantTenantIds = restaurantTenants.map((t2) => t2.id);
         let excludedBranchIds = [];
         if (restaurantTenantIds.length > 0) {
           const restaurantBranches = await db.select({ id: branches.id }).from(branches).where(inArray2(branches.tenantId, restaurantTenantIds));
@@ -2053,8 +2053,8 @@ var init_storage = __esm({
       },
       async createSubscriptionPlan(data) {
         const _ins_plan = await db.insert(subscriptionPlans).values(data).$returningId();
-        const [plan] = await db.select().from(subscriptionPlans).where((0, import_drizzle_orm.eq)(subscriptionPlans.id, _ins_plan[0]?.id ?? 0));
-        return plan;
+        const [plan2] = await db.select().from(subscriptionPlans).where((0, import_drizzle_orm.eq)(subscriptionPlans.id, _ins_plan[0]?.id ?? 0));
+        return plan2;
       },
       async getSubscriptions() {
         return db.select().from(subscriptions).orderBy((0, import_drizzle_orm.desc)(subscriptions.createdAt));
@@ -2349,7 +2349,7 @@ var init_storage = __esm({
         });
         await this.createEmployee({
           name: "Admin",
-          email: "admin@barmagly.com",
+          email: "admin@kassenta.com",
           pin: "1234",
           role: "admin",
           branchId: branch.id,
@@ -3106,14 +3106,14 @@ var init_storage = __esm({
         const existingTenants = await this.getTenants();
         this.seedLog(`Existing tenants count: ${existingTenants.length}`);
         if (existingTenants.length > 0) return false;
-        const adminEmail = "admin@barmagly.com";
-        this.seedLog(`Checking for super admin: ${adminEmail}`);
-        const existingAdmin = await this.getSuperAdminByEmail(adminEmail);
-        if (!existingAdmin) {
+        const adminEmail = process.env.SUPER_ADMIN_EMAIL;
+        const adminPassword = process.env.SUPER_ADMIN_PASSWORD;
+        if (adminEmail && adminPassword && (await this.getSuperAdmins()).length === 0) {
+          const bcrypt8 = (await import("bcrypt")).default;
           await this.createSuperAdmin({
-            name: "Super Admin",
+            name: process.env.SUPER_ADMIN_NAME || "Super Admin",
             email: adminEmail,
-            passwordHash: "$2b$10$OoKOgYj3UlErVOmwqm4rnOpZLdqpLDF3zBiO4VuXJQa56F0DLlesK",
+            passwordHash: await bcrypt8.hash(adminPassword, 10),
             role: "super_admin",
             isActive: true
           });
@@ -3150,28 +3150,28 @@ var init_storage = __esm({
             maxEmployees: 15
           }
         ];
-        for (const t of demoTenants) {
-          const tenant = await this.createTenant(t);
+        for (const t2 of demoTenants) {
+          const tenant = await this.createTenant(t2);
           const plans = [
             { name: "Monthly Basic", type: "monthly", price: "29.99" },
             { name: "Yearly Pro", type: "yearly", price: "299.99" },
             { name: "Trial", type: "trial", price: "0" }
           ];
-          const plan = plans[Math.floor(Math.random() * plans.length)];
+          const plan2 = plans[Math.floor(Math.random() * plans.length)];
           const startDate = /* @__PURE__ */ new Date();
           const endDate = /* @__PURE__ */ new Date();
-          if (plan.type === "monthly") endDate.setMonth(endDate.getMonth() + 1);
-          else if (plan.type === "yearly") endDate.setFullYear(endDate.getFullYear() + 1);
+          if (plan2.type === "monthly") endDate.setMonth(endDate.getMonth() + 1);
+          else if (plan2.type === "yearly") endDate.setFullYear(endDate.getFullYear() + 1);
           else endDate.setDate(endDate.getDate() + 30);
           const sub = await this.createTenantSubscription({
             tenantId: tenant.id,
-            planName: plan.name,
-            planType: plan.type,
-            price: plan.price,
+            planName: plan2.name,
+            planType: plan2.type,
+            price: plan2.price,
             status: "active",
             startDate,
             endDate,
-            autoRenew: plan.type !== "trial"
+            autoRenew: plan2.type !== "trial"
           });
           const randomSegments = Array.from(
             { length: 4 },
@@ -3191,7 +3191,7 @@ var init_storage = __esm({
           await this.createTenantNotification({
             tenantId: tenant.id,
             type: "info",
-            title: "Welcome to Barmagly!",
+            title: "Welcome to Kassenta!",
             message: `Hello ${tenant.ownerName}, thank you for joining our platform.`,
             priority: "normal"
           });
@@ -3268,17 +3268,17 @@ var init_storage = __esm({
         const allTenants = await this.getTenants();
         const result = [];
         let grandTotal = 0;
-        for (const t of allTenants) {
+        for (const t2 of allTenants) {
           try {
             const [row] = await db.select({
               total: import_drizzle_orm.sql`coalesce(sum(commission_amount), 0)`,
               count: import_drizzle_orm.sql`count(*)`
-            }).from(platformCommissions).where((0, import_drizzle_orm.eq)(platformCommissions.tenantId, t.id));
+            }).from(platformCommissions).where((0, import_drizzle_orm.eq)(platformCommissions.tenantId, t2.id));
             const total = parseFloat(row?.total || "0");
             grandTotal += total;
-            result.push({ tenantId: t.id, businessName: t.businessName, commissionTotal: total, count: Number(row?.count || 0) });
+            result.push({ tenantId: t2.id, businessName: t2.businessName, commissionTotal: total, count: Number(row?.count || 0) });
           } catch {
-            result.push({ tenantId: t.id, businessName: t.businessName, commissionTotal: 0, count: 0 });
+            result.push({ tenantId: t2.id, businessName: t2.businessName, commissionTotal: 0, count: 0 });
           }
         }
         return { tenants: result, grandTotal };
@@ -3439,10 +3439,10 @@ var init_storage = __esm({
         const { randomBytes: randomBytes4 } = await import("crypto");
         for (const r of rows) {
           if (!r.driverAccessToken) {
-            const t = randomBytes4(24).toString("hex");
+            const t2 = randomBytes4(24).toString("hex");
             try {
-              await db.update(vehicles).set({ driverAccessToken: t }).where((0, import_drizzle_orm.eq)(vehicles.id, r.id));
-              r.driverAccessToken = t;
+              await db.update(vehicles).set({ driverAccessToken: t2 }).where((0, import_drizzle_orm.eq)(vehicles.id, r.id));
+              r.driverAccessToken = t2;
             } catch {
             }
           }
@@ -3604,9 +3604,9 @@ var init_callerIdService = __esm({
                     });
                   }
                   this.activeCallSlots.delete(key);
-                  const t = this.slotTimeouts.get(key);
-                  if (t) {
-                    clearTimeout(t);
+                  const t2 = this.slotTimeouts.get(key);
+                  if (t2) {
+                    clearTimeout(t2);
                     this.slotTimeouts.delete(key);
                   }
                   this.broadcastCallSlotUpdate(tenantId);
@@ -3848,6 +3848,212 @@ var init_callerIdService = __esm({
   }
 });
 
+// server/emailService.ts
+var emailService_exports = {};
+__export(emailService_exports, {
+  sendContactEnquiry: () => sendContactEnquiry,
+  sendLicenseKeyEmail: () => sendLicenseKeyEmail,
+  verifySmtp: () => verifySmtp
+});
+async function sendLicenseKeyEmail(opts) {
+  const { to, ownerName, businessName, licenseKey, planName, planType, tempPassword, expiresAt } = opts;
+  const planLabel = planName === "advanced" ? "Smart Business Growth" : "POS Starter";
+  const billingLabel = planType === "yearly" ? "Annual" : planType === "monthly" ? "Monthly" : "Trial";
+  const expiryStr = expiresAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Welcome to Kassenta</title>
+</head>
+<body style="margin:0;padding:0;background:#0A0E17;font-family:Inter,Arial,sans-serif;color:#e2e8f0">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0E17;padding:40px 20px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#13172A;border-radius:20px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);max-width:600px">
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#1a1f35,#0d1120);padding:40px 40px 32px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.06)">
+            <div style="font-size:32px;font-weight:900;background:linear-gradient(135deg,#2FD3C6,#6366F1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-1px;margin-bottom:8px">
+              Kassenta POS
+            </div>
+            <div style="font-size:13px;color:#64748b;letter-spacing:2px;text-transform:uppercase">Point of Sale System</div>
+          </td>
+        </tr>
+        <!-- Confetti banner -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#2FD3C620,#6366F110);padding:28px 40px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.05)">
+            <div style="font-size:40px;margin-bottom:10px">\u{1F389}</div>
+            <h1 style="margin:0 0 8px;font-size:26px;font-weight:800;color:#f0f4f8">You're all set, ${ownerName}!</h1>
+            <p style="margin:0;font-size:15px;color:#94a3b8">Your <strong style="color:#2FD3C6">${businessName}</strong> store is ready to go live</p>
+          </td>
+        </tr>
+        <!-- License Key Box -->
+        <tr>
+          <td style="padding:32px 40px">
+            <div style="background:#0A0E17;border:1px solid rgba(47,211,198,0.3);border-radius:16px;padding:24px;text-align:center;margin-bottom:24px">
+              <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#64748b;margin-bottom:12px">Your License Key</div>
+              <div style="font-size:20px;font-weight:800;letter-spacing:3px;color:#2FD3C6;font-family:monospace;word-break:break-all">${licenseKey}</div>
+              <div style="margin-top:12px;font-size:12px;color:#475569">Valid until ${expiryStr}</div>
+            </div>
+
+            <!-- Plan Info -->
+            <div style="display:flex;gap:12px;margin-bottom:24px">
+              <div style="flex:1;background:rgba(47,211,198,0.08);border:1px solid rgba(47,211,198,0.2);border-radius:12px;padding:16px;text-align:center">
+                <div style="font-size:11px;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Plan</div>
+                <div style="font-size:15px;font-weight:700;color:#2FD3C6">${planLabel}</div>
+              </div>
+              <div style="flex:1;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:16px;text-align:center">
+                <div style="font-size:11px;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Billing</div>
+                <div style="font-size:15px;font-weight:700;color:#6366F1">${billingLabel}</div>
+              </div>
+            </div>
+
+            <!-- Login Credentials -->
+            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:20px;margin-bottom:24px">
+              <div style="font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px">App Login Credentials</div>
+              <table width="100%" cellpadding="4" cellspacing="0">
+                <tr>
+                  <td style="font-size:13px;color:#64748b;width:100px">Email</td>
+                  <td style="font-size:13px;color:#e2e8f0;font-weight:600">${to}</td>
+                </tr>
+                <tr>
+                  <td style="font-size:13px;color:#64748b">Password</td>
+                  <td style="font-size:13px;color:#e2e8f0;font-weight:600;font-family:monospace">${tempPassword}</td>
+                </tr>
+                <tr>
+                  <td style="font-size:13px;color:#64748b">License Key</td>
+                  <td style="font-size:13px;color:#2FD3C6;font-weight:600;font-family:monospace">${licenseKey}</td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Steps -->
+            <div style="margin-bottom:24px">
+              <div style="font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px">Get Started in 3 Steps</div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.02);border-radius:10px;padding:12px">
+                  <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2FD3C6,#6366F1);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;flex-shrink:0;text-align:center;line-height:28px">1</div>
+                  <span style="font-size:14px;color:#cbd5e1">Download the <strong style="color:#f0f4f8">Kassenta POS</strong> app</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.02);border-radius:10px;padding:12px">
+                  <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2FD3C6,#6366F1);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;flex-shrink:0;text-align:center;line-height:28px">2</div>
+                  <span style="font-size:14px;color:#cbd5e1">Enter your <strong style="color:#f0f4f8">email & password</strong> to log in</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.02);border-radius:10px;padding:12px">
+                  <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2FD3C6,#6366F1);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;flex-shrink:0;text-align:center;line-height:28px">3</div>
+                  <span style="font-size:14px;color:#cbd5e1">Enter your <strong style="color:#2FD3C6">license key</strong> to activate your store</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- CTA Button -->
+            <div style="text-align:center">
+              <a href="https://barmagly.com" style="display:inline-block;background:linear-gradient(135deg,#2FD3C6,#6366F1);color:#fff;text-decoration:none;padding:14px 40px;border-radius:999px;font-weight:700;font-size:15px;letter-spacing:0.5px">Open Kassenta POS \u2192</a>
+            </div>
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.05);padding:24px 40px;text-align:center">
+            <p style="margin:0 0 8px;font-size:12px;color:#475569">Questions? Contact us at <a href="mailto:info@kassenta.com" style="color:#2FD3C6;text-decoration:none">info@kassenta.com</a></p>
+            <p style="margin:0;font-size:11px;color:#334155">\xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} Kassenta POS \xB7 All rights reserved</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  await transporter.sendMail({
+    from: `"${FROM_NAME}" <${SMTP_USER}>`,
+    replyTo: REPLY_TO,
+    to,
+    subject: `\u{1F389} Welcome to Kassenta POS \u2014 Your License Key for ${businessName}`,
+    html,
+    text: `Welcome to Kassenta POS!
+
+Hi ${ownerName},
+
+Your store "${businessName}" is ready.
+
+License Key: ${licenseKey}
+Email: ${to}
+Password: ${tempPassword}
+Plan: ${planLabel} (${billingLabel})
+Expires: ${expiryStr}
+
+Get the Kassenta POS app and enter your credentials to get started.
+
+Questions? Email us at info@kassenta.com`
+  });
+}
+async function sendContactEnquiry(opts) {
+  if (!SMTP_PASS) throw new Error("SMTP is not configured");
+  const rows = [
+    ["Name", opts.name],
+    ["Email", opts.email],
+    ["Business", opts.business || "\u2014"],
+    ["Phone", opts.phone || "\u2014"],
+    ["Industry", opts.industry || "\u2014"],
+    ["Source IP", opts.sourceIp || "\u2014"]
+  ];
+  const escape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const html = `<div style="font-family:Inter,Arial,sans-serif;line-height:1.6;color:#0B1220">
+  <h2 style="margin:0 0 14px;color:#040E32">New demo request</h2>
+  <table style="border-collapse:collapse;font-size:14px">
+    ${rows.map(
+    ([k, v]) => `<tr><td style="padding:5px 16px 5px 0;color:#667085">${k}</td><td style="padding:5px 0"><strong>${escape(v)}</strong></td></tr>`
+  ).join("")}
+  </table>
+  ${opts.message ? `<p style="margin-top:18px;padding:14px;background:#F4F6FA;border-radius:8px;white-space:pre-wrap">${escape(opts.message)}</p>` : ""}
+</div>`;
+  await transporter.sendMail({
+    from: `"${FROM_NAME}" <${SMTP_USER}>`,
+    to: SMTP_USER,
+    replyTo: opts.email,
+    subject: `Demo request \u2014 ${opts.business || opts.name}`,
+    html,
+    text: rows.map(([k, v]) => `${k}: ${v}`).join("\n") + (opts.message ? `
+
+${opts.message}` : "")
+  });
+}
+async function verifySmtp() {
+  try {
+    await transporter.verify();
+    return true;
+  } catch (e) {
+    console.error("[SMTP] Verification failed:", e);
+    return false;
+  }
+}
+var import_nodemailer, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, FROM_NAME, REPLY_TO, transporter;
+var init_emailService = __esm({
+  "server/emailService.ts"() {
+    "use strict";
+    import_nodemailer = __toESM(require("nodemailer"));
+    SMTP_HOST = process.env.SMTP_HOST || "smtp.hostinger.com";
+    SMTP_PORT = parseInt(process.env.SMTP_PORT || "465");
+    SMTP_USER = process.env.SMTP_USER || "info@kassenta.com";
+    SMTP_PASS = process.env.SMTP_PASS || "";
+    FROM_NAME = process.env.MAIL_FROM_NAME || "Kassenta POS";
+    REPLY_TO = process.env.MAIL_REPLY_TO || SMTP_USER;
+    if (!SMTP_PASS) {
+      console.warn("[SMTP] SMTP_PASS is not set \u2014 outgoing mail is disabled.");
+    }
+    transporter = import_nodemailer.default.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      // 465 = implicit TLS, 587 = STARTTLS
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+      tls: { rejectUnauthorized: false }
+    });
+  }
+});
+
 // server/seedPizzaLemon.ts
 var seedPizzaLemon_exports = {};
 __export(seedPizzaLemon_exports, {
@@ -3953,7 +4159,7 @@ async function seedPizzaLemon() {
   if (pizzaLemonTenants.length > 0) {
     tenant = pizzaLemonTenants[0];
     console.log(`[PIZZA LEMON] Found existing store (ID ${tenant.id}). Upgrading credentials and data...`);
-    const hash3 = await import_bcrypt2.default.hash(STORE_PASSWORD, 10);
+    const hash3 = await import_bcrypt3.default.hash(STORE_PASSWORD, 10);
     await db.update(tenants).set({
       businessName: BUSINESS_NAME,
       ownerEmail: STORE_EMAIL,
@@ -3965,7 +4171,7 @@ async function seedPizzaLemon() {
     }).where((0, import_drizzle_orm4.eq)(tenants.id, 24));
   } else {
     console.log("[PIZZA LEMON] No Tenant ID 24 found. Creating new store with ID 24...");
-    const hash3 = await import_bcrypt2.default.hash(STORE_PASSWORD, 10);
+    const hash3 = await import_bcrypt3.default.hash(STORE_PASSWORD, 10);
     const [newTenant] = await db.insert(tenants).values({
       id: 24,
       businessName: BUSINESS_NAME,
@@ -4271,14 +4477,14 @@ async function seedPizzaLemon() {
     `[PIZZA LEMON]    Menu: ${PIZZAS.length} Pizza, ${CALZONES.length} Calzone, ${PIDE.length} Pide, ${LAHMACUN.length} Lahmacun, ${TELLERGERICHTE.length} Tellergerichte, ${FINGERFOOD.length} Fingerfood, ${SALATE.length} Salat, ${DESSERTS.length} Dessert, ${GETRAENKE.length} Getr\xE4nke, ${BIER.length} Bier, ${ALKOHOL.length} Alkohol, ${EXTRAS.length} Extra = ${total} total`
   );
 }
-var import_drizzle_orm4, import_bcrypt2, import_date_fns, STORE_EMAIL, STORE_PASSWORD, LICENSE_KEY, BUSINESS_NAME, IMG, PIZZA_LEMON_CATEGORIES, PIZZAS, CALZONES, PIDE, LAHMACUN, TELLERGERICHTE, FINGERFOOD, SALATE, DESSERTS, GETRAENKE, BIER, ALKOHOL, EXTRAS;
+var import_drizzle_orm4, import_bcrypt3, import_date_fns, STORE_EMAIL, STORE_PASSWORD, LICENSE_KEY, BUSINESS_NAME, IMG, PIZZA_LEMON_CATEGORIES, PIZZAS, CALZONES, PIDE, LAHMACUN, TELLERGERICHTE, FINGERFOOD, SALATE, DESSERTS, GETRAENKE, BIER, ALKOHOL, EXTRAS;
 var init_seedPizzaLemon = __esm({
   "server/seedPizzaLemon.ts"() {
     "use strict";
     init_db();
     import_drizzle_orm4 = require("drizzle-orm");
     init_schema();
-    import_bcrypt2 = __toESM(require("bcrypt"));
+    import_bcrypt3 = __toESM(require("bcrypt"));
     import_date_fns = require("date-fns");
     STORE_EMAIL = "admin@pizzalemon.ch";
     STORE_PASSWORD = "pizzalemon123";
@@ -4512,7 +4718,7 @@ async function seedZurichRestaurants() {
         continue;
       }
       console.log(`[ZURICH] \u25B6  Creating "${r.businessName}" (tenant ${r.id})...`);
-      const passwordHash = await import_bcrypt3.default.hash(r.password, 10);
+      const passwordHash = await import_bcrypt4.default.hash(r.password, 10);
       await db.insert(tenants).values({
         id: r.id,
         businessName: r.businessName,
@@ -4674,14 +4880,14 @@ async function seedZurichRestaurants() {
     `[ZURICH] \u2713 Finished. Created ${createdCount}, skipped ${skippedCount}, total products inserted this run: ${totalProducts}.`
   );
 }
-var import_drizzle_orm5, import_bcrypt3, import_date_fns2, U, IMG2, HERO, RESTAURANTS;
+var import_drizzle_orm5, import_bcrypt4, import_date_fns2, U, IMG2, HERO, RESTAURANTS;
 var init_seedZurichRestaurants = __esm({
   "server/seedZurichRestaurants.ts"() {
     "use strict";
     init_db();
     import_drizzle_orm5 = require("drizzle-orm");
     init_schema();
-    import_bcrypt3 = __toESM(require("bcrypt"));
+    import_bcrypt4 = __toESM(require("bcrypt"));
     import_date_fns2 = require("date-fns");
     U = (id) => `https://images.unsplash.com/photo-${id}?w=800&q=80&auto=format&fit=crop`;
     IMG2 = {
@@ -5637,20 +5843,20 @@ async function seedAllDemoData() {
   console.log("[SEED] Starting comprehensive demo data seeding...");
   const [saCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(superAdmins);
   if (Number(saCount.count) === 0) {
-    const hash3 = await import_bcrypt4.default.hash("admin123", 10);
+    const hash3 = await import_bcrypt5.default.hash(process.env.SUPER_ADMIN_PASSWORD || require("crypto").randomBytes(18).toString("base64url"), 10);
     await db.insert(superAdmins).values({
       name: "System Admin",
-      email: "admin@barmagly.com",
+      email: process.env.SUPER_ADMIN_EMAIL || "admin@kassenta.com",
       passwordHash: hash3,
       role: "super_admin",
       isActive: true
     });
-    console.log("[SEED] Created super admin: admin@barmagly.com / admin123");
+    console.log("[SEED] Created super admin from SUPER_ADMIN_EMAIL/PASSWORD env");
   }
   const [tenantCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(tenants);
   if (Number(tenantCount.count) < 3) {
     for (const store of DEMO_STORES) {
-      const hash3 = await import_bcrypt4.default.hash("store123", 10);
+      const hash3 = await import_bcrypt5.default.hash("store123", 10);
       const [tenant] = await db.insert(tenants).values({
         businessName: store.biz,
         ownerName: store.owner,
@@ -5686,7 +5892,7 @@ async function seedAllDemoData() {
       await db.insert(tenantNotifications).values({
         tenantId: tenant.id,
         type: "info",
-        title: "Welcome to Barmagly POS!",
+        title: "Welcome to Kassenta POS!",
         message: `Welcome ${store.owner}! Your store "${store.biz}" has been set up successfully.`,
         priority: "normal"
       });
@@ -5694,8 +5900,8 @@ async function seedAllDemoData() {
     console.log("[SEED] Created demo tenants.");
   }
   const allTenants = await db.select().from(tenants);
-  for (const t of allTenants) {
-    console.log(`[SEED] Ensuring data for tenant: ${t.businessName} (ID: ${t.id})`);
+  for (const t2 of allTenants) {
+    console.log(`[SEED] Ensuring data for tenant: ${t2.businessName} (ID: ${t2.id})`);
     const existingCats = await db.select().from(categories);
     if (existingCats.length === 0) {
       for (const cat of CATEGORY_NAMES) {
@@ -5709,23 +5915,23 @@ async function seedAllDemoData() {
       }
     }
     const currentCategories = await db.select().from(categories);
-    let tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm6.eq)(branches.tenantId, t.id));
+    let tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm6.eq)(branches.tenantId, t2.id));
     if (tenantBranches.length === 0) {
       const branchNames = ["Main Branch", "Downtown Branch", "Mall Branch"];
       for (let i = 0; i < rand(1, 3); i++) {
         await db.insert(branches).values({
-          tenantId: t.id,
+          tenantId: t2.id,
           name: branchNames[i],
           address: `${rand(1, 999)} ${pick(["Main St", "Oak Ave", "Market Rd", "King Fahd Blvd"])}`,
           phone: `+201${rand(1e8, 999999999)}`,
-          email: `branch${i + 1}_${t.id}@store.com`,
+          email: `branch${i + 1}_${t2.id}@store.com`,
           isActive: true,
           isMain: i === 0,
           currency: "USD",
           taxRate: "5.00"
         });
       }
-      tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm6.eq)(branches.tenantId, t.id));
+      tenantBranches = await db.select().from(branches).where((0, import_drizzle_orm6.eq)(branches.tenantId, t2.id));
     }
     const branchIds = tenantBranches.map((b) => b.id);
     if (branchIds.length === 0) continue;
@@ -5747,9 +5953,9 @@ async function seedAllDemoData() {
       for (let i = 0; i < roles.length; i++) {
         await db.insert(employees).values({
           name: empNames[i],
-          email: `emp${i + 1}_${t.id}@store.com`,
+          email: `emp${i + 1}_${t2.id}@store.com`,
           phone: `+201${rand(1e8, 999999999)}`,
-          pin: String(1e3 + i + t.id),
+          pin: String(1e3 + i + t2.id),
           role: roles[i],
           branchId: pick(branchIds),
           isActive: true,
@@ -5760,16 +5966,16 @@ async function seedAllDemoData() {
       tenantEmployees = await db.select().from(employees).where(import_drizzle_orm6.sql`${employees.branchId} IN (${import_drizzle_orm6.sql.join(branchIds, import_drizzle_orm6.sql`, `)})`);
     }
     const employeeIds = tenantEmployees.map((e) => e.id);
-    let tenantProducts = await db.select().from(products).where((0, import_drizzle_orm6.eq)(products.tenantId, t.id));
+    let tenantProducts = await db.select().from(products).where((0, import_drizzle_orm6.eq)(products.tenantId, t2.id));
     if (tenantProducts.length === 0) {
       for (const cat of currentCategories) {
         const prods = PRODUCT_NAMES[cat.name] || [];
         for (const p of prods) {
           await db.insert(products).values({
-            tenantId: t.id,
+            tenantId: t2.id,
             name: p.name,
             nameAr: p.nameAr,
-            sku: `SKU-${t.id}-${uuid()}`,
+            sku: `SKU-${t2.id}-${uuid()}`,
             barcode: `${rand(1e12, 9999999999999)}`,
             categoryId: cat.id,
             price: String(p.price),
@@ -5781,7 +5987,7 @@ async function seedAllDemoData() {
           });
         }
       }
-      tenantProducts = await db.select().from(products).where((0, import_drizzle_orm6.eq)(products.tenantId, t.id));
+      tenantProducts = await db.select().from(products).where((0, import_drizzle_orm6.eq)(products.tenantId, t2.id));
     }
     const productIds = tenantProducts.map((p) => p.id);
     for (const pId of productIds) {
@@ -5804,7 +6010,7 @@ async function seedAllDemoData() {
       for (const cust of CUSTOMER_NAMES) {
         await db.insert(customers).values({
           name: cust.name,
-          email: `${cust.email.split("@")[0]}_${t.id}@email.com`,
+          email: `${cust.email.split("@")[0]}_${t2.id}@email.com`,
           phone: cust.phone,
           loyaltyPoints: rand(0, 500),
           totalSpent: String(rand(50, 5e3)),
@@ -5838,7 +6044,7 @@ async function seedAllDemoData() {
         const qty = rand(1, 4);
         const unitPrice = parseFloat(product?.price || "10");
         const total = qty * unitPrice;
-        const receiptNum = `RCP-${t.id}-${bId}-${Date.now()}-${i}`;
+        const receiptNum = `RCP-${t2.id}-${bId}-${Date.now()}-${i}`;
         const [sale] = await db.insert(sales).values({
           receiptNumber: receiptNum,
           branchId: bId,
@@ -5994,7 +6200,7 @@ async function seedAllDemoData() {
       employeeId: pick(employeeIds),
       action: "seed_data",
       entityType: "tenant",
-      entityId: t.id,
+      entityId: t2.id,
       details: "Comprehensive demo data seeded",
       createdAt: /* @__PURE__ */ new Date()
     });
@@ -6005,11 +6211,11 @@ async function seedAllDemoData() {
       message: "Your store has been populated with demo data.",
       priority: "low"
     });
-    console.log(`[SEED] Completed seeding for: ${t.businessName}`);
+    console.log(`[SEED] Completed seeding for: ${t2.businessName}`);
   }
   console.log("[SEED] \u2705 All demo data seeded successfully!");
 }
-var import_drizzle_orm6, crypto4, import_bcrypt4, import_date_fns3, DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
+var import_drizzle_orm6, crypto4, import_bcrypt5, import_date_fns3, DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
 var init_seedAllDemoData = __esm({
   "server/seedAllDemoData.ts"() {
     "use strict";
@@ -6017,7 +6223,7 @@ var init_seedAllDemoData = __esm({
     import_drizzle_orm6 = require("drizzle-orm");
     init_schema();
     crypto4 = __toESM(require("crypto"));
-    import_bcrypt4 = __toESM(require("bcrypt"));
+    import_bcrypt5 = __toESM(require("bcrypt"));
     import_date_fns3 = require("date-fns");
     DEMO_STORES = [
       { biz: "Glow Beauty Salon", owner: "Sara Ahmed", email: "sara@glow.com", phone: "+201001234567" },
@@ -6083,6 +6289,1948 @@ var init_seedAllDemoData = __esm({
       { name: "Tech Wholesale Inc.", contact: "David Lee", email: "david@techwholesale.com", phone: "+1555333" },
       { name: "Beauty World Dist.", contact: "Lina Adel", email: "lina@beautyworld.com", phone: "+1555444" }
     ];
+  }
+});
+
+// server/site/design.ts
+var SITE_CSS;
+var init_design = __esm({
+  "server/site/design.ts"() {
+    "use strict";
+    SITE_CSS = String.raw`
+:root {
+  color-scheme: light;
+
+  --navy: #040E32;
+  --teal: #00C1B0;
+  --teal-deep: #0C8F85;
+
+  --bg: #FFFFFF;
+  --bg-alt: #F5F8FC;
+  --bg-inset: #EEF3F9;
+  --surface: #FFFFFF;
+  --surface-2: #F8FAFD;
+  --border: #E1E8F0;
+  --border-strong: #CBD6E3;
+
+  --text: #0B1220;
+  --text-2: #46566C;
+  --text-3: #6B7B90;
+
+  --accent: #0C8F85;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #E6F6F4;
+  --accent-line: #B7E3DE;
+
+  --gold: #B7791F;
+  --danger: #C2321F;
+  --ok: #047857;
+
+  --shadow-sm: 0 1px 2px rgba(11, 18, 32, .06), 0 1px 3px rgba(11, 18, 32, .04);
+  --shadow-md: 0 4px 12px rgba(11, 18, 32, .07), 0 2px 4px rgba(11, 18, 32, .04);
+  --shadow-lg: 0 18px 48px rgba(11, 18, 32, .10), 0 4px 12px rgba(11, 18, 32, .05);
+
+  --radius: 14px;
+  --radius-sm: 9px;
+  --radius-lg: 22px;
+  --maxw: 1180px;
+  --nav-h: 68px;
+
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-ar: 'Noto Kufi Arabic', 'Inter', sans-serif;
+  --ease: cubic-bezier(.4, 0, .2, 1);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #040E32;
+  --bg-alt: #071444;
+  --bg-inset: #0A1A4D;
+  --surface: #0D1A44;
+  --surface-2: #12224F;
+  --border: #22305C;
+  --border-strong: #2E3E6E;
+
+  --text: #FFFFFF;
+  --text-2: #B9C3D8;
+  --text-3: #8A94AD;
+
+  --accent: #00C1B0;
+  --accent-ink: #04121F;
+  --accent-soft: rgba(0, 193, 176, .10);
+  --accent-line: rgba(0, 193, 176, .28);
+
+  --gold: #F0B429;
+  --danger: #F87171;
+  --ok: #34D399;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .40);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, .45);
+  --shadow-lg: 0 22px 60px rgba(0, 0, 0, .55);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--nav-h) + 16px); }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  transition: background-color .25s var(--ease), color .25s var(--ease);
+}
+html[dir="rtl"] body { font-family: var(--font-ar); }
+
+img, svg, video { max-width: 100%; height: auto; display: block; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.wrap { width: 100%; max-width: var(--maxw); margin-inline: auto; padding-inline: 24px; }
+.section { padding: 88px 0; }
+.section--tight { padding: 60px 0; }
+.section--alt { background: var(--bg-alt); }
+.section--inset { background: var(--bg-inset); }
+@media (max-width: 720px) {
+  .section { padding: 56px 0; }
+  .wrap { padding-inline: 18px; }
+}
+
+.grid { display: grid; gap: 24px; }
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 980px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); } }
+
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: center; }
+.split--wide-left { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); }
+@media (max-width: 900px) { .split, .split--wide-left { grid-template-columns: minmax(0, 1fr); gap: 32px; } }
+
+/* ── Type ───────────────────────────────────────────────────────────────── */
+h1, h2, h3, h4 { line-height: 1.18; letter-spacing: -.02em; font-weight: 800; }
+h1 { font-size: clamp(2.1rem, 1.3rem + 3.2vw, 3.8rem); letter-spacing: -.03em; }
+h2 { font-size: clamp(1.6rem, 1.1rem + 2vw, 2.6rem); }
+h3 { font-size: clamp(1.12rem, 1rem + .5vw, 1.35rem); }
+h4 { font-size: 1rem; }
+p { color: var(--text-2); }
+.lead { font-size: clamp(1.02rem, .96rem + .35vw, 1.2rem); color: var(--text-2); max-width: 62ch; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: .74rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 14px;
+}
+.eyebrow::before { content: ""; width: 22px; height: 2px; background: var(--accent); border-radius: 2px; }
+.section-head { max-width: 720px; margin-bottom: 44px; }
+.section-head--center { margin-inline: auto; text-align: center; }
+.section-head--center .eyebrow { justify-content: center; }
+.section-head p { margin-top: 14px; }
+.muted { color: var(--text-3); }
+.nowrap { white-space: nowrap; }
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  padding: 13px 24px; border-radius: 11px; font-weight: 700; font-size: .94rem;
+  border: 1px solid transparent; transition: transform .18s var(--ease), box-shadow .18s var(--ease), background-color .18s var(--ease), border-color .18s var(--ease);
+  white-space: nowrap;
+}
+.btn svg { width: 17px; height: 17px; flex: none; }
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow-md); }
+.btn-primary:hover { box-shadow: var(--shadow-lg); }
+.btn-ghost { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-quiet { padding-inline: 4px; color: var(--accent); }
+.btn-quiet:hover { text-decoration: underline; text-underline-offset: 4px; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+@media (max-width: 480px) { .btn { width: 100%; } .btn-row { flex-direction: column; } }
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 26px; box-shadow: var(--shadow-sm);
+  transition: transform .22s var(--ease), box-shadow .22s var(--ease), border-color .22s var(--ease);
+}
+.card--hover:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--accent-line); }
+.card h3 { margin-bottom: 8px; }
+.card p { font-size: .93rem; }
+.card-icon {
+  width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); margin-bottom: 16px; border: 1px solid var(--accent-line);
+}
+.card-icon svg { width: 21px; height: 21px; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 100px;
+  font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line);
+}
+.badge--neutral { background: var(--bg-inset); color: var(--text-2); border-color: var(--border); }
+
+.tick-list { list-style: none; display: grid; gap: 11px; }
+.tick-list li { display: flex; gap: 11px; align-items: flex-start; font-size: .94rem; color: var(--text-2); }
+.tick-list svg { width: 19px; height: 19px; flex: none; color: var(--accent); margin-top: 2px; }
+
+/* ── Image slots ────────────────────────────────────────────────────────── */
+.shot {
+  position: relative; border-radius: var(--radius-lg); overflow: hidden;
+  border: 1px solid var(--border); background: var(--surface-2); box-shadow: var(--shadow-lg);
+  aspect-ratio: var(--ar, 16 / 10);
+}
+.shot img { width: 100%; height: 100%; object-fit: cover; }
+.shot--contain img { object-fit: contain; padding: 6%; }
+.shot-ph {
+  display: none; position: absolute; inset: 0; flex-direction: column; gap: 6px;
+  align-items: center; justify-content: center; text-align: center; padding: 20px;
+  background:
+    repeating-linear-gradient(45deg, transparent, transparent 12px, var(--bg-inset) 12px, var(--bg-inset) 24px),
+    var(--surface-2);
+  color: var(--text-3);
+}
+.shot.is-empty img { visibility: hidden; }
+.shot.is-empty .shot-ph { display: flex; }
+.shot-ph b { font-size: .84rem; font-weight: 800; color: var(--text-2); letter-spacing: .02em; }
+.shot-ph small { font-size: .72rem; font-variant-numeric: tabular-nums; }
+.shot-caption { margin-top: 10px; font-size: .78rem; color: var(--text-3); text-align: center; }
+
+/* ── Navigation ─────────────────────────────────────────────────────────── */
+.nav {
+  position: sticky; top: 0; z-index: 900; height: var(--nav-h);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid transparent; transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.nav.scrolled { border-bottom-color: var(--border); box-shadow: var(--shadow-sm); }
+.nav-inner { height: 100%; display: flex; align-items: center; gap: 18px; }
+.brand { display: flex; align-items: center; gap: 10px; flex: none; }
+.brand img { height: 30px; width: auto; }
+.brand-name { font-weight: 800; font-size: 1.06rem; letter-spacing: -.02em; }
+.nav-links { display: flex; align-items: center; gap: 4px; margin-inline-start: 14px; flex: 1 1 auto; }
+.nav-links a {
+  padding: 8px 13px; border-radius: 9px; font-size: .91rem; font-weight: 600; color: var(--text-2);
+  transition: background-color .16s var(--ease), color .16s var(--ease);
+}
+.nav-links a:hover { background: var(--bg-inset); color: var(--text); }
+.nav-links a[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
+.nav-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+
+.icon-btn {
+  width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+  transition: border-color .16s var(--ease), color .16s var(--ease), background-color .16s var(--ease);
+}
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+.icon-btn svg { width: 18px; height: 18px; }
+.theme-btn .i-moon { display: none; }
+[data-theme="dark"] .theme-btn .i-sun { display: none; }
+[data-theme="dark"] .theme-btn .i-moon { display: block; }
+
+.lang { position: relative; }
+.lang-btn { display: flex; align-items: center; gap: 7px; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); font-size: .84rem; font-weight: 700; color: var(--text-2); }
+.lang-btn:hover { border-color: var(--accent); color: var(--accent); }
+.lang-menu {
+  position: absolute; inset-inline-end: 0; top: calc(100% + 8px); min-width: 156px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg);
+  opacity: 0; visibility: hidden; transform: translateY(-6px); transition: all .18s var(--ease); z-index: 950;
+}
+.lang.open .lang-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+.lang-menu button { display: flex; width: 100%; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 8px; font-size: .88rem; font-weight: 600; color: var(--text-2); text-align: start; }
+.lang-menu button:hover { background: var(--bg-inset); color: var(--text); }
+.lang-menu button.active { color: var(--accent); background: var(--accent-soft); }
+.lang-menu .flag { width: 20px; height: 14px; border-radius: 2px; flex: none; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+
+.nav-toggle { display: none; }
+.cta-mobile { display: none; }
+@media (max-width: 1040px) {
+  .nav-toggle { display: grid; }
+  .nav-links {
+    position: fixed; inset: var(--nav-h) 0 auto 0; flex-direction: column; align-items: stretch; gap: 2px;
+    background: var(--bg); border-bottom: 1px solid var(--border); padding: 14px 18px 20px;
+    box-shadow: var(--shadow-lg); display: none; margin: 0; max-height: calc(100dvh - var(--nav-h)); overflow-y: auto;
+  }
+  .nav-links.open { display: flex; }
+  .nav-links a { padding: 12px 14px; font-size: .98rem; }
+  .nav .cta-desktop { display: none; }
+  .nav-links .cta-mobile { display: inline-flex; }
+}
+
+/* ── Hero ───────────────────────────────────────────────────────────────── */
+.hero { position: relative; padding: 84px 0 72px; overflow: hidden; }
+.hero::before {
+  content: ""; position: absolute; inset: -40% -20% auto -20%; height: 620px; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse 46% 44% at 26% 42%, color-mix(in srgb, var(--accent) 16%, transparent) 0%, transparent 66%),
+    radial-gradient(ellipse 40% 40% at 78% 30%, color-mix(in srgb, var(--navy) 10%, transparent) 0%, transparent 62%);
+}
+[data-theme="dark"] .hero::before { background: radial-gradient(ellipse 46% 44% at 26% 42%, rgba(0,193,176,.14) 0%, transparent 66%), radial-gradient(ellipse 40% 40% at 78% 30%, rgba(99,102,241,.12) 0%, transparent 62%); }
+.hero .wrap { position: relative; z-index: 1; }
+.hero h1 { margin-bottom: 20px; }
+.hero .lead { margin-bottom: 4px; }
+.hero-meta { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--border); }
+.hero-meta div { min-width: 92px; }
+.hero-meta b { display: block; font-size: 1.5rem; font-weight: 800; letter-spacing: -.02em; }
+.hero-meta span { font-size: .78rem; color: var(--text-3); }
+
+/* ── Page header (inner pages) ──────────────────────────────────────────── */
+.page-head { padding: 62px 0 44px; border-bottom: 1px solid var(--border); background: var(--bg-alt); }
+.page-head h1 { font-size: clamp(1.9rem, 1.3rem + 2.4vw, 3rem); margin-bottom: 14px; }
+.crumbs { display: flex; gap: 8px; align-items: center; font-size: .8rem; color: var(--text-3); margin-bottom: 16px; }
+.crumbs a:hover { color: var(--accent); }
+
+/* ── Stats / logos ──────────────────────────────────────────────────────── */
+.stat-strip { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.stat-strip div { background: var(--surface); padding: 24px 20px; text-align: center; }
+.stat-strip b { display: block; font-size: 1.85rem; font-weight: 800; letter-spacing: -.03em; color: var(--text); }
+.stat-strip span { font-size: .8rem; color: var(--text-3); }
+@media (max-width: 700px) { .stat-strip { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+/* ── Pricing ────────────────────────────────────────────────────────────── */
+.price-card { display: flex; flex-direction: column; position: relative; }
+.price-card.featured { border-color: var(--accent); box-shadow: var(--shadow-lg); }
+.price-card .price { font-size: 2.5rem; font-weight: 800; letter-spacing: -.03em; margin: 12px 0 2px; }
+.price-card .price small { font-size: .88rem; font-weight: 600; color: var(--text-3); letter-spacing: 0; }
+.price-card .tick-list { margin: 20px 0 26px; }
+.price-card .btn { margin-top: auto; width: 100%; }
+.price-tag { position: absolute; inset-inline-end: 18px; top: -11px; }
+.billing-toggle { display: inline-flex; padding: 4px; gap: 4px; border: 1px solid var(--border); background: var(--surface); border-radius: 100px; margin: 0 auto 36px; }
+.billing-toggle button { padding: 8px 20px; border-radius: 100px; font-size: .86rem; font-weight: 700; color: var(--text-3); }
+.billing-toggle button.active { background: var(--accent); color: var(--accent-ink); }
+
+/* ── FAQ ────────────────────────────────────────────────────────────────── */
+.faq { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.faq details { border-bottom: 1px solid var(--border); }
+.faq details:last-child { border-bottom: 0; }
+.faq summary { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 19px 22px; font-weight: 700; font-size: .97rem; cursor: pointer; list-style: none; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: ""; width: 10px; height: 10px; flex: none; border-right: 2px solid var(--text-3); border-bottom: 2px solid var(--text-3); transform: rotate(45deg) translateY(-3px); transition: transform .2s var(--ease); }
+.faq details[open] summary::after { transform: rotate(225deg) translateY(-3px); }
+.faq details[open] summary { color: var(--accent); }
+.faq .answer { padding: 0 22px 20px; font-size: .93rem; color: var(--text-2); }
+
+/* ── Steps / timeline ───────────────────────────────────────────────────── */
+.steps { counter-reset: step; display: grid; gap: 18px; }
+.step { display: grid; grid-template-columns: 44px minmax(0,1fr); gap: 18px; align-items: start; }
+.step::before {
+  counter-increment: step; content: counter(step, decimal-leading-zero);
+  width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--accent-soft); border: 1px solid var(--accent-line); color: var(--accent);
+  font-weight: 800; font-size: .86rem; font-variant-numeric: tabular-nums;
+}
+.step h3 { margin-bottom: 5px; }
+.step p { font-size: .93rem; }
+
+/* ── Compliance table ───────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; min-width: 620px; font-size: .9rem; }
+th, td { padding: 14px 18px; text-align: start; border-bottom: 1px solid var(--border); }
+th { background: var(--bg-inset); font-weight: 700; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+tbody tr:last-child td { border-bottom: 0; }
+td { color: var(--text-2); }
+td strong { color: var(--text); font-weight: 700; }
+
+/* ── CTA band ───────────────────────────────────────────────────────────── */
+.cta-band { background: var(--navy); color: #fff; border-radius: var(--radius-lg); padding: 54px 44px; text-align: center; position: relative; overflow: hidden; }
+.cta-band::after { content: ""; position: absolute; inset: auto -10% -60% -10%; height: 260px; background: radial-gradient(ellipse 50% 100% at 50% 100%, rgba(0,193,176,.30) 0%, transparent 70%); pointer-events: none; }
+.cta-band h2, .cta-band p { color: #fff; position: relative; z-index: 1; }
+.cta-band p { color: rgba(255,255,255,.76); margin: 14px auto 0; max-width: 56ch; }
+.cta-band .btn-row { justify-content: center; position: relative; z-index: 1; }
+.cta-band .btn-primary { background: var(--teal); color: #04121F; }
+.cta-band .btn-ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.34); }
+.cta-band .btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
+@media (max-width: 640px) { .cta-band { padding: 40px 22px; } }
+
+/* ── Forms ──────────────────────────────────────────────────────────────── */
+.field { display: grid; gap: 7px; }
+.field label { font-size: .82rem; font-weight: 700; color: var(--text-2); }
+.field input, .field select, .field textarea {
+  width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--text); font: inherit; font-size: .93rem;
+  transition: border-color .16s var(--ease), box-shadow .16s var(--ease);
+}
+.field textarea { min-height: 132px; resize: vertical; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.form-note { font-size: .8rem; color: var(--text-3); }
+.form-status { padding: 12px 15px; border-radius: 10px; font-size: .88rem; font-weight: 600; display: none; }
+.form-status.ok { display: block; background: var(--accent-soft); color: var(--ok); border: 1px solid var(--accent-line); }
+.form-status.err { display: block; background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent); }
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.footer { border-top: 1px solid var(--border); background: var(--bg-alt); padding: 56px 0 30px; margin-top: 0; }
+.footer-grid { display: grid; grid-template-columns: 1.6fr repeat(3, 1fr); gap: 40px; }
+@media (max-width: 860px) { .footer-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 30px; } }
+@media (max-width: 480px) { .footer-grid { grid-template-columns: minmax(0,1fr); } }
+.footer p { font-size: .88rem; max-width: 34ch; margin-top: 14px; }
+.footer-col h4 { font-size: .76rem; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 14px; }
+.footer-col a, .footer-col span { display: block; font-size: .89rem; color: var(--text-2); padding: 5px 0; }
+.footer-col a:hover { color: var(--accent); }
+.footer-bottom { display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between; align-items: center; margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--border); font-size: .82rem; color: var(--text-3); }
+.footer-legal { display: flex; flex-wrap: wrap; gap: 18px; }
+
+/* ── Reveal ─────────────────────────────────────────────────────────────── */
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity .55s var(--ease), transform .55s var(--ease); }
+.reveal.visible { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; } }
+
+.skip-link { position: absolute; inset-inline-start: -9999px; top: 8px; z-index: 999; padding: 10px 16px; background: var(--accent); color: var(--accent-ink); border-radius: 8px; font-weight: 700; }
+.skip-link:focus { inset-inline-start: 12px; }
+`;
+  }
+});
+
+// server/site/shell.ts
+function href(routePath) {
+  return routePath === "/" ? "/" : `${routePath}/`;
+}
+function siteAssets() {
+  if (!assetCache) {
+    assetCache = {
+      css: { url: `/assets/site.${hash8(SITE_CSS)}.css`, body: SITE_CSS, contentType: "text/css; charset=utf-8" },
+      js: { url: `/assets/site.${hash8(SITE_JS)}.js`, body: SITE_JS, contentType: "application/javascript; charset=utf-8" }
+    };
+  }
+  return assetCache;
+}
+function findSiteAsset(pathname) {
+  const { css, js } = siteAssets();
+  if (pathname === css.url) return css;
+  if (pathname === js.url) return js;
+  return null;
+}
+function tAttrs(v) {
+  return `data-en="${esc(v.en)}" data-de="${esc(v.de)}" data-ar="${esc(v.ar)}"`;
+}
+function esc(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function shot(slot) {
+  const src = `/brand/site/${slot.id}.webp`;
+  return `<figure class="shot is-empty${slot.contain ? " shot--contain" : ""}" style="--ar:${slot.ratio}">
+  <img src="${src}" alt="${esc(slot.alt.en)}" ${tAttrs(slot.alt).replace(/data-(en|de|ar)=/g, "data-alt-$1=")} loading="lazy" decoding="async"
+       onload="this.closest('.shot').classList.remove('is-empty')" onerror="this.closest('.shot').classList.add('is-empty')">
+  <figcaption class="shot-ph" dir="ltr"><b>${esc(slot.id)}</b><small>${esc(slot.size)}</small></figcaption>
+</figure>${slot.caption ? `<p class="shot-caption" ${tAttrs(slot.caption)}>${esc(slot.caption.en)}</p>` : ""}`;
+}
+function renderPage(meta, body, baseUrl) {
+  const canonical = `${baseUrl}${meta.path === "/" ? "/" : href(meta.path)}`;
+  const { css, js } = siteAssets();
+  const navHtml = NAV.map(
+    (n) => `<a href="${href(n.path)}"${n.path === meta.path ? ' aria-current="page"' : ""} ${tAttrs(n.label)}>${esc(n.label.en)}</a>`
+  ).join("\n        ");
+  const langButtons = ["en", "de", "ar"].map(
+    (l) => `<button type="button" role="menuitemradio" data-lang="${l}" onclick="Kassenta.setLang('${l}')">${FLAGS[l]}<span>${{ en: "English", de: "Deutsch", ar: "\u0627\u0644\u0639\u0631\u0628\u064A\u0629" }[l]}</span></button>`
+  ).join("");
+  const jsonLd = (meta.jsonLd ?? []).map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join("\n  ");
+  return `<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>${esc(meta.title.en)}</title>
+  <meta name="description" content="${esc(meta.description.en)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#040E32" media="(prefers-color-scheme: dark)">
+  <link rel="canonical" href="${canonical}">
+  <link rel="alternate" hreflang="en" href="${canonical}?lang=en">
+  <link rel="alternate" hreflang="de" href="${canonical}?lang=de">
+  <link rel="alternate" hreflang="ar" href="${canonical}?lang=ar">
+  <link rel="alternate" hreflang="x-default" href="${canonical}">
+  <link rel="icon" href="/brand/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+  <link rel="apple-touch-icon" href="/brand/favicon-180.png">
+  <link rel="manifest" href="/site.webmanifest">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Kassenta POS">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="de_CH">
+  <meta property="og:locale:alternate" content="ar_EG">
+  <meta property="og:title" content="${esc(meta.title.en)}">
+  <meta property="og:description" content="${esc(meta.description.en)}">
+  <meta property="og:url" content="${canonical}">
+  <meta property="og:image" content="${baseUrl}/brand/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Kufi+Arabic:wght@400;600;700&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
+
+  <link rel="preload" as="style" href="${css.url}">
+  <link rel="stylesheet" href="${css.url}">
+  <script>
+    // Paint the stored theme/language before first render to avoid a flash.
+    (function () {
+      try {
+        var th = localStorage.getItem('kassenta_theme');
+        if (th !== 'dark' && th !== 'light') th = 'light';
+        document.documentElement.setAttribute('data-theme', th);
+        var lg = localStorage.getItem('kassenta_lang');
+        if (lg === 'de' || lg === 'ar') {
+          document.documentElement.lang = lg;
+          document.documentElement.dir = lg === 'ar' ? 'rtl' : 'ltr';
+        }
+      } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+    })();
+  </script>
+  ${jsonLd}
+</head>
+<body>
+  <a class="skip-link" href="#main" ${tAttrs({ en: "Skip to content", de: "Zum Inhalt springen", ar: "\u062A\u062E\u0637\u064E\u0651 \u0625\u0644\u0649 \u0627\u0644\u0645\u062D\u062A\u0648\u0649" })}>Skip to content</a>
+
+  <header class="nav" id="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="/" aria-label="Kassenta POS \u2014 home">
+        <img src="/brand/logo-mark.png" alt="" width="30" height="30">
+        <span class="brand-name">Kassenta</span>
+      </a>
+      <nav class="nav-links" id="navLinks" aria-label="Main">
+        ${navHtml}
+        <a class="btn btn-primary cta-mobile" href="/contact/" style="margin-top:10px" ${tAttrs({ en: "Book a demo", de: "Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627" })}>Book a demo</a>
+      </nav>
+      <div class="nav-actions">
+        <button class="icon-btn theme-btn" type="button" onclick="Kassenta.toggleTheme()" aria-label="Toggle colour theme">${icons.sun}${icons.moon}</button>
+        <div class="lang" id="langWrap">
+          <button class="lang-btn" type="button" onclick="Kassenta.toggleLangMenu(event)" aria-haspopup="true" aria-expanded="false">
+            ${icons.globe}<span id="langLabel">EN</span>
+          </button>
+          <div class="lang-menu" role="menu">${langButtons}</div>
+        </div>
+        <a class="btn btn-primary cta-desktop" href="/contact/" ${tAttrs({ en: "Book a demo", de: "Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627" })}>Book a demo</a>
+        <button class="icon-btn nav-toggle" type="button" onclick="Kassenta.toggleNav()" aria-label="Toggle navigation" aria-expanded="false">${icons.menu}</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+${body}
+  </main>
+
+  ${renderFooter()}
+
+  <script src="${js.url}" defer></script>
+</body>
+</html>`;
+}
+function renderFooter() {
+  const col = (title, links) => `
+        <div class="footer-col">
+          <h4 ${tAttrs(title)}>${esc(title.en)}</h4>
+          ${links.map(
+    (l) => `<a href="${l.href}"${l.external ? ' target="_blank" rel="noopener"' : ""} ${tAttrs(l.label)}>${esc(l.label.en)}</a>`
+  ).join("\n          ")}
+        </div>`;
+  return `<footer class="footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <a class="brand" href="/"><img src="/brand/logo-mark.png" alt="" width="30" height="30"><span class="brand-name">Kassenta</span></a>
+          <p ${tAttrs({
+    en: "Point of sale, online ordering and delivery in one system. Built for Swiss and European hospitality and retail.",
+    de: "Kasse, Online-Bestellung und Lieferung in einem System. Entwickelt f\xFCr Gastronomie und Handel in der Schweiz und Europa.",
+    ar: "\u0646\u0642\u0637\u0629 \u0628\u064A\u0639 \u0648\u0637\u0644\u0628 \u0623\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u062A\u0648\u0635\u064A\u0644 \u0641\u064A \u0646\u0638\u0627\u0645 \u0648\u0627\u062D\u062F. \u0645\u0635\u0645\u064E\u0651\u0645 \u0644\u0642\u0637\u0627\u0639 \u0627\u0644\u0636\u064A\u0627\u0641\u0629 \u0648\u0627\u0644\u062A\u062C\u0632\u0626\u0629 \u0641\u064A \u0633\u0648\u064A\u0633\u0631\u0627 \u0648\u0623\u0648\u0631\u0648\u0628\u0627."
+  })}>Point of sale, online ordering and delivery in one system. Built for Swiss and European hospitality and retail.</p>
+        </div>
+        ${col({ en: "Product", de: "Produkt", ar: "\u0627\u0644\u0645\u0646\u062A\u062C" }, [
+    { href: "/features/", label: { en: "Features", de: "Funktionen", ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A" } },
+    { href: "/solutions/", label: { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" } },
+    { href: "/pricing/", label: { en: "Pricing", de: "Preise", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631" } },
+    { href: "/compliance/", label: { en: "Compliance", de: "Compliance", ar: "\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644" } }
+  ])}
+        ${col({ en: "Company", de: "Unternehmen", ar: "\u0627\u0644\u0634\u0631\u0643\u0629" }, [
+    { href: "/about/", label: { en: "About", de: "\xDCber uns", ar: "\u0645\u0646 \u0646\u062D\u0646" } },
+    { href: "/contact/", label: { en: "Contact", de: "Kontakt", ar: "\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627" } },
+    { href: "mailto:info@kassenta.com", label: { en: "info@kassenta.com", de: "info@kassenta.com", ar: "info@kassenta.com" } }
+  ])}
+        ${col({ en: "Access", de: "Zugang", ar: "\u0627\u0644\u062F\u062E\u0648\u0644" }, [
+    { href: "/app", label: { en: "Open the POS", de: "Kasse \xF6ffnen", ar: "\u0627\u0641\u062A\u062D \u0646\u0642\u0637\u0629 \u0627\u0644\u0628\u064A\u0639" } },
+    { href: "/restaurants", label: { en: "Order online", de: "Online bestellen", ar: "\u0627\u0637\u0644\u0628 \u0623\u0648\u0646\u0644\u0627\u064A\u0646" } },
+    { href: "/super_admin/login", label: { en: "Admin login", de: "Admin-Login", ar: "\u062F\u062E\u0648\u0644 \u0627\u0644\u0645\u0634\u0631\u0641" } }
+  ])}
+      </div>
+      <div class="footer-bottom">
+        <span>\xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} Kassenta POS. <span ${tAttrs({
+    en: "All rights reserved.",
+    de: "Alle Rechte vorbehalten.",
+    ar: "\u062C\u0645\u064A\u0639 \u0627\u0644\u062D\u0642\u0648\u0642 \u0645\u062D\u0641\u0648\u0638\u0629."
+  })}>All rights reserved.</span></span>
+        <div class="footer-legal">
+          <a href="/privacy" ${tAttrs({ en: "Privacy", de: "Datenschutz", ar: "\u0627\u0644\u062E\u0635\u0648\u0635\u064A\u0629" })}>Privacy</a>
+          <a href="/terms/" ${tAttrs({ en: "Terms", de: "AGB", ar: "\u0627\u0644\u0634\u0631\u0648\u0637" })}>Terms</a>
+          <a href="/imprint/" ${tAttrs({ en: "Imprint", de: "Impressum", ar: "\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0646\u0627\u0634\u0631" })}>Imprint</a>
+          <a href="/delete-account" ${tAttrs({ en: "Delete account", de: "Konto l\xF6schen", ar: "\u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628" })}>Delete account</a>
+        </div>
+      </div>
+    </div>
+  </footer>`;
+}
+var import_crypto6, hash8, assetCache, I, icons, NAV, FLAGS, SITE_JS;
+var init_shell = __esm({
+  "server/site/shell.ts"() {
+    "use strict";
+    import_crypto6 = require("crypto");
+    init_design();
+    hash8 = (s) => (0, import_crypto6.createHash)("sha256").update(s).digest("hex").slice(0, 8);
+    assetCache = null;
+    I = (d, extra = "") => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${d}</svg>`;
+    icons = {
+      check: I(`<polyline points="20 6 9 17 4 12"/>`),
+      arrowRight: I(`<line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/>`),
+      sun: I(`<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>`, ` class="i-sun"`),
+      moon: I(`<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>`, ` class="i-moon"`),
+      menu: I(`<line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>`),
+      globe: I(`<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z"/>`),
+      register: I(`<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v3M7 13h4M7 16h2"/>`),
+      chart: I(`<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>`),
+      truck: I(`<path d="M2 7h11v9H2zM13 10h4l4 3.2V16h-8z"/><circle cx="6.5" cy="18.5" r="1.6"/><circle cx="17" cy="18.5" r="1.6"/>`),
+      phone: I(`<path d="M5 3h3l2 5-2.2 1.3a12 12 0 0 0 5.9 5.9L15 13l5 2v3a2 2 0 0 1-2.2 2A17 17 0 0 1 3 5.2 2 2 0 0 1 5 3z"/>`),
+      shield: I(`<path d="M12 3l7 3v6c0 4.6-3 8-7 9-4-1-7-4.4-7-9V6z"/><polyline points="9 12 11.2 14.2 15.5 9.9"/>`),
+      cloud: I(`<path d="M7 18h9.5a3.5 3.5 0 0 0 .4-7A5.5 5.5 0 0 0 6.3 9.6 4.2 4.2 0 0 0 7 18z"/>`),
+      users: I(`<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.3a3.2 3.2 0 0 1 0 6.4M17.5 20a5.6 5.6 0 0 0-2-4.3"/>`),
+      box: I(`<path d="M12 3l8 4.2v9.6L12 21l-8-4.2V7.2z"/><path d="M4 7.2l8 4.2 8-4.2M12 11.4V21"/>`),
+      tag: I(`<path d="M3 12.5V4a1 1 0 0 1 1-1h8.5L21 11.5 12.5 20z"/><circle cx="7.5" cy="7.5" r="1.3"/>`),
+      clock: I(`<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>`),
+      layers: I(`<path d="M12 3l9 4.5-9 4.5-9-4.5z"/><path d="M3 12.5l9 4.5 9-4.5M3 17l9 4.5 9-4.5"/>`),
+      printer: I(`<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="7" rx="2"/><rect x="7" y="14" width="10" height="7" rx="1"/>`),
+      wifiOff: I(`<path d="M2 8.8A16 16 0 0 1 8 5.4M22 8.8a16 16 0 0 0-5.4-3.2M5.5 12.6A11 11 0 0 1 9 10.6M18.5 12.6a11 11 0 0 0-2.6-1.6M8.8 16.3a6 6 0 0 1 6.4 0"/><circle cx="12" cy="20" r="1"/><line x1="3" y1="3" x2="21" y2="21"/>`),
+      lock: I(`<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>`),
+      scale: I(`<path d="M12 3v18M7 21h10M6 7l-3 6h6zM18 7l-3 6h6zM4 7h16"/>`),
+      pill: I(`<rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-45 12 12)"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/>`),
+      cart: I(`<circle cx="9.5" cy="19" r="1.5"/><circle cx="17.5" cy="19" r="1.5"/><path d="M2 3h2.2l2.6 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.5L20 7H6"/>`),
+      coffee: I(`<path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 9.5h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M7 2.5v2M11 2.5v2"/>`),
+      mail: I(`<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3.5 6.5 12 12.8 20.5 6.5"/>`),
+      pin: I(`<path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>`),
+      building: I(`<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/>`),
+      puzzle: I(`<path d="M10 4h4v2.2a1.8 1.8 0 1 0 3.6 0V4H20v4h-2.2a1.8 1.8 0 1 0 0 3.6H20V20h-4v-2.2a1.8 1.8 0 1 0-3.6 0V20H4v-4h2.2a1.8 1.8 0 1 0 0-3.6H4V8h6z"/>`),
+      refresh: I(`<path d="M20 11A8 8 0 0 0 6.3 6.3L4 8.5"/><polyline points="4 4 4 8.5 8.5 8.5"/><path d="M4 13a8 8 0 0 0 13.7 4.7L20 15.5"/><polyline points="20 20 20 15.5 15.5 15.5"/>`),
+      qr: I(`<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20h1"/>`),
+      bell: I(`<path d="M18 15V10a6 6 0 0 0-12 0v5l-1.6 2.4h15.2z"/><path d="M10 20a2 2 0 0 0 4 0"/>`),
+      key: I(`<circle cx="8" cy="14" r="4"/><path d="M11 11.5L20 3M17 5.5l2 2M15.5 7l1.5 1.5"/>`)
+    };
+    NAV = [
+      { path: "/features", label: { en: "Features", de: "Funktionen", ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A" } },
+      { path: "/solutions", label: { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" } },
+      { path: "/pricing", label: { en: "Pricing", de: "Preise", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631" } },
+      { path: "/compliance", label: { en: "Compliance", de: "Compliance", ar: "\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644" } },
+      { path: "/about", label: { en: "About", de: "\xDCber uns", ar: "\u0645\u0646 \u0646\u062D\u0646" } },
+      { path: "/contact", label: { en: "Contact", de: "Kontakt", ar: "\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627" } }
+    ];
+    FLAGS = {
+      en: `<svg class="flag" viewBox="0 0 60 30"><clipPath id="fen"><path d="M0 0h60v30H0z"/></clipPath><g clip-path="url(#fen)"><path d="M0 0h60v30H0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30m0-30L0 30" stroke="#C8102E" stroke-width="4"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/></g></svg>`,
+      de: `<svg class="flag" viewBox="0 0 5 3"><path fill="#000" d="M0 0h5v1H0z"/><path fill="#D00" d="M0 1h5v1H0z"/><path fill="#FFCE00" d="M0 2h5v1H0z"/></svg>`,
+      ar: `<svg class="flag" viewBox="0 0 6 4"><path fill="#007A3D" d="M0 0h6v4H0z"/><path fill="#fff" d="M2 1.4h2.4v.5H2zM2 2.1h2.4v.5H2z"/></svg>`
+    };
+    SITE_JS = String.raw`
+window.Kassenta = (function () {
+  var LANGS = { en: 'EN', de: 'DE', ar: 'AR' };
+  var DIR = { en: 'ltr', de: 'ltr', ar: 'rtl' };
+  var lang = 'en';
+
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  function applyLang(l) {
+    if (!LANGS[l]) l = 'en';
+    lang = l;
+    var root = document.documentElement;
+    root.lang = l;
+    root.dir = DIR[l];
+    document.querySelectorAll('[data-' + l + ']').forEach(function (el) {
+      var v = el.getAttribute('data-' + l);
+      if (v !== null) el.textContent = v;
+    });
+    document.querySelectorAll('[data-alt-' + l + ']').forEach(function (el) {
+      var v = el.getAttribute('data-alt-' + l);
+      if (v !== null) el.setAttribute('alt', v);
+    });
+    var label = document.getElementById('langLabel');
+    if (label) label.textContent = LANGS[l];
+    document.querySelectorAll('.lang-menu button').forEach(function (b) {
+      var on = b.dataset.lang === l;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+
+  function setLang(l) { store('kassenta_lang', l); applyLang(l); closeLangMenu(); }
+
+  function applyTheme(mode) {
+    document.documentElement.setAttribute('data-theme', mode);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', mode === 'dark' ? '#040E32' : '#FFFFFF');
+  }
+  function toggleTheme() {
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    store('kassenta_theme', next);
+    applyTheme(next);
+  }
+
+  function toggleNav() {
+    var el = document.getElementById('navLinks');
+    var btn = document.querySelector('.nav-toggle');
+    var open = el.classList.toggle('open');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function toggleLangMenu(e) {
+    if (e) e.stopPropagation();
+    var w = document.getElementById('langWrap');
+    var open = w.classList.toggle('open');
+    w.querySelector('.lang-btn').setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function closeLangMenu() {
+    var w = document.getElementById('langWrap');
+    if (!w) return;
+    w.classList.remove('open');
+    w.querySelector('.lang-btn').setAttribute('aria-expanded', 'false');
+  }
+
+  document.addEventListener('click', function (e) { if (!e.target.closest('.lang')) closeLangMenu(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeLangMenu(); });
+
+  var nav = document.getElementById('nav');
+  var onScroll = function () { nav.classList.toggle('scrolled', window.scrollY > 24); };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('visible'); io.unobserve(en.target); } });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+  } else {
+    document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('visible'); });
+  }
+
+  // ?lang=de wins over the stored preference so hreflang links land on the
+  // right language for a first-time visitor arriving from search.
+  var urlLang = new URLSearchParams(location.search).get('lang');
+  if (urlLang && LANGS[urlLang]) { store('kassenta_lang', urlLang); applyLang(urlLang); }
+  else applyLang(read('kassenta_lang') || 'en');
+  applyTheme(read('kassenta_theme') === 'dark' ? 'dark' : 'light');
+
+  return { setLang: setLang, toggleTheme: toggleTheme, toggleNav: toggleNav, toggleLangMenu: toggleLangMenu };
+})();
+`;
+  }
+});
+
+// server/site/pages.ts
+var head, card, ticks, faq, ctaBand, pageHead, home, features, vertical, solutions, plan, pricing, compliance, about, contact, PAGES;
+var init_pages = __esm({
+  "server/site/pages.ts"() {
+    "use strict";
+    init_shell();
+    head = (eyebrow, title, lead, center = false) => `
+      <div class="section-head${center ? " section-head--center" : ""} reveal">
+        <span class="eyebrow" ${tAttrs(eyebrow)}>${esc(eyebrow.en)}</span>
+        <h2 ${tAttrs(title)}>${esc(title.en)}</h2>
+        ${lead ? `<p class="lead"${center ? ' style="margin-inline:auto"' : ""} ${tAttrs(lead)}>${esc(lead.en)}</p>` : ""}
+      </div>`;
+    card = (icon, title, body) => `
+        <article class="card card--hover reveal">
+          <div class="card-icon">${icon}</div>
+          <h3 ${tAttrs(title)}>${esc(title.en)}</h3>
+          <p ${tAttrs(body)}>${esc(body.en)}</p>
+        </article>`;
+    ticks = (items) => `<ul class="tick-list">${items.map((i) => `<li>${icons.check}<span ${tAttrs(i)}>${esc(i.en)}</span></li>`).join("")}</ul>`;
+    faq = (items) => `
+      <div class="faq reveal">
+        ${items.map(
+      (i) => `<details>
+          <summary><span ${tAttrs(i.q)}>${esc(i.q.en)}</span></summary>
+          <div class="answer" ${tAttrs(i.a)}>${esc(i.a.en)}</div>
+        </details>`
+    ).join("")}
+      </div>`;
+    ctaBand = (title, body) => `
+  <section class="section">
+    <div class="wrap">
+      <div class="cta-band reveal">
+        <h2 ${tAttrs(title)}>${esc(title.en)}</h2>
+        <p ${tAttrs(body)}>${esc(body.en)}</p>
+        <div class="btn-row">
+          <a class="btn btn-primary" href="/contact/" ${tAttrs({ en: "Book a demo", de: "Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u062A\u0648\u0636\u064A\u062D\u064A\u064B\u0627" })}>Book a demo</a>
+          <a class="btn btn-ghost" href="/pricing/" ${tAttrs({ en: "See pricing", de: "Preise ansehen", ar: "\u0634\u0627\u0647\u062F \u0627\u0644\u0623\u0633\u0639\u0627\u0631" })}>See pricing</a>
+        </div>
+      </div>
+    </div>
+  </section>`;
+    pageHead = (title, lead, crumb) => `
+  <section class="page-head">
+    <div class="wrap">
+      <div class="crumbs"><a href="/" ${tAttrs({ en: "Home", de: "Start", ar: "\u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629" })}>Home</a><span>/</span><span ${tAttrs(crumb)}>${esc(crumb.en)}</span></div>
+      <h1 ${tAttrs(title)}>${esc(title.en)}</h1>
+      <p class="lead" ${tAttrs(lead)}>${esc(lead.en)}</p>
+    </div>
+  </section>`;
+    home = {
+      meta: {
+        path: "/",
+        title: {
+          en: "Kassenta POS \u2014 Point of sale, online ordering and delivery in one system",
+          de: "Kassenta POS \u2014 Kasse, Online-Bestellung und Lieferung in einem System",
+          ar: "Kassenta POS \u2014 \u0646\u0642\u0637\u0629 \u0628\u064A\u0639 \u0648\u0637\u0644\u0628 \u0623\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u062A\u0648\u0635\u064A\u0644 \u0641\u064A \u0646\u0638\u0627\u0645 \u0648\u0627\u062D\u062F"
+        },
+        description: {
+          en: "Kassenta runs the till, the online shop, the kitchen and the delivery fleet from one place. Swiss VAT, CHF rounding and TWINT built in. Works on phone, tablet and desktop.",
+          de: "Kassenta betreibt Kasse, Online-Shop, K\xFCche und Lieferflotte an einem Ort. Schweizer MwSt., CHF-Rundung und TWINT integriert. F\xFCr Smartphone, Tablet und Desktop.",
+          ar: "\u064A\u062F\u064A\u0631 Kassenta \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0627\u0644\u0645\u062A\u062C\u0631 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0648\u0627\u0644\u0645\u0637\u0628\u062E \u0648\u0623\u0633\u0637\u0648\u0644 \u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u0645\u0646 \u0645\u0643\u0627\u0646 \u0648\u0627\u062D\u062F. \u0636\u0631\u064A\u0628\u0629 \u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u062A\u0642\u0631\u064A\u0628 CHF \u0648TWINT \u0645\u062F\u0645\u062C\u0629. \u064A\u0639\u0645\u0644 \u0639\u0644\u0649 \u0627\u0644\u0647\u0627\u062A\u0641 \u0648\u0627\u0644\u062A\u0627\u0628\u0644\u062A \u0648\u0627\u0644\u0643\u0645\u0628\u064A\u0648\u062A\u0631."
+        },
+        jsonLd: [
+          {
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            name: "Kassenta POS",
+            applicationCategory: "BusinessApplication",
+            operatingSystem: "Web, Android, iOS",
+            offers: { "@type": "Offer", price: "49", priceCurrency: "CHF" },
+            description: "Point of sale, online ordering and delivery management for hospitality and retail in Switzerland and Europe."
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            name: "Kassenta",
+            url: "https://kassenta.com",
+            logo: "https://kassenta.com/brand/logo-mark.png",
+            email: "info@kassenta.com"
+          }
+        ]
+      },
+      body: `
+  <section class="hero">
+    <div class="wrap">
+      <div class="split split--wide-left">
+        <div>
+          <span class="badge" ${tAttrs({ en: "Built for Switzerland and the EU", de: "F\xFCr die Schweiz und die EU gebaut", ar: "\u0645\u0635\u0645\u064E\u0651\u0645 \u0644\u0633\u0648\u064A\u0633\u0631\u0627 \u0648\u0627\u0644\u0627\u062A\u062D\u0627\u062F \u0627\u0644\u0623\u0648\u0631\u0648\u0628\u064A" })}>Built for Switzerland and the EU</span>
+          <h1 style="margin-top:18px" ${tAttrs({
+        en: "One system for the till, the shop and the road",
+        de: "Ein System f\xFCr Kasse, Shop und Lieferung",
+        ar: "\u0646\u0638\u0627\u0645 \u0648\u0627\u062D\u062F \u0644\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0627\u0644\u0645\u062A\u062C\u0631 \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644"
+      })}>One system for the till, the shop and the road</h1>
+          <p class="lead" ${tAttrs({
+        en: "Kassenta replaces the patchwork of a POS terminal, an ordering website, a delivery app and a spreadsheet. Every order \u2014 counter, table QR, phone or online \u2014 lands in the same queue, with the same stock and the same reports.",
+        de: "Kassenta ersetzt das Flickwerk aus Kassenterminal, Bestellwebsite, Liefer-App und Tabellenkalkulation. Jede Bestellung \u2014 Theke, Tisch-QR, Telefon oder online \u2014 landet in derselben Warteschlange, mit demselben Bestand und denselben Berichten.",
+        ar: "\u064A\u0633\u062A\u0628\u062F\u0644 Kassenta \u062E\u0644\u064A\u0637 \u0623\u062C\u0647\u0632\u0629 \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0645\u0648\u0642\u0639 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0648\u062A\u0637\u0628\u064A\u0642 \u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u0648\u062C\u062F\u0627\u0648\u0644 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A. \u0643\u0644 \u0637\u0644\u0628 \u2014 \u0645\u0646 \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0623\u0648 QR \u0627\u0644\u0637\u0627\u0648\u0644\u0629 \u0623\u0648 \u0627\u0644\u0647\u0627\u062A\u0641 \u0623\u0648 \u0627\u0644\u0625\u0646\u062A\u0631\u0646\u062A \u2014 \u064A\u0635\u0644 \u0625\u0644\u0649 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0646\u0641\u0633\u0647\u0627\u060C \u0628\u0627\u0644\u0645\u062E\u0632\u0648\u0646 \u0646\u0641\u0633\u0647 \u0648\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631 \u0646\u0641\u0633\u0647\u0627."
+      })}>Kassenta replaces the patchwork of a POS terminal, an ordering website, a delivery app and a spreadsheet. Every order \u2014 counter, table QR, phone or online \u2014 lands in the same queue, with the same stock and the same reports.</p>
+          <div class="btn-row">
+            <a class="btn btn-primary" href="/contact/">${icons.arrowRight}<span ${tAttrs({ en: "Book a live demo", de: "Live-Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u0645\u0628\u0627\u0634\u0631\u064B\u0627" })}>Book a live demo</span></a>
+            <a class="btn btn-ghost" href="/features/" ${tAttrs({ en: "Explore the platform", de: "Plattform ansehen", ar: "\u0627\u0633\u062A\u0643\u0634\u0641 \u0627\u0644\u0645\u0646\u0635\u0629" })}>Explore the platform</a>
+          </div>
+          <div class="hero-meta">
+            <div><b>3</b><span ${tAttrs({ en: "Languages: EN / DE / AR", de: "Sprachen: EN / DE / AR", ar: "\u0644\u063A\u0627\u062A: EN / DE / AR" })}>Languages: EN / DE / AR</span></div>
+            <div><b>8.1%</b><span ${tAttrs({ en: "Swiss VAT handled", de: "Schweizer MwSt. ber\xFCcksichtigt", ar: "\u0636\u0631\u064A\u0628\u0629 \u0633\u0648\u064A\u0633\u0631\u0627 \u0645\u062F\u0639\u0648\u0645\u0629" })}>Swiss VAT handled</span></div>
+            <div><b>0.05</b><span ${tAttrs({ en: "CHF cash rounding", de: "CHF-Rappenrundung", ar: "\u062A\u0642\u0631\u064A\u0628 \u0646\u0642\u062F\u064A CHF" })}>CHF cash rounding</span></div>
+            <div><b>24/7</b><span ${tAttrs({ en: "Cloud availability", de: "Cloud-Verf\xFCgbarkeit", ar: "\u062A\u0648\u0627\u0641\u0631 \u0633\u062D\u0627\u0628\u064A" })}>Cloud availability</span></div>
+          </div>
+        </div>
+        <div class="reveal">
+          ${shot({ id: "hero-pos-tablet", ratio: "4 / 5", size: "1200 \xD7 1500", alt: { en: "Kassenta POS running on a tablet at a restaurant counter", de: "Kassenta POS auf einem Tablet an der Theke eines Restaurants", ar: "Kassenta POS \u064A\u0639\u0645\u0644 \u0639\u0644\u0649 \u062A\u0627\u0628\u0644\u062A \u0639\u0646\u062F \u0643\u0627\u0634\u064A\u0631 \u0645\u0637\u0639\u0645" } })}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section--tight">
+    <div class="wrap">
+      <div class="stat-strip reveal">
+        <div><b ${tAttrs({ en: "Counter", de: "Theke", ar: "\u0627\u0644\u0643\u0627\u0634\u064A\u0631" })}>Counter</b><span ${tAttrs({ en: "Touch POS on any screen", de: "Touch-Kasse auf jedem Bildschirm", ar: "\u0643\u0627\u0634\u064A\u0631 \u0644\u0645\u0633\u064A \u0639\u0644\u0649 \u0623\u064A \u0634\u0627\u0634\u0629" })}>Touch POS on any screen</span></div>
+        <div><b ${tAttrs({ en: "Online", de: "Online", ar: "\u0623\u0648\u0646\u0644\u0627\u064A\u0646" })}>Online</b><span ${tAttrs({ en: "Your own branded storefront", de: "Eigener Shop im Branding", ar: "\u0645\u062A\u062C\u0631\u0643 \u0628\u0647\u0648\u064A\u062A\u0643 \u0627\u0644\u062E\u0627\u0635\u0629" })}>Your own branded storefront</span></div>
+        <div><b ${tAttrs({ en: "Tables", de: "Tische", ar: "\u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A" })}>Tables</b><span ${tAttrs({ en: "QR ordering per seat", de: "QR-Bestellung pro Platz", ar: "\u0637\u0644\u0628 \u0628\u0640QR \u0644\u0643\u0644 \u0637\u0627\u0648\u0644\u0629" })}>QR ordering per seat</span></div>
+        <div><b ${tAttrs({ en: "Delivery", de: "Lieferung", ar: "\u0627\u0644\u062A\u0648\u0635\u064A\u0644" })}>Delivery</b><span ${tAttrs({ en: "Drivers, zones and tracking", de: "Fahrer, Zonen und Tracking", ar: "\u0633\u0627\u0626\u0642\u0648\u0646 \u0648\u0645\u0646\u0627\u0637\u0642 \u0648\u062A\u062A\u0628\u0651\u0639" })}>Drivers, zones and tracking</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="wrap">
+      ${head(
+        { en: "The platform", de: "Die Plattform", ar: "\u0627\u0644\u0645\u0646\u0635\u0629" },
+        { en: "Four products, one database", de: "Vier Produkte, eine Datenbank", ar: "\u0623\u0631\u0628\u0639\u0629 \u0645\u0646\u062A\u062C\u0627\u062A\u060C \u0642\u0627\u0639\u062F\u0629 \u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0627\u062D\u062F\u0629" },
+        {
+          en: "Stock, prices, customers and taxes are defined once. Every surface reads from the same place, so a sold-out item disappears from the online menu the second the counter sells the last one.",
+          de: "Bestand, Preise, Kunden und Steuern werden einmal definiert. Jede Oberfl\xE4che liest aus derselben Quelle \u2014 ein ausverkaufter Artikel verschwindet in dem Moment aus der Online-Karte, in dem die Theke den letzten verkauft.",
+          ar: "\u064A\u064F\u0639\u0631\u064E\u0651\u0641 \u0627\u0644\u0645\u062E\u0632\u0648\u0646 \u0648\u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0648\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u0627\u0644\u0636\u0631\u0627\u0626\u0628 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629. \u0643\u0644 \u0627\u0644\u0648\u0627\u062C\u0647\u0627\u062A \u062A\u0642\u0631\u0623 \u0645\u0646 \u0627\u0644\u0645\u0635\u062F\u0631 \u0646\u0641\u0633\u0647\u060C \u0641\u064A\u062E\u062A\u0641\u064A \u0627\u0644\u0635\u0646\u0641 \u0627\u0644\u0645\u0646\u062A\u0647\u064A \u0645\u0646 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0629 \u0644\u062D\u0638\u0629 \u0628\u064A\u0639 \u0622\u062E\u0631 \u0642\u0637\u0639\u0629 \u0639\u0644\u0649 \u0627\u0644\u0643\u0627\u0634\u064A\u0631."
+        },
+        true
+      )}
+      <div class="grid grid-4">
+        ${card(icons.register, { en: "POS application", de: "Kassen-App", ar: "\u062A\u0637\u0628\u064A\u0642 \u0627\u0644\u0643\u0627\u0634\u064A\u0631" }, {
+        en: "Touch-first ordering, split payments, discounts, shift handover and end-of-day cash-up. Runs in the browser and as a native Android and iOS app.",
+        de: "Touch-orientierte Bestellung, Teilzahlungen, Rabatte, Schicht\xFCbergabe und Tagesabschluss. L\xE4uft im Browser sowie als native Android- und iOS-App.",
+        ar: "\u0637\u0644\u0628 \u0628\u0627\u0644\u0644\u0645\u0633\u060C \u0648\u062F\u0641\u0639 \u0645\u0642\u0633\u064E\u0651\u0645\u060C \u0648\u062E\u0635\u0648\u0645\u0627\u062A\u060C \u0648\u062A\u0633\u0644\u064A\u0645 \u0627\u0644\u0648\u0631\u062F\u064A\u0627\u062A\u060C \u0648\u062A\u0642\u0641\u064A\u0644 \u0627\u0644\u064A\u0648\u0645. \u064A\u0639\u0645\u0644 \u0641\u064A \u0627\u0644\u0645\u062A\u0635\u0641\u062D \u0648\u0643\u062A\u0637\u0628\u064A\u0642 \u0623\u0646\u062F\u0631\u0648\u064A\u062F \u0648iOS \u0623\u0635\u0644\u064A."
+      })}
+        ${card(icons.cart, { en: "Customer storefront", de: "Kunden-Shop", ar: "\u0645\u062A\u062C\u0631 \u0627\u0644\u0639\u0645\u0644\u0627\u0621" }, {
+        en: "A branded ordering page per business, with menus, options, promo codes, scheduled orders and delivery-zone pricing.",
+        de: "Eine gebrandete Bestellseite pro Betrieb, mit Karte, Optionen, Gutscheinen, Vorbestellungen und Zonenpreisen.",
+        ar: "\u0635\u0641\u062D\u0629 \u0637\u0644\u0628 \u0628\u0647\u0648\u064A\u0629 \u0643\u0644 \u0645\u062A\u062C\u0631\u060C \u0645\u0639 \u0627\u0644\u0642\u0648\u0627\u0626\u0645 \u0648\u0627\u0644\u062E\u064A\u0627\u0631\u0627\u062A \u0648\u0623\u0643\u0648\u0627\u062F \u0627\u0644\u062E\u0635\u0645 \u0648\u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u0645\u062C\u062F\u0648\u0644\u0629 \u0648\u062A\u0633\u0639\u064A\u0631 \u0645\u0646\u0627\u0637\u0642 \u0627\u0644\u062A\u0648\u0635\u064A\u0644."
+      })}
+        ${card(icons.truck, { en: "Delivery operations", de: "Lieferbetrieb", ar: "\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062A\u0648\u0635\u064A\u0644" }, {
+        en: "Assign drivers, broadcast open orders, follow the status pipeline and send customers a live tracking link.",
+        de: "Fahrer zuweisen, offene Auftr\xE4ge ausschreiben, Statusverlauf verfolgen und Kunden einen Live-Tracking-Link senden.",
+        ar: "\u0625\u0633\u0646\u0627\u062F \u0627\u0644\u0633\u0627\u0626\u0642\u064A\u0646\u060C \u0648\u0628\u062B\u0651 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u0645\u0641\u062A\u0648\u062D\u0629\u060C \u0648\u0645\u062A\u0627\u0628\u0639\u0629 \u0645\u0631\u0627\u062D\u0644 \u0627\u0644\u062D\u0627\u0644\u0629\u060C \u0648\u0625\u0631\u0633\u0627\u0644 \u0631\u0627\u0628\u0637 \u062A\u062A\u0628\u0651\u0639 \u0645\u0628\u0627\u0634\u0631 \u0644\u0644\u0639\u0645\u064A\u0644."
+      })}
+        ${card(icons.layers, { en: "Owner console", de: "Betreiber-Konsole", ar: "\u0644\u0648\u062D\u0629 \u0627\u0644\u0645\u0627\u0644\u0643" }, {
+        en: "Multi-branch overview, licences, staff roles and reporting across every location from one login.",
+        de: "Filial\xFCbersicht, Lizenzen, Mitarbeiterrollen und Auswertungen \xFCber alle Standorte mit einem Login.",
+        ar: "\u0646\u0638\u0631\u0629 \u0634\u0627\u0645\u0644\u0629 \u0639\u0644\u0649 \u0627\u0644\u0641\u0631\u0648\u0639\u060C \u0648\u0627\u0644\u062A\u0631\u0627\u062E\u064A\u0635\u060C \u0648\u0623\u062F\u0648\u0627\u0631 \u0627\u0644\u0645\u0648\u0638\u0641\u064A\u0646\u060C \u0648\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631 \u0644\u0643\u0644 \u0627\u0644\u0645\u0648\u0627\u0642\u0639 \u0645\u0646 \u062D\u0633\u0627\u0628 \u0648\u0627\u062D\u062F."
+      })}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="split">
+        <div class="reveal">
+          ${shot({ id: "home-order-flow", ratio: "16 / 11", size: "1600 \xD7 1100", alt: { en: "Order flow from customer to kitchen to driver", de: "Bestellablauf vom Kunden \xFCber die K\xFCche zum Fahrer", ar: "\u0645\u0633\u0627\u0631 \u0627\u0644\u0637\u0644\u0628 \u0645\u0646 \u0627\u0644\u0639\u0645\u064A\u0644 \u0625\u0644\u0649 \u0627\u0644\u0645\u0637\u0628\u062E \u0625\u0644\u0649 \u0627\u0644\u0633\u0627\u0626\u0642" } })}
+        </div>
+        <div>
+          ${head(
+        { en: "How it flows", de: "Der Ablauf", ar: "\u0643\u064A\u0641 \u064A\u0633\u064A\u0631 \u0627\u0644\u0639\u0645\u0644" },
+        { en: "From tap to doorstep without re-typing anything", de: "Vom Tippen bis zur Haust\xFCr \u2014 ohne Doppelerfassung", ar: "\u0645\u0646 \u0627\u0644\u0636\u063A\u0637\u0629 \u0625\u0644\u0649 \u0628\u0627\u0628 \u0627\u0644\u0639\u0645\u064A\u0644 \u062F\u0648\u0646 \u0625\u0639\u0627\u062F\u0629 \u0625\u062F\u062E\u0627\u0644" }
+      )}
+          <div class="steps">
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "The order arrives", de: "Die Bestellung trifft ein", ar: "\u064A\u0635\u0644 \u0627\u0644\u0637\u0644\u0628" })}>The order arrives</h3><p ${tAttrs({
+        en: "From the counter, a table QR code, an inbound phone call with caller ID, or your online storefront.",
+        de: "Von der Theke, per Tisch-QR-Code, \xFCber einen Anruf mit Rufnummernerkennung oder aus Ihrem Online-Shop.",
+        ar: "\u0645\u0646 \u0627\u0644\u0643\u0627\u0634\u064A\u0631\u060C \u0623\u0648 QR \u0627\u0644\u0637\u0627\u0648\u0644\u0629\u060C \u0623\u0648 \u0645\u0643\u0627\u0644\u0645\u0629 \u0648\u0627\u0631\u062F\u0629 \u0645\u0639 \u062A\u0639\u0631\u064A\u0641 \u0627\u0644\u0645\u062A\u0635\u0644\u060C \u0623\u0648 \u0645\u062A\u062C\u0631\u0643 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A."
+      })}>From the counter, a table QR code, an inbound phone call with caller ID, or your online storefront.</p></div></div>
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "The kitchen sees it", de: "Die K\xFCche sieht sie", ar: "\u064A\u0631\u0627\u0647 \u0627\u0644\u0645\u0637\u0628\u062E" })}>The kitchen sees it</h3><p ${tAttrs({
+        en: "It appears in the live queue with modifiers, allergen notes and the promised time. Print a ticket or work from the screen.",
+        de: "Sie erscheint in der Live-Warteschlange mit Optionen, Allergenhinweisen und Zusagezeit. Bon drucken oder direkt am Bildschirm arbeiten.",
+        ar: "\u064A\u0638\u0647\u0631 \u0641\u064A \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u062D\u064A\u0651\u0629 \u0645\u0639 \u0627\u0644\u0625\u0636\u0627\u0641\u0627\u062A \u0648\u0645\u0644\u0627\u062D\u0638\u0627\u062A \u0627\u0644\u062D\u0633\u0627\u0633\u064A\u0629 \u0648\u0627\u0644\u0648\u0642\u062A \u0627\u0644\u0645\u062A\u0648\u0642\u0639. \u0627\u0637\u0628\u0639 \u062A\u0630\u0643\u0631\u0629 \u0623\u0648 \u0627\u0639\u0645\u0644 \u0645\u0646 \u0627\u0644\u0634\u0627\u0634\u0629."
+      })}>It appears in the live queue with modifiers, allergen notes and the promised time. Print a ticket or work from the screen.</p></div></div>
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "A driver takes it", de: "Ein Fahrer \xFCbernimmt", ar: "\u064A\u0633\u062A\u0644\u0645\u0647 \u0627\u0644\u0633\u0627\u0626\u0642" })}>A driver takes it</h3><p ${tAttrs({
+        en: "Assign directly or broadcast to available drivers. The customer gets a tracking link; you get the timestamps.",
+        de: "Direkt zuweisen oder an verf\xFCgbare Fahrer ausschreiben. Der Kunde erh\xE4lt einen Tracking-Link, Sie die Zeitstempel.",
+        ar: "\u0623\u0633\u0646\u0650\u062F\u0647 \u0645\u0628\u0627\u0634\u0631\u0629 \u0623\u0648 \u0627\u0628\u062B\u0651\u0647 \u0644\u0644\u0633\u0627\u0626\u0642\u064A\u0646 \u0627\u0644\u0645\u062A\u0627\u062D\u064A\u0646. \u064A\u062D\u0635\u0644 \u0627\u0644\u0639\u0645\u064A\u0644 \u0639\u0644\u0649 \u0631\u0627\u0628\u0637 \u062A\u062A\u0628\u0651\u0639\u060C \u0648\u062A\u062D\u0635\u0644 \u0623\u0646\u062A \u0639\u0644\u0649 \u0627\u0644\u0623\u0648\u0642\u0627\u062A."
+      })}>Assign directly or broadcast to available drivers. The customer gets a tracking link; you get the timestamps.</p></div></div>
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "The books close themselves", de: "Der Abschluss l\xE4uft von selbst", ar: "\u062A\u064F\u0642\u0641\u0644 \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u062A\u0644\u0642\u0627\u0626\u064A\u064B\u0627" })}>The books close themselves</h3><p ${tAttrs({
+        en: "Cash-up compares counted cash to expected, files the shift, and pushes the day into your VAT-ready reports.",
+        de: "Der Kassensturz vergleicht Ist- mit Sollbestand, schliesst die Schicht ab und \xFCbertr\xE4gt den Tag in Ihre MwSt.-f\xE4higen Berichte.",
+        ar: "\u064A\u0642\u0627\u0631\u0646 \u0627\u0644\u062A\u0642\u0641\u064A\u0644 \u0627\u0644\u0646\u0642\u062F \u0627\u0644\u0645\u0639\u062F\u0648\u062F \u0628\u0627\u0644\u0645\u062A\u0648\u0642\u0639\u060C \u0648\u064A\u063A\u0644\u0642 \u0627\u0644\u0648\u0631\u062F\u064A\u0629\u060C \u0648\u064A\u0636\u064A\u0641 \u0627\u0644\u064A\u0648\u0645 \u0625\u0644\u0649 \u062A\u0642\u0627\u0631\u064A\u0631 \u062C\u0627\u0647\u0632\u0629 \u0644\u0644\u0636\u0631\u064A\u0628\u0629."
+      })}>Cash-up compares counted cash to expected, files the shift, and pushes the day into your VAT-ready reports.</p></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--inset">
+    <div class="wrap">
+      ${head(
+        { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" },
+        { en: "Configured for how your trade actually works", de: "Auf Ihre Branche zugeschnitten", ar: "\u0645\u0647\u064A\u064E\u0651\u0623 \u062D\u0633\u0628 \u0637\u0628\u064A\u0639\u0629 \u0646\u0634\u0627\u0637\u0643" },
+        {
+          en: "A pharmacy needs batch numbers; a bakery needs scale integration; a caf\xE9 needs a two-tap flat white. Kassenta ships a preset per vertical and lets you adjust every part of it.",
+          de: "Eine Apotheke braucht Chargennummern, eine B\xE4ckerei Waagenanbindung, ein Caf\xE9 einen Flat White in zwei Taps. Kassenta liefert je Branche eine Vorlage \u2014 und l\xE4sst Sie alles daran anpassen.",
+          ar: "\u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0629 \u062A\u062D\u062A\u0627\u062C \u0623\u0631\u0642\u0627\u0645 \u062A\u0634\u063A\u064A\u0644\u0627\u062A\u060C \u0648\u0627\u0644\u0645\u062E\u0628\u0632 \u064A\u062D\u062A\u0627\u062C \u0645\u064A\u0632\u0627\u0646\u064B\u0627\u060C \u0648\u0627\u0644\u0643\u0627\u0641\u064A\u0647 \u064A\u062D\u062A\u0627\u062C \u0637\u0644\u0628\u064B\u0627 \u0628\u0636\u063A\u0637\u062A\u064A\u0646. \u064A\u0648\u0641\u0651\u0631 Kassenta \u0625\u0639\u062F\u0627\u062F\u064B\u0627 \u062C\u0627\u0647\u0632\u064B\u0627 \u0644\u0643\u0644 \u0646\u0634\u0627\u0637 \u0645\u0639 \u0625\u0645\u0643\u0627\u0646\u064A\u0629 \u062A\u0639\u062F\u064A\u0644 \u0643\u0644 \u062A\u0641\u0635\u064A\u0644\u0629."
+        },
+        true
+      )}
+      <div class="grid grid-3">
+        ${card(icons.coffee, { en: "Caf\xE9s and bars", de: "Caf\xE9s und Bars", ar: "\u0627\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u0627\u0644\u0628\u0627\u0631\u0627\u062A" }, {
+        en: "Fast repeat orders, cup sizes and milk options as modifiers, tab handling and a tip line on the receipt.",
+        de: "Schnelle Wiederholbestellungen, Gr\xF6ssen und Milchoptionen als Optionen, Deckel-Verwaltung und Trinkgeldzeile auf dem Bon.",
+        ar: "\u0637\u0644\u0628\u0627\u062A \u0645\u062A\u0643\u0631\u0631\u0629 \u0633\u0631\u064A\u0639\u0629\u060C \u0648\u0623\u062D\u062C\u0627\u0645 \u0648\u062E\u064A\u0627\u0631\u0627\u062A \u062D\u0644\u064A\u0628 \u0643\u0625\u0636\u0627\u0641\u0627\u062A\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062D\u0633\u0627\u0628 \u0627\u0644\u0645\u0641\u062A\u0648\u062D\u060C \u0648\u0633\u0637\u0631 \u0628\u0642\u0634\u064A\u0634 \u0641\u064A \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629."
+      })}
+        ${card(icons.register, { en: "Restaurants", de: "Restaurants", ar: "\u0627\u0644\u0645\u0637\u0627\u0639\u0645" }, {
+        en: "Table plan, course timing, dine-in versus takeaway VAT, split bills and QR ordering from the table.",
+        de: "Tischplan, Gangsteuerung, MwSt. f\xFCr Vor-Ort und Takeaway, Rechnungsteilung und QR-Bestellung am Tisch.",
+        ar: "\u0645\u062E\u0637\u0637 \u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A\u060C \u0648\u062A\u0648\u0642\u064A\u062A \u0627\u0644\u0623\u0637\u0628\u0627\u0642\u060C \u0648\u0636\u0631\u064A\u0628\u0629 \u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0645\u0642\u0627\u0628\u0644 \u062A\u064A\u0643 \u0623\u0648\u0627\u064A\u060C \u0648\u062A\u0642\u0633\u064A\u0645 \u0627\u0644\u0641\u0648\u0627\u062A\u064A\u0631\u060C \u0648\u0637\u0644\u0628 QR \u0645\u0646 \u0627\u0644\u0637\u0627\u0648\u0644\u0629."
+      })}
+        ${card(icons.cart, { en: "Supermarkets", de: "Superm\xE4rkte", ar: "\u0627\u0644\u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A" }, {
+        en: "Barcode scanning, weighed goods, deposit handling and fast multi-item checkout with a customer display.",
+        de: "Barcode-Scanning, Gewichtsware, Pfandverwaltung und schneller Multi-Artikel-Checkout mit Kundendisplay.",
+        ar: "\u0645\u0633\u062D \u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062F\u060C \u0648\u0627\u0644\u0633\u0644\u0639 \u0628\u0627\u0644\u0648\u0632\u0646\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062A\u0623\u0645\u064A\u0646 \u0627\u0644\u0645\u0633\u062A\u0631\u062F\u060C \u0648\u062F\u0641\u0639 \u0633\u0631\u064A\u0639 \u0644\u0623\u0635\u0646\u0627\u0641 \u0645\u062A\u0639\u062F\u062F\u0629 \u0645\u0639 \u0634\u0627\u0634\u0629 \u0639\u0645\u064A\u0644."
+      })}
+        ${card(icons.pill, { en: "Pharmacies", de: "Apotheken", ar: "\u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0627\u062A" }, {
+        en: "Reduced VAT categories, batch and expiry tracking, restricted-item prompts and per-operator audit trails.",
+        de: "Reduzierte MwSt.-Kategorien, Chargen- und Verfallsverfolgung, Hinweise bei rezeptpflichtigen Artikeln und Audit-Trails je Mitarbeiter.",
+        ar: "\u0641\u0626\u0627\u062A \u0636\u0631\u064A\u0628\u0629 \u0645\u062E\u0641\u064E\u0651\u0636\u0629\u060C \u0648\u062A\u062A\u0628\u0651\u0639 \u0627\u0644\u062A\u0634\u063A\u064A\u0644\u0627\u062A \u0648\u062A\u0648\u0627\u0631\u064A\u062E \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0629\u060C \u0648\u062A\u0646\u0628\u064A\u0647\u0627\u062A \u0627\u0644\u0623\u0635\u0646\u0627\u0641 \u0627\u0644\u0645\u0642\u064A\u064E\u0651\u062F\u0629\u060C \u0648\u0633\u062C\u0644 \u062A\u062F\u0642\u064A\u0642 \u0644\u0643\u0644 \u0645\u0633\u062A\u062E\u062F\u0645."
+      })}
+        ${card(icons.box, { en: "Bakeries", de: "B\xE4ckereien", ar: "\u0627\u0644\u0645\u062E\u0627\u0628\u0632" }, {
+        en: "Weight-based pricing, morning pre-orders, production planning and waste recording at close.",
+        de: "Preis nach Gewicht, Vorbestellungen am Morgen, Produktionsplanung und Retourenerfassung beim Abschluss.",
+        ar: "\u062A\u0633\u0639\u064A\u0631 \u0628\u0627\u0644\u0648\u0632\u0646\u060C \u0648\u0637\u0644\u0628\u0627\u062A \u0645\u0633\u0628\u0642\u0629 \u0635\u0628\u0627\u062D\u064A\u0629\u060C \u0648\u062A\u062E\u0637\u064A\u0637 \u0627\u0644\u0625\u0646\u062A\u0627\u062C\u060C \u0648\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0647\u062F\u0631 \u0639\u0646\u062F \u0627\u0644\u0625\u063A\u0644\u0627\u0642."
+      })}
+        ${card(icons.tag, { en: "Retail", de: "Einzelhandel", ar: "\u0627\u0644\u062A\u062C\u0632\u0626\u0629" }, {
+        en: "Variants by size and colour, stock counts, returns with reason codes and supplier purchase records.",
+        de: "Varianten nach Gr\xF6sse und Farbe, Inventuren, Retouren mit Grundcodes und Lieferantenbelege.",
+        ar: "\u0645\u062A\u063A\u064A\u0651\u0631\u0627\u062A \u0628\u0627\u0644\u0645\u0642\u0627\u0633 \u0648\u0627\u0644\u0644\u0648\u0646\u060C \u0648\u062C\u0631\u062F \u0627\u0644\u0645\u062E\u0632\u0648\u0646\u060C \u0648\u0645\u0631\u062A\u062C\u0639\u0627\u062A \u0628\u0623\u0633\u0628\u0627\u0628 \u0645\u062D\u062F\u064E\u0651\u062F\u0629\u060C \u0648\u0633\u062C\u0644\u0627\u062A \u0645\u0634\u062A\u0631\u064A\u0627\u062A \u0627\u0644\u0645\u0648\u0631\u062F\u064A\u0646."
+      })}
+      </div>
+      <div class="btn-row" style="justify-content:center">
+        <a class="btn btn-ghost" href="/solutions/" ${tAttrs({ en: "Compare all industry presets", de: "Alle Branchenvorlagen vergleichen", ar: "\u0642\u0627\u0631\u0646 \u0643\u0644 \u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" })}>Compare all industry presets</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          ${head(
+        { en: "Built in, not bolted on", de: "Eingebaut, nicht angeflanscht", ar: "\u0645\u062F\u0645\u062C \u0644\u0627 \u0645\u0636\u0627\u0641" },
+        { en: "The Swiss details that usually cost extra", de: "Die Schweizer Details, die sonst extra kosten", ar: "\u062A\u0641\u0627\u0635\u064A\u0644 \u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0639\u0627\u062F\u0629\u064B \u0645\u0627 \u062A\u064F\u0643\u0644\u0651\u0641 \u0625\u0636\u0627\u0641\u064A\u064B\u0627" }
+      )}
+          ${ticks([
+        { en: "8.1% standard and 2.6% reduced VAT, with the dine-in versus takeaway distinction applied per line.", de: "8,1 % Normal- und 2,6 % reduzierter MwSt.-Satz, mit Unterscheidung Vor-Ort/Takeaway pro Position.", ar: "\u0636\u0631\u064A\u0628\u0629 8.1% \u0639\u0627\u062F\u064A\u0629 \u06482.6% \u0645\u062E\u0641\u064E\u0651\u0636\u0629\u060C \u0645\u0639 \u0627\u0644\u062A\u0641\u0631\u0642\u0629 \u0628\u064A\u0646 \u0627\u0644\u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0648\u0627\u0644\u062A\u064A\u0643 \u0623\u0648\u0627\u064A \u0644\u0643\u0644 \u0628\u0646\u062F." },
+        { en: "Cash totals rounded to the nearest CHF 0.05 while card and TWINT keep the exact amount.", de: "Barbetr\xE4ge auf 5 Rappen gerundet, Karte und TWINT bleiben exakt.", ar: "\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F \u0644\u0623\u0642\u0631\u0628 0.05 \u0641\u0631\u0646\u0643 \u0645\u0639 \u0625\u0628\u0642\u0627\u0621 \u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0642\u064A\u0642 \u0644\u0644\u0628\u0637\u0627\u0642\u0629 \u0648TWINT." },
+        { en: "TWINT, card, cash and invoice as first-class payment methods on the receipt and in reports.", de: "TWINT, Karte, Bar und Rechnung als gleichwertige Zahlungsarten auf Bon und in Berichten.", ar: "TWINT \u0648\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0648\u0627\u0644\u0646\u0642\u062F \u0648\u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0643\u0648\u0633\u0627\u0626\u0644 \u062F\u0641\u0639 \u0623\u0633\u0627\u0633\u064A\u0629 \u0641\u064A \u0627\u0644\u0625\u064A\u0635\u0627\u0644 \u0648\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631." },
+        { en: "German, English and Arabic across the whole product, including right-to-left layout.", de: "Deutsch, Englisch und Arabisch im gesamten Produkt, inklusive Rechts-nach-links-Layout.", ar: "\u0627\u0644\u0623\u0644\u0645\u0627\u0646\u064A\u0629 \u0648\u0627\u0644\u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629 \u0648\u0627\u0644\u0639\u0631\u0628\u064A\u0629 \u0641\u064A \u0643\u0644 \u0627\u0644\u0645\u0646\u062A\u062C\u060C \u0628\u0645\u0627 \u0641\u064A \u0630\u0644\u0643 \u0627\u0644\u062A\u062E\u0637\u064A\u0637 \u0645\u0646 \u0627\u0644\u064A\u0645\u064A\u0646 \u0644\u0644\u064A\u0633\u0627\u0631." },
+        { en: "Data hosted in Europe, with GDPR and nDSG deletion and export requests handled from the console.", de: "Daten in Europa gehostet, DSGVO- und nDSG-L\xF6sch- sowie Exportanfragen direkt in der Konsole.", ar: "\u0627\u0633\u062A\u0636\u0627\u0641\u0629 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0641\u064A \u0623\u0648\u0631\u0648\u0628\u0627\u060C \u0645\u0639 \u0645\u0639\u0627\u0644\u062C\u0629 \u0637\u0644\u0628\u0627\u062A \u0627\u0644\u062D\u0630\u0641 \u0648\u0627\u0644\u062A\u0635\u062F\u064A\u0631 \u0648\u0641\u0642 GDPR \u0648nDSG \u0645\u0646 \u0627\u0644\u0644\u0648\u062D\u0629." }
+      ])}
+          <div class="btn-row">
+            <a class="btn btn-ghost" href="/compliance/" ${tAttrs({ en: "Read the compliance detail", de: "Compliance-Details lesen", ar: "\u0627\u0642\u0631\u0623 \u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644" })}>Read the compliance detail</a>
+          </div>
+        </div>
+        <div class="reveal">
+          ${shot({ id: "home-swiss-receipt", ratio: "5 / 6", size: "1250 \xD7 1500", alt: { en: "Receipt showing Swiss VAT split and cash rounding", de: "Bon mit Schweizer MwSt.-Aufteilung und Rappenrundung", ar: "\u0625\u064A\u0635\u0627\u0644 \u064A\u0648\u0636\u0651\u062D \u062A\u0642\u0633\u064A\u0645 \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A" } })}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="wrap">
+      ${head(
+        { en: "Everywhere you work", de: "\xDCberall im Einsatz", ar: "\u0623\u064A\u0646\u0645\u0627 \u062A\u0639\u0645\u0644" },
+        { en: "Phone in the aisle, tablet at the counter, browser in the office", de: "Handy im Gang, Tablet an der Theke, Browser im B\xFCro", ar: "\u0647\u0627\u062A\u0641 \u0628\u064A\u0646 \u0627\u0644\u0631\u0641\u0648\u0641\u060C \u062A\u0627\u0628\u0644\u062A \u0639\u0644\u0649 \u0627\u0644\u0643\u0627\u0634\u064A\u0631\u060C \u0645\u062A\u0635\u0641\u062D \u0641\u064A \u0627\u0644\u0645\u0643\u062A\u0628" },
+        {
+          en: "One codebase, three form factors. The layout adapts rather than shrinking: the cart becomes a sheet on a phone, a sidebar on a tablet and a fixed panel on a desktop.",
+          de: "Eine Codebasis, drei Formate. Das Layout passt sich an, statt nur zu schrumpfen: Der Warenkorb wird zum Sheet am Handy, zur Seitenleiste am Tablet und zum festen Panel am Desktop.",
+          ar: "\u0642\u0627\u0639\u062F\u0629 \u0643\u0648\u062F \u0648\u0627\u062D\u062F\u0629 \u0648\u062B\u0644\u0627\u062B\u0629 \u0623\u062D\u062C\u0627\u0645. \u0627\u0644\u062A\u062E\u0637\u064A\u0637 \u064A\u062A\u0643\u064A\u0651\u0641 \u0628\u062F\u0644 \u0623\u0646 \u064A\u0646\u0643\u0645\u0634: \u0627\u0644\u0633\u0644\u0629 \u062A\u0635\u0628\u062D \u0644\u0648\u062D\u064B\u0627 \u0641\u064A \u0627\u0644\u0647\u0627\u062A\u0641\u060C \u0648\u0634\u0631\u064A\u0637\u064B\u0627 \u062C\u0627\u0646\u0628\u064A\u064B\u0627 \u0641\u064A \u0627\u0644\u062A\u0627\u0628\u0644\u062A\u060C \u0648\u0644\u0648\u062D\u0629 \u062B\u0627\u0628\u062A\u0629 \u0641\u064A \u0627\u0644\u0643\u0645\u0628\u064A\u0648\u062A\u0631."
+        },
+        true
+      )}
+      <div class="reveal">
+        ${shot({ id: "home-devices", ratio: "16 / 8", size: "1920 \xD7 960", contain: true, alt: { en: "Kassenta shown on a phone, a tablet and a desktop browser", de: "Kassenta auf Smartphone, Tablet und Desktop-Browser", ar: "Kassenta \u0639\u0644\u0649 \u0647\u0627\u062A\u0641 \u0648\u062A\u0627\u0628\u0644\u062A \u0648\u0645\u062A\u0635\u0641\u062D \u0643\u0645\u0628\u064A\u0648\u062A\u0631" } })}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap" style="max-width:860px">
+      ${head({ en: "Questions", de: "Fragen", ar: "\u0623\u0633\u0626\u0644\u0629" }, { en: "Frequently asked", de: "H\xE4ufig gefragt", ar: "\u0627\u0644\u0623\u0643\u062B\u0631 \u062A\u0643\u0631\u0627\u0631\u064B\u0627" }, void 0, true)}
+      ${faq([
+        {
+          q: { en: "Do I need to buy special hardware?", de: "Brauche ich spezielle Hardware?", ar: "\u0647\u0644 \u0623\u062D\u062A\u0627\u062C \u0623\u062C\u0647\u0632\u0629 \u062E\u0627\u0635\u0629\u061F" },
+          a: {
+            en: "No. Kassenta runs in any modern browser and as an app on Android and iOS, so an existing tablet or laptop is enough to start. Receipt printers, cash drawers and barcode scanners are supported but optional.",
+            de: "Nein. Kassenta l\xE4uft in jedem modernen Browser sowie als App unter Android und iOS \u2014 ein vorhandenes Tablet oder Notebook gen\xFCgt f\xFCr den Start. Bondrucker, Kassenladen und Barcodescanner werden unterst\xFCtzt, sind aber optional.",
+            ar: "\u0644\u0627. \u064A\u0639\u0645\u0644 Kassenta \u0641\u064A \u0623\u064A \u0645\u062A\u0635\u0641\u062D \u062D\u062F\u064A\u062B \u0648\u0643\u062A\u0637\u0628\u064A\u0642 \u0639\u0644\u0649 \u0623\u0646\u062F\u0631\u0648\u064A\u062F \u0648iOS\u060C \u0644\u0630\u0627 \u064A\u0643\u0641\u064A \u062A\u0627\u0628\u0644\u062A \u0623\u0648 \u0644\u0627\u0628\u062A\u0648\u0628 \u0644\u062F\u064A\u0643 \u0644\u0644\u0628\u062F\u0621. \u0627\u0644\u0637\u0627\u0628\u0639\u0627\u062A \u0648\u0623\u062F\u0631\u0627\u062C \u0627\u0644\u0646\u0642\u062F \u0648\u0642\u0627\u0631\u0626\u0627\u062A \u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062F \u0645\u062F\u0639\u0648\u0645\u0629 \u0644\u0643\u0646\u0647\u0627 \u0627\u062E\u062A\u064A\u0627\u0631\u064A\u0629."
+          }
+        },
+        {
+          q: { en: "What happens if the internet drops?", de: "Was passiert bei Internetausfall?", ar: "\u0645\u0627\u0630\u0627 \u0644\u0648 \u0627\u0646\u0642\u0637\u0639 \u0627\u0644\u0625\u0646\u062A\u0631\u0646\u062A\u061F" },
+          a: {
+            en: "The POS keeps taking orders and payments from its local cache and syncs the queue once the connection returns. Online ordering and driver tracking need connectivity, since they involve people outside the building.",
+            de: "Die Kasse nimmt weiterhin Bestellungen und Zahlungen aus dem lokalen Cache entgegen und synchronisiert die Warteschlange, sobald die Verbindung zur\xFCck ist. Online-Bestellung und Fahrer-Tracking ben\xF6tigen eine Verbindung, da Personen ausserhalb beteiligt sind.",
+            ar: "\u064A\u0648\u0627\u0635\u0644 \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0627\u0633\u062A\u0642\u0628\u0627\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0648\u0627\u0644\u0645\u062F\u0641\u0648\u0639\u0627\u062A \u0645\u0646 \u0627\u0644\u0630\u0627\u0643\u0631\u0629 \u0627\u0644\u0645\u062D\u0644\u064A\u0629 \u062B\u0645 \u064A\u0632\u0627\u0645\u0646 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0641\u0648\u0631 \u0639\u0648\u062F\u0629 \u0627\u0644\u0627\u062A\u0635\u0627\u0644. \u0623\u0645\u0627 \u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0648\u062A\u062A\u0628\u0651\u0639 \u0627\u0644\u0633\u0627\u0626\u0642\u064A\u0646 \u0641\u064A\u062D\u062A\u0627\u062C\u0627\u0646 \u0627\u062A\u0635\u0627\u0644\u064B\u0627 \u0644\u0623\u0646\u0647\u0645\u0627 \u064A\u0634\u0645\u0644\u0627\u0646 \u0623\u0634\u062E\u0627\u0635\u064B\u0627 \u062E\u0627\u0631\u062C \u0627\u0644\u0645\u062D\u0644."
+          }
+        },
+        {
+          q: { en: "Can I move my existing products and customers in?", de: "Kann ich bestehende Artikel und Kunden \xFCbernehmen?", ar: "\u0647\u0644 \u064A\u0645\u0643\u0646 \u0646\u0642\u0644 \u0645\u0646\u062A\u062C\u0627\u062A\u064A \u0648\u0639\u0645\u0644\u0627\u0626\u064A \u0627\u0644\u062D\u0627\u0644\u064A\u064A\u0646\u061F" },
+          a: {
+            en: "Yes. Products, categories and customers import from CSV, and we do the first import with you during onboarding so the mapping is right before you go live.",
+            de: "Ja. Artikel, Kategorien und Kunden werden per CSV importiert; den ersten Import machen wir beim Onboarding gemeinsam, damit die Zuordnung vor dem Livegang stimmt.",
+            ar: "\u0646\u0639\u0645. \u062A\u064F\u0633\u062A\u0648\u0631\u062F \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0627\u0644\u0641\u0626\u0627\u062A \u0648\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0645\u0646 \u0645\u0644\u0641 CSV\u060C \u0648\u0646\u0642\u0648\u0645 \u0628\u0623\u0648\u0644 \u0627\u0633\u062A\u064A\u0631\u0627\u062F \u0645\u0639\u0643 \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u062A\u0647\u064A\u0626\u0629 \u0644\u0636\u0645\u0627\u0646 \u0635\u062D\u0629 \u0627\u0644\u0631\u0628\u0637 \u0642\u0628\u0644 \u0627\u0644\u062A\u0634\u063A\u064A\u0644."
+          }
+        },
+        {
+          q: { en: "How many branches can one account hold?", de: "Wie viele Filialen kann ein Konto haben?", ar: "\u0643\u0645 \u0641\u0631\u0639\u064B\u0627 \u064A\u0633\u062A\u0648\u0639\u0628 \u0627\u0644\u062D\u0633\u0627\u0628 \u0627\u0644\u0648\u0627\u062D\u062F\u061F" },
+          a: {
+            en: "As many as you need. Each branch keeps its own stock, staff and prices while the owner console reports across all of them together.",
+            de: "So viele wie n\xF6tig. Jede Filiale f\xFChrt eigenen Bestand, Personal und Preise, w\xE4hrend die Betreiber-Konsole filial\xFCbergreifend auswertet.",
+            ar: "\u0628\u0644\u0627 \u062D\u062F. \u0644\u0643\u0644 \u0641\u0631\u0639 \u0645\u062E\u0632\u0648\u0646\u0647 \u0648\u0645\u0648\u0638\u0641\u0648\u0647 \u0648\u0623\u0633\u0639\u0627\u0631\u0647\u060C \u0628\u064A\u0646\u0645\u0627 \u062A\u0639\u0631\u0636 \u0644\u0648\u062D\u0629 \u0627\u0644\u0645\u0627\u0644\u0643 \u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u062C\u0645\u0651\u0639\u0629 \u0644\u0643\u0644 \u0627\u0644\u0641\u0631\u0648\u0639."
+          }
+        },
+        {
+          q: { en: "Is my data locked in?", de: "Sind meine Daten eingeschlossen?", ar: "\u0647\u0644 \u0628\u064A\u0627\u0646\u0627\u062A\u064A \u0645\u062D\u062A\u062C\u0632\u0629\u061F" },
+          a: {
+            en: "No. Sales, products and customers can be exported to CSV at any time from the reporting screens, and a full export can be requested from support.",
+            de: "Nein. Ums\xE4tze, Artikel und Kunden lassen sich jederzeit aus den Berichten als CSV exportieren; einen Vollexport erhalten Sie \xFCber den Support.",
+            ar: "\u0644\u0627. \u064A\u0645\u0643\u0646 \u062A\u0635\u062F\u064A\u0631 \u0627\u0644\u0645\u0628\u064A\u0639\u0627\u062A \u0648\u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0625\u0644\u0649 CSV \u0641\u064A \u0623\u064A \u0648\u0642\u062A \u0645\u0646 \u0634\u0627\u0634\u0627\u062A \u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631\u060C \u0648\u0637\u0644\u0628 \u062A\u0635\u062F\u064A\u0631 \u0643\u0627\u0645\u0644 \u0639\u0628\u0631 \u0627\u0644\u062F\u0639\u0645."
+          }
+        }
+      ])}
+    </div>
+  </section>
+
+  ${ctaBand(
+        { en: "See it running on your own menu", de: "Sehen Sie es mit Ihrer eigenen Karte", ar: "\u0634\u0627\u0647\u062F\u0647 \u064A\u0639\u0645\u0644 \u0639\u0644\u0649 \u0642\u0627\u0626\u0645\u062A\u0643 \u0623\u0646\u062A" },
+        {
+          en: "Send us your current menu or product list. We load it into a demo account and walk you through a normal service \u2014 counter, online order and delivery \u2014 in about 30 minutes.",
+          de: "Senden Sie uns Ihre aktuelle Karte oder Artikelliste. Wir laden sie in ein Demo-Konto und zeigen Ihnen in rund 30 Minuten einen normalen Serviceablauf \u2014 Theke, Online-Bestellung und Lieferung.",
+          ar: "\u0623\u0631\u0633\u0644 \u0644\u0646\u0627 \u0642\u0627\u0626\u0645\u062A\u0643 \u0623\u0648 \u0642\u0627\u0626\u0645\u0629 \u0645\u0646\u062A\u062C\u0627\u062A\u0643 \u0627\u0644\u062D\u0627\u0644\u064A\u0629. \u0646\u062D\u0645\u0651\u0644\u0647\u0627 \u0641\u064A \u062D\u0633\u0627\u0628 \u062A\u062C\u0631\u064A\u0628\u064A \u0648\u0646\u0639\u0631\u0636 \u0644\u0643 \u062F\u0648\u0631\u0629 \u0639\u0645\u0644 \u0643\u0627\u0645\u0644\u0629 \u2014 \u0643\u0627\u0634\u064A\u0631 \u0648\u0637\u0644\u0628 \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0648\u062A\u0648\u0635\u064A\u0644 \u2014 \u0641\u064A \u0646\u062D\u0648 30 \u062F\u0642\u064A\u0642\u0629."
+        }
+      )}`
+    };
+    features = {
+      meta: {
+        path: "/features",
+        title: {
+          en: "Features \u2014 Kassenta POS",
+          de: "Funktionen \u2014 Kassenta POS",
+          ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A \u2014 Kassenta POS"
+        },
+        description: {
+          en: "Touch POS, table QR ordering, delivery dispatch, inventory, CRM and loyalty, staff shifts and VAT-ready reporting \u2014 every module in the Kassenta platform.",
+          de: "Touch-Kasse, Tisch-QR-Bestellung, Lieferdisposition, Lagerhaltung, CRM und Treueprogramm, Schichten und MwSt.-f\xE4hige Auswertungen \u2014 alle Module der Kassenta-Plattform.",
+          ar: "\u0643\u0627\u0634\u064A\u0631 \u0644\u0645\u0633\u064A\u060C \u0648\u0637\u0644\u0628 QR \u0644\u0644\u0637\u0627\u0648\u0644\u0627\u062A\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062A\u0648\u0635\u064A\u0644\u060C \u0648\u0627\u0644\u0645\u062E\u0632\u0648\u0646\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u0627\u0644\u0648\u0644\u0627\u0621\u060C \u0648\u0648\u0631\u062F\u064A\u0627\u062A \u0627\u0644\u0645\u0648\u0638\u0641\u064A\u0646\u060C \u0648\u062A\u0642\u0627\u0631\u064A\u0631 \u062C\u0627\u0647\u0632\u0629 \u0644\u0644\u0636\u0631\u064A\u0628\u0629 \u2014 \u0643\u0644 \u0648\u062D\u062F\u0627\u062A \u0645\u0646\u0635\u0629 Kassenta."
+        }
+      },
+      body: `
+  ${pageHead(
+        { en: "Everything the floor, the kitchen and the office need", de: "Alles f\xFCr Verkaufsfl\xE4che, K\xFCche und B\xFCro", ar: "\u0643\u0644 \u0645\u0627 \u062A\u062D\u062A\u0627\u062C\u0647 \u0627\u0644\u0635\u0627\u0644\u0629 \u0648\u0627\u0644\u0645\u0637\u0628\u062E \u0648\u0627\u0644\u0625\u062F\u0627\u0631\u0629" },
+        {
+          en: "Kassenta is one application with modules you switch on as you grow. Nothing here is a separate purchase or a separate login.",
+          de: "Kassenta ist eine Anwendung mit Modulen, die Sie beim Wachsen zuschalten. Nichts davon ist ein separater Kauf oder ein separates Login.",
+          ar: "Kassenta \u062A\u0637\u0628\u064A\u0642 \u0648\u0627\u062D\u062F \u0628\u0648\u062D\u062F\u0627\u062A \u062A\u0641\u0639\u0651\u0644\u0647\u0627 \u0645\u0639 \u0646\u0645\u0648\u0651\u0643. \u0644\u0627 \u0634\u064A\u0621 \u0647\u0646\u0627 \u0634\u0631\u0627\u0621 \u0645\u0646\u0641\u0635\u0644 \u0623\u0648 \u062D\u0633\u0627\u0628 \u0645\u0646\u0641\u0635\u0644."
+        },
+        { en: "Features", de: "Funktionen", ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A" }
+      )}
+
+  <section class="section">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          ${head({ en: "Selling", de: "Verkauf", ar: "\u0627\u0644\u0628\u064A\u0639" }, { en: "A till that keeps up with a queue", de: "Eine Kasse, die mit der Schlange mith\xE4lt", ar: "\u0643\u0627\u0634\u064A\u0631 \u064A\u0648\u0627\u0643\u0628 \u0627\u0644\u0637\u0627\u0628\u0648\u0631" })}
+          ${ticks([
+        { en: "Category and search-first product grid, tuned so a regular order takes three taps.", de: "Raster nach Kategorie und Suche, so abgestimmt, dass eine Standardbestellung drei Taps braucht.", ar: "\u0634\u0628\u0643\u0629 \u0645\u0646\u062A\u062C\u0627\u062A \u0628\u0627\u0644\u0641\u0626\u0627\u062A \u0648\u0627\u0644\u0628\u062D\u062B\u060C \u0645\u0636\u0628\u0648\u0637\u0629 \u0644\u064A\u062A\u0645 \u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u0645\u0639\u062A\u0627\u062F \u0628\u062B\u0644\u0627\u062B \u0636\u063A\u0637\u0627\u062A." },
+        { en: "Variants and modifiers with price deltas \u2014 sizes, extras, removals and free-text kitchen notes.", de: "Varianten und Optionen mit Preisdifferenz \u2014 Gr\xF6ssen, Extras, Abwahl und freie K\xFCchennotizen.", ar: "\u0645\u062A\u063A\u064A\u0651\u0631\u0627\u062A \u0648\u0625\u0636\u0627\u0641\u0627\u062A \u0628\u0641\u0631\u0648\u0642 \u0633\u0639\u0631\u064A\u0629 \u2014 \u0623\u062D\u062C\u0627\u0645 \u0648\u0625\u0636\u0627\u0641\u0627\u062A \u0648\u062D\u0630\u0641 \u0648\u0645\u0644\u0627\u062D\u0638\u0627\u062A \u0645\u0637\u0628\u062E \u062D\u0631\u0629." },
+        { en: "Percentage or fixed discounts per line or per ticket, with a reason recorded against the operator.", de: "Prozentuale oder feste Rabatte je Position oder Bon, mit Begr\xFCndung und Zuordnung zum Mitarbeiter.", ar: "\u062E\u0635\u0648\u0645\u0627\u062A \u0646\u0633\u0628\u064A\u0629 \u0623\u0648 \u062B\u0627\u0628\u062A\u0629 \u0644\u0643\u0644 \u0628\u0646\u062F \u0623\u0648 \u0641\u0627\u062A\u0648\u0631\u0629\u060C \u0645\u0639 \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0633\u0628\u0628 \u0628\u0627\u0633\u0645 \u0627\u0644\u0645\u0648\u0638\u0641." },
+        { en: "Split payments across cash, card, TWINT and wallet on a single ticket.", de: "Teilzahlungen \xFCber Bar, Karte, TWINT und Guthaben auf einem Bon.", ar: "\u062F\u0641\u0639 \u0645\u0642\u0633\u064E\u0651\u0645 \u0628\u064A\u0646 \u0627\u0644\u0646\u0642\u062F \u0648\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0648TWINT \u0648\u0627\u0644\u0645\u062D\u0641\u0638\u0629 \u0641\u064A \u0641\u0627\u062A\u0648\u0631\u0629 \u0648\u0627\u062D\u062F\u0629." },
+        { en: "Held tickets, quick reprint and a searchable invoice history with a 24-hour and full-range view.", de: "Geparkte Bons, Schnell-Nachdruck und durchsuchbare Beleghistorie mit 24-Stunden- und Gesamtansicht.", ar: "\u0641\u0648\u0627\u062A\u064A\u0631 \u0645\u0639\u0644\u064E\u0651\u0642\u0629\u060C \u0648\u0625\u0639\u0627\u062F\u0629 \u0637\u0628\u0627\u0639\u0629 \u0633\u0631\u064A\u0639\u0629\u060C \u0648\u0633\u062C\u0644 \u0641\u0648\u0627\u062A\u064A\u0631 \u0642\u0627\u0628\u0644 \u0644\u0644\u0628\u062D\u062B \u0628\u0639\u0631\u0636 24 \u0633\u0627\u0639\u0629 \u0623\u0648 \u0643\u0627\u0645\u0644 \u0627\u0644\u0645\u062F\u0629." },
+        { en: "Barcode scanning from the device camera or a USB or Bluetooth scanner.", de: "Barcode-Scan \xFCber Ger\xE4tekamera oder USB-/Bluetooth-Scanner.", ar: "\u0645\u0633\u062D \u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062F \u0645\u0646 \u0643\u0627\u0645\u064A\u0631\u0627 \u0627\u0644\u062C\u0647\u0627\u0632 \u0623\u0648 \u0645\u0627\u0633\u062D USB \u0623\u0648 \u0628\u0644\u0648\u062A\u0648\u062B." }
+      ])}
+        </div>
+        <div class="reveal">${shot({ id: "feature-pos-grid", ratio: "16 / 11", size: "1600 \xD7 1100", alt: { en: "The Kassenta product grid and cart during a busy service", de: "Artikelraster und Warenkorb von Kassenta im laufenden Betrieb", ar: "\u0634\u0628\u0643\u0629 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0633\u0644\u0629 Kassenta \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u062E\u062F\u0645\u0629" } })}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="wrap">
+      <div class="split">
+        <div class="reveal">${shot({ id: "feature-online-store", ratio: "16 / 11", size: "1600 \xD7 1100", alt: { en: "A branded Kassenta online storefront on a phone", de: "Gebrandeter Kassenta-Onlineshop auf dem Smartphone", ar: "\u0645\u062A\u062C\u0631 Kassenta \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0628\u0647\u0648\u064A\u0629 \u0627\u0644\u0645\u062A\u062C\u0631 \u0639\u0644\u0649 \u0627\u0644\u0647\u0627\u062A\u0641" } })}</div>
+        <div>
+          ${head({ en: "Online and tables", de: "Online und Tische", ar: "\u0623\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A" }, { en: "Your own ordering channel, not a marketplace listing", de: "Ihr eigener Bestellkanal statt eines Marktplatz-Eintrags", ar: "\u0642\u0646\u0627\u0629 \u0637\u0644\u0628 \u062E\u0627\u0635\u0629 \u0628\u0643 \u0644\u0627 \u0645\u062C\u0631\u062F \u0625\u062F\u0631\u0627\u062C \u0641\u064A \u062A\u0637\u0628\u064A\u0642 \u0648\u0633\u064A\u0637" })}
+          ${ticks([
+        { en: "A storefront at your own address, with your logo, colours, opening hours and promo banner.", de: "Ein Shop unter Ihrer eigenen Adresse, mit Logo, Farben, \xD6ffnungszeiten und Aktionsbanner.", ar: "\u0645\u062A\u062C\u0631 \u0639\u0644\u0649 \u0639\u0646\u0648\u0627\u0646\u0643 \u0627\u0644\u062E\u0627\u0635\u060C \u0628\u0634\u0639\u0627\u0631\u0643 \u0648\u0623\u0644\u0648\u0627\u0646\u0643 \u0648\u0645\u0648\u0627\u0639\u064A\u062F\u0643 \u0648\u0634\u0631\u064A\u0637 \u0639\u0631\u0648\u0636\u0643." },
+        { en: "Per-table QR codes that open the menu with the table already attached to the order.", de: "QR-Codes je Tisch, die die Karte mit bereits zugeordnetem Tisch \xF6ffnen.", ar: "\u0623\u0643\u0648\u0627\u062F QR \u0644\u0643\u0644 \u0637\u0627\u0648\u0644\u0629 \u062A\u0641\u062A\u062D \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0648\u0627\u0644\u0637\u0627\u0648\u0644\u0629 \u0645\u0631\u062A\u0628\u0637\u0629 \u0628\u0627\u0644\u0637\u0644\u0628 \u062A\u0644\u0642\u0627\u0626\u064A\u064B\u0627." },
+        { en: "Delivery, pickup and dine-in as separate flows, each with its own fee, minimum and VAT treatment.", de: "Lieferung, Abholung und Vor-Ort als getrennte Abl\xE4ufe mit eigener Geb\xFChr, Mindestbestellwert und MwSt.-Behandlung.", ar: "\u062A\u0648\u0635\u064A\u0644 \u0648\u0627\u0633\u062A\u0644\u0627\u0645 \u0648\u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0643\u0645\u0633\u0627\u0631\u0627\u062A \u0645\u0646\u0641\u0635\u0644\u0629\u060C \u0644\u0643\u0644 \u0645\u0646\u0647\u0627 \u0631\u0633\u0648\u0645 \u0648\u062D\u062F \u0623\u062F\u0646\u0649 \u0648\u0645\u0639\u0627\u0644\u062C\u0629 \u0636\u0631\u064A\u0628\u064A\u0629 \u062E\u0627\u0635\u0629." },
+        { en: "Scheduled orders for a later slot, with the kitchen queue ordering itself by promised time.", de: "Vorbestellungen f\xFCr ein sp\xE4teres Zeitfenster; die K\xFCchenwarteschlange sortiert sich nach Zusagezeit.", ar: "\u0637\u0644\u0628\u0627\u062A \u0645\u062C\u062F\u0648\u0644\u0629 \u0644\u0648\u0642\u062A \u0644\u0627\u062D\u0642\u060C \u0645\u0639 \u062A\u0631\u062A\u064A\u0628 \u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0637\u0628\u062E \u062A\u0644\u0642\u0627\u0626\u064A\u064B\u0627 \u062D\u0633\u0628 \u0627\u0644\u0648\u0642\u062A \u0627\u0644\u0645\u062A\u0641\u0642 \u0639\u0644\u064A\u0647." },
+        { en: "Promo codes with usage limits, validity windows and per-code reporting.", de: "Gutscheincodes mit Nutzungslimits, G\xFCltigkeitszeitr\xE4umen und Auswertung je Code.", ar: "\u0623\u0643\u0648\u0627\u062F \u062E\u0635\u0645 \u0628\u062D\u062F\u0648\u062F \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0648\u0641\u062A\u0631\u0627\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0648\u062A\u0642\u0627\u0631\u064A\u0631 \u0644\u0643\u0644 \u0643\u0648\u062F." }
+      ])}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      ${head(
+        { en: "Modules", de: "Module", ar: "\u0627\u0644\u0648\u062D\u062F\u0627\u062A" },
+        { en: "The rest of the operation", de: "Der Rest des Betriebs", ar: "\u0628\u0642\u064A\u0629 \u0627\u0644\u0639\u0645\u0644\u064A\u0627\u062A" },
+        void 0,
+        true
+      )}
+      <div class="grid grid-3">
+        ${card(icons.truck, { en: "Delivery dispatch", de: "Lieferdisposition", ar: "\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062A\u0648\u0635\u064A\u0644" }, {
+        en: "Driver roster with online, busy and offline states. Assign an order to a driver or broadcast it to everyone free and let the first to accept take it.",
+        de: "Fahrer\xFCbersicht mit Status online, besch\xE4ftigt und offline. Auftrag direkt zuweisen oder an alle freien Fahrer ausschreiben \u2014 wer zuerst annimmt, f\xE4hrt.",
+        ar: "\u0642\u0627\u0626\u0645\u0629 \u0633\u0627\u0626\u0642\u064A\u0646 \u0628\u062D\u0627\u0644\u0627\u062A \u0645\u062A\u0627\u062D \u0648\u0645\u0634\u063A\u0648\u0644 \u0648\u063A\u064A\u0631 \u0645\u062A\u0635\u0644. \u0623\u0633\u0646\u0650\u062F \u0627\u0644\u0637\u0644\u0628 \u0644\u0633\u0627\u0626\u0642 \u0623\u0648 \u0627\u0628\u062B\u0651\u0647 \u0644\u0643\u0644 \u0627\u0644\u0645\u062A\u0627\u062D\u064A\u0646 \u0644\u064A\u0623\u062E\u0630\u0647 \u0623\u0648\u0644 \u0645\u0646 \u064A\u0642\u0628\u0644\u0647."
+      })}
+        ${card(icons.pin, { en: "Delivery zones", de: "Lieferzonen", ar: "\u0645\u0646\u0627\u0637\u0642 \u0627\u0644\u062A\u0648\u0635\u064A\u0644" }, {
+        en: "Draw zones by postcode or radius, each with its own fee, minimum order value and estimated time shown to the customer.",
+        de: "Zonen nach Postleitzahl oder Radius festlegen, je mit eigener Geb\xFChr, Mindestbestellwert und angezeigter Lieferzeit.",
+        ar: "\u062D\u062F\u0650\u0651\u062F \u0627\u0644\u0645\u0646\u0627\u0637\u0642 \u0628\u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0628\u0631\u064A\u062F\u064A \u0623\u0648 \u0646\u0635\u0641 \u0627\u0644\u0642\u0637\u0631\u060C \u0644\u0643\u0644 \u0645\u0646\u0647\u0627 \u0631\u0633\u0648\u0645 \u0648\u062D\u062F \u0623\u062F\u0646\u0649 \u0648\u0648\u0642\u062A \u0645\u062A\u0648\u0642\u0639 \u064A\u0638\u0647\u0631 \u0644\u0644\u0639\u0645\u064A\u0644."
+      })}
+        ${card(icons.box, { en: "Inventory", de: "Lagerhaltung", ar: "\u0627\u0644\u0645\u062E\u0632\u0648\u0646" }, {
+        en: "Stock levels per branch, low-stock alerts, stock counts with variance, returns with reason codes and supplier records.",
+        de: "Best\xE4nde je Filiale, Warnungen bei Mindestbestand, Inventuren mit Abweichung, Retouren mit Grundcodes und Lieferantenbelege.",
+        ar: "\u0623\u0631\u0635\u062F\u0629 \u0644\u0643\u0644 \u0641\u0631\u0639\u060C \u0648\u062A\u0646\u0628\u064A\u0647\u0627\u062A \u0646\u0642\u0635\u060C \u0648\u062C\u0631\u062F \u0645\u0639 \u0641\u0631\u0648\u0642\u0627\u062A\u060C \u0648\u0645\u0631\u062A\u062C\u0639\u0627\u062A \u0628\u0623\u0633\u0628\u0627\u0628\u060C \u0648\u0633\u062C\u0644\u0627\u062A \u0645\u0648\u0631\u062F\u064A\u0646."
+      })}
+        ${card(icons.users, { en: "Customers and loyalty", de: "Kunden und Treue", ar: "\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u0627\u0644\u0648\u0644\u0627\u0621" }, {
+        en: "Full customer records with addresses and order history, a store wallet, referral codes and bronze to platinum loyalty tiers.",
+        de: "Vollst\xE4ndige Kundenakten mit Adressen und Bestellhistorie, Guthabenkonto, Empfehlungscodes und Treuestufen von Bronze bis Platin.",
+        ar: "\u0633\u062C\u0644\u0627\u062A \u0639\u0645\u0644\u0627\u0621 \u0643\u0627\u0645\u0644\u0629 \u0628\u0627\u0644\u0639\u0646\u0627\u0648\u064A\u0646 \u0648\u0633\u062C\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062A\u060C \u0648\u0645\u062D\u0641\u0638\u0629 \u062F\u0627\u062E\u0644 \u0627\u0644\u0645\u062A\u062C\u0631\u060C \u0648\u0623\u0643\u0648\u0627\u062F \u0625\u062D\u0627\u0644\u0629\u060C \u0648\u0645\u0633\u062A\u0648\u064A\u0627\u062A \u0648\u0644\u0627\u0621 \u0645\u0646 \u0627\u0644\u0628\u0631\u0648\u0646\u0632\u064A \u0644\u0644\u0628\u0644\u0627\u062A\u064A\u0646\u064A."
+      })}
+        ${card(icons.clock, { en: "Staff and shifts", de: "Personal und Schichten", ar: "\u0627\u0644\u0645\u0648\u0638\u0641\u0648\u0646 \u0648\u0627\u0644\u0648\u0631\u062F\u064A\u0627\u062A" }, {
+        en: "PIN login per employee, role-based permissions, attendance, cash drawer opening and closing floats and a per-shift audit trail.",
+        de: "PIN-Login je Mitarbeiter, rollenbasierte Rechte, Anwesenheit, Kassenbestand bei \xD6ffnung und Abschluss sowie Audit-Trail je Schicht.",
+        ar: "\u062F\u062E\u0648\u0644 \u0628\u0631\u0642\u0645 \u0633\u0631\u064A \u0644\u0643\u0644 \u0645\u0648\u0638\u0641\u060C \u0648\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u062D\u0633\u0628 \u0627\u0644\u062F\u0648\u0631\u060C \u0648\u062D\u0636\u0648\u0631\u060C \u0648\u0631\u0635\u064A\u062F \u062F\u0631\u062C \u0627\u0644\u0646\u0642\u062F \u0639\u0646\u062F \u0627\u0644\u0641\u062A\u062D \u0648\u0627\u0644\u0625\u063A\u0644\u0627\u0642\u060C \u0648\u0633\u062C\u0644 \u062A\u062F\u0642\u064A\u0642 \u0644\u0643\u0644 \u0648\u0631\u062F\u064A\u0629."
+      })}
+        ${card(icons.chart, { en: "Reporting", de: "Auswertungen", ar: "\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631" }, {
+        en: "Sales, inventory, returns, delivery, finance and activity views, filterable by date, branch and operator, exportable to CSV.",
+        de: "Ansichten f\xFCr Umsatz, Bestand, Retouren, Lieferung, Finanzen und Aktivit\xE4t \u2014 filterbar nach Datum, Filiale und Mitarbeiter, als CSV exportierbar.",
+        ar: "\u0639\u0631\u0648\u0636 \u0644\u0644\u0645\u0628\u064A\u0639\u0627\u062A \u0648\u0627\u0644\u0645\u062E\u0632\u0648\u0646 \u0648\u0627\u0644\u0645\u0631\u062A\u062C\u0639\u0627\u062A \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u0648\u0627\u0644\u0645\u0627\u0644\u064A\u0629 \u0648\u0627\u0644\u0646\u0634\u0627\u0637\u060C \u0628\u0641\u0644\u0627\u062A\u0631 \u0644\u0644\u062A\u0627\u0631\u064A\u062E \u0648\u0627\u0644\u0641\u0631\u0639 \u0648\u0627\u0644\u0645\u0648\u0638\u0641\u060C \u0648\u062A\u0635\u062F\u064A\u0631 \u0625\u0644\u0649 CSV."
+      })}
+        ${card(icons.phone, { en: "Caller ID", de: "Rufnummernerkennung", ar: "\u062A\u0639\u0631\u064A\u0641 \u0627\u0644\u0645\u062A\u0635\u0644" }, {
+        en: "Incoming calls match against the customer database and open the record with the last order ready to repeat.",
+        de: "Eingehende Anrufe werden mit der Kundendatenbank abgeglichen und \xF6ffnen den Datensatz samt letzter Bestellung zum Wiederholen.",
+        ar: "\u062A\u064F\u0637\u0627\u0628\u064E\u0642 \u0627\u0644\u0645\u0643\u0627\u0644\u0645\u0627\u062A \u0627\u0644\u0648\u0627\u0631\u062F\u0629 \u0645\u0639 \u0642\u0627\u0639\u062F\u0629 \u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u062A\u0641\u062A\u062D \u0627\u0644\u0633\u062C\u0644 \u0645\u0639 \u0622\u062E\u0631 \u0637\u0644\u0628 \u062C\u0627\u0647\u0632 \u0644\u0644\u062A\u0643\u0631\u0627\u0631."
+      })}
+        ${card(icons.bell, { en: "Notifications", de: "Benachrichtigungen", ar: "\u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062A" }, {
+        en: "Web push to the counter, email confirmations to the customer and WhatsApp messages for order and delivery updates.",
+        de: "Web-Push an die Theke, E-Mail-Best\xE4tigungen an Kunden und WhatsApp-Nachrichten zu Bestell- und Lieferstatus.",
+        ar: "\u0625\u0634\u0639\u0627\u0631\u0627\u062A \u0641\u0648\u0631\u064A\u0629 \u0644\u0644\u0643\u0627\u0634\u064A\u0631\u060C \u0648\u062A\u0623\u0643\u064A\u062F\u0627\u062A \u0628\u0627\u0644\u0628\u0631\u064A\u062F \u0644\u0644\u0639\u0645\u064A\u0644\u060C \u0648\u0631\u0633\u0627\u0626\u0644 \u0648\u0627\u062A\u0633\u0627\u0628 \u0644\u062A\u062D\u062F\u064A\u062B\u0627\u062A \u0627\u0644\u0637\u0644\u0628 \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644."
+      })}
+        ${card(icons.printer, { en: "Printing", de: "Druck", ar: "\u0627\u0644\u0637\u0628\u0627\u0639\u0629" }, {
+        en: "Thermal receipts, kitchen tickets and A4 PDF invoices, with a printer profile per station.",
+        de: "Thermobons, K\xFCchenbons und A4-PDF-Rechnungen, mit Druckerprofil je Station.",
+        ar: "\u0625\u064A\u0635\u0627\u0644\u0627\u062A \u062D\u0631\u0627\u0631\u064A\u0629 \u0648\u062A\u0630\u0627\u0643\u0631 \u0645\u0637\u0628\u062E \u0648\u0641\u0648\u0627\u062A\u064A\u0631 PDF \u0628\u062D\u062C\u0645 A4\u060C \u0645\u0639 \u0645\u0644\u0641 \u0637\u0627\u0628\u0639\u0629 \u0644\u0643\u0644 \u0645\u062D\u0637\u0629."
+      })}
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--inset">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          ${head({ en: "Platform", de: "Plattform", ar: "\u0627\u0644\u0645\u0646\u0635\u0629" }, { en: "Made to be extended", de: "F\xFCr Erweiterung gebaut", ar: "\u0645\u0628\u0646\u064A\u0651 \u0644\u0644\u062A\u0648\u0633\u0651\u0639" })}
+          ${ticks([
+        { en: "Modules are switched on per business, so a caf\xE9 never sees pharmacy fields and a pharmacy never sees table plans.", de: "Module werden je Betrieb aktiviert \u2014 ein Caf\xE9 sieht nie Apothekenfelder, eine Apotheke nie Tischpl\xE4ne.", ar: "\u062A\u064F\u0641\u0639\u064E\u0651\u0644 \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0644\u0643\u0644 \u0646\u0634\u0627\u0637\u060C \u0641\u0644\u0627 \u064A\u0631\u0649 \u0627\u0644\u0643\u0627\u0641\u064A\u0647 \u062D\u0642\u0648\u0644 \u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0629 \u0648\u0644\u0627 \u062A\u0631\u0649 \u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0629 \u0645\u062E\u0637\u0637 \u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A." },
+        { en: "A documented REST API for stock, orders and customers, so accounting and ERP tools can read and write.", de: "Dokumentierte REST-API f\xFCr Bestand, Bestellungen und Kunden, damit Buchhaltung und ERP lesen und schreiben k\xF6nnen.", ar: "\u0648\u0627\u062C\u0647\u0629 REST \u0645\u0648\u062B\u0651\u0642\u0629 \u0644\u0644\u0645\u062E\u0632\u0648\u0646 \u0648\u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0648\u0627\u0644\u0639\u0645\u0644\u0627\u0621\u060C \u0644\u062A\u0642\u0631\u0623 \u0648\u062A\u0643\u062A\u0628 \u0623\u062F\u0648\u0627\u062A \u0627\u0644\u0645\u062D\u0627\u0633\u0628\u0629 \u0648ERP." },
+        { en: "Webhooks on order created, paid, dispatched and delivered.", de: "Webhooks bei Bestellung erstellt, bezahlt, versendet und geliefert.", ar: "Webhooks \u0639\u0646\u062F \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0637\u0644\u0628 \u0648\u062F\u0641\u0639\u0647 \u0648\u0625\u0631\u0633\u0627\u0644\u0647 \u0648\u062A\u0633\u0644\u064A\u0645\u0647." },
+        { en: "Role and permission model that also governs the API, not just the screens.", de: "Rollen- und Rechtemodell, das auch die API steuert, nicht nur die Oberfl\xE4chen.", ar: "\u0646\u0645\u0648\u0630\u062C \u0623\u062F\u0648\u0627\u0631 \u0648\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u064A\u062D\u0643\u0645 \u0627\u0644\u0648\u0627\u062C\u0647\u0629 \u0627\u0644\u0628\u0631\u0645\u062C\u064A\u0629 \u0623\u064A\u0636\u064B\u0627 \u0644\u0627 \u0627\u0644\u0634\u0627\u0634\u0627\u062A \u0641\u0642\u0637." }
+      ])}
+        </div>
+        <div class="reveal">${shot({ id: "feature-modules", ratio: "4 / 3", size: "1400 \xD7 1050", alt: { en: "Module switches in the Kassenta owner console", de: "Modulschalter in der Kassenta-Betreiberkonsole", ar: "\u0645\u0641\u0627\u062A\u064A\u062D \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0641\u064A \u0644\u0648\u062D\u0629 \u0645\u0627\u0644\u0643 Kassenta" } })}</div>
+      </div>
+    </div>
+  </section>
+
+  ${ctaBand(
+        { en: "Want a module we have not listed?", de: "Fehlt Ihnen ein Modul?", ar: "\u062A\u062D\u062A\u0627\u062C \u0648\u062D\u062F\u0629 \u063A\u064A\u0631 \u0645\u0630\u0643\u0648\u0631\u0629\u061F" },
+        {
+          en: "Tell us what your trade needs. The platform is built so a new vertical module is a configuration, not a rewrite.",
+          de: "Sagen Sie uns, was Ihre Branche braucht. Die Plattform ist so gebaut, dass ein neues Branchenmodul eine Konfiguration ist \u2014 kein Neubau.",
+          ar: "\u0623\u062E\u0628\u0631\u0646\u0627 \u0628\u0645\u0627 \u064A\u062D\u062A\u0627\u062C\u0647 \u0646\u0634\u0627\u0637\u0643. \u0627\u0644\u0645\u0646\u0635\u0629 \u0645\u0628\u0646\u064A\u0629 \u0628\u062D\u064A\u062B \u062A\u0643\u0648\u0646 \u0627\u0644\u0648\u062D\u062F\u0629 \u0627\u0644\u062C\u062F\u064A\u062F\u0629 \u0625\u0639\u062F\u0627\u062F\u064B\u0627 \u0644\u0627 \u0625\u0639\u0627\u062F\u0629 \u0628\u0646\u0627\u0621."
+        }
+      )}`
+    };
+    vertical = (id, icon, name, intro, points, alt) => `
+  <section class="section" id="${id}">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          <div class="card-icon">${icon}</div>
+          <h2 ${tAttrs(name)}>${esc(name.en)}</h2>
+          <p class="lead" style="margin:14px 0 24px" ${tAttrs(intro)}>${esc(intro.en)}</p>
+          ${ticks(points)}
+        </div>
+        <div class="reveal">${shot({ id, ratio: "4 / 3", size: "1400 \xD7 1050", alt })}</div>
+      </div>
+    </div>
+  </section>`;
+    solutions = {
+      meta: {
+        path: "/solutions",
+        title: { en: "Industries \u2014 Kassenta POS", de: "Branchen \u2014 Kassenta POS", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A \u2014 Kassenta POS" },
+        description: {
+          en: "Ready-made configurations for caf\xE9s, restaurants, supermarkets, pharmacies, bakeries and retail \u2014 each with the fields, taxes and workflows that trade actually uses.",
+          de: "Fertige Konfigurationen f\xFCr Caf\xE9s, Restaurants, Superm\xE4rkte, Apotheken, B\xE4ckereien und Einzelhandel \u2014 je mit den Feldern, Steuers\xE4tzen und Abl\xE4ufen der Branche.",
+          ar: "\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u062C\u0627\u0647\u0632\u0629 \u0644\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u0627\u0644\u0645\u0637\u0627\u0639\u0645 \u0648\u0627\u0644\u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A \u0648\u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0627\u062A \u0648\u0627\u0644\u0645\u062E\u0627\u0628\u0632 \u0648\u0627\u0644\u062A\u062C\u0632\u0626\u0629 \u2014 \u0644\u0643\u0644 \u0645\u0646\u0647\u0627 \u0627\u0644\u062D\u0642\u0648\u0644 \u0648\u0627\u0644\u0636\u0631\u0627\u0626\u0628 \u0648\u0633\u064A\u0631 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0645\u0646\u0627\u0633\u0628."
+        }
+      },
+      body: `
+  ${pageHead(
+        { en: "One platform, six ready-made shapes", de: "Eine Plattform, sechs fertige Auspr\xE4gungen", ar: "\u0645\u0646\u0635\u0629 \u0648\u0627\u062D\u062F\u0629\u060C \u0633\u062A\u0629 \u0625\u0639\u062F\u0627\u062F\u0627\u062A \u062C\u0627\u0647\u0632\u0629" },
+        {
+          en: "Choosing your industry at setup switches on the right modules, tax categories, product fields and receipt layout. Everything stays editable afterwards.",
+          de: "Die Branchenwahl bei der Einrichtung aktiviert die passenden Module, Steuerkategorien, Artikelfelder und das Bonlayout. Alles bleibt danach \xE4nderbar.",
+          ar: "\u0627\u062E\u062A\u064A\u0627\u0631 \u0645\u062C\u0627\u0644\u0643 \u0639\u0646\u062F \u0627\u0644\u062A\u0647\u064A\u0626\u0629 \u064A\u0641\u0639\u0651\u0644 \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0648\u0641\u0626\u0627\u062A \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0648\u062D\u0642\u0648\u0644 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u062A\u0646\u0633\u064A\u0642 \u0627\u0644\u0625\u064A\u0635\u0627\u0644 \u0627\u0644\u0645\u0646\u0627\u0633\u0628\u0629. \u0648\u064A\u0628\u0642\u0649 \u0643\u0644 \u0634\u064A\u0621 \u0642\u0627\u0628\u0644\u064B\u0627 \u0644\u0644\u062A\u0639\u062F\u064A\u0644 \u0628\u0639\u062F\u0647\u0627."
+        },
+        { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" }
+      )}
+
+  ${vertical(
+        "industry-cafe",
+        icons.coffee,
+        { en: "Caf\xE9s and bars", de: "Caf\xE9s und Bars", ar: "\u0627\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u0627\u0644\u0628\u0627\u0631\u0627\u062A" },
+        {
+          en: "Speed is the whole product. The preset puts the twelve items that make up most of the day on the first screen and turns everything else into a modifier.",
+          de: "Tempo ist das Produkt. Die Vorlage legt die zw\xF6lf Artikel, die den Grossteil des Tages ausmachen, auf den ersten Bildschirm und macht den Rest zur Option.",
+          ar: "\u0627\u0644\u0633\u0631\u0639\u0629 \u0647\u064A \u0627\u0644\u0645\u0646\u062A\u062C \u0643\u0644\u0647. \u064A\u0636\u0639 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0627\u0644\u062C\u0627\u0647\u0632 \u0627\u0644\u0623\u0635\u0646\u0627\u0641 \u0627\u0644\u0627\u062B\u0646\u064A \u0639\u0634\u0631 \u0627\u0644\u0623\u0643\u062B\u0631 \u0645\u0628\u064A\u0639\u064B\u0627 \u0641\u064A \u0627\u0644\u0634\u0627\u0634\u0629 \u0627\u0644\u0623\u0648\u0644\u0649 \u0648\u064A\u062D\u0648\u0651\u0644 \u0627\u0644\u0628\u0627\u0642\u064A \u0625\u0644\u0649 \u0625\u0636\u0627\u0641\u0627\u062A."
+        },
+        [
+          { en: "Size and milk options as one-tap modifiers with automatic price deltas.", de: "Gr\xF6ssen und Milchoptionen als Ein-Tap-Optionen mit automatischer Preisdifferenz.", ar: "\u0623\u062D\u062C\u0627\u0645 \u0648\u062E\u064A\u0627\u0631\u0627\u062A \u062D\u0644\u064A\u0628 \u0628\u0636\u063A\u0637\u0629 \u0648\u0627\u062D\u062F\u0629 \u0645\u0639 \u0641\u0631\u0648\u0642 \u0633\u0639\u0631 \u062A\u0644\u0642\u0627\u0626\u064A\u0629." },
+          { en: "Open tabs per table or per guest name, settled at the end of the visit.", de: "Offene Deckel je Tisch oder Gastname, am Ende des Besuchs abgerechnet.", ar: "\u062D\u0633\u0627\u0628\u0627\u062A \u0645\u0641\u062A\u0648\u062D\u0629 \u0644\u0643\u0644 \u0637\u0627\u0648\u0644\u0629 \u0623\u0648 \u0628\u0627\u0633\u0645 \u0627\u0644\u0636\u064A\u0641\u060C \u062A\u064F\u0633\u062F\u064E\u0651\u062F \u0646\u0647\u0627\u064A\u0629 \u0627\u0644\u0632\u064A\u0627\u0631\u0629." },
+          { en: "Tip line on the receipt and a tip report per employee per shift.", de: "Trinkgeldzeile auf dem Bon und Trinkgeldbericht je Mitarbeiter und Schicht.", ar: "\u0633\u0637\u0631 \u0628\u0642\u0634\u064A\u0634 \u0641\u064A \u0627\u0644\u0625\u064A\u0635\u0627\u0644 \u0648\u062A\u0642\u0631\u064A\u0631 \u0628\u0642\u0634\u064A\u0634 \u0644\u0643\u0644 \u0645\u0648\u0638\u0641 \u0641\u064A \u0643\u0644 \u0648\u0631\u062F\u064A\u0629." },
+          { en: "Loyalty stamps that convert into a free item automatically at the till.", de: "Treuestempel, die an der Kasse automatisch zu einem Gratisartikel werden.", ar: "\u0623\u062E\u062A\u0627\u0645 \u0648\u0644\u0627\u0621 \u062A\u062A\u062D\u0648\u0651\u0644 \u062A\u0644\u0642\u0627\u0626\u064A\u064B\u0627 \u0625\u0644\u0649 \u0635\u0646\u0641 \u0645\u062C\u0627\u0646\u064A \u0639\u0646\u062F \u0627\u0644\u0643\u0627\u0634\u064A\u0631." }
+        ],
+        { en: "Kassenta on a caf\xE9 counter with a fast-order grid", de: "Kassenta an der Caf\xE9-Theke mit Schnellbestellraster", ar: "Kassenta \u0639\u0644\u0649 \u0643\u0627\u0634\u064A\u0631 \u0643\u0627\u0641\u064A\u0647 \u0628\u0634\u0628\u0643\u0629 \u0637\u0644\u0628 \u0633\u0631\u064A\u0639" }
+      )}
+
+  ${vertical(
+        "industry-restaurant",
+        icons.register,
+        { en: "Restaurants", de: "Restaurants", ar: "\u0627\u0644\u0645\u0637\u0627\u0639\u0645" },
+        {
+          en: "Service happens in parallel: tables, phone orders, walk-ins and delivery all at once. The preset keeps them in one queue with clear promised times.",
+          de: "Service l\xE4uft parallel: Tische, Telefonbestellungen, Laufkundschaft und Lieferung gleichzeitig. Die Vorlage h\xE4lt alles in einer Warteschlange mit klaren Zusagezeiten.",
+          ar: "\u0627\u0644\u062E\u062F\u0645\u0629 \u062A\u0633\u064A\u0631 \u0628\u0627\u0644\u062A\u0648\u0627\u0632\u064A: \u0637\u0627\u0648\u0644\u0627\u062A \u0648\u0645\u0643\u0627\u0644\u0645\u0627\u062A \u0648\u0632\u0628\u0627\u0626\u0646 \u0639\u0627\u0628\u0631\u0648\u0646 \u0648\u062A\u0648\u0635\u064A\u0644 \u0641\u064A \u0622\u0646 \u0648\u0627\u062D\u062F. \u064A\u0628\u0642\u064A\u0647\u0627 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0641\u064A \u0642\u0627\u0626\u0645\u0629 \u0648\u0627\u062D\u062F\u0629 \u0628\u0623\u0648\u0642\u0627\u062A \u0648\u0627\u0636\u062D\u0629."
+        },
+        [
+          { en: "Table plan with availability, occupancy and reservation states.", de: "Tischplan mit Verf\xFCgbarkeit, Belegung und Reservierungsstatus.", ar: "\u0645\u062E\u0637\u0637 \u0637\u0627\u0648\u0644\u0627\u062A \u0628\u062D\u0627\u0644\u0627\u062A \u0627\u0644\u0625\u062A\u0627\u062D\u0629 \u0648\u0627\u0644\u0625\u0634\u063A\u0627\u0644 \u0648\u0627\u0644\u062D\u062C\u0632." },
+          { en: "Dine-in and takeaway VAT applied per line, so a mixed ticket is still correct.", de: "MwSt. f\xFCr Vor-Ort und Takeaway je Position \u2014 auch ein gemischter Bon bleibt korrekt.", ar: "\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0648\u0627\u0644\u062A\u064A\u0643 \u0623\u0648\u0627\u064A \u0644\u0643\u0644 \u0628\u0646\u062F\u060C \u0641\u062A\u0628\u0642\u0649 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0627\u0644\u0645\u062E\u062A\u0644\u0637\u0629 \u0635\u062D\u064A\u062D\u0629." },
+          { en: "Split a bill by guest, by item or evenly, with separate receipts.", de: "Rechnung nach Gast, nach Artikel oder gleichm\xE4ssig teilen, mit separaten Bons.", ar: "\u062A\u0642\u0633\u064A\u0645 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u062D\u0633\u0628 \u0627\u0644\u0636\u064A\u0641 \u0623\u0648 \u0627\u0644\u0635\u0646\u0641 \u0623\u0648 \u0628\u0627\u0644\u062A\u0633\u0627\u0648\u064A\u060C \u0645\u0639 \u0625\u064A\u0635\u0627\u0644\u0627\u062A \u0645\u0646\u0641\u0635\u0644\u0629." },
+          { en: "Kitchen tickets grouped by course, printed or shown on a screen.", de: "K\xFCchenbons nach Gang gruppiert, gedruckt oder auf dem Bildschirm.", ar: "\u062A\u0630\u0627\u0643\u0631 \u0645\u0637\u0628\u062E \u0645\u062C\u0645\u064E\u0651\u0639\u0629 \u062D\u0633\u0628 \u0627\u0644\u0637\u0628\u0642\u060C \u0645\u0637\u0628\u0648\u0639\u0629 \u0623\u0648 \u0645\u0639\u0631\u0648\u0636\u0629 \u0639\u0644\u0649 \u0634\u0627\u0634\u0629." }
+        ],
+        { en: "Restaurant table plan and live order queue in Kassenta", de: "Restaurant-Tischplan und Live-Bestellliste in Kassenta", ar: "\u0645\u062E\u0637\u0637 \u0637\u0627\u0648\u0644\u0627\u062A \u0627\u0644\u0645\u0637\u0639\u0645 \u0648\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u062D\u064A\u0651\u0629 \u0641\u064A Kassenta" }
+      )}
+
+  ${vertical(
+        "industry-supermarket",
+        icons.cart,
+        { en: "Supermarkets and grocers", de: "Superm\xE4rkte und Lebensmittelhandel", ar: "\u0627\u0644\u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A \u0648\u0627\u0644\u0628\u0642\u0627\u0644\u0629" },
+        {
+          en: "High item counts and low margins mean the checkout has to be exact and fast. The preset optimises for scanning rather than browsing.",
+          de: "Viele Artikel und schmale Margen verlangen eine exakte und schnelle Kasse. Die Vorlage optimiert auf Scannen statt Bl\xE4ttern.",
+          ar: "\u0643\u062B\u0631\u0629 \u0627\u0644\u0623\u0635\u0646\u0627\u0641 \u0648\u0636\u0622\u0644\u0629 \u0627\u0644\u0647\u0627\u0645\u0634 \u062A\u062A\u0637\u0644\u0628\u0627\u0646 \u062F\u0641\u0639\u064B\u0627 \u062F\u0642\u064A\u0642\u064B\u0627 \u0648\u0633\u0631\u064A\u0639\u064B\u0627. \u064A\u0631\u0643\u0651\u0632 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0639\u0644\u0649 \u0627\u0644\u0645\u0633\u062D \u0644\u0627 \u0627\u0644\u062A\u0635\u0641\u0651\u062D."
+        },
+        [
+          { en: "Continuous barcode scanning with quantity multipliers and instant subtotal.", de: "Durchgehendes Barcode-Scannen mit Mengenmultiplikatoren und sofortiger Zwischensumme.", ar: "\u0645\u0633\u062D \u0628\u0627\u0631\u0643\u0648\u062F \u0645\u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0645\u0636\u0627\u0639\u0650\u0641\u0627\u062A \u0627\u0644\u0643\u0645\u064A\u0629 \u0648\u0645\u062C\u0645\u0648\u0639 \u0641\u0648\u0631\u064A." },
+          { en: "Weighed goods priced per kilogram, from a connected scale or manual entry.", de: "Gewichtsware mit Kilopreis, von angeschlossener Waage oder manueller Eingabe.", ar: "\u0633\u0644\u0639 \u0628\u0627\u0644\u0648\u0632\u0646 \u0645\u0633\u0639\u064E\u0651\u0631\u0629 \u0628\u0627\u0644\u0643\u064A\u0644\u0648\u060C \u0645\u0646 \u0645\u064A\u0632\u0627\u0646 \u0645\u062A\u0635\u0644 \u0623\u0648 \u0628\u0625\u062F\u062E\u0627\u0644 \u064A\u062F\u0648\u064A." },
+          { en: "Reduced VAT for food handled separately from standard-rate non-food.", de: "Reduzierte MwSt. f\xFCr Lebensmittel getrennt vom Normalsatz f\xFCr Non-Food.", ar: "\u0636\u0631\u064A\u0628\u0629 \u0645\u062E\u0641\u064E\u0651\u0636\u0629 \u0644\u0644\u0623\u063A\u0630\u064A\u0629 \u0645\u0646\u0641\u0635\u0644\u0629 \u0639\u0646 \u0627\u0644\u0646\u0633\u0628\u0629 \u0627\u0644\u0639\u0627\u062F\u064A\u0629 \u0644\u063A\u064A\u0631 \u0627\u0644\u0623\u063A\u0630\u064A\u0629." },
+          { en: "Deposit and return handling as a distinct line, not a discount.", de: "Pfand und R\xFCckgabe als eigene Position, nicht als Rabatt.", ar: "\u0627\u0644\u062A\u0623\u0645\u064A\u0646 \u0627\u0644\u0645\u0633\u062A\u0631\u062F \u0643\u0633\u0637\u0631 \u0645\u0633\u062A\u0642\u0644 \u0644\u0627 \u0643\u062E\u0635\u0645." }
+        ],
+        { en: "Supermarket checkout with barcode scanning in Kassenta", de: "Supermarktkasse mit Barcode-Scan in Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A \u0645\u0639 \u0645\u0633\u062D \u0628\u0627\u0631\u0643\u0648\u062F \u0641\u064A Kassenta" }
+      )}
+
+  ${vertical(
+        "industry-pharmacy",
+        icons.pill,
+        { en: "Pharmacies", de: "Apotheken", ar: "\u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0627\u062A" },
+        {
+          en: "Traceability matters more than speed. The preset adds the fields a regulator asks for and records who did what.",
+          de: "Nachvollziehbarkeit z\xE4hlt mehr als Tempo. Die Vorlage erg\xE4nzt die von Beh\xF6rden geforderten Felder und protokolliert, wer was getan hat.",
+          ar: "\u0627\u0644\u062A\u062A\u0628\u0651\u0639 \u0623\u0647\u0645 \u0645\u0646 \u0627\u0644\u0633\u0631\u0639\u0629. \u064A\u0636\u064A\u0641 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0627\u0644\u062D\u0642\u0648\u0644 \u0627\u0644\u062A\u064A \u062A\u0637\u0644\u0628\u0647\u0627 \u0627\u0644\u062C\u0647\u0627\u062A \u0627\u0644\u0631\u0642\u0627\u0628\u064A\u0629 \u0648\u064A\u0633\u062C\u0651\u0644 \u0645\u0646 \u0641\u0639\u0644 \u0645\u0627\u0630\u0627."
+        },
+        [
+          { en: "Batch number and expiry date per item, with an alert before stock expires.", de: "Chargennummer und Verfallsdatum je Artikel, mit Warnung vor Ablauf.", ar: "\u0631\u0642\u0645 \u0627\u0644\u062A\u0634\u063A\u064A\u0644\u0629 \u0648\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0629 \u0644\u0643\u0644 \u0635\u0646\u0641\u060C \u0645\u0639 \u062A\u0646\u0628\u064A\u0647 \u0642\u0628\u0644 \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621." },
+          { en: "Restricted-item prompts that require a supervisor PIN before the sale completes.", de: "Hinweise bei eingeschr\xE4nkten Artikeln, die vor Abschluss eine Vorgesetzten-PIN verlangen.", ar: "\u062A\u0646\u0628\u064A\u0647\u0627\u062A \u0627\u0644\u0623\u0635\u0646\u0627\u0641 \u0627\u0644\u0645\u0642\u064A\u064E\u0651\u062F\u0629 \u062A\u062A\u0637\u0644\u0628 \u0631\u0642\u0645 \u0645\u0634\u0631\u0641 \u0642\u0628\u0644 \u0625\u062A\u0645\u0627\u0645 \u0627\u0644\u0628\u064A\u0639." },
+          { en: "Per-operator audit trail on every sale, void, discount and price override.", de: "Audit-Trail je Mitarbeiter f\xFCr jeden Verkauf, Storno, Rabatt und jede Preis\xE4nderung.", ar: "\u0633\u062C\u0644 \u062A\u062F\u0642\u064A\u0642 \u0644\u0643\u0644 \u0645\u0648\u0638\u0641 \u0639\u0644\u0649 \u0643\u0644 \u0628\u064A\u0639 \u0648\u0625\u0644\u063A\u0627\u0621 \u0648\u062E\u0635\u0645 \u0648\u062A\u0639\u062F\u064A\u0644 \u0633\u0639\u0631." },
+          { en: "Reduced VAT categories separated from standard-rate cosmetics and accessories.", de: "Reduzierte MwSt.-Kategorien getrennt von Kosmetik und Zubeh\xF6r zum Normalsatz.", ar: "\u0641\u0626\u0627\u062A \u0636\u0631\u064A\u0628\u0629 \u0645\u062E\u0641\u064E\u0651\u0636\u0629 \u0645\u0646\u0641\u0635\u0644\u0629 \u0639\u0646 \u0645\u0633\u062A\u062D\u0636\u0631\u0627\u062A \u0627\u0644\u062A\u062C\u0645\u064A\u0644 \u0648\u0627\u0644\u0645\u0644\u062D\u0642\u0627\u062A \u0628\u0627\u0644\u0646\u0633\u0628\u0629 \u0627\u0644\u0639\u0627\u062F\u064A\u0629." }
+        ],
+        { en: "Pharmacy counter with batch and expiry fields in Kassenta", de: "Apothekentresen mit Chargen- und Verfallsfeldern in Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u0635\u064A\u062F\u0644\u064A\u0629 \u0645\u0639 \u062D\u0642\u0648\u0644 \u0627\u0644\u062A\u0634\u063A\u064A\u0644\u0629 \u0648\u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0629 \u0641\u064A Kassenta" }
+      )}
+
+  ${vertical(
+        "industry-bakery",
+        icons.scale,
+        { en: "Bakeries", de: "B\xE4ckereien", ar: "\u0627\u0644\u0645\u062E\u0627\u0628\u0632" },
+        {
+          en: "Everything sells in four hours and what is left is waste. The preset ties pre-orders, production and end-of-day waste into one number.",
+          de: "Alles verkauft sich in vier Stunden, der Rest ist Ausschuss. Die Vorlage verbindet Vorbestellungen, Produktion und Tagesende-Retouren zu einer Kennzahl.",
+          ar: "\u0643\u0644 \u0634\u064A\u0621 \u064A\u064F\u0628\u0627\u0639 \u0641\u064A \u0623\u0631\u0628\u0639 \u0633\u0627\u0639\u0627\u062A \u0648\u0645\u0627 \u064A\u062A\u0628\u0642\u0651\u0649 \u0647\u062F\u0631. \u064A\u0631\u0628\u0637 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u0645\u0633\u0628\u0642\u0629 \u0648\u0627\u0644\u0625\u0646\u062A\u0627\u062C \u0648\u0647\u062F\u0631 \u0646\u0647\u0627\u064A\u0629 \u0627\u0644\u064A\u0648\u0645 \u0641\u064A \u0631\u0642\u0645 \u0648\u0627\u062D\u062F."
+        },
+        [
+          { en: "Price by weight or by piece on the same product, chosen at the till.", de: "Preis nach Gewicht oder St\xFCck beim selben Artikel, an der Kasse w\xE4hlbar.", ar: "\u062A\u0633\u0639\u064A\u0631 \u0628\u0627\u0644\u0648\u0632\u0646 \u0623\u0648 \u0628\u0627\u0644\u0642\u0637\u0639\u0629 \u0644\u0644\u0645\u0646\u062A\u062C \u0646\u0641\u0633\u0647\u060C \u064A\u064F\u062E\u062A\u0627\u0631 \u0639\u0646\u062F \u0627\u0644\u0643\u0627\u0634\u064A\u0631." },
+          { en: "Pre-orders for a named pickup time, listed for the morning shift.", de: "Vorbestellungen mit fester Abholzeit, f\xFCr die Fr\xFChschicht aufgelistet.", ar: "\u0637\u0644\u0628\u0627\u062A \u0645\u0633\u0628\u0642\u0629 \u0628\u0648\u0642\u062A \u0627\u0633\u062A\u0644\u0627\u0645 \u0645\u062D\u062F\u064E\u0651\u062F\u060C \u062A\u0638\u0647\u0631 \u0644\u0648\u0631\u062F\u064A\u0629 \u0627\u0644\u0635\u0628\u0627\u062D." },
+          { en: "Production plan generated from yesterday's sales and today's pre-orders.", de: "Produktionsplan aus den gestrigen Verk\xE4ufen und heutigen Vorbestellungen.", ar: "\u062E\u0637\u0629 \u0625\u0646\u062A\u0627\u062C \u062A\u064F\u0628\u0646\u0649 \u0645\u0646 \u0645\u0628\u064A\u0639\u0627\u062A \u0627\u0644\u0623\u0645\u0633 \u0648\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u064A\u0648\u0645 \u0627\u0644\u0645\u0633\u0628\u0642\u0629." },
+          { en: "Waste recorded at close as a separate figure so margin stays honest.", de: "Retouren beim Abschluss separat erfasst, damit die Marge ehrlich bleibt.", ar: "\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0647\u062F\u0631 \u0639\u0646\u062F \u0627\u0644\u0625\u063A\u0644\u0627\u0642 \u0643\u0631\u0642\u0645 \u0645\u0646\u0641\u0635\u0644 \u0644\u064A\u0628\u0642\u0649 \u0627\u0644\u0647\u0627\u0645\u0634 \u0635\u0627\u062F\u0642\u064B\u0627." }
+        ],
+        { en: "Bakery counter with weight-based pricing in Kassenta", de: "B\xE4ckereitheke mit Preis nach Gewicht in Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u0645\u062E\u0628\u0632 \u0645\u0639 \u062A\u0633\u0639\u064A\u0631 \u0628\u0627\u0644\u0648\u0632\u0646 \u0641\u064A Kassenta" }
+      )}
+
+  ${vertical(
+        "industry-retail",
+        icons.tag,
+        { en: "Retail", de: "Einzelhandel", ar: "\u0627\u0644\u062A\u062C\u0632\u0626\u0629" },
+        {
+          en: "The same shirt in five sizes and three colours is fifteen stock lines. The preset keeps that manageable at the counter.",
+          de: "Dasselbe Hemd in f\xFCnf Gr\xF6ssen und drei Farben sind f\xFCnfzehn Bestandszeilen. Die Vorlage h\xE4lt das an der Kasse handhabbar.",
+          ar: "\u0627\u0644\u0642\u0645\u064A\u0635 \u0646\u0641\u0633\u0647 \u0628\u062E\u0645\u0633\u0629 \u0645\u0642\u0627\u0633\u0627\u062A \u0648\u062B\u0644\u0627\u062B\u0629 \u0623\u0644\u0648\u0627\u0646 \u064A\u0639\u0646\u064A \u062E\u0645\u0633\u0629 \u0639\u0634\u0631 \u0633\u0637\u0631 \u0645\u062E\u0632\u0648\u0646. \u064A\u0628\u0642\u064A\u0647\u0627 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0633\u0647\u0644\u0629 \u0639\u0646\u062F \u0627\u0644\u0643\u0627\u0634\u064A\u0631."
+        },
+        [
+          { en: "Variant matrix by size and colour with per-variant stock and barcode.", de: "Variantenmatrix nach Gr\xF6sse und Farbe mit Bestand und Barcode je Variante.", ar: "\u0645\u0635\u0641\u0648\u0641\u0629 \u0645\u062A\u063A\u064A\u0651\u0631\u0627\u062A \u0628\u0627\u0644\u0645\u0642\u0627\u0633 \u0648\u0627\u0644\u0644\u0648\u0646 \u0645\u0639 \u0645\u062E\u0632\u0648\u0646 \u0648\u0628\u0627\u0631\u0643\u0648\u062F \u0644\u0643\u0644 \u0645\u062A\u063A\u064A\u0651\u0631." },
+          { en: "Returns and exchanges with reason codes that feed the returns report.", de: "Retouren und Umtausch mit Grundcodes, die in den Retourenbericht fliessen.", ar: "\u0645\u0631\u062A\u062C\u0639\u0627\u062A \u0648\u0627\u0633\u062A\u0628\u062F\u0627\u0644 \u0628\u0623\u0633\u0628\u0627\u0628 \u0645\u062D\u062F\u064E\u0651\u062F\u0629 \u062A\u063A\u0630\u0651\u064A \u062A\u0642\u0631\u064A\u0631 \u0627\u0644\u0645\u0631\u062A\u062C\u0639\u0627\u062A." },
+          { en: "Customer records that show past purchases when a return has no receipt.", de: "Kundenakten mit fr\xFCheren K\xE4ufen, wenn eine Retoure ohne Beleg kommt.", ar: "\u0633\u062C\u0644\u0627\u062A \u0639\u0645\u0644\u0627\u0621 \u062A\u064F\u0638\u0647\u0631 \u0627\u0644\u0645\u0634\u062A\u0631\u064A\u0627\u062A \u0627\u0644\u0633\u0627\u0628\u0642\u0629 \u0639\u0646\u062F \u0645\u0631\u062A\u062C\u0639 \u0628\u0644\u0627 \u0625\u064A\u0635\u0627\u0644." },
+          { en: "Seasonal price lists scheduled to start and end on set dates.", de: "Saisonale Preislisten mit geplantem Start- und Enddatum.", ar: "\u0642\u0648\u0627\u0626\u0645 \u0623\u0633\u0639\u0627\u0631 \u0645\u0648\u0633\u0645\u064A\u0629 \u062A\u0628\u062F\u0623 \u0648\u062A\u0646\u062A\u0647\u064A \u0641\u064A \u062A\u0648\u0627\u0631\u064A\u062E \u0645\u062D\u062F\u064E\u0651\u062F\u0629." }
+        ],
+        { en: "Retail counter with size and colour variants in Kassenta", de: "Einzelhandelskasse mit Gr\xF6ssen- und Farbvarianten in Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u062A\u062C\u0632\u0626\u0629 \u0645\u0639 \u0645\u062A\u063A\u064A\u0651\u0631\u0627\u062A \u0627\u0644\u0645\u0642\u0627\u0633 \u0648\u0627\u0644\u0644\u0648\u0646 \u0641\u064A Kassenta" }
+      )}
+
+  ${ctaBand(
+        { en: "Not on the list?", de: "Nicht dabei?", ar: "\u0645\u062C\u0627\u0644\u0643 \u063A\u064A\u0631 \u0645\u0630\u0643\u0648\u0631\u061F" },
+        {
+          en: "Butchers, florists, kiosks and salons all run on Kassenta today with a custom preset. Tell us the fields and rules your trade needs.",
+          de: "Metzgereien, Floristen, Kioske und Salons arbeiten heute mit einer eigenen Vorlage auf Kassenta. Nennen Sie uns die Felder und Regeln Ihrer Branche.",
+          ar: "\u0627\u0644\u062C\u0632\u0627\u0631\u0648\u0646 \u0648\u0628\u0627\u0626\u0639\u0648 \u0627\u0644\u0632\u0647\u0648\u0631 \u0648\u0627\u0644\u0623\u0643\u0634\u0627\u0643 \u0648\u0627\u0644\u0635\u0627\u0644\u0648\u0646\u0627\u062A \u064A\u0639\u0645\u0644\u0648\u0646 \u0627\u0644\u064A\u0648\u0645 \u0639\u0644\u0649 Kassenta \u0628\u0625\u0639\u062F\u0627\u062F \u0645\u062E\u0635\u064E\u0651\u0635. \u0623\u062E\u0628\u0631\u0646\u0627 \u0628\u0627\u0644\u062D\u0642\u0648\u0644 \u0648\u0627\u0644\u0642\u0648\u0627\u0639\u062F \u0627\u0644\u062A\u064A \u064A\u062D\u062A\u0627\u062C\u0647\u0627 \u0646\u0634\u0627\u0637\u0643."
+        }
+      )}`
+    };
+    plan = (name, monthly, blurb, points, featured = false, tag) => `
+        <article class="card price-card${featured ? " featured" : ""} reveal">
+          ${tag ? `<span class="badge price-tag" ${tAttrs(tag)}>${esc(tag.en)}</span>` : ""}
+          <h3 ${tAttrs(name)}>${esc(name.en)}</h3>
+          <p style="font-size:.9rem" ${tAttrs(blurb)}>${esc(blurb.en)}</p>
+          <div class="price"><span data-monthly="${monthly}" data-yearly="${Math.round(monthly * 0.8)}" class="price-value">${monthly}</span> <small>CHF <span ${tAttrs({ en: "per month", de: "pro Monat", ar: "\u0634\u0647\u0631\u064A\u064B\u0627" })}>per month</span></small></div>
+          <p class="form-note" ${tAttrs({ en: "Per location. VAT excluded.", de: "Pro Standort. Exkl. MwSt.", ar: "\u0644\u0643\u0644 \u0641\u0631\u0639. \u063A\u064A\u0631 \u0634\u0627\u0645\u0644 \u0627\u0644\u0636\u0631\u064A\u0628\u0629." })}>Per location. VAT excluded.</p>
+          ${ticks(points)}
+          <a class="btn ${featured ? "btn-primary" : "btn-ghost"}" href="/contact/" ${tAttrs({ en: "Start with this plan", de: "Mit diesem Plan starten", ar: "\u0627\u0628\u062F\u0623 \u0628\u0647\u0630\u0647 \u0627\u0644\u0628\u0627\u0642\u0629" })}>Start with this plan</a>
+        </article>`;
+    pricing = {
+      meta: {
+        path: "/pricing",
+        title: { en: "Pricing \u2014 Kassenta POS", de: "Preise \u2014 Kassenta POS", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u2014 Kassenta POS" },
+        description: {
+          en: "Transparent per-location pricing in CHF. No commission on your own orders, no setup fee, and every plan includes onboarding and support.",
+          de: "Transparente Preise je Standort in CHF. Keine Provision auf eigene Bestellungen, keine Einrichtungsgeb\xFChr, Onboarding und Support in jedem Plan.",
+          ar: "\u0623\u0633\u0639\u0627\u0631 \u0634\u0641\u0627\u0641\u0629 \u0644\u0643\u0644 \u0641\u0631\u0639 \u0628\u0627\u0644\u0641\u0631\u0646\u0643 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A. \u0628\u0644\u0627 \u0639\u0645\u0648\u0644\u0629 \u0639\u0644\u0649 \u0637\u0644\u0628\u0627\u062A\u0643\u060C \u0648\u0628\u0644\u0627 \u0631\u0633\u0648\u0645 \u062A\u0623\u0633\u064A\u0633\u060C \u0648\u0645\u0639 \u062A\u0647\u064A\u0626\u0629 \u0648\u062F\u0639\u0645 \u0641\u064A \u0643\u0644 \u0627\u0644\u0628\u0627\u0642\u0627\u062A."
+        }
+      },
+      body: `
+  ${pageHead(
+        { en: "Pay for locations, not for orders", de: "Zahlen Sie f\xFCr Standorte, nicht f\xFCr Bestellungen", ar: "\u0627\u062F\u0641\u0639 \u0645\u0642\u0627\u0628\u0644 \u0627\u0644\u0641\u0631\u0648\u0639 \u0644\u0627 \u0645\u0642\u0627\u0628\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062A" },
+        {
+          en: "Delivery marketplaces take a share of every order. Kassenta charges a flat fee per location, so the more you sell through your own channel, the less each order costs you.",
+          de: "Lieferplattformen behalten einen Anteil jeder Bestellung. Kassenta berechnet eine Pauschale je Standort \u2014 je mehr Sie \xFCber den eigenen Kanal verkaufen, desto g\xFCnstiger wird jede Bestellung.",
+          ar: "\u062A\u0623\u062E\u0630 \u0645\u0646\u0635\u0627\u062A \u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u0646\u0633\u0628\u0629 \u0645\u0646 \u0643\u0644 \u0637\u0644\u0628. \u064A\u0641\u0631\u0636 Kassenta \u0631\u0633\u0645\u064B\u0627 \u062B\u0627\u0628\u062A\u064B\u0627 \u0644\u0643\u0644 \u0641\u0631\u0639\u060C \u0641\u0643\u0644\u0645\u0627 \u0628\u0639\u062A \u0623\u0643\u062B\u0631 \u0639\u0628\u0631 \u0642\u0646\u0627\u062A\u0643 \u0627\u0644\u062E\u0627\u0635\u0629 \u0642\u0644\u0651\u062A \u062A\u0643\u0644\u0641\u0629 \u0627\u0644\u0637\u0644\u0628."
+        },
+        { en: "Pricing", de: "Preise", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631" }
+      )}
+
+  <section class="section">
+    <div class="wrap">
+      <div style="text-align:center">
+        <div class="billing-toggle" role="group" aria-label="Billing period">
+          <button type="button" class="active" data-cycle="monthly" onclick="KassentaPricing.set('monthly')" ${tAttrs({ en: "Monthly", de: "Monatlich", ar: "\u0634\u0647\u0631\u064A" })}>Monthly</button>
+          <button type="button" data-cycle="yearly" onclick="KassentaPricing.set('yearly')" ${tAttrs({ en: "Yearly \u2014 save 20%", de: "J\xE4hrlich \u2014 20% sparen", ar: "\u0633\u0646\u0648\u064A \u2014 \u0648\u0641\u0651\u0631 20%" })}>Yearly \u2014 save 20%</button>
+        </div>
+      </div>
+      <div class="grid grid-3">
+        ${plan(
+        { en: "Starter", de: "Starter", ar: "\u0627\u0644\u0645\u0628\u062A\u062F\u0626\u0629" },
+        49,
+        { en: "One counter, one screen. For a single caf\xE9, kiosk or small shop finding its feet.", de: "Eine Kasse, ein Bildschirm. F\xFCr ein einzelnes Caf\xE9, einen Kiosk oder kleinen Laden.", ar: "\u0643\u0627\u0634\u064A\u0631 \u0648\u0627\u062D\u062F \u0648\u0634\u0627\u0634\u0629 \u0648\u0627\u062D\u062F\u0629. \u0644\u0643\u0627\u0641\u064A\u0647 \u0623\u0648 \u0643\u0634\u0643 \u0623\u0648 \u0645\u062D\u0644 \u0635\u063A\u064A\u0631 \u0641\u064A \u0628\u062F\u0627\u064A\u062A\u0647." },
+        [
+          { en: "POS on one device, unlimited products and staff PINs", de: "Kasse auf einem Ger\xE4t, unbegrenzte Artikel und Mitarbeiter-PINs", ar: "\u0643\u0627\u0634\u064A\u0631 \u0639\u0644\u0649 \u062C\u0647\u0627\u0632 \u0648\u0627\u062D\u062F\u060C \u0648\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0623\u0631\u0642\u0627\u0645 \u0645\u0648\u0638\u0641\u064A\u0646 \u0628\u0644\u0627 \u062D\u062F" },
+          { en: "Swiss VAT, cash rounding and TWINT", de: "Schweizer MwSt., Rappenrundung und TWINT", ar: "\u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A \u0648TWINT" },
+          { en: "Sales and inventory reports with CSV export", de: "Umsatz- und Bestandsberichte mit CSV-Export", ar: "\u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u0628\u064A\u0639\u0627\u062A \u0648\u0645\u062E\u0632\u0648\u0646 \u0645\u0639 \u062A\u0635\u062F\u064A\u0631 CSV" },
+          { en: "Email support, next business day", de: "E-Mail-Support am n\xE4chsten Werktag", ar: "\u062F\u0639\u0645 \u0628\u0627\u0644\u0628\u0631\u064A\u062F \u0641\u064A \u064A\u0648\u0645 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u062A\u0627\u0644\u064A" }
+        ]
+      )}
+        ${plan(
+        { en: "Professional", de: "Professional", ar: "\u0627\u0644\u0627\u062D\u062A\u0631\u0627\u0641\u064A\u0629" },
+        99,
+        { en: "Counter plus your own online channel. For restaurants that deliver and take table orders.", de: "Kasse plus eigener Online-Kanal. F\xFCr Restaurants mit Lieferung und Tischbestellung.", ar: "\u0643\u0627\u0634\u064A\u0631 \u0645\u0639 \u0642\u0646\u0627\u062A\u0643 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0629. \u0644\u0644\u0645\u0637\u0627\u0639\u0645 \u0627\u0644\u062A\u064A \u062A\u0648\u0635\u0651\u0644 \u0648\u062A\u0633\u062A\u0642\u0628\u0644 \u0637\u0644\u0628\u0627\u062A \u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A." },
+        [
+          { en: "Everything in Starter, on up to five devices", de: "Alles aus Starter, auf bis zu f\xFCnf Ger\xE4ten", ar: "\u0643\u0644 \u0645\u0627 \u0641\u064A \u0627\u0644\u0645\u0628\u062A\u062F\u0626\u0629\u060C \u0639\u0644\u0649 \u062E\u0645\u0633\u0629 \u0623\u062C\u0647\u0632\u0629" },
+          { en: "Branded online storefront and table QR ordering", de: "Gebrandeter Onlineshop und Tisch-QR-Bestellung", ar: "\u0645\u062A\u062C\u0631 \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0628\u0647\u0648\u064A\u062A\u0643 \u0648\u0637\u0644\u0628 QR \u0644\u0644\u0637\u0627\u0648\u0644\u0627\u062A" },
+          { en: "Delivery zones, drivers and customer tracking links", de: "Lieferzonen, Fahrer und Tracking-Links f\xFCr Kunden", ar: "\u0645\u0646\u0627\u0637\u0642 \u062A\u0648\u0635\u064A\u0644 \u0648\u0633\u0627\u0626\u0642\u0648\u0646 \u0648\u0631\u0648\u0627\u0628\u0637 \u062A\u062A\u0628\u0651\u0639 \u0644\u0644\u0639\u0645\u0644\u0627\u0621" },
+          { en: "Loyalty tiers, wallet, promo codes and referrals", de: "Treuestufen, Guthaben, Gutscheincodes und Empfehlungen", ar: "\u0645\u0633\u062A\u0648\u064A\u0627\u062A \u0648\u0644\u0627\u0621 \u0648\u0645\u062D\u0641\u0638\u0629 \u0648\u0623\u0643\u0648\u0627\u062F \u062E\u0635\u0645 \u0648\u0625\u062D\u0627\u0644\u0627\u062A" },
+          { en: "WhatsApp and email order notifications", de: "Bestellbenachrichtigungen per WhatsApp und E-Mail", ar: "\u0625\u0634\u0639\u0627\u0631\u0627\u062A \u0637\u0644\u0628\u0627\u062A \u0639\u0628\u0631 \u0648\u0627\u062A\u0633\u0627\u0628 \u0648\u0627\u0644\u0628\u0631\u064A\u062F" },
+          { en: "Phone and chat support during business hours", de: "Telefon- und Chat-Support zu Gesch\xE4ftszeiten", ar: "\u062F\u0639\u0645 \u0647\u0627\u062A\u0641\u064A \u0648\u0645\u062D\u0627\u062F\u062B\u0629 \u062E\u0644\u0627\u0644 \u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0639\u0645\u0644" }
+        ],
+        true,
+        { en: "Most chosen", de: "Am h\xE4ufigsten", ar: "\u0627\u0644\u0623\u0643\u062B\u0631 \u0627\u062E\u062A\u064A\u0627\u0631\u064B\u0627" }
+      )}
+        ${plan(
+        { en: "Enterprise", de: "Enterprise", ar: "\u0627\u0644\u0645\u0624\u0633\u0633\u0627\u062A" },
+        199,
+        { en: "Several branches under one roof, with the API and the reporting to match.", de: "Mehrere Filialen unter einem Dach, mit passender API und Auswertung.", ar: "\u0639\u062F\u0629 \u0641\u0631\u0648\u0639 \u062A\u062D\u062A \u0645\u0638\u0644\u0629 \u0648\u0627\u062D\u062F\u0629\u060C \u0645\u0639 \u0648\u0627\u062C\u0647\u0629 \u0628\u0631\u0645\u062C\u064A\u0629 \u0648\u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u0646\u0627\u0633\u0628\u0629." },
+        [
+          { en: "Everything in Professional, unlimited devices", de: "Alles aus Professional, unbegrenzte Ger\xE4te", ar: "\u0643\u0644 \u0645\u0627 \u0641\u064A \u0627\u0644\u0627\u062D\u062A\u0631\u0627\u0641\u064A\u0629\u060C \u0648\u0623\u062C\u0647\u0632\u0629 \u0628\u0644\u0627 \u062D\u062F" },
+          { en: "Multi-branch console with consolidated reporting", de: "Filialkonsole mit konsolidierter Auswertung", ar: "\u0644\u0648\u062D\u0629 \u0645\u062A\u0639\u062F\u062F\u0629 \u0627\u0644\u0641\u0631\u0648\u0639 \u0628\u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u062C\u0645\u0651\u0639\u0629" },
+          { en: "REST API, webhooks and accounting export", de: "REST-API, Webhooks und Buchhaltungsexport", ar: "\u0648\u0627\u062C\u0647\u0629 REST \u0648Webhooks \u0648\u062A\u0635\u062F\u064A\u0631 \u0645\u062D\u0627\u0633\u0628\u064A" },
+          { en: "Caller ID integration and custom vertical modules", de: "Rufnummernerkennung und eigene Branchenmodule", ar: "\u062A\u0639\u0631\u064A\u0641 \u0627\u0644\u0645\u062A\u0635\u0644 \u0648\u0648\u062D\u062F\u0627\u062A \u0645\u062E\u0635\u064E\u0651\u0635\u0629 \u0644\u0645\u062C\u0627\u0644\u0643" },
+          { en: "Named contact, priority response and on-site onboarding", de: "Fester Ansprechpartner, priorisierte Reaktion und Onboarding vor Ort", ar: "\u0645\u0633\u0624\u0648\u0644 \u0645\u062E\u0635\u064E\u0651\u0635 \u0648\u0627\u0633\u062A\u062C\u0627\u0628\u0629 \u0630\u0627\u062A \u0623\u0648\u0644\u0648\u064A\u0629 \u0648\u062A\u0647\u064A\u0626\u0629 \u0641\u064A \u0627\u0644\u0645\u0648\u0642\u0639" }
+        ]
+      )}
+      </div>
+      <p class="form-note" style="text-align:center;margin-top:24px" ${tAttrs({
+        en: "Prices are per location in CHF, excluding VAT. Yearly billing is charged once for twelve months.",
+        de: "Preise je Standort in CHF, exkl. MwSt. Die Jahresabrechnung erfolgt einmalig f\xFCr zw\xF6lf Monate.",
+        ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0644\u0643\u0644 \u0641\u0631\u0639 \u0628\u0627\u0644\u0641\u0631\u0646\u0643 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A \u0648\u063A\u064A\u0631 \u0634\u0627\u0645\u0644\u0629 \u0627\u0644\u0636\u0631\u064A\u0628\u0629. \u062A\u064F\u062D\u0635\u064E\u0651\u0644 \u0627\u0644\u0641\u0648\u062A\u0631\u0629 \u0627\u0644\u0633\u0646\u0648\u064A\u0629 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629 \u0644\u0627\u062B\u0646\u064A \u0639\u0634\u0631 \u0634\u0647\u0631\u064B\u0627."
+      })}>Prices are per location in CHF, excluding VAT. Yearly billing is charged once for twelve months.</p>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="wrap">
+      ${head(
+        { en: "Included everywhere", de: "\xDCberall enthalten", ar: "\u0645\u0634\u0645\u0648\u0644 \u0641\u064A \u0643\u0644 \u0627\u0644\u0628\u0627\u0642\u0627\u062A" },
+        { en: "Things other vendors invoice separately", de: "Was andere Anbieter separat berechnen", ar: "\u0623\u0645\u0648\u0631 \u064A\u0641\u0648\u062A\u0631\u0647\u0627 \u0622\u062E\u0631\u0648\u0646 \u0645\u0646\u0641\u0635\u0644\u0629" },
+        void 0,
+        true
+      )}
+      <div class="grid grid-4">
+        ${card(icons.refresh, { en: "Updates", de: "Updates", ar: "\u0627\u0644\u062A\u062D\u062F\u064A\u062B\u0627\u062A" }, { en: "Every release, including new modules, at no extra cost.", de: "Jede Version, inklusive neuer Module, ohne Aufpreis.", ar: "\u0643\u0644 \u0625\u0635\u062F\u0627\u0631\u060C \u0628\u0645\u0627 \u0641\u064A\u0647 \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0627\u0644\u062C\u062F\u064A\u062F\u0629\u060C \u062F\u0648\u0646 \u062A\u0643\u0644\u0641\u0629 \u0625\u0636\u0627\u0641\u064A\u0629." })}
+        ${card(icons.cloud, { en: "Hosting and backups", de: "Hosting und Backups", ar: "\u0627\u0644\u0627\u0633\u062A\u0636\u0627\u0641\u0629 \u0648\u0627\u0644\u0646\u0633\u062E \u0627\u0644\u0627\u062D\u062A\u064A\u0627\u0637\u064A" }, { en: "European hosting with daily backups and point-in-time restore.", de: "Europ\xE4isches Hosting mit t\xE4glichen Backups und Point-in-Time-Restore.", ar: "\u0627\u0633\u062A\u0636\u0627\u0641\u0629 \u0623\u0648\u0631\u0648\u0628\u064A\u0629 \u0645\u0639 \u0646\u0633\u062E \u064A\u0648\u0645\u064A \u0648\u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0644\u0623\u064A \u0644\u062D\u0638\u0629." })}
+        ${card(icons.users, { en: "Onboarding", de: "Onboarding", ar: "\u0627\u0644\u062A\u0647\u064A\u0626\u0629" }, { en: "We import your menu and train your team before you go live.", de: "Wir importieren Ihre Karte und schulen Ihr Team vor dem Livegang.", ar: "\u0646\u0633\u062A\u0648\u0631\u062F \u0642\u0627\u0626\u0645\u062A\u0643 \u0648\u0646\u062F\u0631\u0651\u0628 \u0641\u0631\u064A\u0642\u0643 \u0642\u0628\u0644 \u0627\u0644\u062A\u0634\u063A\u064A\u0644." })}
+        ${card(icons.key, { en: "No commission", de: "Keine Provision", ar: "\u0628\u0644\u0627 \u0639\u0645\u0648\u0644\u0629" }, { en: "Orders through your own storefront cost you nothing per order.", de: "Bestellungen \xFCber Ihren eigenen Shop kosten pro Bestellung nichts.", ar: "\u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0639\u0628\u0631 \u0645\u062A\u062C\u0631\u0643 \u0644\u0627 \u062A\u0643\u0644\u0651\u0641\u0643 \u0634\u064A\u0626\u064B\u0627 \u0644\u0643\u0644 \u0637\u0644\u0628." })}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap" style="max-width:860px">
+      ${head({ en: "Billing", de: "Abrechnung", ar: "\u0627\u0644\u0641\u0648\u062A\u0631\u0629" }, { en: "Common questions", de: "H\xE4ufige Fragen", ar: "\u0623\u0633\u0626\u0644\u0629 \u0634\u0627\u0626\u0639\u0629" }, void 0, true)}
+      ${faq([
+        {
+          q: { en: "Is there a minimum contract?", de: "Gibt es eine Mindestlaufzeit?", ar: "\u0647\u0644 \u0647\u0646\u0627\u0643 \u062D\u062F \u0623\u062F\u0646\u0649 \u0644\u0644\u062A\u0639\u0627\u0642\u062F\u061F" },
+          a: { en: "Monthly plans run month to month and can be cancelled at the end of any period. Yearly plans run for twelve months and are billed once.", de: "Monatspl\xE4ne laufen monatlich und k\xF6nnen zum Periodenende gek\xFCndigt werden. Jahrespl\xE4ne laufen zw\xF6lf Monate und werden einmalig abgerechnet.", ar: "\u0627\u0644\u0628\u0627\u0642\u0627\u062A \u0627\u0644\u0634\u0647\u0631\u064A\u0629 \u062A\u064F\u062C\u062F\u064E\u0651\u062F \u0634\u0647\u0631\u064A\u064B\u0627 \u0648\u064A\u0645\u0643\u0646 \u0625\u0644\u063A\u0627\u0624\u0647\u0627 \u0646\u0647\u0627\u064A\u0629 \u0623\u064A \u0641\u062A\u0631\u0629. \u0627\u0644\u0628\u0627\u0642\u0627\u062A \u0627\u0644\u0633\u0646\u0648\u064A\u0629 \u0644\u0627\u062B\u0646\u064A \u0639\u0634\u0631 \u0634\u0647\u0631\u064B\u0627 \u0648\u062A\u064F\u062D\u0635\u064E\u0651\u0644 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629." }
+        },
+        {
+          q: { en: "What counts as a location?", de: "Was z\xE4hlt als Standort?", ar: "\u0645\u0627 \u0627\u0644\u0630\u064A \u064A\u064F\u062D\u062A\u0633\u0628 \u0641\u0631\u0639\u064B\u0627\u061F" },
+          a: { en: "One physical address. Devices inside that address are covered by the plan's device limit; a second shop needs a second location.", de: "Eine physische Adresse. Ger\xE4te an dieser Adresse fallen unter das Ger\xE4telimit des Plans; ein zweites Gesch\xE4ft ben\xF6tigt einen zweiten Standort.", ar: "\u0639\u0646\u0648\u0627\u0646 \u0641\u0639\u0644\u064A \u0648\u0627\u062D\u062F. \u0627\u0644\u0623\u062C\u0647\u0632\u0629 \u062F\u0627\u062E\u0644 \u0647\u0630\u0627 \u0627\u0644\u0639\u0646\u0648\u0627\u0646 \u062A\u062F\u062E\u0644 \u0636\u0645\u0646 \u062D\u062F \u0627\u0644\u0628\u0627\u0642\u0629\u061B \u0648\u0627\u0644\u0645\u062D\u0644 \u0627\u0644\u062B\u0627\u0646\u064A \u064A\u062D\u062A\u0627\u062C \u0641\u0631\u0639\u064B\u0627 \u062B\u0627\u0646\u064A\u064B\u0627." }
+        },
+        {
+          q: { en: "Do you take a cut of card or TWINT payments?", de: "Behalten Sie einen Anteil an Karten- oder TWINT-Zahlungen?", ar: "\u0647\u0644 \u062A\u0623\u062E\u0630\u0648\u0646 \u0646\u0633\u0628\u0629 \u0645\u0646 \u0645\u062F\u0641\u0648\u0639\u0627\u062A \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0623\u0648 TWINT\u061F" },
+          a: { en: "No. You keep your own acquirer contract and its rates. Kassenta records the payment and never sits between you and the money.", de: "Nein. Sie behalten Ihren eigenen Acquirer-Vertrag und dessen Konditionen. Kassenta erfasst die Zahlung und steht nie zwischen Ihnen und dem Geld.", ar: "\u0644\u0627. \u062A\u062D\u062A\u0641\u0638 \u0628\u0639\u0642\u062F \u0645\u0632\u0648\u0651\u062F \u0627\u0644\u062F\u0641\u0639 \u0627\u0644\u062E\u0627\u0635 \u0628\u0643 \u0648\u0623\u0633\u0639\u0627\u0631\u0647. \u064A\u0633\u062C\u0651\u0644 Kassenta \u0627\u0644\u062F\u0641\u0639\u0629 \u0648\u0644\u0627 \u064A\u0642\u0641 \u0623\u0628\u062F\u064B\u0627 \u0628\u064A\u0646\u0643 \u0648\u0628\u064A\u0646 \u0623\u0645\u0648\u0627\u0644\u0643." }
+        },
+        {
+          q: { en: "Can I change plan later?", de: "Kann ich den Plan sp\xE4ter wechseln?", ar: "\u0647\u0644 \u064A\u0645\u0643\u0646\u0646\u064A \u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u0628\u0627\u0642\u0629 \u0644\u0627\u062D\u0642\u064B\u0627\u061F" },
+          a: { en: "Yes, in both directions, effective from the next billing period. Your data and settings are untouched by a plan change.", de: "Ja, in beide Richtungen, wirksam ab der n\xE4chsten Abrechnungsperiode. Daten und Einstellungen bleiben unver\xE4ndert.", ar: "\u0646\u0639\u0645\u060C \u0641\u064A \u0627\u0644\u0627\u062A\u062C\u0627\u0647\u064A\u0646\u060C \u0627\u0639\u062A\u0628\u0627\u0631\u064B\u0627 \u0645\u0646 \u0641\u062A\u0631\u0629 \u0627\u0644\u0641\u0648\u062A\u0631\u0629 \u0627\u0644\u062A\u0627\u0644\u064A\u0629. \u0644\u0627 \u064A\u0645\u0633\u0651 \u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u0628\u0627\u0642\u0629 \u0628\u064A\u0627\u0646\u0627\u062A\u0643 \u0648\u0625\u0639\u062F\u0627\u062F\u0627\u062A\u0643." }
+        }
+      ])}
+    </div>
+  </section>
+
+  ${ctaBand(
+        { en: "Run the numbers with us", de: "Rechnen wir gemeinsam", ar: "\u0644\u0646\u062D\u0633\u0628 \u0627\u0644\u0623\u0631\u0642\u0627\u0645 \u0645\u0639\u064B\u0627" },
+        {
+          en: "Send your current monthly order volume and platform commission. We will show you the break-even point in writing before you commit to anything.",
+          de: "Senden Sie uns Ihr monatliches Bestellvolumen und die Plattformprovision. Wir zeigen Ihnen den Break-even schriftlich, bevor Sie sich festlegen.",
+          ar: "\u0623\u0631\u0633\u0644 \u062D\u062C\u0645 \u0637\u0644\u0628\u0627\u062A\u0643 \u0627\u0644\u0634\u0647\u0631\u064A \u0648\u0639\u0645\u0648\u0644\u0629 \u0627\u0644\u0645\u0646\u0635\u0629 \u0627\u0644\u062D\u0627\u0644\u064A\u0629. \u0633\u0646\u0639\u0631\u0636 \u0644\u0643 \u0646\u0642\u0637\u0629 \u0627\u0644\u062A\u0639\u0627\u062F\u0644 \u0643\u062A\u0627\u0628\u064A\u064B\u0627 \u0642\u0628\u0644 \u0623\u064A \u0627\u0644\u062A\u0632\u0627\u0645."
+        }
+      )}
+
+  <script>
+    window.KassentaPricing = (function () {
+      function set(cycle) {
+        document.querySelectorAll('.billing-toggle button').forEach(function (b) {
+          b.classList.toggle('active', b.dataset.cycle === cycle);
+        });
+        document.querySelectorAll('.price-value').forEach(function (el) {
+          el.textContent = el.getAttribute(cycle === 'yearly' ? 'data-yearly' : 'data-monthly');
+        });
+      }
+      return { set: set };
+    })();
+  </script>`
+    };
+    compliance = {
+      meta: {
+        path: "/compliance",
+        title: { en: "Compliance and data protection \u2014 Kassenta POS", de: "Compliance und Datenschutz \u2014 Kassenta POS", ar: "\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0648\u062D\u0645\u0627\u064A\u0629 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u2014 Kassenta POS" },
+        description: {
+          en: "Swiss VAT rates and cash rounding, GDPR and nDSG handling, audit trails, and our roadmap for German, Austrian, French and Italian fiscalisation.",
+          de: "Schweizer MwSt.-S\xE4tze und Rappenrundung, DSGVO- und nDSG-Umsetzung, Audit-Trails und unsere Roadmap zur Fiskalisierung in Deutschland, \xD6sterreich, Frankreich und Italien.",
+          ar: "\u0646\u0633\u0628 \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A\u060C \u0648\u0627\u0644\u062A\u0632\u0627\u0645 GDPR \u0648nDSG\u060C \u0648\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u062A\u062F\u0642\u064A\u0642\u060C \u0648\u062E\u0637\u062A\u0646\u0627 \u0644\u0644\u0623\u0646\u0638\u0645\u0629 \u0627\u0644\u0636\u0631\u064A\u0628\u064A\u0629 \u0641\u064A \u0623\u0644\u0645\u0627\u0646\u064A\u0627 \u0648\u0627\u0644\u0646\u0645\u0633\u0627 \u0648\u0641\u0631\u0646\u0633\u0627 \u0648\u0625\u064A\u0637\u0627\u0644\u064A\u0627."
+        }
+      },
+      body: `
+  ${pageHead(
+        { en: "What we handle, and what is still on the roadmap", de: "Was wir abdecken \u2014 und was noch aussteht", ar: "\u0645\u0627 \u0646\u063A\u0637\u0651\u064A\u0647 \u0648\u0645\u0627 \u0644\u0627 \u064A\u0632\u0627\u0644 \u0641\u064A \u0627\u0644\u062E\u0637\u0629" },
+        {
+          en: "Fiscal rules differ in every market and vendors are often vague about which ones they actually implement. This page states our position plainly so you can check it against your accountant's list.",
+          de: "Steuerliche Vorgaben unterscheiden sich je Markt, und Anbieter bleiben oft vage, was sie tats\xE4chlich umsetzen. Diese Seite nennt unsere Position klar, damit Sie sie mit der Liste Ihrer Treuhand abgleichen k\xF6nnen.",
+          ar: "\u062A\u062E\u062A\u0644\u0641 \u0627\u0644\u0642\u0648\u0627\u0639\u062F \u0627\u0644\u0636\u0631\u064A\u0628\u064A\u0629 \u0628\u064A\u0646 \u0627\u0644\u0623\u0633\u0648\u0627\u0642 \u0648\u0643\u062B\u064A\u0631\u064B\u0627 \u0645\u0627 \u064A\u0643\u0648\u0646 \u0627\u0644\u0645\u0648\u0631\u062F\u0648\u0646 \u063A\u0627\u0645\u0636\u064A\u0646 \u0628\u0634\u0623\u0646 \u0645\u0627 \u064A\u0646\u0641\u0651\u0630\u0648\u0646\u0647 \u0641\u0639\u0644\u064A\u064B\u0627. \u062A\u0639\u0631\u0636 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062D\u0629 \u0645\u0648\u0642\u0641\u0646\u0627 \u0628\u0648\u0636\u0648\u062D \u0644\u062A\u0642\u0627\u0631\u0646\u0647 \u0628\u0642\u0627\u0626\u0645\u0629 \u0645\u062D\u0627\u0633\u0628\u0643."
+        },
+        { en: "Compliance", de: "Compliance", ar: "\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644" }
+      )}
+
+  <section class="section">
+    <div class="wrap">
+      ${head(
+        { en: "Switzerland", de: "Schweiz", ar: "\u0633\u0648\u064A\u0633\u0631\u0627" },
+        { en: "The home market, implemented in full", de: "Der Heimatmarkt, vollst\xE4ndig umgesetzt", ar: "\u0627\u0644\u0633\u0648\u0642 \u0627\u0644\u0623\u0633\u0627\u0633\u064A\u060C \u0645\u0646\u0641\u064E\u0651\u0630 \u0628\u0627\u0644\u0643\u0627\u0645\u0644" }
+      )}
+      <div class="grid grid-2">
+        ${card(icons.scale, { en: "VAT rates", de: "MwSt.-S\xE4tze", ar: "\u0646\u0633\u0628 \u0627\u0644\u0636\u0631\u064A\u0628\u0629" }, {
+        en: "8.1% standard, 2.6% reduced and 3.8% accommodation, applied per product category. Dine-in and takeaway are treated separately on the same ticket.",
+        de: "8,1 % Normalsatz, 2,6 % reduziert und 3,8 % Beherbergung, je Artikelkategorie angewendet. Vor-Ort und Takeaway werden auf demselben Bon getrennt behandelt.",
+        ar: "8.1% \u0639\u0627\u062F\u064A\u0629 \u06482.6% \u0645\u062E\u0641\u064E\u0651\u0636\u0629 \u06483.8% \u0625\u0642\u0627\u0645\u0629\u060C \u062A\u064F\u0637\u0628\u064E\u0651\u0642 \u062D\u0633\u0628 \u0641\u0626\u0629 \u0627\u0644\u0645\u0646\u062A\u062C. \u0648\u064A\u064F\u0639\u0627\u0644\u064E\u062C \u0627\u0644\u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0648\u0627\u0644\u062A\u064A\u0643 \u0623\u0648\u0627\u064A \u0628\u0634\u0643\u0644 \u0645\u0646\u0641\u0635\u0644 \u0641\u064A \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0646\u0641\u0633\u0647\u0627."
+      })}
+        ${card(icons.register, { en: "Cash rounding", de: "Rappenrundung", ar: "\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A" }, {
+        en: "Cash totals round to the nearest CHF 0.05 at the ticket level. Card, TWINT and invoice keep the exact amount, and the difference is posted as a rounding line.",
+        de: "Barbetr\xE4ge runden auf 5 Rappen je Bon. Karte, TWINT und Rechnung behalten den exakten Betrag; die Differenz wird als Rundungsposition gebucht.",
+        ar: "\u062A\u064F\u0642\u0631\u064E\u0651\u0628 \u0645\u0628\u0627\u0644\u063A \u0627\u0644\u0646\u0642\u062F \u0644\u0623\u0642\u0631\u0628 0.05 \u0641\u0631\u0646\u0643 \u0639\u0644\u0649 \u0645\u0633\u062A\u0648\u0649 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629. \u0648\u062A\u062D\u062A\u0641\u0638 \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0648TWINT \u0648\u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0628\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0642\u064A\u0642\u060C \u0648\u064A\u064F\u0642\u064A\u064E\u0651\u062F \u0627\u0644\u0641\u0631\u0642 \u0643\u0633\u0637\u0631 \u062A\u0642\u0631\u064A\u0628."
+      })}
+        ${card(icons.lock, { en: "nDSG and GDPR", de: "nDSG und DSGVO", ar: "nDSG \u0648GDPR" }, {
+        en: "Data is hosted in Europe. Customers can request export or deletion, and both are executed from the console with a record of who approved them.",
+        de: "Daten werden in Europa gehostet. Kunden k\xF6nnen Export oder L\xF6schung verlangen; beides wird in der Konsole ausgef\xFChrt und protokolliert.",
+        ar: "\u062A\u064F\u0633\u062A\u0636\u0627\u0641 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0641\u064A \u0623\u0648\u0631\u0648\u0628\u0627. \u0648\u064A\u0645\u0643\u0646 \u0644\u0644\u0639\u0645\u0644\u0627\u0621 \u0637\u0644\u0628 \u0627\u0644\u062A\u0635\u062F\u064A\u0631 \u0623\u0648 \u0627\u0644\u062D\u0630\u0641\u060C \u0648\u064A\u064F\u0646\u0641\u064E\u0651\u0630\u0627\u0646 \u0645\u0646 \u0627\u0644\u0644\u0648\u062D\u0629 \u0645\u0639 \u062A\u0633\u062C\u064A\u0644 \u0645\u0646 \u0648\u0627\u0641\u0642 \u0639\u0644\u064A\u0647\u0645\u0627."
+      })}
+        ${card(icons.shield, { en: "Audit trail", de: "Audit-Trail", ar: "\u0633\u062C\u0644 \u0627\u0644\u062A\u062F\u0642\u064A\u0642" }, {
+        en: "Every sale, void, discount, price override and cash movement records the operator, the device and the timestamp. Records are append-only.",
+        de: "Jeder Verkauf, Storno, Rabatt, jede Preis\xE4nderung und Kassenbewegung erfasst Mitarbeiter, Ger\xE4t und Zeitstempel. Eintr\xE4ge sind nur anf\xFCgbar.",
+        ar: "\u0643\u0644 \u0628\u064A\u0639 \u0648\u0625\u0644\u063A\u0627\u0621 \u0648\u062E\u0635\u0645 \u0648\u062A\u0639\u062F\u064A\u0644 \u0633\u0639\u0631 \u0648\u062D\u0631\u0643\u0629 \u0646\u0642\u062F\u064A\u0629 \u064A\u0633\u062C\u0651\u0644 \u0627\u0644\u0645\u0648\u0638\u0641 \u0648\u0627\u0644\u062C\u0647\u0627\u0632 \u0648\u0627\u0644\u0648\u0642\u062A. \u0648\u0627\u0644\u0633\u062C\u0644\u0627\u062A \u0625\u0636\u0627\u0641\u064A\u0629 \u0641\u0642\u0637 \u0644\u0627 \u062A\u064F\u0639\u062F\u064E\u0651\u0644."
+      })}
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="wrap">
+      ${head(
+        { en: "European Union", de: "Europ\xE4ische Union", ar: "\u0627\u0644\u0627\u062A\u062D\u0627\u062F \u0627\u0644\u0623\u0648\u0631\u0648\u0628\u064A" },
+        { en: "Where each market stands today", de: "Wo jeder Markt heute steht", ar: "\u0648\u0636\u0639 \u0643\u0644 \u0633\u0648\u0642 \u0627\u0644\u064A\u0648\u0645" },
+        {
+          en: "Fiscalisation means certified hardware or software signatures in several EU countries. We list the exact requirement and our current status rather than a single claim of European compliance.",
+          de: "Fiskalisierung bedeutet in mehreren EU-L\xE4ndern zertifizierte Hardware oder Software-Signaturen. Wir nennen die konkrete Anforderung und unseren aktuellen Stand statt einer pauschalen Compliance-Aussage.",
+          ar: "\u062A\u0639\u0646\u064A \u0627\u0644\u0641\u0648\u062A\u0631\u0629 \u0627\u0644\u0636\u0631\u064A\u0628\u064A\u0629 \u0641\u064A \u0639\u062F\u0629 \u062F\u0648\u0644 \u0623\u0648\u0631\u0648\u0628\u064A\u0629 \u0623\u062C\u0647\u0632\u0629 \u0645\u0639\u062A\u0645\u062F\u0629 \u0623\u0648 \u062A\u0648\u0642\u064A\u0639\u0627\u062A \u0628\u0631\u0645\u062C\u064A\u0629. \u0646\u0639\u0631\u0636 \u0627\u0644\u0645\u062A\u0637\u0644\u064E\u0651\u0628 \u0628\u062F\u0642\u0629 \u0648\u0648\u0636\u0639\u0646\u0627 \u0627\u0644\u062D\u0627\u0644\u064A \u0628\u062F\u0644 \u0627\u062F\u0639\u0627\u0621 \u0627\u0645\u062A\u062B\u0627\u0644 \u0623\u0648\u0631\u0648\u0628\u064A \u0639\u0627\u0645."
+        }
+      )}
+      <div class="table-wrap reveal">
+        <table>
+          <thead>
+            <tr>
+              <th ${tAttrs({ en: "Market", de: "Markt", ar: "\u0627\u0644\u0633\u0648\u0642" })}>Market</th>
+              <th ${tAttrs({ en: "Requirement", de: "Anforderung", ar: "\u0627\u0644\u0645\u062A\u0637\u0644\u064E\u0651\u0628" })}>Requirement</th>
+              <th ${tAttrs({ en: "Status", de: "Status", ar: "\u0627\u0644\u062D\u0627\u0644\u0629" })}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Switzerland</strong></td>
+              <td ${tAttrs({ en: "VAT rates, cash rounding, retention of records", de: "MwSt.-S\xE4tze, Rappenrundung, Aufbewahrung", ar: "\u0646\u0633\u0628 \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A \u0648\u062D\u0641\u0638 \u0627\u0644\u0633\u062C\u0644\u0627\u062A" })}>VAT rates, cash rounding, retention of records</td>
+              <td><span class="badge" ${tAttrs({ en: "Available", de: "Verf\xFCgbar", ar: "\u0645\u062A\u0627\u062D" })}>Available</span></td>
+            </tr>
+            <tr>
+              <td><strong>Germany</strong></td>
+              <td ${tAttrs({ en: "KassenSichV with a certified TSE, DSFinV-K export", de: "KassenSichV mit zertifizierter TSE, DSFinV-K-Export", ar: "KassenSichV \u0645\u0639 TSE \u0645\u0639\u062A\u0645\u062F \u0648\u062A\u0635\u062F\u064A\u0631 DSFinV-K" })}>KassenSichV with a certified TSE, DSFinV-K export</td>
+              <td><span class="badge badge--neutral" ${tAttrs({ en: "In progress", de: "In Arbeit", ar: "\u0642\u064A\u062F \u0627\u0644\u062A\u0646\u0641\u064A\u0630" })}>In progress</span></td>
+            </tr>
+            <tr>
+              <td><strong>Austria</strong></td>
+              <td ${tAttrs({ en: "RKSV signature device and receipt QR chain", de: "RKSV-Signatureinheit und Beleg-QR-Kette", ar: "\u062C\u0647\u0627\u0632 \u062A\u0648\u0642\u064A\u0639 RKSV \u0648\u0633\u0644\u0633\u0644\u0629 QR \u0644\u0644\u0625\u064A\u0635\u0627\u0644\u0627\u062A" })}>RKSV signature device and receipt QR chain</td>
+              <td><span class="badge badge--neutral" ${tAttrs({ en: "In progress", de: "In Arbeit", ar: "\u0642\u064A\u062F \u0627\u0644\u062A\u0646\u0641\u064A\u0630" })}>In progress</span></td>
+            </tr>
+            <tr>
+              <td><strong>France</strong></td>
+              <td ${tAttrs({ en: "NF525 certification for cash register software", de: "NF525-Zertifizierung f\xFCr Kassensoftware", ar: "\u0634\u0647\u0627\u062F\u0629 NF525 \u0644\u0628\u0631\u0627\u0645\u062C \u0627\u0644\u0643\u0627\u0634\u064A\u0631" })}>NF525 certification for cash register software</td>
+              <td><span class="badge badge--neutral" ${tAttrs({ en: "Planned", de: "Geplant", ar: "\u0645\u062E\u0637\u064E\u0651\u0637" })}>Planned</span></td>
+            </tr>
+            <tr>
+              <td><strong>Italy</strong></td>
+              <td ${tAttrs({ en: "Registratore Telematico daily transmission", de: "Registratore Telematico mit Tages\xFCbermittlung", ar: "Registratore Telematico \u0628\u0625\u0631\u0633\u0627\u0644 \u064A\u0648\u0645\u064A" })}>Registratore Telematico daily transmission</td>
+              <td><span class="badge badge--neutral" ${tAttrs({ en: "Planned", de: "Geplant", ar: "\u0645\u062E\u0637\u064E\u0651\u0637" })}>Planned</span></td>
+            </tr>
+            <tr>
+              <td><strong>EU-wide</strong></td>
+              <td ${tAttrs({ en: "GDPR: lawful basis, export, deletion, processor agreement", de: "DSGVO: Rechtsgrundlage, Export, L\xF6schung, AV-Vertrag", ar: "GDPR: \u0627\u0644\u0623\u0633\u0627\u0633 \u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A \u0648\u0627\u0644\u062A\u0635\u062F\u064A\u0631 \u0648\u0627\u0644\u062D\u0630\u0641 \u0648\u0627\u062A\u0641\u0627\u0642\u064A\u0629 \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629" })}>GDPR: lawful basis, export, deletion, processor agreement</td>
+              <td><span class="badge" ${tAttrs({ en: "Available", de: "Verf\xFCgbar", ar: "\u0645\u062A\u0627\u062D" })}>Available</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="form-note" style="margin-top:16px" ${tAttrs({
+        en: "If your market requires certification we have not completed, we will say so before you sign rather than after.",
+        de: "Wenn Ihr Markt eine Zertifizierung verlangt, die wir noch nicht abgeschlossen haben, sagen wir das vor Vertragsabschluss \u2014 nicht danach.",
+        ar: "\u0625\u0630\u0627 \u0643\u0627\u0646 \u0633\u0648\u0642\u0643 \u064A\u062A\u0637\u0644\u0628 \u0634\u0647\u0627\u062F\u0629 \u0644\u0645 \u0646\u0643\u0645\u0644\u0647\u0627 \u0628\u0639\u062F\u060C \u0641\u0633\u0646\u062E\u0628\u0631\u0643 \u0642\u0628\u0644 \u0627\u0644\u062A\u0648\u0642\u064A\u0639 \u0644\u0627 \u0628\u0639\u062F\u0647."
+      })}>If your market requires certification we have not completed, we will say so before you sign rather than after.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          ${head({ en: "Security", de: "Sicherheit", ar: "\u0627\u0644\u0623\u0645\u0627\u0646" }, { en: "How the system protects the data", de: "Wie das System die Daten sch\xFCtzt", ar: "\u0643\u064A\u0641 \u064A\u062D\u0645\u064A \u0627\u0644\u0646\u0638\u0627\u0645 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A" })}
+          ${ticks([
+        { en: "Traffic is encrypted in transit with TLS; passwords and staff PINs are stored as bcrypt hashes, never in plain text.", de: "Datenverkehr wird per TLS verschl\xFCsselt; Passw\xF6rter und Mitarbeiter-PINs werden als bcrypt-Hashes gespeichert, nie im Klartext.", ar: "\u062A\u064F\u0634\u0641\u064E\u0651\u0631 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u0646\u0642\u0644 \u0628\u0640TLS\u060C \u0648\u062A\u064F\u062E\u0632\u064E\u0651\u0646 \u0643\u0644\u0645\u0627\u062A \u0627\u0644\u0645\u0631\u0648\u0631 \u0648\u0623\u0631\u0642\u0627\u0645 \u0627\u0644\u0645\u0648\u0638\u0641\u064A\u0646 \u0643\u062A\u062C\u0632\u0626\u0627\u062A bcrypt \u0644\u0627 \u0643\u0646\u0635 \u0635\u0631\u064A\u062D." },
+        { en: "Each business is isolated by tenant, and every request is checked against both the licence and the employee's role.", de: "Jeder Betrieb ist mandantengetrennt; jede Anfrage wird gegen Lizenz und Mitarbeiterrolle gepr\xFCft.", ar: "\u0643\u0644 \u0646\u0634\u0627\u0637 \u0645\u0639\u0632\u0648\u0644 \u0643\u0645\u0633\u062A\u0623\u062C\u0631 \u0645\u0633\u062A\u0642\u0644\u060C \u0648\u0643\u0644 \u0637\u0644\u0628 \u064A\u064F\u0641\u062D\u0635 \u0645\u0642\u0627\u0628\u0644 \u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u0648\u062F\u0648\u0631 \u0627\u0644\u0645\u0648\u0638\u0641 \u0645\u0639\u064B\u0627." },
+        { en: "Sessions expire and can be revoked centrally when a device is lost or an employee leaves.", de: "Sitzungen laufen ab und k\xF6nnen zentral widerrufen werden, wenn ein Ger\xE4t verloren geht oder jemand ausscheidet.", ar: "\u062A\u0646\u062A\u0647\u064A \u0627\u0644\u062C\u0644\u0633\u0627\u062A \u0648\u064A\u0645\u0643\u0646 \u0625\u0628\u0637\u0627\u0644\u0647\u0627 \u0645\u0631\u0643\u0632\u064A\u064B\u0627 \u0639\u0646\u062F \u0641\u0642\u062F \u062C\u0647\u0627\u0632 \u0623\u0648 \u0645\u063A\u0627\u062F\u0631\u0629 \u0645\u0648\u0638\u0641." },
+        { en: "Daily encrypted backups with point-in-time restore, tested on a schedule rather than assumed to work.", de: "T\xE4glich verschl\xFCsselte Backups mit Point-in-Time-Restore, planm\xE4ssig getestet statt nur angenommen.", ar: "\u0646\u0633\u062E \u0627\u062D\u062A\u064A\u0627\u0637\u064A \u064A\u0648\u0645\u064A \u0645\u0634\u0641\u064E\u0651\u0631 \u0645\u0639 \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0644\u0623\u064A \u0644\u062D\u0638\u0629\u060C \u062A\u064F\u062E\u062A\u0628\u0631 \u062F\u0648\u0631\u064A\u064B\u0627 \u0644\u0627 \u064A\u064F\u0641\u062A\u0631\u0636 \u0646\u062C\u0627\u062D\u0647\u0627." }
+      ])}
+        </div>
+        <div class="reveal">${shot({ id: "compliance-audit", ratio: "4 / 3", size: "1400 \xD7 1050", alt: { en: "Audit trail and permission settings in the Kassenta console", de: "Audit-Trail und Berechtigungen in der Kassenta-Konsole", ar: "\u0633\u062C\u0644 \u0627\u0644\u062A\u062F\u0642\u064A\u0642 \u0648\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0641\u064A \u0644\u0648\u062D\u0629 Kassenta" } })}</div>
+      </div>
+    </div>
+  </section>
+
+  ${ctaBand(
+        { en: "Send this page to your accountant", de: "Senden Sie diese Seite Ihrer Treuhand", ar: "\u0623\u0631\u0633\u0644 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062D\u0629 \u0625\u0644\u0649 \u0645\u062D\u0627\u0633\u0628\u0643" },
+        {
+          en: "We are happy to answer their questions directly, in writing, before you make a decision. Compliance is not a sales conversation.",
+          de: "Wir beantworten deren Fragen gerne direkt und schriftlich, bevor Sie entscheiden. Compliance ist kein Verkaufsgespr\xE4ch.",
+          ar: "\u064A\u0633\u0639\u062F\u0646\u0627 \u0627\u0644\u0625\u062C\u0627\u0628\u0629 \u0639\u0644\u0649 \u0623\u0633\u0626\u0644\u062A\u0647 \u0645\u0628\u0627\u0634\u0631\u0629 \u0648\u0643\u062A\u0627\u0628\u064A\u064B\u0627 \u0642\u0628\u0644 \u0623\u0646 \u062A\u0642\u0631\u0631. \u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0644\u064A\u0633 \u062D\u062F\u064A\u062B \u0645\u0628\u064A\u0639\u0627\u062A."
+        }
+      )}`
+    };
+    about = {
+      meta: {
+        path: "/about",
+        title: { en: "About Kassenta", de: "\xDCber Kassenta", ar: "\u0639\u0646 Kassenta" },
+        description: {
+          en: "Kassenta was built inside working restaurants rather than in a boardroom. Our approach to product, pricing and support, and how to reach us.",
+          de: "Kassenta entstand in laufenden Restaurants, nicht im Sitzungszimmer. Unser Ansatz zu Produkt, Preisen und Support \u2014 und wie Sie uns erreichen.",
+          ar: "\u0648\u064F\u0644\u062F Kassenta \u062F\u0627\u062E\u0644 \u0645\u0637\u0627\u0639\u0645 \u0639\u0627\u0645\u0644\u0629 \u0644\u0627 \u0641\u064A \u0642\u0627\u0639\u0629 \u0627\u062C\u062A\u0645\u0627\u0639\u0627\u062A. \u0646\u0647\u062C\u0646\u0627 \u0641\u064A \u0627\u0644\u0645\u0646\u062A\u062C \u0648\u0627\u0644\u062A\u0633\u0639\u064A\u0631 \u0648\u0627\u0644\u062F\u0639\u0645\u060C \u0648\u0643\u064A\u0641\u064A\u0629 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627."
+        }
+      },
+      body: `
+  ${pageHead(
+        { en: "Built behind the counter", de: "Hinter der Theke entstanden", ar: "\u0648\u064F\u0644\u062F \u062E\u0644\u0641 \u0627\u0644\u0643\u0627\u0634\u064A\u0631" },
+        {
+          en: "Kassenta started because a restaurant we worked with was paying three vendors for tools that refused to talk to each other, and a commission on top of that to a delivery platform.",
+          de: "Kassenta entstand, weil ein Restaurant, mit dem wir arbeiteten, drei Anbieter f\xFCr Werkzeuge bezahlte, die nicht miteinander sprachen \u2014 plus Provision an eine Lieferplattform.",
+          ar: "\u0628\u062F\u0623 Kassenta \u0644\u0623\u0646 \u0645\u0637\u0639\u0645\u064B\u0627 \u0639\u0645\u0644\u0646\u0627 \u0645\u0639\u0647 \u0643\u0627\u0646 \u064A\u062F\u0641\u0639 \u0644\u062B\u0644\u0627\u062B\u0629 \u0645\u0648\u0631\u062F\u064A\u0646 \u0644\u0623\u062F\u0648\u0627\u062A \u0644\u0627 \u062A\u062A\u062D\u062F\u062B \u0645\u0639 \u0628\u0639\u0636\u0647\u0627\u060C \u0648\u0639\u0645\u0648\u0644\u0629 \u0641\u0648\u0642 \u0630\u0644\u0643 \u0644\u0645\u0646\u0635\u0629 \u062A\u0648\u0635\u064A\u0644."
+        },
+        { en: "About", de: "\xDCber uns", ar: "\u0645\u0646 \u0646\u062D\u0646" }
+      )}
+
+  <section class="section">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          ${head({ en: "Our approach", de: "Unser Ansatz", ar: "\u0646\u0647\u062C\u0646\u0627" }, { en: "Three rules we hold to", de: "Drei Regeln, an die wir uns halten", ar: "\u062B\u0644\u0627\u062B \u0642\u0648\u0627\u0639\u062F \u0646\u0644\u062A\u0632\u0645 \u0628\u0647\u0627" })}
+          <div class="steps">
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "Ship what we can demonstrate", de: "Nur liefern, was wir zeigen k\xF6nnen", ar: "\u0646\u0637\u0631\u062D \u0645\u0627 \u0646\u0633\u062A\u0637\u064A\u0639 \u0639\u0631\u0636\u0647" })}>Ship what we can demonstrate</h3><p ${tAttrs({
+        en: "If a feature is on this site, you can see it working in a demo the same week. Anything still on the roadmap is labelled as such, including on the compliance page.",
+        de: "Steht eine Funktion auf dieser Seite, sehen Sie sie in derselben Woche in einer Demo. Was noch auf der Roadmap ist, kennzeichnen wir als solches \u2014 auch auf der Compliance-Seite.",
+        ar: "\u0625\u0646 \u0630\u064F\u0643\u0631\u062A \u0645\u064A\u0632\u0629 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0645\u0648\u0642\u0639 \u0641\u064A\u0645\u0643\u0646\u0643 \u0631\u0624\u064A\u062A\u0647\u0627 \u062A\u0639\u0645\u0644 \u0641\u064A \u0639\u0631\u0636 \u062E\u0644\u0627\u0644 \u0627\u0644\u0623\u0633\u0628\u0648\u0639 \u0646\u0641\u0633\u0647. \u0648\u0645\u0627 \u0632\u0627\u0644 \u0641\u064A \u0627\u0644\u062E\u0637\u0629 \u0646\u0636\u0639 \u0639\u0644\u064A\u0647 \u0639\u0644\u0627\u0645\u0629 \u0648\u0627\u0636\u062D\u0629\u060C \u0628\u0645\u0627 \u0641\u064A \u0630\u0644\u0643 \u0641\u064A \u0635\u0641\u062D\u0629 \u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644."
+      })}>If a feature is on this site, you can see it working in a demo the same week. Anything still on the roadmap is labelled as such, including on the compliance page.</p></div></div>
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "Never charge per order", de: "Niemals pro Bestellung abrechnen", ar: "\u0644\u0627 \u0646\u062D\u0627\u0633\u0628 \u0639\u0644\u0649 \u0643\u0644 \u0637\u0644\u0628" })}>Never charge per order</h3><p ${tAttrs({
+        en: "A percentage of revenue punishes you for growing. A flat fee per location means our incentive is to keep you running, not to take a slice of every ticket.",
+        de: "Ein Umsatzanteil bestraft Wachstum. Eine Pauschale je Standort bedeutet: Unser Anreiz ist, dass Sie laufen \u2014 nicht ein Anteil an jedem Bon.",
+        ar: "\u0627\u0644\u0646\u0633\u0628\u0629 \u0645\u0646 \u0627\u0644\u0625\u064A\u0631\u0627\u062F \u062A\u0639\u0627\u0642\u0628\u0643 \u0639\u0644\u0649 \u0627\u0644\u0646\u0645\u0648. \u0627\u0644\u0631\u0633\u0645 \u0627\u0644\u062B\u0627\u0628\u062A \u0644\u0643\u0644 \u0641\u0631\u0639 \u064A\u062C\u0639\u0644 \u0645\u0635\u0644\u062D\u062A\u0646\u0627 \u0623\u0646 \u062A\u0633\u062A\u0645\u0631 \u0628\u0646\u062C\u0627\u062D \u0644\u0627 \u0623\u0646 \u0646\u0642\u062A\u0637\u0639 \u0645\u0646 \u0643\u0644 \u0641\u0627\u062A\u0648\u0631\u0629."
+      })}>A percentage of revenue punishes you for growing. A flat fee per location means our incentive is to keep you running, not to take a slice of every ticket.</p></div></div>
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "Your data stays yours", de: "Ihre Daten bleiben Ihre", ar: "\u0628\u064A\u0627\u0646\u0627\u062A\u0643 \u062A\u0628\u0642\u0649 \u0645\u0644\u0643\u0643" })}>Your data stays yours</h3><p ${tAttrs({
+        en: "Customers, recipes and sales history export to CSV whenever you want. We do not resell aggregated data, and we do not market to your customers.",
+        de: "Kunden, Rezepturen und Verkaufshistorie exportieren Sie jederzeit als CSV. Wir verkaufen keine aggregierten Daten weiter und bewerben Ihre Kunden nicht.",
+        ar: "\u064A\u0645\u0643\u0646\u0643 \u062A\u0635\u062F\u064A\u0631 \u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u0627\u0644\u0648\u0635\u0641\u0627\u062A \u0648\u0633\u062C\u0644 \u0627\u0644\u0645\u0628\u064A\u0639\u0627\u062A \u0625\u0644\u0649 CSV \u0645\u062A\u0649 \u0634\u0626\u062A. \u0644\u0627 \u0646\u0628\u064A\u0639 \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u062C\u0645\u064E\u0651\u0639\u0629 \u0648\u0644\u0627 \u0646\u0633\u0648\u0651\u0642 \u0644\u0639\u0645\u0644\u0627\u0626\u0643."
+      })}>Customers, recipes and sales history export to CSV whenever you want. We do not resell aggregated data, and we do not market to your customers.</p></div></div>
+          </div>
+        </div>
+        <div class="reveal">${shot({ id: "about-team", ratio: "4 / 5", size: "1200 \xD7 1500", alt: { en: "The Kassenta team working alongside restaurant staff", de: "Das Kassenta-Team arbeitet mit Restaurantmitarbeitenden", ar: "\u0641\u0631\u064A\u0642 Kassenta \u064A\u0639\u0645\u0644 \u0645\u0639 \u0637\u0627\u0642\u0645 \u0627\u0644\u0645\u0637\u0639\u0645" } })}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="wrap">
+      ${head({ en: "Support", de: "Support", ar: "\u0627\u0644\u062F\u0639\u0645" }, { en: "What happens when something breaks at 19:00", de: "Was passiert, wenn um 19:00 etwas ausf\xE4llt", ar: "\u0645\u0627\u0630\u0627 \u064A\u062D\u062F\u062B \u0625\u0646 \u062A\u0639\u0637\u0651\u0644 \u0634\u064A\u0621 \u0627\u0644\u0633\u0627\u0639\u0629 19:00" }, void 0, true)}
+      <div class="grid grid-3">
+        ${card(icons.phone, { en: "Reach a person", de: "Erreichen Sie einen Menschen", ar: "\u062A\u0635\u0644 \u0625\u0644\u0649 \u0625\u0646\u0633\u0627\u0646" }, {
+        en: "Phone and WhatsApp during business hours on Professional and above, with a named contact on Enterprise.",
+        de: "Telefon und WhatsApp zu Gesch\xE4ftszeiten ab Professional, mit festem Ansprechpartner bei Enterprise.",
+        ar: "\u0647\u0627\u062A\u0641 \u0648\u0648\u0627\u062A\u0633\u0627\u0628 \u062E\u0644\u0627\u0644 \u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0639\u0645\u0644 \u0641\u064A \u0627\u0644\u0627\u062D\u062A\u0631\u0627\u0641\u064A\u0629 \u0641\u0645\u0627 \u0641\u0648\u0642\u060C \u0645\u0639 \u0645\u0633\u0624\u0648\u0644 \u0645\u062E\u0635\u064E\u0651\u0635 \u0641\u064A \u0628\u0627\u0642\u0629 \u0627\u0644\u0645\u0624\u0633\u0633\u0627\u062A."
+      })}
+        ${card(icons.wifiOff, { en: "Keep selling meanwhile", de: "Weiterverkaufen in der Zwischenzeit", ar: "\u0627\u0633\u062A\u0645\u0631 \u0641\u064A \u0627\u0644\u0628\u064A\u0639 \u0623\u062B\u0646\u0627\u0621 \u0630\u0644\u0643" }, {
+        en: "The POS holds orders locally when the connection drops, so a network problem is an inconvenience rather than a closed till.",
+        de: "Die Kasse h\xE4lt Bestellungen lokal, wenn die Verbindung abbricht \u2014 ein Netzproblem ist l\xE4stig, aber keine geschlossene Kasse.",
+        ar: "\u064A\u062D\u062A\u0641\u0638 \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0628\u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0645\u062D\u0644\u064A\u064B\u0627 \u0639\u0646\u062F \u0627\u0646\u0642\u0637\u0627\u0639 \u0627\u0644\u0627\u062A\u0635\u0627\u0644\u060C \u0641\u062A\u0635\u0628\u062D \u0645\u0634\u0643\u0644\u0629 \u0627\u0644\u0634\u0628\u0643\u0629 \u0625\u0632\u0639\u0627\u062C\u064B\u0627 \u0644\u0627 \u062A\u0648\u0642\u0641\u064B\u0627 \u0639\u0646 \u0627\u0644\u0628\u064A\u0639."
+      })}
+        ${card(icons.refresh, { en: "Fix, then explain", de: "Erst beheben, dann erkl\xE4ren", ar: "\u0646\u064F\u0635\u0644\u062D \u062B\u0645 \u0646\u0634\u0631\u062D" }, {
+        en: "We restore service first and send a written explanation afterwards, including what we changed so it does not recur.",
+        de: "Wir stellen zuerst den Betrieb wieder her und senden danach eine schriftliche Erkl\xE4rung inklusive der \xC4nderungen, damit es nicht wieder passiert.",
+        ar: "\u0646\u0639\u064A\u062F \u0627\u0644\u062E\u062F\u0645\u0629 \u0623\u0648\u0644\u064B\u0627 \u062B\u0645 \u0646\u0631\u0633\u0644 \u0634\u0631\u062D\u064B\u0627 \u0645\u0643\u062A\u0648\u0628\u064B\u0627 \u064A\u0634\u0645\u0644 \u0645\u0627 \u063A\u064A\u0651\u0631\u0646\u0627\u0647 \u0643\u064A \u0644\u0627 \u064A\u062A\u0643\u0631\u0631."
+      })}
+      </div>
+    </div>
+  </section>
+
+  ${ctaBand(
+        { en: "Come and take it apart", de: "Nehmen Sie es auseinander", ar: "\u062A\u0639\u0627\u0644 \u0648\u0627\u0641\u062D\u0635\u0647 \u0628\u0646\u0641\u0633\u0643" },
+        {
+          en: "The fastest way to judge a POS is to run a real service on it. Bring your busiest hour and we will set it up.",
+          de: "Am schnellsten beurteilen Sie eine Kasse, indem Sie einen echten Service darauf fahren. Bringen Sie Ihre Stosszeit mit \u2014 wir richten es ein.",
+          ar: "\u0623\u0633\u0631\u0639 \u0637\u0631\u064A\u0642\u0629 \u0644\u0644\u062D\u0643\u0645 \u0639\u0644\u0649 \u0646\u0638\u0627\u0645 \u0643\u0627\u0634\u064A\u0631 \u0647\u064A \u062A\u0634\u063A\u064A\u0644 \u062E\u062F\u0645\u0629 \u062D\u0642\u064A\u0642\u064A\u0629 \u0639\u0644\u064A\u0647. \u0623\u062D\u0636\u0631 \u0623\u0643\u062B\u0631 \u0633\u0627\u0639\u0627\u062A\u0643 \u0627\u0632\u062F\u062D\u0627\u0645\u064B\u0627 \u0648\u0633\u0646\u062C\u0647\u0651\u0632\u0647."
+        }
+      )}`
+    };
+    contact = {
+      meta: {
+        path: "/contact",
+        title: { en: "Contact and demo \u2014 Kassenta POS", de: "Kontakt und Demo \u2014 Kassenta POS", ar: "\u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0648\u0627\u0644\u0639\u0631\u0636 \u0627\u0644\u062A\u0648\u0636\u064A\u062D\u064A \u2014 Kassenta POS" },
+        description: {
+          en: "Book a 30-minute demo on your own menu, or email info@kassenta.com. We answer every message from a real person, usually within one business day.",
+          de: "Buchen Sie eine 30-min\xFCtige Demo mit Ihrer eigenen Karte oder schreiben Sie an info@kassenta.com. Jede Nachricht wird von einem Menschen beantwortet, meist innerhalb eines Werktags.",
+          ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u0644\u0645\u062F\u0629 30 \u062F\u0642\u064A\u0642\u0629 \u0639\u0644\u0649 \u0642\u0627\u0626\u0645\u062A\u0643\u060C \u0623\u0648 \u0631\u0627\u0633\u0644\u0646\u0627 \u0639\u0644\u0649 info@kassenta.com. \u0646\u0631\u062F\u0651 \u0639\u0644\u0649 \u0643\u0644 \u0631\u0633\u0627\u0644\u0629 \u0628\u0634\u0643\u0644 \u0634\u062E\u0635\u064A\u060C \u063A\u0627\u0644\u0628\u064B\u0627 \u062E\u0644\u0627\u0644 \u064A\u0648\u0645 \u0639\u0645\u0644."
+        }
+      },
+      body: `
+  ${pageHead(
+        { en: "Talk to us", de: "Sprechen Sie mit uns", ar: "\u062A\u062D\u062F\u0651\u062B \u0625\u0644\u064A\u0646\u0627" },
+        {
+          en: "Send your menu or product list with the form and we will load it into a demo account before the call, so you see your own business rather than a sample restaurant.",
+          de: "Senden Sie Ihre Karte oder Artikelliste \xFCber das Formular; wir laden sie vor dem Termin in ein Demo-Konto, damit Sie Ihren eigenen Betrieb sehen \u2014 kein Musterrestaurant.",
+          ar: "\u0623\u0631\u0633\u0644 \u0642\u0627\u0626\u0645\u062A\u0643 \u0623\u0648 \u0645\u0646\u062A\u062C\u0627\u062A\u0643 \u0639\u0628\u0631 \u0627\u0644\u0646\u0645\u0648\u0630\u062C \u0648\u0633\u0646\u062D\u0645\u0651\u0644\u0647\u0627 \u0641\u064A \u062D\u0633\u0627\u0628 \u062A\u062C\u0631\u064A\u0628\u064A \u0642\u0628\u0644 \u0627\u0644\u0645\u0643\u0627\u0644\u0645\u0629\u060C \u0644\u062A\u0631\u0649 \u0646\u0634\u0627\u0637\u0643 \u0623\u0646\u062A \u0644\u0627 \u0645\u0637\u0639\u0645\u064B\u0627 \u0646\u0645\u0648\u0630\u062C\u064A\u064B\u0627."
+        },
+        { en: "Contact", de: "Kontakt", ar: "\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627" }
+      )}
+
+  <section class="section">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          <form class="card" id="contactForm" novalidate style="display:grid;gap:18px">
+            <div class="grid grid-2" style="gap:16px">
+              <div class="field">
+                <label for="cf-name" ${tAttrs({ en: "Your name", de: "Ihr Name", ar: "\u0627\u0633\u0645\u0643" })}>Your name</label>
+                <input id="cf-name" name="name" type="text" required autocomplete="name">
+              </div>
+              <div class="field">
+                <label for="cf-business" ${tAttrs({ en: "Business name", de: "Betriebsname", ar: "\u0627\u0633\u0645 \u0627\u0644\u0646\u0634\u0627\u0637" })}>Business name</label>
+                <input id="cf-business" name="business" type="text" autocomplete="organization">
+              </div>
+            </div>
+            <div class="grid grid-2" style="gap:16px">
+              <div class="field">
+                <label for="cf-email" ${tAttrs({ en: "Email", de: "E-Mail", ar: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A" })}>Email</label>
+                <input id="cf-email" name="email" type="email" required autocomplete="email" inputmode="email">
+              </div>
+              <div class="field">
+                <label for="cf-phone" ${tAttrs({ en: "Phone or WhatsApp", de: "Telefon oder WhatsApp", ar: "\u0627\u0644\u0647\u0627\u062A\u0641 \u0623\u0648 \u0648\u0627\u062A\u0633\u0627\u0628" })}>Phone or WhatsApp</label>
+                <input id="cf-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel">
+              </div>
+            </div>
+            <div class="field">
+              <label for="cf-industry" ${tAttrs({ en: "Industry", de: "Branche", ar: "\u0627\u0644\u0645\u062C\u0627\u0644" })}>Industry</label>
+              <select id="cf-industry" name="industry">
+                <option value="restaurant" ${tAttrs({ en: "Restaurant", de: "Restaurant", ar: "\u0645\u0637\u0639\u0645" })}>Restaurant</option>
+                <option value="cafe" ${tAttrs({ en: "Caf\xE9 or bar", de: "Caf\xE9 oder Bar", ar: "\u0643\u0627\u0641\u064A\u0647 \u0623\u0648 \u0628\u0627\u0631" })}>Caf\xE9 or bar</option>
+                <option value="supermarket" ${tAttrs({ en: "Supermarket or grocer", de: "Supermarkt oder Lebensmittel", ar: "\u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A \u0623\u0648 \u0628\u0642\u0627\u0644\u0629" })}>Supermarket or grocer</option>
+                <option value="pharmacy" ${tAttrs({ en: "Pharmacy", de: "Apotheke", ar: "\u0635\u064A\u062F\u0644\u064A\u0629" })}>Pharmacy</option>
+                <option value="bakery" ${tAttrs({ en: "Bakery", de: "B\xE4ckerei", ar: "\u0645\u062E\u0628\u0632" })}>Bakery</option>
+                <option value="retail" ${tAttrs({ en: "Retail", de: "Einzelhandel", ar: "\u062A\u062C\u0632\u0626\u0629" })}>Retail</option>
+                <option value="other" ${tAttrs({ en: "Something else", de: "Etwas anderes", ar: "\u0634\u064A\u0621 \u0622\u062E\u0631" })}>Something else</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="cf-message" ${tAttrs({ en: "What would you like to see?", de: "Was m\xF6chten Sie sehen?", ar: "\u0645\u0627 \u0627\u0644\u0630\u064A \u062A\u0648\u062F\u0651 \u0631\u0624\u064A\u062A\u0647\u061F" })}>What would you like to see?</label>
+              <textarea id="cf-message" name="message" placeholder="e.g. we run two branches, take phone orders and deliver in a 5 km radius"></textarea>
+            </div>
+            <div class="form-status" id="cf-status" role="status" aria-live="polite"></div>
+            <button class="btn btn-primary" type="submit" id="cf-submit" ${tAttrs({ en: "Request a demo", de: "Demo anfragen", ar: "\u0627\u0637\u0644\u0628 \u0639\u0631\u0636\u064B\u0627 \u062A\u0648\u0636\u064A\u062D\u064A\u064B\u0627" })}>Request a demo</button>
+            <p class="form-note" ${tAttrs({
+        en: "We use your details only to answer this enquiry. No newsletter, no third parties.",
+        de: "Wir verwenden Ihre Angaben nur zur Beantwortung dieser Anfrage. Kein Newsletter, keine Dritten.",
+        ar: "\u0646\u0633\u062A\u062E\u062F\u0645 \u0628\u064A\u0627\u0646\u0627\u062A\u0643 \u0644\u0644\u0631\u062F\u0651 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628 \u0641\u0642\u0637. \u0628\u0644\u0627 \u0646\u0634\u0631\u0627\u062A \u0628\u0631\u064A\u062F\u064A\u0629 \u0648\u0628\u0644\u0627 \u0623\u0637\u0631\u0627\u0641 \u062B\u0627\u0644\u062B\u0629."
+      })}>We use your details only to answer this enquiry. No newsletter, no third parties.</p>
+          </form>
+        </div>
+        <div>
+          ${head({ en: "Direct", de: "Direkt", ar: "\u0645\u0628\u0627\u0634\u0631\u0629" }, { en: "Or skip the form", de: "Oder ohne Formular", ar: "\u0623\u0648 \u062A\u062C\u0627\u0648\u0632 \u0627\u0644\u0646\u0645\u0648\u0630\u062C" })}
+          <div class="grid" style="gap:16px">
+            <article class="card">
+              <div class="card-icon">${icons.mail}</div>
+              <h3 ${tAttrs({ en: "Email", de: "E-Mail", ar: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A" })}>Email</h3>
+              <p><a href="mailto:info@kassenta.com" style="color:var(--accent);font-weight:700">info@kassenta.com</a></p>
+            </article>
+            <article class="card">
+              <div class="card-icon">${icons.building}</div>
+              <h3 ${tAttrs({ en: "Existing customer?", de: "Bestandskunde?", ar: "\u0639\u0645\u064A\u0644 \u062D\u0627\u0644\u064A\u061F" })}>Existing customer?</h3>
+              <p ${tAttrs({
+        en: "Open the POS and use the support entry in Settings so your licence and branch come through with the message.",
+        de: "\xD6ffnen Sie die Kasse und nutzen Sie den Support-Eintrag in den Einstellungen, damit Lizenz und Filiale mitgesendet werden.",
+        ar: "\u0627\u0641\u062A\u062D \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0627\u0633\u062A\u062E\u062F\u0645 \u0645\u062F\u062E\u0644 \u0627\u0644\u062F\u0639\u0645 \u0641\u064A \u0627\u0644\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0644\u064A\u0635\u0644\u0646\u0627 \u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u0648\u0627\u0644\u0641\u0631\u0639 \u0645\u0639 \u0627\u0644\u0631\u0633\u0627\u0644\u0629."
+      })}>Open the POS and use the support entry in Settings so your licence and branch come through with the message.</p>
+              <p style="margin-top:12px"><a class="btn-quiet" href="/app" ${tAttrs({ en: "Open the POS", de: "Kasse \xF6ffnen", ar: "\u0627\u0641\u062A\u062D \u0627\u0644\u0643\u0627\u0634\u064A\u0631" })}>Open the POS</a></p>
+            </article>
+            <article class="card">
+              <div class="card-icon">${icons.clock}</div>
+              <h3 ${tAttrs({ en: "Response time", de: "Antwortzeit", ar: "\u0632\u0645\u0646 \u0627\u0644\u0627\u0633\u062A\u062C\u0627\u0628\u0629" })}>Response time</h3>
+              <p ${tAttrs({
+        en: "Enquiries are answered within one business day. Support tickets from live customers are answered the same day during business hours.",
+        de: "Anfragen beantworten wir innerhalb eines Werktags. Support-Tickets aktiver Kunden am selben Tag zu Gesch\xE4ftszeiten.",
+        ar: "\u0646\u0631\u062F\u0651 \u0639\u0644\u0649 \u0627\u0644\u0627\u0633\u062A\u0641\u0633\u0627\u0631\u0627\u062A \u062E\u0644\u0627\u0644 \u064A\u0648\u0645 \u0639\u0645\u0644. \u0648\u062A\u064F\u062C\u0627\u0628 \u062A\u0630\u0627\u0643\u0631 \u062F\u0639\u0645 \u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0627\u0644\u0646\u0634\u0637\u064A\u0646 \u0641\u064A \u0627\u0644\u064A\u0648\u0645 \u0646\u0641\u0633\u0647 \u062E\u0644\u0627\u0644 \u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0639\u0645\u0644."
+      })}>Enquiries are answered within one business day. Support tickets from live customers are answered the same day during business hours.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      var form = document.getElementById('contactForm');
+      var status = document.getElementById('cf-status');
+      var btn = document.getElementById('cf-submit');
+      if (!form) return;
+      var MSG = {
+        sending: { en: 'Sending\u2026', de: 'Wird gesendet\u2026', ar: '\u062C\u0627\u0631\u064D \u0627\u0644\u0625\u0631\u0633\u0627\u0644\u2026' },
+        ok: { en: 'Thank you. We will reply within one business day.', de: 'Danke. Wir antworten innerhalb eines Werktags.', ar: '\u0634\u0643\u0631\u064B\u0627 \u0644\u0643. \u0633\u0646\u0631\u062F\u0651 \u062E\u0644\u0627\u0644 \u064A\u0648\u0645 \u0639\u0645\u0644.' },
+        err: { en: 'Could not send. Please email info@kassenta.com instead.', de: 'Senden fehlgeschlagen. Bitte schreiben Sie an info@kassenta.com.', ar: '\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u0625\u0631\u0633\u0627\u0644. \u064A\u0631\u062C\u0649 \u0627\u0644\u0645\u0631\u0627\u0633\u0644\u0629 \u0639\u0644\u0649 info@kassenta.com.' },
+        invalid: { en: 'Please fill in your name and a valid email address.', de: 'Bitte Name und eine g\xFCltige E-Mail-Adresse angeben.', ar: '\u064A\u0631\u062C\u0649 \u0625\u062F\u062E\u0627\u0644 \u0627\u0644\u0627\u0633\u0645 \u0648\u0628\u0631\u064A\u062F \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0635\u062D\u064A\u062D.' }
+      };
+      function say(kind, cls) {
+        var lang = document.documentElement.lang || 'en';
+        status.textContent = MSG[kind][lang] || MSG[kind].en;
+        status.className = 'form-status ' + cls;
+      }
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var data = Object.fromEntries(new FormData(form).entries());
+        if (!data.name || !/^[^@s]+@[^@s]+.[^@s]+$/.test(String(data.email || ''))) {
+          return say('invalid', 'err');
+        }
+        btn.disabled = true;
+        say('sending', 'ok');
+        fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        }).then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+          form.reset();
+          say('ok', 'ok');
+        }).catch(function () {
+          say('err', 'err');
+        }).finally(function () { btn.disabled = false; });
+      });
+    })();
+  </script>`
+    };
+    PAGES = [home, features, solutions, pricing, compliance, about, contact];
+  }
+});
+
+// server/site/index.ts
+var site_exports = {};
+__export(site_exports, {
+  SITE_PATHS: () => SITE_PATHS,
+  findSiteAsset: () => findSiteAsset,
+  isSitePath: () => isSitePath,
+  normaliseSitePath: () => normaliseSitePath,
+  renderPage: () => renderPage,
+  renderSitePage: () => renderSitePage
+});
+function normaliseSitePath(pathname) {
+  if (pathname === "/" || pathname === "/index.html") return "/";
+  let p = pathname.replace(/\/index\.html$/i, "");
+  if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
+  return p.toLowerCase();
+}
+function isSitePath(pathname) {
+  return BY_PATH.has(normaliseSitePath(pathname));
+}
+function renderSitePage(pathname, baseUrl) {
+  const page = BY_PATH.get(normaliseSitePath(pathname));
+  if (!page) return null;
+  return renderPage(page.meta, page.body, baseUrl);
+}
+var BY_PATH, SITE_PATHS;
+var init_site = __esm({
+  "server/site/index.ts"() {
+    "use strict";
+    init_shell();
+    init_pages();
+    BY_PATH = new Map(PAGES.map((p) => [p.meta.path, p]));
+    SITE_PATHS = PAGES.map((p) => p.meta.path);
   }
 });
 
@@ -6361,6 +8509,140 @@ var requireSuperAdmin = async (req, res, next) => {
   }
 };
 
+// server/employeeAuth.ts
+var import_jsonwebtoken2 = __toESM(require("jsonwebtoken"));
+var import_bcrypt = __toESM(require("bcrypt"));
+var EMPLOYEE_TOKEN_HEADER = "x-employee-token";
+var TOKEN_TTL = "12h";
+var BCRYPT_ROUNDS = 10;
+function employeeAuthMode() {
+  return process.env.EMPLOYEE_AUTH_MODE === "strict" ? "strict" : "soft";
+}
+function generateEmployeeToken(claims) {
+  return import_jsonwebtoken2.default.sign(claims, JWT_SECRET, { expiresIn: TOKEN_TTL });
+}
+function verifyEmployeeToken(token) {
+  try {
+    return import_jsonwebtoken2.default.verify(token, JWT_SECRET);
+  } catch {
+    return null;
+  }
+}
+function isHashedPin(stored) {
+  return typeof stored === "string" && stored.startsWith("$2");
+}
+function hashPin(pin) {
+  return import_bcrypt.default.hash(pin, BCRYPT_ROUNDS);
+}
+async function verifyPin(pin, stored) {
+  if (!stored || !pin) return false;
+  if (isHashedPin(stored)) return import_bcrypt.default.compare(pin, stored);
+  return stored === pin;
+}
+function attachEmployee() {
+  return (req, _res, next) => {
+    const raw = req.headers[EMPLOYEE_TOKEN_HEADER];
+    const token = Array.isArray(raw) ? raw[0] : raw;
+    if (token) {
+      const claims = verifyEmployeeToken(token);
+      if (claims) req.employee = claims;
+    }
+    next();
+  };
+}
+function requireRole(...roles) {
+  const allowed = /* @__PURE__ */ new Set([...roles, "owner", "admin"]);
+  return (req, res, next) => {
+    const emp = req.employee;
+    if (!emp) {
+      if (employeeAuthMode() === "strict") {
+        return res.status(401).json({
+          error: "Employee authentication required",
+          code: "EMPLOYEE_TOKEN_REQUIRED"
+        });
+      }
+      console.warn(
+        `[employeeAuth] soft-mode passthrough: ${req.method} ${req.path} \u2014 no employee token`
+      );
+      return next();
+    }
+    if (typeof req.tenantId === "number" && typeof emp.tenantId === "number" && emp.tenantId !== req.tenantId) {
+      return res.status(403).json({ error: "Employee does not belong to this tenant" });
+    }
+    if (!allowed.has(emp.role) && !emp.permissions?.some((p) => allowed.has(p))) {
+      return res.status(403).json({
+        error: "Insufficient permissions",
+        code: "FORBIDDEN_ROLE",
+        required: [...allowed]
+      });
+    }
+    next();
+  };
+}
+var requireManager = requireRole("manager");
+var requireAdmin = requireRole();
+var requireStaff = requireRole("manager", "cashier");
+var GUARD_EXEMPT = [
+  /^\/api\/employees\/login$/
+  // the login itself cannot require a login
+];
+var ROUTE_RULES = [
+  // Catalogue & stock — cashiers are read-only.
+  {
+    methods: ["POST", "PUT", "PATCH", "DELETE"],
+    path: /^\/api\/(products|categories|inventory|suppliers|purchase-orders|stock-counts)(\/|$)/,
+    roles: ["manager"],
+    label: "catalogue"
+  },
+  // Store-level configuration and staff — owner/admin only.
+  {
+    methods: ["POST", "PUT", "PATCH", "DELETE"],
+    path: /^\/api\/(branches|employees)(\/|$)/,
+    roles: [],
+    label: "store-admin"
+  },
+  // Destructive customer/sale operations.
+  {
+    methods: ["DELETE"],
+    path: /^\/api\/(customers|sales|returns)(\/|$)/,
+    roles: ["manager"],
+    label: "destructive"
+  },
+  // Business intelligence — hidden from cashiers.
+  {
+    methods: ["GET"],
+    path: /^\/api\/(reports|analytics)(\/|$)/,
+    roles: ["manager"],
+    label: "reporting"
+  },
+  // Operational settings.
+  {
+    methods: ["PUT", "PATCH", "POST"],
+    path: /^\/api\/(store-settings|promo-codes|delivery-zones|drivers|payment-gateway)(\/|$)/,
+    roles: ["manager"],
+    label: "operations"
+  },
+  // Backups contain the whole tenant database.
+  {
+    methods: ["POST", "PUT", "DELETE"],
+    path: /^\/api\/backup(\/|$)/,
+    roles: [],
+    label: "backup"
+  }
+];
+function guardTenantRoutes() {
+  return (req, res, next) => {
+    if (!req.path.startsWith("/api")) return next();
+    if (req.path.startsWith("/api/super-admin")) return next();
+    if (GUARD_EXEMPT.some((re) => re.test(req.path))) return next();
+    const rule = ROUTE_RULES.find(
+      (r) => r.methods.includes(req.method) && r.path.test(req.path)
+    );
+    if (!rule) return next();
+    return requireRole(...rule.roles)(req, res, next);
+  };
+}
+
 // server/stripeClient.ts
 var import_stripe = __toESM(require("stripe"));
 var connectionSettings;
@@ -6430,154 +8712,8 @@ async function getStripeSync() {
   return stripeSync;
 }
 
-// server/emailService.ts
-var import_nodemailer = __toESM(require("nodemailer"));
-var SMTP_HOST = process.env.SMTP_HOST || "smtp.hostinger.com";
-var SMTP_PORT = parseInt(process.env.SMTP_PORT || "465");
-var SMTP_USER = process.env.SMTP_USER || "info@barmagly.tech";
-var SMTP_PASS = process.env.SMTP_PASS || "Khaled312001*Khaled312001*";
-var FROM_NAME = "Barmagly POS";
-var transporter = import_nodemailer.default.createTransport({
-  host: SMTP_HOST,
-  port: SMTP_PORT,
-  secure: true,
-  // port 465 = SSL
-  auth: { user: SMTP_USER, pass: SMTP_PASS },
-  tls: { rejectUnauthorized: false }
-});
-async function sendLicenseKeyEmail(opts) {
-  const { to, ownerName, businessName, licenseKey, planName, planType, tempPassword, expiresAt } = opts;
-  const planLabel = planName === "advanced" ? "Smart Business Growth" : "POS Starter";
-  const billingLabel = planType === "yearly" ? "Annual" : planType === "monthly" ? "Monthly" : "Trial";
-  const expiryStr = expiresAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Welcome to Barmagly</title>
-</head>
-<body style="margin:0;padding:0;background:#0A0E17;font-family:Inter,Arial,sans-serif;color:#e2e8f0">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0E17;padding:40px 20px">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#13172A;border-radius:20px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);max-width:600px">
-        <!-- Header -->
-        <tr>
-          <td style="background:linear-gradient(135deg,#1a1f35,#0d1120);padding:40px 40px 32px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.06)">
-            <div style="font-size:32px;font-weight:900;background:linear-gradient(135deg,#2FD3C6,#6366F1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-1px;margin-bottom:8px">
-              Barmagly POS
-            </div>
-            <div style="font-size:13px;color:#64748b;letter-spacing:2px;text-transform:uppercase">Point of Sale System</div>
-          </td>
-        </tr>
-        <!-- Confetti banner -->
-        <tr>
-          <td style="background:linear-gradient(135deg,#2FD3C620,#6366F110);padding:28px 40px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.05)">
-            <div style="font-size:40px;margin-bottom:10px">\u{1F389}</div>
-            <h1 style="margin:0 0 8px;font-size:26px;font-weight:800;color:#f0f4f8">You're all set, ${ownerName}!</h1>
-            <p style="margin:0;font-size:15px;color:#94a3b8">Your <strong style="color:#2FD3C6">${businessName}</strong> store is ready to go live</p>
-          </td>
-        </tr>
-        <!-- License Key Box -->
-        <tr>
-          <td style="padding:32px 40px">
-            <div style="background:#0A0E17;border:1px solid rgba(47,211,198,0.3);border-radius:16px;padding:24px;text-align:center;margin-bottom:24px">
-              <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#64748b;margin-bottom:12px">Your License Key</div>
-              <div style="font-size:20px;font-weight:800;letter-spacing:3px;color:#2FD3C6;font-family:monospace;word-break:break-all">${licenseKey}</div>
-              <div style="margin-top:12px;font-size:12px;color:#475569">Valid until ${expiryStr}</div>
-            </div>
-
-            <!-- Plan Info -->
-            <div style="display:flex;gap:12px;margin-bottom:24px">
-              <div style="flex:1;background:rgba(47,211,198,0.08);border:1px solid rgba(47,211,198,0.2);border-radius:12px;padding:16px;text-align:center">
-                <div style="font-size:11px;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Plan</div>
-                <div style="font-size:15px;font-weight:700;color:#2FD3C6">${planLabel}</div>
-              </div>
-              <div style="flex:1;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:16px;text-align:center">
-                <div style="font-size:11px;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Billing</div>
-                <div style="font-size:15px;font-weight:700;color:#6366F1">${billingLabel}</div>
-              </div>
-            </div>
-
-            <!-- Login Credentials -->
-            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:20px;margin-bottom:24px">
-              <div style="font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px">App Login Credentials</div>
-              <table width="100%" cellpadding="4" cellspacing="0">
-                <tr>
-                  <td style="font-size:13px;color:#64748b;width:100px">Email</td>
-                  <td style="font-size:13px;color:#e2e8f0;font-weight:600">${to}</td>
-                </tr>
-                <tr>
-                  <td style="font-size:13px;color:#64748b">Password</td>
-                  <td style="font-size:13px;color:#e2e8f0;font-weight:600;font-family:monospace">${tempPassword}</td>
-                </tr>
-                <tr>
-                  <td style="font-size:13px;color:#64748b">License Key</td>
-                  <td style="font-size:13px;color:#2FD3C6;font-weight:600;font-family:monospace">${licenseKey}</td>
-                </tr>
-              </table>
-            </div>
-
-            <!-- Steps -->
-            <div style="margin-bottom:24px">
-              <div style="font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:16px;text-transform:uppercase;letter-spacing:1px">Get Started in 3 Steps</div>
-              <div style="display:flex;flex-direction:column;gap:10px">
-                <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.02);border-radius:10px;padding:12px">
-                  <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2FD3C6,#6366F1);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;flex-shrink:0;text-align:center;line-height:28px">1</div>
-                  <span style="font-size:14px;color:#cbd5e1">Download the <strong style="color:#f0f4f8">Barmagly POS</strong> app</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.02);border-radius:10px;padding:12px">
-                  <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2FD3C6,#6366F1);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;flex-shrink:0;text-align:center;line-height:28px">2</div>
-                  <span style="font-size:14px;color:#cbd5e1">Enter your <strong style="color:#f0f4f8">email & password</strong> to log in</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.02);border-radius:10px;padding:12px">
-                  <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2FD3C6,#6366F1);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;flex-shrink:0;text-align:center;line-height:28px">3</div>
-                  <span style="font-size:14px;color:#cbd5e1">Enter your <strong style="color:#2FD3C6">license key</strong> to activate your store</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- CTA Button -->
-            <div style="text-align:center">
-              <a href="https://barmagly.com" style="display:inline-block;background:linear-gradient(135deg,#2FD3C6,#6366F1);color:#fff;text-decoration:none;padding:14px 40px;border-radius:999px;font-weight:700;font-size:15px;letter-spacing:0.5px">Open Barmagly POS \u2192</a>
-            </div>
-          </td>
-        </tr>
-        <!-- Footer -->
-        <tr>
-          <td style="background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.05);padding:24px 40px;text-align:center">
-            <p style="margin:0 0 8px;font-size:12px;color:#475569">Questions? Contact us at <a href="mailto:info@barmagly.tech" style="color:#2FD3C6;text-decoration:none">info@barmagly.tech</a></p>
-            <p style="margin:0;font-size:11px;color:#334155">\xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} Barmagly POS \xB7 All rights reserved</p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-  await transporter.sendMail({
-    from: `"${FROM_NAME}" <${SMTP_USER}>`,
-    to,
-    subject: `\u{1F389} Welcome to Barmagly POS \u2014 Your License Key for ${businessName}`,
-    html,
-    text: `Welcome to Barmagly POS!
-
-Hi ${ownerName},
-
-Your store "${businessName}" is ready.
-
-License Key: ${licenseKey}
-Email: ${to}
-Password: ${tempPassword}
-Plan: ${planLabel} (${billingLabel})
-Expires: ${expiryStr}
-
-Get the Barmagly POS app and enter your credentials to get started.
-
-Questions? Email us at info@barmagly.tech`
-  });
-}
+// server/routes.ts
+init_emailService();
 
 // server/whatsappService.ts
 var import_os = __toESM(require("os"));
@@ -7202,7 +9338,7 @@ ${text2}`;
 
 // server/customerAuthService.ts
 var import_crypto3 = __toESM(require("crypto"));
-var import_bcrypt = __toESM(require("bcrypt"));
+var import_bcrypt2 = __toESM(require("bcrypt"));
 init_db();
 init_schema();
 var import_drizzle_orm2 = require("drizzle-orm");
@@ -7282,10 +9418,10 @@ async function findCustomerByEmail(email, tenantId) {
 }
 async function verifyCustomerPassword(customer, password) {
   if (!customer.passwordHash) return false;
-  return import_bcrypt.default.compare(password, customer.passwordHash);
+  return import_bcrypt2.default.compare(password, customer.passwordHash);
 }
 async function setCustomerPassword(customerId, password) {
-  const hash3 = await import_bcrypt.default.hash(password, 10);
+  const hash3 = await import_bcrypt2.default.hash(password, 10);
   await db.update(customers).set({ passwordHash: hash3, hasAccount: true }).where((0, import_drizzle_orm2.eq)(customers.id, customerId));
 }
 async function createCustomerSession(customerId, tenantId, deviceInfo) {
@@ -7473,10 +9609,51 @@ async function deductWallet(customerId, tenantId, amount, orderId) {
 }
 
 // server/routes.ts
-var bcrypt5 = __toESM(require("bcrypt"));
+var bcrypt6 = __toESM(require("bcrypt"));
 var crypto5 = __toESM(require("crypto"));
 var import_date_fns4 = require("date-fns");
 var import_google_auth_library = require("google-auth-library");
+
+// server/rateLimit.ts
+var buckets = /* @__PURE__ */ new Map();
+var lastSweep = Date.now();
+function sweep(now) {
+  if (now - lastSweep < 6e4) return;
+  lastSweep = now;
+  for (const [key, b] of buckets) {
+    if (b.resetAt <= now) buckets.delete(key);
+  }
+}
+function clientKey(req) {
+  const forwarded = req.header("x-forwarded-for");
+  const ip = forwarded ? forwarded.split(",")[0].trim() : req.ip || req.socket.remoteAddress || "unknown";
+  return ip;
+}
+function rateLimit(opts) {
+  const { max, windowMs, name, keyFn, message } = opts;
+  return (req, res, next) => {
+    const now = Date.now();
+    sweep(now);
+    const key = `${name}:${keyFn ? keyFn(req) : clientKey(req)}`;
+    let bucket = buckets.get(key);
+    if (!bucket || bucket.resetAt <= now) {
+      bucket = { count: 0, resetAt: now + windowMs };
+      buckets.set(key, bucket);
+    }
+    bucket.count += 1;
+    const remaining = Math.max(0, max - bucket.count);
+    res.setHeader("RateLimit-Limit", String(max));
+    res.setHeader("RateLimit-Remaining", String(remaining));
+    res.setHeader("RateLimit-Reset", String(Math.ceil((bucket.resetAt - now) / 1e3)));
+    if (bucket.count > max) {
+      res.setHeader("Retry-After", String(Math.ceil((bucket.resetAt - now) / 1e3)));
+      return res.status(429).json({ error: message || "Too many requests. Please try again shortly." });
+    }
+    next();
+  };
+}
+
+// server/routes.ts
 var TIMESTAMP_FIELDS = [
   "createdAt",
   "updatedAt",
@@ -7521,8 +9698,8 @@ async function registerRoutes(app2) {
       }
       const storePath = import_node_path.default.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
       let html = import_node_fs.default.readFileSync(storePath, "utf-8");
-      const storeName = String(tenant.businessName || "Barmagly Store").replace(/[<>"]/g, "");
-      const storeLogo = String(config.logoUrl || tenant.logo || "https://pos.barmagly.tech/app/assets/images/icon.png").replace(/"/g, "");
+      const storeName = String(tenant.businessName || "Kassenta Store").replace(/[<>"]/g, "");
+      const storeLogo = String(config.logoUrl || tenant.logo || "https://kassenta.com/app/assets/images/icon.png").replace(/"/g, "");
       html = html.replace(/\{\{SLUG\}\}/g, slug);
       html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
       html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
@@ -7630,7 +9807,7 @@ async function registerRoutes(app2) {
               confirm: true,
               automatic_payment_methods: { enabled: true, allow_redirects: "never" },
               receipt_email: ownerEmail,
-              description: `Barmagly ${planName} ${planType} \u2014 ${businessName}`,
+              description: `Kassenta ${planName} ${planType} \u2014 ${businessName}`,
               metadata: { businessName, ownerEmail, planName, planType }
             });
             if (pi.status === "requires_action") {
@@ -7646,7 +9823,7 @@ async function registerRoutes(app2) {
               currency: "chf",
               source: stripeToken,
               receipt_email: ownerEmail,
-              description: `Barmagly ${planName} ${planType} \u2014 ${businessName}`,
+              description: `Kassenta ${planName} ${planType} \u2014 ${businessName}`,
               metadata: { businessName, ownerEmail, planName, planType }
             });
             if (charge.status !== "succeeded") {
@@ -7660,7 +9837,7 @@ async function registerRoutes(app2) {
         }
       }
       const tempPassword = "Bpos" + Math.floor(1e5 + Math.random() * 9e5);
-      const passwordHash = await bcrypt5.hash(tempPassword, 10);
+      const passwordHash = await bcrypt6.hash(tempPassword, 10);
       const tenant = await storage.createTenant({
         businessName,
         ownerName,
@@ -7698,7 +9875,7 @@ async function registerRoutes(app2) {
         { length: 4 },
         () => crypto5.randomBytes(2).toString("hex").toUpperCase()
       );
-      const licenseKey = `BARMAGLY-${randomSegments.join("-")}`;
+      const licenseKey = `KASSENTA-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
         licenseKey,
         tenantId: tenant.id,
@@ -7711,7 +9888,7 @@ async function registerRoutes(app2) {
       await storage.createTenantNotification({
         tenantId: tenant.id,
         type: "info",
-        title: "Welcome to Barmagly!",
+        title: "Welcome to Kassenta!",
         message: `Your account for ${businessName} is ready. Open the app and enter your license key to activate.`,
         priority: "normal"
       });
@@ -7760,7 +9937,7 @@ async function registerRoutes(app2) {
       const isYearly = planType === "yearly";
       const priceChf = isYearly ? isAdvanced ? 4999 : 1999 : isAdvanced ? 499 : 199;
       const tempPassword = "Bpos" + Math.floor(1e5 + Math.random() * 9e5);
-      const passwordHash = await bcrypt5.hash(tempPassword, 10);
+      const passwordHash = await bcrypt6.hash(tempPassword, 10);
       const tenant = await storage.createTenant({
         businessName,
         ownerName,
@@ -7786,7 +9963,7 @@ async function registerRoutes(app2) {
         paymentMethod: "stripe"
       });
       const randomSegments = Array.from({ length: 4 }, () => crypto5.randomBytes(2).toString("hex").toUpperCase());
-      const licenseKey = `BARMAGLY-${randomSegments.join("-")}`;
+      const licenseKey = `KASSENTA-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
         licenseKey,
         tenantId: tenant.id,
@@ -7820,7 +9997,7 @@ async function registerRoutes(app2) {
       if (!tenant) {
         isNew = true;
         const tempPassword = "GAuth-" + crypto5.randomBytes(4).toString("hex");
-        const passwordHash = await bcrypt5.hash(tempPassword, 10);
+        const passwordHash = await bcrypt6.hash(tempPassword, 10);
         tenant = await storage.createTenant({
           businessName: payload.name ? `${payload.name}'s Store` : "My New Store",
           ownerName: name,
@@ -7935,86 +10112,90 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: e.message });
     }
   });
-  app2.post("/api/license/validate", async (req, res) => {
-    try {
-      const { licenseKey, email, password, deviceId } = req.body;
-      if (process.env.NODE_ENV !== "production") console.log("[VALIDATE] Incoming request details:", { licenseKey, email: email ? email.substring(0, 2) + "***" : void 0, deviceId });
-      if (!licenseKey) {
-        return res.json({ isValid: false, reason: "License key is required" });
-      }
-      const license = await storage.getLicenseByKey(licenseKey);
-      if (process.env.NODE_ENV !== "production") console.log("[VALIDATE] getLicenseByKey result for", licenseKey, ":", !!license);
-      if (!license) {
-        return res.json({ isValid: false, reason: "Invalid license key" });
-      }
-      if (license.status !== "active") {
-        return res.json({ isValid: false, reason: `License is ${license.status}` });
-      }
-      if (license.expiresAt && new Date(license.expiresAt) < /* @__PURE__ */ new Date()) {
-        return res.json({ isValid: false, reason: "License has expired" });
-      }
-      const tenant = await storage.getTenant(license.tenantId);
-      if (!tenant) {
-        return res.json({ isValid: false, reason: "Tenant not found" });
-      }
-      if (tenant.status !== "active") {
-        return res.json({ isValid: false, reason: `Store account is ${tenant.status}` });
-      }
-      if (email) {
-        if (tenant.ownerEmail.toLowerCase() !== email.toLowerCase()) {
-          return res.json({ isValid: false, reason: "Email does not match this license" });
+  app2.post(
+    "/api/license/validate",
+    rateLimit({ name: "license-ip", max: 30, windowMs: 10 * 60 * 1e3 }),
+    async (req, res) => {
+      try {
+        const { licenseKey, email, password, deviceId } = req.body;
+        if (process.env.NODE_ENV !== "production") console.log("[VALIDATE] Incoming request details:", { licenseKey, email: email ? email.substring(0, 2) + "***" : void 0, deviceId });
+        if (!licenseKey) {
+          return res.json({ isValid: false, reason: "License key is required" });
         }
-        if (password) {
-          if (!tenant.passwordHash) {
-            return res.json({ isValid: false, reason: "Account credentials not configured" });
+        const license = await storage.getLicenseByKey(licenseKey);
+        if (process.env.NODE_ENV !== "production") console.log("[VALIDATE] getLicenseByKey result for", licenseKey, ":", !!license);
+        if (!license) {
+          return res.json({ isValid: false, reason: "Invalid license key" });
+        }
+        if (license.status !== "active") {
+          return res.json({ isValid: false, reason: `License is ${license.status}` });
+        }
+        if (license.expiresAt && new Date(license.expiresAt) < /* @__PURE__ */ new Date()) {
+          return res.json({ isValid: false, reason: "License has expired" });
+        }
+        const tenant = await storage.getTenant(license.tenantId);
+        if (!tenant) {
+          return res.json({ isValid: false, reason: "Tenant not found" });
+        }
+        if (tenant.status !== "active") {
+          return res.json({ isValid: false, reason: `Store account is ${tenant.status}` });
+        }
+        if (email) {
+          if (tenant.ownerEmail.toLowerCase() !== email.toLowerCase()) {
+            return res.json({ isValid: false, reason: "Email does not match this license" });
           }
-          const passwordValid = await bcrypt5.compare(password, tenant.passwordHash);
-          if (!passwordValid) {
-            return res.json({ isValid: false, reason: "Invalid password" });
+          if (password) {
+            if (!tenant.passwordHash) {
+              return res.json({ isValid: false, reason: "Account credentials not configured" });
+            }
+            const passwordValid = await bcrypt6.compare(password, tenant.passwordHash);
+            if (!passwordValid) {
+              return res.json({ isValid: false, reason: "Invalid password" });
+            }
           }
         }
-      }
-      const isNewActivation = !!email;
-      if (isNewActivation) {
-        const currentCount = license.currentActivations || 0;
-        const maxCount = license.maxActivations || 3;
-        if (currentCount >= maxCount) {
-          return res.json({ isValid: false, reason: `Maximum activations reached (${maxCount}). Contact support to add more.` });
+        const isNewActivation = !!email;
+        if (isNewActivation) {
+          const currentCount = license.currentActivations || 0;
+          const maxCount = license.maxActivations || 3;
+          if (currentCount >= maxCount) {
+            return res.json({ isValid: false, reason: `Maximum activations reached (${maxCount}). Contact support to add more.` });
+          }
         }
+        const subs = await storage.getTenantSubscriptions(tenant.id);
+        const activeSub = subs.find((s) => s.status === "active");
+        await storage.updateLicenseKey(license.id, {
+          lastValidatedAt: /* @__PURE__ */ new Date(),
+          deviceInfo: deviceId || license.deviceInfo,
+          currentActivations: (license.currentActivations || 0) + (isNewActivation ? 1 : 0)
+        });
+        const subInfo = activeSub ? {
+          active: true,
+          plan: activeSub.planName,
+          daysRemaining: activeSub.endDate ? Math.max(0, Math.ceil((new Date(activeSub.endDate).getTime() - Date.now()) / (1e3 * 60 * 60 * 24))) : 365,
+          requiresUpgrade: false
+        } : {
+          active: false,
+          plan: "No active plan",
+          daysRemaining: 0,
+          requiresUpgrade: true
+        };
+        res.json({
+          isValid: true,
+          tenant: {
+            id: tenant.id,
+            name: tenant.businessName,
+            logo: tenant.logo,
+            storeType: tenant.storeType
+          },
+          subscription: subInfo
+        });
+      } catch (e) {
+        console.error("License validation error:", e);
+        res.status(500).json({ isValid: false, reason: "Server error during validation" });
       }
-      const subs = await storage.getTenantSubscriptions(tenant.id);
-      const activeSub = subs.find((s) => s.status === "active");
-      await storage.updateLicenseKey(license.id, {
-        lastValidatedAt: /* @__PURE__ */ new Date(),
-        deviceInfo: deviceId || license.deviceInfo,
-        currentActivations: (license.currentActivations || 0) + (isNewActivation ? 1 : 0)
-      });
-      const subInfo = activeSub ? {
-        active: true,
-        plan: activeSub.planName,
-        daysRemaining: activeSub.endDate ? Math.max(0, Math.ceil((new Date(activeSub.endDate).getTime() - Date.now()) / (1e3 * 60 * 60 * 24))) : 365,
-        requiresUpgrade: false
-      } : {
-        active: false,
-        plan: "No active plan",
-        daysRemaining: 0,
-        requiresUpgrade: true
-      };
-      res.json({
-        isValid: true,
-        tenant: {
-          id: tenant.id,
-          name: tenant.businessName,
-          logo: tenant.logo,
-          storeType: tenant.storeType
-        },
-        subscription: subInfo
-      });
-    } catch (e) {
-      console.error("License validation error:", e);
-      res.status(500).json({ isValid: false, reason: "Server error during validation" });
     }
-  });
+  );
   app2.get("/api/dashboard", async (req, res) => {
     try {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
@@ -8118,7 +10299,7 @@ async function registerRoutes(app2) {
       const tenants2 = await storage.getTenants();
       const licenses = await storage.getLicenseKeys();
       const subsWithTenant = tenantSubs.map((sub) => {
-        const tenant = tenants2.find((t) => t.id === sub.tenantId);
+        const tenant = tenants2.find((t2) => t2.id === sub.tenantId);
         const tenantLicenses = licenses.filter((l) => l.tenantId === sub.tenantId);
         return {
           ...sub,
@@ -8200,21 +10381,30 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: e.message });
     }
   });
-  app2.post("/api/employees", async (req, res) => {
+  app2.post("/api/employees", requireAdmin, async (req, res) => {
     try {
-      res.json(await storage.createEmployee(sanitizeDates(req.body)));
+      const data = sanitizeDates(req.body);
+      if (data.pin) data.pin = await hashPin(String(data.pin));
+      const created = await storage.createEmployee(data);
+      const { pin, ...safe } = created ?? {};
+      res.json(safe);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
   });
-  app2.put("/api/employees/:id", async (req, res) => {
+  app2.put("/api/employees/:id", requireAdmin, async (req, res) => {
     try {
-      res.json(await storage.updateEmployee(Number(req.params.id), sanitizeDates(req.body)));
+      const data = sanitizeDates(req.body);
+      if (data.pin) data.pin = await hashPin(String(data.pin));
+      else delete data.pin;
+      const updated = await storage.updateEmployee(Number(req.params.id), data);
+      const { pin, ...safe } = updated ?? {};
+      res.json(safe);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
   });
-  app2.delete("/api/employees/:id", async (req, res) => {
+  app2.delete("/api/employees/:id", requireAdmin, async (req, res) => {
     try {
       await storage.deleteEmployee(Number(req.params.id));
       res.json({ success: true });
@@ -8222,31 +10412,75 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: e.message });
     }
   });
-  app2.post("/api/employees/login", async (req, res) => {
-    try {
-      let emp;
-      if (req.body.employeeId) {
-        emp = await storage.getEmployee(Number(req.body.employeeId));
-        if (!emp || emp.pin !== req.body.pin) {
-          return res.status(401).json({ error: "Invalid PIN for this employee" });
+  app2.post(
+    "/api/employees/login",
+    rateLimit({ name: "pin-ip", max: 20, windowMs: 10 * 60 * 1e3, message: "Too many attempts. Wait a moment and try again." }),
+    rateLimit({
+      name: "pin-tenant",
+      max: 40,
+      windowMs: 10 * 60 * 1e3,
+      keyFn: (req) => String(req.tenantId ?? req.header("x-license-key") ?? "unknown"),
+      message: "Too many attempts. Wait a moment and try again."
+    }),
+    async (req, res) => {
+      try {
+        const pin = String(req.body?.pin ?? "");
+        if (!pin) return res.status(400).json({ error: "PIN is required" });
+        const tenantId = req.tenantId;
+        let emp;
+        if (req.body.employeeId) {
+          emp = await storage.getEmployee(Number(req.body.employeeId));
+          if (!emp) return res.status(401).json({ error: "Invalid PIN for this employee" });
+          if (tenantId && emp.tenantId && emp.tenantId !== tenantId) {
+            return res.status(401).json({ error: "Invalid PIN for this employee" });
+          }
+          if (!await verifyPin(pin, emp.pin)) {
+            return res.status(401).json({ error: "Invalid PIN for this employee" });
+          }
+        } else if (tenantId) {
+          const staff = await storage.getEmployeesByTenant(tenantId);
+          emp = null;
+          for (const candidate of staff) {
+            if (await verifyPin(pin, candidate.pin)) {
+              emp = candidate;
+              break;
+            }
+          }
+          if (!emp) return res.status(401).json({ error: "Invalid PIN" });
+        } else {
+          emp = await storage.getEmployeeByPin(pin);
+          if (!emp) return res.status(401).json({ error: "Invalid PIN" });
         }
-      } else {
-        emp = await storage.getEmployeeByPin(req.body.pin);
-        if (!emp) return res.status(401).json({ error: "Invalid PIN" });
+        if (!emp.isActive) return res.status(401).json({ error: "Account deactivated" });
+        if (!isHashedPin(emp.pin)) {
+          try {
+            await storage.updateEmployee(emp.id, { pin: await hashPin(pin) });
+          } catch (err) {
+            console.error("[employeeAuth] PIN re-hash failed for employee", emp.id, err);
+          }
+        }
+        await storage.createActivityLog({
+          employeeId: emp.id,
+          action: "login",
+          entityType: "employee",
+          entityId: emp.id,
+          details: `${emp.name} logged in`
+        });
+        const token = generateEmployeeToken({
+          employeeId: emp.id,
+          tenantId: emp.tenantId ?? tenantId ?? null,
+          branchId: emp.branchId ?? null,
+          role: emp.role,
+          name: emp.name,
+          permissions: Array.isArray(emp.permissions) ? emp.permissions : []
+        });
+        const { pin: _pin, ...safeEmp } = emp;
+        res.json({ ...safeEmp, token });
+      } catch (e) {
+        res.status(500).json({ error: e.message });
       }
-      if (!emp.isActive) return res.status(401).json({ error: "Account deactivated" });
-      await storage.createActivityLog({
-        employeeId: emp.id,
-        action: "login",
-        entityType: "employee",
-        entityId: emp.id,
-        details: `${emp.name} logged in`
-      });
-      res.json(emp);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
     }
-  });
+  );
   app2.get("/api/categories", async (req, res) => {
     try {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
@@ -9946,7 +12180,9 @@ async function registerRoutes(app2) {
         storeType: tenant?.storeType || "supermarket",
         commissionRate: 0,
         // commission is baked into product prices via applyMarkup
-        whatsappAdminPhone: tenant?.metadata?.whatsappAdminPhone || ""
+        whatsappAdminPhone: tenant?.metadata?.whatsappAdminPhone || "",
+        // BIZ-01: opt-in minimum-order top-up, delivery only. 0 = disabled.
+        minOrderAmount: Number(tenant?.metadata?.minOrderAmount) || 0
       });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -9964,20 +12200,28 @@ async function registerRoutes(app2) {
       }
       const mainBranch = branches2.find((b) => b.isMain) || branches2[0];
       if (!mainBranch) return res.status(404).json({ error: "No branch found" });
-      const { whatsappAdminPhone, ...cleanBranchData } = branchData;
+      const { whatsappAdminPhone, minOrderAmount, ...cleanBranchData } = branchData;
       const updatedBranch = await storage.updateBranch(mainBranch.id, cleanBranchData);
       if (mainBranch.tenantId) {
         const tenantUpdates = {};
         if (storeType) tenantUpdates.storeType = storeType;
-        if (whatsappAdminPhone !== void 0) {
+        if (whatsappAdminPhone !== void 0 || minOrderAmount !== void 0) {
           const existingTenant = await storage.getTenant(mainBranch.tenantId);
-          tenantUpdates.metadata = { ...existingTenant?.metadata || {}, whatsappAdminPhone: whatsappAdminPhone.replace(/\D/g, "") };
+          const metadata = { ...existingTenant?.metadata || {} };
+          if (whatsappAdminPhone !== void 0) metadata.whatsappAdminPhone = whatsappAdminPhone.replace(/\D/g, "");
+          if (minOrderAmount !== void 0) metadata.minOrderAmount = Math.max(0, Number(minOrderAmount) || 0);
+          tenantUpdates.metadata = metadata;
         }
         if (Object.keys(tenantUpdates).length > 0) {
           await storage.updateTenant(mainBranch.tenantId, tenantUpdates);
         }
       }
-      res.json({ ...updatedBranch, storeType, whatsappAdminPhone: whatsappAdminPhone?.replace(/\D/g, "") || "" });
+      res.json({
+        ...updatedBranch,
+        storeType,
+        whatsappAdminPhone: whatsappAdminPhone?.replace(/\D/g, "") || "",
+        minOrderAmount: Math.max(0, Number(minOrderAmount) || 0)
+      });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -10384,7 +12628,7 @@ async function test(){
     if (!targetPhone) return res.status(400).json({ error: "No phone number specified and no global admin phone configured" });
     const sent = await whatsappService.sendText(
       targetPhone,
-      "\u{1F9EA} *Test Message*\n\nThis is a test from Barmagly POS WhatsApp integration.\n\n\u2705 If you receive this, the connection is working!"
+      "\u{1F9EA} *Test Message*\n\nThis is a test from Kassenta POS WhatsApp integration.\n\n\u2705 If you receive this, the connection is working!"
     );
     res.json({ success: sent, phone: targetPhone });
   });
@@ -10529,8 +12773,8 @@ async function test(){
       const branches2 = await storage.getBranchesByTenant(config.tenantId);
       const currency = branches2?.[0]?.currency || "CHF";
       const storeTenant = await storage.getTenant(config.tenantId);
-      const storeName = String(storeTenant?.businessName || config.businessName || "Barmagly Store").replace(/[<>"]/g, "");
-      const storeLogo = String(config.logoUrl || storeTenant?.logo || "https://pos.barmagly.tech/app/assets/images/icon.png").replace(/"/g, "");
+      const storeName = String(storeTenant?.businessName || config.businessName || "Kassenta Store").replace(/[<>"]/g, "");
+      const storeLogo = String(config.logoUrl || storeTenant?.logo || "https://kassenta.com/app/assets/images/icon.png").replace(/"/g, "");
       html = html.replace(/\{\{SLUG\}\}/g, slug);
       html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
       html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
@@ -10918,20 +13162,30 @@ Valid for 10 minutes.`);
       res.status(500).json({ error: e.message });
     }
   });
-  app2.post("/api/delivery/auth/login", async (req, res) => {
-    try {
-      const { email, password, tenantId } = req.body;
-      if (!email || !password || !tenantId) return res.status(400).json({ error: "email, password, tenantId required" });
-      const customer = await findCustomerByEmail(email, Number(tenantId));
-      if (!customer) return res.status(401).json({ error: "Invalid credentials" });
-      const valid = await verifyCustomerPassword(customer, password);
-      if (!valid) return res.status(401).json({ error: "Invalid credentials" });
-      const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
-      res.json({ success: true, token, customer: { id: customer.id, name: customer.name, email: customer.email, loyaltyPoints: customer.loyaltyPoints, loyaltyTier: customer.loyaltyTier, walletBalance: customer.walletBalance } });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
+  app2.post(
+    "/api/delivery/auth/login",
+    rateLimit({ name: "cust-login-ip", max: 15, windowMs: 15 * 60 * 1e3 }),
+    rateLimit({
+      name: "cust-login-email",
+      max: 6,
+      windowMs: 15 * 60 * 1e3,
+      keyFn: (req) => String(req.body?.email || "").toLowerCase().slice(0, 160)
+    }),
+    async (req, res) => {
+      try {
+        const { email, password, tenantId } = req.body;
+        if (!email || !password || !tenantId) return res.status(400).json({ error: "email, password, tenantId required" });
+        const customer = await findCustomerByEmail(email, Number(tenantId));
+        if (!customer) return res.status(401).json({ error: "Invalid credentials" });
+        const valid = await verifyCustomerPassword(customer, password);
+        if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+        const token = await createCustomerSession(customer.id, Number(tenantId), req.headers["user-agent"]);
+        res.json({ success: true, token, customer: { id: customer.id, name: customer.name, email: customer.email, loyaltyPoints: customer.loyaltyPoints, loyaltyTier: customer.loyaltyTier, walletBalance: customer.walletBalance } });
+      } catch (e) {
+        res.status(500).json({ error: e.message });
+      }
     }
-  });
+  );
   app2.post("/api/delivery/auth/register", async (req, res) => {
     try {
       const { name, email, phone, password, tenantId, referralCode } = req.body;
@@ -11148,8 +13402,8 @@ Valid for 10 minutes.`);
     if (slug === "barmagly") {
       const config2 = await storage.getLandingPageConfigBySlug("pizza-lemon");
       if (config2) {
-        config2.storeName = "Barmagly";
-        config2.heroTitle = "Barmagly Delivery";
+        config2.storeName = "Kassenta";
+        config2.heroTitle = "Kassenta Delivery";
       }
       return config2;
     }
@@ -11843,7 +14097,7 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
       if (!customer) return res.status(401).json({ error: "Not authenticated" });
       const { amount } = req.body;
       if (!amount || Number(amount) <= 0) return res.status(400).json({ error: "Valid amount required" });
-      const stripe = getUncachableStripeClient();
+      const stripe = await getUncachableStripeClient();
       const intent = await stripe.paymentIntents.create({
         amount: Math.round(Number(amount) * 100),
         currency: "chf",
@@ -12152,7 +14406,7 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
   app2.get("/api/delivery/sitemap.xml", async (_req, res) => {
     try {
       const configs = await storage.getAllLandingPageConfigs();
-      const baseUrl = process.env.APP_URL || "https://pos.barmagly.tech";
+      const baseUrl = process.env.APP_URL || "https://kassenta.com";
       let xml = `<?xml version="1.0" encoding="UTF-8"?>
 `;
       xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -12260,7 +14514,7 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
 Allow: /api/order/
 Allow: /api/restaurants
 Disallow: /api/delivery/
-Sitemap: https://barmagly.tech/api/delivery/sitemap.xml
+Sitemap: https://kassenta.com/api/delivery/sitemap.xml
 `
     );
   });
@@ -12269,7 +14523,7 @@ Sitemap: https://barmagly.tech/api/delivery/sitemap.xml
 }
 
 // server/superAdminRoutes.ts
-var bcrypt6 = __toESM(require("bcrypt"));
+var bcrypt7 = __toESM(require("bcrypt"));
 var crypto6 = __toESM(require("crypto"));
 var fs4 = __toESM(require("fs"));
 var path3 = __toESM(require("path"));
@@ -12348,11 +14602,11 @@ function startAutoBackup() {
     pruneOldBackups();
     try {
       const tenants2 = await storage.getTenants();
-      for (const t of tenants2) {
+      for (const t2 of tenants2) {
         try {
-          await createTenantBackup(t.id);
+          await createTenantBackup(t2.id);
         } catch (e) {
-          console.error(`[BACKUP] Failed for tenant ${t.id}:`, e);
+          console.error(`[BACKUP] Failed for tenant ${t2.id}:`, e);
         }
       }
       console.log(`[BACKUP] Done \u2013 ${tenants2.length} stores backed up.`);
@@ -12363,27 +14617,38 @@ function startAutoBackup() {
 }
 startAutoBackup();
 function registerSuperAdminRoutes(app2) {
-  app2.post("/api/super-admin/login", async (req, res) => {
-    try {
-      const { email, password } = req.body;
-      if (!email || !password) {
-        return res.status(400).json({ error: "Email and password are required" });
+  app2.post(
+    "/api/super-admin/login",
+    rateLimit({ name: "sa-login-ip", max: 10, windowMs: 15 * 60 * 1e3, message: "Too many login attempts. Try again in a few minutes." }),
+    rateLimit({
+      name: "sa-login-email",
+      max: 5,
+      windowMs: 15 * 60 * 1e3,
+      keyFn: (req) => String(req.body?.email || "").toLowerCase().slice(0, 160),
+      message: "Too many login attempts for this account. Try again in a few minutes."
+    }),
+    async (req, res) => {
+      try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+          return res.status(400).json({ error: "Email and password are required" });
+        }
+        const admin = await storage.getSuperAdminByEmail(email);
+        if (!admin || !admin.isActive) {
+          return res.status(401).json({ error: "Invalid credentials" });
+        }
+        const valid = await bcrypt7.compare(password, admin.passwordHash);
+        if (!valid) {
+          return res.status(401).json({ error: "Invalid credentials" });
+        }
+        const token = generateToken(admin.id, admin.email, admin.role || "super_admin");
+        res.json({ token, admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } });
+      } catch (e) {
+        console.error("Super admin login error:", e);
+        res.status(500).json({ error: "Server error" });
       }
-      const admin = await storage.getSuperAdminByEmail(email);
-      if (!admin || !admin.isActive) {
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
-      const valid = await bcrypt6.compare(password, admin.passwordHash);
-      if (!valid) {
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
-      const token = generateToken(admin.id, admin.email, admin.role || "super_admin");
-      res.json({ token, admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } });
-    } catch (e) {
-      console.error("Super admin login error:", e);
-      res.status(500).json({ error: "Server error" });
     }
-  });
+  );
   app2.get("/api/super-admin/stats", requireSuperAdmin, async (_req, res) => {
     try {
       const stats = await storage.getSuperAdminDashboardStats();
@@ -12437,11 +14702,11 @@ function registerSuperAdminRoutes(app2) {
       const { tenantSubscriptions: tenantSubscriptions2, tenants: tenants2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
       const allTenants = await storage.getTenants();
       const allSubs = await storage.getTenantSubscriptions();
-      const revenueByTenant = allTenants.map((t) => {
-        const tenantSubs = allSubs.filter((s) => s.tenantId === t.id && s.status === "active");
+      const revenueByTenant = allTenants.map((t2) => {
+        const tenantSubs = allSubs.filter((s) => s.tenantId === t2.id && s.status === "active");
         const rev = tenantSubs.reduce((acc, s) => acc + parseFloat(s.price || "0"), 0);
-        return { tenantId: t.id, businessName: t.businessName, revenue: rev, subCount: tenantSubs.length };
-      }).filter((t) => t.revenue > 0).sort((a, b) => b.revenue - a.revenue);
+        return { tenantId: t2.id, businessName: t2.businessName, revenue: rev, subCount: tenantSubs.length };
+      }).filter((t2) => t2.revenue > 0).sort((a, b) => b.revenue - a.revenue);
       const monthly = [];
       for (let i = 5; i >= 0; i--) {
         const d = /* @__PURE__ */ new Date();
@@ -12461,10 +14726,10 @@ function registerSuperAdminRoutes(app2) {
       }
       const planBreakdown = {};
       allSubs.filter((s) => s.status === "active").forEach((s) => {
-        const plan = s.planType || "unknown";
-        if (!planBreakdown[plan]) planBreakdown[plan] = { count: 0, revenue: 0 };
-        planBreakdown[plan].count++;
-        planBreakdown[plan].revenue += parseFloat(s.price || "0");
+        const plan2 = s.planType || "unknown";
+        if (!planBreakdown[plan2]) planBreakdown[plan2] = { count: 0, revenue: 0 };
+        planBreakdown[plan2].count++;
+        planBreakdown[plan2].revenue += parseFloat(s.price || "0");
       });
       res.json({ revenueByTenant, monthly, planBreakdown });
     } catch (e) {
@@ -12477,8 +14742,8 @@ function registerSuperAdminRoutes(app2) {
       const result = [];
       let grandTotal = 0;
       let grandCount = 0;
-      for (const t of allTenants) {
-        const tenantSales = await storage.getSales({ tenantId: t.id, limit: 1e3 });
+      for (const t2 of allTenants) {
+        const tenantSales = await storage.getSales({ tenantId: t2.id, limit: 1e3 });
         const total = tenantSales.reduce((acc, s) => acc + parseFloat(s.totalAmount || "0"), 0);
         grandTotal += total;
         grandCount += tenantSales.length;
@@ -12487,8 +14752,8 @@ function registerSuperAdminRoutes(app2) {
         const todaySales = tenantSales.filter((s) => new Date(s.createdAt) >= today);
         const todayTotal = todaySales.reduce((acc, s) => acc + parseFloat(s.totalAmount || "0"), 0);
         result.push({
-          tenantId: t.id,
-          businessName: t.businessName,
+          tenantId: t2.id,
+          businessName: t2.businessName,
           totalSales: tenantSales.length,
           totalRevenue: total,
           todaySales: todaySales.length,
@@ -12544,9 +14809,9 @@ function registerSuperAdminRoutes(app2) {
       }
       const allTenants = await storage.getTenants();
       const results = [];
-      for (const t of allTenants) {
+      for (const t2 of allTenants) {
         const notif = await storage.createTenantNotification({
-          tenantId: t.id,
+          tenantId: t2.id,
           title,
           message,
           type: type || "info",
@@ -12596,7 +14861,7 @@ function registerSuperAdminRoutes(app2) {
   app2.post("/api/super-admin/tenants", requireSuperAdmin, async (req, res) => {
     try {
       const { businessName, ownerName, ownerEmail, ownerPhone, status: status2, maxBranches, maxEmployees, storeType, address } = req.body;
-      const passwordHash = await bcrypt6.hash("admin123", 10);
+      const passwordHash = await bcrypt7.hash("admin123", 10);
       const tenant = await storage.createTenant({
         businessName,
         ownerName,
@@ -12663,7 +14928,7 @@ function registerSuperAdminRoutes(app2) {
     try {
       const id = parseInt(req.params.id);
       const { newPassword } = req.body;
-      const passwordHash = await bcrypt6.hash(newPassword || "admin123", 10);
+      const passwordHash = await bcrypt7.hash(newPassword || "admin123", 10);
       await storage.updateTenant(id, { passwordHash });
       res.json({ success: true, message: "Password reset successfully" });
     } catch (e) {
@@ -12674,7 +14939,7 @@ function registerSuperAdminRoutes(app2) {
     try {
       const subs = await storage.getTenantSubscriptions();
       const tenantList = await storage.getTenants();
-      const tenantMap = Object.fromEntries(tenantList.map((t) => [t.id, t]));
+      const tenantMap = Object.fromEntries(tenantList.map((t2) => [t2.id, t2]));
       const enriched = subs.map((s) => ({ ...s, tenant: tenantMap[s.tenantId] || null }));
       res.json(enriched);
     } catch (e) {
@@ -12743,7 +15008,7 @@ function registerSuperAdminRoutes(app2) {
     try {
       const keys = await storage.getLicenseKeys();
       const tenantList = await storage.getTenants();
-      const tenantMap = Object.fromEntries(tenantList.map((t) => [t.id, t]));
+      const tenantMap = Object.fromEntries(tenantList.map((t2) => [t2.id, t2]));
       const enriched = keys.map((k) => ({ ...k, tenant: tenantMap[k.tenantId] || null }));
       res.json(enriched);
     } catch (e) {
@@ -12754,7 +15019,7 @@ function registerSuperAdminRoutes(app2) {
     try {
       const { tenantId, subscriptionId, maxActivations, expiresAt, notes, customKey } = req.body;
       const segments = Array.from({ length: 4 }, () => crypto6.randomBytes(2).toString("hex").toUpperCase());
-      const licenseKey = customKey || `BARMAGLY-${segments.join("-")}`;
+      const licenseKey = customKey || `KASSENTA-${segments.join("-")}`;
       const key = await storage.createLicenseKey({
         licenseKey,
         tenantId,
@@ -12802,18 +15067,18 @@ function registerSuperAdminRoutes(app2) {
       const allTenants = await storage.getTenants();
       const allSubs = await storage.getTenantSubscriptions();
       const result = [];
-      for (const t of allTenants) {
-        const branches2 = await storage.getBranchesByTenant(t.id);
-        const employees2 = await storage.getEmployeesByTenant(t.id);
-        const products2 = await storage.getProductsByTenant(t.id);
-        const tenantSubs = allSubs.filter((s) => s.tenantId === t.id && s.status === "active");
-        const todaySales = await storage.getSales({ tenantId: t.id, limit: 200 });
+      for (const t2 of allTenants) {
+        const branches2 = await storage.getBranchesByTenant(t2.id);
+        const employees2 = await storage.getEmployeesByTenant(t2.id);
+        const products2 = await storage.getProductsByTenant(t2.id);
+        const tenantSubs = allSubs.filter((s) => s.tenantId === t2.id && s.status === "active");
+        const todaySales = await storage.getSales({ tenantId: t2.id, limit: 200 });
         const today = /* @__PURE__ */ new Date();
         today.setHours(0, 0, 0, 0);
         const todayFiltered = todaySales.filter((s) => new Date(s.createdAt) >= today);
         const todayRevenue = todayFiltered.reduce((acc, s) => acc + parseFloat(s.total || "0"), 0);
         result.push({
-          ...t,
+          ...t2,
           branchCount: branches2.length,
           employeeCount: employees2.length,
           productCount: products2.length,
@@ -13030,11 +15295,11 @@ function registerSuperAdminRoutes(app2) {
       } else {
         const tenants2 = await storage.getTenants();
         const results = [];
-        for (const t of tenants2) {
+        for (const t2 of tenants2) {
           try {
-            results.push(await createTenantBackup(t.id));
+            results.push(await createTenantBackup(t2.id));
           } catch (e) {
-            console.error(`[BACKUP] Failed to backup tenant ${t.id}:`, e);
+            console.error(`[BACKUP] Failed to backup tenant ${t2.id}:`, e);
           }
         }
         res.json({ success: true, count: results.length, files: results });
@@ -13190,8 +15455,8 @@ function registerSuperAdminRoutes(app2) {
       const { expenses: expenses2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
       const tenants2 = await storage.getTenants();
       const result = [];
-      for (const t of tenants2) {
-        const branchesList = await storage.getBranchesByTenant(t.id);
+      for (const t2 of tenants2) {
+        const branchesList = await storage.getBranchesByTenant(t2.id);
         const branchIds = branchesList.map((b) => b.id);
         let total = 0;
         if (branchIds.length > 0) {
@@ -13199,7 +15464,7 @@ function registerSuperAdminRoutes(app2) {
           const rows = await db.select().from(expenses2).where(inArray2(expenses2.branchId, branchIds));
           total = rows.reduce((acc, e) => acc + parseFloat(e.amount || "0"), 0);
         }
-        result.push({ tenantId: t.id, businessName: t.businessName, totalExpenses: total });
+        result.push({ tenantId: t2.id, businessName: t2.businessName, totalExpenses: total });
       }
       res.json(result);
     } catch (e) {
@@ -13229,26 +15494,26 @@ function registerSuperAdminRoutes(app2) {
       const tenants2 = await storage.getTenants();
       const subs = await storage.getTenantSubscriptions();
       const report = [];
-      for (const t of tenants2) {
-        const sales2 = await storage.getSales({ tenantId: t.id, limit: 1e4 });
+      for (const t2 of tenants2) {
+        const sales2 = await storage.getSales({ tenantId: t2.id, limit: 1e4 });
         const revenue = sales2.reduce((a, s) => a + parseFloat(s.totalAmount || "0"), 0);
-        const activeSub = subs.find((s) => s.tenantId === t.id && s.status === "active");
-        const employees2 = await storage.getEmployeesByTenant(t.id);
-        const products2 = await storage.getProductsByTenant(t.id);
-        const branches2 = await storage.getBranchesByTenant(t.id);
+        const activeSub = subs.find((s) => s.tenantId === t2.id && s.status === "active");
+        const employees2 = await storage.getEmployeesByTenant(t2.id);
+        const products2 = await storage.getProductsByTenant(t2.id);
+        const branches2 = await storage.getBranchesByTenant(t2.id);
         report.push({
-          tenantId: t.id,
-          businessName: t.businessName,
-          ownerEmail: t.ownerEmail,
-          status: t.status,
-          storeType: t.storeType,
+          tenantId: t2.id,
+          businessName: t2.businessName,
+          ownerEmail: t2.ownerEmail,
+          status: t2.status,
+          storeType: t2.storeType,
           branches: branches2.length,
           employees: employees2.length,
           products: products2.length,
           totalSales: sales2.length,
           totalRevenue: revenue,
           subscription: activeSub ? { plan: activeSub.planName, expires: activeSub.endDate } : null,
-          createdAt: t.createdAt
+          createdAt: t2.createdAt
         });
       }
       res.json(report);
@@ -13399,9 +15664,9 @@ function registerSuperAdminRoutes(app2) {
       if (!adminId) return res.status(401).json({ error: "Unauthorized" });
       const admin = await storage.getSuperAdminByEmail(req.admin.email);
       if (!admin) return res.status(404).json({ error: "Admin not found" });
-      const valid = await bcrypt6.compare(currentPassword, admin.passwordHash);
+      const valid = await bcrypt7.compare(currentPassword, admin.passwordHash);
       if (!valid) return res.status(400).json({ error: "Current password is incorrect" });
-      const newHash = await bcrypt6.hash(newPassword, 10);
+      const newHash = await bcrypt7.hash(newPassword, 10);
       await storage.updateSuperAdmin(adminId, { passwordHash: newHash });
       res.json({ success: true, message: "Password changed successfully" });
     } catch (e) {
@@ -13508,7 +15773,7 @@ function registerBroadcastRoutes(app2) {
         (0, import_drizzle_orm8.eq)(landingPageConfig.enableOnlineOrdering, true)
       ));
       if (activeTenants.length === 0) return res.json({ restaurants: [], products: [], categories: [] });
-      const tenantIds = activeTenants.map((t) => t.id);
+      const tenantIds = activeTenants.map((t2) => t2.id);
       const allProducts = await db.select({
         id: products.id,
         tenantId: products.tenantId,
@@ -13532,7 +15797,7 @@ function registerBroadcastRoutes(app2) {
         name: categories.name
       }).from(categories).where((0, import_drizzle_orm8.inArray)(categories.tenantId, tenantIds));
       const catMap = new Map(cats.map((c) => [`${c.tenantId}:${c.id}`, c.name]));
-      const tMap = new Map(activeTenants.map((t) => [t.id, t]));
+      const tMap = new Map(activeTenants.map((t2) => [t2.id, t2]));
       const parseJson = (v) => {
         if (Array.isArray(v) || v && typeof v === "object") return v;
         if (typeof v === "string" && v.trim()) {
@@ -13545,14 +15810,14 @@ function registerBroadcastRoutes(app2) {
         return [];
       };
       const decorate = (p) => {
-        const t = tMap.get(p.tenantId);
+        const t2 = tMap.get(p.tenantId);
         return {
           id: p.id,
           tenantId: p.tenantId,
-          tenantName: t?.name || "",
-          tenantLogo: t?.logo || null,
-          tenantSlug: t?.slug || "",
-          tenantColor: t?.primaryColor || "#FF5722",
+          tenantName: t2?.name || "",
+          tenantLogo: t2?.logo || null,
+          tenantSlug: t2?.slug || "",
+          tenantColor: t2?.primaryColor || "#FF5722",
           name: p.name,
           nameAr: p.nameAr,
           description: p.description,
@@ -13659,8 +15924,8 @@ function registerBroadcastRoutes(app2) {
       let trackingToken = null;
       let orderNumber = null;
       if (row.claimedByTenantId) {
-        const [t] = await db.select({ businessName: tenants.businessName }).from(tenants).where((0, import_drizzle_orm8.eq)(tenants.id, row.claimedByTenantId)).limit(1);
-        claimedByName = t?.businessName || null;
+        const [t2] = await db.select({ businessName: tenants.businessName }).from(tenants).where((0, import_drizzle_orm8.eq)(tenants.id, row.claimedByTenantId)).limit(1);
+        claimedByName = t2?.businessName || null;
         if (row.onlineOrderId) {
           const [oo] = await db.select({ orderNumber: onlineOrders.orderNumber, trackingToken: onlineOrders.trackingToken, status: onlineOrders.status }).from(onlineOrders).where((0, import_drizzle_orm8.eq)(onlineOrders.id, row.onlineOrderId)).limit(1);
           orderNumber = oo?.orderNumber || null;
@@ -14157,7 +16422,7 @@ function registerCustomerExtraRoutes(app2) {
 }
 
 // server/tenantAuth.ts
-var import_jsonwebtoken2 = __toESM(require("jsonwebtoken"));
+var import_jsonwebtoken3 = __toESM(require("jsonwebtoken"));
 init_storage();
 var PUBLIC_ROUTES = [
   "/api/health",
@@ -14224,6 +16489,12 @@ var PUBLIC_ROUTES = [
   // Customer chat single room + messages
   "/api/robots.txt",
   // SEO robots.txt
+  "/api/sitemap.xml",
+  // SEO sitemap (CDN-prefixed variant)
+  "/api/contact",
+  // Website demo request (rate limited, no auth)
+  "/api/favicon.ico",
+  // Favicon via the CDN-prefixed path
   // ── HTML pages served under /api/ prefix (Hostinger CDN compatibility) ──
   "/api/order",
   // Delivery listing (no-slug) + /api/order/
@@ -14254,8 +16525,13 @@ var PUBLIC_ROUTES = [
 var PUBLIC_ROUTE_PATTERNS = [
   /^\/api\/store\/\d+\/menu$/
 ];
+function matchesPrefix(path5, route) {
+  if (route.endsWith("/")) return path5.startsWith(route);
+  if (path5 === route) return true;
+  return path5.startsWith(route + "/");
+}
 function isPublicRoute(path5) {
-  if (PUBLIC_ROUTES.some((route) => path5.startsWith(route))) return true;
+  if (PUBLIC_ROUTES.some((route) => matchesPrefix(path5, route))) return true;
   if (PUBLIC_ROUTE_PATTERNS.some((pattern) => pattern.test(path5))) return true;
   return false;
 }
@@ -14268,7 +16544,7 @@ var SEED_ROUTES = [
   "/api/force-full-seed"
 ];
 function isSeedRoute(path5) {
-  return SEED_ROUTES.some((route) => path5.startsWith(route));
+  return SEED_ROUTES.some((route) => matchesPrefix(path5, route));
 }
 function tenantAuthMiddleware() {
   const isDev = process.env.NODE_ENV === "development";
@@ -14284,15 +16560,14 @@ function tenantAuthMiddleware() {
     }
     if (isSeedRoute(req.path)) {
       if (isDev) return next();
-      const seedSecret = process.env.SEED_SECRET || "barmagly-seed-2026-zrh";
-      if (req.headers["x-seed-secret"] === seedSecret) return next();
-      return res.status(403).json({ error: "Seed endpoints are disabled in production" });
+      console.warn(`[tenantAuth] Blocked seed route in production: ${req.path}`);
+      return res.status(404).json({ error: "Not found" });
     }
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith("Bearer ")) {
       try {
         const token = authHeader.split(" ")[1];
-        const decoded = import_jsonwebtoken2.default.verify(token, JWT_SECRET);
+        const decoded = import_jsonwebtoken3.default.verify(token, JWT_SECRET);
         const admin = await storage.getSuperAdmin(decoded.id);
         if (admin && admin.isActive) {
           const tenantId2 = req.query.tenantId ? Number(req.query.tenantId) : req.body?.tenantId ? Number(req.body.tenantId) : void 0;
@@ -14361,7 +16636,7 @@ var DELETE_ACCOUNT_HTML = String.raw`<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Delete Your Account — Barmagly POS</title>
+<title>Delete Your Account — Kassenta POS</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -14443,14 +16718,14 @@ var DELETE_ACCOUNT_HTML = String.raw`<!DOCTYPE html>
 
 <header>
   <h1>Delete Your Account &amp; Data</h1>
-  <p class="subtitle">Barmagly POS — Account &amp; data deletion request</p>
+  <p class="subtitle">Kassenta POS — Account &amp; data deletion request</p>
 </header>
 
-<p>This page explains how to permanently delete your <strong>Barmagly POS</strong> account, all data associated with it, and what is retained for legal and accounting reasons after deletion.</p>
+<p>This page explains how to permanently delete your <strong>Kassenta POS</strong> account, all data associated with it, and what is retained for legal and accounting reasons after deletion.</p>
 
 <div class="card">
-  <strong>Developer name shown on Google Play:</strong> Barmagly<br>
-  <strong>App:</strong> Barmagly POS (<code>com.barmagly.pos</code>)
+  <strong>Developer name shown on Google Play:</strong> Kassenta<br>
+  <strong>App:</strong> Kassenta POS (<code>com.barmagly.pos</code>)
 </div>
 
 <h2>1. How to request deletion</h2>
@@ -14459,30 +16734,30 @@ var DELETE_ACCOUNT_HTML = String.raw`<!DOCTYPE html>
 
 <h3>Option A — Email (recommended)</h3>
 <ol>
-  <li>Send an email from your registered admin address to <a href="mailto:privacy@barmagly.tech?subject=Account%20Deletion%20Request">privacy@barmagly.tech</a></li>
+  <li>Send an email from your registered admin address to <a href="mailto:privacy@kassenta.com?subject=Account%20Deletion%20Request">privacy@kassenta.com</a></li>
   <li>Use the subject line: <code>Account Deletion Request</code></li>
   <li>Include in the body:
     <ul>
       <li>Your store name</li>
-      <li>Your license key (<code>BARMAGLY-XXXX-XXXX-XXXX-XXXX</code>)</li>
+      <li>Your license key (<code>KASSENTA-XXXX-XXXX-XXXX-XXXX</code>)</li>
       <li>The admin email registered with the account</li>
     </ul>
   </li>
   <li>You will receive confirmation within <strong>3 business days</strong> and full deletion within <strong>30 days</strong>.</li>
 </ol>
 
-<p><a class="button" href="mailto:privacy@barmagly.tech?subject=Account%20Deletion%20Request">Email a deletion request</a></p>
+<p><a class="button" href="mailto:privacy@kassenta.com?subject=Account%20Deletion%20Request">Email a deletion request</a></p>
 
 <h3>Option B — Web form</h3>
 <ol>
-  <li>Sign in at <a href="https://barmagly.tech/login">barmagly.tech/login</a></li>
+  <li>Sign in at <a href="https://kassenta.com/login">kassenta.com/login</a></li>
   <li>Go to <strong>Settings → Account → Delete account</strong></li>
   <li>Confirm with your password and the one-time code sent to your email</li>
 </ol>
 
 <h3>Option C — Inside the app</h3>
 <ol>
-  <li>Open Barmagly POS on your device</li>
+  <li>Open Kassenta POS on your device</li>
   <li>Tap the <strong>Settings</strong> tab (admin role required)</li>
   <li>Scroll to <strong>Danger zone → Request account deletion</strong></li>
   <li>Follow the on-screen confirmation steps</li>
@@ -14525,7 +16800,7 @@ var DELETE_ACCOUNT_HTML = String.raw`<!DOCTYPE html>
   <li>Delete individual customers from <strong>Customers → [tap row] → Delete</strong></li>
   <li>Delete employee accounts from <strong>Settings → Employees → Remove</strong></li>
   <li>Delete products from <strong>Products → [edit] → Delete</strong></li>
-  <li>Request a bulk export and selective deletion by emailing <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a></li>
+  <li>Request a bulk export and selective deletion by emailing <a href="mailto:privacy@kassenta.com">privacy@kassenta.com</a></li>
 </ul>
 
 <h2>5. After deletion — what to expect</h2>
@@ -14541,14 +16816,14 @@ var DELETE_ACCOUNT_HTML = String.raw`<!DOCTYPE html>
 
 <p>If you have any questions about the deletion process or what data is retained:</p>
 <ul>
-  <li>Privacy questions: <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a></li>
-  <li>General support: <a href="mailto:support@barmagly.tech">support@barmagly.tech</a></li>
-  <li>Website: <a href="https://barmagly.tech">barmagly.tech</a></li>
+  <li>Privacy questions: <a href="mailto:privacy@kassenta.com">privacy@kassenta.com</a></li>
+  <li>General support: <a href="mailto:support@kassenta.com">support@kassenta.com</a></li>
+  <li>Website: <a href="https://kassenta.com">kassenta.com</a></li>
 </ul>
 
 <footer>
   <p><strong>Last updated:</strong> 29 May 2026<br>
-  <strong>Operated by:</strong> Barmagly · Egypt<br>
+  <strong>Operated by:</strong> Kassenta · Egypt<br>
   See also our <a href="/privacy">Privacy Policy</a>.</p>
 </footer>
 
@@ -14561,7 +16836,7 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Privacy Policy — Barmagly POS</title>
+<title>Privacy Policy — Kassenta POS</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -14673,35 +16948,35 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 <div class="container">
 
 <header>
-  <h1>Privacy Policy — Barmagly POS</h1>
+  <h1>Privacy Policy — Kassenta POS</h1>
   <p class="meta"><strong>Effective date:</strong> 29 May 2026</p>
   <p class="meta"><strong>Last updated:</strong> 29 May 2026</p>
 </header>
 
 <h2>1. Introduction</h2>
 <p>
-  This Privacy Policy explains how <strong>Barmagly</strong> ("Barmagly", "we", "us", or "our"), a company based in Egypt operating at
-  <a href="https://www.barmagly.tech">www.barmagly.tech</a>, handles information in connection with the
-  <strong>Barmagly POS</strong> mobile application (package <code>com.barmagly.pos</code>) and its supporting backend services at
-  <code>pos.barmagly.tech</code>.
+  This Privacy Policy explains how <strong>Kassenta</strong> ("Kassenta", "we", "us", or "our"), a company based in Egypt operating at
+  <a href="https://www.kassenta.com">www.kassenta.com</a>, handles information in connection with the
+  <strong>Kassenta POS</strong> mobile application (package <code>com.barmagly.pos</code>) and its supporting backend services at
+  <code>kassenta.com</code>.
 </p>
 <p>
-  Barmagly POS is a tablet-optimized Point of Sale and mini-ERP application for pharmacies, retail stores, cafes,
+  Kassenta POS is a tablet-optimized Point of Sale and mini-ERP application for pharmacies, retail stores, cafes,
   restaurants, and small businesses. It provides cart and checkout, inventory and product management, customer CRM,
   reporting, table and online ordering, delivery management, and multi-currency payments. Each merchant ("Store")
   operates an isolated workspace activated via a license key.
 </p>
 <div class="callout">
-  <strong>Who is the data controller?</strong> When a merchant uses Barmagly POS to run their business, the merchant
-  is the <em>controller</em> of customer and transaction data they enter. Barmagly acts as a <em>processor</em> on
-  the merchant's behalf. For account holders (merchants, owners, managers, cashiers), Barmagly is the controller of
+  <strong>Who is the data controller?</strong> When a merchant uses Kassenta POS to run their business, the merchant
+  is the <em>controller</em> of customer and transaction data they enter. Kassenta acts as a <em>processor</em> on
+  the merchant's behalf. For account holders (merchants, owners, managers, cashiers), Kassenta is the controller of
   the account information needed to provide the service.
 </div>
 
 <h2>2. Data We Collect</h2>
 
 <h3>2.1 Information merchants enter into the app</h3>
-<p>Merchants and their staff voluntarily enter business data into Barmagly POS, which may include:</p>
+<p>Merchants and their staff voluntarily enter business data into Kassenta POS, which may include:</p>
 <ul>
   <li>Account and staff information: employee names, PINs (stored hashed), email addresses for administrators, and roles (Admin/Owner, Manager, Cashier).</li>
   <li>Store information: store name, branches, addresses, tax IDs, logos, operating hours, and currency configuration.</li>
@@ -14728,7 +17003,7 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 </ul>
 
 <h2>3. Permissions</h2>
-<p>Barmagly POS requests only the permissions required for its features:</p>
+<p>Kassenta POS requests only the permissions required for its features:</p>
 <table>
   <thead>
     <tr><th>Permission</th><th>Why it is used</th><th>Optional?</th></tr>
@@ -14736,7 +17011,7 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
   <tbody>
     <tr>
       <td><strong>INTERNET</strong> / <strong>ACCESS_NETWORK_STATE</strong></td>
-      <td>To synchronize with the Barmagly backend (pos.barmagly.tech), receive online orders, and process payments.</td>
+      <td>To synchronize with the Kassenta backend (kassenta.com), receive online orders, and process payments.</td>
       <td>Required</td>
     </tr>
     <tr>
@@ -14762,7 +17037,7 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 <ul>
   <li>Provide the core POS, inventory, CRM, reporting, and delivery features of the app.</li>
   <li>Authenticate users and enforce role-based access (Admin/Owner, Manager, Cashier).</li>
-  <li>Activate and validate license keys (format <code>BARMAGLY-XXXX-XXXX-XXXX-XXXX</code>).</li>
+  <li>Activate and validate license keys (format <code>KASSENTA-XXXX-XXXX-XXXX-XXXX</code>).</li>
   <li>Generate receipts, reports, and merchant communications.</li>
   <li>Process payments through merchant-configured providers (Stripe, TWINT, Card, Cash).</li>
   <li>Send transactional notifications (WhatsApp, email) when the merchant configures them.</li>
@@ -14789,21 +17064,21 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
       <td>Global</td>
     </tr>
     <tr>
-      <td><strong>Barmagly infrastructure</strong> (pos.barmagly.tech)</td>
-      <td>Hosts the application backend and PostgreSQL database. Operated by Barmagly under HTTPS.</td>
+      <td><strong>Kassenta infrastructure</strong> (kassenta.com)</td>
+      <td>Hosts the application backend and PostgreSQL database. Operated by Kassenta under HTTPS.</td>
       <td>EU</td>
     </tr>
   </tbody>
 </table>
 <p>
   We may also disclose information if required by law, court order, or to protect the rights, safety, or property of
-  Barmagly, our users, or the public. In the event of a corporate transaction (merger, acquisition), data may be
+  Kassenta, our users, or the public. In the event of a corporate transaction (merger, acquisition), data may be
   transferred to the successor entity under equivalent protections.
 </p>
 
 <h2>6. Data Retention</h2>
 <p>
-  We retain merchant and transaction data for as long as the merchant maintains an active Barmagly POS license, so
+  We retain merchant and transaction data for as long as the merchant maintains an active Kassenta POS license, so
   the merchant can access historical reports and comply with accounting and tax laws.
 </p>
 <ul>
@@ -14811,11 +17086,11 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
   <li>Backups containing deleted data are rotated out within a reasonable additional period and are not restored to live systems.</li>
   <li>Technical logs are typically retained for up to 90 days for security and debugging.</li>
 </ul>
-<p>To request deletion, email <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a>.</p>
+<p>To request deletion, email <a href="mailto:privacy@kassenta.com">privacy@kassenta.com</a>.</p>
 
 <h2>7. Children's Privacy</h2>
 <p>
-  Barmagly POS is a business tool intended for use by adults aged <strong>18 or older</strong>. It is not directed at
+  Kassenta POS is a business tool intended for use by adults aged <strong>18 or older</strong>. It is not directed at
   children, and we do not knowingly collect personal information from anyone under 18. If you believe a child has
   provided personal information through the app, please contact us and we will delete it.
 </p>
@@ -14839,23 +17114,23 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 <p>
   Because merchants control the data they enter about their own customers, end-customers should first contact the
   merchant. If you cannot reach them or need our help, contact
-  <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a> and we will assist or route the request appropriately.
+  <a href="mailto:privacy@kassenta.com">privacy@kassenta.com</a> and we will assist or route the request appropriately.
 </p>
 
 <h2>9. Cookies</h2>
 <p>
-  The Barmagly POS mobile app does <strong>not</strong> use cookies. It uses secure tokens stored locally on the device
+  The Kassenta POS mobile app does <strong>not</strong> use cookies. It uses secure tokens stored locally on the device
   to keep the merchant signed in.
 </p>
 <p>
-  Our website (<a href="https://www.barmagly.tech">www.barmagly.tech</a>) uses only essential cookies required for the
+  Our website (<a href="https://www.kassenta.com">www.kassenta.com</a>) uses only essential cookies required for the
   site to function and for basic security. We do not use advertising or cross-site tracking cookies. If we ever
   introduce optional analytics cookies, we will request your consent first.
 </p>
 
 <h2>10. International Transfers</h2>
 <p>
-  Barmagly is based in Egypt, our primary infrastructure is hosted in the EU, and our sub-processors (Google Cloud
+  Kassenta is based in Egypt, our primary infrastructure is hosted in the EU, and our sub-processors (Google Cloud
   Storage, Stripe) operate globally. As a result, your information may be transferred to and processed in countries
   outside your own, including Egypt, Switzerland, the European Union, and the United States.
 </p>
@@ -14868,7 +17143,7 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 <h2>11. Security</h2>
 <p>We apply industry-standard technical and organizational measures to protect your data, including:</p>
 <ul>
-  <li><strong>HTTPS / TLS</strong> encryption for all traffic between the app and pos.barmagly.tech.</li>
+  <li><strong>HTTPS / TLS</strong> encryption for all traffic between the app and kassenta.com.</li>
   <li><strong>bcrypt</strong> hashing for passwords and employee PINs — we never store them in plain text.</li>
   <li><strong>License-key authentication</strong> with per-store isolation and signed session tokens.</li>
   <li>Role-based access control (Admin/Owner, Manager, Cashier) inside each store.</li>
@@ -14885,28 +17160,173 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
   We may update this Privacy Policy from time to time to reflect changes in the app, our services, or applicable law.
   When we do, we will update the "Effective date" above and, for material changes, we will notify merchants in-app or
   by email before the changes take effect. The current version is always available at
-  <a href="https://barmagly.tech/privacy">https://barmagly.tech/privacy</a>.
+  <a href="https://kassenta.com/privacy">https://kassenta.com/privacy</a>.
 </p>
 
 <h2>13. Contact Us</h2>
 <p>If you have questions, requests, or concerns about this Privacy Policy or your personal data, please contact:</p>
 <div class="contact-box">
-  <strong>Barmagly</strong><br>
+  <strong>Kassenta</strong><br>
   Privacy team<br>
   Egypt<br>
-  Email: <a href="mailto:privacy@barmagly.tech">privacy@barmagly.tech</a><br>
-  Website: <a href="https://www.barmagly.tech">www.barmagly.tech</a>
+  Email: <a href="mailto:privacy@kassenta.com">privacy@kassenta.com</a><br>
+  Website: <a href="https://www.kassenta.com">www.kassenta.com</a>
 </div>
 
 <footer>
-  &copy; 2026 Barmagly. All rights reserved.
+  &copy; 2026 Kassenta. All rights reserved.
 </footer>
 
 </div>
 </body>
 </html>`;
 
+// server/site/legal.ts
+init_shell();
+var LEGAL_BASE = process.env.PUBLIC_BASE_URL || "https://kassenta.com";
+var LEGAL_CSS = `<style>
+  .legal { padding: 52px 0 80px; }
+  .legal .wrap { max-width: 820px; }
+  .legal h2 { font-size: 1.32rem; margin: 38px 0 12px; }
+  .legal p, .legal li { color: var(--text-2); font-size: .96rem; }
+  .legal ul, .legal ol { margin: 12px 0; padding-inline-start: 22px; display: grid; gap: 8px; }
+  .legal a { color: var(--accent); font-weight: 600; }
+  .legal a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .legal .updated { font-size: .84rem; color: var(--text-3); }
+  .legal dl { display: grid; grid-template-columns: minmax(150px, auto) 1fr; gap: 10px 24px; margin-top: 16px; }
+  .legal dt { font-weight: 700; color: var(--text); font-size: .92rem; }
+  .legal dd { color: var(--text-2); font-size: .92rem; }
+  @media (max-width: 560px) { .legal dl { grid-template-columns: 1fr; gap: 2px 0; } .legal dd { margin-bottom: 12px; } }
+</style>`;
+var TERMS_HTML = renderPage(
+  {
+    path: "/terms",
+    title: { en: "Terms of Service \u2014 Kassenta POS", de: "AGB \u2014 Kassenta POS", ar: "\u0634\u0631\u0648\u0637 \u0627\u0644\u062E\u062F\u0645\u0629 \u2014 Kassenta POS" },
+    description: {
+      en: "The terms under which Kassenta provides its point of sale, online ordering and delivery software.",
+      de: "Die Bedingungen, unter denen Kassenta seine Kassen-, Online-Bestell- und Liefersoftware bereitstellt.",
+      ar: "\u0627\u0644\u0634\u0631\u0648\u0637 \u0627\u0644\u062A\u064A \u064A\u0642\u062F\u0651\u0645 \u0628\u0645\u0648\u062C\u0628\u0647\u0627 Kassenta \u0628\u0631\u0627\u0645\u062C \u0646\u0642\u0627\u0637 \u0627\u0644\u0628\u064A\u0639 \u0648\u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644."
+    }
+  },
+  `${LEGAL_CSS}
+  <section class="page-head">
+    <div class="wrap">
+      <div class="crumbs"><a href="/">Home</a><span>/</span><span>Terms</span></div>
+      <h1>Terms of Service</h1>
+      <p class="updated">Last updated: 11 August 2026</p>
+    </div>
+  </section>
+  <section class="legal">
+    <div class="wrap">
+      <h2>1. Who these terms are between</h2>
+      <p>These terms govern your use of the Kassenta point of sale, online ordering, delivery management and reporting software (the &quot;Service&quot;). By creating an account or using a licence key issued to your business, you accept them on behalf of that business.</p>
+
+      <h2>2. Your licence</h2>
+      <p>We grant your business a non-exclusive, non-transferable right to use the Service for as long as your subscription is active. The licence covers the number of locations and devices in your plan. You may not resell, sublicense or white-label the Service without a written agreement with us.</p>
+
+      <h2>3. Your account and your staff</h2>
+      <ul>
+        <li>You are responsible for keeping licence keys, administrator passwords and staff PINs confidential.</li>
+        <li>Actions taken with your credentials are treated as your actions. Tell us immediately if you believe a credential has been exposed and we will revoke it.</li>
+        <li>You decide which staff hold which role. Roles govern both the screens and the API, so grant administrator rights sparingly.</li>
+      </ul>
+
+      <h2>4. Fees and billing</h2>
+      <ul>
+        <li>Fees are stated per location in Swiss francs, excluding VAT, and are charged in advance for the billing period you selected.</li>
+        <li>Monthly subscriptions renew monthly until cancelled, with effect from the end of the current period.</li>
+        <li>Yearly subscriptions are charged once for twelve months and are not refundable pro rata, except where required by law.</li>
+        <li>We take no commission on orders placed through your own storefront, and we never sit between you and your payment provider.</li>
+        <li>If a payment fails we contact you before restricting access. We do not delete data because of a missed payment.</li>
+      </ul>
+
+      <h2>5. Your data</h2>
+      <p>Your products, customers, sales and settings belong to you. We process them to provide the Service and for no other purpose. We do not sell aggregated data and we do not market to your customers. Export to CSV is available from the reporting screens at any time, and a full export can be requested from support. Our handling of personal data is described in the <a href="/privacy">Privacy Policy</a>.</p>
+
+      <h2>6. Availability</h2>
+      <p>We aim for continuous availability and run daily encrypted backups with point-in-time restore. The point of sale continues to accept orders from its local cache during a network interruption and synchronises when the connection returns. We do not guarantee uninterrupted operation; planned maintenance is announced in advance where practical.</p>
+
+      <h2>7. Acceptable use</h2>
+      <ul>
+        <li>Do not use the Service to break the law, to process payments for goods you are not licensed to sell, or to send unsolicited messages to customers.</li>
+        <li>Do not attempt to access another business&#39;s data, probe the Service for vulnerabilities without written permission, or circumvent licence limits.</li>
+        <li>Security researchers are welcome to report findings to <a href="mailto:info@kassenta.com">info@kassenta.com</a>; we will not pursue good-faith reports.</li>
+      </ul>
+
+      <h2>8. Fiscal and tax responsibility</h2>
+      <p>The Service applies the tax rates, rounding rules and record retention that you configure. Confirming that your configuration matches the law in your market remains your responsibility and that of your accountant. Where a market requires a certification we have not completed, this is stated plainly on the <a href="/compliance/">Compliance</a> page.</p>
+
+      <h2>9. Liability</h2>
+      <p>We are liable without limitation for damage caused intentionally or by gross negligence, and for damage to life, body or health. In all other cases our aggregate liability is limited to the fees you paid in the twelve months before the event. We are not liable for indirect or consequential loss, including lost profit, where such exclusion is permitted by law.</p>
+
+      <h2>10. Ending the agreement</h2>
+      <p>You may cancel at any time with effect from the end of your current billing period. We may terminate for a material breach that is not remedied within 30 days of written notice. On termination we keep your data available for export for 60 days, then delete it.</p>
+
+      <h2>11. Changes</h2>
+      <p>We may update these terms. Material changes are announced by email at least 30 days before they take effect; continuing to use the Service after that date constitutes acceptance.</p>
+
+      <h2>12. Governing law</h2>
+      <p>These terms are governed by Swiss law. The place of jurisdiction is the registered seat of Kassenta, unless mandatory consumer protection law provides otherwise.</p>
+
+      <h2>13. Contact</h2>
+      <p>Questions about these terms: <a href="mailto:info@kassenta.com">info@kassenta.com</a></p>
+    </div>
+  </section>`,
+  LEGAL_BASE
+);
+var IMPRINT_HTML = renderPage(
+  {
+    path: "/imprint",
+    title: { en: "Imprint \u2014 Kassenta POS", de: "Impressum \u2014 Kassenta POS", ar: "\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0646\u0627\u0634\u0631 \u2014 Kassenta POS" },
+    description: {
+      en: "Legal disclosure and contact details for Kassenta.",
+      de: "Anbieterkennzeichnung und Kontaktangaben von Kassenta.",
+      ar: "\u0627\u0644\u0625\u0641\u0635\u0627\u062D \u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A \u0648\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0627\u0644\u062E\u0627\u0635\u0629 \u0628\u0640 Kassenta."
+    }
+  },
+  `${LEGAL_CSS}
+  <section class="page-head">
+    <div class="wrap">
+      <div class="crumbs"><a href="/">Home</a><span>/</span><span>Imprint</span></div>
+      <h1>Imprint</h1>
+      <p class="updated">Legal disclosure under applicable Swiss and EU information duties</p>
+    </div>
+  </section>
+  <section class="legal">
+    <div class="wrap">
+      <h2>Service provider</h2>
+      <dl>
+        <dt>Trading name</dt><dd>Kassenta</dd>
+        <dt>Product</dt><dd>Kassenta POS System \u2014 point of sale, online ordering and delivery software</dd>
+        <dt>Email</dt><dd><a href="mailto:info@kassenta.com">info@kassenta.com</a></dd>
+        <dt>Website</dt><dd><a href="https://kassenta.com">kassenta.com</a></dd>
+      </dl>
+      <p class="updated" style="margin-top:18px">Postal address, commercial register number and VAT identification number are supplied on request and appear on every invoice.</p>
+
+      <h2>Responsible for content</h2>
+      <p>The operator named above is responsible for the content of this website.</p>
+
+      <h2>Liability for content</h2>
+      <p>We prepare the content of these pages with care but cannot guarantee that it is accurate, complete and current at all times. Product statements describe the Service as delivered at the time of publication; anything still under development is marked as such on the <a href="/compliance/">Compliance</a> page.</p>
+
+      <h2>Liability for links</h2>
+      <p>This site links to external websites over whose content we have no control. Responsibility for that content lies with the respective operator. We check linked pages for legal violations at the time of linking and remove links promptly if we become aware of a violation.</p>
+
+      <h2>Copyright</h2>
+      <p>The content and design of these pages are protected by copyright. Reproduction, adaptation or distribution beyond the limits of copyright law requires our written consent. The Kassenta name and logo are our trademarks.</p>
+
+      <h2>Data protection</h2>
+      <p>How we handle personal data is described in the <a href="/privacy">Privacy Policy</a>. Requests to export or delete your data can be sent to <a href="mailto:info@kassenta.com">info@kassenta.com</a> and are executed within 30 days.</p>
+
+      <h2>Dispute resolution</h2>
+      <p>We are neither obliged nor willing to participate in dispute resolution proceedings before a consumer arbitration board. Business customers should raise any dispute with us directly at the address above.</p>
+    </div>
+  </section>`,
+  LEGAL_BASE
+);
+
 // server/index.ts
+init_site();
 var fs5 = __toESM(require("fs"));
 var path4 = __toESM(require("path"));
 var runMigrations = null;
@@ -14929,6 +17349,14 @@ var app = (0, import_express.default)();
 var log2 = console.log;
 app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'self'");
+  res.setHeader("Permissions-Policy", "geolocation=(self), camera=(self), microphone=(), payment=(), interest-cohort=()");
+  if ((req.header("x-forwarded-proto") || req.protocol) === "https") {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
   next();
 });
 var MEDIA_PATH_RE = /"\/(?:uploads|assets|objects)\//g;
@@ -14949,6 +17377,11 @@ app.use((_req, res, next) => {
 function setupCors(app2) {
   app2.use((req, res, next) => {
     const origins = /* @__PURE__ */ new Set([
+      "https://kassenta.com",
+      "https://www.kassenta.com",
+      "https://backend.kassenta.com",
+      // Kept during the migration window so the old deployment keeps working
+      // until pos.barmagly.tech is retired.
       "https://pos.barmagly.tech"
     ]);
     if (process.env.REPLIT_DEV_DOMAIN) {
@@ -14970,7 +17403,10 @@ function setupCors(app2) {
         "Access-Control-Allow-Methods",
         "GET, POST, PUT, DELETE, OPTIONS"
       );
-      res.header("Access-Control-Allow-Headers", "Content-Type, x-license-key");
+      res.header(
+        "Access-Control-Allow-Headers",
+        "Content-Type, x-license-key, x-employee-token, Authorization"
+      );
       res.header("Access-Control-Allow-Credentials", "true");
     }
     if (req.method === "OPTIONS") {
@@ -15041,37 +17477,7 @@ function serveExpoManifest(platform, res) {
   const manifest = fs5.readFileSync(manifestPath, "utf-8");
   res.send(manifest);
 }
-function serveLandingPage({
-  req,
-  res,
-  appName
-}) {
-  const forwardedProto = req.header("x-forwarded-proto");
-  const protocol = forwardedProto || req.protocol || "https";
-  const forwardedHost = req.header("x-forwarded-host");
-  const host = forwardedHost || req.get("host");
-  const baseUrl = `${protocol}://${host}`;
-  const expsUrl = `${host}`;
-  log2(`baseUrl`, baseUrl);
-  log2(`expsUrl`, expsUrl);
-  const templatePath = path4.resolve(
-    process.cwd(),
-    "server",
-    "templates",
-    "landing-page.html"
-  );
-  const template = fs5.readFileSync(templatePath, "utf-8");
-  let html = template.replace(/BASE_URL_PLACEHOLDER/g, baseUrl).replace(/EXPS_URL_PLACEHOLDER/g, expsUrl).replace(/APP_NAME_PLACEHOLDER/g, appName);
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.status(200).send(html);
-}
 function configureExpoAndLanding(app2) {
-  const templatePath = path4.resolve(
-    process.cwd(),
-    "server",
-    "templates",
-    "landing-page.html"
-  );
   const dashboardPath = path4.resolve(
     process.cwd(),
     "server",
@@ -15097,12 +17503,35 @@ function configureExpoAndLanding(app2) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(DELETE_ACCOUNT_HTML);
     }
-    if (req.path === "/privacy" || req.path === "/privacy/") {
+    if (req.path === "/privacy" || req.path === "/privacy/" || req.path === "/privacy-policy") {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(PRIVACY_POLICY_HTML);
     }
-    if (req.path === "/" || req.path === "/index.html") {
-      return serveLandingPage({ req, res, appName });
+    if (req.path === "/terms" || req.path === "/terms/") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(TERMS_HTML);
+    }
+    if (req.path === "/imprint" || req.path === "/imprint/") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(IMPRINT_HTML);
+    }
+    if (req.method === "GET" && req.path.startsWith("/assets/site.")) {
+      const asset = findSiteAsset(req.path);
+      if (asset) {
+        res.setHeader("Content-Type", asset.contentType);
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        return res.status(200).send(asset.body);
+      }
+    }
+    if (req.method === "GET" && isSitePath(req.path)) {
+      const proto = req.header("x-forwarded-proto") || req.protocol || "https";
+      const host = req.header("x-forwarded-host") || req.get("host");
+      const html = renderSitePage(req.path, `${proto}://${host}`);
+      if (html) {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=86400");
+        return res.status(200).send(html);
+      }
     }
     if (req.path === "/app" || req.path === "/app/" || req.path === "/app/index.html") {
       const appIndexPath = path4.resolve(process.cwd(), "dist", "app", "index.html");
@@ -15179,8 +17608,8 @@ function configureExpoAndLanding(app2) {
           if (sub === "/manifest.json") {
             res.setHeader("Content-Type", "application/manifest+json");
             return res.status(200).json({
-              name: "Barmagly",
-              short_name: "Barmagly",
+              name: "Kassenta",
+              short_name: "Kassenta",
               start_url: "/customer/",
               display: "standalone",
               scope: "/customer/",
@@ -15238,7 +17667,7 @@ function configureExpoAndLanding(app2) {
         const basePath = isApiPrefixed ? "/api" : "";
         let html = fs5.readFileSync(restaurantsIndexPath, "utf-8");
         const configJson = JSON.stringify({
-          storeName: "Barmagly Delivery",
+          storeName: "Kassenta Delivery",
           currency: process.env.DEFAULT_CURRENCY || "CHF",
           language: req.query.lang || "en",
           stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
@@ -15281,8 +17710,8 @@ function configureExpoAndLanding(app2) {
           }
         }
         if (isBrandAlias && config) {
-          config.storeName = "Barmagly";
-          config.heroTitle = "Barmagly Delivery";
+          config.storeName = "Kassenta";
+          config.heroTitle = "Kassenta Delivery";
         }
         if (!config) return res.status(404).send("<h1>Store not found</h1>");
         const tenantId = config.tenantId;
@@ -15321,7 +17750,7 @@ function configureExpoAndLanding(app2) {
         });
         html = html.replace("__DELIVERY_CONFIG__", configJson);
         const storeName = config.storeName || config.heroTitle || config.name || tenant.businessName;
-        const metaTitle = config.metaTitle || `${storeName} \u2014 Order Online | Barmagly Delivery`;
+        const metaTitle = config.metaTitle || `${storeName} \u2014 Order Online | Kassenta Delivery`;
         const metaDesc = config.metaDescription || `Order food online from ${storeName}. Fast delivery to your door.`;
         const coverImage = config.coverImage || config.headerBgImage || "";
         const seoMeta = `
@@ -15349,7 +17778,7 @@ function configureExpoAndLanding(app2) {
         const basePath = isApiPrefixed ? "/api" : "";
         let html = fs5.readFileSync(restaurantsIndexPath, "utf-8");
         const configJson = JSON.stringify({
-          storeName: "Barmagly Delivery",
+          storeName: "Kassenta Delivery",
           currency: process.env.DEFAULT_CURRENCY || "CHF",
           language: req.query.lang || "en",
           stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
@@ -15418,8 +17847,8 @@ function configureExpoAndLanding(app2) {
         const config = await storage2.getLandingPageConfig(tenantId);
         const storePath = path4.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
         let html = fs5.readFileSync(storePath, "utf-8");
-        const storeName = String(tenant.businessName || "Barmagly Store").replace(/[<>"]/g, "");
-        const storeLogo = String(config?.logoUrl || tenant.logo || "https://pos.barmagly.tech/app/assets/images/icon.png").replace(/"/g, "");
+        const storeName = String(tenant.businessName || "Kassenta Store").replace(/[<>"]/g, "");
+        const storeLogo = String(config?.logoUrl || tenant.logo || "https://kassenta.com/app/assets/images/icon.png").replace(/"/g, "");
         html = html.replace(/\{\{SLUG\}\}/g, slug);
         html = html.replace(/\{\{TENANT_ID\}\}/g, String(tenantId));
         html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
@@ -15443,11 +17872,7 @@ function configureExpoAndLanding(app2) {
       return serveExpoManifest(platform, res);
     }
     if (req.path === "/landing") {
-      return serveLandingPage({
-        req,
-        res,
-        appName
-      });
+      return res.redirect(301, "/");
     }
     next();
   });
@@ -15457,14 +17882,165 @@ function configureExpoAndLanding(app2) {
   });
   app2.use("/delivery-app", deliveryAppStatic);
   app2.use("/api/delivery-app", deliveryAppStatic);
-  const uploadsStatic = import_express.default.static(path4.resolve(process.cwd(), "uploads"));
-  const assetsStatic = import_express.default.static(path4.resolve(process.cwd(), "assets"));
+  const uploadsStatic = import_express.default.static(path4.resolve(process.cwd(), "uploads"), { maxAge: "30d" });
+  const assetsStatic = import_express.default.static(path4.resolve(process.cwd(), "assets"), { maxAge: "30d" });
   app2.use("/assets", assetsStatic);
   app2.use("/api/assets", assetsStatic);
   app2.use("/uploads", uploadsStatic);
   app2.use("/api/uploads", uploadsStatic);
   app2.use("/objects", uploadsStatic);
   app2.use("/api/objects", uploadsStatic);
+  const brandStatic = import_express.default.static(path4.resolve(process.cwd(), "public", "brand"), {
+    maxAge: "7d"
+  });
+  app2.use("/brand", brandStatic);
+  app2.use("/api/brand", brandStatic);
+  app2.get(["/favicon.ico", "/api/favicon.ico"], (_req, res) => {
+    res.sendFile(path4.resolve(process.cwd(), "public", "brand", "favicon.ico"));
+  });
+  app2.get("/site.webmanifest", (_req, res) => {
+    res.type("application/manifest+json").set("Cache-Control", "public, max-age=86400").send(
+      JSON.stringify({
+        name: "Kassenta POS",
+        short_name: "Kassenta",
+        description: "Point of sale, online ordering and delivery in one system.",
+        start_url: "/",
+        display: "standalone",
+        background_color: "#FFFFFF",
+        theme_color: "#0C8F85",
+        icons: [
+          { src: "/brand/favicon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/brand/favicon-512.png", sizes: "512x512", type: "image/png" },
+          { src: "/brand/favicon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
+        ]
+      })
+    );
+  });
+  app2.post(
+    ["/contact", "/api/contact"],
+    rateLimit({ name: "contact-ip", max: 5, windowMs: 60 * 60 * 1e3 }),
+    rateLimit({
+      name: "contact-email",
+      max: 3,
+      windowMs: 60 * 60 * 1e3,
+      keyFn: (req) => String(req.body?.email || "").toLowerCase().slice(0, 120)
+    }),
+    async (req, res) => {
+      try {
+        const body = req.body ?? {};
+        const str = (v, max) => String(v ?? "").trim().slice(0, max);
+        const name = str(body.name, 120);
+        const email = str(body.email, 160);
+        const message = str(body.message, 4e3);
+        if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
+          return res.status(400).json({ error: "A name and a valid email address are required." });
+        }
+        if (str(body.website, 10)) return res.status(200).json({ ok: true });
+        const { sendContactEnquiry: sendContactEnquiry2 } = await Promise.resolve().then(() => (init_emailService(), emailService_exports));
+        await sendContactEnquiry2({
+          name,
+          email,
+          business: str(body.business, 160),
+          phone: str(body.phone, 60),
+          industry: str(body.industry, 40),
+          message,
+          sourceIp: clientKey(req)
+        });
+        res.json({ ok: true });
+      } catch (e) {
+        log2(`[contact] send failed: ${e?.message}`);
+        res.status(502).json({ error: "Could not send the message. Please email info@kassenta.com." });
+      }
+    }
+  );
+  const SITE_URL = process.env.PUBLIC_BASE_URL || "https://kassenta.com";
+  app2.get(["/robots.txt", "/api/robots.txt"], (_req, res) => {
+    res.type("text/plain").send(
+      [
+        "User-agent: *",
+        "Allow: /",
+        "",
+        "# Private surfaces \u2014 never index",
+        "Disallow: /super_admin",
+        "Disallow: /dashboard",
+        "Disallow: /license-gate",
+        "Disallow: /login",
+        "Disallow: /api/",
+        "",
+        "# Public ordering pages should stay crawlable",
+        "Allow: /api/order/",
+        "Allow: /api/restaurants",
+        "",
+        `Sitemap: ${SITE_URL}/sitemap.xml`,
+        ""
+      ].join("\n")
+    );
+  });
+  app2.get(["/sitemap.xml", "/api/sitemap.xml"], async (_req, res) => {
+    try {
+      const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+      const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+      const { SITE_PATHS: SITE_PATHS2 } = await Promise.resolve().then(() => (init_site(), site_exports));
+      const entries = [
+        { loc: "/", priority: "1.0", changefreq: "weekly", alternates: true },
+        // Every marketing page, derived from the site router so the two can't drift.
+        ...SITE_PATHS2.filter((p) => p !== "/").map((loc) => ({
+          loc: `${loc}/`,
+          priority: loc === "/pricing" || loc === "/features" ? "0.9" : "0.8",
+          changefreq: "monthly",
+          alternates: true
+        })),
+        { loc: "/app", priority: "0.7", changefreq: "weekly" },
+        { loc: "/restaurants", priority: "0.8", changefreq: "daily" },
+        { loc: "/privacy", priority: "0.3", changefreq: "yearly" },
+        { loc: "/terms/", priority: "0.3", changefreq: "yearly" },
+        { loc: "/imprint/", priority: "0.3", changefreq: "yearly" },
+        { loc: "/delete-account", priority: "0.3", changefreq: "yearly" }
+      ];
+      try {
+        const configs = await storage2.getAllLandingPageConfigs();
+        for (const c of configs || []) {
+          if (c?.slug) entries.push({ loc: `/order/${c.slug}`, priority: "0.8", changefreq: "daily" });
+        }
+      } catch {
+      }
+      const esc2 = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>
+`;
+      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" `;
+      xml += `xmlns:xhtml="http://www.w3.org/1999/xhtml">
+`;
+      for (const e of entries) {
+        xml += `  <url>
+`;
+        xml += `    <loc>${esc2(SITE_URL + e.loc)}</loc>
+`;
+        xml += `    <lastmod>${today}</lastmod>
+`;
+        xml += `    <changefreq>${e.changefreq}</changefreq>
+`;
+        xml += `    <priority>${e.priority}</priority>
+`;
+        if (e.alternates) {
+          for (const lang of ["de", "en", "ar"]) {
+            xml += `    <xhtml:link rel="alternate" hreflang="${lang}" href="${esc2(`${SITE_URL}${e.loc}?lang=${lang}`)}"/>
+`;
+          }
+          xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="${esc2(SITE_URL + e.loc)}"/>
+`;
+        }
+        xml += `  </url>
+`;
+      }
+      xml += `</urlset>
+`;
+      res.set("Content-Type", "application/xml; charset=utf-8");
+      res.set("Cache-Control", "public, max-age=3600");
+      res.send(xml);
+    } catch (e) {
+      res.status(500).type("text/plain").send(`sitemap error: ${e.message}`);
+    }
+  });
   app2.use("/sounds", import_express.default.static(path4.resolve(process.cwd(), "public", "sounds")));
   app2.use("/api/sounds", import_express.default.static(path4.resolve(process.cwd(), "public", "sounds")));
   app2.use("/app/assets/images", import_express.default.static(path4.resolve(process.cwd(), "assets", "images")));
@@ -15766,6 +18342,8 @@ function setupPaymentGatewayRoutes(app2) {
   setupBodyParsing(app);
   setupRequestLogging(app);
   app.use(tenantAuthMiddleware());
+  app.use(attachEmployee());
+  app.use(guardTenantRoutes());
   setupStripeRoutes(app);
   setupPaymentGatewayRoutes(app);
   configureExpoAndLanding(app);
@@ -16006,20 +18584,28 @@ function setupPaymentGatewayRoutes(app2) {
   }
   try {
     const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
-    const adminEmail = "admin@barmagly.com";
-    const existingAdmin = await storage2.getSuperAdminByEmail(adminEmail);
-    if (!existingAdmin) {
-      await storage2.createSuperAdmin({
-        name: "Super Admin",
-        email: adminEmail,
-        passwordHash: "$2b$10$OoKOgYj3UlErVOmwqm4rnOpZLdqpLDF3zBiO4VuXJQa56F0DLlesK",
-        role: "super_admin",
-        isActive: true
-      });
-      log2("Super admin created");
+    const admins = await storage2.getSuperAdmins();
+    if (admins.length === 0) {
+      const email = process.env.SUPER_ADMIN_EMAIL;
+      const password = process.env.SUPER_ADMIN_PASSWORD;
+      if (email && password) {
+        const bcrypt8 = (await import("bcrypt")).default;
+        await storage2.createSuperAdmin({
+          name: process.env.SUPER_ADMIN_NAME || "Super Admin",
+          email,
+          passwordHash: await bcrypt8.hash(password, 10),
+          role: "super_admin",
+          isActive: true
+        });
+        log2(`Super admin bootstrapped from environment: ${email}`);
+      } else {
+        log2(
+          "[SECURITY] No super admin exists. Set SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD to bootstrap one \u2014 refusing to create a default account."
+        );
+      }
     }
   } catch (err) {
-    log2("Error creating super admin:", err);
+    log2("Error checking super admin:", err);
   }
   try {
     const { seedPizzaLemon: seedPizzaLemon2 } = await Promise.resolve().then(() => (init_seedPizzaLemon(), seedPizzaLemon_exports));

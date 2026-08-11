@@ -48,6 +48,9 @@ const PUBLIC_ROUTES = [
   "/api/customer/chats",            // Customer chat list (auth via Bearer customer token)
   "/api/customer/chats/",           // Customer chat single room + messages
   "/api/robots.txt",               // SEO robots.txt
+  "/api/sitemap.xml",              // SEO sitemap (CDN-prefixed variant)
+  "/api/contact",                  // Website demo request (rate limited, no auth)
+  "/api/favicon.ico",              // Favicon via the CDN-prefixed path
   // ── HTML pages served under /api/ prefix (Hostinger CDN compatibility) ──
   "/api/order",                    // Delivery listing (no-slug) + /api/order/
   "/api/track/",                   // Public tracking page HTML
@@ -68,8 +71,23 @@ const PUBLIC_ROUTE_PATTERNS = [
   /^\/api\/store\/\d+\/menu$/,
 ];
 
+/**
+ * SEC-04 — segment-boundary matching.
+ *
+ * A plain `startsWith` lets any route that merely shares a textual prefix slip
+ * through unauthenticated: `/api/store` would open `/api/store-settings`, and
+ * `/api/health` would open `/api/health-internal`. Requiring the match to end
+ * at a path separator keeps every intended sub-path public while closing the
+ * sibling-prefix hole, including for entries added later.
+ */
+function matchesPrefix(path: string, route: string): boolean {
+  if (route.endsWith("/")) return path.startsWith(route);
+  if (path === route) return true;
+  return path.startsWith(route + "/");
+}
+
 function isPublicRoute(path: string): boolean {
-  if (PUBLIC_ROUTES.some(route => path.startsWith(route))) return true;
+  if (PUBLIC_ROUTES.some(route => matchesPrefix(path, route))) return true;
   if (PUBLIC_ROUTE_PATTERNS.some(pattern => pattern.test(path))) return true;
   return false;
 }
@@ -84,7 +102,7 @@ const SEED_ROUTES = [
 ];
 
 function isSeedRoute(path: string): boolean {
-  return SEED_ROUTES.some(route => path.startsWith(route));
+  return SEED_ROUTES.some(route => matchesPrefix(path, route));
 }
 
 export function tenantAuthMiddleware() {
@@ -104,11 +122,12 @@ export function tenantAuthMiddleware() {
     }
 
     if (isSeedRoute(req.path)) {
+      // SEC-03: seed routes rebuild the product catalog (delete + reinsert).
+      // They are development-only — no secret header can re-open them in
+      // production, and 404 hides their existence from probing.
       if (isDev) return next();
-      // Allow a one-time production seed run with the correct secret header.
-      const seedSecret = process.env.SEED_SECRET || "barmagly-seed-2026-zrh";
-      if (req.headers["x-seed-secret"] === seedSecret) return next();
-      return res.status(403).json({ error: "Seed endpoints are disabled in production" });
+      console.warn(`[tenantAuth] Blocked seed route in production: ${req.path}`);
+      return res.status(404).json({ error: "Not found" });
     }
 
     const authHeader = req.headers.authorization;

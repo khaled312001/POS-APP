@@ -1,5 +1,5 @@
 {
-  "name": "Barmagly Delivery",
+  "name": "Kassenta Delivery",
   "short_name": "Delivery",
   "description": "Order food online — fast delivery to your door",
   "start_url": "/api/order",

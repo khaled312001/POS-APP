@@ -5,6 +5,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
+import { useTheme } from "@/lib/theme-context";
 
 type TabPageHeaderProps = {
   title: string;
@@ -14,6 +16,8 @@ type TabPageHeaderProps = {
   isRTL?: boolean;
   colors?: [string, string] | [string, string, string];
   rightActions?: React.ReactNode;
+  /** Set false on screens that already expose the switch elsewhere. */
+  showThemeToggle?: boolean;
   children?: React.ReactNode;
   style?: ViewStyle;
 };
@@ -31,6 +35,25 @@ export function HeaderIconButton({ icon, onPress }: HeaderIconButtonProps) {
   );
 }
 
+/**
+ * Light/dark switch styled for the gradient header. Present on every tab so the
+ * preference is always one tap away, not buried in Settings.
+ */
+export function HeaderThemeToggle() {
+  const { isDark, toggle } = useTheme();
+  return (
+    <Pressable
+      onPress={toggle}
+      style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: isDark }}
+      accessibilityLabel={isDark ? "Switch to light theme" : "Switch to dark theme"}
+    >
+      <Ionicons name={isDark ? "sunny-outline" : "moon-outline"} size={21} color={Colors.white} />
+    </Pressable>
+  );
+}
+
 export default function TabPageHeader({
   title,
   subtitle,
@@ -39,6 +62,7 @@ export default function TabPageHeader({
   isRTL = false,
   colors = [Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd],
   rightActions,
+  showThemeToggle = true,
   children,
   style,
 }: TabPageHeaderProps) {
@@ -66,14 +90,19 @@ export default function TabPageHeader({
             <Text style={[styles.subtitle, isRTL && styles.textRtl]}>{subtitle}</Text>
           ) : null}
         </View>
-        {rightActions ? <View style={[styles.actions, isRTL && styles.actionsRtl]}>{rightActions}</View> : null}
+        {rightActions || showThemeToggle ? (
+          <View style={[styles.actions, isRTL && styles.actionsRtl]}>
+            {rightActions}
+            {showThemeToggle ? <HeaderThemeToggle /> : null}
+          </View>
+        ) : null}
       </View>
       {children ? <View style={styles.content}>{children}</View> : null}
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   header: {
     paddingHorizontal: 14,
     paddingTop: 14,
@@ -142,7 +171,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  iconButtonPressed: {
+    backgroundColor: "rgba(255,255,255,0.28)",
+    transform: [{ scale: 0.94 }],
+  },
   textRtl: {
     textAlign: "right",
   },
-});
+}));

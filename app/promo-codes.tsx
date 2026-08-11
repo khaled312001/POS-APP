@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 import { useLicense } from "@/lib/license-context";
 import { getQueryFn, getApiUrl } from "@/lib/query-client";
 import { useLanguage } from "@/lib/language-context";
@@ -163,7 +164,7 @@ export default function PromoCodesScreen() {
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
           {promos.length === 0 && (
             <View style={styles.emptyState}>
-              <Text style={{ fontSize: 40 }}>🏷️</Text>
+              <Ionicons name="pricetag-outline" size={40} color={Colors.textMuted} />
               <Text style={styles.emptyText}>
                 {language === "ar" ? "لا توجد كودات بعد" : "No promo codes yet"}
               </Text>
@@ -346,7 +347,7 @@ export default function PromoCodesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { flexDirection: "row", alignItems: "center", padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
   backBtn: { padding: 4, marginRight: 8 },
@@ -381,4 +382,4 @@ const styles = StyleSheet.create({
   typeBtnTextActive: { color: Colors.deliveryPrimary },
   saveBtn: { backgroundColor: Colors.deliveryPrimary, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 8 },
   saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-});
+}));

@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, getQueryFn } from "@/lib/query-client";
 import { useQuery } from "@tanstack/react-query";
@@ -21,7 +22,7 @@ function getApiUrl() {
     const domain = process.env.EXPO_PUBLIC_DOMAIN || 'localhost';
     return `https://${domain}`;
   }
-  return 'https://pos.barmagly.tech';
+  return 'https://kassenta.com';
 }
 
 interface Employee {
@@ -78,7 +79,7 @@ export default function LoginScreen() {
   const [request, googleResponse, promptAsync] = Google.useAuthRequest({
     androidClientId: "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com",
     webClientId: "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com",
-    redirectUri: Platform.OS === 'web' ? "https://pos.barmagly.tech/app" : undefined,
+    redirectUri: Platform.OS === 'web' ? "https://kassenta.com/app" : undefined,
   });
 
   useEffect(() => {
@@ -457,7 +458,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: {
     flex: 1,
     backgroundColor: Colors.surface,
@@ -670,4 +671,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-});
+}));

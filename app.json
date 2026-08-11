@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "Barmagly POS",
+    "name": "Kassenta POS",
     "slug": "barmagly-pos",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
-    "scheme": "barmagly",
+    "scheme": "kassenta",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0A0E27"
+      "backgroundColor": "#040E32"
     },
     "ios": {
       "supportsTablet": true,
@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "tech.barmagly.pos",
-      "versionCode": 8,
+      "versionCode": 9,
       "minSdkVersion": 26,
       "targetSdkVersion": 35,
       "permissions": [
@@ -32,7 +32,7 @@
         "android.permission.VIBRATE"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#0A0E27",
+        "backgroundColor": "#040E32",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -40,11 +40,11 @@
     },
     "web": {
       "favicon": "./assets/images/favicon.png",
-      "name": "Barmagly POS",
-      "shortName": "Barmagly",
-      "description": "Point of Sale system for modern restaurants and stores",
-      "themeColor": "#2FD3C6",
-      "backgroundColor": "#0A0E17",
+      "name": "Kassenta POS System",
+      "shortName": "Kassenta",
+      "description": "Point of Sale and retail management for restaurants, cafes, shops and pharmacies",
+      "themeColor": "#00C1B0",
+      "backgroundColor": "#040E32",
       "lang": "en",
       "display": "standalone",
       "bundler": "metro"
@@ -53,7 +53,7 @@
       [
         "expo-router",
         {
-          "origin": "https://pos.barmagly.tech/"
+          "origin": "https://kassenta.com/"
         }
       ],
       "expo-font",
@@ -61,7 +61,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Barmagly POS to access the camera to scan product barcodes.",
+          "cameraPermission": "Allow Kassenta POS to access the camera to scan product barcodes.",
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
@@ -69,7 +69,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Barmagly POS to access your photos to set product images.",
+          "photosPermission": "Allow Kassenta POS to access your photos to set product images.",
           "cameraPermission": false,
           "microphonePermission": false
         }
@@ -82,7 +82,7 @@
     },
     "extra": {
       "router": {
-        "origin": "https://pos.barmagly.tech/"
+        "origin": "https://kassenta.com/"
       },
       "eas": {
         "projectId": "70016573-6c3a-4410-bb4e-c32ba66ee6d5"

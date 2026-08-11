@@ -10,6 +10,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { playClickSound } from "@/lib/sound";
 import BarcodeScanner from "@/components/BarcodeScanner";
@@ -782,7 +783,7 @@ export default function ProductsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: { flex: 1, backgroundColor: Colors.background },
   searchRow: { paddingHorizontal: 12, paddingVertical: 10 },
   searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 42, borderWidth: 1, borderColor: Colors.inputBorder },
@@ -818,4 +819,4 @@ const styles = StyleSheet.create({
   addonToggleOn: { backgroundColor: Colors.success },
   addonToggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff", alignSelf: "flex-start" },
   addonToggleThumbOn: { alignSelf: "flex-end" },
-});
+}));

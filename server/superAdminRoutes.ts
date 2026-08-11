@@ -8,6 +8,7 @@ import { generateToken, requireSuperAdmin, SuperAdminRequest } from "./superAdmi
 import { addMonths, addYears, addDays } from "date-fns";
 import { db } from "./db";
 import { eq, desc, sql, and, gte, lte, sum } from "drizzle-orm";
+import { rateLimit } from "./rateLimit";
 
 // ── BACKUP HELPERS ────────────────────────────────────────────────────────
 const BACKUP_DIR = path.resolve(process.cwd(), "backups");
@@ -96,7 +97,19 @@ startAutoBackup();
 
 export function registerSuperAdminRoutes(app: Express) {
   // ── AUTH ──────────────────────────────────────────────────────────────
-  app.post("/api/super-admin/login", async (req: Request, res: Response) => {
+  // Brute-force guard on the highest-value credential in the system: a
+  // successful guess here reaches every tenant's data.
+  app.post(
+    "/api/super-admin/login",
+    rateLimit({ name: "sa-login-ip", max: 10, windowMs: 15 * 60 * 1000, message: "Too many login attempts. Try again in a few minutes." }),
+    rateLimit({
+      name: "sa-login-email",
+      max: 5,
+      windowMs: 15 * 60 * 1000,
+      keyFn: (req) => String((req.body as any)?.email || "").toLowerCase().slice(0, 160),
+      message: "Too many login attempts for this account. Try again in a few minutes.",
+    }),
+    async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
       if (!email || !password) {
@@ -529,7 +542,7 @@ export function registerSuperAdminRoutes(app: Express) {
     try {
       const { tenantId, subscriptionId, maxActivations, expiresAt, notes, customKey } = req.body;
       const segments = Array.from({ length: 4 }, () => crypto.randomBytes(2).toString("hex").toUpperCase());
-      const licenseKey = customKey || `BARMAGLY-${segments.join("-")}`;
+      const licenseKey = customKey || `KASSENTA-${segments.join("-")}`;
 
       const key = await storage.createLicenseKey({
         licenseKey, tenantId,

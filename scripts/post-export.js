@@ -1,7 +1,7 @@
 // Post-export script: restructures dist/ for Vercel deployment
 // Layout after this script runs:
-//   dist/index.html              ← landing page  (https://pos.barmagly.tech/)
-//   dist/app/index.html          ← Expo POS app  (https://pos.barmagly.tech/app)
+//   dist/index.html              ← marketing site home
+//   dist/app/index.html          ← Expo POS app  (/app)
 //   dist/app/_expo/...           ← Expo static assets
 //   dist/app/assets/...          ← app assets
 //   dist/uploads/...             ← product uploads served from /uploads/*
@@ -55,10 +55,10 @@ function copyDirRecursive(srcDir, destDir) {
 fs.mkdirSync(appDir, { recursive: true });
 
 // ── 2. Service Worker (scope: /app/) ─────────────────────────────────────────
-const swContent = `// Barmagly POS — Service Worker
+const swContent = `// Kassenta POS — Service Worker
 // Handles offline caching and Web Push notifications.
 
-const CACHE_NAME = "barmagly-pos-v3";
+const CACHE_NAME = "kassenta-pos-v4";
 
 const APP_SHELL = [
   "/app",
@@ -136,7 +136,7 @@ self.addEventListener("push", (event) => {
   try {
     payload = event.data.json();
   } catch {
-    payload = { title: "Barmagly POS", body: event.data.text(), type: "generic" };
+    payload = { title: "Kassenta POS", body: event.data.text(), type: "generic" };
   }
 
   const { type, title, body, data = {} } = payload;
@@ -153,9 +153,9 @@ self.addEventListener("push", (event) => {
     requireInteraction: type === "incoming_call",
     vibrate: type === "incoming_call" ? [200, 100, 200, 100, 200] : [200],
     actions: type === "incoming_call"
-      ? [{ action: "accept", title: "✅ Accept" }, { action: "decline", title: "❌ Decline" }]
+      ? [{ action: "accept", title: "Accept" }, { action: "decline", title: "Decline" }]
       : type === "new_order"
-      ? [{ action: "view", title: "👁 View Order" }]
+      ? [{ action: "view", title: "View order" }]
       : [],
   };
 
@@ -166,11 +166,11 @@ self.addEventListener("push", (event) => {
           (c) => c.url.includes("/app") && c.focused
         );
         if (hasFocusedAppTab) return;
-        return self.registration.showNotification(title || "Barmagly POS", options);
+        return self.registration.showNotification(title || "Kassenta POS", options);
       })
     );
   } else {
-    event.waitUntil(self.registration.showNotification(title || "Barmagly POS", options));
+    event.waitUntil(self.registration.showNotification(title || "Kassenta POS", options));
   }
 });
 
@@ -201,15 +201,15 @@ console.log("[post-export] Wrote app/sw.js");
 
 // ── 3. Web App Manifest ───────────────────────────────────────────────────────
 const manifestContent = JSON.stringify({
-  name: "Barmagly POS",
-  short_name: "Barmagly",
-  description: "Point of Sale system for modern restaurants and stores",
+  name: "Kassenta POS",
+  short_name: "Kassenta",
+  description: "Point of sale, online ordering and delivery in one system.",
   start_url: "/app/",
   scope: "/app/",
   display: "standalone",
   orientation: "any",
-  theme_color: "#2FD3C6",
-  background_color: "#0A0E17",
+  theme_color: "#0C8F85",
+  background_color: "#F4F6FA",
   lang: "en",
   icons: [
     { src: "/app/assets/images/icon.png", sizes: "192x192", type: "image/png", purpose: "any" },
@@ -302,22 +302,86 @@ if (fs.existsSync(sourceSoundsDir)) {
   console.log("[post-export] Mirrored dist/sounds/ → dist/app/sounds/");
 }
 
-// ── 6. Landing page at dist/index.html ───────────────────────────────────────
-const landingTemplatePath = path.resolve(__dirname, "../server/templates/landing-page.html");
-if (fs.existsSync(landingTemplatePath)) {
-  let landingHtml = fs.readFileSync(landingTemplatePath, "utf-8");
-  // Replace server-side template placeholders with static values
-  landingHtml = landingHtml
-    .replace(/BASE_URL_PLACEHOLDER/g, "https://pos.barmagly.tech")
-    .replace(/EXPS_URL_PLACEHOLDER/g, "pos.barmagly.tech")
-    .replace(/APP_NAME_PLACEHOLDER/g, "Barmagly POS")
-    // Fix super-admin link to use underscore path
-    .replace(/\/super-admin\//g, "/super_admin/");
+// ── 6. Marketing site, pre-rendered to static HTML ──────────────────────────
+// Apache serves the document root directly and the Hostinger CDN caches and
+// brotli-compresses it, so shipping the pages as files skips the node process
+// entirely. Express still renders the same routes from the same module as a
+// fallback for backend.kassenta.com and for any path Apache has no file for.
+{
+  const esbuild = require("esbuild");
+  const os = require("os");
+  const repoRoot = path.resolve(__dirname, "..");
+  const stamp = Date.now();
+  const bundlePath = path.join(os.tmpdir(), `kassenta-site-${stamp}.cjs`);
+  const legalBundle = path.join(os.tmpdir(), `kassenta-legal-${stamp}.cjs`);
 
-  fs.writeFileSync(path.join(distDir, "index.html"), landingHtml, "utf-8");
-  console.log("[post-export] Wrote landing page → dist/index.html");
-} else {
-  console.warn("[post-export] WARNING: landing-page.html template not found, root will be empty");
+  // esbuild's JS API rather than the CLI: spawning npx.cmd fails with EINVAL on
+  // Windows, and the API skips a process launch either way.
+  const bundle = (entry, outfile) =>
+    esbuild.buildSync({
+      entryPoints: [entry],
+      outfile,
+      bundle: true,
+      platform: "node",
+      format: "cjs",
+      packages: "external",
+      absWorkingDir: repoRoot,
+      logLevel: "silent",
+    });
+
+  try {
+    bundle(path.join(repoRoot, "server/site/index.ts"), bundlePath);
+    const site = require(bundlePath);
+    const baseUrl = process.env.PUBLIC_BASE_URL || "https://kassenta.com";
+    let pageCount = 0;
+
+    for (const routePath of site.SITE_PATHS) {
+      const html = site.renderSitePage(routePath, baseUrl);
+      if (!html) continue;
+      const outFile =
+        routePath === "/"
+          ? path.join(distDir, "index.html")
+          : path.join(distDir, routePath.slice(1), "index.html");
+      fs.mkdirSync(path.dirname(outFile), { recursive: true });
+      fs.writeFileSync(outFile, html, "utf8");
+      pageCount++;
+    }
+
+    // Terms and imprint come from the same shell but live in their own module.
+    bundle(path.join(repoRoot, "server/site/legal.ts"), legalBundle);
+    const legal = require(legalBundle);
+    for (const [slug, html] of [["terms", legal.TERMS_HTML], ["imprint", legal.IMPRINT_HTML]]) {
+      fs.mkdirSync(path.join(distDir, slug), { recursive: true });
+      fs.writeFileSync(path.join(distDir, slug, "index.html"), html, "utf8");
+      pageCount++;
+    }
+
+    // Content-hashed stylesheet and script, shared by every page.
+    const homeHtml = fs.readFileSync(path.join(distDir, "index.html"), "utf8");
+    const assetUrls = new Set(
+      [...homeHtml.matchAll(/\/assets\/site\.[a-f0-9]+\.(?:css|js)/g)].map((m) => m[0])
+    );
+    fs.mkdirSync(path.join(distDir, "assets"), { recursive: true });
+    for (const url of assetUrls) {
+      const asset = site.findSiteAsset(url);
+      if (asset) fs.writeFileSync(path.join(distDir, url.replace(/^\//, "")), asset.body, "utf8");
+    }
+
+    // NOTE: deliberately no .htaccess here. The document root already carries
+    // the Passenger configuration, and overwriting it would take the whole app
+    // down. Pages are emitted as <slug>/index.html and linked with a trailing
+    // slash, so Apache serves them directly with no redirect and no rewrite.
+
+    console.log(`[post-export] Pre-rendered ${pageCount} site pages + ${assetUrls.size} assets`);
+  } catch (err) {
+    console.error("[post-export] Site pre-render FAILED:", err.message);
+    console.error("[post-export] The document root would keep serving the previous build — aborting.");
+    process.exit(1);
+  } finally {
+    for (const f of [bundlePath, legalBundle]) {
+      try { fs.unlinkSync(f); } catch (_) {}
+    }
+  }
 }
 
 // ── 7. Super Admin pages ──────────────────────────────────────────────────────
@@ -337,6 +401,6 @@ if (fs.existsSync(loginTemplatePath)) {
 }
 
 console.log("[post-export] Done. dist/ structure:");
-console.log("  /             → landing page");
+console.log("  /             → marketing site (7 pages + terms + imprint)");
 console.log("  /app          → Expo POS app");
 console.log("  /super_admin  → Super Admin dashboard");

@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 import { useLicense } from "@/lib/license-context";
 import { useLanguage } from "@/lib/language-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
@@ -30,7 +31,7 @@ function buildPrintHtml(qrCodes: any[], storeSlug: string, storeName: string, ap
         <div class="scan-text">Scan to order from your table</div>
         <div class="scan-text-ar">امسح للطلب من طاولتك</div>
         <div class="divider"></div>
-        <div class="footer-text">Powered by Barmagly POS</div>
+        <div class="footer-text">Powered by Kassenta POS</div>
       </div>
     `;
   }).join("");
@@ -180,7 +181,7 @@ function buildSinglePrintHtml(qr: any, storeSlug: string, storeName: string, api
   <div class="table">${qr.tableName}</div>
   <div class="msg">Scan to order from your table</div>
   <div class="msg-ar">امسح للطلب من طاولتك</div>
-  <div class="footer">Powered by Barmagly POS</div>
+  <div class="footer">Powered by Kassenta POS</div>
 </div>
 <script>window.onload = function() { window.print(); }</script>
 </body></html>`;
@@ -222,7 +223,7 @@ export default function TableQrScreen() {
   });
 
   const storeSlug = landingConfig?.slug || "";
-  const storeName = tenant?.businessName || "Restaurant";
+  const storeName = landingConfig?.storeName || tenant?.name || "Restaurant";
   const apiUrl = getApiUrl();
   const baseUrl = apiUrl.replace(/\/api$/, "").replace(/:\d+$/, "");
 
@@ -322,7 +323,7 @@ export default function TableQrScreen() {
   }, [qrCodes, storeSlug, storeName, apiUrl]);
 
   const getQrUrl = (qr: any) => {
-    const productionBase = "https://pos.barmagly.tech/api";
+    const productionBase = "https://kassenta.com/api";
     return `${productionBase}/order/${storeSlug}?table=${qr.qrToken}`;
   };
 
@@ -620,7 +621,7 @@ export default function TableQrScreen() {
 }
 
 // ── Styles ──────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: { flex: 1, backgroundColor: Colors.background },
   scrollContent: { flex: 1, paddingHorizontal: 16 },
 
@@ -778,4 +779,4 @@ const styles = StyleSheet.create({
     borderRadius: 12, marginTop: 16,
   },
   printPreviewBtnText: { color: "#fff", fontSize: 14, fontWeight: "800" },
-});
+}));

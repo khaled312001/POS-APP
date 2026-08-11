@@ -1,7 +1,7 @@
 {
-  "name": "Barmagly Driver",
+  "name": "Kassenta Driver",
   "short_name": "Driver",
-  "description": "Delivery driver app for Barmagly POS",
+  "description": "Delivery driver app for Kassenta POS",
   "start_url": "/driver/",
   "scope": "/driver/",
   "display": "standalone",

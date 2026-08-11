@@ -9,6 +9,10 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { callerIdService } from "./callerIdService";
 import { pushService } from "./pushService";
 import { requireSuperAdmin } from "./superAdminAuth";
+import {
+  generateEmployeeToken, verifyPin, hashPin, isHashedPin,
+  requireRole, requireManager, requireAdmin,
+} from "./employeeAuth";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { sendLicenseKeyEmail } from "./emailService";
 import { whatsappService } from "./whatsappService";
@@ -49,6 +53,7 @@ import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import { addDays, addMonths, addYears } from "date-fns";
 import { OAuth2Client } from "google-auth-library";
+import { rateLimit } from "./rateLimit";
 
 const googleClient = new OAuth2Client("852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com");
 
@@ -69,8 +74,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const storePath = path.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
       let html = fs.readFileSync(storePath, "utf-8");
-      const storeName = String((tenant as any).businessName || "Barmagly Store").replace(/[<>"]/g, "");
-      const storeLogo = String((config as any).logoUrl || (tenant as any).logo || "https://pos.barmagly.tech/app/assets/images/icon.png").replace(/"/g, "");
+      const storeName = String((tenant as any).businessName || "Kassenta Store").replace(/[<>"]/g, "");
+      const storeLogo = String((config as any).logoUrl || (tenant as any).logo || "https://kassenta.com/app/assets/images/icon.png").replace(/"/g, "");
       html = html.replace(/\{\{SLUG\}\}/g, slug);
       html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
       html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
@@ -192,7 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               confirm: true,
               automatic_payment_methods: { enabled: true, allow_redirects: "never" },
               receipt_email: ownerEmail,
-              description: `Barmagly ${planName} ${planType} — ${businessName}`,
+              description: `Kassenta ${planName} ${planType} — ${businessName}`,
               metadata: { businessName, ownerEmail, planName, planType },
             });
             if (pi.status === "requires_action") {
@@ -209,7 +214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               currency: "chf",
               source: stripeToken,
               receipt_email: ownerEmail,
-              description: `Barmagly ${planName} ${planType} — ${businessName}`,
+              description: `Kassenta ${planName} ${planType} — ${businessName}`,
               metadata: { businessName, ownerEmail, planName, planType },
             });
             if (charge.status !== "succeeded") {
@@ -268,7 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const randomSegments = Array.from({ length: 4 }, () =>
         crypto.randomBytes(2).toString("hex").toUpperCase()
       );
-      const licenseKey = `BARMAGLY-${randomSegments.join("-")}`;
+      const licenseKey = `KASSENTA-${randomSegments.join("-")}`;
 
       await storage.createLicenseKey({
         licenseKey,
@@ -284,7 +289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createTenantNotification({
         tenantId: tenant.id,
         type: "info",
-        title: "Welcome to Barmagly!",
+        title: "Welcome to Kassenta!",
         message: `Your account for ${businessName} is ready. Open the app and enter your license key to activate.`,
         priority: "normal",
       });
@@ -358,7 +363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         autoRenew: true, paymentMethod: "stripe",
       });
       const randomSegments = Array.from({ length: 4 }, () => crypto.randomBytes(2).toString("hex").toUpperCase());
-      const licenseKey = `BARMAGLY-${randomSegments.join("-")}`;
+      const licenseKey = `KASSENTA-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
         licenseKey, tenantId: tenant.id, subscriptionId: subscription.id,
         status: "active", maxActivations: isAdvanced ? 10 : 3, expiresAt: endDate,
@@ -533,7 +538,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // License Validation
-  app.post("/api/license/validate", async (req, res) => {
+  // Licence keys are long, but the endpoint is unauthenticated and public —
+  // cap it so it cannot be used to enumerate keys or as an amplification target.
+  app.post(
+    "/api/license/validate",
+    rateLimit({ name: "license-ip", max: 30, windowMs: 10 * 60 * 1000 }),
+    async (req, res) => {
     try {
       const { licenseKey, email, password, deviceId } = req.body;
       if (process.env.NODE_ENV !== 'production') console.log("[VALIDATE] Incoming request details:", { licenseKey, email: email ? email.substring(0, 2) + "***" : undefined, deviceId });
@@ -822,29 +832,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ ...safe, hasPin: !!pin });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
-  app.post("/api/employees", async (req, res) => {
-    try { res.json(await storage.createEmployee(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  app.post("/api/employees", requireAdmin, async (req, res) => {
+    try {
+      const data: any = sanitizeDates(req.body);
+      if (data.pin) data.pin = await hashPin(String(data.pin));
+      const created: any = await storage.createEmployee(data);
+      const { pin, ...safe } = created ?? {};
+      res.json(safe);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
-  app.put("/api/employees/:id", async (req, res) => {
-    try { res.json(await storage.updateEmployee(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+  app.put("/api/employees/:id", requireAdmin, async (req, res) => {
+    try {
+      const data: any = sanitizeDates(req.body);
+      // An empty string means "leave the PIN alone", not "clear it".
+      if (data.pin) data.pin = await hashPin(String(data.pin));
+      else delete data.pin;
+      const updated: any = await storage.updateEmployee(Number(req.params.id), data);
+      const { pin, ...safe } = updated ?? {};
+      res.json(safe);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
-  app.delete("/api/employees/:id", async (req, res) => {
+  app.delete("/api/employees/:id", requireAdmin, async (req, res) => {
     try { await storage.deleteEmployee(Number(req.params.id)); res.json({ success: true }); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
-  app.post("/api/employees/login", async (req, res) => {
+  // A 4-digit PIN has 10k combinations — without a limit it falls in seconds.
+  // Keyed per device and per licence so one shop cannot lock out another.
+  app.post(
+    "/api/employees/login",
+    rateLimit({ name: "pin-ip", max: 20, windowMs: 10 * 60 * 1000, message: "Too many attempts. Wait a moment and try again." }),
+    rateLimit({
+      name: "pin-tenant",
+      max: 40,
+      windowMs: 10 * 60 * 1000,
+      keyFn: (req: any) => String(req.tenantId ?? req.header("x-license-key") ?? "unknown"),
+      message: "Too many attempts. Wait a moment and try again.",
+    }),
+    async (req: any, res) => {
     try {
-      let emp;
+      const pin = String(req.body?.pin ?? "");
+      if (!pin) return res.status(400).json({ error: "PIN is required" });
+
+      // The license key already identified the store; trust that over anything
+      // the client sends. A PIN must never match an employee of another tenant.
+      const tenantId: number | undefined = req.tenantId;
+      let emp: any;
+
       if (req.body.employeeId) {
         emp = await storage.getEmployee(Number(req.body.employeeId));
-        if (!emp || emp.pin !== req.body.pin) {
+        if (!emp) return res.status(401).json({ error: "Invalid PIN for this employee" });
+        if (tenantId && emp.tenantId && emp.tenantId !== tenantId) {
           return res.status(401).json({ error: "Invalid PIN for this employee" });
         }
+        if (!(await verifyPin(pin, emp.pin))) {
+          return res.status(401).json({ error: "Invalid PIN for this employee" });
+        }
+      } else if (tenantId) {
+        const staff = await storage.getEmployeesByTenant(tenantId);
+        emp = null;
+        for (const candidate of staff as any[]) {
+          if (await verifyPin(pin, candidate.pin)) { emp = candidate; break; }
+        }
+        if (!emp) return res.status(401).json({ error: "Invalid PIN" });
       } else {
-        emp = await storage.getEmployeeByPin(req.body.pin);
+        // No license context (local dev). Legacy plaintext lookup only.
+        emp = await storage.getEmployeeByPin(pin);
         if (!emp) return res.status(401).json({ error: "Invalid PIN" });
       }
+
       if (!emp.isActive) return res.status(401).json({ error: "Account deactivated" });
-      // Log activity
+
+      // SEC-02: transparent migration — the first successful login on a legacy
+      // plaintext PIN replaces it with a bcrypt hash.
+      if (!isHashedPin(emp.pin)) {
+        try {
+          await storage.updateEmployee(emp.id, { pin: await hashPin(pin) } as any);
+        } catch (err) {
+          console.error("[employeeAuth] PIN re-hash failed for employee", emp.id, err);
+        }
+      }
+
       await storage.createActivityLog({
         employeeId: emp.id,
         action: "login",
@@ -852,7 +918,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entityId: emp.id,
         details: `${emp.name} logged in`,
       });
-      res.json(emp);
+
+      const token = generateEmployeeToken({
+        employeeId: emp.id,
+        tenantId: emp.tenantId ?? tenantId ?? null,
+        branchId: emp.branchId ?? null,
+        role: emp.role,
+        name: emp.name,
+        permissions: Array.isArray(emp.permissions) ? emp.permissions : [],
+      });
+
+      // Never ship the PIN back to the client — the app persists this object.
+      const { pin: _pin, ...safeEmp } = emp;
+      res.json({ ...safeEmp, token });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -2400,6 +2478,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storeType: tenant?.storeType || "supermarket",
         commissionRate: 0, // commission is baked into product prices via applyMarkup
         whatsappAdminPhone: (tenant?.metadata as any)?.whatsappAdminPhone || "",
+        // BIZ-01: opt-in minimum-order top-up, delivery only. 0 = disabled.
+        minOrderAmount: Number((tenant?.metadata as any)?.minOrderAmount) || 0,
       });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -2421,21 +2501,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mainBranch = branches.find((b: any) => b.isMain) || branches[0];
       if (!mainBranch) return res.status(404).json({ error: "No branch found" });
 
-      const { whatsappAdminPhone, ...cleanBranchData } = branchData;
+      const { whatsappAdminPhone, minOrderAmount, ...cleanBranchData } = branchData;
       const updatedBranch = await storage.updateBranch(mainBranch.id, cleanBranchData);
       if (mainBranch.tenantId) {
         const tenantUpdates: any = {};
         if (storeType) tenantUpdates.storeType = storeType;
-        if (whatsappAdminPhone !== undefined) {
+        if (whatsappAdminPhone !== undefined || minOrderAmount !== undefined) {
           const existingTenant = await storage.getTenant(mainBranch.tenantId as number);
-          tenantUpdates.metadata = { ...(existingTenant?.metadata as any || {}), whatsappAdminPhone: whatsappAdminPhone.replace(/\D/g, "") };
+          const metadata: any = { ...(existingTenant?.metadata as any || {}) };
+          if (whatsappAdminPhone !== undefined) metadata.whatsappAdminPhone = whatsappAdminPhone.replace(/\D/g, "");
+          if (minOrderAmount !== undefined) metadata.minOrderAmount = Math.max(0, Number(minOrderAmount) || 0);
+          tenantUpdates.metadata = metadata;
         }
         if (Object.keys(tenantUpdates).length > 0) {
           await storage.updateTenant(mainBranch.tenantId as number, tenantUpdates);
         }
       }
 
-      res.json({ ...updatedBranch, storeType, whatsappAdminPhone: whatsappAdminPhone?.replace(/\D/g, "") || "" });
+      res.json({
+        ...updatedBranch,
+        storeType,
+        whatsappAdminPhone: whatsappAdminPhone?.replace(/\D/g, "") || "",
+        minOrderAmount: Math.max(0, Number(minOrderAmount) || 0),
+      });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -2906,7 +2994,7 @@ async function test(){
     if (!targetPhone) return res.status(400).json({ error: "No phone number specified and no global admin phone configured" });
     const sent = await whatsappService.sendText(
       targetPhone,
-      "🧪 *Test Message*\n\nThis is a test from Barmagly POS WhatsApp integration.\n\n✅ If you receive this, the connection is working!"
+      "🧪 *Test Message*\n\nThis is a test from Kassenta POS WhatsApp integration.\n\n✅ If you receive this, the connection is working!"
     );
     res.json({ success: sent, phone: targetPhone });
   });
@@ -3051,8 +3139,8 @@ async function test(){
       const branches = await storage.getBranchesByTenant(config.tenantId);
       const currency = branches?.[0]?.currency || "CHF";
       const storeTenant: any = await storage.getTenant(config.tenantId);
-      const storeName = String(storeTenant?.businessName || (config as any).businessName || "Barmagly Store").replace(/[<>"]/g, "");
-      const storeLogo = String((config as any).logoUrl || storeTenant?.logo || "https://pos.barmagly.tech/app/assets/images/icon.png").replace(/"/g, "");
+      const storeName = String(storeTenant?.businessName || (config as any).businessName || "Kassenta Store").replace(/[<>"]/g, "");
+      const storeLogo = String((config as any).logoUrl || storeTenant?.logo || "https://kassenta.com/app/assets/images/icon.png").replace(/"/g, "");
 
       html = html.replace(/\{\{SLUG\}\}/g, slug);
       html = html.replace(/\{\{TENANT_ID\}\}/g, String(config.tenantId));
@@ -3405,7 +3493,16 @@ async function test(){
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.post("/api/delivery/auth/login", async (req: Request, res: Response) => {
+  app.post(
+    "/api/delivery/auth/login",
+    rateLimit({ name: "cust-login-ip", max: 15, windowMs: 15 * 60 * 1000 }),
+    rateLimit({
+      name: "cust-login-email",
+      max: 6,
+      windowMs: 15 * 60 * 1000,
+      keyFn: (req) => String((req.body as any)?.email || "").toLowerCase().slice(0, 160),
+    }),
+    async (req: Request, res: Response) => {
     try {
       const { email, password, tenantId } = req.body;
       if (!email || !password || !tenantId) return res.status(400).json({ error: "email, password, tenantId required" });
@@ -3653,8 +3750,8 @@ async function test(){
     if (slug === "barmagly") {
       const config = await storage.getLandingPageConfigBySlug("pizza-lemon");
       if (config) {
-        (config as any).storeName = "Barmagly";
-        (config as any).heroTitle = "Barmagly Delivery";
+        (config as any).storeName = "Kassenta";
+        (config as any).heroTitle = "Kassenta Delivery";
       }
       return config;
     }
@@ -4319,7 +4416,7 @@ async function test(){
       const { amount } = req.body;
       if (!amount || Number(amount) <= 0) return res.status(400).json({ error: "Valid amount required" });
       // Create Stripe PaymentIntent for wallet top-up
-      const stripe = getUncachableStripeClient();
+      const stripe = await getUncachableStripeClient();
       const intent = await stripe.paymentIntents.create({
         amount: Math.round(Number(amount) * 100),
         currency: "chf",
@@ -4658,7 +4755,7 @@ async function test(){
   app.get("/api/delivery/sitemap.xml", async (_req: Request, res: Response) => {
     try {
       const configs = await storage.getAllLandingPageConfigs();
-      const baseUrl = process.env.APP_URL || "https://pos.barmagly.tech";
+      const baseUrl = process.env.APP_URL || "https://kassenta.com";
       let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
       xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
       for (const config of (configs || [])) {
@@ -4777,7 +4874,7 @@ async function test(){
 
   app.get("/api/robots.txt", (_req: Request, res: Response) => {
     res.type("text/plain").send(
-      `User-agent: *\nAllow: /api/order/\nAllow: /api/restaurants\nDisallow: /api/delivery/\nSitemap: https://barmagly.tech/api/delivery/sitemap.xml\n`
+      `User-agent: *\nAllow: /api/order/\nAllow: /api/restaurants\nDisallow: /api/delivery/\nSitemap: https://kassenta.com/api/delivery/sitemap.xml\n`
     );
   });
 

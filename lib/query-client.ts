@@ -6,6 +6,9 @@ import { getApiUrl } from "./api-config";
 export { getApiUrl };
 
 let cachedLicenseKey: string | null = null;
+let cachedEmployeeToken: string | null = null;
+
+export const EMPLOYEE_TOKEN_STORAGE_KEY = "kassenta_employee_token";
 
 async function getLicenseKey(): Promise<string | null> {
   if (cachedLicenseKey) return cachedLicenseKey;
@@ -25,11 +28,37 @@ export function setCachedLicenseKey(key: string) {
   cachedLicenseKey = key;
 }
 
+/**
+ * SEC-01: the employee token proves *who* is acting, while the license key only
+ * proves *which store*. The server derives role permissions from this token.
+ */
+async function getEmployeeToken(): Promise<string | null> {
+  if (cachedEmployeeToken) return cachedEmployeeToken;
+  try {
+    cachedEmployeeToken = await AsyncStorage.getItem(EMPLOYEE_TOKEN_STORAGE_KEY);
+    return cachedEmployeeToken;
+  } catch {
+    return null;
+  }
+}
+
+export function setCachedEmployeeToken(token: string | null) {
+  cachedEmployeeToken = token;
+}
+
+export function clearCachedEmployeeToken() {
+  cachedEmployeeToken = null;
+}
+
 async function getAuthHeaders(extraHeaders?: Record<string, string>): Promise<Record<string, string>> {
   const headers: Record<string, string> = { ...extraHeaders };
   const licenseKey = await getLicenseKey();
   if (licenseKey) {
     headers["x-license-key"] = licenseKey;
+  }
+  const employeeToken = await getEmployeeToken();
+  if (employeeToken) {
+    headers["x-employee-token"] = employeeToken;
   }
   return headers;
 }

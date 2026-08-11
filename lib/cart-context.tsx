@@ -4,10 +4,35 @@ export interface CartItem {
   id: number;
   productId: number;
   name: string;
+  /** Variant identity kept as data — never re-parsed out of `name`. */
+  variantName?: string;
   price: number;
   quantity: number;
   modifiers?: { name: string; option: string; price: number }[];
   notes?: string;
+}
+
+// BUG-01: Date.now() collides when two items land in the same millisecond
+// (fast tapping, barcode scanner bursts) — the duplicate id then makes
+// updateQuantity/removeItem hit both rows. Monotonic counter guarantees
+// uniqueness while keeping the id numeric.
+let itemSeq = 0;
+function nextItemId(): number {
+  itemSeq = (itemSeq + 1) % 1000;
+  return Date.now() * 1000 + itemSeq;
+}
+
+/** Stable identity for merging duplicates: product + variant + modifiers. */
+function mergeKeyOf(
+  productId: number,
+  variantName: string | undefined,
+  modifiers: { name: string; option: string; price: number }[] | undefined,
+): string {
+  const mods = (modifiers ?? [])
+    .map((m) => `${m.name}:${m.option}:${m.price}`)
+    .sort()
+    .join("|");
+  return `${productId}#${variantName ?? ""}#${mods}`;
 }
 
 interface AddItemProps {
@@ -38,7 +63,9 @@ interface CartContextValue {
   serviceFeeRate: number;
   setServiceFeeRate: (r: number) => void;
   serviceFee: number;
-  minimumOrderSurcharge: number; // CHF added when subtotal < 20
+  minOrderAmount: number; // 0 = disabled; delivery-only when set
+  setMinOrderAmount: (v: number) => void;
+  minimumOrderSurcharge: number; // top-up added when a delivery cart is under minOrderAmount
   total: number;
   customerId: number | null;
   setCustomerId: (id: number | null) => void;
@@ -55,7 +82,12 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [discountRate, setDiscountRate] = useState(0); // stored as percentage 0-100
-  const [taxRate, setTaxRate] = useState(7.7);
+  // Swiss standard VAT is 8.1% since 1 Jan 2024 (was 7.7%). Overridden per
+  // branch from store settings; this is only the pre-load fallback.
+  const [taxRate, setTaxRate] = useState(8.1);
+  // BIZ-01: minimum-order top-up. 0 = disabled (the default for every tenant).
+  // Only ever applies to delivery — never to dine-in or pickup.
+  const [minOrderAmount, setMinOrderAmount] = useState(0);
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [serviceFeeRate, setServiceFeeRate] = useState(0);
   const [customerId, setCustomerId] = useState<number | null>(null);
@@ -65,12 +97,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addItem = useCallback((product: AddItemProps) => {
     setItems((prev) => {
-      // Find if item with SAME productId and SAME variant/modifiers exists
       const variantName = product.variant?.name;
-      const existing = prev.find((i) =>
-        i.productId === product.id &&
-        (variantName ? i.name.includes(variantName) : !i.name.includes("(")) &&
-        JSON.stringify(i.modifiers || []) === JSON.stringify(product.modifiers || [])
+      // Match on real identity, not on parsing the display name — a product
+      // whose own name contains "(" used to break the old string heuristic.
+      const key = mergeKeyOf(product.id, variantName, product.modifiers);
+      const existing = prev.find(
+        (i) => mergeKeyOf(i.productId, i.variantName, i.modifiers) === key
       );
 
       if (existing) {
@@ -83,9 +115,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const itemPrice = product.variant ? product.variant.price : product.price;
 
       return [...prev, {
-        id: Date.now(),
+        id: nextItemId(),
         productId: product.id,
         name: itemName,
+        variantName,
         price: itemPrice,
         quantity: 1,
         modifiers: product.modifiers
@@ -118,16 +151,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setVehicleId(null);
   }, []);
 
-  const MIN_ORDER_AMOUNT = 20;
-
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price * i.quantity, 0), [items]);
   // discount auto-scales with subtotal using the stored rate
   const discount = useMemo(() => (subtotal * discountRate) / 100, [subtotal, discountRate]);
-  // minimum order surcharge: brings subtotal up to 20 CHF when cart has items
-  const minimumOrderSurcharge = useMemo(
-    () => (items.length > 0 && subtotal - discount < MIN_ORDER_AMOUNT ? MIN_ORDER_AMOUNT - (subtotal - discount) : 0),
-    [items.length, subtotal, discount]
-  );
+  // Minimum-order top-up — delivery only, and only when the tenant configured
+  // a threshold. Previously a hardcoded 20 CHF applied to every order type of
+  // every tenant, so a 4.50 coffee was billed at 20.00.
+  const minimumOrderSurcharge = useMemo(() => {
+    if (minOrderAmount <= 0 || orderType !== "delivery" || items.length === 0) return 0;
+    const net = subtotal - discount;
+    return net < minOrderAmount ? minOrderAmount - net : 0;
+  }, [minOrderAmount, orderType, items.length, subtotal, discount]);
   const tax = useMemo(() => ((subtotal - discount + minimumOrderSurcharge) * taxRate) / 100, [subtotal, discount, minimumOrderSurcharge, taxRate]);
   const serviceFee = useMemo(() => ((subtotal - discount + minimumOrderSurcharge) * serviceFeeRate) / 100, [subtotal, discount, minimumOrderSurcharge, serviceFeeRate]);
   const total = useMemo(() => subtotal - discount + minimumOrderSurcharge + tax + deliveryFee + serviceFee, [subtotal, discount, minimumOrderSurcharge, tax, deliveryFee, serviceFee]);
@@ -140,10 +174,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     () => ({
       items, addItem, removeItem, updateQuantity, updateItem, clearCart,
       subtotal, itemCount, discount, discountRate, setDiscount, taxRate, setTaxRate,
-      tax, deliveryFee, setDeliveryFee, serviceFeeRate, setServiceFeeRate, serviceFee, minimumOrderSurcharge, total,
+      tax, deliveryFee, setDeliveryFee, serviceFeeRate, setServiceFeeRate, serviceFee,
+      minOrderAmount, setMinOrderAmount, minimumOrderSurcharge, total,
       customerId, setCustomerId, tableNumber, setTableNumber, orderType, setOrderType, vehicleId, setVehicleId,
     }),
-    [items, addItem, removeItem, updateQuantity, updateItem, clearCart, subtotal, itemCount, discount, discountRate, taxRate, tax, deliveryFee, serviceFeeRate, serviceFee, minimumOrderSurcharge, total, customerId, tableNumber, orderType, vehicleId]
+    [items, addItem, removeItem, updateQuantity, updateItem, clearCart, subtotal, itemCount, discount, discountRate, taxRate, tax, deliveryFee, serviceFeeRate, serviceFee, minOrderAmount, minimumOrderSurcharge, total, customerId, tableNumber, orderType, vehicleId]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

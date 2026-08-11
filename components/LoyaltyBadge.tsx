@@ -1,14 +1,19 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 
 type Tier = "bronze" | "silver" | "gold" | "platinum";
 
-const TIER_CONFIG: Record<Tier, { icon: string; color: string; bg: string }> = {
-  bronze:   { icon: "🥉", color: Colors.loyaltyBronze,   bg: "rgba(205,127,50,0.15)" },
-  silver:   { icon: "🥈", color: Colors.loyaltySilver,   bg: "rgba(192,192,192,0.20)" },
-  gold:     { icon: "🥇", color: Colors.loyaltyGold,     bg: "rgba(255,215,0,0.20)" },
-  platinum: { icon: "💎", color: Colors.loyaltyPlatinum, bg: "rgba(229,228,226,0.25)" },
+type TierStyle = { icon: keyof typeof Ionicons.glyphMap; color: string; bg: string };
+
+// `bg` stays translucent on purpose so the tier tint reads on both palettes.
+const TIER_CONFIG: Record<Tier, TierStyle> = {
+  bronze:   { icon: "medal-outline",   color: Colors.loyaltyBronze,   bg: "rgba(205,127,50,0.15)" },
+  silver:   { icon: "medal-outline",   color: Colors.loyaltySilver,   bg: "rgba(148,163,184,0.20)" },
+  gold:     { icon: "trophy-outline",  color: Colors.loyaltyGold,     bg: "rgba(255,215,0,0.18)" },
+  platinum: { icon: "diamond-outline", color: Colors.loyaltyPlatinum, bg: "rgba(100,116,139,0.18)" },
 };
 
 interface Props {
@@ -23,7 +28,7 @@ export default function LoyaltyBadge({ tier, points, compact = false }: Props) {
   if (compact) {
     return (
       <View style={[styles.compact, { backgroundColor: config.bg }]}>
-        <Text style={styles.compactIcon}>{config.icon}</Text>
+        <Ionicons name={config.icon} size={13} color={config.color} />
         <Text style={[styles.compactLabel, { color: config.color }]}>
           {tier.charAt(0).toUpperCase() + tier.slice(1)}
         </Text>
@@ -33,7 +38,7 @@ export default function LoyaltyBadge({ tier, points, compact = false }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: config.bg }]}>
-      <Text style={styles.icon}>{config.icon}</Text>
+      <Ionicons name={config.icon} size={20} color={config.color} />
       <View>
         <Text style={[styles.tier, { color: config.color }]}>
           {tier.charAt(0).toUpperCase() + tier.slice(1)} Member
@@ -46,7 +51,7 @@ export default function LoyaltyBadge({ tier, points, compact = false }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: {
     flexDirection: "row",
     alignItems: "center",
@@ -68,4 +73,4 @@ const styles = StyleSheet.create({
   },
   compactIcon: { fontSize: 12 },
   compactLabel: { fontSize: 11, fontWeight: "600" },
-});
+}));

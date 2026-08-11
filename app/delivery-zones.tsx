@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 import { useLicense } from "@/lib/license-context";
 import { getQueryFn, apiRequest, getApiUrl } from "@/lib/query-client";
 import { useLanguage } from "@/lib/language-context";
@@ -139,7 +140,7 @@ export default function DeliveryZonesScreen() {
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
           {zones.length === 0 && (
             <View style={styles.emptyState}>
-              <Text style={{ fontSize: 40 }}>🗺️</Text>
+              <Ionicons name="map-outline" size={40} color={Colors.textMuted} />
               <Text style={styles.emptyText}>
                 {language === "ar" ? "لا توجد مناطق توصيل بعد" : "No delivery zones yet"}
               </Text>
@@ -292,7 +293,7 @@ export default function DeliveryZonesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { flexDirection: "row", alignItems: "center", padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
   backBtn: { padding: 4, marginRight: 8 },
@@ -321,4 +322,4 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 12 },
   saveBtn: { backgroundColor: Colors.deliveryPrimary, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 8 },
   saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-});
+}));

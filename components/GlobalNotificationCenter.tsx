@@ -18,11 +18,13 @@
  * auto-dismiss (10 s), tap-to-navigate, manual dismiss.
  */
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { useLicense } from "@/lib/license-context";
 import { getApiUrl } from "@/lib/query-client";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 
 type NotifKind =
   | "order"
@@ -38,7 +40,7 @@ interface Notif {
   title: string;
   body: string;
   meta?: string;
-  emoji: string;
+  icon: keyof typeof Ionicons.glyphMap;
   color: string;
   href?: string;            // route to open on tap
   expiresAt: number;        // ms timestamp — auto dismiss
@@ -80,7 +82,7 @@ function NotificationCard({ n, onTap, onDismiss }: { n: Notif; onTap: () => void
         style={[styles.card, { borderColor: n.color + "60", backgroundColor: n.color + "16" }]}
       >
         <View style={[styles.icon, { backgroundColor: n.color }]}>
-          <Text style={styles.iconText}>{n.emoji}</Text>
+          <Ionicons name={n.icon} size={18} color={n.color} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={styles.titleRow}>
@@ -91,7 +93,7 @@ function NotificationCard({ n, onTap, onDismiss }: { n: Notif; onTap: () => void
           {n.meta ? <Text style={styles.meta} numberOfLines={1}>{n.meta}</Text> : null}
         </View>
         <Pressable onPress={(e) => { e.stopPropagation(); dismiss(); }} style={styles.close} hitSlop={8}>
-          <Text style={styles.closeText}>✕</Text>
+          <Ionicons name="close" size={18} color={Colors.textMuted} />
         </Pressable>
       </Pressable>
     </Animated.View>
@@ -249,7 +251,7 @@ export default function GlobalNotificationCenter() {
       switch (m.type) {
         case "new_online_order": {
           push({
-            id, kind: "order", emoji: "🛒", color: "#3B82F6",
+            id, kind: "order", icon: "cart-outline", color: "#3B82F6",
             title: "New online order",
             body: m.orderNumber ? `Order #${m.orderNumber}` : `Order ID ${m.orderId || ""}`,
             meta: m.tenantId ? `Tenant ${m.tenantId}` : undefined,
@@ -260,7 +262,7 @@ export default function GlobalNotificationCenter() {
         }
         case "broadcast_new": {
           push({
-            id, kind: "broadcast", emoji: "📣", color: "#FF5722",
+            id, kind: "broadcast", icon: "megaphone-outline", color: "#FF5722",
             title: `Broadcast — ${m.customerName || "New customer"}`,
             body: typeof m.items === "string"
               ? "Tap to view items"
@@ -280,7 +282,7 @@ export default function GlobalNotificationCenter() {
         case "chat_new_message": {
           if (m.senderType === "customer") {
             push({
-              id, kind: "chat", emoji: "💬", color: "#2FD3C6",
+              id, kind: "chat", icon: "chatbubble-ellipses-outline", color: "#2FD3C6",
               title: `${m.senderName || "Customer"} — Order #${m.orderId}`,
               body: String(m.body || "").slice(0, 120),
               href: "/(tabs)/online-orders",
@@ -291,13 +293,13 @@ export default function GlobalNotificationCenter() {
         }
         case "delivery_status_change": {
           const labels: Record<string, string> = {
-            on_way: "On the way 🛵",
-            delivered: "Delivered ✅",
+            on_way: "On the way",
+            delivered: "Delivered",
             ready: "Ready for pickup",
             preparing: "Being prepared",
           };
           push({
-            id, kind: "delivery", emoji: "🚚", color: "#10B981",
+            id, kind: "delivery", icon: "cube-outline", color: "#10B981",
             title: `Order #${m.orderId} — ${labels[m.status] || m.status}`,
             body: m.driverName ? `Driver: ${m.driverName}` : "Status updated",
             href: "/(tabs)/online-orders",
@@ -307,7 +309,7 @@ export default function GlobalNotificationCenter() {
         }
         case "incoming_call": {
           push({
-            id, kind: "call", emoji: "📞", color: "#F59E0B",
+            id, kind: "call", icon: "call-outline", color: "#F59E0B",
             title: "Incoming call",
             body: m.phoneNumber || "Unknown number",
             meta: m.customer?.name ? `${m.customer.name}${m.customer.address ? " · " + m.customer.address : ""}` : undefined,
@@ -321,7 +323,7 @@ export default function GlobalNotificationCenter() {
           // Quiet — only show if going online (relevant for assignment), no beep
           if (m.status === "available") {
             push({
-              id, kind: "driver", emoji: "🟢", color: "#10B981",
+              id, kind: "driver", icon: "person-outline", color: "#10B981",
               title: "Driver online",
               body: `Vehicle #${m.vehicleId} is now available`,
               expiresAt: Date.now() + 4000,
@@ -359,7 +361,7 @@ export default function GlobalNotificationCenter() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   host: {
     position: "absolute" as const,
     top: 0, left: 0, right: 0,
@@ -403,4 +405,4 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   closeText: { color: Colors.text + "AA", fontSize: 16, fontWeight: "700" as const },
-});
+}));

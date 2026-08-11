@@ -9,6 +9,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useLicense } from "@/lib/license-context";
@@ -19,6 +20,7 @@ import BarcodeScanner from "@/components/BarcodeScanner";
 import { playClickSound, playAddSound } from "@/lib/sound";
 import RealTimeClock from "@/components/RealTimeClock";
 import { useLanguage } from "@/lib/language-context";
+import { useTheme } from "@/lib/theme-context";
 import { useNotifications } from "@/lib/notification-context";
 import { printHtmlViaIframe, autoPrint3Copies } from "@/utils/printing";
 import { getChromeMetrics } from "@/lib/responsive";
@@ -65,6 +67,7 @@ export default function POSScreen() {
   const qc = useQueryClient();
   const cart = useCart();
   const { t, isRTL, rtlTextAlign, rtlText, rtlRow, language } = useLanguage();
+  const { isDark, toggle: toggleTheme } = useTheme();
   const [screenDims, setScreenDims] = useState(Dimensions.get("window"));
   useEffect(() => {
     const sub = Dimensions.addEventListener("change", ({ window }) => setScreenDims(window));
@@ -717,7 +720,9 @@ export default function POSScreen() {
     if (storeSettings?.commissionRate !== undefined) {
       cart.setServiceFeeRate(Number(storeSettings.commissionRate) || 0);
     }
-  }, [storeSettings?.taxRate, storeSettings?.commissionRate]);
+    // BIZ-01: minimum-order top-up is opt-in per store and delivery-only.
+    cart.setMinOrderAmount(Number(storeSettings?.minOrderAmount) || 0);
+  }, [storeSettings?.taxRate, storeSettings?.commissionRate, storeSettings?.minOrderAmount]);
 
   useEffect(() => {
     if (cart.orderType === "delivery" && storeSettings?.deliveryFee) {
@@ -1312,7 +1317,7 @@ export default function POSScreen() {
       <View style={[styles.header, isMobileWeb && styles.headerMobile]}>
         <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.headerGradient}>
           <View style={[styles.headerContent, isRTL && { flexDirection: "row-reverse" }, isMobileWeb && styles.headerContentMobile]}>
-            <Text style={[styles.headerTitle, rtlTextAlign]}>Barmagly POS</Text>
+            <Text style={[styles.headerTitle, rtlTextAlign]}>Kassenta POS</Text>
             <View style={[styles.headerRight, isRTL && { flexDirection: "row-reverse", alignItems: "center" }, { alignItems: "center" }, isMobileWeb && styles.headerRightMobile]}>
               <RealTimeClock />
               <Pressable onPress={() => setShowCallHistory(true)} style={[styles.headerInvoiceBtn, { position: "relative" }]}>
@@ -1335,6 +1340,19 @@ export default function POSScreen() {
               >
                 <Ionicons name="refresh-outline" size={20} color={Colors.white} />
                 <Text style={styles.headerInvoiceLabel}>{language === "ar" ? "تحديث" : language === "de" ? "Aktualisieren" : "Refresh"}</Text>
+              </Pressable>
+              <Pressable
+                onPress={toggleTheme}
+                style={styles.headerInvoiceBtn}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: isDark }}
+              >
+                <Ionicons name={isDark ? "sunny-outline" : "moon-outline"} size={20} color={Colors.white} />
+                <Text style={styles.headerInvoiceLabel}>
+                  {isDark
+                    ? (language === "ar" ? "فاتح" : language === "de" ? "Hell" : "Light")
+                    : (language === "ar" ? "داكن" : language === "de" ? "Dunkel" : "Dark")}
+                </Text>
               </Pressable>
               <Pressable onPress={handleEndOfDay} style={styles.headerInvoiceBtn} disabled={endOfDayLoading || zeroOutLoading}>
                 {zeroOutLoading
@@ -2176,7 +2194,7 @@ export default function POSScreen() {
                                 {toppingDisplayName(toppingName)}
                               </Text>
                               <Text style={{ fontSize: 8, color: isSelected ? "#000" : row.textColor, opacity: 0.8, lineHeight: 10 }}>+2</Text>
-                              {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
+                              {isSelected && <Ionicons name="checkmark" size={11} color="#000" style={{ position: "absolute", top: 2, right: 3 }} />}
                             </Pressable>
                           </View>
                         );
@@ -2216,7 +2234,7 @@ export default function POSScreen() {
                           <Text style={{ fontSize: 8, color: isSelected ? "#000" : sauce.textColor, opacity: 0.9, lineHeight: 10, fontWeight: "700" }}>
                             {language === "ar" ? "مجاناً" : language === "de" ? "GRATIS" : "FREE"}
                           </Text>
-                          {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 4 }}>✓</Text>}
+                          {isSelected && <Ionicons name="checkmark" size={11} color="#000" style={{ position: "absolute", top: 2, right: 4 }} />}
                         </Pressable>
                       );
                     })}
@@ -2459,7 +2477,7 @@ export default function POSScreen() {
                               }}
                             >
                               <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginBottom: 1 }}>
-                                <Text style={{ fontSize: 12 }}>🚗</Text>
+                                <Ionicons name="car-outline" size={13} color={Colors.textSecondary} />
                                 <Text style={{ color: isSelected ? Colors.accent : Colors.text, fontSize: 10, fontWeight: "700" }} numberOfLines={1}>
                                   {v.licensePlate}
                                 </Text>
@@ -2621,7 +2639,7 @@ export default function POSScreen() {
                   {lastSale?.vehicleId && (() => {
                     const v = (vehicles as any[]).find((x: any) => x.id === lastSale.vehicleId); return v ? (
                       <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                        <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>🚗 Driver:</Text>
+                        <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Driver:</Text>
                         <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{v.driverName || ""}{v.licensePlate ? ` (${v.licensePlate})` : ""}</Text>
                       </View>
                     ) : null;
@@ -2865,7 +2883,7 @@ export default function POSScreen() {
                       </Pressable>
                     ))}
                     <Pressable onPress={() => setNcShowSuggestions(false)} style={{ padding: 7, alignItems: "center", borderTopWidth: 1, borderTopColor: Colors.cardBorder }}>
-                      <Text style={{ color: Colors.textMuted, fontSize: 10 }}>✕ {language === "de" ? "Schließen" : "Close"}</Text>
+                      <Text style={{ color: Colors.textMuted, fontSize: 10 }}>{language === "de" ? "Schließen" : "Close"}</Text>
                     </Pressable>
                   </ScrollView>
                 </View>
@@ -3249,7 +3267,7 @@ export default function POSScreen() {
                     {selectedInvoice?.vehicleId && (() => {
                       const v = (vehicles as any[]).find((x: any) => x.id === selectedInvoice.vehicleId); return v ? (
                         <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                          <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>🚗 Driver:</Text>
+                          <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Driver:</Text>
                           <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{v.driverName || ""}{v.licensePlate ? ` (${v.licensePlate})` : ""}</Text>
                         </View>
                       ) : null;
@@ -3585,7 +3603,7 @@ export default function POSScreen() {
           <View style={[styles.modalContent, { maxHeight: "92%" }]}>
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>
-                {language === "ar" ? "🌐 الطلبات الإلكترونية" : language === "de" ? "🌐 Online-Bestellungen" : "🌐 Online Orders"}
+                {language === "ar" ? "الطلبات الإلكترونية" : language === "de" ? "Online-Bestellungen" : "Online Orders"}
               </Text>
               <Pressable onPress={() => setShowOnlineOrders(false)}>
                 <Ionicons name="close" size={24} color={Colors.text} />
@@ -3607,7 +3625,7 @@ export default function POSScreen() {
                   delivered: Colors.success,
                   cancelled: Colors.danger,
                 };
-                const payIcon: Record<string, string> = { cash: "💵", card: "💳", mobile: "📱" };
+                const payIcon: Record<string, keyof typeof Ionicons.glyphMap> = { cash: "cash-outline", card: "card-outline", mobile: "phone-portrait-outline" };
                 return (
                   <View style={{
                     backgroundColor: Colors.surfaceLight,
@@ -3624,14 +3642,13 @@ export default function POSScreen() {
                         <Text style={{ color: Colors.accent, fontWeight: "800" }}>CHF {Number(item.totalAmount).toFixed(2)}</Text>
                       </View>
                     </View>
-                    <Text style={{ color: Colors.textSecondary, fontSize: 12, marginBottom: 2 }}>
-                      👤 {item.customerName} · 📞 {item.customerPhone}
+                    <Text style={{ color: Colors.textSecondary, fontSize: 12, marginBottom: 2 }}>{item.customerName} · {item.customerPhone}
                     </Text>
                     {item.customerAddress && (
-                      <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 2 }}>📍 {item.customerAddress}</Text>
+                      <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 2 }}>{item.customerAddress}</Text>
                     )}
                     <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 6 }}>
-                      {payIcon[item.paymentMethod] || "💵"} {item.paymentMethod?.toUpperCase()} · {item.orderType?.toUpperCase()} · {orderDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {item.paymentMethod?.toUpperCase()} · {item.orderType?.toUpperCase()} · {orderDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </Text>
                     {/* Items */}
                     {orderItems.map((it: any, idx: number) => (
@@ -3639,7 +3656,7 @@ export default function POSScreen() {
                         • {it.name} x{it.quantity} — CHF {Number(it.total).toFixed(2)}
                       </Text>
                     ))}
-                    {item.notes && <Text style={{ color: Colors.warning, fontSize: 11, marginTop: 4 }}>📝 {item.notes}</Text>}
+                    {item.notes && <Text style={{ color: Colors.warning, fontSize: 11, marginTop: 4 }}>{item.notes}</Text>}
 
                     {/* Action buttons */}
                     <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
@@ -3723,8 +3740,7 @@ export default function POSScreen() {
                           }}
                           style={{ backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.cardBorder, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
                         >
-                          <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 12 }}>
-                            🛒 {language === "ar" ? "تحميل للنقطة" : language === "de" ? "In POS laden" : "Load to POS"}
+                          <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 12 }}>{language === "ar" ? "تحميل للنقطة" : language === "de" ? "In POS laden" : "Load to POS"}
                           </Text>
                         </Pressable>
                       )}
@@ -3734,7 +3750,7 @@ export default function POSScreen() {
               }}
               ListEmptyComponent={
                 <View style={{ alignItems: "center", paddingVertical: 40 }}>
-                  <Text style={{ fontSize: 40 }}>🌐</Text>
+                  <Ionicons name="globe-outline" size={40} color={Colors.textMuted} />
                   <Text style={{ color: Colors.textMuted, fontSize: 15, marginTop: 12, fontWeight: "600" }}>
                     {language === "ar" ? "لا توجد طلبات إلكترونية" : language === "de" ? "Keine Online-Bestellungen" : "No online orders yet"}
                   </Text>
@@ -3752,7 +3768,7 @@ export default function POSScreen() {
             {/* Header */}
             <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>
-                {language === "ar" ? "📞 سجل المكالمات" : language === "de" ? "📞 Anrufhistorie" : "📞 Call History"}
+                {language === "ar" ? "سجل المكالمات" : language === "de" ? "Anrufhistorie" : "Call History"}
               </Text>
               <Pressable onPress={() => setShowCallHistory(false)}>
                 <Ionicons name="close" size={24} color={Colors.text} />
@@ -4143,7 +4159,7 @@ export default function POSScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { overflow: "hidden" },
   headerMobile: { flexShrink: 0 },
@@ -4628,4 +4644,4 @@ const styles = StyleSheet.create({
   },
   modalCancelBtn: { marginTop: 24, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: Colors.cardBorder, alignItems: "center" as const },
   modalCancelBtnText: { color: Colors.textMuted, fontSize: 15, fontWeight: "600" as const },
-});
+}));

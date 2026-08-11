@@ -15,6 +15,7 @@ import { CartProvider } from "@/lib/cart-context";
 import { LanguageProvider } from "@/lib/language-context";
 import { LicenseProvider, useLicense } from "@/lib/license-context";
 import { NotificationProvider } from "@/lib/notification-context";
+import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import { Platform } from "react-native";
@@ -54,7 +55,7 @@ if (Platform.OS === "web" && typeof window !== "undefined" && "serviceWorker" in
           const existing = await reg.pushManager.getSubscription();
           const sub = existing || await reg.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(publicKey),
+            applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource,
           });
 
           // Send subscription to server
@@ -106,6 +107,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 function RootLayoutNav() {
   const { isValid, isValidating } = useLicense();
+  const { colors } = useTheme();
   const [fontsLoaded, fontError] = useFonts({
     ...Ionicons.font,
     ...Feather.font,
@@ -122,7 +124,12 @@ function RootLayoutNav() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.background },
+      }}
+    >
       <Stack.Screen name="intro" options={{ headerShown: false }} />
       <Stack.Screen name="license-gate" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -132,30 +139,40 @@ function RootLayoutNav() {
   );
 }
 
+function ThemedShell() {
+  const { isDark, colors } = useTheme();
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
+      <KeyboardProvider>
+        <LanguageProvider>
+          <LicenseProvider>
+            <AuthProvider>
+              <NotificationProvider>
+                <CartProvider>
+                  <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
+                  <RootLayoutNav />
+                  <BroadcastToaster />
+                  <GlobalNotificationCenter />
+                </CartProvider>
+              </NotificationProvider>
+            </AuthProvider>
+          </LicenseProvider>
+        </LanguageProvider>
+      </KeyboardProvider>
+    </GestureHandlerRootView>
+  );
+}
+
 export default function RootLayout() {
   // Splash hide moved to RootLayoutNav to wait for license validation
 
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <KeyboardProvider>
-            <LanguageProvider>
-              <LicenseProvider>
-                <AuthProvider>
-                  <NotificationProvider>
-                    <CartProvider>
-                      <StatusBar style="light" />
-                      <RootLayoutNav />
-                      <BroadcastToaster />
-                      <GlobalNotificationCenter />
-                    </CartProvider>
-                  </NotificationProvider>
-                </AuthProvider>
-              </LicenseProvider>
-            </LanguageProvider>
-          </KeyboardProvider>
-        </GestureHandlerRootView>
+        <ThemeProvider>
+          <ThemedShell />
+        </ThemeProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

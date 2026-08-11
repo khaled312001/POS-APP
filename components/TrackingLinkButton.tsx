@@ -1,7 +1,9 @@
 import React from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { TouchableOpacity, Text, StyleSheet, Share, Platform } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 
 interface Props {
   trackingToken: string;
@@ -10,7 +12,7 @@ interface Props {
 }
 
 export default function TrackingLinkButton({ trackingToken, baseUrl, label }: Props) {
-  const url = `${baseUrl || "https://pos.barmagly.tech"}/track/${trackingToken}`;
+  const url = `${baseUrl || "https://kassenta.com"}/track/${trackingToken}`;
 
   const handlePress = async () => {
     if (Platform.OS === "web") {
@@ -28,13 +30,13 @@ export default function TrackingLinkButton({ trackingToken, baseUrl, label }: Pr
 
   return (
     <TouchableOpacity style={styles.btn} onPress={handlePress}>
-      <Text style={styles.icon}>🔗</Text>
+      <Ionicons name="link-outline" size={14} color={Colors.accent} />
       <Text style={styles.label}>{label || "Share Tracking Link"}</Text>
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   btn: {
     flexDirection: "row",
     alignItems: "center",
@@ -47,4 +49,4 @@ const styles = StyleSheet.create({
   },
   icon: { fontSize: 14 },
   label: { fontSize: 13, color: Colors.accent, fontWeight: "600" },
-});
+}));

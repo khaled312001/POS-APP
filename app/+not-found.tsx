@@ -2,6 +2,7 @@ import { Link, Stack } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 
 export default function NotFoundScreen() {
   return (
@@ -25,7 +26,7 @@ export default function NotFoundScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: {
     flex: 1,
     alignItems: "center",
@@ -71,4 +72,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: Colors.textDark,
   },
-});
+}));

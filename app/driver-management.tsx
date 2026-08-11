@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 import { useLicense } from "@/lib/license-context";
 import { getQueryFn, getApiUrl } from "@/lib/query-client";
 import { useLanguage } from "@/lib/language-context";
@@ -134,7 +135,7 @@ export default function DriverManagementScreen() {
             <>
               {drivers.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Text style={{ fontSize: 40 }}>🚗</Text>
+                  <Ionicons name="car-outline" size={40} color={Colors.textMuted} />
                   <Text style={styles.emptyText}>{lbl("No drivers added yet", "لا يوجد سائقون بعد")}</Text>
                   <Text style={styles.emptySubtext}>{lbl("Add drivers from the Vehicles section in Settings", "أضف سائقين من قسم المركبات في الإعدادات")}</Text>
                 </View>
@@ -165,8 +166,7 @@ export default function DriverManagementScreen() {
                             </View>
                             {/* Rating chip */}
                             <View style={[styles.chip, { backgroundColor: Colors.loyaltyGold + "15" }]}>
-                              <Text style={[styles.chipText, { color: Colors.loyaltyGold }]}>
-                                ⭐ {parseFloat(String(driver.driverRating || 5)).toFixed(1)}
+                              <Text style={[styles.chipText, { color: Colors.loyaltyGold }]}>{parseFloat(String(driver.driverRating || 5)).toFixed(1)}
                               </Text>
                             </View>
                             {/* Deliveries */}
@@ -178,8 +178,7 @@ export default function DriverManagementScreen() {
                           </View>
                           {/* GPS info */}
                           {driver.currentLat && driver.currentLng ? (
-                            <Text style={styles.gpsText}>
-                              📍 {Number(driver.currentLat).toFixed(4)}, {Number(driver.currentLng).toFixed(4)}
+                            <Text style={styles.gpsText}>{Number(driver.currentLat).toFixed(4)}, {Number(driver.currentLng).toFixed(4)}
                               {lastSeen ? ` · ${lastSeen}` : ""}
                             </Text>
                           ) : null}
@@ -241,7 +240,7 @@ export default function DriverManagementScreen() {
                         <Text style={[styles.leaderRank, { color: i === 0 ? Colors.loyaltyGold : Colors.textMuted }]}>#{i + 1}</Text>
                         <Text style={[styles.leaderName, { flex: 1 }, isRTL && { textAlign: "right" }]}>{driver.driverName}</Text>
                         <Text style={styles.leaderDeliveries}>{driver.totalDeliveries} {lbl("trips", "رحلة")}</Text>
-                        <Text style={styles.leaderRating}>⭐ {parseFloat(String(driver.driverRating || 5)).toFixed(1)}</Text>
+                        <Text style={styles.leaderRating}>{parseFloat(String(driver.driverRating || 5)).toFixed(1)}</Text>
                       </View>
                     ))}
                 </View>
@@ -254,7 +253,7 @@ export default function DriverManagementScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { flexDirection: "row", alignItems: "center", padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
   backBtn: { padding: 4, marginRight: 8 },
@@ -296,4 +295,4 @@ const styles = StyleSheet.create({
   leaderName: { color: Colors.text, fontSize: 14, fontWeight: "600" },
   leaderDeliveries: { color: Colors.textMuted, fontSize: 12 },
   leaderRating: { color: Colors.textMuted, fontSize: 12, marginLeft: 6 },
-});
+}));

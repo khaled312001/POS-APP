@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import {
   Modal, View, Text, TouchableOpacity, FlatList, ActivityIndicator, StyleSheet,
 } from "react-native";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 import { apiRequest } from "@/lib/query-client";
 
 interface Driver {
@@ -75,7 +77,7 @@ export default function DriverAssignModal({
           <View style={styles.header}>
             <Text style={styles.title}>Assign Driver</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeText}>✕</Text>
+              <Ionicons name="close" size={20} color={Colors.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -83,7 +85,7 @@ export default function DriverAssignModal({
             <ActivityIndicator color={Colors.deliveryPrimary} style={{ margin: 24 }} />
           ) : drivers.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>🚗</Text>
+              <Ionicons name="car-outline" size={40} color={Colors.textMuted} style={styles.emptyIcon} />
               <Text style={styles.emptyText}>No available drivers</Text>
             </View>
           ) : (
@@ -101,7 +103,7 @@ export default function DriverAssignModal({
                   disabled={assigning === driver.id}
                 >
                   <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>🚗</Text>
+                    <Ionicons name="car-sport-outline" size={20} color={Colors.accent} />
                   </View>
                   <View style={styles.driverInfo}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
@@ -111,7 +113,7 @@ export default function DriverAssignModal({
                       </View>
                     </View>
                     <Text style={styles.driverMeta}>
-                      {driver.vehicleType} · {driver.plateNumber} · ⭐ {parseFloat(String(driver.driverRating || 5)).toFixed(1)}
+                      {driver.vehicleType} · {driver.plateNumber} · {parseFloat(String(driver.driverRating || 5)).toFixed(1)}★
                     </Text>
                     {driver.driverPhone && (
                       <Text style={styles.driverPhone}>{driver.driverPhone}</Text>
@@ -135,7 +137,7 @@ export default function DriverAssignModal({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -198,4 +200,4 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   assignBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-});
+}));

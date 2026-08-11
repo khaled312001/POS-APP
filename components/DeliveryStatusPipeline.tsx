@@ -1,6 +1,8 @@
 import React from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { View, Text, StyleSheet } from "react-native";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 
 const STEPS = [
   { key: "pending",   label: "Received",  labelAr: "استلام" },
@@ -48,7 +50,7 @@ export default function DeliveryStatusPipeline({ currentStatus, isRtl = false, t
             )}
             <View style={styles.stepContainer}>
               <View style={[styles.dot, { backgroundColor: dotColor, borderColor: dotColor }]}>
-                {isDone && <Text style={styles.checkmark}>✓</Text>}
+                {isDone && <Ionicons name="checkmark" size={11} color={Colors.white} style={styles.checkmark} />}
                 {isActive && <View style={styles.activeDot} />}
               </View>
               <Text style={[
@@ -71,7 +73,7 @@ export default function DeliveryStatusPipeline({ currentStatus, isRtl = false, t
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -130,4 +132,4 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: "rgba(255,255,255,0.35)",
   },
-});
+}));

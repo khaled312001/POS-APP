@@ -94,15 +94,15 @@ export async function seedAllDemoData() {
     // 1. Ensure Super Admin exists
     const [saCount] = await db.select({ count: sql<number>`count(*)` }).from(superAdmins);
     if (Number(saCount.count) === 0) {
-        const hash = await bcrypt.hash("admin123", 10);
+        const hash = await bcrypt.hash(process.env.SUPER_ADMIN_PASSWORD || require("crypto").randomBytes(18).toString("base64url"), 10);
         await db.insert(superAdmins).values({
             name: "System Admin",
-            email: "admin@barmagly.com",
+            email: process.env.SUPER_ADMIN_EMAIL || "admin@kassenta.com",
             passwordHash: hash,
             role: "super_admin",
             isActive: true,
         });
-        console.log("[SEED] Created super admin: admin@barmagly.com / admin123");
+        console.log("[SEED] Created super admin from SUPER_ADMIN_EMAIL/PASSWORD env");
     }
 
     // 2. Create Demo Tenants if none exist
@@ -151,7 +151,7 @@ export async function seedAllDemoData() {
             await db.insert(tenantNotifications).values({
                 tenantId: tenant.id,
                 type: "info",
-                title: "Welcome to Barmagly POS!",
+                title: "Welcome to Kassenta POS!",
                 message: `Welcome ${store.owner}! Your store "${store.biz}" has been set up successfully.`,
                 priority: "normal",
             });

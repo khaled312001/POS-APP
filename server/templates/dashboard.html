@@ -4,12 +4,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Barmagly Smart POS - Admin Dashboard</title>
+  <title>Kassenta POS System - Admin Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    // Paint the stored theme before first render so there is no flash of the
+    // wrong palette. Same storage key as the POS app and the marketing site.
+    (function () {
+      try {
+        var t = localStorage.getItem('kassenta_theme');
+        document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
+      } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+    })();
+    function toggleTheme() {
+      var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('kassenta_theme', next); } catch (e) {}
+    }
+  </script>
   <style>
     * {
       margin: 0;
@@ -18,27 +33,72 @@
     }
 
     :root {
-      --bg: #0A0E27;
+      color-scheme: light;
+      --bg: #F4F6FA;
+      --surface: #FFFFFF;
+      --surface2: #F8FAFD;
+      --surface3: #EDF1F7;
+      --accent: #0C8F85;
+      --accent-ink: #FFFFFF;
+      --accent2: #6D28D9;
+      --accent3: #1E40AF;
+      --text: #0B1220;
+      --text2: #475467;
+      --text3: #667085;
+      --border: #DCE3ED;
+      --border2: #E3E8EF;
+      --shadow: 0 1px 2px rgba(11,18,32,.06), 0 4px 12px rgba(11,18,32,.05);
+      --grad-ink: #0B1220;
+      --overlay: rgba(11, 18, 32, .45);
+      --green: #047857;
+      --red: #DC2626;
+      --orange: #B45309;
+      --blue: #1D4ED8;
+      --pink: #BE185D;
+      --radius: 16px;
+      --sidebar-w: 260px;
+      --header-h: 64px
+    }
+
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #040E32;
       --surface: #131740;
       --surface2: #1a1f4a;
       --surface3: #1e2354;
-      --accent: #2FD3C6;
+      --accent: #00C1B0;
+      --accent-ink: #04121F;
       --accent2: #7C3AED;
       --accent3: #1E40AF;
       --text: #e2e8f0;
       --text2: #94a3b8;
       --text3: #64748b;
-      --border: rgba(47, 211, 198, 0.12);
+      --border: rgba(0, 193, 176, 0.12);
       --border2: rgba(255, 255, 255, 0.06);
+      --shadow: 0 6px 18px rgba(0,0,0,.45);
+      --grad-ink: #ffffff;
+      --overlay: rgba(0, 0, 0, .55);
       --green: #10b981;
       --red: #ef4444;
       --orange: #f59e0b;
       --blue: #3b82f6;
       --pink: #ec4899;
-      --radius: 16px;
-      --sidebar-w: 260px;
-      --header-h: 64px
     }
+
+    /* ── Theme toggle ── light is default, dark is opt-in and shared with the
+       POS app through the kassenta_theme key. ── */
+    .theme-toggle {
+      width: 38px; height: 38px; display: grid; place-items: center;
+      border-radius: 10px; border: 1px solid var(--border); background: var(--surface);
+      color: var(--text2); cursor: pointer; flex: none;
+      transition: color .18s, border-color .18s;
+    }
+    .theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+    .theme-toggle svg { width: 18px; height: 18px; }
+    .theme-toggle .i-moon { display: none; }
+    [data-theme="dark"] .theme-toggle .i-sun { display: none; }
+    [data-theme="dark"] .theme-toggle .i-moon { display: block; }
+
 
     body {
       font-family: 'Inter', system-ui, sans-serif;
@@ -76,19 +136,20 @@
       width: 40px;
       height: 40px;
       border-radius: 12px;
-      background: linear-gradient(135deg, var(--accent3), var(--accent2), var(--accent));
+      background: var(--brand-navy, #040E32);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
-      font-weight: 800;
-      color: #fff
+      padding: 6px;
+      flex: none
     }
+
+    .sidebar-logo img { width: 100%; height: 100%; object-fit: contain }
 
     .sidebar-brand-text h2 {
       font-size: 16px;
       font-weight: 700;
-      background: linear-gradient(135deg, var(--accent), #fff);
+      background: linear-gradient(135deg, var(--accent), var(--grad-ink));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text
@@ -138,14 +199,14 @@
     }
 
     .nav-item:hover {
-      background: rgba(47, 211, 198, 0.06);
+      background: color-mix(in srgb, var(--accent) 8%, transparent);
       color: var(--text)
     }
 
     .nav-item.active {
-      background: linear-gradient(135deg, rgba(47, 211, 198, 0.12), rgba(124, 58, 237, 0.08));
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 13%, transparent), color-mix(in srgb, var(--accent2) 10%, transparent));
       color: var(--accent);
-      border-color: rgba(47, 211, 198, 0.2);
+      border-color: color-mix(in srgb, var(--accent) 28%, transparent);
       font-weight: 600
     }
 
@@ -230,8 +291,8 @@
       align-items: center;
       gap: 6px;
       padding: 8px 16px;
-      background: rgba(47, 211, 198, 0.1);
-      border: 1px solid rgba(47, 211, 198, 0.2);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
       border-radius: 10px;
       color: var(--accent);
       font-size: 12px;
@@ -305,7 +366,7 @@
 
     .stat-card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 32px rgba(47, 211, 198, 0.08)
+      box-shadow: var(--shadow)
     }
 
     .stat-card::before {
@@ -417,7 +478,7 @@
       font-weight: 600;
       padding: 3px 10px;
       border-radius: 20px;
-      background: rgba(47, 211, 198, 0.1);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
       color: var(--accent)
     }
 
@@ -496,7 +557,7 @@
     }
 
     .badge-teal {
-      background: rgba(47, 211, 198, 0.15);
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
       color: var(--accent)
     }
 
@@ -516,7 +577,7 @@
     }
 
     .branch-card:hover {
-      box-shadow: 0 8px 32px rgba(47, 211, 198, 0.08);
+      box-shadow: var(--shadow);
       transform: translateY(-2px)
     }
 
@@ -758,7 +819,7 @@
     }
 
     .filter-btn.active {
-      background: rgba(47, 211, 198, 0.1);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
       border-color: var(--accent);
       color: var(--accent)
     }
@@ -780,7 +841,7 @@
     }
 
     .skeleton {
-      background: linear-gradient(90deg, var(--surface2) 25%, rgba(47, 211, 198, 0.04) 50%, var(--surface2) 75%);
+      background: linear-gradient(90deg, var(--surface2) 25%, color-mix(in srgb, var(--accent) 6%, transparent) 50%, var(--surface2) 75%);
       background-size: 200% 100%;
       animation: shimmer 1.5s infinite;
       border-radius: 8px
@@ -1044,7 +1105,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, .5);
+      background: var(--overlay);
       z-index: 150
     }
 
@@ -1122,9 +1183,9 @@
 
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <div class="sidebar-logo">B</div>
+      <div class="sidebar-logo"><img src="/brand/logo-mark.png" alt="Kassenta"></div>
       <div class="sidebar-brand-text">
-        <h2>Barmagly POS</h2>
+        <h2>Kassenta POS</h2>
         <span>Admin Dashboard</span>
       </div>
     </div>
@@ -1194,6 +1255,10 @@
       </div>
       <div class="top-bar-right">
         <span class="last-updated" id="lastUpdated">Loading...</span>
+        <button class="theme-toggle" type="button" onclick="toggleTheme()" aria-label="Toggle colour theme" title="Light / dark">
+          <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
         <button class="refresh-btn" onclick="loadAllData()">
           <div class="pulse-dot"></div>
           <span>Refresh</span>
@@ -1698,7 +1763,7 @@
       const container = document.getElementById('paymentDonut');
       if (!methods || !methods.length) { container.innerHTML = '<div class="empty-state">No payment data</div>'; return; }
       const total = methods.reduce((s, m) => s + Number(m.total || 0), 0);
-      const colors = ['#2FD3C6', '#7C3AED', '#1E40AF', '#10b981', '#ec4899', '#f59e0b'];
+      const colors = ['#00C1B0', '#7C3AED', '#1E40AF', '#10b981', '#ec4899', '#f59e0b'];
       let offset = 0;
       let paths = '';
       const radius = 50, cx = 70, cy = 70;
@@ -1932,7 +1997,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'barmagly-export-' + new Date().toISOString().slice(0, 10) + '.json';
+        a.download = 'kassenta-export-' + new Date().toISOString().slice(0, 10) + '.json';
         a.click();
         URL.revokeObjectURL(url);
       }).catch(err => alert('Export failed: ' + err.message));

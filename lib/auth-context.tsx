@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useState, useMemo, ReactNode, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  EMPLOYEE_TOKEN_STORAGE_KEY,
+  setCachedEmployeeToken,
+  clearCachedEmployeeToken,
+} from "./query-client";
 
 interface Employee {
   id: number;
@@ -7,6 +12,8 @@ interface Employee {
   role: string;
   branchId: number | null;
   permissions: string[];
+  /** Issued by POST /api/employees/login — proves role to the server. */
+  token?: string;
 }
 
 interface AuthContextValue {
@@ -32,18 +39,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     AsyncStorage.getItem("barmagly_employee").then((data) => {
-      if (data) setEmployee(JSON.parse(data));
+      if (!data) return;
+      const stored: Employee = JSON.parse(data);
+      setEmployee(stored);
+      // Warm the request cache so the very first API call after a cold start
+      // already carries the employee token.
+      if (stored.token) setCachedEmployeeToken(stored.token);
     });
   }, []);
 
   const login = (emp: Employee) => {
     setEmployee(emp);
     AsyncStorage.setItem("barmagly_employee", JSON.stringify(emp));
+    if (emp.token) {
+      setCachedEmployeeToken(emp.token);
+      AsyncStorage.setItem(EMPLOYEE_TOKEN_STORAGE_KEY, emp.token);
+    }
   };
 
   const logout = () => {
     setEmployee(null);
+    clearCachedEmployeeToken();
     AsyncStorage.removeItem("barmagly_employee");
+    AsyncStorage.removeItem(EMPLOYEE_TOKEN_STORAGE_KEY);
   };
 
   const role = employee?.role || "";

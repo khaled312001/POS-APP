@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, TouchableOpacity, Animated, ScrollView, Platform, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BrandLogo } from '@/components/BrandLogo';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
+import { themedStyles } from "@/lib/themed-styles";
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,15 +20,15 @@ const LANGUAGES: { code: Lang; label: string; nativeLabel: string }[] = [
 ];
 
 const TABLET_BANNER: Record<Lang, string> = {
-    en: '🖥️  For the best POS experience, use a Tablet or iPad',
-    ar: '🖥️  للحصول على أفضل تجربة، استخدم التطبيق على تابلت أو آيباد',
-    de: '🖥️  Für das beste Erlebnis verwenden Sie dieses App auf einem Tablet oder iPad',
+    en: 'For the best POS experience, use a tablet or iPad',
+    ar: 'للحصول على أفضل تجربة، استخدم التطبيق على تابلت أو آيباد',
+    de: 'Für das beste Erlebnis verwenden Sie diese App auf einem Tablet oder iPad',
 };
 
 const CONTENT: Record<Lang, { welcome: string; brand: string; subtitle: string; start: string; features: { icon: string; text: string }[] }> = {
     en: {
         welcome: 'Welcome to',
-        brand: 'Barmagly POS',
+        brand: 'Kassenta POS',
         subtitle: 'Smart point-of-sale for modern businesses.',
         start: 'Get Started',
         features: [
@@ -37,7 +39,7 @@ const CONTENT: Record<Lang, { welcome: string; brand: string; subtitle: string; 
     },
     ar: {
         welcome: 'مرحباً بك في',
-        brand: 'برمجلي POS',
+        brand: 'كاسينتا POS',
         subtitle: 'نقطة بيع ذكية للأعمال الحديثة.',
         start: 'ابدأ الآن',
         features: [
@@ -48,7 +50,7 @@ const CONTENT: Record<Lang, { welcome: string; brand: string; subtitle: string; 
     },
     de: {
         welcome: 'Willkommen bei',
-        brand: 'Barmagly POS',
+        brand: 'Kassenta POS',
         subtitle: 'Smartes Kassensystem für moderne Unternehmen.',
         start: 'Loslegen',
         features: [
@@ -91,7 +93,7 @@ export default function IntroScreen() {
     return (
         <View style={styles.container}>
             <LinearGradient
-                colors={['#0A0E27', '#1a1060', '#0f2a60']}
+                colors={['#040E32', '#0F1A55', '#0B2A5A']}
                 style={styles.gradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -128,28 +130,13 @@ export default function IntroScreen() {
                     {/* Header area */}
                     <View style={styles.header}>
                         <View style={styles.logoRow}>
-                            <LinearGradient
-                                colors={[Colors.primary, Colors.secondary]}
-                                style={styles.logoBadge}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                            >
-                                <Ionicons name="storefront" size={24} color={Colors.white} />
-                            </LinearGradient>
-                            <Text style={styles.logoName}>Barmagly</Text>
+                            <BrandLogo variant="full" height={34} />
                         </View>
                     </View>
 
                     {/* Hero icon */}
                     <View style={styles.heroIconContainer}>
-                        <LinearGradient
-                            colors={[Colors.primary, Colors.secondary, Colors.accent]}
-                            style={styles.heroIconGradient}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                        >
-                            <Ionicons name="storefront" size={56} color={Colors.white} />
-                        </LinearGradient>
+                        <BrandLogo variant="mark" height={104} />
                         <View style={styles.heroIconGlow} />
                     </View>
 
@@ -234,14 +221,14 @@ export default function IntroScreen() {
                         </LinearGradient>
                     </Pressable>
 
-                    <Text style={styles.footerNote}>© 2026 Barmagly</Text>
+                    <Text style={styles.footerNote}>© 2026 Kassenta</Text>
                 </ScrollView>
             </LinearGradient>
         </View>
     );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
     /* Tablet recommendation banner */
     tabletBanner: {
         position: 'absolute',
@@ -514,4 +501,4 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.25)',
         fontSize: 12,
     },
-});
+}));

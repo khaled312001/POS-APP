@@ -311,7 +311,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                                 const filtered = prev.filter((c) => c.slot !== data.slot);
                                 return [...filtered, { ...data, id: callId }].slice(0, 4);
                             });
-                            // 🔔 Start phone ring sound
+                            // Start phone ring sound
                             startCallRing();
                         } else if (data.type === "active_calls" || data.type === "calls_update") {
                             const seen = getSeenCallIds();

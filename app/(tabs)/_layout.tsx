@@ -3,6 +3,7 @@ import { Platform, StyleSheet, Dimensions, Modal } from "react-native";
 import React, { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 import { BlurView } from "expo-blur";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
@@ -131,12 +132,11 @@ export default function TabLayout() {
     return <Redirect href="/license-gate" />;
   }
 
-  const showWarningUrl = "https://www.barmagly.tech/upgrade"; // Or a modal
+  const showWarningUrl = "https://kassenta.com/upgrade"; // Or a modal
 
   const banner = subscription?.requiresUpgrade ? (
     <View style={{ backgroundColor: Colors.warning, padding: 12, paddingTop: Platform.OS === 'ios' ? 44 : 24, paddingBottom: 12 }}>
-      <Text style={{ color: '#000', fontWeight: 'bold', textAlign: 'center', fontSize: 13 }}>
-        ⚠️ Your {subscription.plan} subscription {subscription.daysRemaining > 0 ? `expires in ${subscription.daysRemaining} days` : 'has expired'}. Contact super admin to avoid service interruption.
+      <Text style={{ color: '#000', fontWeight: 'bold', textAlign: 'center', fontSize: 13 }}>Your {subscription.plan} subscription {subscription.daysRemaining > 0 ? `expires in ${subscription.daysRemaining} days` : 'has expired'}. Contact super admin to avoid service interruption.
       </Text>
     </View>
   ) : null;
@@ -323,7 +323,7 @@ export default function TabLayout() {
               <Pressable style={styles.mobileNavBackdrop} onPress={() => setShowMobileNav(false)} />
               <View style={[styles.mobileNavSheet, isRTL && { alignSelf: "flex-start" }]}>
                 <View style={[styles.mobileNavHeader, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Text style={styles.mobileNavTitle}>Barmagly POS</Text>
+                  <Text style={styles.mobileNavTitle}>Kassenta POS</Text>
                   <Pressable onPress={() => setShowMobileNav(false)} style={styles.mobileNavClose}>
                     <Ionicons name="close" size={22} color={Colors.text} />
                   </Pressable>
@@ -387,12 +387,11 @@ export default function TabLayout() {
               justifyContent: "center", alignItems: "center",
               transform: [{ scale: notifPulse }],
             }}>
-              <Text style={{ fontSize: 28 }}>🛵</Text>
+              <Ionicons name="bicycle" size={26} color={Colors.deliveryPrimary} />
             </Animated.View>
 
             <View style={{ flex: 1 }}>
-              <Text style={{ color: "#4ade80", fontWeight: "900", fontSize: 15, letterSpacing: 0.3 }}>
-                🔔 {t("newOnlineOrder" as any) || "New Online Order!"}
+              <Text style={{ color: "#4ade80", fontWeight: "900", fontSize: 15, letterSpacing: 0.3 }}>{t("newOnlineOrder" as any) || "New Online Order!"}
               </Text>
               <Text style={{ color: "#86efac", fontSize: 13, marginTop: 3, fontWeight: "700" }}>
                 #{onlineOrderNotification.orderNumber} · {onlineOrderNotification.customerName}
@@ -418,7 +417,7 @@ export default function TabLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   mobileNavOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.48)",
@@ -501,4 +500,4 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
   },
-});
+}));

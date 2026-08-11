@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, Pressable, Modal, Platform } from "react-native
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 
 interface BarcodeScannerProps {
   visible: boolean;
@@ -100,7 +101,7 @@ export default function BarcodeScanner({ visible, onScanned, onClose }: BarcodeS
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: { flex: 1, backgroundColor: Colors.background },
   cameraContainer: { flex: 1 },
   camera: { flex: 1 },
@@ -127,4 +128,4 @@ const styles = StyleSheet.create({
   webFallback: { flex: 1, justifyContent: "center", alignItems: "center", padding: 40, gap: 12 },
   webFallbackTitle: { color: Colors.text, fontSize: 20, fontWeight: "700" },
   webFallbackText: { color: Colors.textMuted, fontSize: 14, textAlign: "center" },
-});
+}));

@@ -195,10 +195,10 @@ export function autoPrint3Copies(
       <div style="text-align:center;font-size:11px;margin-top:5px;">Vielen Dank für Ihren Einkauf!</div>
       ${storeAddr ? `<div style="text-align:center;font-size:10px;margin-top:1px;">${storeName} · ${storeAddr}${storePhone ? " · Tel: " + storePhone : ""}</div>` : ""}
       ${printQrDataUrl ? `<div style="text-align:center;margin-top:5px;"><img src="${printQrDataUrl}" style="width:80px;height:80px;"></div>` : ""}
-      <div style="text-align:center;font-size:9px;color:#000;margin-top:5px;">Developed by Barmagly · www.barmagly.tech</div>
+      <div style="text-align:center;font-size:9px;color:#000;margin-top:5px;">Powered by Kassenta · kassenta.com</div>
     </body></html>`;
 
-    const devFooter = `<div style="text-align:center;font-size:9px;color:#000;margin-top:5px;">Developed by Barmagly · www.barmagly.tech</div>`;
+    const devFooter = `<div style="text-align:center;font-size:9px;color:#000;margin-top:5px;">Powered by Kassenta · kassenta.com</div>`;
 
     // ── JOB 2: FAHRERAUFTRAG (نسخة السائق / التوصيل) ──────────
     const job2 = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">${css}</head><body>

@@ -4,7 +4,7 @@
 
 Barmagly Smart POS is a production-ready, tablet-optimized Point of Sale and Mini-ERP system designed for pharmacies, retail stores, cafes, and small businesses. It is branded under the Barmagly company (www.barmagly.tech, Egypt-based). Default currency is **Swiss Franc (CHF)**.
 
-The application is built as an Expo (React Native) frontend with a Node.js/Express backend, backed by a PostgreSQL database. It targets web, iOS, and Android platforms with a dark-mode-first UI featuring a Blue → Purple → Teal gradient brand identity (accent color: #2FD3C6).
+The application is built as an Expo (React Native) frontend with a Node.js/Express backend, backed by a **MySQL** database (Drizzle `mysqlTable`). It targets web, iOS, and Android platforms with a dark-mode-first UI featuring a Blue → Purple → Teal gradient brand identity (accent color: #2FD3C6).
 
 ## Architecture
 
@@ -13,6 +13,37 @@ The application is built as an Expo (React Native) frontend with a Node.js/Expre
 - **License-based activation**: Stores are activated via license keys (format: `BARMAGLY-XXXX-XXXX-XXXX-XXXX`).
 - **API security**: All tenant-scoped API routes are protected by `tenantAuthMiddleware` (`server/tenantAuth.ts`) which validates the `x-license-key` header against the claimed `tenantId`.
 - **Cascade deletes**: All tenant-related tables have `onDelete: 'cascade'` foreign key constraints.
+
+## Authentication & Authorization
+
+Three independent layers — do not confuse them:
+
+| Layer | Credential | Proves | Enforced by |
+|---|---|---|---|
+| Store activation | `x-license-key` header | *which* tenant | `server/tenantAuth.ts` |
+| Employee identity | `x-employee-token` header (JWT, 12h) | *who* is acting + their role | `server/employeeAuth.ts` |
+| Platform admin | `Authorization: Bearer` (JWT, 24h) | super-admin identity | `server/superAdminAuth.ts` |
+
+**The license key alone grants no role.** It identifies the store; permissions come from the
+employee token issued by `POST /api/employees/login`.
+
+Authorization rules live in **one table** — `ROUTE_RULES` in `server/employeeAuth.ts`. Add a rule
+there rather than sprinkling guards across route definitions.
+
+### Rollout mode — `EMPLOYEE_AUTH_MODE`
+
+| Value | Behaviour |
+|---|---|
+| `soft` (default) | Requests **with** a token are fully enforced; requests **without** one pass through and log a warning. Lets older clients keep working during rollout. |
+| `strict` | The employee token is mandatory on every guarded route. |
+
+⚠️ **`soft` is a migration window, not a destination.** Set `EMPLOYEE_AUTH_MODE=strict` once every
+deployed client sends the token — until then the bypass still exists.
+
+### PIN storage
+
+PINs are bcrypt-hashed. Legacy plaintext PINs still authenticate and are **transparently re-hashed
+on first successful login**, so no migration script is needed. `verifyPin()` handles both formats.
 
 ### Role-Based Access Control
 
@@ -54,14 +85,14 @@ Permission helpers in `lib/auth-context.tsx`:
 
 ### Backend
 - **Server**: Node.js with Express v5
-- **ORM**: Drizzle ORM with PostgreSQL
-- **Auth**: PIN-based employee login, JWT for super admin, license key middleware for API
+- **ORM**: Drizzle ORM with **MySQL** (`mysqlTable` — note: `.returning()` is not supported, use `$returningId()`)
+- **Auth**: three independent layers — see [Authentication & Authorization](#authentication--authorization)
 - **Payments**: Stripe integration (optional — falls back gracefully when not configured)
 
 ### Database
-- **PostgreSQL** via `DATABASE_URL` environment variable
-- **Schema**: `shared/schema.ts` (Drizzle pgTable definitions)
-- **Migrations**: `drizzle-kit push`
+- **MySQL** via `DATABASE_URL` environment variable
+- **Schema**: `shared/schema.ts` (Drizzle `mysqlTable` definitions — 66 tables)
+- **Migrations**: auto-migration block in `server/index.ts` (runs on every startup)
 
 ## Project Structure
 
@@ -109,8 +140,8 @@ lib/
 - **Online Ordering**: Public store pages, WebSocket order notifications
 - **Super Admin**: Tenant management, subscription control, license generation, backup/restore, analytics
 - **Backup System**: Automated daily backups, manual backup/restore per tenant
-- **PWA Support**: Service worker, manifest.json for "Install App" prompt
-- **Internationalization**: English, Arabic (RTL), German
+- **PWA Support**: the **delivery/driver app** ships a service worker + manifest. The POS app itself has neither yet — and no offline mode (see `KASSENTA_AUDIT_AND_ROADMAP.md` → OPS-01)
+- **Internationalization**: English, Arabic (RTL), German (French and Italian still missing for the Swiss market)
 
 ## Development
 

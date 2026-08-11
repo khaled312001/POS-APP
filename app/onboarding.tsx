@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Activi
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
+import { themedStyles } from "@/lib/themed-styles";
 import { Ionicons } from '@expo/vector-icons';
 import { useLicense } from '@/lib/license-context';
 import { useLanguage } from '@/lib/language-context';
@@ -201,7 +202,7 @@ export default function OnboardingScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
     container: {
         flex: 1,
         backgroundColor: Colors.background,
@@ -317,4 +318,4 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '900',
     }
-});
+}));

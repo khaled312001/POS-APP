@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { I18nManager, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Language, t, TranslationKey, isRTL } from "./i18n";
+import { useTheme } from "./theme-context";
 
 interface LanguageContextType {
   language: Language;
@@ -13,6 +14,8 @@ interface LanguageContextType {
   rtlRowReverse: any;
   rtlTextAlign: any;
   rtlText: any;
+  /** Current palette id — exposed so consumers can key memoised render output. */
+  themeMode: "light" | "dark";
 }
 
 const LanguageContext = createContext<LanguageContextType | null>(null);
@@ -22,6 +25,13 @@ const LANG_KEY = "app_language";
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLangState] = useState<Language>("en");
   const [loaded, setLoaded] = useState(false);
+
+  // Theme fan-out. Colours are read through a live proxy (constants/colors.ts),
+  // so a palette switch only needs every screen to re-render — no remount, no
+  // navigation reset. Every screen already calls useLanguage(), and this
+  // provider rebuilds its context value on each render, so subscribing here
+  // propagates the switch to the whole app in one hop.
+  const { mode: themeMode } = useTheme();
 
   useEffect(() => {
     AsyncStorage.getItem(LANG_KEY).then((val) => {
@@ -39,6 +49,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       I18nManager.forceRTL(rtl);
     }
   }, []);
+
+  // Keep the document in sync so native browser UI (scrollbars, form controls,
+  // text selection, autofill) picks the right direction and language.
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    document.documentElement.lang = language;
+    document.documentElement.dir = isRTL(language) ? "rtl" : "ltr";
+  }, [language]);
 
   const translate = useCallback((key: TranslationKey) => t(language, key), [language]);
 
@@ -60,7 +78,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   if (!loaded) return null;
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t: translate, isRTL: rtl, rtlStyle, rtlRow, rtlRowReverse, rtlTextAlign, rtlText }}>
+    <LanguageContext.Provider
+      value={{ language, setLanguage, t: translate, isRTL: rtl, rtlStyle, rtlRow, rtlRowReverse, rtlTextAlign, rtlText, themeMode }}
+    >
       {children}
     </LanguageContext.Provider>
   );

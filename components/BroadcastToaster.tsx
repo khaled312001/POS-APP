@@ -7,6 +7,8 @@
  * broadcast panel in Online Orders.
  */
 import React, { useEffect, useRef, useState } from "react";
+import { Colors } from "@/constants/colors";
+import { Ionicons } from "@expo/vector-icons";
 import { Platform, Pressable, StyleSheet, Text, View, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import { useLicense } from "@/lib/license-context";
@@ -125,7 +127,7 @@ export default function BroadcastToaster() {
     <Animated.View style={[styles.wrap, { transform: [{ translateY: slide }] }]} pointerEvents="box-none">
       <Pressable style={styles.card} onPress={() => { router.push("/(tabs)/online-orders" as any); hide(); }}>
         <View style={styles.row}>
-          <View style={styles.icon}><Text style={styles.iconText}>📣</Text></View>
+          <View style={styles.icon}><Ionicons name="megaphone-outline" size={18} color={Colors.white} /></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>New Broadcast Order — {current.customerName}</Text>
             <Text style={styles.line} numberOfLines={1}>{itemLine || "tap to view"}</Text>
@@ -135,7 +137,7 @@ export default function BroadcastToaster() {
             </Text>
           </View>
           <Pressable onPress={hide} style={styles.close} hitSlop={8}>
-            <Text style={styles.closeText}>✕</Text>
+            <Ionicons name="close" size={18} color={Colors.white} />
           </Pressable>
         </View>
         <Text style={styles.cta}>Tap to open & accept →</Text>

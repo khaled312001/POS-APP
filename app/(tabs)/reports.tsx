@@ -19,6 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 import { getQueryFn, getApiUrl } from "@/lib/query-client";
 import { getDisplayNumber } from "@/lib/api-config";
 import { useLanguage } from "@/lib/language-context";
@@ -1236,14 +1237,14 @@ export default function ReportsScreen() {
                 }}
               >
                 <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.deliveryPrimary + "20", alignItems: "center", justifyContent: "center" }}>
-                  <Text style={{ fontSize: 16 }}>🚗</Text>
+                  <Ionicons name="car-outline" size={16} color={Colors.deliveryPrimary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[{ color: Colors.text, fontSize: 14, fontWeight: "600" }, rtlTextAlign, rtlText]}>{driver.driverName || "Driver"}</Text>
                   <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, marginTop: 3 }}>
                     <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{driver.deliveries ?? 0} {t("deliveries") ?? "deliveries"}</Text>
                     <Text style={{ color: Colors.textMuted, fontSize: 11 }}>·</Text>
-                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>⭐ {parseFloat(String(driver.rating ?? 5)).toFixed(1)}</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{parseFloat(String(driver.rating ?? 5)).toFixed(1)}</Text>
                   </View>
                 </View>
                 <View style={[styles.badge, { backgroundColor: Colors.driverOnline + "20" }]}>
@@ -1581,7 +1582,7 @@ export default function ReportsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -1970,4 +1971,4 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: 14,
   },
-});
+}));

@@ -5,6 +5,7 @@ import { registerSuperAdminRoutes } from "./superAdminRoutes";
 import { registerBroadcastRoutes } from "./broadcastRoutes";
 import { registerCustomerExtraRoutes } from "./customerExtraRoutes";
 import { tenantAuthMiddleware } from "./tenantAuth";
+import { attachEmployee, guardTenantRoutes } from "./employeeAuth";
 import { callerIdService } from "./callerIdService";
 import { whatsappService } from "./whatsappService";
 // stripe-replit-sync uses import.meta.url which crashes in CJS bundles on Hostinger
@@ -13,6 +14,9 @@ let runMigrations: any = null;
 import { getStripeSync, getStripePublishableKey, getUncachableStripeClient, getStripeSecretKey } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 import { DELETE_ACCOUNT_HTML, PRIVACY_POLICY_HTML } from "./legal-pages";
+import { TERMS_HTML, IMPRINT_HTML } from "./site/legal";
+import { isSitePath, renderSitePage, findSiteAsset } from "./site";
+import { rateLimit, clientKey } from "./rateLimit";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -39,9 +43,23 @@ if (!usingMySql) {
 const app = express();
 const log = console.log;
 
-// Security and Cross-Origin Headers
-app.use((req, res, next) => {
-  res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+// ── Security headers ─────────────────────────────────────────────────────────
+// Applied to every response, including static files and HTML. No CSP yet: the
+// POS bundle and the admin templates both rely on inline scripts, so a strict
+// policy would break them — `frame-ancestors` gives the clickjacking protection
+// that matters most without that risk.
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'self'");
+  res.setHeader("Permissions-Policy", "geolocation=(self), camera=(self), microphone=(), payment=(), interest-cohort=()");
+  // Only meaningful over TLS; sending it on plain HTTP is ignored anyway, but
+  // gating on the forwarded proto keeps local development honest.
+  if ((req.header("x-forwarded-proto") || req.protocol) === "https") {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
   next();
 });
 
@@ -73,6 +91,11 @@ declare module "http" {
 function setupCors(app: express.Application) {
   app.use((req, res, next) => {
     const origins = new Set<string>([
+      "https://kassenta.com",
+      "https://www.kassenta.com",
+      "https://backend.kassenta.com",
+      // Kept during the migration window so the old deployment keeps working
+      // until pos.barmagly.tech is retired.
       "https://pos.barmagly.tech",
     ]);
 
@@ -102,7 +125,10 @@ function setupCors(app: express.Application) {
         "Access-Control-Allow-Methods",
         "GET, POST, PUT, DELETE, OPTIONS",
       );
-      res.header("Access-Control-Allow-Headers", "Content-Type, x-license-key");
+      res.header(
+        "Access-Control-Allow-Headers",
+        "Content-Type, x-license-key, x-employee-token, Authorization",
+      );
       res.header("Access-Control-Allow-Credentials", "true");
     }
 
@@ -193,51 +219,7 @@ function serveExpoManifest(platform: string, res: Response) {
   res.send(manifest);
 }
 
-function serveLandingPage({
-  req,
-  res,
-  appName,
-}: {
-  req: Request;
-  res: Response;
-  appName: string;
-}) {
-  const forwardedProto = req.header("x-forwarded-proto");
-  const protocol = forwardedProto || req.protocol || "https";
-  const forwardedHost = req.header("x-forwarded-host");
-  const host = forwardedHost || req.get("host");
-  const baseUrl = `${protocol}://${host}`;
-  const expsUrl = `${host}`;
-
-  log(`baseUrl`, baseUrl);
-  log(`expsUrl`, expsUrl);
-
-  const templatePath = path.resolve(
-    process.cwd(),
-    "server",
-    "templates",
-    "landing-page.html"
-  );
-  const template = fs.readFileSync(templatePath, "utf-8");
-
-  let html = template
-    .replace(/BASE_URL_PLACEHOLDER/g, baseUrl)
-    .replace(/EXPS_URL_PLACEHOLDER/g, expsUrl)
-    .replace(/APP_NAME_PLACEHOLDER/g, appName);
-
-
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.status(200).send(html);
-}
-
-
 function configureExpoAndLanding(app: express.Application) {
-  const templatePath = path.resolve(
-    process.cwd(),
-    "server",
-    "templates",
-    "landing-page.html",
-  );
   const dashboardPath = path.resolve(
     process.cwd(),
     "server",
@@ -285,13 +267,43 @@ function configureExpoAndLanding(app: express.Application) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(DELETE_ACCOUNT_HTML);
     }
-    if (req.path === "/privacy" || req.path === "/privacy/") {
+    if (req.path === "/privacy" || req.path === "/privacy/" || req.path === "/privacy-policy") {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(PRIVACY_POLICY_HTML);
     }
+    if (req.path === "/terms" || req.path === "/terms/") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(TERMS_HTML);
+    }
+    if (req.path === "/imprint" || req.path === "/imprint/") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(IMPRINT_HTML);
+    }
 
-    if (req.path === "/" || req.path === "/index.html") {
-      return serveLandingPage({ req, res, appName });
+    // Content-hashed site assets — safe to cache forever, the hash changes on
+    // every deploy that touches the stylesheet or the script.
+    if (req.method === "GET" && req.path.startsWith("/assets/site.")) {
+      const asset = findSiteAsset(req.path);
+      if (asset) {
+        res.setHeader("Content-Type", asset.contentType);
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        return res.status(200).send(asset.body);
+      }
+    }
+
+    // ── Marketing site (server/site) ──────────────────────────────────────
+    // Multi-page: /, /features, /solutions, /pricing, /compliance, /about,
+    // /contact. Rendered from one shared shell so nav, theme and language
+    // behave identically on every page.
+    if (req.method === "GET" && isSitePath(req.path)) {
+      const proto = req.header("x-forwarded-proto") || req.protocol || "https";
+      const host = req.header("x-forwarded-host") || req.get("host");
+      const html = renderSitePage(req.path, `${proto}://${host}`);
+      if (html) {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=86400");
+        return res.status(200).send(html);
+      }
     }
 
     if (req.path === "/app" || req.path === "/app/" || req.path === "/app/index.html") {
@@ -379,7 +391,7 @@ function configureExpoAndLanding(app: express.Application) {
           if (sub === "/manifest.json") {
             res.setHeader("Content-Type", "application/manifest+json");
             return res.status(200).json({
-              name: "Barmagly", short_name: "Barmagly",
+              name: "Kassenta", short_name: "Kassenta",
               start_url: "/customer/", display: "standalone", scope: "/customer/",
               theme_color: "#FF5722", background_color: "#070A12",
               icons: [{ src: "/api/delivery-app/icons/icon-192.png", sizes: "192x192", type: "image/png" },
@@ -445,7 +457,7 @@ function configureExpoAndLanding(app: express.Application) {
         const basePath = isApiPrefixed ? "/api" : "";
         let html = fs.readFileSync(restaurantsIndexPath, "utf-8");
         const configJson = JSON.stringify({
-          storeName: "Barmagly Delivery",
+          storeName: "Kassenta Delivery",
           currency: process.env.DEFAULT_CURRENCY || "CHF",
           language: (req.query.lang as string) || "en",
           stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
@@ -499,8 +511,8 @@ function configureExpoAndLanding(app: express.Application) {
           }
         }
         if (isBrandAlias && config) {
-          (config as any).storeName = "Barmagly";
-          (config as any).heroTitle = "Barmagly Delivery";
+          (config as any).storeName = "Kassenta";
+          (config as any).heroTitle = "Kassenta Delivery";
         }
         if (!config) return res.status(404).send("<h1>Store not found</h1>");
         const tenantId = config.tenantId;
@@ -542,7 +554,7 @@ function configureExpoAndLanding(app: express.Application) {
 
         // SEO meta tag injection for restaurant pages
         const storeName = config.storeName || (config as any).heroTitle || (config as any).name || tenant.businessName;
-        const metaTitle = (config as any).metaTitle || `${storeName} — Order Online | Barmagly Delivery`;
+        const metaTitle = (config as any).metaTitle || `${storeName} — Order Online | Kassenta Delivery`;
         const metaDesc = (config as any).metaDescription || `Order food online from ${storeName}. Fast delivery to your door.`;
         const coverImage = (config as any).coverImage || (config as any).headerBgImage || "";
         const seoMeta = `
@@ -572,7 +584,7 @@ function configureExpoAndLanding(app: express.Application) {
         const basePath = isApiPrefixed ? "/api" : "";
         let html = fs.readFileSync(restaurantsIndexPath, "utf-8");
         const configJson = JSON.stringify({
-          storeName: "Barmagly Delivery",
+          storeName: "Kassenta Delivery",
           currency: process.env.DEFAULT_CURRENCY || "CHF",
           language: (req.query.lang as string) || "en",
           stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
@@ -652,8 +664,8 @@ function configureExpoAndLanding(app: express.Application) {
         const config = await storage.getLandingPageConfig(tenantId);
         const storePath = path.resolve(process.cwd(), "server", "templates", "restaurant-store.html");
         let html = fs.readFileSync(storePath, "utf-8");
-        const storeName = String((tenant as any).businessName || "Barmagly Store").replace(/[<>"]/g, "");
-        const storeLogo = String((config as any)?.logoUrl || (tenant as any).logo || "https://pos.barmagly.tech/app/assets/images/icon.png").replace(/"/g, "");
+        const storeName = String((tenant as any).businessName || "Kassenta Store").replace(/[<>"]/g, "");
+        const storeLogo = String((config as any)?.logoUrl || (tenant as any).logo || "https://kassenta.com/app/assets/images/icon.png").replace(/"/g, "");
         html = html.replace(/\{\{SLUG\}\}/g, slug!);
         html = html.replace(/\{\{TENANT_ID\}\}/g, String(tenantId));
         html = html.replace(/\{\{STORE_NAME\}\}/g, storeName);
@@ -679,12 +691,11 @@ function configureExpoAndLanding(app: express.Application) {
       return serveExpoManifest(platform, res);
     }
 
+    // Legacy alias — the single-page landing template was replaced by the
+    // multi-page site in server/site. Anything still linking to /landing lands
+    // on the new home page instead of a stale copy.
     if (req.path === "/landing") {
-      return serveLandingPage({
-        req,
-        res,
-        appName,
-      });
+      return res.redirect(301, "/");
     }
 
     next();
@@ -698,14 +709,184 @@ function configureExpoAndLanding(app: express.Application) {
   app.use("/delivery-app", deliveryAppStatic);
   app.use("/api/delivery-app", deliveryAppStatic);
 
-  const uploadsStatic = express.static(path.resolve(process.cwd(), "uploads"));
-  const assetsStatic  = express.static(path.resolve(process.cwd(), "assets"));
+  // Product photos and app assets are content-addressed by filename in practice
+  // (a new upload gets a new name), so a long TTL is safe and removes a request
+  // per image on every repeat visit to a menu.
+  const uploadsStatic = express.static(path.resolve(process.cwd(), "uploads"), { maxAge: "30d" });
+  const assetsStatic  = express.static(path.resolve(process.cwd(), "assets"), { maxAge: "30d" });
   app.use("/assets",          assetsStatic);
   app.use("/api/assets",      assetsStatic);
   app.use("/uploads",         uploadsStatic);
   app.use("/api/uploads",     uploadsStatic);   // CDN-compatible path
   app.use("/objects",         uploadsStatic);
   app.use("/api/objects",     uploadsStatic);
+  // Brand assets (logo variants + favicons) generated by
+  // scripts/generate-brand-assets.py. Mounted on both prefixes because only
+  // /api/* reaches Express through the Hostinger CDN.
+  const brandStatic = express.static(path.resolve(process.cwd(), "public", "brand"), {
+    maxAge: "7d",
+  });
+  app.use("/brand", brandStatic);
+  app.use("/api/brand", brandStatic);
+  app.get(["/favicon.ico", "/api/favicon.ico"], (_req, res) => {
+    res.sendFile(path.resolve(process.cwd(), "public", "brand", "favicon.ico"));
+  });
+
+  // Web app manifest for the marketing site (the POS app ships its own).
+  app.get("/site.webmanifest", (_req, res) => {
+    res.type("application/manifest+json").set("Cache-Control", "public, max-age=86400").send(
+      JSON.stringify({
+        name: "Kassenta POS",
+        short_name: "Kassenta",
+        description: "Point of sale, online ordering and delivery in one system.",
+        start_url: "/",
+        display: "standalone",
+        background_color: "#FFFFFF",
+        theme_color: "#0C8F85",
+        icons: [
+          { src: "/brand/favicon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/brand/favicon-512.png", sizes: "512x512", type: "image/png" },
+          { src: "/brand/favicon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        ],
+      }),
+    );
+  });
+
+  // ── Website demo request ────────────────────────────────────────────────
+  // Rate limited twice: per IP and per submitted email, so neither a single
+  // host nor a single address can be used to flood the sales inbox.
+  app.post(
+    ["/contact", "/api/contact"],
+    rateLimit({ name: "contact-ip", max: 5, windowMs: 60 * 60 * 1000 }),
+    rateLimit({
+      name: "contact-email",
+      max: 3,
+      windowMs: 60 * 60 * 1000,
+      keyFn: (req) => String((req.body as any)?.email || "").toLowerCase().slice(0, 120),
+    }),
+    async (req: Request, res: Response) => {
+      try {
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const str = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+
+        const name = str(body.name, 120);
+        const email = str(body.email, 160);
+        const message = str(body.message, 4000);
+
+        if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) {
+          return res.status(400).json({ error: "A name and a valid email address are required." });
+        }
+        // Honeypot: real users never see this field, bots fill everything in.
+        if (str(body.website, 10)) return res.status(200).json({ ok: true });
+
+        const { sendContactEnquiry } = await import("./emailService");
+        await sendContactEnquiry({
+          name,
+          email,
+          business: str(body.business, 160),
+          phone: str(body.phone, 60),
+          industry: str(body.industry, 40),
+          message,
+          sourceIp: clientKey(req),
+        });
+        res.json({ ok: true });
+      } catch (e: any) {
+        log(`[contact] send failed: ${e?.message}`);
+        res.status(502).json({ error: "Could not send the message. Please email info@kassenta.com." });
+      }
+    },
+  );
+
+  // ── SEO: robots.txt + sitemap.xml at the ROOT ───────────────────────────
+  // Crawlers only ever look at /robots.txt and /sitemap.xml. Both previously
+  // existed under /api/… only, so every crawler got a 404 and the site had no
+  // discoverable sitemap at all.
+  const SITE_URL = process.env.PUBLIC_BASE_URL || "https://kassenta.com";
+
+  app.get(["/robots.txt", "/api/robots.txt"], (_req, res) => {
+    res.type("text/plain").send(
+      [
+        "User-agent: *",
+        "Allow: /",
+        "",
+        "# Private surfaces — never index",
+        "Disallow: /super_admin",
+        "Disallow: /dashboard",
+        "Disallow: /license-gate",
+        "Disallow: /login",
+        "Disallow: /api/",
+        "",
+        "# Public ordering pages should stay crawlable",
+        "Allow: /api/order/",
+        "Allow: /api/restaurants",
+        "",
+        `Sitemap: ${SITE_URL}/sitemap.xml`,
+        "",
+      ].join("\n"),
+    );
+  });
+
+  app.get(["/sitemap.xml", "/api/sitemap.xml"], async (_req, res) => {
+    try {
+      const { storage } = await import("./storage");
+      const today = new Date().toISOString().slice(0, 10);
+
+      type Entry = { loc: string; priority: string; changefreq: string; alternates?: boolean };
+      const { SITE_PATHS } = await import("./site");
+
+      const entries: Entry[] = [
+        { loc: "/", priority: "1.0", changefreq: "weekly", alternates: true },
+        // Every marketing page, derived from the site router so the two can't drift.
+        ...SITE_PATHS.filter((p) => p !== "/").map((loc) => ({
+          loc: `${loc}/`,
+          priority: loc === "/pricing" || loc === "/features" ? "0.9" : "0.8",
+          changefreq: "monthly",
+          alternates: true,
+        })),
+        { loc: "/app", priority: "0.7", changefreq: "weekly" },
+        { loc: "/restaurants", priority: "0.8", changefreq: "daily" },
+        { loc: "/privacy", priority: "0.3", changefreq: "yearly" },
+        { loc: "/terms/", priority: "0.3", changefreq: "yearly" },
+        { loc: "/imprint/", priority: "0.3", changefreq: "yearly" },
+        { loc: "/delete-account", priority: "0.3", changefreq: "yearly" },
+      ];
+
+      // Public storefronts — one indexable page per active store.
+      try {
+        const configs = await storage.getAllLandingPageConfigs();
+        for (const c of (configs || []) as any[]) {
+          if (c?.slug) entries.push({ loc: `/order/${c.slug}`, priority: "0.8", changefreq: "daily" });
+        }
+      } catch { /* storefronts are optional in the sitemap */ }
+
+      const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" `;
+      xml += `xmlns:xhtml="http://www.w3.org/1999/xhtml">\n`;
+      for (const e of entries) {
+        xml += `  <url>\n`;
+        xml += `    <loc>${esc(SITE_URL + e.loc)}</loc>\n`;
+        xml += `    <lastmod>${today}</lastmod>\n`;
+        xml += `    <changefreq>${e.changefreq}</changefreq>\n`;
+        xml += `    <priority>${e.priority}</priority>\n`;
+        if (e.alternates) {
+          for (const lang of ["de", "en", "ar"]) {
+            xml += `    <xhtml:link rel="alternate" hreflang="${lang}" href="${esc(`${SITE_URL}${e.loc}?lang=${lang}`)}"/>\n`;
+          }
+          xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="${esc(SITE_URL + e.loc)}"/>\n`;
+        }
+        xml += `  </url>\n`;
+      }
+      xml += `</urlset>\n`;
+
+      res.set("Content-Type", "application/xml; charset=utf-8");
+      res.set("Cache-Control", "public, max-age=3600");
+      res.send(xml);
+    } catch (e: any) {
+      res.status(500).type("text/plain").send(`sitemap error: ${e.message}`);
+    }
+  });
+
   app.use("/sounds", express.static(path.resolve(process.cwd(), "public", "sounds")));
   app.use("/api/sounds", express.static(path.resolve(process.cwd(), "public", "sounds")));
   // Serve project icon assets at the /app/assets/images path so the PWA manifest icons resolve
@@ -1057,6 +1238,11 @@ function setupPaymentGatewayRoutes(app: express.Application) {
   setupRequestLogging(app);
 
   app.use(tenantAuthMiddleware());
+  // SEC-01: decode the employee token (when present) so requireRole can act on
+  // it. Runs after tenantAuth so req.tenantId is available for the cross-tenant
+  // check inside requireRole.
+  app.use(attachEmployee());
+  app.use(guardTenantRoutes());
 
   setupStripeRoutes(app);
   setupPaymentGatewayRoutes(app);
@@ -1337,22 +1523,37 @@ function setupPaymentGatewayRoutes(app: express.Application) {
     }
   }
 
+  // ── Super-admin bootstrap ──────────────────────────────────────────────
+  // This used to recreate a hardcoded admin@barmagly.com / admin123 account on
+  // EVERY startup whenever that exact address was missing — so renaming the
+  // real admin silently resurrected a default-password super admin with full
+  // platform access. It now runs only when the table is completely empty, and
+  // only from environment-supplied credentials.
   try {
     const { storage } = await import("./storage");
-    const adminEmail = "admin@barmagly.com";
-    const existingAdmin = await storage.getSuperAdminByEmail(adminEmail);
-    if (!existingAdmin) {
-      await storage.createSuperAdmin({
-        name: "Super Admin",
-        email: adminEmail,
-        passwordHash: "$2b$10$OoKOgYj3UlErVOmwqm4rnOpZLdqpLDF3zBiO4VuXJQa56F0DLlesK",
-        role: "super_admin",
-        isActive: true,
-      });
-      log("Super admin created");
+    const admins = await storage.getSuperAdmins();
+    if (admins.length === 0) {
+      const email = process.env.SUPER_ADMIN_EMAIL;
+      const password = process.env.SUPER_ADMIN_PASSWORD;
+      if (email && password) {
+        const bcrypt = (await import("bcrypt")).default;
+        await storage.createSuperAdmin({
+          name: process.env.SUPER_ADMIN_NAME || "Super Admin",
+          email,
+          passwordHash: await bcrypt.hash(password, 10),
+          role: "super_admin",
+          isActive: true,
+        });
+        log(`Super admin bootstrapped from environment: ${email}`);
+      } else {
+        log(
+          "[SECURITY] No super admin exists. Set SUPER_ADMIN_EMAIL and " +
+          "SUPER_ADMIN_PASSWORD to bootstrap one — refusing to create a default account.",
+        );
+      }
     }
   } catch (err) {
-    log("Error creating super admin:", err);
+    log("Error checking super admin:", err);
   }
 
   try {

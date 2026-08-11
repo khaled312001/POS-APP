@@ -1,4 +1,4 @@
-/* Barmagly Customer SPA — single-file front-end.
+/* Kassenta Customer SPA — single-file front-end.
    Hash routing: #/intro | #/login | #/register | #/home | #/restaurants
                  #/menu/:slug | #/broadcast | #/orders | #/track/:token
                  #/chat/:orderId | #/account

@@ -11,8 +11,10 @@ import * as DocumentPicker from "expo-document-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { getDisplayNumber } from "@/lib/api-config";
@@ -38,13 +40,13 @@ function SettingRow({ icon, label, value, onPress, color, rtl }: { icon: string;
   );
 }
 
-const rowStyles = StyleSheet.create({
+const rowStyles = themedStyles((Colors) => ({
   row: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface, borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder },
   iconWrap: { width: 40, height: 40, borderRadius: 10, justifyContent: "center", alignItems: "center", marginRight: 12 },
   info: { flex: 1 },
   label: { color: Colors.text, fontSize: 15, fontWeight: "600" },
   value: { color: Colors.textMuted, fontSize: 12, marginTop: 2 },
-});
+}));
 
 const expenseCategoryColors: Record<string, string> = {
   rent: "#3B82F6",
@@ -811,6 +813,16 @@ export default function SettingsScreen() {
         <SettingRow icon="star" label={t("loyaltyConfiguration")} value={t("loyaltyPoints")} onPress={() => setShowLoyaltyConfig(true)} color={Colors.loyaltyGold} rtl={isRTL} />
 
         <Text style={styles.sectionTitle}>{t("system")}</Text>
+        <View style={[rowStyles.row, isRTL && { flexDirection: "row-reverse" }]}>
+          <View style={[rowStyles.iconWrap, { backgroundColor: Colors.accent + "20" }, isRTL ? { marginLeft: 12, marginRight: 0 } : {}]}>
+            <Ionicons name="contrast-outline" size={20} color={Colors.accent} />
+          </View>
+          <View style={[rowStyles.info, isRTL && { alignItems: "flex-end" }]}>
+            <Text style={[rowStyles.label, isRTL && { textAlign: "right" }]}>{t("appearance")}</Text>
+            <Text style={[rowStyles.value, isRTL && { textAlign: "right" }]}>{t("appearanceDesc")}</Text>
+          </View>
+          <ThemeToggle variant="segmented" />
+        </View>
         <SettingRow icon="language" label={t("language")} value={language === "ar" ? "العربية" : language === "de" ? "Deutsch" : "English"} onPress={() => setShowLanguagePicker(true)} color={Colors.info} rtl={isRTL} />
         <Pressable
           style={[rowStyles.row, isRTL && { flexDirection: "row-reverse" }]}
@@ -3251,7 +3263,7 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>🚲 {t("deliveryZones")}</Text>
+              <Text style={styles.modalTitle}>{t("deliveryZones")}</Text>
               <Pressable onPress={() => setShowDeliveryZones(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <Text style={{ color: Colors.textMuted, padding: 16, textAlign: "center" }}>
@@ -3266,7 +3278,7 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>🏷️ {t("promoCodes")}</Text>
+              <Text style={styles.modalTitle}>{t("promoCodes")}</Text>
               <Pressable onPress={() => setShowPromoCodes(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <Text style={{ color: Colors.textMuted, padding: 16, textAlign: "center" }}>
@@ -3281,7 +3293,7 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>🚗 {t("driverManagement")}</Text>
+              <Text style={styles.modalTitle}>{t("driverManagement")}</Text>
               <Pressable onPress={() => setShowDriverManagement(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <Text style={{ color: Colors.textMuted, padding: 16, textAlign: "center" }}>
@@ -3296,7 +3308,7 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>⭐ {t("loyaltyConfiguration")}</Text>
+              <Text style={styles.modalTitle}>{t("loyaltyConfiguration")}</Text>
               <Pressable onPress={() => setShowLoyaltyConfig(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <Text style={{ color: Colors.textMuted, padding: 16, textAlign: "center" }}>
@@ -3310,7 +3322,7 @@ export default function SettingsScreen() {
   );
 }
 
-const pgStyles = StyleSheet.create({
+const pgStyles = themedStyles((Colors) => ({
   section: { marginBottom: 8 },
   gatewayHeader: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 16 },
   gatewayIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: "center", alignItems: "center" },
@@ -3340,9 +3352,9 @@ const pgStyles = StyleSheet.create({
   infoRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10 },
   infoNote: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: Colors.info + "10", borderRadius: 10, padding: 10, marginTop: 4 },
   infoNoteText: { color: Colors.textSecondary, fontSize: 12, flex: 1 },
-});
+}));
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { paddingHorizontal: 12 },
   profileCard: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.cardBorder },
@@ -3377,9 +3389,9 @@ const styles = StyleSheet.create({
   saveBtnText: { color: Colors.white, fontSize: 16, fontWeight: "700" },
   clockBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
   clockBtnText: { fontSize: 13, fontWeight: "700" },
-});
+}));
 
-const smStyles = StyleSheet.create({
+const smStyles = themedStyles((Colors) => ({
   notifBadge: { position: "absolute", top: 0, right: 0, backgroundColor: Colors.danger, borderRadius: 10, minWidth: 18, height: 18, justifyContent: "center", alignItems: "center", paddingHorizontal: 4 },
   notifBadgeText: { color: Colors.white, fontSize: 10, fontWeight: "800" },
   tab: { flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.surfaceLight, alignItems: "center" },
@@ -3399,4 +3411,4 @@ const smStyles = StyleSheet.create({
   notifMsg: { color: Colors.textMuted, fontSize: 12, marginTop: 2 },
   notifTime: { color: Colors.textMuted, fontSize: 10, marginTop: 4 },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.accent },
-});
+}));

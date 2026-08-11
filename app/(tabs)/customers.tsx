@@ -8,6 +8,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 import { apiRequest, getQueryFn } from "@/lib/query-client";
 import { playClickSound } from "@/lib/sound";
 import { useAuth } from "@/lib/auth-context";
@@ -380,7 +381,7 @@ export default function CustomersScreen() {
                     ) : null}
                   </View>
                   <Text style={[styles.cardMeta, rtlTextAlign]} numberOfLines={1}>{getSubtitle(item)}</Text>
-                  {item.company ? <Text style={[{ color: Colors.accent, fontSize: 11, marginTop: 2 }, rtlTextAlign]}>🏢 {item.company}</Text> : null}
+                  {item.company ? <Text style={[{ color: Colors.accent, fontSize: 11, marginTop: 2 }, rtlTextAlign]}>{item.company}</Text> : null}
                 </View>
                 <View style={[styles.cardRight, isRTL && { alignItems: "flex-start" }]}>
                   {(item.orderCount > 0 || item.visitCount > 0) && (
@@ -403,8 +404,7 @@ export default function CustomersScreen() {
                   )}
                   {parseFloat(item.walletBalance || "0") > 0 && (
                     <View style={{ backgroundColor: "rgba(16,185,129,0.12)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                      <Text style={{ color: Colors.success, fontSize: 10, fontWeight: "700" }}>
-                        👛 {parseFloat(item.walletBalance).toFixed(2)}
+                      <Text style={{ color: Colors.success, fontSize: 10, fontWeight: "700" }}>{parseFloat(item.walletBalance).toFixed(2)}
                       </Text>
                     </View>
                   )}
@@ -434,7 +434,7 @@ export default function CustomersScreen() {
               <Pressable onPress={() => { playClickSound("light"); setShowForm(false); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={[styles.sectionLabel, rtlTextAlign]}>📋 {language === "ar" ? "معلومات أساسية" : "Basic Info"}</Text>
+              <Text style={[styles.sectionLabel, rtlTextAlign]}>{language === "ar" ? "معلومات أساسية" : "Basic Info"}</Text>
 
               <View style={{ flexDirection: "row", gap: 8 }}>
                 <View style={{ width: 80 }}>
@@ -474,14 +474,14 @@ export default function CustomersScreen() {
                 </View>
               </View>
 
-              <Text style={[styles.sectionLabel, rtlTextAlign]}>🚗 {language === "ar" ? "معلومات التوصيل" : "Delivery Info"}</Text>
+              <Text style={[styles.sectionLabel, rtlTextAlign]}>{language === "ar" ? "معلومات التوصيل" : "Delivery Info"}</Text>
               <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "كيف تصل" : "How to Go"}</Text>
               <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.howToGo} onChangeText={(v) => setForm({ ...form, howToGo: v })} placeholderTextColor={Colors.textMuted} placeholder="Driving directions..." />
 
               <Text style={[styles.label, rtlTextAlign]}>Screen Info</Text>
               <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.screenInfo} onChangeText={(v) => setForm({ ...form, screenInfo: v })} placeholderTextColor={Colors.textMuted} placeholder="Door code, etc..." />
 
-              <Text style={[styles.sectionLabel, rtlTextAlign]}>📍 {language === "ar" ? "العنوان" : "Address"}</Text>
+              <Text style={[styles.sectionLabel, rtlTextAlign]}>{language === "ar" ? "العنوان" : "Address"}</Text>
 
               {/* Quick city picker */}
               <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "اختر المدينة" : "Stadt wählen"}</Text>
@@ -565,7 +565,7 @@ export default function CustomersScreen() {
                       onPress={() => setShowStreetSuggestions(false)}
                       style={{ padding: 8, alignItems: "center", borderTopWidth: 1, borderTopColor: Colors.cardBorder }}
                     >
-                      <Text style={{ color: Colors.textMuted, fontSize: 11 }}>✕ {language === "ar" ? "إغلاق" : "Schließen"}</Text>
+                      <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{language === "ar" ? "إغلاق" : "Schließen"}</Text>
                     </Pressable>
                   </ScrollView>
                 </View>
@@ -616,7 +616,7 @@ export default function CustomersScreen() {
                   </View>
                   <Text style={{ color: Colors.text, fontSize: 20, fontWeight: "700" }}>{selectedCustomer.name}</Text>
                   {selectedCustomer.salutation && <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>({selectedCustomer.salutation})</Text>}
-                  {selectedCustomer.company && <Text style={{ color: Colors.accent, fontSize: 13, marginTop: 4, fontWeight: "600" }}>🏢 {selectedCustomer.company}</Text>}
+                  {selectedCustomer.company && <Text style={{ color: Colors.accent, fontSize: 13, marginTop: 4, fontWeight: "600" }}>{selectedCustomer.company}</Text>}
                   {selectedCustomer.customerNr && <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }}>Kunden-Nr: #{selectedCustomer.customerNr}</Text>}
                   {selectedCustomer.loyaltyTier && (
                     <View style={{ marginTop: 6 }}>
@@ -624,8 +624,7 @@ export default function CustomersScreen() {
                     </View>
                   )}
                   {selectedCustomer.referralCode && (
-                    <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 4 }}>
-                      🎁 {t("referralCode")}: {selectedCustomer.referralCode}
+                    <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 4 }}>{t("referralCode")}: {selectedCustomer.referralCode}
                     </Text>
                   )}
                 </View>
@@ -660,14 +659,14 @@ export default function CustomersScreen() {
                       <Text style={[styles.statValue, { color: Colors.success }]}>
                         {parseFloat(selectedCustomer.walletBalance).toFixed(2)}
                       </Text>
-                      <Text style={styles.statLabel}>👛 {t("walletBalance")}</Text>
+                      <Text style={styles.statLabel}>{t("walletBalance")}</Text>
                     </View>
                   )}
                 </View>
 
                 {/* Contact Info */}
                 <View style={styles.detailSection}>
-                  <Text style={styles.sectionTitle}>📞 {language === "ar" ? "معلومات الاتصال" : "Contact"}</Text>
+                  <Text style={styles.sectionTitle}>{language === "ar" ? "معلومات الاتصال" : "Contact"}</Text>
                   <InfoRow icon="call-outline" label={language === "ar" ? "هاتف" : "Telefon"} value={selectedCustomer.phone} isRTL={isRTL} />
                   <InfoRow icon="mail-outline" label={language === "ar" ? "بريد" : "Email"} value={selectedCustomer.email} isRTL={isRTL} />
                   {selectedCustomer.zhd && <InfoRow icon="person-outline" label="z.Hd." value={selectedCustomer.zhd} isRTL={isRTL} />}
@@ -676,7 +675,7 @@ export default function CustomersScreen() {
                 {/* Address */}
                 {(selectedCustomer.address || selectedCustomer.street || selectedCustomer.city) && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.sectionTitle}>📍 {language === "ar" ? "العنوان" : "Adresse"}</Text>
+                    <Text style={styles.sectionTitle}>{language === "ar" ? "العنوان" : "Adresse"}</Text>
                     {selectedCustomer.street && (
                       <InfoRow icon="navigate-outline" label={language === "ar" ? "الشارع" : "Strasse"} value={`${selectedCustomer.street || ""} ${selectedCustomer.streetNr || ""} ${selectedCustomer.houseNr || ""}`.trim()} isRTL={isRTL} />
                     )}
@@ -695,7 +694,7 @@ export default function CustomersScreen() {
                 {/* Delivery */}
                 {(selectedCustomer.howToGo || selectedCustomer.screenInfo) && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.sectionTitle}>🚗 {language === "ar" ? "توصيل" : "Lieferung"}</Text>
+                    <Text style={styles.sectionTitle}>{language === "ar" ? "توصيل" : "Lieferung"}</Text>
                     <InfoRow icon="car-outline" label={language === "ar" ? "كيف تصل" : "How to Go"} value={selectedCustomer.howToGo} isRTL={isRTL} />
                     <InfoRow icon="tv-outline" label="Screen Info" value={selectedCustomer.screenInfo} isRTL={isRTL} />
                   </View>
@@ -704,7 +703,7 @@ export default function CustomersScreen() {
                 {/* Order History Dates */}
                 {(selectedCustomer.firstOrderDate || selectedCustomer.lastOrderDate) && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.sectionTitle}>📅 {language === "ar" ? "تاريخ الطلبات" : "Bestellhistorie"}</Text>
+                    <Text style={styles.sectionTitle}>{language === "ar" ? "تاريخ الطلبات" : "Bestellhistorie"}</Text>
                     <InfoRow icon="calendar-outline" label={language === "ar" ? "أول طلب" : "Erste Bestellung"} value={selectedCustomer.firstOrderDate} isRTL={isRTL} />
                     <InfoRow icon="time-outline" label={language === "ar" ? "آخر طلب" : "Letzte Bestellung"} value={selectedCustomer.lastOrderDate} isRTL={isRTL} />
                   </View>
@@ -713,7 +712,7 @@ export default function CustomersScreen() {
                 {/* Notes */}
                 {selectedCustomer.notes && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.sectionTitle}>📝 {language === "ar" ? "ملاحظات" : "Notizen"}</Text>
+                    <Text style={styles.sectionTitle}>{language === "ar" ? "ملاحظات" : "Notizen"}</Text>
                     <Text style={{ color: Colors.text, fontSize: 14, lineHeight: 20 }}>{selectedCustomer.notes}</Text>
                   </View>
                 )}
@@ -724,7 +723,7 @@ export default function CustomersScreen() {
                   selectedCustomer.r8 || selectedCustomer.r9 || selectedCustomer.r10 ||
                   Number(selectedCustomer.r14) > 0 || Number(selectedCustomer.r15) > 0) && (
                   <View style={[styles.detailSection, { backgroundColor: Colors.surface + "bb", borderStyle: "dashed", borderWidth: 1, borderColor: Colors.cardBorder }]}>
-                    <Text style={styles.sectionTitle}>ℹ️ {language === "ar" ? "معلومات إضافية" : "Additional Info"}</Text>
+                    <Text style={styles.sectionTitle}>{language === "ar" ? "معلومات إضافية" : "Additional Info"}</Text>
                     {selectedCustomer.customerNr ? <InfoRow icon="id-card-outline" label="Kunden-Nr" value={`#${selectedCustomer.customerNr}`} isRTL={isRTL} /> : null}
                     {selectedCustomer.source ? <InfoRow icon="cloud-outline" label="Source" value={selectedCustomer.source} isRTL={isRTL} /> : null}
                     {selectedCustomer.legacyRef ? <InfoRow icon="link-outline" label="Legacy Ref" value={selectedCustomer.legacyRef} isRTL={isRTL} /> : null}
@@ -811,7 +810,7 @@ export default function CustomersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: { flex: 1, backgroundColor: Colors.background },
   searchRow: { paddingHorizontal: 12, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 8 },
   searchBox: { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 42, borderWidth: 1, borderColor: Colors.inputBorder },
@@ -848,4 +847,4 @@ const styles = StyleSheet.create({
   statLabel: { color: Colors.textMuted, fontSize: 10, marginTop: 2 },
   detailSection: { backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 10 },
   sectionTitle: { color: Colors.textSecondary, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
-});
+}));

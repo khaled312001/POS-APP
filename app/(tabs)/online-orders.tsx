@@ -9,6 +9,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
+import { themedStyles } from "@/lib/themed-styles";
 import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { getDisplayNumber } from "@/lib/api-config";
@@ -40,7 +41,7 @@ const STATUS_META: Record<string, { label: string; labelAr: string; labelDe: str
   completed: { label: "Completed", labelAr: "مكتمل", labelDe: "Abgeschlossen", color: "#10B981", icon: "checkmark-done-outline" },
 };
 
-const PAY_ICON: Record<string, string> = { cash: "💵", card: "💳", mobile: "📱" };
+const PAY_ICON: Record<string, keyof typeof Ionicons.glyphMap> = { cash: "cash-outline", card: "card-outline", mobile: "phone-portrait-outline" };
 
 function FallbackOrderImage({ uri, style }: { uri: string; style: any }) {
   const fallbacks = getWebStaticFallbackChain(uri);
@@ -93,7 +94,7 @@ export default function OrdersScreen() {
   const qc = useQueryClient();
   const tenantId = tenant?.id;
 
-  const [viewMode, setViewMode] = useState<"online" | "pos" | "all">("all");
+  const [viewMode, setViewMode] = useState<"online" | "pos" | "dine_in" | "all">("all");
   const [filter, setFilter] = useState<string>("all");
   const [orderTypeFilter, setOrderTypeFilter] = useState<string>("all_types");
   const [driverAssignOrderId, setDriverAssignOrderId] = useState<number | null>(null);
@@ -310,7 +311,7 @@ export default function OrdersScreen() {
       const data = await res.json();
       if (data?.success) {
         playNotificationSound();
-        setBcToast(lbl("✅ Order accepted — now in your POS queue", "✅ تم قبول الطلب — موجود الآن في قائمتك", "✅ Bestellung angenommen"));
+        setBcToast(lbl("Order accepted — now in your POS queue", "تم قبول الطلب — موجود الآن في قائمتك", "Bestellung angenommen"));
         qc.invalidateQueries({ queryKey: ["/api/broadcast-orders/pending"] });
         qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
       } else {
@@ -577,7 +578,7 @@ export default function OrdersScreen() {
       t.name.toLowerCase() === clean ||
       (t.names && t.names.some(n => n.toLowerCase() === clean)) ||
       label.toLowerCase().includes(t.name.toLowerCase())
-    ) || { icon: "✨", category: "Others" };
+    ) || { icon: "", category: "Others" };
   };
 
   const addItemToOrder = (prod: any) => {
@@ -661,7 +662,8 @@ export default function OrdersScreen() {
 
     const sourceColor = isPOS ? "#F59E0B" : "#6366F1";
     const sourceBg = isPOS ? "rgba(245,158,11,0.12)" : "rgba(99,102,241,0.12)";
-    const sourceLabel = isPOS ? (language === "ar" ? "📞 كاشير" : "📞 POS") : (language === "ar" ? "🌐 إلكتروني" : "🌐 Online");
+    const sourceLabel = isPOS ? (language === "ar" ? "كاشير" : "POS") : (language === "ar" ? "إلكتروني" : "Online");
+    const sourceIcon: keyof typeof Ionicons.glyphMap = isPOS ? "call-outline" : "globe-outline";
     const orderId = isPOS ? (getDisplayNumber(item.receiptNumber) || `#${item.id}`) : `#${getDisplayNumber(item.orderNumber)}`;
 
     return (
@@ -676,6 +678,7 @@ export default function OrdersScreen() {
           <View style={[styles.orderNumRow, isRTL && { flexDirection: "row-reverse" }]}>
             {isNew && <View style={styles.newDot} />}
             <View style={[styles.sourceBadge, { backgroundColor: sourceBg, borderColor: sourceColor + "60" }]}>
+              <Ionicons name={sourceIcon} size={11} color={sourceColor} />
               <Text style={[styles.sourceBadgeText, { color: sourceColor }]}>{sourceLabel}</Text>
             </View>
             <Text style={styles.orderNum}>{orderId}</Text>
@@ -705,7 +708,8 @@ export default function OrdersScreen() {
             <View style={styles.metaChips}>
               {item.paymentMethod ? (
                 <View style={styles.metaChip}>
-                  <Text style={styles.metaChipText}>{PAY_ICON[item.paymentMethod] || "💵"} {item.paymentMethod?.toUpperCase()}</Text>
+                  <Ionicons name={PAY_ICON[item.paymentMethod] || "cash-outline"} size={12} color={Colors.textSecondary} />
+                  <Text style={styles.metaChipText}>{item.paymentMethod?.toUpperCase()}</Text>
                 </View>
               ) : null}
               {item.orderType ? (
@@ -714,14 +718,18 @@ export default function OrdersScreen() {
                     : item.orderType === "dine_in" ? "rgba(245,158,11,0.15)"
                     : "rgba(16,185,129,0.15)"
                 }]}>
-                  <Text style={styles.metaChipText}>
-                    {item.orderType === "delivery" ? "🛵" : item.orderType === "dine_in" ? "🍽" : "🏃"} {item.orderType === "dine_in" ? "Dine-in" : item.orderType}
-                  </Text>
+                  <Ionicons
+                    name={item.orderType === "delivery" ? "bicycle-outline" : item.orderType === "dine_in" ? "restaurant-outline" : "walk-outline"}
+                    size={12}
+                    color={Colors.textSecondary}
+                  />
+                  <Text style={styles.metaChipText}>{item.orderType === "dine_in" ? "Dine-in" : item.orderType}</Text>
                 </View>
               ) : null}
               {item.tableNumber ? (
                 <View style={[styles.metaChip, { backgroundColor: "rgba(30,64,175,0.15)" }]}>
-                  <Text style={styles.metaChipText}>🪑 {item.tableNumber}</Text>
+                  <Ionicons name="grid-outline" size={12} color={Colors.textSecondary} />
+                  <Text style={styles.metaChipText}>{item.tableNumber}</Text>
                 </View>
               ) : null}
             </View>
@@ -742,11 +750,11 @@ export default function OrdersScreen() {
               </View>
             ))}
             {orderItems.length > 4 && <Text style={styles.itemAddons}>+{orderItems.length - 4} {lbl("more items", "عناصر أخرى", "weitere Artikel")}</Text>}
-            {item.notes ? <Text style={[styles.orderNotes, isRTL && { textAlign: "right" }]}>📝 {item.notes}</Text> : null}
+            {item.notes ? <Text style={[styles.orderNotes, isRTL && { textAlign: "right" }]}>{item.notes}</Text> : null}
           </View>
         ) : item.notes ? (
           <View style={styles.itemsList}>
-            <Text style={[styles.orderNotes, isRTL && { textAlign: "right" }]}>📝 {item.notes}</Text>
+            <Text style={[styles.orderNotes, isRTL && { textAlign: "right" }]}>{item.notes}</Text>
           </View>
         ) : null}
 
@@ -770,7 +778,7 @@ export default function OrdersScreen() {
             onPress={() => openChat(item)}
             style={{ flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingVertical: 6, paddingHorizontal: 12, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.accent + "40", marginBottom: 6 }}
           >
-            <Text style={{ fontSize: 14 }}>💬</Text>
+            <Ionicons name="chatbubble-ellipses-outline" size={15} color={Colors.accent} />
             <Text style={{ color: Colors.accent, fontWeight: "600", fontSize: 13 }}>{lbl("Chat", "محادثة", "Chat")}</Text>
           </Pressable>
         ) : null}
@@ -778,7 +786,7 @@ export default function OrdersScreen() {
         {/* Time + fee */}
         <View style={[styles.totalsRow, isRTL && { flexDirection: "row-reverse" }]}>
           <Text style={styles.timeText}>
-            📅 {orderDate.toLocaleDateString()} ⏰ {orderDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            {orderDate.toLocaleDateString()} · {orderDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           </Text>
           {item.deliveryFee && Number(item.deliveryFee) > 0 ? (
             <Text style={styles.feeText}>+CHF {Number(item.deliveryFee).toFixed(2)} {lbl("delivery", "توصيل", "Lieferung")}</Text>
@@ -1162,7 +1170,7 @@ export default function OrdersScreen() {
                             <Text style={{ fontSize: 10, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 11 }} numberOfLines={2}>
                               {toppingDisplayName(toppingName)}
                             </Text>
-                            {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
+                            {isSelected && <Ionicons name="checkmark" size={11} color="#000" style={{ position: "absolute", top: 2, right: 3 }} />}
                           </Pressable>
                         </View>
                       );
@@ -1242,7 +1250,7 @@ export default function OrdersScreen() {
                           <Text style={{ fontSize: 9, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 10 }} numberOfLines={2}>
                             {toppingDisplayName(toppingName)}
                           </Text>
-                          {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 3 }}>✓</Text>}
+                          {isSelected && <Ionicons name="checkmark" size={11} color="#000" style={{ position: "absolute", top: 2, right: 3 }} />}
                         </Pressable>
                       </View>
                     );
@@ -1273,7 +1281,7 @@ export default function OrdersScreen() {
                         <Text style={{ fontSize: 10, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : sauce.textColor, lineHeight: 11 }} numberOfLines={1}>
                           {toppingDisplayName(sauce.name)}
                         </Text>
-                        {isSelected && <Text style={{ fontSize: 10, fontWeight: "900", color: "#000", position: "absolute", top: 2, right: 4 }}>✓</Text>}
+                        {isSelected && <Ionicons name="checkmark" size={11} color="#000" style={{ position: "absolute", top: 2, right: 4 }} />}
                       </Pressable>
                     );
                   })}
@@ -1396,7 +1404,7 @@ export default function OrdersScreen() {
                             <FallbackOrderImage uri={p.image} style={styles.productCardImage} />
                           ) : (
                             <View style={[styles.productCardImagePlaceholder, { backgroundColor: catColor + "20" }]}>
-                              <Text style={{ fontSize: 20 }}>🍕</Text>
+                              <Ionicons name="fast-food-outline" size={20} color={Colors.textMuted} />
                             </View>
                           )}
                           <View style={styles.productCardBody}>
@@ -1440,13 +1448,14 @@ export default function OrdersScreen() {
         ) : undefined}
       >
         <View style={[styles.filterRow, isRTL && { flexDirection: "row-reverse" }]}>
-          {[
-            { key: "all", en: "All Orders", ar: "الكل", de: "Alle" },
-            { key: "online", en: "🌐 Online", ar: "🌐 إلكتروني", de: "🌐 Online" },
-            { key: "dine_in", en: "🍽 Tables", ar: "🍽 طاولات", de: "🍽 Tisch" },
-            { key: "pos", en: "📞 POS", ar: "📞 كاشير", de: "📞 Kasse" },
-          ].map(f => (
-            <Pressable key={f.key} onPress={() => { playClickSound("light"); setViewMode(f.key as any); }} style={[styles.filterTab, viewMode === f.key && styles.filterTabActive]}>
+          {([
+            { key: "all", icon: "layers-outline", en: "All Orders", ar: "الكل", de: "Alle" },
+            { key: "online", icon: "globe-outline", en: "Online", ar: "إلكتروني", de: "Online" },
+            { key: "dine_in", icon: "restaurant-outline", en: "Tables", ar: "طاولات", de: "Tisch" },
+            { key: "pos", icon: "call-outline", en: "POS", ar: "كاشير", de: "Kasse" },
+          ] as const).map(f => (
+            <Pressable key={f.key} onPress={() => { playClickSound("light"); setViewMode(f.key); }} style={[styles.filterTab, styles.filterTabWithIcon, viewMode === f.key && styles.filterTabActive]}>
+              <Ionicons name={f.icon} size={14} color={viewMode === f.key ? Colors.accent : "rgba(255,255,255,0.55)"} />
               <Text style={[styles.filterTabText, viewMode === f.key && styles.filterTabTextActive]}>
                 {language === "ar" ? f.ar : language === "de" ? f.de : f.en}
               </Text>
@@ -1472,27 +1481,32 @@ export default function OrdersScreen() {
         {/* Delivery order type filter */}
         {viewMode === "online" && (
           <View style={[styles.filterRow, isRTL && { flexDirection: "row-reverse" }]}>
-            {[
-              { key: "all_types", en: "All Types", ar: "الكل", de: "Alle" },
-              { key: "delivery", en: "🛵 Delivery", ar: "🛵 توصيل", de: "🛵 Lieferung" },
-              { key: "pickup", en: "🏃 Pickup", ar: "🏃 استلام", de: "🏃 Abholung" },
-              { key: "dine_in", en: "🍽 Dine-in", ar: "🍽 طاولات", de: "🍽 Vor Ort" },
-              { key: "scheduled", en: "📅 Scheduled", ar: "📅 مجدول", de: "📅 Geplant" },
-            ].map(f => (
-              <Pressable
-                key={f.key}
-                onPress={() => { playClickSound("light"); setOrderTypeFilter?.(f.key); }}
-                style={[
-                  styles.filterTab,
-                  { paddingHorizontal: 8 },
-                  (orderTypeFilter || "all_types") === f.key && { backgroundColor: Colors.deliveryPrimaryLight, borderColor: Colors.deliveryPrimary },
-                ]}
-              >
-                <Text style={[styles.filterTabText, (orderTypeFilter || "all_types") === f.key && { color: Colors.deliveryPrimary }]}>
-                  {language === "ar" ? f.ar : language === "de" ? f.de : f.en}
-                </Text>
-              </Pressable>
-            ))}
+            {([
+              { key: "all_types", icon: "apps-outline", en: "All Types", ar: "الكل", de: "Alle" },
+              { key: "delivery", icon: "bicycle-outline", en: "Delivery", ar: "توصيل", de: "Lieferung" },
+              { key: "pickup", icon: "walk-outline", en: "Pickup", ar: "استلام", de: "Abholung" },
+              { key: "dine_in", icon: "restaurant-outline", en: "Dine-in", ar: "طاولات", de: "Vor Ort" },
+              { key: "scheduled", icon: "calendar-outline", en: "Scheduled", ar: "مجدول", de: "Geplant" },
+            ] as const).map(f => {
+              const active = (orderTypeFilter || "all_types") === f.key;
+              return (
+                <Pressable
+                  key={f.key}
+                  onPress={() => { playClickSound("light"); setOrderTypeFilter?.(f.key); }}
+                  style={[
+                    styles.filterTab,
+                    styles.filterTabWithIcon,
+                    { paddingHorizontal: 8 },
+                    active && { backgroundColor: Colors.deliveryPrimaryLight, borderColor: Colors.deliveryPrimary },
+                  ]}
+                >
+                  <Ionicons name={f.icon} size={14} color={active ? Colors.deliveryPrimary : "rgba(255,255,255,0.55)"} />
+                  <Text style={[styles.filterTabText, active && { color: Colors.deliveryPrimary }]}>
+                    {language === "ar" ? f.ar : language === "de" ? f.de : f.en}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         )}
       </TabPageHeader>
@@ -1512,7 +1526,7 @@ export default function OrdersScreen() {
               <View style={styles.bcSection}>
                 <View style={styles.bcSectionHdr}>
                   <Text style={styles.bcSectionTitle}>
-                    📣 {lbl("Incoming Broadcast Orders", "طلبات مفتوحة", "Eingehende Broadcast-Bestellungen")}
+                    {lbl("Incoming Broadcast Orders", "طلبات مفتوحة", "Eingehende Broadcast-Bestellungen")}
                     {"  "}
                     <Text style={styles.bcSectionCount}>({(broadcastOrders as any[]).length})</Text>
                   </Text>
@@ -1527,17 +1541,17 @@ export default function OrdersScreen() {
                   return (
                     <View key={`bc-${bc.id}`} style={styles.bcCard}>
                       <View style={styles.bcRow}>
-                        <Text style={styles.bcName}>👤 {bc.customerName}</Text>
+                        <Text style={styles.bcName}>{bc.customerName}</Text>
                         <Text style={styles.bcTimer}>⏱ {Math.floor(secsLeft / 60)}:{String(secsLeft % 60).padStart(2, "0")}</Text>
                       </View>
-                      <Text style={styles.bcMeta}>📞 {bc.customerPhone}</Text>
-                      {bc.customerAddress ? <Text style={styles.bcMeta}>📍 {bc.customerAddress}</Text> : null}
+                      <Text style={styles.bcMeta}>{bc.customerPhone}</Text>
+                      {bc.customerAddress ? <Text style={styles.bcMeta}>{bc.customerAddress}</Text> : null}
                       <View style={styles.bcItemsBox}>
                         {bcItems.map((it: any, idx: number) => (
                           <Text key={idx} style={styles.bcItem}>• {it.quantity}× {it.name}{it.notes ? ` — ${it.notes}` : ""}</Text>
                         ))}
                       </View>
-                      {bc.notes ? <Text style={styles.bcNotes}>📝 {bc.notes}</Text> : null}
+                      {bc.notes ? <Text style={styles.bcNotes}>{bc.notes}</Text> : null}
                       <View style={styles.bcTotalRow}>
                         <Text style={styles.bcTotalLbl}>{lbl("Est. Total", "الإجمالي المقدر", "Geschätzt")}</Text>
                         <Text style={styles.bcTotalVal}>CHF {Number(bc.estimatedTotal || 0).toFixed(2)}</Text>
@@ -1547,7 +1561,7 @@ export default function OrdersScreen() {
                           <Text style={styles.bcBtnRejectText}>{lbl("Reject", "رفض", "Ablehnen")}</Text>
                         </Pressable>
                         <Pressable style={[styles.bcBtn, styles.bcBtnAccept, bcBusyId === bc.id && { opacity: 0.6 }]} onPress={() => acceptBroadcast(bc)} disabled={bcBusyId === bc.id}>
-                          <Text style={styles.bcBtnAcceptText}>{bcBusyId === bc.id ? lbl("Accepting…", "جاري القبول…", "Wird angenommen…") : "✓ " + lbl("Accept", "قبول", "Annehmen")}</Text>
+                          <Text style={styles.bcBtnAcceptText}>{bcBusyId === bc.id ? lbl("Accepting…", "جاري القبول…", "Wird angenommen…") : lbl("Accept", "قبول", "Annehmen")}</Text>
                         </Pressable>
                       </View>
                     </View>
@@ -1560,7 +1574,12 @@ export default function OrdersScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>{viewMode === "online" ? "🌐" : viewMode === "pos" ? "📞" : "📋"}</Text>
+            <Ionicons
+              name={viewMode === "online" ? "globe-outline" : viewMode === "pos" ? "call-outline" : "receipt-outline"}
+              size={52}
+              color={Colors.textMuted}
+              style={styles.emptyIcon}
+            />
             <Text style={styles.emptyTitle}>{lbl("No orders yet", "لا توجد طلبات", "Keine Bestellungen")}</Text>
             <Text style={styles.emptyText}>
               {lbl("Orders will appear here in real time", "ستظهر الطلبات هنا فور وصولها", "Bestellungen erscheinen hier in Echtzeit")}
@@ -1575,11 +1594,11 @@ export default function OrdersScreen() {
           <View style={{ backgroundColor: Colors.background, height: "85%", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16 }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
               <View>
-                <Text style={{ color: Colors.text, fontWeight: "800", fontSize: 16 }}>💬 {lbl("Chat with customer", "محادثة العميل", "Chat mit Kunde")}</Text>
+                <Text style={{ color: Colors.text, fontWeight: "800", fontSize: 16 }}>{lbl("Chat with customer", "محادثة العميل", "Chat mit Kunde")}</Text>
                 <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>{lbl("Order #", "طلب #", "Bestellung #")}{chatRoomOrderId}</Text>
               </View>
               <Pressable onPress={() => setChatRoomOrderId(null)} style={{ padding: 8 }}>
-                <Text style={{ color: Colors.text, fontSize: 22 }}>✕</Text>
+                <Ionicons name="close" size={22} color={Colors.text} />
               </Pressable>
             </View>
             <ScrollView style={{ flex: 1, marginBottom: 8 }} contentContainerStyle={{ paddingBottom: 12 }}>
@@ -1587,7 +1606,7 @@ export default function OrdersScreen() {
                 <View style={{ padding: 20, alignItems: "center" }}><ActivityIndicator color={Colors.accent} /></View>
               ) : chatMessages.length === 0 ? (
                 <View style={{ padding: 30, alignItems: "center" }}>
-                  <Text style={{ fontSize: 40, marginBottom: 8, opacity: 0.5 }}>💬</Text>
+                  <Ionicons name="chatbubbles-outline" size={40} color={Colors.textMuted} style={{ marginBottom: 8, opacity: 0.6 }} />
                   <Text style={{ color: Colors.textMuted, fontSize: 13, textAlign: "center" }}>
                     {lbl("No messages yet — wait for the customer to start", "لا توجد رسائل — انتظر حتى يبدأ العميل المحادثة", "Noch keine Nachrichten")}
                   </Text>
@@ -1623,7 +1642,7 @@ export default function OrdersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
   container: { flex: 1, backgroundColor: Colors.background },
   // ── Broadcast (marketplace) panel ─────────────────────────
   bcToast: { backgroundColor: Colors.accent + "20", borderColor: Colors.accent + "60", borderWidth: 1, padding: 12, borderRadius: 10, marginBottom: 10 },
@@ -1660,6 +1679,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)",
   },
+  filterTabWithIcon: { flexDirection: "row", alignItems: "center", gap: 6 },
   filterTabActive: { backgroundColor: Colors.accent + "22", borderColor: Colors.accent },
   filterTabText: { color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: "600" },
   filterTabTextActive: { color: Colors.accent },
@@ -1679,6 +1699,7 @@ const styles = StyleSheet.create({
   },
   newDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#F59E0B", marginRight: 6 },
   sourceBadge: {
+    flexDirection: "row", alignItems: "center", gap: 4,
     paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1,
   },
   sourceBadgeText: { fontSize: 10, fontWeight: "800" },
@@ -1700,7 +1721,7 @@ const styles = StyleSheet.create({
   customerName: { color: Colors.text, fontWeight: "700", fontSize: 13 },
   customerSub: { color: Colors.textMuted, fontSize: 11, marginTop: 1 },
   metaChips: { flexDirection: "column", gap: 4, alignItems: "flex-end" },
-  metaChip: { backgroundColor: "rgba(255,255,255,0.06)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  metaChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(255,255,255,0.06)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
   metaChipText: { color: Colors.textSecondary, fontSize: 10, fontWeight: "600" },
 
   itemsList: { backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 10, padding: 10, marginBottom: 10, gap: 4 },
@@ -1822,7 +1843,7 @@ const styles = StyleSheet.create({
   statusTabTextActive: { color: Colors.accent },
 
   emptyState: { alignItems: "center", paddingTop: 80, paddingHorizontal: 32 },
-  emptyIcon: { fontSize: 56, marginBottom: 16 },
+  emptyIcon: { marginBottom: 16, opacity: 0.7 },
   emptyTitle: { color: Colors.text, fontSize: 18, fontWeight: "800", marginBottom: 8 },
   emptyText: { color: Colors.textMuted, fontSize: 13, textAlign: "center", lineHeight: 20 },
-});
+}));

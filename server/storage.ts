@@ -1064,7 +1064,7 @@ export const storage = {
 
     await this.createEmployee({
       name: "Admin",
-      email: "admin@barmagly.com",
+      email: "admin@kassenta.com",
       pin: "1234",
       role: "admin",
       branchId: branch.id,
@@ -1897,15 +1897,16 @@ export const storage = {
     this.seedLog(`Existing tenants count: ${existingTenants.length}`);
     if (existingTenants.length > 0) return false;
 
-    // 1. Create Default Super Admin if not exists
-    const adminEmail = "admin@barmagly.com";
-    this.seedLog(`Checking for super admin: ${adminEmail}`);
-    const existingAdmin = await this.getSuperAdminByEmail(adminEmail);
-    if (!existingAdmin) {
+    // 1. Super admin bootstrap — env only. A hardcoded default-password admin
+    //    here was a standing backdoor into every tenant on the platform.
+    const adminEmail = process.env.SUPER_ADMIN_EMAIL;
+    const adminPassword = process.env.SUPER_ADMIN_PASSWORD;
+    if (adminEmail && adminPassword && (await this.getSuperAdmins()).length === 0) {
+      const bcrypt = (await import("bcrypt")).default;
       await this.createSuperAdmin({
-        name: "Super Admin",
+        name: process.env.SUPER_ADMIN_NAME || "Super Admin",
         email: adminEmail,
-        passwordHash: "$2b$10$OoKOgYj3UlErVOmwqm4rnOpZLdqpLDF3zBiO4VuXJQa56F0DLlesK",
+        passwordHash: await bcrypt.hash(adminPassword, 10),
         role: "super_admin",
         isActive: true,
       });
@@ -1997,7 +1998,7 @@ export const storage = {
       await this.createTenantNotification({
         tenantId: tenant.id,
         type: "info",
-        title: "Welcome to Barmagly!",
+        title: "Welcome to Kassenta!",
         message: `Hello ${tenant.ownerName}, thank you for joining our platform.`,
         priority: "normal",
       });

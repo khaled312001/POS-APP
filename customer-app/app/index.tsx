@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
+  Linking,
   Platform,
   StyleSheet,
   View,
@@ -9,7 +10,21 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView, WebViewNavigation } from "react-native-webview";
 
-const CUSTOMER_URL = "https://pos.barmagly.tech/customer/";
+// SEC-05: the storefront origin lives in env so a rebrand/domain move does not
+// need a code change. Everything outside it opens in the system browser.
+const CUSTOMER_URL =
+  process.env.EXPO_PUBLIC_CUSTOMER_URL ?? "https://kassenta.com/customer/";
+
+const ALLOWED_ORIGIN = new URL(CUSTOMER_URL).origin;
+
+/** In-app navigation is confined to the storefront origin. */
+function isInAppUrl(url: string): boolean {
+  try {
+    return new URL(url).origin === ALLOWED_ORIGIN;
+  } catch {
+    return false;
+  }
+}
 
 export default function CustomerWebView() {
   const webRef = useRef<WebView>(null);
@@ -33,7 +48,14 @@ export default function CustomerWebView() {
         ref={webRef}
         source={{ uri: CUSTOMER_URL }}
         style={styles.web}
-        originWhitelist={["https://*", "http://*"]}
+        originWhitelist={[ALLOWED_ORIGIN]}
+        onShouldStartLoadWithRequest={(req) => {
+          if (isInAppUrl(req.url)) return true;
+          // tel:/mailto:/maps and any third-party link leave the app instead of
+          // rendering inside it under the brand's chrome.
+          void Linking.openURL(req.url).catch(() => {});
+          return false;
+        }}
         allowsBackForwardNavigationGestures
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}

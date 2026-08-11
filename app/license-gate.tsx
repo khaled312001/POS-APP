@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLicense } from '@/lib/license-context';
 import { Colors } from '@/constants/colors';
+import { themedStyles } from "@/lib/themed-styles";
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
@@ -10,7 +11,7 @@ import { useLanguage } from '@/lib/language-context';
 
 
 
-const WEBSITE_URL = 'https://pos.barmagly.tech/';
+const WEBSITE_URL = 'https://kassenta.com/';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function LicenseGate() {
@@ -203,7 +204,7 @@ export default function LicenseGate() {
                             ]}>
                                 <TextInput
                                     style={[styles.input, styles.inputKey]}
-                                    placeholder="BARMAGLY-XXXX-XXXX-XXXX-XXXX"
+                                    placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXX"
                                     placeholderTextColor={Colors.textMuted}
                                     value={key}
                                     onChangeText={setKey}
@@ -276,7 +277,7 @@ export default function LicenseGate() {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles((Colors) => ({
     container: {
         flex: 1,
         backgroundColor: Colors.background,
@@ -735,4 +736,4 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         textDecorationLine: 'underline',
     },
-});
+}));
