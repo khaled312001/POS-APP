@@ -1,5 +1,5 @@
 /**
- * partner.js — Partner with Us / Barmagly for Business (Just Eat style)
+ * partner.js — Partner with Us / Kassenta for Business (Just Eat style)
  */
 window.pages = window.pages || {};
 
@@ -18,7 +18,7 @@ pages.partner = {
   <!-- Hero -->
   <div class="partner-hero">
     <div class="partner-hero__icon"><i data-lucide="handshake" class="icon-3xl"></i></div>
-    <h1 class="partner-hero__title">${rtl ? "انمِّ مطعمك مع Barmagly" : "Grow your restaurant with Barmagly"}</h1>
+    <h1 class="partner-hero__title">${rtl ? "انمِّ مطعمك مع Kassenta" : "Grow your restaurant with Kassenta"}</h1>
     <p class="partner-hero__sub">${rtl ? "انضم إلى منصتنا واوصل طعامك لآلاف العملاء الجدد" : "Join our platform and reach thousands of new customers"}</p>
     <button class="btn btn-primary btn-lg" onclick="pages.partner._scrollToForm()">
       <i data-lucide="rocket" class="icon-sm"></i>
@@ -50,7 +50,7 @@ pages.partner = {
 
   <!-- Benefits -->
   <div class="info-section">
-    <h2 class="info-section__title">${rtl ? "لماذا Barmagly؟" : "Why Barmagly?"}</h2>
+    <h2 class="info-section__title">${rtl ? "لماذا Kassenta؟" : "Why Kassenta?"}</h2>
     <div class="partner-benefits">
       <div class="partner-benefit">
         <div class="partner-benefit__icon"><i data-lucide="users" class="icon-xl"></i></div>
@@ -203,12 +203,12 @@ pages.partner = {
     <div class="partner-testimonials">
       <div class="partner-testimonial">
         <div class="partner-testimonial__stars">★★★★★</div>
-        <p class="partner-testimonial__text">"${rtl ? "منذ انضمامنا لـ Barmagly، زادت مبيعاتنا بنسبة 40%. المنصة سهلة الاستخدام والدعم ممتاز" : "Since joining Barmagly, our sales increased by 40%. The platform is easy to use and support is excellent"}"</p>
+        <p class="partner-testimonial__text">"${rtl ? "منذ انضمامنا لـ Kassenta، زادت مبيعاتنا بنسبة 40%. المنصة سهلة الاستخدام والدعم ممتاز" : "Since joining Kassenta, our sales increased by 40%. The platform is easy to use and support is excellent"}"</p>
         <div class="partner-testimonial__author">${rtl ? "أحمد — مطعم الشرق" : "Ahmad — Eastern Kitchen"}</div>
       </div>
       <div class="partner-testimonial">
         <div class="partner-testimonial__stars">★★★★★</div>
-        <p class="partner-testimonial__text">"${rtl ? "أفضل قرار اتخذناه هو الشراكة مع Barmagly. وصلنا لعملاء لم نكن نحلم بالوصول إليهم" : "The best decision we made was partnering with Barmagly. We reached customers we never dreamed of"}"</p>
+        <p class="partner-testimonial__text">"${rtl ? "أفضل قرار اتخذناه هو الشراكة مع Kassenta. وصلنا لعملاء لم نكن نحلم بالوصول إليهم" : "The best decision we made was partnering with Kassenta. We reached customers we never dreamed of"}"</p>
         <div class="partner-testimonial__author">${rtl ? "ماركو — بيتزا نابولي" : "Marco — Napoli Pizza"}</div>
       </div>
     </div>

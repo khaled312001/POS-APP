@@ -57,7 +57,7 @@ self.addEventListener("fetch", (event) => {
 // Push notifications
 self.addEventListener("push", (event) => {
   const data = event.data?.json() || {};
-  const title = data.title || "Barmagly Driver";
+  const title = data.title || "Kassenta Driver";
   const options = {
     body: data.body || "You have a new notification",
     icon: "/delivery-app/driver/icon-192.png",

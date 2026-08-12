@@ -88,7 +88,7 @@ pages.giftcards = {
     <h2 class="info-section__title">${rtl ? "معاينة" : "Preview"}</h2>
     <div class="gift-preview" id="giftPreview">
       <div class="gift-preview__card" style="background:${designs[0].gradient}">
-        <div class="gift-preview__logo">Barmagly</div>
+        <div class="gift-preview__logo">Kassenta</div>
         <div class="gift-preview__icon"><i data-lucide="${designs[0].icon}" class="icon-2xl"></i></div>
         <div class="gift-preview__amount">${currency} 50</div>
         <div class="gift-preview__label">${designs[0].name}</div>

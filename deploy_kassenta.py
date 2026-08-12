@@ -98,6 +98,10 @@ def deploy_server(t):
             (ROOT / "server_dist", "server_dist"),
             (ROOT / "server" / "templates", "server/templates"),
             (ROOT / "public" / "brand", "public/brand"),
+            # Customer storefront and driver PWA — served by express.static from
+            # the app root. Left out of the original migration, so the copy on
+            # the host stayed on the pre-rebrand version until 12 Aug 2026.
+            (ROOT / "delivery-app", "delivery-app"),
             (ROOT / "app.json", "app.json"),
             (ROOT / "package.json", "package.json"),
         ],

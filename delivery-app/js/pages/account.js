@@ -59,7 +59,7 @@ pages.account = {
       <div class="account-avatar account-avatar--guest">
         <i data-lucide="user" class="icon-3xl"></i>
       </div>
-      <h1 class="account-hero__title">${rtl ? "مرحباً بك في Barmagly" : "Welcome to Barmagly"}</h1>
+      <h1 class="account-hero__title">${rtl ? "مرحباً بك في Kassenta" : "Welcome to Kassenta"}</h1>
       <p class="account-hero__sub">${rtl ? "سجل دخولك لتتبع طلباتك واكسب النقاط" : "Sign in to track orders, earn points & more"}</p>
       <div class="account-hero__actions">
         <button class="btn btn-primary btn-lg" onclick="router.navigate('login')">
@@ -289,7 +289,7 @@ pages.account = {
     </div>
   </div>
 
-  <p class="account-version">Barmagly v2.0</p>
+  <p class="account-version">Kassenta v2.0</p>
   <div class="home-spacer"></div>
 </div>`;
   },

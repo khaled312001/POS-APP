@@ -1,9 +1,9 @@
 /**
- * Service Worker — Barmagly Delivery PWA
+ * Service Worker — Kassenta Delivery PWA
  * Caches static assets, serves offline fallback, and handles push notifications.
  */
 
-const CACHE_NAME = "barmagly-delivery-v5";
+const CACHE_NAME = "kassenta-delivery-v5";
 const STATIC_ASSETS = [
   "/api/delivery-app/css/base.css",
   "/api/delivery-app/css/components.css",
@@ -31,8 +31,8 @@ const STATIC_ASSETS = [
   "/api/delivery-app/js/pages/partner.js",
 ];
 
-const API_CACHE_NAME = "barmagly-api-v1";
-const IMAGE_CACHE_NAME = "barmagly-images-v1";
+const API_CACHE_NAME = "kassenta-api-v1";
+const IMAGE_CACHE_NAME = "kassenta-images-v1";
 const API_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const IMAGE_CACHE_MAX = 200;
 
@@ -180,7 +180,7 @@ self.addEventListener("push", (event) => {
       vibrate: [200, 100, 200],
       actions: data.actions || [],
     };
-    event.waitUntil(self.registration.showNotification(data.title || "Barmagly Delivery", options));
+    event.waitUntil(self.registration.showNotification(data.title || "Kassenta Delivery", options));
   } catch (_) {}
 });
 

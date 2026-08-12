@@ -30,7 +30,7 @@ pages.login = {
     <div class="auth-card__header">
       <div class="auth-logo-wrap">
         <div class="auth-logo-icon"><i data-lucide="utensils" class="icon-2xl"></i></div>
-        <span class="auth-logo-text">Barmagly</span>
+        <span class="auth-logo-text">Kassenta</span>
       </div>
       <h1 class="auth-title">${rtl ? "مرحباً بك" : "Welcome"}</h1>
       <p class="auth-subtitle">${rtl ? "سجّل دخولك أو أنشئ حساباً للمتابعة" : "Sign in or create an account to continue"}</p>

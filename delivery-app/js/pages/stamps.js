@@ -13,7 +13,7 @@ pages.stamps = {
     var cards = [
       {
         id: 1,
-        restaurant: "Barmagly",
+        restaurant: "Kassenta",
         reward: rtl ? "وجبة مجانية" : "Free meal",
         total: 10,
         collected: customer ? 7 : 0,

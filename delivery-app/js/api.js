@@ -1,5 +1,5 @@
 /**
- * api.js — API client for Barmagly Delivery
+ * api.js — API client for Kassenta Delivery
  * Wraps fetch with auth headers, error handling, and base URL resolution.
  */
 
