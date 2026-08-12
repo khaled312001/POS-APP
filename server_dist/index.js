@@ -6492,6 +6492,9 @@ p { color: var(--text-2); }
 }
 .shot img { width: 100%; height: 100%; object-fit: cover; }
 .shot--contain img { object-fit: contain; padding: 6%; }
+/* Cut-out artwork: no frame, so the transparent background picks up the section. */
+.shot--bare { border: 0; background: transparent; box-shadow: none; border-radius: 0; }
+.shot--bare img { object-fit: contain; }
 .shot-ph {
   display: none; position: absolute; inset: 0; flex-direction: column; gap: 6px;
   align-items: center; justify-content: center; text-align: center; padding: 20px;
@@ -6679,6 +6682,21 @@ td strong { color: var(--text); font-weight: 700; }
 .footer-col a:hover { color: var(--accent); }
 .footer-bottom { display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between; align-items: center; margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--border); font-size: .82rem; color: var(--text-3); }
 .footer-legal { display: flex; flex-wrap: wrap; gap: 18px; }
+.footer-maker {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+  font-size: .8rem; color: var(--text-3);
+}
+.footer-maker a { color: var(--accent); font-weight: 700; }
+.footer-maker a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.footer-maker .uid {
+  display: inline-flex; align-items: center; gap: 7px; margin-inline-start: auto;
+  padding: 4px 11px; border-radius: 100px;
+  background: var(--bg-inset); border: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.footer-maker .uid b { color: var(--text-2); font-weight: 700; letter-spacing: .01em; }
+@media (max-width: 620px) { .footer-maker .uid { margin-inline-start: 0; } }
 
 /* ── Reveal ─────────────────────────────────────────────────────────────── */
 .reveal { opacity: 0; transform: translateY(16px); transition: opacity .55s var(--ease), transform .55s var(--ease); }
@@ -6716,10 +6734,18 @@ function tAttrs(v) {
 function esc(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
+function parseSize(size) {
+  const m = size.match(/(\d+)\s*[×x]\s*(\d+)/);
+  return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
+}
 function shot(slot) {
   const src = `/brand/site/${slot.id}.webp`;
-  return `<figure class="shot is-empty${slot.contain ? " shot--contain" : ""}" style="--ar:${slot.ratio}">
-  <img src="${src}" alt="${esc(slot.alt.en)}" ${tAttrs(slot.alt).replace(/data-(en|de|ar)=/g, "data-alt-$1=")} loading="lazy" decoding="async"
+  const dim = parseSize(slot.size);
+  const dimAttrs = dim ? ` width="${dim.w}" height="${dim.h}"` : "";
+  const loadAttrs = slot.priority ? ` loading="eager" fetchpriority="high" decoding="async"` : ` loading="lazy" decoding="async"`;
+  const variant = `${slot.contain ? " shot--contain" : ""}${slot.bare ? " shot--bare" : ""}`;
+  return `<figure class="shot is-empty${variant}" style="--ar:${slot.ratio}">
+  <img src="${src}" alt="${esc(slot.alt.en)}" ${tAttrs(slot.alt).replace(/data-(en|de|ar)=/g, "data-alt-$1=")}${dimAttrs}${loadAttrs}
        onload="this.closest('.shot').classList.remove('is-empty')" onerror="this.closest('.shot').classList.add('is-empty')">
   <figcaption class="shot-ph" dir="ltr"><b>${esc(slot.id)}</b><small>${esc(slot.size)}</small></figcaption>
 </figure>${slot.caption ? `<p class="shot-caption" ${tAttrs(slot.caption)}>${esc(slot.caption.en)}</p>` : ""}`;
@@ -6733,7 +6759,18 @@ function renderPage(meta, body, baseUrl) {
   const langButtons = ["en", "de", "ar"].map(
     (l) => `<button type="button" role="menuitemradio" data-lang="${l}" onclick="Kassenta.setLang('${l}')">${FLAGS[l]}<span>${{ en: "English", de: "Deutsch", ar: "\u0627\u0644\u0639\u0631\u0628\u064A\u0629" }[l]}</span></button>`
   ).join("");
-  const jsonLd = (meta.jsonLd ?? []).map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join("\n  ");
+  const crumb = meta.path === "/" ? null : {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+      { "@type": "ListItem", position: 2, name: meta.title.en.split(" \u2014 ")[0], item: canonical }
+    ]
+  };
+  const blocks = [...meta.jsonLd ?? [], ...crumb ? [crumb] : []];
+  const jsonLd = blocks.map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join("\n  ");
+  const heroPreload = meta.heroImage ? `
+  <link rel="preload" as="image" href="/brand/site/${meta.heroImage}.webp" fetchpriority="high" type="image/webp">` : "";
   return `<!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -6762,8 +6799,16 @@ function renderPage(meta, body, baseUrl) {
   <meta property="og:title" content="${esc(meta.title.en)}">
   <meta property="og:description" content="${esc(meta.description.en)}">
   <meta property="og:url" content="${canonical}">
-  <meta property="og:image" content="${baseUrl}/brand/og-image.png">
+  <meta property="og:image" content="${baseUrl}/brand/og-image.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Kassenta POS running on a tablet, showing the ordering screen">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${esc(meta.title.en)}">
+  <meta name="twitter:description" content="${esc(meta.description.en)}">
+  <meta name="twitter:image" content="${baseUrl}/brand/og-image.jpg">
+  <meta name="twitter:image:alt" content="Kassenta POS running on a tablet, showing the ordering screen">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -6771,7 +6816,7 @@ function renderPage(meta, body, baseUrl) {
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
 
   <link rel="preload" as="style" href="${css.url}">
-  <link rel="stylesheet" href="${css.url}">
+  <link rel="stylesheet" href="${css.url}">${heroPreload}
   <script>
     // Paint the stored theme/language before first render to avoid a flash.
     (function () {
@@ -6874,6 +6919,22 @@ function renderFooter() {
           <a href="/imprint/" ${tAttrs({ en: "Imprint", de: "Impressum", ar: "\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0646\u0627\u0634\u0631" })}>Imprint</a>
           <a href="/delete-account" ${tAttrs({ en: "Delete account", de: "Konto l\xF6schen", ar: "\u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628" })}>Delete account</a>
         </div>
+      </div>
+      <div class="footer-maker">
+        <span ${tAttrs({
+    en: "Built by Barmagly",
+    de: "Entwickelt von Barmagly",
+    ar: "\u062A\u0645\u062A \u0627\u0644\u0628\u0631\u0645\u062C\u0629 \u0628\u0648\u0627\u0633\u0637\u0629 \u0634\u0631\u0643\u0629 \u0628\u0631\u0645\u062C\u0644\u064A"
+  })}>Built by Barmagly</span>
+        <a href="https://barmagly.tech/" target="_blank" rel="noopener">barmagly.tech</a>
+        <span class="uid" dir="ltr" title="Swiss company identification number">
+          <span ${tAttrs({
+    en: "Swiss company ID",
+    de: "Schweizer UID",
+    ar: "\u062A\u0631\u062E\u064A\u0635 \u0633\u0648\u064A\u0633\u0631\u064A \u0631\u0633\u0645\u064A"
+  })}>Swiss company ID</span>
+          <b>CHE-154.312.079</b>
+        </span>
       </div>
     </div>
   </footer>`;
@@ -7029,7 +7090,7 @@ window.Kassenta = (function () {
 });
 
 // server/site/pages.ts
-var head, card, ticks, faq, ctaBand, pageHead, home, features, vertical, solutions, plan, pricing, compliance, about, contact, PAGES;
+var head, card, ticks, faq, ctaBand, pageHead, home, features, INDUSTRY_ART, vertical, solutions, plan, pricing, compliance, about, contact, PAGES;
 var init_pages = __esm({
   "server/site/pages.ts"() {
     "use strict";
@@ -7081,32 +7142,126 @@ var init_pages = __esm({
       meta: {
         path: "/",
         title: {
-          en: "Kassenta POS \u2014 Point of sale, online ordering and delivery in one system",
-          de: "Kassenta POS \u2014 Kasse, Online-Bestellung und Lieferung in einem System",
-          ar: "Kassenta POS \u2014 \u0646\u0642\u0637\u0629 \u0628\u064A\u0639 \u0648\u0637\u0644\u0628 \u0623\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u062A\u0648\u0635\u064A\u0644 \u0641\u064A \u0646\u0638\u0627\u0645 \u0648\u0627\u062D\u062F"
+          en: "Kassenta POS \u2014 till, online ordering and delivery",
+          de: "Kassenta POS \u2014 Kasse, Online-Bestellung und Lieferung",
+          ar: "Kassenta POS \u2014 \u0643\u0627\u0634\u064A\u0631 \u0648\u0637\u0644\u0628 \u0623\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u062A\u0648\u0635\u064A\u0644"
         },
         description: {
-          en: "Kassenta runs the till, the online shop, the kitchen and the delivery fleet from one place. Swiss VAT, CHF rounding and TWINT built in. Works on phone, tablet and desktop.",
-          de: "Kassenta betreibt Kasse, Online-Shop, K\xFCche und Lieferflotte an einem Ort. Schweizer MwSt., CHF-Rundung und TWINT integriert. F\xFCr Smartphone, Tablet und Desktop.",
-          ar: "\u064A\u062F\u064A\u0631 Kassenta \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0627\u0644\u0645\u062A\u062C\u0631 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0648\u0627\u0644\u0645\u0637\u0628\u062E \u0648\u0623\u0633\u0637\u0648\u0644 \u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u0645\u0646 \u0645\u0643\u0627\u0646 \u0648\u0627\u062D\u062F. \u0636\u0631\u064A\u0628\u0629 \u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u062A\u0642\u0631\u064A\u0628 CHF \u0648TWINT \u0645\u062F\u0645\u062C\u0629. \u064A\u0639\u0645\u0644 \u0639\u0644\u0649 \u0627\u0644\u0647\u0627\u062A\u0641 \u0648\u0627\u0644\u062A\u0627\u0628\u0644\u062A \u0648\u0627\u0644\u0643\u0645\u0628\u064A\u0648\u062A\u0631."
+          en: "One system for the till, your own online shop and delivery. Swiss VAT, CHF rounding and TWINT built in. Runs on phone, tablet and desktop.",
+          de: "Ein System f\xFCr Kasse, eigenen Online-Shop und Lieferung. Schweizer MwSt., Rappenrundung und TWINT integriert. F\xFCr Handy, Tablet und Desktop.",
+          ar: "\u0646\u0638\u0627\u0645 \u0648\u0627\u062D\u062F \u0644\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0645\u062A\u062C\u0631\u0643 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644. \u0636\u0631\u064A\u0628\u0629 \u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u062A\u0642\u0631\u064A\u0628 CHF \u0648TWINT \u0645\u062F\u0645\u062C\u0629. \u064A\u0639\u0645\u0644 \u0639\u0644\u0649 \u0627\u0644\u0647\u0627\u062A\u0641 \u0648\u0627\u0644\u062A\u0627\u0628\u0644\u062A \u0648\u0627\u0644\u0643\u0645\u0628\u064A\u0648\u062A\u0631."
         },
+        heroImage: "hero-pos-tablet",
         jsonLd: [
           {
             "@context": "https://schema.org",
             "@type": "SoftwareApplication",
             name: "Kassenta POS",
             applicationCategory: "BusinessApplication",
+            applicationSubCategory: "Point of Sale",
             operatingSystem: "Web, Android, iOS",
-            offers: { "@type": "Offer", price: "49", priceCurrency: "CHF" },
+            url: "https://kassenta.com/",
+            image: "https://kassenta.com/brand/og-image.jpg",
+            inLanguage: ["en", "de", "ar"],
+            featureList: [
+              "Touch point of sale",
+              "Branded online storefront",
+              "Table QR ordering",
+              "Delivery dispatch and driver tracking",
+              "Inventory and stock counts",
+              "Customer records and loyalty",
+              "Swiss VAT and CHF cash rounding",
+              "VAT-ready reporting with CSV export"
+            ],
+            offers: {
+              "@type": "AggregateOffer",
+              priceCurrency: "CHF",
+              lowPrice: "49",
+              highPrice: "199",
+              offerCount: 3,
+              url: "https://kassenta.com/pricing/"
+            },
             description: "Point of sale, online ordering and delivery management for hospitality and retail in Switzerland and Europe."
           },
           {
             "@context": "https://schema.org",
             "@type": "Organization",
             name: "Kassenta",
+            alternateName: "Kassenta POS System",
             url: "https://kassenta.com",
             logo: "https://kassenta.com/brand/logo-mark.png",
-            email: "info@kassenta.com"
+            image: "https://kassenta.com/brand/og-image.jpg",
+            email: "info@kassenta.com",
+            areaServed: ["CH", "DE", "AT", "FR", "IT"],
+            identifier: {
+              "@type": "PropertyValue",
+              propertyID: "CHE",
+              name: "Swiss company identification number (UID)",
+              value: "CHE-154.312.079"
+            },
+            parentOrganization: { "@type": "Organization", name: "Barmagly", url: "https://barmagly.tech/" },
+            contactPoint: {
+              "@type": "ContactPoint",
+              contactType: "sales",
+              email: "info@kassenta.com",
+              availableLanguage: ["English", "German", "Arabic"]
+            }
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: "Kassenta POS",
+            url: "https://kassenta.com/",
+            inLanguage: ["en", "de", "ar"],
+            publisher: { "@type": "Organization", name: "Kassenta" }
+          },
+          {
+            // Mirrors the FAQ section below — Google can surface these directly in
+            // the result. Keep the two in sync when the copy changes.
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: [
+              {
+                "@type": "Question",
+                name: "Do I need to buy special hardware?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "No. Kassenta runs in any modern browser and as an app on Android and iOS, so an existing tablet or laptop is enough to start. Receipt printers, cash drawers and barcode scanners are supported but optional."
+                }
+              },
+              {
+                "@type": "Question",
+                name: "What happens if the internet drops?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "The POS keeps taking orders and payments from its local cache and syncs the queue once the connection returns. Online ordering and driver tracking need connectivity, since they involve people outside the building."
+                }
+              },
+              {
+                "@type": "Question",
+                name: "Can I move my existing products and customers in?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Yes. Products, categories and customers import from CSV, and we do the first import with you during onboarding so the mapping is right before you go live."
+                }
+              },
+              {
+                "@type": "Question",
+                name: "How many branches can one account hold?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "As many as you need. Each branch keeps its own stock, staff and prices while the owner console reports across all of them together."
+                }
+              },
+              {
+                "@type": "Question",
+                name: "Is my data locked in?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "No. Sales, products and customers can be exported to CSV at any time from the reporting screens, and a full export can be requested from support."
+                }
+              }
+            ]
           }
         ]
       },
@@ -7138,7 +7293,7 @@ var init_pages = __esm({
           </div>
         </div>
         <div class="reveal">
-          ${shot({ id: "hero-pos-tablet", ratio: "4 / 5", size: "1200 \xD7 1500", alt: { en: "Kassenta POS running on a tablet at a restaurant counter", de: "Kassenta POS auf einem Tablet an der Theke eines Restaurants", ar: "Kassenta POS \u064A\u0639\u0645\u0644 \u0639\u0644\u0649 \u062A\u0627\u0628\u0644\u062A \u0639\u0646\u062F \u0643\u0627\u0634\u064A\u0631 \u0645\u0637\u0639\u0645" } })}
+          ${shot({ id: "hero-pos-tablet", ratio: "4 / 5", size: "1122 \xD7 1402", priority: true, alt: { en: "Kassenta POS running on a tablet at a restaurant counter", de: "Kassenta POS auf einem Tablet an der Theke eines Restaurants", ar: "Kassenta POS \u064A\u0639\u0645\u0644 \u0639\u0644\u0649 \u062A\u0627\u0628\u0644\u062A \u0639\u0646\u062F \u0643\u0627\u0634\u064A\u0631 \u0645\u0637\u0639\u0645" } })}
         </div>
       </div>
     </div>
@@ -7196,7 +7351,7 @@ var init_pages = __esm({
     <div class="wrap">
       <div class="split">
         <div class="reveal">
-          ${shot({ id: "home-order-flow", ratio: "16 / 11", size: "1600 \xD7 1100", alt: { en: "Order flow from customer to kitchen to driver", de: "Bestellablauf vom Kunden \xFCber die K\xFCche zum Fahrer", ar: "\u0645\u0633\u0627\u0631 \u0627\u0644\u0637\u0644\u0628 \u0645\u0646 \u0627\u0644\u0639\u0645\u064A\u0644 \u0625\u0644\u0649 \u0627\u0644\u0645\u0637\u0628\u062E \u0625\u0644\u0649 \u0627\u0644\u0633\u0627\u0626\u0642" } })}
+          ${shot({ id: "home-order-flow", ratio: "16 / 9", size: "1600 \xD7 900", alt: { en: "Order flow from customer to kitchen to driver", de: "Bestellablauf vom Kunden \xFCber die K\xFCche zum Fahrer", ar: "\u0645\u0633\u0627\u0631 \u0627\u0644\u0637\u0644\u0628 \u0645\u0646 \u0627\u0644\u0639\u0645\u064A\u0644 \u0625\u0644\u0649 \u0627\u0644\u0645\u0637\u0628\u062E \u0625\u0644\u0649 \u0627\u0644\u0633\u0627\u0626\u0642" } })}
         </div>
         <div>
           ${head(
@@ -7300,7 +7455,7 @@ var init_pages = __esm({
           </div>
         </div>
         <div class="reveal">
-          ${shot({ id: "home-swiss-receipt", ratio: "5 / 6", size: "1250 \xD7 1500", alt: { en: "Receipt showing Swiss VAT split and cash rounding", de: "Bon mit Schweizer MwSt.-Aufteilung und Rappenrundung", ar: "\u0625\u064A\u0635\u0627\u0644 \u064A\u0648\u0636\u0651\u062D \u062A\u0642\u0633\u064A\u0645 \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A" } })}
+          ${shot({ id: "home-swiss-receipt", ratio: "4 / 5", size: "1122 \xD7 1402", alt: { en: "Receipt showing Swiss VAT split and cash rounding", de: "Bon mit Schweizer MwSt.-Aufteilung und Rappenrundung", ar: "\u0625\u064A\u0635\u0627\u0644 \u064A\u0648\u0636\u0651\u062D \u062A\u0642\u0633\u064A\u0645 \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A" } })}
         </div>
       </div>
     </div>
@@ -7319,7 +7474,7 @@ var init_pages = __esm({
         true
       )}
       <div class="reveal">
-        ${shot({ id: "home-devices", ratio: "16 / 8", size: "1920 \xD7 960", contain: true, alt: { en: "Kassenta shown on a phone, a tablet and a desktop browser", de: "Kassenta auf Smartphone, Tablet und Desktop-Browser", ar: "Kassenta \u0639\u0644\u0649 \u0647\u0627\u062A\u0641 \u0648\u062A\u0627\u0628\u0644\u062A \u0648\u0645\u062A\u0635\u0641\u062D \u0643\u0645\u0628\u064A\u0648\u062A\u0631" } })}
+        ${shot({ id: "home-devices", ratio: "3 / 2", size: "1536 \xD7 1024", bare: true, alt: { en: "Kassenta shown on a phone, a tablet and a desktop browser", de: "Kassenta auf Smartphone, Tablet und Desktop-Browser", ar: "Kassenta \u0639\u0644\u0649 \u0647\u0627\u062A\u0641 \u0648\u062A\u0627\u0628\u0644\u062A \u0648\u0645\u062A\u0635\u0641\u062D \u0643\u0645\u0628\u064A\u0648\u062A\u0631" } })}
       </div>
     </div>
   </section>
@@ -7385,9 +7540,9 @@ var init_pages = __esm({
       meta: {
         path: "/features",
         title: {
-          en: "Features \u2014 Kassenta POS",
-          de: "Funktionen \u2014 Kassenta POS",
-          ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A \u2014 Kassenta POS"
+          en: "POS features: till, table QR, delivery \u2014 Kassenta",
+          de: "Kassen-Funktionen: Theke, Tisch-QR, Lieferung \u2014 Kassenta",
+          ar: "\u0645\u0645\u064A\u0632\u0627\u062A \u0627\u0644\u0643\u0627\u0634\u064A\u0631: \u0627\u0644\u0628\u064A\u0639 \u0648QR \u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u2014 Kassenta"
         },
         description: {
           en: "Touch POS, table QR ordering, delivery dispatch, inventory, CRM and loyalty, staff shifts and VAT-ready reporting \u2014 every module in the Kassenta platform.",
@@ -7420,7 +7575,7 @@ var init_pages = __esm({
         { en: "Barcode scanning from the device camera or a USB or Bluetooth scanner.", de: "Barcode-Scan \xFCber Ger\xE4tekamera oder USB-/Bluetooth-Scanner.", ar: "\u0645\u0633\u062D \u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062F \u0645\u0646 \u0643\u0627\u0645\u064A\u0631\u0627 \u0627\u0644\u062C\u0647\u0627\u0632 \u0623\u0648 \u0645\u0627\u0633\u062D USB \u0623\u0648 \u0628\u0644\u0648\u062A\u0648\u062B." }
       ])}
         </div>
-        <div class="reveal">${shot({ id: "feature-pos-grid", ratio: "16 / 11", size: "1600 \xD7 1100", alt: { en: "The Kassenta product grid and cart during a busy service", de: "Artikelraster und Warenkorb von Kassenta im laufenden Betrieb", ar: "\u0634\u0628\u0643\u0629 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0633\u0644\u0629 Kassenta \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u062E\u062F\u0645\u0629" } })}</div>
+        <div class="reveal">${shot({ id: "feature-pos-grid", ratio: "4 / 3", size: "1448 \xD7 1086", alt: { en: "The Kassenta product grid and cart during a busy service", de: "Artikelraster und Warenkorb von Kassenta im laufenden Betrieb", ar: "\u0634\u0628\u0643\u0629 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0633\u0644\u0629 Kassenta \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u062E\u062F\u0645\u0629" } })}</div>
       </div>
     </div>
   </section>
@@ -7428,7 +7583,7 @@ var init_pages = __esm({
   <section class="section section--alt">
     <div class="wrap">
       <div class="split">
-        <div class="reveal">${shot({ id: "feature-online-store", ratio: "16 / 11", size: "1600 \xD7 1100", alt: { en: "A branded Kassenta online storefront on a phone", de: "Gebrandeter Kassenta-Onlineshop auf dem Smartphone", ar: "\u0645\u062A\u062C\u0631 Kassenta \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0628\u0647\u0648\u064A\u0629 \u0627\u0644\u0645\u062A\u062C\u0631 \u0639\u0644\u0649 \u0627\u0644\u0647\u0627\u062A\u0641" } })}</div>
+        <div class="reveal">${shot({ id: "feature-online-store", ratio: "2 / 3", size: "1024 \xD7 1536", alt: { en: "A branded Kassenta online storefront on a phone", de: "Gebrandeter Kassenta-Onlineshop auf dem Smartphone", ar: "\u0645\u062A\u062C\u0631 Kassenta \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0628\u0647\u0648\u064A\u0629 \u0627\u0644\u0645\u062A\u062C\u0631 \u0639\u0644\u0649 \u0627\u0644\u0647\u0627\u062A\u0641" } })}</div>
         <div>
           ${head({ en: "Online and tables", de: "Online und Tische", ar: "\u0623\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A" }, { en: "Your own ordering channel, not a marketplace listing", de: "Ihr eigener Bestellkanal statt eines Marktplatz-Eintrags", ar: "\u0642\u0646\u0627\u0629 \u0637\u0644\u0628 \u062E\u0627\u0635\u0629 \u0628\u0643 \u0644\u0627 \u0645\u062C\u0631\u062F \u0625\u062F\u0631\u0627\u062C \u0641\u064A \u062A\u0637\u0628\u064A\u0642 \u0648\u0633\u064A\u0637" })}
           ${ticks([
@@ -7513,7 +7668,7 @@ var init_pages = __esm({
         { en: "Role and permission model that also governs the API, not just the screens.", de: "Rollen- und Rechtemodell, das auch die API steuert, nicht nur die Oberfl\xE4chen.", ar: "\u0646\u0645\u0648\u0630\u062C \u0623\u062F\u0648\u0627\u0631 \u0648\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u064A\u062D\u0643\u0645 \u0627\u0644\u0648\u0627\u062C\u0647\u0629 \u0627\u0644\u0628\u0631\u0645\u062C\u064A\u0629 \u0623\u064A\u0636\u064B\u0627 \u0644\u0627 \u0627\u0644\u0634\u0627\u0634\u0627\u062A \u0641\u0642\u0637." }
       ])}
         </div>
-        <div class="reveal">${shot({ id: "feature-modules", ratio: "4 / 3", size: "1400 \xD7 1050", alt: { en: "Module switches in the Kassenta owner console", de: "Modulschalter in der Kassenta-Betreiberkonsole", ar: "\u0645\u0641\u0627\u062A\u064A\u062D \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0641\u064A \u0644\u0648\u062D\u0629 \u0645\u0627\u0644\u0643 Kassenta" } })}</div>
+        <div class="reveal">${shot({ id: "feature-modules", ratio: "3 / 2", size: "1536 \xD7 1024", alt: { en: "Module switches in the Kassenta owner console", de: "Modulschalter in der Kassenta-Betreiberkonsole", ar: "\u0645\u0641\u0627\u062A\u064A\u062D \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0641\u064A \u0644\u0648\u062D\u0629 \u0645\u0627\u0644\u0643 Kassenta" } })}</div>
       </div>
     </div>
   </section>
@@ -7527,6 +7682,14 @@ var init_pages = __esm({
         }
       )}`
     };
+    INDUSTRY_ART = {
+      "industry-cafe": { ratio: "4 / 5", size: "1122 \xD7 1402" },
+      "industry-restaurant": { ratio: "4 / 5", size: "1122 \xD7 1402" },
+      "industry-supermarket": { ratio: "4 / 5", size: "1122 \xD7 1402" },
+      "industry-pharmacy": { ratio: "5 / 4", size: "1402 \xD7 1122" },
+      "industry-bakery": { ratio: "21 / 23", size: "1198 \xD7 1313" },
+      "industry-retail": { ratio: "5 / 4", size: "1402 \xD7 1122" }
+    };
     vertical = (id, icon, name, intro, points, alt) => `
   <section class="section" id="${id}">
     <div class="wrap">
@@ -7537,19 +7700,39 @@ var init_pages = __esm({
           <p class="lead" style="margin:14px 0 24px" ${tAttrs(intro)}>${esc(intro.en)}</p>
           ${ticks(points)}
         </div>
-        <div class="reveal">${shot({ id, ratio: "4 / 3", size: "1400 \xD7 1050", alt })}</div>
+        <div class="reveal">${shot({ id, ratio: INDUSTRY_ART[id]?.ratio ?? "4 / 3", size: INDUSTRY_ART[id]?.size ?? "1400 \xD7 1050", alt })}</div>
       </div>
     </div>
   </section>`;
     solutions = {
       meta: {
         path: "/solutions",
-        title: { en: "Industries \u2014 Kassenta POS", de: "Branchen \u2014 Kassenta POS", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A \u2014 Kassenta POS" },
+        title: { en: "POS for caf\xE9s, restaurants, retail \u2014 Kassenta", de: "Kasse f\xFCr Caf\xE9, Restaurant, Handel \u2014 Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u0644\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u0627\u0644\u0645\u0637\u0627\u0639\u0645 \u0648\u0627\u0644\u062A\u062C\u0632\u0626\u0629 \u2014 Kassenta" },
         description: {
-          en: "Ready-made configurations for caf\xE9s, restaurants, supermarkets, pharmacies, bakeries and retail \u2014 each with the fields, taxes and workflows that trade actually uses.",
+          en: "Ready-made setups for caf\xE9s, restaurants, supermarkets, pharmacies, bakeries and retail \u2014 each with the fields, taxes and workflows that trade uses.",
           de: "Fertige Konfigurationen f\xFCr Caf\xE9s, Restaurants, Superm\xE4rkte, Apotheken, B\xE4ckereien und Einzelhandel \u2014 je mit den Feldern, Steuers\xE4tzen und Abl\xE4ufen der Branche.",
           ar: "\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u062C\u0627\u0647\u0632\u0629 \u0644\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u0627\u0644\u0645\u0637\u0627\u0639\u0645 \u0648\u0627\u0644\u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A \u0648\u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0627\u062A \u0648\u0627\u0644\u0645\u062E\u0627\u0628\u0632 \u0648\u0627\u0644\u062A\u062C\u0632\u0626\u0629 \u2014 \u0644\u0643\u0644 \u0645\u0646\u0647\u0627 \u0627\u0644\u062D\u0642\u0648\u0644 \u0648\u0627\u0644\u0636\u0631\u0627\u0626\u0628 \u0648\u0633\u064A\u0631 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0645\u0646\u0627\u0633\u0628."
-        }
+        },
+        jsonLd: [
+          {
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            name: "Industries Kassenta is configured for",
+            itemListElement: [
+              ["Caf\xE9s and bars", "industry-cafe"],
+              ["Restaurants", "industry-restaurant"],
+              ["Supermarkets and grocers", "industry-supermarket"],
+              ["Pharmacies", "industry-pharmacy"],
+              ["Bakeries", "industry-bakery"],
+              ["Retail", "industry-retail"]
+            ].map(([name, anchor], i) => ({
+              "@type": "ListItem",
+              position: i + 1,
+              name,
+              url: `https://kassenta.com/solutions/#${anchor}`
+            }))
+          }
+        ]
       },
       body: `
   ${pageHead(
@@ -7692,12 +7875,89 @@ var init_pages = __esm({
     pricing = {
       meta: {
         path: "/pricing",
-        title: { en: "Pricing \u2014 Kassenta POS", de: "Preise \u2014 Kassenta POS", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u2014 Kassenta POS" },
+        title: { en: "Pricing \u2014 flat fee per location, no commission", de: "Preise \u2014 Pauschale je Standort, keine Provision", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u2014 \u0631\u0633\u0645 \u062B\u0627\u0628\u062A \u0644\u0643\u0644 \u0641\u0631\u0639 \u0628\u0644\u0627 \u0639\u0645\u0648\u0644\u0629" },
         description: {
           en: "Transparent per-location pricing in CHF. No commission on your own orders, no setup fee, and every plan includes onboarding and support.",
           de: "Transparente Preise je Standort in CHF. Keine Provision auf eigene Bestellungen, keine Einrichtungsgeb\xFChr, Onboarding und Support in jedem Plan.",
           ar: "\u0623\u0633\u0639\u0627\u0631 \u0634\u0641\u0627\u0641\u0629 \u0644\u0643\u0644 \u0641\u0631\u0639 \u0628\u0627\u0644\u0641\u0631\u0646\u0643 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A. \u0628\u0644\u0627 \u0639\u0645\u0648\u0644\u0629 \u0639\u0644\u0649 \u0637\u0644\u0628\u0627\u062A\u0643\u060C \u0648\u0628\u0644\u0627 \u0631\u0633\u0648\u0645 \u062A\u0623\u0633\u064A\u0633\u060C \u0648\u0645\u0639 \u062A\u0647\u064A\u0626\u0629 \u0648\u062F\u0639\u0645 \u0641\u064A \u0643\u0644 \u0627\u0644\u0628\u0627\u0642\u0627\u062A."
-        }
+        },
+        jsonLd: [
+          {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            name: "Kassenta POS",
+            description: "Point of sale, online ordering and delivery software, priced per location with no commission on your own orders.",
+            image: "https://kassenta.com/brand/og-image.jpg",
+            brand: { "@type": "Brand", name: "Kassenta" },
+            offers: [
+              {
+                "@type": "Offer",
+                name: "Starter",
+                price: "49",
+                priceCurrency: "CHF",
+                availability: "https://schema.org/InStock",
+                url: "https://kassenta.com/pricing/",
+                description: "One counter, one screen. For a single caf\xE9, kiosk or small shop."
+              },
+              {
+                "@type": "Offer",
+                name: "Professional",
+                price: "99",
+                priceCurrency: "CHF",
+                availability: "https://schema.org/InStock",
+                url: "https://kassenta.com/pricing/",
+                description: "Counter plus your own online channel, delivery and loyalty."
+              },
+              {
+                "@type": "Offer",
+                name: "Enterprise",
+                price: "199",
+                priceCurrency: "CHF",
+                availability: "https://schema.org/InStock",
+                url: "https://kassenta.com/pricing/",
+                description: "Several branches under one roof, with the API and consolidated reporting."
+              }
+            ]
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: [
+              {
+                "@type": "Question",
+                name: "Is there a minimum contract?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Monthly plans run month to month and can be cancelled at the end of any period. Yearly plans run for twelve months and are billed once."
+                }
+              },
+              {
+                "@type": "Question",
+                name: "What counts as a location?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "One physical address. Devices inside that address are covered by the plan's device limit; a second shop needs a second location."
+                }
+              },
+              {
+                "@type": "Question",
+                name: "Do you take a cut of card or TWINT payments?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "No. You keep your own acquirer contract and its rates. Kassenta records the payment and never sits between you and the money."
+                }
+              },
+              {
+                "@type": "Question",
+                name: "Can I change plan later?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Yes, in both directions, effective from the next billing period. Your data and settings are untouched by a plan change."
+                }
+              }
+            ]
+          }
+        ]
       },
       body: `
   ${pageHead(
@@ -7833,7 +8093,7 @@ var init_pages = __esm({
     compliance = {
       meta: {
         path: "/compliance",
-        title: { en: "Compliance and data protection \u2014 Kassenta POS", de: "Compliance und Datenschutz \u2014 Kassenta POS", ar: "\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0648\u062D\u0645\u0627\u064A\u0629 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u2014 Kassenta POS" },
+        title: { en: "Swiss VAT, GDPR and EU fiscalisation \u2014 Kassenta", de: "Schweizer MwSt., DSGVO und Fiskalisierung \u2014 Kassenta", ar: "\u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648GDPR \u0648\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0627\u0644\u0623\u0648\u0631\u0648\u0628\u064A \u2014 Kassenta" },
         description: {
           en: "Swiss VAT rates and cash rounding, GDPR and nDSG handling, audit trails, and our roadmap for German, Austrian, French and Italian fiscalisation.",
           de: "Schweizer MwSt.-S\xE4tze und Rappenrundung, DSGVO- und nDSG-Umsetzung, Audit-Trails und unsere Roadmap zur Fiskalisierung in Deutschland, \xD6sterreich, Frankreich und Italien.",
@@ -7956,7 +8216,7 @@ var init_pages = __esm({
         { en: "Daily encrypted backups with point-in-time restore, tested on a schedule rather than assumed to work.", de: "T\xE4glich verschl\xFCsselte Backups mit Point-in-Time-Restore, planm\xE4ssig getestet statt nur angenommen.", ar: "\u0646\u0633\u062E \u0627\u062D\u062A\u064A\u0627\u0637\u064A \u064A\u0648\u0645\u064A \u0645\u0634\u0641\u064E\u0651\u0631 \u0645\u0639 \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0644\u0623\u064A \u0644\u062D\u0638\u0629\u060C \u062A\u064F\u062E\u062A\u0628\u0631 \u062F\u0648\u0631\u064A\u064B\u0627 \u0644\u0627 \u064A\u064F\u0641\u062A\u0631\u0636 \u0646\u062C\u0627\u062D\u0647\u0627." }
       ])}
         </div>
-        <div class="reveal">${shot({ id: "compliance-audit", ratio: "4 / 3", size: "1400 \xD7 1050", alt: { en: "Audit trail and permission settings in the Kassenta console", de: "Audit-Trail und Berechtigungen in der Kassenta-Konsole", ar: "\u0633\u062C\u0644 \u0627\u0644\u062A\u062F\u0642\u064A\u0642 \u0648\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0641\u064A \u0644\u0648\u062D\u0629 Kassenta" } })}</div>
+        <div class="reveal">${shot({ id: "compliance-audit", ratio: "5 / 4", size: "1402 \xD7 1122", alt: { en: "Audit trail and permission settings in the Kassenta console", de: "Audit-Trail und Berechtigungen in der Kassenta-Konsole", ar: "\u0633\u062C\u0644 \u0627\u0644\u062A\u062F\u0642\u064A\u0642 \u0648\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0641\u064A \u0644\u0648\u062D\u0629 Kassenta" } })}</div>
       </div>
     </div>
   </section>
@@ -7973,7 +8233,7 @@ var init_pages = __esm({
     about = {
       meta: {
         path: "/about",
-        title: { en: "About Kassenta", de: "\xDCber Kassenta", ar: "\u0639\u0646 Kassenta" },
+        title: { en: "About Kassenta \u2014 built behind the counter", de: "\xDCber Kassenta \u2014 hinter der Theke entstanden", ar: "\u0639\u0646 Kassenta \u2014 \u0648\u064F\u0644\u062F \u062E\u0644\u0641 \u0627\u0644\u0643\u0627\u0634\u064A\u0631" },
         description: {
           en: "Kassenta was built inside working restaurants rather than in a boardroom. Our approach to product, pricing and support, and how to reach us.",
           de: "Kassenta entstand in laufenden Restaurants, nicht im Sitzungszimmer. Unser Ansatz zu Produkt, Preisen und Support \u2014 und wie Sie uns erreichen.",
@@ -8014,7 +8274,7 @@ var init_pages = __esm({
       })}>Customers, recipes and sales history export to CSV whenever you want. We do not resell aggregated data, and we do not market to your customers.</p></div></div>
           </div>
         </div>
-        <div class="reveal">${shot({ id: "about-team", ratio: "4 / 5", size: "1200 \xD7 1500", alt: { en: "The Kassenta team working alongside restaurant staff", de: "Das Kassenta-Team arbeitet mit Restaurantmitarbeitenden", ar: "\u0641\u0631\u064A\u0642 Kassenta \u064A\u0639\u0645\u0644 \u0645\u0639 \u0637\u0627\u0642\u0645 \u0627\u0644\u0645\u0637\u0639\u0645" } })}</div>
+        <div class="reveal">${shot({ id: "about-team", ratio: "2 / 3", size: "1023 \xD7 1537", alt: { en: "The Kassenta team working alongside restaurant staff", de: "Das Kassenta-Team arbeitet mit Restaurantmitarbeitenden", ar: "\u0641\u0631\u064A\u0642 Kassenta \u064A\u0639\u0645\u0644 \u0645\u0639 \u0637\u0627\u0642\u0645 \u0627\u0644\u0645\u0637\u0639\u0645" } })}</div>
       </div>
     </div>
   </section>
@@ -8054,12 +8314,32 @@ var init_pages = __esm({
     contact = {
       meta: {
         path: "/contact",
-        title: { en: "Contact and demo \u2014 Kassenta POS", de: "Kontakt und Demo \u2014 Kassenta POS", ar: "\u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0648\u0627\u0644\u0639\u0631\u0636 \u0627\u0644\u062A\u0648\u0636\u064A\u062D\u064A \u2014 Kassenta POS" },
+        title: { en: "Book a demo on your own menu \u2014 Kassenta POS", de: "Demo mit Ihrer eigenen Karte \u2014 Kassenta POS", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u0639\u0644\u0649 \u0642\u0627\u0626\u0645\u062A\u0643 \u2014 Kassenta POS" },
         description: {
           en: "Book a 30-minute demo on your own menu, or email info@kassenta.com. We answer every message from a real person, usually within one business day.",
           de: "Buchen Sie eine 30-min\xFCtige Demo mit Ihrer eigenen Karte oder schreiben Sie an info@kassenta.com. Jede Nachricht wird von einem Menschen beantwortet, meist innerhalb eines Werktags.",
           ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u0644\u0645\u062F\u0629 30 \u062F\u0642\u064A\u0642\u0629 \u0639\u0644\u0649 \u0642\u0627\u0626\u0645\u062A\u0643\u060C \u0623\u0648 \u0631\u0627\u0633\u0644\u0646\u0627 \u0639\u0644\u0649 info@kassenta.com. \u0646\u0631\u062F\u0651 \u0639\u0644\u0649 \u0643\u0644 \u0631\u0633\u0627\u0644\u0629 \u0628\u0634\u0643\u0644 \u0634\u062E\u0635\u064A\u060C \u063A\u0627\u0644\u0628\u064B\u0627 \u062E\u0644\u0627\u0644 \u064A\u0648\u0645 \u0639\u0645\u0644."
-        }
+        },
+        jsonLd: [
+          {
+            "@context": "https://schema.org",
+            "@type": "ContactPage",
+            name: "Contact Kassenta",
+            url: "https://kassenta.com/contact/",
+            mainEntity: {
+              "@type": "Organization",
+              name: "Kassenta",
+              email: "info@kassenta.com",
+              url: "https://kassenta.com",
+              contactPoint: {
+                "@type": "ContactPoint",
+                contactType: "sales",
+                email: "info@kassenta.com",
+                availableLanguage: ["English", "German", "Arabic"]
+              }
+            }
+          }
+        ]
       },
       body: `
   ${pageHead(
@@ -17298,10 +17578,12 @@ var IMPRINT_HTML = renderPage(
       <dl>
         <dt>Trading name</dt><dd>Kassenta</dd>
         <dt>Product</dt><dd>Kassenta POS System \u2014 point of sale, online ordering and delivery software</dd>
+        <dt>Developed by</dt><dd>Barmagly \u2014 <a href="https://barmagly.tech/" target="_blank" rel="noopener">barmagly.tech</a></dd>
+        <dt>Swiss company ID (UID)</dt><dd><span dir="ltr">CHE-154.312.079</span></dd>
         <dt>Email</dt><dd><a href="mailto:info@kassenta.com">info@kassenta.com</a></dd>
         <dt>Website</dt><dd><a href="https://kassenta.com">kassenta.com</a></dd>
       </dl>
-      <p class="updated" style="margin-top:18px">Postal address, commercial register number and VAT identification number are supplied on request and appear on every invoice.</p>
+      <p class="updated" style="margin-top:18px">The postal address and VAT identification number are supplied on request and appear on every invoice. The company identification number above can be verified in the Swiss <span dir="ltr">UID</span> register.</p>
 
       <h2>Responsible for content</h2>
       <p>The operator named above is responsible for the content of this website.</p>
@@ -17971,6 +18253,19 @@ function configureExpoAndLanding(app2) {
         "Allow: /api/order/",
         "Allow: /api/restaurants",
         "",
+        "# Imagery is meant to be indexed",
+        "Allow: /brand/",
+        "Allow: /uploads/",
+        "",
+        "# Crawl-delay only for the aggressive SEO crawlers, not search engines",
+        "User-agent: AhrefsBot",
+        "Crawl-delay: 10",
+        "",
+        "User-agent: SemrushBot",
+        "Crawl-delay: 10",
+        "",
+        // Sitemap is a non-group directive: it applies to every crawler
+        // regardless of where it sits, so no trailing User-agent block is needed.
         `Sitemap: ${SITE_URL}/sitemap.xml`,
         ""
       ].join("\n")
@@ -17980,6 +18275,33 @@ function configureExpoAndLanding(app2) {
     try {
       const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
       const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+      const img = (id, caption) => ({
+        loc: `/brand/site/${id}.webp`,
+        caption
+      });
+      const PAGE_IMAGES = {
+        "/": [
+          img("hero-pos-tablet", "Kassenta POS running on a tablet at a restaurant counter"),
+          img("home-order-flow", "Order flow from customer to kitchen to delivery driver"),
+          img("home-swiss-receipt", "Receipt showing the Swiss VAT split and CHF cash rounding"),
+          img("home-devices", "Kassenta POS on a phone, a tablet and a desktop browser")
+        ],
+        "/features/": [
+          img("feature-pos-grid", "The Kassenta product grid and cart during a busy service"),
+          img("feature-online-store", "A branded Kassenta online storefront on a phone"),
+          img("feature-modules", "Module switches in the Kassenta owner console")
+        ],
+        "/solutions/": [
+          img("industry-cafe", "Kassenta POS on a caf\xE9 counter"),
+          img("industry-restaurant", "Restaurant table plan and live order queue in Kassenta"),
+          img("industry-supermarket", "Supermarket checkout with barcode scanning in Kassenta"),
+          img("industry-pharmacy", "Pharmacy counter with batch and expiry fields in Kassenta"),
+          img("industry-bakery", "Bakery counter with weight-based pricing in Kassenta"),
+          img("industry-retail", "Retail counter with size and colour variants in Kassenta")
+        ],
+        "/compliance/": [img("compliance-audit", "Audit trail and permission settings in the Kassenta console")],
+        "/about/": [img("about-team", "The Kassenta team working alongside restaurant staff")]
+      };
       const { SITE_PATHS: SITE_PATHS2 } = await Promise.resolve().then(() => (init_site(), site_exports));
       const entries = [
         { loc: "/", priority: "1.0", changefreq: "weekly", alternates: true },
@@ -18008,7 +18330,8 @@ function configureExpoAndLanding(app2) {
       let xml = `<?xml version="1.0" encoding="UTF-8"?>
 `;
       xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" `;
-      xml += `xmlns:xhtml="http://www.w3.org/1999/xhtml">
+      xml += `xmlns:xhtml="http://www.w3.org/1999/xhtml" `;
+      xml += `xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 `;
       for (const e of entries) {
         xml += `  <url>
@@ -18027,6 +18350,16 @@ function configureExpoAndLanding(app2) {
 `;
           }
           xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="${esc2(SITE_URL + e.loc)}"/>
+`;
+        }
+        for (const image of PAGE_IMAGES[e.loc] ?? []) {
+          xml += `    <image:image>
+`;
+          xml += `      <image:loc>${esc2(SITE_URL + image.loc)}</image:loc>
+`;
+          xml += `      <image:caption>${esc2(image.caption)}</image:caption>
+`;
+          xml += `    </image:image>
 `;
         }
         xml += `  </url>

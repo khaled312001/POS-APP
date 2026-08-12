@@ -125,10 +125,12 @@ export const IMPRINT_HTML = renderPage(
       <dl>
         <dt>Trading name</dt><dd>Kassenta</dd>
         <dt>Product</dt><dd>Kassenta POS System — point of sale, online ordering and delivery software</dd>
+        <dt>Developed by</dt><dd>Barmagly — <a href="https://barmagly.tech/" target="_blank" rel="noopener">barmagly.tech</a></dd>
+        <dt>Swiss company ID (UID)</dt><dd><span dir="ltr">CHE-154.312.079</span></dd>
         <dt>Email</dt><dd><a href="mailto:info@kassenta.com">info@kassenta.com</a></dd>
         <dt>Website</dt><dd><a href="https://kassenta.com">kassenta.com</a></dd>
       </dl>
-      <p class="updated" style="margin-top:18px">Postal address, commercial register number and VAT identification number are supplied on request and appear on every invoice.</p>
+      <p class="updated" style="margin-top:18px">The postal address and VAT identification number are supplied on request and appear on every invoice. The company identification number above can be verified in the Swiss <span dir="ltr">UID</span> register.</p>
 
       <h2>Responsible for content</h2>
       <p>The operator named above is responsible for the content of this website.</p>

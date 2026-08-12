@@ -820,6 +820,19 @@ function configureExpoAndLanding(app: express.Application) {
         "Allow: /api/order/",
         "Allow: /api/restaurants",
         "",
+        "# Imagery is meant to be indexed",
+        "Allow: /brand/",
+        "Allow: /uploads/",
+        "",
+        "# Crawl-delay only for the aggressive SEO crawlers, not search engines",
+        "User-agent: AhrefsBot",
+        "Crawl-delay: 10",
+        "",
+        "User-agent: SemrushBot",
+        "Crawl-delay: 10",
+        "",
+        // Sitemap is a non-group directive: it applies to every crawler
+        // regardless of where it sits, so no trailing User-agent block is needed.
         `Sitemap: ${SITE_URL}/sitemap.xml`,
         "",
       ].join("\n"),
@@ -831,7 +844,45 @@ function configureExpoAndLanding(app: express.Application) {
       const { storage } = await import("./storage");
       const today = new Date().toISOString().slice(0, 10);
 
-      type Entry = { loc: string; priority: string; changefreq: string; alternates?: boolean };
+      type SitemapImage = { loc: string; caption: string };
+      type Entry = {
+        loc: string;
+        priority: string;
+        changefreq: string;
+        alternates?: boolean;
+        images?: SitemapImage[];
+      };
+
+      // Image sitemap entries. Google will not discover images inside a CSS
+      // background or behind lazy loading on its own; listing them here is the
+      // supported way to get them into Google Images.
+      const img = (id: string, caption: string): SitemapImage => ({
+        loc: `/brand/site/${id}.webp`,
+        caption,
+      });
+      const PAGE_IMAGES: Record<string, SitemapImage[]> = {
+        "/": [
+          img("hero-pos-tablet", "Kassenta POS running on a tablet at a restaurant counter"),
+          img("home-order-flow", "Order flow from customer to kitchen to delivery driver"),
+          img("home-swiss-receipt", "Receipt showing the Swiss VAT split and CHF cash rounding"),
+          img("home-devices", "Kassenta POS on a phone, a tablet and a desktop browser"),
+        ],
+        "/features/": [
+          img("feature-pos-grid", "The Kassenta product grid and cart during a busy service"),
+          img("feature-online-store", "A branded Kassenta online storefront on a phone"),
+          img("feature-modules", "Module switches in the Kassenta owner console"),
+        ],
+        "/solutions/": [
+          img("industry-cafe", "Kassenta POS on a café counter"),
+          img("industry-restaurant", "Restaurant table plan and live order queue in Kassenta"),
+          img("industry-supermarket", "Supermarket checkout with barcode scanning in Kassenta"),
+          img("industry-pharmacy", "Pharmacy counter with batch and expiry fields in Kassenta"),
+          img("industry-bakery", "Bakery counter with weight-based pricing in Kassenta"),
+          img("industry-retail", "Retail counter with size and colour variants in Kassenta"),
+        ],
+        "/compliance/": [img("compliance-audit", "Audit trail and permission settings in the Kassenta console")],
+        "/about/": [img("about-team", "The Kassenta team working alongside restaurant staff")],
+      };
       const { SITE_PATHS } = await import("./site");
 
       const entries: Entry[] = [
@@ -862,7 +913,8 @@ function configureExpoAndLanding(app: express.Application) {
       const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
       let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
       xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" `;
-      xml += `xmlns:xhtml="http://www.w3.org/1999/xhtml">\n`;
+      xml += `xmlns:xhtml="http://www.w3.org/1999/xhtml" `;
+      xml += `xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`;
       for (const e of entries) {
         xml += `  <url>\n`;
         xml += `    <loc>${esc(SITE_URL + e.loc)}</loc>\n`;
@@ -874,6 +926,12 @@ function configureExpoAndLanding(app: express.Application) {
             xml += `    <xhtml:link rel="alternate" hreflang="${lang}" href="${esc(`${SITE_URL}${e.loc}?lang=${lang}`)}"/>\n`;
           }
           xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="${esc(SITE_URL + e.loc)}"/>\n`;
+        }
+        for (const image of PAGE_IMAGES[e.loc] ?? []) {
+          xml += `    <image:image>\n`;
+          xml += `      <image:loc>${esc(SITE_URL + image.loc)}</image:loc>\n`;
+          xml += `      <image:caption>${esc(image.caption)}</image:caption>\n`;
+          xml += `    </image:image>\n`;
         }
         xml += `  </url>\n`;
       }

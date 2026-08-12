@@ -143,23 +143,50 @@ export interface ImageSlot {
   alt: T3;
   /** CSS aspect-ratio value, e.g. "16 / 10". */
   ratio: string;
-  /** Rendered pixel target, shown in the placeholder and used in the prompt sheet. */
+  /** Intrinsic pixel size of the artwork, e.g. "1122 × 1402". */
   size: string;
   contain?: boolean;
+  /** Cut-out artwork with a transparent background: no card frame, no shadow. */
+  bare?: boolean;
   caption?: T3;
+  /**
+   * Set on the one image above the fold. It becomes the LCP element, so it is
+   * fetched eagerly at high priority and preloaded from <head> instead of being
+   * discovered when the lazy loader reaches it.
+   */
+  priority?: boolean;
+}
+
+/** Every slot rendered on the site, in page order — used to build the image sitemap. */
+export const IMAGE_SLOTS: { page: string; id: string; alt: T3 }[] = [];
+
+function parseSize(size: string): { w: number; h: number } | null {
+  const m = size.match(/(\d+)\s*[×x]\s*(\d+)/);
+  return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
 }
 
 /**
  * Every image slot on the site. `docs/KASSENTA_IMAGE_PROMPTS.md` documents the
  * generation prompt for each id; dropping `<id>.webp` into public/brand/site/
  * makes it appear with no code change.
+ *
+ * `width`/`height` are always emitted: without them the browser cannot reserve
+ * the box before the bytes arrive and the page jumps as each image lands, which
+ * is exactly what Cumulative Layout Shift measures.
  */
 export function shot(slot: ImageSlot): string {
   const src = `/brand/site/${slot.id}.webp`;
+  const dim = parseSize(slot.size);
+  const dimAttrs = dim ? ` width="${dim.w}" height="${dim.h}"` : "";
+  const loadAttrs = slot.priority
+    ? ` loading="eager" fetchpriority="high" decoding="async"`
+    : ` loading="lazy" decoding="async"`;
+
   // Starts in the placeholder state and clears it on load, so a lazy image far
   // down the page still shows a framed slot instead of blank space.
-  return `<figure class="shot is-empty${slot.contain ? " shot--contain" : ""}" style="--ar:${slot.ratio}">
-  <img src="${src}" alt="${esc(slot.alt.en)}" ${tAttrs(slot.alt).replace(/data-(en|de|ar)=/g, "data-alt-$1=")} loading="lazy" decoding="async"
+  const variant = `${slot.contain ? " shot--contain" : ""}${slot.bare ? " shot--bare" : ""}`;
+  return `<figure class="shot is-empty${variant}" style="--ar:${slot.ratio}">
+  <img src="${src}" alt="${esc(slot.alt.en)}" ${tAttrs(slot.alt).replace(/data-(en|de|ar)=/g, "data-alt-$1=")}${dimAttrs}${loadAttrs}
        onload="this.closest('.shot').classList.remove('is-empty')" onerror="this.closest('.shot').classList.add('is-empty')">
   <figcaption class="shot-ph" dir="ltr"><b>${esc(slot.id)}</b><small>${esc(slot.size)}</small></figcaption>
 </figure>${slot.caption ? `<p class="shot-caption" ${tAttrs(slot.caption)}>${esc(slot.caption.en)}</p>` : ""}`;
@@ -172,6 +199,10 @@ export interface PageMeta {
   description: T3;
   /** Optional JSON-LD blocks appended to <head>. */
   jsonLd?: object[];
+  /** Slot id of the image to preload — set on pages with an above-the-fold image. */
+  heroImage?: string;
+  /** Extra keywords for the sitemap's image entries. */
+  images?: string[];
 }
 
 export function renderPage(meta: PageMeta, body: string, baseUrl: string): string {
@@ -191,7 +222,30 @@ export function renderPage(meta: PageMeta, body: string, baseUrl: string): strin
     )
     .join("");
 
-  const jsonLd = (meta.jsonLd ?? []).map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join("\n  ");
+  // Breadcrumbs on every inner page: Google renders them in the result snippet
+  // instead of the bare URL, and they make the site's shape explicit to crawlers.
+  const crumb =
+    meta.path === "/"
+      ? null
+      : {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+            { "@type": "ListItem", position: 2, name: meta.title.en.split(" — ")[0], item: canonical },
+          ],
+        };
+
+  const blocks = [...(meta.jsonLd ?? []), ...(crumb ? [crumb] : [])];
+  const jsonLd = blocks
+    .map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`)
+    .join("\n  ");
+
+  // The above-the-fold image is the LCP element; preloading it removes the wait
+  // for the parser to reach the <img> before the download can start.
+  const heroPreload = meta.heroImage
+    ? `\n  <link rel="preload" as="image" href="/brand/site/${meta.heroImage}.webp" fetchpriority="high" type="image/webp">`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="en" dir="ltr">
@@ -221,8 +275,16 @@ export function renderPage(meta: PageMeta, body: string, baseUrl: string): strin
   <meta property="og:title" content="${esc(meta.title.en)}">
   <meta property="og:description" content="${esc(meta.description.en)}">
   <meta property="og:url" content="${canonical}">
-  <meta property="og:image" content="${baseUrl}/brand/og-image.png">
+  <meta property="og:image" content="${baseUrl}/brand/og-image.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Kassenta POS running on a tablet, showing the ordering screen">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${esc(meta.title.en)}">
+  <meta name="twitter:description" content="${esc(meta.description.en)}">
+  <meta name="twitter:image" content="${baseUrl}/brand/og-image.jpg">
+  <meta name="twitter:image:alt" content="Kassenta POS running on a tablet, showing the ordering screen">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -230,7 +292,7 @@ export function renderPage(meta: PageMeta, body: string, baseUrl: string): strin
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
 
   <link rel="preload" as="style" href="${css.url}">
-  <link rel="stylesheet" href="${css.url}">
+  <link rel="stylesheet" href="${css.url}">${heroPreload}
   <script>
     // Paint the stored theme/language before first render to avoid a flash.
     (function () {
@@ -338,6 +400,22 @@ function renderFooter(): string {
           <a href="/imprint/" ${tAttrs({ en: "Imprint", de: "Impressum", ar: "بيانات الناشر" })}>Imprint</a>
           <a href="/delete-account" ${tAttrs({ en: "Delete account", de: "Konto löschen", ar: "حذف الحساب" })}>Delete account</a>
         </div>
+      </div>
+      <div class="footer-maker">
+        <span ${tAttrs({
+          en: "Built by Barmagly",
+          de: "Entwickelt von Barmagly",
+          ar: "تمت البرمجة بواسطة شركة برمجلي",
+        })}>Built by Barmagly</span>
+        <a href="https://barmagly.tech/" target="_blank" rel="noopener">barmagly.tech</a>
+        <span class="uid" dir="ltr" title="Swiss company identification number">
+          <span ${tAttrs({
+            en: "Swiss company ID",
+            de: "Schweizer UID",
+            ar: "ترخيص سويسري رسمي",
+          })}>Swiss company ID</span>
+          <b>CHE-154.312.079</b>
+        </span>
       </div>
     </div>
   </footer>`;

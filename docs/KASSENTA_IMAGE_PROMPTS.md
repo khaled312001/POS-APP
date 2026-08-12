@@ -3,6 +3,40 @@
 Every image slot on **kassenta.com** is listed below with the exact file name, size
 and a ready-to-paste prompt for ChatGPT / DALL·E / Midjourney.
 
+> ## ✅ All 16 images are live
+>
+> Delivered on 12 August 2026 and processed by
+> [`scripts/optimize-site-images.py`](../scripts/optimize-site-images.py):
+> **28.9 MB → 1.4 MB** (95% smaller) as WebP q82, capped at a 1600 px long edge.
+>
+> **Nothing was cropped.** The generator returned different aspect ratios than the
+> brief asked for on several slots, so the page layout follows the artwork instead —
+> the ratios below are the delivered ones, not the requested ones.
+>
+> To replace an image: drop the new file in `new images/`, re-run the script, then
+> rebuild and deploy. Update the ratio in `server/site/pages.ts` if the shape changed.
+
+| Slot | Delivered | Ratio | WebP |
+|---|---|---|---|
+| `hero-pos-tablet` | 1122 × 1402 | 4 / 5 | 56 KB |
+| `home-order-flow` | 1600 × 900 | 16 / 9 | 75 KB |
+| `home-swiss-receipt` | 1122 × 1402 | 4 / 5 | 66 KB |
+| `home-devices` | 1536 × 1024 | 3 / 2 | 101 KB (alpha kept — cut-out) |
+| `feature-pos-grid` | 1448 × 1086 | 4 / 3 | 67 KB |
+| `feature-online-store` | 1024 × 1536 | 2 / 3 | 119 KB |
+| `feature-modules` | 1536 × 1024 | 3 / 2 | 81 KB |
+| `industry-cafe` | 1122 × 1402 | 4 / 5 | 91 KB |
+| `industry-restaurant` | 1122 × 1402 | 4 / 5 | 83 KB |
+| `industry-supermarket` | 1122 × 1402 | 4 / 5 | 96 KB |
+| `industry-pharmacy` | 1402 × 1122 | 5 / 4 | 50 KB |
+| `industry-bakery` | 1198 × 1313 | 21 / 23 | 177 KB |
+| `industry-retail` | 1402 × 1122 | 5 / 4 | 99 KB |
+| `compliance-audit` | 1402 × 1122 | 5 / 4 | 109 KB |
+| `about-team` | 1023 × 1537 | 2 / 3 | 86 KB |
+| `og-image` | 1200 × 630 | — | 74 KB JPEG, typography composited by `generate-og-image.py` |
+
+---
+
 ## How to use this document
 
 1. Generate the image with the prompt under each slot.

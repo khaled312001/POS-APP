@@ -200,6 +200,9 @@ p { color: var(--text-2); }
 }
 .shot img { width: 100%; height: 100%; object-fit: cover; }
 .shot--contain img { object-fit: contain; padding: 6%; }
+/* Cut-out artwork: no frame, so the transparent background picks up the section. */
+.shot--bare { border: 0; background: transparent; box-shadow: none; border-radius: 0; }
+.shot--bare img { object-fit: contain; }
 .shot-ph {
   display: none; position: absolute; inset: 0; flex-direction: column; gap: 6px;
   align-items: center; justify-content: center; text-align: center; padding: 20px;
@@ -387,6 +390,21 @@ td strong { color: var(--text); font-weight: 700; }
 .footer-col a:hover { color: var(--accent); }
 .footer-bottom { display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between; align-items: center; margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--border); font-size: .82rem; color: var(--text-3); }
 .footer-legal { display: flex; flex-wrap: wrap; gap: 18px; }
+.footer-maker {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+  font-size: .8rem; color: var(--text-3);
+}
+.footer-maker a { color: var(--accent); font-weight: 700; }
+.footer-maker a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.footer-maker .uid {
+  display: inline-flex; align-items: center; gap: 7px; margin-inline-start: auto;
+  padding: 4px 11px; border-radius: 100px;
+  background: var(--bg-inset); border: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.footer-maker .uid b { color: var(--text-2); font-weight: 700; letter-spacing: .01em; }
+@media (max-width: 620px) { .footer-maker .uid { margin-inline-start: 0; } }
 
 /* ── Reveal ─────────────────────────────────────────────────────────────── */
 .reveal { opacity: 0; transform: translateY(16px); transition: opacity .55s var(--ease), transform .55s var(--ease); }

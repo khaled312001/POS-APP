@@ -62,23 +62,45 @@ export const home: { meta: PageMeta; body: string } = {
   meta: {
     path: "/",
     title: {
-      en: "Kassenta POS — Point of sale, online ordering and delivery in one system",
-      de: "Kassenta POS — Kasse, Online-Bestellung und Lieferung in einem System",
-      ar: "Kassenta POS — نقطة بيع وطلب أونلاين وتوصيل في نظام واحد",
+      en: "Kassenta POS — till, online ordering and delivery",
+      de: "Kassenta POS — Kasse, Online-Bestellung und Lieferung",
+      ar: "Kassenta POS — كاشير وطلب أونلاين وتوصيل",
     },
     description: {
-      en: "Kassenta runs the till, the online shop, the kitchen and the delivery fleet from one place. Swiss VAT, CHF rounding and TWINT built in. Works on phone, tablet and desktop.",
-      de: "Kassenta betreibt Kasse, Online-Shop, Küche und Lieferflotte an einem Ort. Schweizer MwSt., CHF-Rundung und TWINT integriert. Für Smartphone, Tablet und Desktop.",
-      ar: "يدير Kassenta الكاشير والمتجر الإلكتروني والمطبخ وأسطول التوصيل من مكان واحد. ضريبة سويسرية وتقريب CHF وTWINT مدمجة. يعمل على الهاتف والتابلت والكمبيوتر.",
+      en: "One system for the till, your own online shop and delivery. Swiss VAT, CHF rounding and TWINT built in. Runs on phone, tablet and desktop.",
+      de: "Ein System für Kasse, eigenen Online-Shop und Lieferung. Schweizer MwSt., Rappenrundung und TWINT integriert. Für Handy, Tablet und Desktop.",
+      ar: "نظام واحد للكاشير ومتجرك الإلكتروني والتوصيل. ضريبة سويسرية وتقريب CHF وTWINT مدمجة. يعمل على الهاتف والتابلت والكمبيوتر.",
     },
+    heroImage: "hero-pos-tablet",
     jsonLd: [
       {
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         name: "Kassenta POS",
         applicationCategory: "BusinessApplication",
+        applicationSubCategory: "Point of Sale",
         operatingSystem: "Web, Android, iOS",
-        offers: { "@type": "Offer", price: "49", priceCurrency: "CHF" },
+        url: "https://kassenta.com/",
+        image: "https://kassenta.com/brand/og-image.jpg",
+        inLanguage: ["en", "de", "ar"],
+        featureList: [
+          "Touch point of sale",
+          "Branded online storefront",
+          "Table QR ordering",
+          "Delivery dispatch and driver tracking",
+          "Inventory and stock counts",
+          "Customer records and loyalty",
+          "Swiss VAT and CHF cash rounding",
+          "VAT-ready reporting with CSV export",
+        ],
+        offers: {
+          "@type": "AggregateOffer",
+          priceCurrency: "CHF",
+          lowPrice: "49",
+          highPrice: "199",
+          offerCount: 3,
+          url: "https://kassenta.com/pricing/",
+        },
         description:
           "Point of sale, online ordering and delivery management for hospitality and retail in Switzerland and Europe.",
       },
@@ -86,9 +108,81 @@ export const home: { meta: PageMeta; body: string } = {
         "@context": "https://schema.org",
         "@type": "Organization",
         name: "Kassenta",
+        alternateName: "Kassenta POS System",
         url: "https://kassenta.com",
         logo: "https://kassenta.com/brand/logo-mark.png",
+        image: "https://kassenta.com/brand/og-image.jpg",
         email: "info@kassenta.com",
+        areaServed: ["CH", "DE", "AT", "FR", "IT"],
+        identifier: {
+          "@type": "PropertyValue",
+          propertyID: "CHE",
+          name: "Swiss company identification number (UID)",
+          value: "CHE-154.312.079",
+        },
+        parentOrganization: { "@type": "Organization", name: "Barmagly", url: "https://barmagly.tech/" },
+        contactPoint: {
+          "@type": "ContactPoint",
+          contactType: "sales",
+          email: "info@kassenta.com",
+          availableLanguage: ["English", "German", "Arabic"],
+        },
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: "Kassenta POS",
+        url: "https://kassenta.com/",
+        inLanguage: ["en", "de", "ar"],
+        publisher: { "@type": "Organization", name: "Kassenta" },
+      },
+      {
+        // Mirrors the FAQ section below — Google can surface these directly in
+        // the result. Keep the two in sync when the copy changes.
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: [
+          {
+            "@type": "Question",
+            name: "Do I need to buy special hardware?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "No. Kassenta runs in any modern browser and as an app on Android and iOS, so an existing tablet or laptop is enough to start. Receipt printers, cash drawers and barcode scanners are supported but optional.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "What happens if the internet drops?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "The POS keeps taking orders and payments from its local cache and syncs the queue once the connection returns. Online ordering and driver tracking need connectivity, since they involve people outside the building.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "Can I move my existing products and customers in?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Yes. Products, categories and customers import from CSV, and we do the first import with you during onboarding so the mapping is right before you go live.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "How many branches can one account hold?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "As many as you need. Each branch keeps its own stock, staff and prices while the owner console reports across all of them together.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "Is my data locked in?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "No. Sales, products and customers can be exported to CSV at any time from the reporting screens, and a full export can be requested from support.",
+            },
+          },
+        ],
       },
     ],
   },
@@ -120,7 +214,7 @@ export const home: { meta: PageMeta; body: string } = {
           </div>
         </div>
         <div class="reveal">
-          ${shot({ id: "hero-pos-tablet", ratio: "4 / 5", size: "1200 × 1500", alt: { en: "Kassenta POS running on a tablet at a restaurant counter", de: "Kassenta POS auf einem Tablet an der Theke eines Restaurants", ar: "Kassenta POS يعمل على تابلت عند كاشير مطعم" } })}
+          ${shot({ id: "hero-pos-tablet", ratio: "4 / 5", size: "1122 × 1402", priority: true, alt: { en: "Kassenta POS running on a tablet at a restaurant counter", de: "Kassenta POS auf einem Tablet an der Theke eines Restaurants", ar: "Kassenta POS يعمل على تابلت عند كاشير مطعم" } })}
         </div>
       </div>
     </div>
@@ -178,7 +272,7 @@ export const home: { meta: PageMeta; body: string } = {
     <div class="wrap">
       <div class="split">
         <div class="reveal">
-          ${shot({ id: "home-order-flow", ratio: "16 / 11", size: "1600 × 1100", alt: { en: "Order flow from customer to kitchen to driver", de: "Bestellablauf vom Kunden über die Küche zum Fahrer", ar: "مسار الطلب من العميل إلى المطبخ إلى السائق" } })}
+          ${shot({ id: "home-order-flow", ratio: "16 / 9", size: "1600 × 900", alt: { en: "Order flow from customer to kitchen to driver", de: "Bestellablauf vom Kunden über die Küche zum Fahrer", ar: "مسار الطلب من العميل إلى المطبخ إلى السائق" } })}
         </div>
         <div>
           ${head(
@@ -282,7 +376,7 @@ export const home: { meta: PageMeta; body: string } = {
           </div>
         </div>
         <div class="reveal">
-          ${shot({ id: "home-swiss-receipt", ratio: "5 / 6", size: "1250 × 1500", alt: { en: "Receipt showing Swiss VAT split and cash rounding", de: "Bon mit Schweizer MwSt.-Aufteilung und Rappenrundung", ar: "إيصال يوضّح تقسيم الضريبة السويسرية والتقريب النقدي" } })}
+          ${shot({ id: "home-swiss-receipt", ratio: "4 / 5", size: "1122 × 1402", alt: { en: "Receipt showing Swiss VAT split and cash rounding", de: "Bon mit Schweizer MwSt.-Aufteilung und Rappenrundung", ar: "إيصال يوضّح تقسيم الضريبة السويسرية والتقريب النقدي" } })}
         </div>
       </div>
     </div>
@@ -301,7 +395,7 @@ export const home: { meta: PageMeta; body: string } = {
         true
       )}
       <div class="reveal">
-        ${shot({ id: "home-devices", ratio: "16 / 8", size: "1920 × 960", contain: true, alt: { en: "Kassenta shown on a phone, a tablet and a desktop browser", de: "Kassenta auf Smartphone, Tablet und Desktop-Browser", ar: "Kassenta على هاتف وتابلت ومتصفح كمبيوتر" } })}
+        ${shot({ id: "home-devices", ratio: "3 / 2", size: "1536 × 1024", bare: true, alt: { en: "Kassenta shown on a phone, a tablet and a desktop browser", de: "Kassenta auf Smartphone, Tablet und Desktop-Browser", ar: "Kassenta على هاتف وتابلت ومتصفح كمبيوتر" } })}
       </div>
     </div>
   </section>
@@ -371,9 +465,9 @@ export const features: { meta: PageMeta; body: string } = {
   meta: {
     path: "/features",
     title: {
-      en: "Features — Kassenta POS",
-      de: "Funktionen — Kassenta POS",
-      ar: "المميزات — Kassenta POS",
+      en: "POS features: till, table QR, delivery — Kassenta",
+      de: "Kassen-Funktionen: Theke, Tisch-QR, Lieferung — Kassenta",
+      ar: "مميزات الكاشير: البيع وQR الطاولات والتوصيل — Kassenta",
     },
     description: {
       en: "Touch POS, table QR ordering, delivery dispatch, inventory, CRM and loyalty, staff shifts and VAT-ready reporting — every module in the Kassenta platform.",
@@ -406,7 +500,7 @@ export const features: { meta: PageMeta; body: string } = {
             { en: "Barcode scanning from the device camera or a USB or Bluetooth scanner.", de: "Barcode-Scan über Gerätekamera oder USB-/Bluetooth-Scanner.", ar: "مسح الباركود من كاميرا الجهاز أو ماسح USB أو بلوتوث." },
           ])}
         </div>
-        <div class="reveal">${shot({ id: "feature-pos-grid", ratio: "16 / 11", size: "1600 × 1100", alt: { en: "The Kassenta product grid and cart during a busy service", de: "Artikelraster und Warenkorb von Kassenta im laufenden Betrieb", ar: "شبكة المنتجات وسلة Kassenta أثناء الخدمة" } })}</div>
+        <div class="reveal">${shot({ id: "feature-pos-grid", ratio: "4 / 3", size: "1448 × 1086", alt: { en: "The Kassenta product grid and cart during a busy service", de: "Artikelraster und Warenkorb von Kassenta im laufenden Betrieb", ar: "شبكة المنتجات وسلة Kassenta أثناء الخدمة" } })}</div>
       </div>
     </div>
   </section>
@@ -414,7 +508,7 @@ export const features: { meta: PageMeta; body: string } = {
   <section class="section section--alt">
     <div class="wrap">
       <div class="split">
-        <div class="reveal">${shot({ id: "feature-online-store", ratio: "16 / 11", size: "1600 × 1100", alt: { en: "A branded Kassenta online storefront on a phone", de: "Gebrandeter Kassenta-Onlineshop auf dem Smartphone", ar: "متجر Kassenta الإلكتروني بهوية المتجر على الهاتف" } })}</div>
+        <div class="reveal">${shot({ id: "feature-online-store", ratio: "2 / 3", size: "1024 × 1536", alt: { en: "A branded Kassenta online storefront on a phone", de: "Gebrandeter Kassenta-Onlineshop auf dem Smartphone", ar: "متجر Kassenta الإلكتروني بهوية المتجر على الهاتف" } })}</div>
         <div>
           ${head({ en: "Online and tables", de: "Online und Tische", ar: "أونلاين والطاولات" }, { en: "Your own ordering channel, not a marketplace listing", de: "Ihr eigener Bestellkanal statt eines Marktplatz-Eintrags", ar: "قناة طلب خاصة بك لا مجرد إدراج في تطبيق وسيط" })}
           ${ticks([
@@ -499,7 +593,7 @@ export const features: { meta: PageMeta; body: string } = {
             { en: "Role and permission model that also governs the API, not just the screens.", de: "Rollen- und Rechtemodell, das auch die API steuert, nicht nur die Oberflächen.", ar: "نموذج أدوار وصلاحيات يحكم الواجهة البرمجية أيضًا لا الشاشات فقط." },
           ])}
         </div>
-        <div class="reveal">${shot({ id: "feature-modules", ratio: "4 / 3", size: "1400 × 1050", alt: { en: "Module switches in the Kassenta owner console", de: "Modulschalter in der Kassenta-Betreiberkonsole", ar: "مفاتيح الوحدات في لوحة مالك Kassenta" } })}</div>
+        <div class="reveal">${shot({ id: "feature-modules", ratio: "3 / 2", size: "1536 × 1024", alt: { en: "Module switches in the Kassenta owner console", de: "Modulschalter in der Kassenta-Betreiberkonsole", ar: "مفاتيح الوحدات في لوحة مالك Kassenta" } })}</div>
       </div>
     </div>
   </section>
@@ -517,6 +611,16 @@ export const features: { meta: PageMeta; body: string } = {
 // ════════════════════════════════════════════════════════════════════════════
 // SOLUTIONS / INDUSTRIES
 // ════════════════════════════════════════════════════════════════════════════
+/** Native artwork ratios — see scripts/optimize-site-images.py. */
+const INDUSTRY_ART: Record<string, { ratio: string; size: string }> = {
+  "industry-cafe": { ratio: "4 / 5", size: "1122 × 1402" },
+  "industry-restaurant": { ratio: "4 / 5", size: "1122 × 1402" },
+  "industry-supermarket": { ratio: "4 / 5", size: "1122 × 1402" },
+  "industry-pharmacy": { ratio: "5 / 4", size: "1402 × 1122" },
+  "industry-bakery": { ratio: "21 / 23", size: "1198 × 1313" },
+  "industry-retail": { ratio: "5 / 4", size: "1402 × 1122" },
+};
+
 const vertical = (
   id: string,
   icon: string,
@@ -534,7 +638,7 @@ const vertical = (
           <p class="lead" style="margin:14px 0 24px" ${tAttrs(intro)}>${esc(intro.en)}</p>
           ${ticks(points)}
         </div>
-        <div class="reveal">${shot({ id, ratio: "4 / 3", size: "1400 × 1050", alt })}</div>
+        <div class="reveal">${shot({ id, ratio: INDUSTRY_ART[id]?.ratio ?? "4 / 3", size: INDUSTRY_ART[id]?.size ?? "1400 × 1050", alt })}</div>
       </div>
     </div>
   </section>`;
@@ -542,12 +646,32 @@ const vertical = (
 export const solutions: { meta: PageMeta; body: string } = {
   meta: {
     path: "/solutions",
-    title: { en: "Industries — Kassenta POS", de: "Branchen — Kassenta POS", ar: "المجالات — Kassenta POS" },
+    title: { en: "POS for cafés, restaurants, retail — Kassenta", de: "Kasse für Café, Restaurant, Handel — Kassenta", ar: "كاشير للمقاهي والمطاعم والتجزئة — Kassenta" },
     description: {
-      en: "Ready-made configurations for cafés, restaurants, supermarkets, pharmacies, bakeries and retail — each with the fields, taxes and workflows that trade actually uses.",
+      en: "Ready-made setups for cafés, restaurants, supermarkets, pharmacies, bakeries and retail — each with the fields, taxes and workflows that trade uses.",
       de: "Fertige Konfigurationen für Cafés, Restaurants, Supermärkte, Apotheken, Bäckereien und Einzelhandel — je mit den Feldern, Steuersätzen und Abläufen der Branche.",
       ar: "إعدادات جاهزة للمقاهي والمطاعم والسوبر ماركت والصيدليات والمخابز والتجزئة — لكل منها الحقول والضرائب وسير العمل المناسب.",
     },
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: "Industries Kassenta is configured for",
+        itemListElement: [
+          ["Cafés and bars", "industry-cafe"],
+          ["Restaurants", "industry-restaurant"],
+          ["Supermarkets and grocers", "industry-supermarket"],
+          ["Pharmacies", "industry-pharmacy"],
+          ["Bakeries", "industry-bakery"],
+          ["Retail", "industry-retail"],
+        ].map(([name, anchor], i) => ({
+          "@type": "ListItem",
+          position: i + 1,
+          name,
+          url: `https://kassenta.com/solutions/#${anchor}`,
+        })),
+      },
+    ],
   },
   body: `
   ${pageHead(
@@ -702,12 +826,90 @@ const plan = (
 export const pricing: { meta: PageMeta; body: string } = {
   meta: {
     path: "/pricing",
-    title: { en: "Pricing — Kassenta POS", de: "Preise — Kassenta POS", ar: "الأسعار — Kassenta POS" },
+    title: { en: "Pricing — flat fee per location, no commission", de: "Preise — Pauschale je Standort, keine Provision", ar: "الأسعار — رسم ثابت لكل فرع بلا عمولة" },
     description: {
       en: "Transparent per-location pricing in CHF. No commission on your own orders, no setup fee, and every plan includes onboarding and support.",
       de: "Transparente Preise je Standort in CHF. Keine Provision auf eigene Bestellungen, keine Einrichtungsgebühr, Onboarding und Support in jedem Plan.",
       ar: "أسعار شفافة لكل فرع بالفرنك السويسري. بلا عمولة على طلباتك، وبلا رسوم تأسيس، ومع تهيئة ودعم في كل الباقات.",
     },
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: "Kassenta POS",
+        description:
+          "Point of sale, online ordering and delivery software, priced per location with no commission on your own orders.",
+        image: "https://kassenta.com/brand/og-image.jpg",
+        brand: { "@type": "Brand", name: "Kassenta" },
+        offers: [
+          {
+            "@type": "Offer",
+            name: "Starter",
+            price: "49",
+            priceCurrency: "CHF",
+            availability: "https://schema.org/InStock",
+            url: "https://kassenta.com/pricing/",
+            description: "One counter, one screen. For a single café, kiosk or small shop.",
+          },
+          {
+            "@type": "Offer",
+            name: "Professional",
+            price: "99",
+            priceCurrency: "CHF",
+            availability: "https://schema.org/InStock",
+            url: "https://kassenta.com/pricing/",
+            description: "Counter plus your own online channel, delivery and loyalty.",
+          },
+          {
+            "@type": "Offer",
+            name: "Enterprise",
+            price: "199",
+            priceCurrency: "CHF",
+            availability: "https://schema.org/InStock",
+            url: "https://kassenta.com/pricing/",
+            description: "Several branches under one roof, with the API and consolidated reporting.",
+          },
+        ],
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: [
+          {
+            "@type": "Question",
+            name: "Is there a minimum contract?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Monthly plans run month to month and can be cancelled at the end of any period. Yearly plans run for twelve months and are billed once.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "What counts as a location?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "One physical address. Devices inside that address are covered by the plan's device limit; a second shop needs a second location.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "Do you take a cut of card or TWINT payments?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "No. You keep your own acquirer contract and its rates. Kassenta records the payment and never sits between you and the money.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "Can I change plan later?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Yes, in both directions, effective from the next billing period. Your data and settings are untouched by a plan change.",
+            },
+          },
+        ],
+      },
+    ],
   },
   body: `
   ${pageHead(
@@ -847,7 +1049,7 @@ export const pricing: { meta: PageMeta; body: string } = {
 export const compliance: { meta: PageMeta; body: string } = {
   meta: {
     path: "/compliance",
-    title: { en: "Compliance and data protection — Kassenta POS", de: "Compliance und Datenschutz — Kassenta POS", ar: "الامتثال وحماية البيانات — Kassenta POS" },
+    title: { en: "Swiss VAT, GDPR and EU fiscalisation — Kassenta", de: "Schweizer MwSt., DSGVO und Fiskalisierung — Kassenta", ar: "الضريبة السويسرية وGDPR والامتثال الأوروبي — Kassenta" },
     description: {
       en: "Swiss VAT rates and cash rounding, GDPR and nDSG handling, audit trails, and our roadmap for German, Austrian, French and Italian fiscalisation.",
       de: "Schweizer MwSt.-Sätze und Rappenrundung, DSGVO- und nDSG-Umsetzung, Audit-Trails und unsere Roadmap zur Fiskalisierung in Deutschland, Österreich, Frankreich und Italien.",
@@ -970,7 +1172,7 @@ export const compliance: { meta: PageMeta; body: string } = {
             { en: "Daily encrypted backups with point-in-time restore, tested on a schedule rather than assumed to work.", de: "Täglich verschlüsselte Backups mit Point-in-Time-Restore, planmässig getestet statt nur angenommen.", ar: "نسخ احتياطي يومي مشفَّر مع استعادة لأي لحظة، تُختبر دوريًا لا يُفترض نجاحها." },
           ])}
         </div>
-        <div class="reveal">${shot({ id: "compliance-audit", ratio: "4 / 3", size: "1400 × 1050", alt: { en: "Audit trail and permission settings in the Kassenta console", de: "Audit-Trail und Berechtigungen in der Kassenta-Konsole", ar: "سجل التدقيق وإعدادات الصلاحيات في لوحة Kassenta" } })}</div>
+        <div class="reveal">${shot({ id: "compliance-audit", ratio: "5 / 4", size: "1402 × 1122", alt: { en: "Audit trail and permission settings in the Kassenta console", de: "Audit-Trail und Berechtigungen in der Kassenta-Konsole", ar: "سجل التدقيق وإعدادات الصلاحيات في لوحة Kassenta" } })}</div>
       </div>
     </div>
   </section>
@@ -991,7 +1193,7 @@ export const compliance: { meta: PageMeta; body: string } = {
 export const about: { meta: PageMeta; body: string } = {
   meta: {
     path: "/about",
-    title: { en: "About Kassenta", de: "Über Kassenta", ar: "عن Kassenta" },
+    title: { en: "About Kassenta — built behind the counter", de: "Über Kassenta — hinter der Theke entstanden", ar: "عن Kassenta — وُلد خلف الكاشير" },
     description: {
       en: "Kassenta was built inside working restaurants rather than in a boardroom. Our approach to product, pricing and support, and how to reach us.",
       de: "Kassenta entstand in laufenden Restaurants, nicht im Sitzungszimmer. Unser Ansatz zu Produkt, Preisen und Support — und wie Sie uns erreichen.",
@@ -1032,7 +1234,7 @@ export const about: { meta: PageMeta; body: string } = {
             })}>Customers, recipes and sales history export to CSV whenever you want. We do not resell aggregated data, and we do not market to your customers.</p></div></div>
           </div>
         </div>
-        <div class="reveal">${shot({ id: "about-team", ratio: "4 / 5", size: "1200 × 1500", alt: { en: "The Kassenta team working alongside restaurant staff", de: "Das Kassenta-Team arbeitet mit Restaurantmitarbeitenden", ar: "فريق Kassenta يعمل مع طاقم المطعم" } })}</div>
+        <div class="reveal">${shot({ id: "about-team", ratio: "2 / 3", size: "1023 × 1537", alt: { en: "The Kassenta team working alongside restaurant staff", de: "Das Kassenta-Team arbeitet mit Restaurantmitarbeitenden", ar: "فريق Kassenta يعمل مع طاقم المطعم" } })}</div>
       </div>
     </div>
   </section>
@@ -1076,12 +1278,32 @@ export const about: { meta: PageMeta; body: string } = {
 export const contact: { meta: PageMeta; body: string } = {
   meta: {
     path: "/contact",
-    title: { en: "Contact and demo — Kassenta POS", de: "Kontakt und Demo — Kassenta POS", ar: "التواصل والعرض التوضيحي — Kassenta POS" },
+    title: { en: "Book a demo on your own menu — Kassenta POS", de: "Demo mit Ihrer eigenen Karte — Kassenta POS", ar: "احجز عرضًا على قائمتك — Kassenta POS" },
     description: {
       en: "Book a 30-minute demo on your own menu, or email info@kassenta.com. We answer every message from a real person, usually within one business day.",
       de: "Buchen Sie eine 30-minütige Demo mit Ihrer eigenen Karte oder schreiben Sie an info@kassenta.com. Jede Nachricht wird von einem Menschen beantwortet, meist innerhalb eines Werktags.",
       ar: "احجز عرضًا لمدة 30 دقيقة على قائمتك، أو راسلنا على info@kassenta.com. نردّ على كل رسالة بشكل شخصي، غالبًا خلال يوم عمل.",
     },
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "ContactPage",
+        name: "Contact Kassenta",
+        url: "https://kassenta.com/contact/",
+        mainEntity: {
+          "@type": "Organization",
+          name: "Kassenta",
+          email: "info@kassenta.com",
+          url: "https://kassenta.com",
+          contactPoint: {
+            "@type": "ContactPoint",
+            contactType: "sales",
+            email: "info@kassenta.com",
+            availableLanguage: ["English", "German", "Arabic"],
+          },
+        },
+      },
+    ],
   },
   body: `
   ${pageHead(
