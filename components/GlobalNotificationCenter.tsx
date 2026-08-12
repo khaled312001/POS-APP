@@ -282,7 +282,7 @@ export default function GlobalNotificationCenter() {
         case "chat_new_message": {
           if (m.senderType === "customer") {
             push({
-              id, kind: "chat", icon: "chatbubble-ellipses-outline", color: "#2FD3C6",
+              id, kind: "chat", icon: "chatbubble-ellipses-outline", color: Colors.hueTeal,
               title: `${m.senderName || "Customer"} — Order #${m.orderId}`,
               body: String(m.body || "").slice(0, 120),
               href: "/(tabs)/online-orders",
@@ -309,7 +309,7 @@ export default function GlobalNotificationCenter() {
         }
         case "incoming_call": {
           push({
-            id, kind: "call", icon: "call-outline", color: "#F59E0B",
+            id, kind: "call", icon: "call-outline", color: Colors.hueAmber,
             title: "Incoming call",
             body: m.phoneNumber || "Unknown number",
             meta: m.customer?.name ? `${m.customer.name}${m.customer.address ? " · " + m.customer.address : ""}` : undefined,

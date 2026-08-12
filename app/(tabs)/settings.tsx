@@ -631,7 +631,7 @@ export default function SettingsScreen() {
       case "shift_ended": return { name: "stop-circle", color: Colors.warning };
       case "sale_completed": return { name: "cart", color: Colors.accent };
       case "return_processed": return { name: "swap-horizontal", color: Colors.danger };
-      case "cash_drawer": return { name: "cash", color: "#F59E0B" };
+      case "cash_drawer": return { name: "cash", color: Colors.hueAmber };
       default: return { name: "notifications", color: Colors.info };
     }
   }, []);
@@ -768,9 +768,9 @@ export default function SettingsScreen() {
               setStoreLogo(storeSettings?.logo || null);
               setShowStoreSettings(true);
             }} color={Colors.accent} rtl={isRTL} />
-            <SettingRow icon="card" label={t("paymentGateways")} value={pgConfig?.stripe?.status === "connected" ? t("stripeConnected") : t("notConfigured")} onPress={() => { setPgTestResult(null); setShowPaymentGateway(true); }} color="#7C3AED" rtl={isRTL} />
-            <SettingRow icon="cloud-upload" label={t("bulkImport")} value={t("importData")} onPress={() => { setImportResult(null); setShowBulkImport(true); }} color="#F59E0B" rtl={isRTL} />
-            <SettingRow icon="qr-code" label="QR Tables" value={t("manageTables" as any) || "Manage QR codes"} onPress={() => router.push("/table-qr")} color="#2FD3C6" rtl={isRTL} />
+            <SettingRow icon="card" label={t("paymentGateways")} value={pgConfig?.stripe?.status === "connected" ? t("stripeConnected") : t("notConfigured")} onPress={() => { setPgTestResult(null); setShowPaymentGateway(true); }} color={Colors.hueIndigo} rtl={isRTL} />
+            <SettingRow icon="cloud-upload" label={t("bulkImport")} value={t("importData")} onPress={() => { setImportResult(null); setShowBulkImport(true); }} color={Colors.hueAmber} rtl={isRTL} />
+            <SettingRow icon="qr-code" label="QR Tables" value={t("manageTables" as any) || "Manage QR codes"} onPress={() => router.push("/table-qr")} color={Colors.hueTeal} rtl={isRTL} />
           </>
         )}
 
@@ -780,17 +780,17 @@ export default function SettingsScreen() {
             <SettingRow icon="cube" label={t("suppliers")} value={`${suppliers.length} ${t("suppliers")}`} onPress={() => setShowSuppliers(true)} color={Colors.success} rtl={isRTL} />
             <SettingRow icon="wallet" label={t("expenses")} value={`${expenses.length} ${t("expenses")}`} onPress={() => setShowExpenses(true)} color={Colors.warning} rtl={isRTL} />
             <SettingRow icon="time" label={t("attendance")} value={`${shifts.length} ${t("attendance")}`} onPress={() => setShowAttendance(true)} color={Colors.warning} rtl={isRTL} />
-            {isAdmin && <SettingRow icon="pulse" label={t("shiftMonitor")} value={`${allActiveShifts.length} ${t("activeShiftsCount")}`} onPress={() => { setShiftMonitorTab("active"); setShowShiftMonitor(true); }} color="#2FD3C6" rtl={isRTL} />}
+            {isAdmin && <SettingRow icon="pulse" label={t("shiftMonitor")} value={`${allActiveShifts.length} ${t("activeShiftsCount")}`} onPress={() => { setShiftMonitorTab("active"); setShowShiftMonitor(true); }} color={Colors.hueTeal} rtl={isRTL} />}
             <SettingRow icon="document-text" label={t("purchaseOrders")} value={`${purchaseOrders.length} ${t("orders")}`} onPress={() => setShowPurchaseOrders(true)} color={Colors.info} rtl={isRTL} />
             <SettingRow icon="list" label={t("activityLog")} value={`${activityLog.length} ${t("entries")}`} onPress={() => setShowActivityLog(true)} color={Colors.secondary} rtl={isRTL} />
             <SettingRow icon="swap-horizontal" label={t("returnsRefunds")} value={`${returns.length} ${t("returns")}`} onPress={() => setShowReturnsManager(true)} color={Colors.danger} rtl={isRTL} />
             <SettingRow icon="cash" label={t("cashDrawer")} value={activeShift ? t("activeShift") : t("noActiveShift")} onPress={() => setShowCashDrawer(true)} color={Colors.success} rtl={isRTL} />
             <SettingRow icon="home" label={t("warehouses")} value={`${warehousesList.length} ${t("warehouses")}`} onPress={() => setShowWarehouseManager(true)} color={Colors.accent} rtl={isRTL} />
             <SettingRow icon="layers" label={t("productBatches")} value={`${batchesList.length} ${t("batches")}`} onPress={() => { setBatchView("list"); setShowBatchManager(true); }} color={Colors.secondary} rtl={isRTL} />
-            <SettingRow icon="car" label={t("vehicles")} value={`${vehiclesList.length} ${t("vehicles")}`} onPress={() => setShowVehicles(true)} color="#F97316" rtl={isRTL} />
-            <SettingRow icon="calendar" label={t("dailyClosing")} value={`${dailyClosingsList.length} ${t("entries")}`} onPress={() => setShowDailyClosing(true)} color="#06B6D4" rtl={isRTL} />
-            <SettingRow icon="calendar-number" label={t("monthlyClosing")} value={`${monthlyClosingsList.length} ${t("entries")}`} onPress={() => setShowMonthlyClosing(true)} color="#8B5CF6" rtl={isRTL} />
-            <SettingRow icon="receipt" label={t("accountsReceivable")} value={t("debitoren")} onPress={() => setShowAccountsReceivable(true)} color="#EF4444" rtl={isRTL} />
+            <SettingRow icon="car" label={t("vehicles")} value={`${vehiclesList.length} ${t("vehicles")}`} onPress={() => setShowVehicles(true)} color={Colors.hueOrange} rtl={isRTL} />
+            <SettingRow icon="calendar" label={t("dailyClosing")} value={`${dailyClosingsList.length} ${t("entries")}`} onPress={() => setShowDailyClosing(true)} color={Colors.hueCyan} rtl={isRTL} />
+            <SettingRow icon="calendar-number" label={t("monthlyClosing")} value={`${monthlyClosingsList.length} ${t("entries")}`} onPress={() => setShowMonthlyClosing(true)} color={Colors.hueViolet} rtl={isRTL} />
+            <SettingRow icon="receipt" label={t("accountsReceivable")} value={t("debitoren")} onPress={() => setShowAccountsReceivable(true)} color={Colors.hueRose} rtl={isRTL} />
           </>
         )}
 
@@ -804,7 +804,7 @@ export default function SettingsScreen() {
 
         <Text style={styles.sectionTitle}>{t("deliveryPlatform")}</Text>
         <SettingRow icon="bicycle" label={t("deliveryZones")} value={t("addDeliveryZone")} onPress={() => router.push("/delivery-zones")} color={Colors.deliveryPrimary} rtl={isRTL} />
-        <SettingRow icon="pricetag" label={t("promoCodes")} value={t("addPromoCode")} onPress={() => router.push("/promo-codes")} color="#8B5CF6" rtl={isRTL} />
+        <SettingRow icon="pricetag" label={t("promoCodes")} value={t("addPromoCode")} onPress={() => router.push("/promo-codes")} color={Colors.hueViolet} rtl={isRTL} />
         <SettingRow icon="car" label={t("driverManagement")} value={t("activeDrivers")} onPress={() => router.push("/driver-management")} color={Colors.driverOnline} rtl={isRTL} />
         {isAdmin && (
           <SettingRow icon="globe-outline" label={t("editStorefront") || "Edit Storefront"} value={t("storefrontDesc") || "Name, offers, delivery, payments"} onPress={() => setShowStorefront(true)} color={Colors.accent} rtl={isRTL} />
@@ -843,7 +843,7 @@ export default function SettingsScreen() {
           />
         </Pressable>
         {canManage && <SettingRow icon="print" label={t("receiptPrinter")} value={t("notConfigured")} onPress={() => setShowPrinterSettings(true)} color={Colors.textMuted} rtl={isRTL} />}
-        {canManage && <SettingRow icon="print-outline" label={t("printerConfig")} value={t("printerConfigDesc")} onPress={() => setShowPrinterConfig(true)} color="#7C3AED" rtl={isRTL} />}
+        {canManage && <SettingRow icon="print-outline" label={t("printerConfig")} value={t("printerConfigDesc")} onPress={() => setShowPrinterConfig(true)} color={Colors.hueIndigo} rtl={isRTL} />}
         <SettingRow icon="cloud-upload" label={t("syncStatus")} value={t("connected")} color={Colors.success} rtl={isRTL} />
         <SettingRow icon="information-circle" label={t("appVersion")} value="1.0.0" color={Colors.info} rtl={isRTL} />
 
@@ -2847,8 +2847,8 @@ export default function SettingsScreen() {
               ) : (
                 vehiclesList.map((v: any) => (
                   <View key={v.id} style={[styles.empCard, isRTL && { flexDirection: "row-reverse" }]}>
-                    <View style={[styles.empAvatar, { backgroundColor: "#F97316" + "20" }]}>
-                      <Ionicons name="car" size={22} color="#F97316" />
+                    <View style={[styles.empAvatar, { backgroundColor: Colors.hueOrange + "20" }]}>
+                      <Ionicons name="car" size={22} color={Colors.hueOrange} />
                     </View>
                     <View style={[styles.empInfo, isRTL && { alignItems: "flex-end" }]}>
                       <Text style={styles.empName}>{v.licensePlate}</Text>
@@ -2991,7 +2991,7 @@ export default function SettingsScreen() {
               <Text style={{ color: Colors.textMuted, fontSize: 13, marginBottom: 16 }}>{t("dailyClosingDesc")}</Text>
 
               {/* Perform closing button */}
-              <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: "#06B6D4" + "40" }}>
+              <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.hueCyan + "40" }}>
                 <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 15, marginBottom: 12 }}>{t("performDailyClosing")}</Text>
                 <View style={{ marginBottom: 10 }}>
                   <Text style={styles.label}>{t("openingCash")}</Text>
@@ -3079,7 +3079,7 @@ export default function SettingsScreen() {
               </View>
 
               {/* Print daily report button */}
-              <Pressable style={{ backgroundColor: "#F59E0B" + "20", borderRadius: 12, padding: 14, marginBottom: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: "#F59E0B" + "60" }} onPress={async () => {
+              <Pressable style={{ backgroundColor: Colors.hueAmber + "20", borderRadius: 12, padding: 14, marginBottom: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: Colors.hueAmber + "60" }} onPress={async () => {
                 if (Platform.OS !== "web") { Alert.alert("Info", "Drucken ist nur im Web verfügbar."); return; }
                 try {
                   const today = new Date().toISOString().split("T")[0];
@@ -3130,8 +3130,8 @@ export default function SettingsScreen() {
                   printHtmlViaIframe(html);
                 } catch (e: any) { Alert.alert("Fehler", e.message); }
               }}>
-                <Ionicons name="print-outline" size={20} color="#F59E0B" />
-                <Text style={{ color: "#F59E0B", fontWeight: "700", fontSize: 14 }}>Personalbericht drucken</Text>
+                <Ionicons name="print-outline" size={20} color={Colors.hueAmber} />
+                <Text style={{ color: Colors.hueAmber, fontWeight: "700", fontSize: 14 }}>Personalbericht drucken</Text>
               </Pressable>
 
               {/* Past closings */}
@@ -3165,7 +3165,7 @@ export default function SettingsScreen() {
             <ScrollView>
               <Text style={{ color: Colors.textMuted, fontSize: 13, marginBottom: 16 }}>{t("monthlyClosingDesc")}</Text>
 
-              <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: "#8B5CF6" + "40" }}>
+              <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.hueViolet + "40" }}>
                 <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 15, marginBottom: 12 }}>{t("performMonthlyClosing")}</Text>
                 <View style={{ marginBottom: 10 }}>
                   <Text style={styles.label}>{t("notes")}</Text>
@@ -3227,9 +3227,9 @@ export default function SettingsScreen() {
                 const total = debtors.reduce((s: number, c: any) => s + Number(c.creditBalance || 0), 0);
                 return (
                   <>
-                    <View style={{ backgroundColor: "#EF4444" + "15", borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: "#EF4444" + "40" }}>
+                    <View style={{ backgroundColor: Colors.hueRose + "15", borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.hueRose + "40" }}>
                       <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{t("totalOutstanding")}</Text>
-                      <Text style={{ color: "#EF4444", fontSize: 28, fontWeight: "800" }}>CHF {total.toFixed(2)}</Text>
+                      <Text style={{ color: Colors.hueRose, fontSize: 28, fontWeight: "800" }}>CHF {total.toFixed(2)}</Text>
                       <Text style={{ color: Colors.textMuted, fontSize: 13 }}>{debtors.length} {t("customersWithCredit")}</Text>
                     </View>
                     {debtors.length === 0 ? (
@@ -3243,7 +3243,7 @@ export default function SettingsScreen() {
                               <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{c.phone || t("noPhone")}</Text>
                             </View>
                             <View style={{ alignItems: "flex-end" }}>
-                              <Text style={{ color: "#EF4444", fontWeight: "800", fontSize: 16 }}>CHF {Number(c.creditBalance).toFixed(2)}</Text>
+                              <Text style={{ color: Colors.hueRose, fontWeight: "800", fontSize: 16 }}>CHF {Number(c.creditBalance).toFixed(2)}</Text>
                               <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{t("creditBalance")}</Text>
                             </View>
                           </View>

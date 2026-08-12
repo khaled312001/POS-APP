@@ -6,8 +6,10 @@
 // idiom correct everywhere and avoids a second compositing pass at paint time.
 //
 // Contrast: every colour used for text or icons clears WCAG AA (4.5:1) against
-// its own theme's `background`/`surface`. The light accent is a darkened teal
-// (#0C8F85, 4.6:1 on white) because the brand teal #00C1B0 is only 1.9:1.
+// the worst surface it actually lands on. For the light theme that surface is
+// not white — it is the ~13% tint of the colour itself that the app paints
+// behind badges and icon chips (`Colors.accent + "22"`), which is measurably
+// harder. Ratios were measured in the running app, not derived from the source.
 
 export type ThemeMode = "light" | "dark";
 
@@ -15,7 +17,8 @@ export type ThemeMode = "light" | "dark";
 export const Brand = {
   navy: "#040E32",
   teal: "#00C1B0",
-  tealDark: "#0C8F85",
+  /** AA teal for light surfaces: 6.1:1 on white, 4.9:1 on its own tint. */
+  tealDark: "#0A6E65",
 } as const;
 
 export const darkPalette = {
@@ -38,6 +41,13 @@ export const darkPalette = {
   text: "#FFFFFF",
   textSecondary: "#B6BBC7",
   textMuted: "#8A94AD",
+  /**
+   * Ink for content sitting ON the accent fill — active pills, primary buttons,
+   * selected chips. Its value follows the accent, not the page: the dark theme's
+   * accent is bright teal so the ink is near-black, the light theme's accent is
+   * a deep teal so the ink is white. (Named `textDark` for history; ~50 call
+   * sites use it, all of them on an accent fill.)
+   */
   textDark: "#04121F",
 
   success: "#10B981",
@@ -84,6 +94,18 @@ export const darkPalette = {
   loyaltyGold: "#FFD700",
   loyaltyPlatinum: "#E5E4E2",
 
+  // ── Category hues ──
+  // Used to distinguish settings rows, badges and icon chips from one another.
+  // They are tokens rather than literals so the light theme gets a version that
+  // survives a white page — the vivid values below are unreadable on one.
+  hueTeal: "#2FD3C6",
+  hueViolet: "#8B5CF6",
+  hueIndigo: "#7C3AED",
+  hueAmber: "#F59E0B",
+  hueCyan: "#06B6D4",
+  hueOrange: "#F97316",
+  hueRose: "#EF4444",
+
   // ── Elevation (mapped to shadow/elevation props) ──
   shadow: "#000000",
   overlay: "rgba(2, 7, 26, 0.72)",
@@ -92,10 +114,15 @@ export const darkPalette = {
 
 export type Palette = typeof darkPalette;
 
+// Light-theme values are measured, not chosen by eye. Every colour used for
+// text or icons clears 4.5:1 against the *worst* surface it actually lands on —
+// which is not white but the ~13% tint of itself that the app paints behind
+// badges and icon chips (`Colors.x + "22"`). Verified in the browser with
+// _audit_contrast.js against the running app, not calculated from the source.
 export const lightPalette: Palette = {
   primary: "#1E40AF",
-  secondary: "#6D28D9",
-  accent: Brand.tealDark,
+  secondary: "#5B21B6",
+  accent: "#0A6E65",
   gradientStart: "#1E40AF",
   gradientMid: "#4F46E5",
   gradientEnd: "#0C8F85",
@@ -110,52 +137,62 @@ export const lightPalette: Palette = {
   cardBorder: "#DCE3ED",
 
   text: "#0B1220",
-  textSecondary: "#475467",
-  textMuted: "#667085",
-  textDark: "#04121F",
+  textSecondary: "#3F4C60",
+  textMuted: "#5B6779",
+  // White, not dark: the light accent (#0A6E65) is a deep teal, and near-black
+  // ink on it measured 3.09:1. White gives 6.1:1.
+  textDark: "#FFFFFF",
 
-  success: "#047857",
-  warning: "#B45309",
-  danger: "#DC2626",
+  success: "#046B4E",
+  warning: "#92400E",
+  danger: "#B91C1C",
   info: "#1D4ED8",
 
   white: "#FFFFFF",
   black: "#000000",
 
   tabBar: "#FFFFFF",
-  tabActive: Brand.tealDark,
-  tabInactive: "#667085",
+  tabActive: "#0A6E65",
+  tabInactive: "#5B6779",
 
   border: "#E3E8EF",
 
   inputBg: "#FFFFFF",
   inputBorder: "#CBD5E1",
-  inputFocusBorder: Brand.tealDark,
+  inputFocusBorder: "#0A6E65",
 
-  statusAvailable: "#047857",
-  statusOccupied: "#DC2626",
-  statusReserved: "#B45309",
+  statusAvailable: "#046B4E",
+  statusOccupied: "#B91C1C",
+  statusReserved: "#92400E",
   statusPending: "#1D4ED8",
 
-  deliveryPrimary: "#D9480F",
-  deliveryPrimaryDark: "#B03A0C",
+  deliveryPrimary: "#A8380C",
+  deliveryPrimaryDark: "#8A2E0A",
   deliveryPrimaryLight: "#FDEBE3",
 
   statusAccepted: "#1D4ED8",
-  statusPreparing: "#6D28D9",
-  statusReady: "#0C8F85",
-  statusOnWay: "#D9480F",
-  statusDelivered: "#047857",
-  statusCancelled: "#DC2626",
+  statusPreparing: "#5B21B6",
+  statusReady: "#0A6E65",
+  statusOnWay: "#A8380C",
+  statusDelivered: "#046B4E",
+  statusCancelled: "#B91C1C",
 
-  driverOnline: "#2E7D32",
-  driverBusy: "#D9480F",
-  driverOffline: "#6B7280",
+  driverOnline: "#256B29",
+  driverBusy: "#A8380C",
+  driverOffline: "#5B6779",
 
-  loyaltyBronze: "#96591F",
-  loyaltySilver: "#6B7280",
-  loyaltyGold: "#B7791F",
-  loyaltyPlatinum: "#64748B",
+  loyaltyBronze: "#7A4718",
+  loyaltySilver: "#5B6779",
+  loyaltyGold: "#854D0E",
+  loyaltyPlatinum: "#4B5A70",
+
+  hueTeal: "#0A6E65",
+  hueViolet: "#5B21B6",
+  hueIndigo: "#4C1D95",
+  hueAmber: "#92400E",
+  hueCyan: "#155E75",
+  hueOrange: "#9A3412",
+  hueRose: "#B91C1C",
 
   shadow: "#0B1220",
   overlay: "rgba(11, 18, 32, 0.45)",

@@ -264,9 +264,11 @@ export default function TabLayout() {
             left: 0,
             right: 0,
             height: webToolbarHeight,
-            backgroundColor: Colors.background,
+            // Surface, not background: the toolbar has to read as a raised bar
+            // against the page beneath it in both palettes.
+            backgroundColor: Colors.surface,
             borderBottomWidth: 1,
-            borderBottomColor: "rgba(255,255,255,0.08)",
+            borderBottomColor: Colors.border,
             flexDirection: isRTL ? "row-reverse" : "row",
             alignItems: "center",
             justifyContent: "space-between",
@@ -275,21 +277,22 @@ export default function TabLayout() {
           }}>
             <Pressable
               onPress={() => setShowMobileNav(true)}
+              accessibilityLabel="Open navigation"
               style={({ pressed }) => ({
                 width: 40,
                 height: 40,
                 borderRadius: 12,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: pressed ? Colors.card : "rgba(255,255,255,0.07)",
+                backgroundColor: pressed ? Colors.surfaceLight : "transparent",
                 borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.12)",
+                borderColor: Colors.border,
               })}
             >
-              <Ionicons name="menu-outline" size={22} color={Colors.white} />
+              <Ionicons name="menu-outline" size={22} color={Colors.text} />
             </Pressable>
 
-            <Text style={{ color: Colors.white, fontSize: 16, fontWeight: "800" }} numberOfLines={1}>
+            <Text style={{ color: Colors.text, fontSize: 16, fontWeight: "800" }} numberOfLines={1}>
               {currentTitle}
             </Text>
 
@@ -301,18 +304,19 @@ export default function TabLayout() {
                       window.dispatchEvent(new CustomEvent("barmagly-open-cart"));
                     }
                   }}
+                  accessibilityLabel="Open cart"
                   style={({ pressed }) => ({
                     width: 40,
                     height: 40,
                     borderRadius: 12,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: pressed ? Colors.card : "rgba(255,255,255,0.07)",
+                    backgroundColor: pressed ? Colors.surfaceLight : "transparent",
                     borderWidth: 1,
-                    borderColor: "rgba(255,255,255,0.12)",
+                    borderColor: Colors.border,
                   })}
                 >
-                  <Ionicons name="cart-outline" size={20} color={Colors.white} />
+                  <Ionicons name="cart-outline" size={20} color={Colors.text} />
                 </Pressable>
               ) : null}
             </View>

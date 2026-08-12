@@ -138,7 +138,7 @@ const styles = themedStyles((Colors) => ({
   },
   subtitle: {
     marginTop: 4,
-    color: "rgba(255,255,255,0.72)",
+    color: "rgba(255,255,255,0.85)",
     fontSize: 12,
   },
   badge: {

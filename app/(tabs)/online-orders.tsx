@@ -32,12 +32,12 @@ import DeliveryStatusPipeline from "@/components/DeliveryStatusPipeline";
 const STATUS_FLOW = ["pending", "accepted", "preparing", "ready", "delivered"];
 
 const STATUS_META: Record<string, { label: string; labelAr: string; labelDe: string; color: string; icon: string; next?: string }> = {
-  pending: { label: "Pending", labelAr: "انتظار", labelDe: "Ausstehend", color: "#F59E0B", icon: "time-outline", next: "accepted" },
+  pending: { label: "Pending", labelAr: "انتظار", labelDe: "Ausstehend", color: Colors.hueAmber, icon: "time-outline", next: "accepted" },
   accepted: { label: "Accepted", labelAr: "مقبول", labelDe: "Angenommen", color: "#3B82F6", icon: "checkmark-circle-outline", next: "preparing" },
-  preparing: { label: "Preparing", labelAr: "قيد التحضير", labelDe: "In Zubereitung", color: "#8B5CF6", icon: "flame-outline", next: "ready" },
-  ready: { label: "Ready", labelAr: "جاهز", labelDe: "Fertig", color: "#2FD3C6", icon: "bag-check-outline", next: "delivered" },
+  preparing: { label: "Preparing", labelAr: "قيد التحضير", labelDe: "In Zubereitung", color: Colors.hueViolet, icon: "flame-outline", next: "ready" },
+  ready: { label: "Ready", labelAr: "جاهز", labelDe: "Fertig", color: Colors.hueTeal, icon: "bag-check-outline", next: "delivered" },
   delivered: { label: "Delivered", labelAr: "تم التوصيل", labelDe: "Geliefert", color: "#10B981", icon: "checkmark-done-outline" },
-  cancelled: { label: "Cancelled", labelAr: "ملغي", labelDe: "Storniert", color: "#EF4444", icon: "close-circle-outline" },
+  cancelled: { label: "Cancelled", labelAr: "ملغي", labelDe: "Storniert", color: Colors.hueRose, icon: "close-circle-outline" },
   completed: { label: "Completed", labelAr: "مكتمل", labelDe: "Abgeschlossen", color: "#10B981", icon: "checkmark-done-outline" },
 };
 
@@ -1185,7 +1185,7 @@ export default function OrdersScreen() {
                         {lbl(`Selected(${selectedToppings.length})`, `الإضافات(${selectedToppings.length})`, `Ausgewählt(${selectedToppings.length})`)}
                       </Text>
                       <Pressable onPress={() => setSelectedToppings([])}>
-                        <Text style={{ color: "#EF4444", fontSize: 11, fontWeight: "600" }}>{lbl("Clear all", "مسح الكل", "Alle löschen")}</Text>
+                        <Text style={{ color: Colors.hueRose, fontSize: 11, fontWeight: "600" }}>{lbl("Clear all", "مسح الكل", "Alle löschen")}</Text>
                       </Pressable>
                     </View>
                     <Text style={{ color: Colors.text, fontSize: 11 }}>{selectedToppings.map(t => toppingDisplayName(t)).join(", ")}</Text>
@@ -1455,7 +1455,7 @@ export default function OrdersScreen() {
             { key: "pos", icon: "call-outline", en: "POS", ar: "كاشير", de: "Kasse" },
           ] as const).map(f => (
             <Pressable key={f.key} onPress={() => { playClickSound("light"); setViewMode(f.key); }} style={[styles.filterTab, styles.filterTabWithIcon, viewMode === f.key && styles.filterTabActive]}>
-              <Ionicons name={f.icon} size={14} color={viewMode === f.key ? Colors.accent : "rgba(255,255,255,0.55)"} />
+              <Ionicons name={f.icon} size={14} color={viewMode === f.key ? Colors.accent : "rgba(255,255,255,0.85)"} />
               <Text style={[styles.filterTabText, viewMode === f.key && styles.filterTabTextActive]}>
                 {language === "ar" ? f.ar : language === "de" ? f.de : f.en}
               </Text>
@@ -1500,7 +1500,7 @@ export default function OrdersScreen() {
                     active && { backgroundColor: Colors.deliveryPrimaryLight, borderColor: Colors.deliveryPrimary },
                   ]}
                 >
-                  <Ionicons name={f.icon} size={14} color={active ? Colors.deliveryPrimary : "rgba(255,255,255,0.55)"} />
+                  <Ionicons name={f.icon} size={14} color={active ? Colors.deliveryPrimary : "rgba(255,255,255,0.85)"} />
                   <Text style={[styles.filterTabText, active && { color: Colors.deliveryPrimary }]}>
                     {language === "ar" ? f.ar : language === "de" ? f.de : f.en}
                   </Text>
@@ -1681,7 +1681,7 @@ const styles = themedStyles((Colors) => ({
   },
   filterTabWithIcon: { flexDirection: "row", alignItems: "center", gap: 6 },
   filterTabActive: { backgroundColor: Colors.accent + "22", borderColor: Colors.accent },
-  filterTabText: { color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: "600" },
+  filterTabText: { color: "rgba(255,255,255,0.82)", fontSize: 12, fontWeight: "600" },
   filterTabTextActive: { color: Colors.accent },
   listContent: { padding: 12, paddingBottom: 100, gap: 12 },
 
@@ -1690,14 +1690,14 @@ const styles = themedStyles((Colors) => ({
     borderWidth: 1, borderColor: Colors.cardBorder, borderLeftWidth: 4,
   },
   orderCardNew: {
-    borderColor: "#F59E0B",
+    borderColor: Colors.hueAmber,
     elevation: 6,
     ...(Platform.OS === "web" ? { boxShadow: "0px 0px 8px rgba(245,158,11,0.25)" } as any : { shadowColor: "#F59E0B", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 8 }),
   },
   orderCardPos: {
     borderStyle: "dashed" as any,
   },
-  newDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#F59E0B", marginRight: 6 },
+  newDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.hueAmber, marginRight: 6 },
   sourceBadge: {
     flexDirection: "row", alignItems: "center", gap: 4,
     paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1,

@@ -3,7 +3,21 @@ import { View, Text, StyleSheet, Pressable, TouchableOpacity, Animated, ScrollVi
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandLogo } from '@/components/BrandLogo';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '@/constants/colors';
+import { Brand } from '@/constants/colors';
+
+// This screen paints its own navy gradient in both themes, so it uses fixed
+// on-dark colours rather than palette tokens — a light-theme accent would be
+// unreadable here.
+const OnNavy = {
+    accent: Brand.teal,
+    primary: '#3B6BF5',
+    secondary: '#8B5CF6',
+    text: '#FFFFFF',
+    textSoft: 'rgba(255,255,255,0.72)',
+    textFaint: 'rgba(255,255,255,0.55)',
+    hairline: 'rgba(255,255,255,0.16)',
+    fill: 'rgba(255,255,255,0.10)',
+};
 import { themedStyles } from "@/lib/themed-styles";
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -149,7 +163,7 @@ export default function IntroScreen() {
                     <View style={[styles.featuresRow, isRTL && { flexDirection: 'row-reverse' }]}>
                         {content.features.map((f, i) => (
                             <View key={i} style={styles.featurePill}>
-                                <Ionicons name={f.icon as any} size={14} color={Colors.accent} />
+                                <Ionicons name={f.icon as any} size={14} color={OnNavy.accent} />
                                 <Text style={styles.featurePillText}>{f.text}</Text>
                             </View>
                         ))}
@@ -175,7 +189,7 @@ export default function IntroScreen() {
                                     >
                                         {selected && (
                                             <LinearGradient
-                                                colors={[Colors.primary, Colors.secondary]}
+                                                colors={[OnNavy.primary, OnNavy.secondary]}
                                                 style={[StyleSheet.absoluteFillObject, { borderRadius: 14 }]}
                                                 start={{ x: 0, y: 0 }}
                                                 end={{ x: 1, y: 1 }}
@@ -187,7 +201,7 @@ export default function IntroScreen() {
                                         </Text>
                                         {selected && (
                                             <View style={styles.languageCheck}>
-                                                <Ionicons name="checkmark-circle" size={16} color={Colors.white} />
+                                                <Ionicons name="checkmark-circle" size={16} color={OnNavy.text} />
                                             </View>
                                         )}
                                     </TouchableOpacity>
@@ -202,20 +216,20 @@ export default function IntroScreen() {
                         onPress={handleStart}
                     >
                         <LinearGradient
-                            colors={[Colors.primary, Colors.secondary]}
+                            colors={[OnNavy.primary, OnNavy.secondary]}
                             style={styles.buttonGradient}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                         >
                             {isRTL ? (
                                 <>
-                                    <Ionicons name="arrow-back" size={22} color={Colors.white} style={{ marginLeft: 10 }} />
+                                    <Ionicons name="arrow-back" size={22} color={OnNavy.text} style={{ marginLeft: 10 }} />
                                     <Text style={[styles.buttonText, rtlText]}>{content.start}</Text>
                                 </>
                             ) : (
                                 <>
                                     <Text style={styles.buttonText}>{content.start}</Text>
-                                    <Ionicons name="arrow-forward" size={22} color={Colors.white} style={{ marginLeft: 10 }} />
+                                    <Ionicons name="arrow-forward" size={22} color={OnNavy.text} style={{ marginLeft: 10 }} />
                                 </>
                             )}
                         </LinearGradient>
@@ -327,7 +341,7 @@ const styles = themedStyles((Colors) => ({
     logoName: {
         fontSize: 22,
         fontWeight: '800',
-        color: Colors.white,
+        color: OnNavy.text,
         letterSpacing: 0.5,
     },
 
@@ -348,7 +362,7 @@ const styles = themedStyles((Colors) => ({
         width: 110,
         height: 110,
         borderRadius: 34,
-        backgroundColor: Colors.primary,
+        backgroundColor: OnNavy.primary,
         opacity: 0.25,
         top: 8,
         left: 0,
@@ -357,14 +371,14 @@ const styles = themedStyles((Colors) => ({
     welcomeText: {
         fontSize: 17,
         fontWeight: '400',
-        color: 'rgba(255,255,255,0.65)',
+        color: OnNavy.textSoft,
         textAlign: 'center',
         marginBottom: 4,
     },
     brandText: {
         fontSize: 34,
         fontWeight: '900',
-        color: Colors.white,
+        color: OnNavy.text,
         textAlign: 'center',
         marginBottom: 10,
         letterSpacing: 0.5,
@@ -372,7 +386,7 @@ const styles = themedStyles((Colors) => ({
     subtitle: {
         fontSize: 14,
         lineHeight: 21,
-        color: 'rgba(255,255,255,0.6)',
+        color: OnNavy.textSoft,
         textAlign: 'center',
         marginBottom: 20,
         maxWidth: 300,
@@ -396,7 +410,7 @@ const styles = themedStyles((Colors) => ({
         borderRadius: 20,
     },
     featurePillText: {
-        color: Colors.accent,
+        color: OnNavy.accent,
         fontSize: 12,
         fontWeight: '600',
     },
@@ -405,7 +419,7 @@ const styles = themedStyles((Colors) => ({
     divider: {
         width: '80%',
         height: 1,
-        backgroundColor: 'rgba(255,255,255,0.08)',
+        backgroundColor: OnNavy.fill,
         marginVertical: 24,
     },
 
@@ -415,7 +429,7 @@ const styles = themedStyles((Colors) => ({
         marginBottom: 24,
     },
     languageSectionLabel: {
-        color: 'rgba(255,255,255,0.45)',
+        color: OnNavy.textFaint,
         fontSize: 11,
         fontWeight: '600',
         textAlign: 'center',
@@ -438,14 +452,14 @@ const styles = themedStyles((Colors) => ({
         paddingHorizontal: 10,
         borderRadius: 14,
         borderWidth: 1.5,
-        borderColor: 'rgba(255,255,255,0.12)',
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderColor: OnNavy.hairline,
+        backgroundColor: OnNavy.fill,
         gap: 6,
         position: 'relative',
         overflow: 'hidden',
     },
     languageOptionSelected: {
-        borderColor: Colors.primary,
+        borderColor: OnNavy.primary,
     },
     languageFlag: {
         alignItems: 'center',
@@ -455,10 +469,10 @@ const styles = themedStyles((Colors) => ({
     languageNativeLabel: {
         fontSize: 13,
         fontWeight: '600',
-        color: 'rgba(255,255,255,0.55)',
+        color: OnNavy.textFaint,
     },
     languageNativeLabelSelected: {
-        color: Colors.white,
+        color: OnNavy.text,
         fontWeight: '700',
     },
     languageCheck: {
@@ -474,7 +488,7 @@ const styles = themedStyles((Colors) => ({
         borderRadius: 16,
         overflow: 'hidden',
         elevation: 12,
-        shadowColor: Colors.primary,
+        shadowColor: OnNavy.primary,
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.5,
         shadowRadius: 16,
@@ -492,13 +506,13 @@ const styles = themedStyles((Colors) => ({
         transform: [{ scale: 0.98 }],
     },
     buttonText: {
-        color: Colors.white,
+        color: OnNavy.text,
         fontSize: 18,
         fontWeight: '700',
         letterSpacing: 0.3,
     },
     footerNote: {
-        color: 'rgba(255,255,255,0.25)',
+        color: OnNavy.textFaint,
         fontSize: 12,
     },
 }));

@@ -71,7 +71,7 @@ export default function ProductsScreen() {
   const [viewMode, setViewMode] = useState<"products" | "categories">("products");
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editCategory, setEditCategory] = useState<any>(null);
-  const [catForm, setCatForm] = useState({ name: "", color: "#7C3AED", icon: "grid" });
+  const [catForm, setCatForm] = useState({ name: "", color: Colors.hueIndigo, icon: "grid" });
   const [productImage, setProductImage] = useState<string | null>(null);
   const [categoryImage, setCategoryImage] = useState<string | null>(null);
   const [initialStock, setInitialStock] = useState("");
@@ -124,7 +124,7 @@ export default function ProductsScreen() {
       qc.invalidateQueries({ queryKey: ["/api/categories"] });
       setShowCategoryForm(false);
       setEditCategory(null);
-      setCatForm({ name: "", color: "#7C3AED", icon: "grid" });
+      setCatForm({ name: "", color: Colors.hueIndigo, icon: "grid" });
     },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
@@ -302,7 +302,7 @@ export default function ProductsScreen() {
               if (viewMode === "products") {
                 resetForm(); setEditProduct(null); setShowForm(true);
               } else {
-                setCatForm({ name: "", color: "#7C3AED", icon: "grid" }); setEditCategory(null); setShowCategoryForm(true);
+                setCatForm({ name: "", color: Colors.hueIndigo, icon: "grid" }); setEditCategory(null); setShowCategoryForm(true);
               }
             }}
           />
