@@ -57,3 +57,9 @@ play-store-release/local-builds/
 *.jks
 *.keystore
 wsl-build-pos.log
+
+# Play Store binaries — regenerate with the WSL build scripts, do not commit
+play-store-release/*.aab
+play-store-release/*.apk
+customer-app/play-store/*.aab
+customer-app/play-store/*.apk

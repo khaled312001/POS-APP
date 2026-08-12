@@ -191,9 +191,12 @@ const AUDIT = `(() => {
 
   await page.goto(BASE + "/app", { waitUntil: "domcontentloaded", timeout: 60000 });
   const auth = await page.evaluate(async (base, license, email) => {
+      // No `email` in the body on purpose: the server only counts an activation
+      // when one is present, and a licence has a hard activation cap. Tooling
+      // that runs repeatedly would otherwise lock the demo store out.
     const lic = await fetch(`${base}/api/license/validate`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ licenseKey: license, email }),
+      body: JSON.stringify({ licenseKey: license }),
     }).then((r) => r.json());
     const emp = await fetch(`${base}/api/employees/login`, {
       method: "POST", headers: { "Content-Type": "application/json", "x-license-key": license },

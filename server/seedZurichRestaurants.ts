@@ -922,7 +922,7 @@ export async function seedZurichRestaurants() {
                 isActive: true,
                 isMain: true,
                 currency: "CHF",
-                taxRate: "7.70",
+                taxRate: "8.10", // Swiss standard VAT since 1 Jan 2024 (was 7.7%)
             }).$returningId();
             const branchId = branch.id;
 
