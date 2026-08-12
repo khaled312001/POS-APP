@@ -23,7 +23,7 @@ export const Brand = {
 
 export const darkPalette = {
   primary: "#3B6BF5",
-  secondary: "#8B5CF6",
+  secondary: "#A78BFA",
   accent: "#00C1B0",
   gradientStart: "#1E40AF",
   gradientMid: "#7C3AED",
@@ -40,7 +40,7 @@ export const darkPalette = {
 
   text: "#FFFFFF",
   textSecondary: "#B6BBC7",
-  textMuted: "#8A94AD",
+  textMuted: "#9AA4BC",
   /**
    * Ink for content sitting ON the accent fill — active pills, primary buttons,
    * selected chips. Its value follows the accent, not the page: the dark theme's
@@ -60,7 +60,7 @@ export const darkPalette = {
 
   tabBar: "#040E32",
   tabActive: "#00C1B0",
-  tabInactive: "#8A94AD",
+  tabInactive: "#9AA4BC",
 
   border: "#212B4B",
 
@@ -99,12 +99,12 @@ export const darkPalette = {
   // They are tokens rather than literals so the light theme gets a version that
   // survives a white page — the vivid values below are unreadable on one.
   hueTeal: "#2FD3C6",
-  hueViolet: "#8B5CF6",
-  hueIndigo: "#7C3AED",
+  hueViolet: "#A78BFA",
+  hueIndigo: "#A78BFA",
   hueAmber: "#F59E0B",
-  hueCyan: "#06B6D4",
-  hueOrange: "#F97316",
-  hueRose: "#EF4444",
+  hueCyan: "#22D3EE",
+  hueOrange: "#FB923C",
+  hueRose: "#F87171", // icon tint only, never a fill
 
   // ── Elevation (mapped to shadow/elevation props) ──
   shadow: "#000000",

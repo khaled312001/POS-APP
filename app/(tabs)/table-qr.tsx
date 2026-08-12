@@ -430,7 +430,7 @@ export default function TableQrScreen() {
         onPress={() => generateSingleQr(item)}
         style={styles.generateBtn}
       >
-        <Ionicons name="qr-code-outline" size={16} color="#fff" />
+        <Ionicons name="qr-code-outline" size={16} color={Colors.textDark} />
         <Text style={styles.generateBtnText}>{lbl("Generate QR", "إنشاء QR", "QR erstellen")}</Text>
       </Pressable>
     </View>
@@ -450,8 +450,8 @@ export default function TableQrScreen() {
               disabled={generating}
               style={[styles.headerBtn, { backgroundColor: Colors.accent }]}
             >
-              <Ionicons name="flash-outline" size={16} color="#fff" />
-              <Text style={styles.headerBtnText}>
+              <Ionicons name="flash-outline" size={16} color={Colors.textDark} />
+              <Text style={[styles.headerBtnText, { color: Colors.textDark }]}>
                 {generating
                   ? lbl("Generating...", "جاري الإنشاء...", "Wird erstellt...")
                   : lbl(`Generate All (${tablesWithoutQr.length})`, `إنشاء الكل (${tablesWithoutQr.length})`, `Alle erstellen (${tablesWithoutQr.length})`)}
@@ -460,8 +460,8 @@ export default function TableQrScreen() {
           )}
           {qrCodes.length > 0 && (
             <Pressable onPress={printAll} style={[styles.headerBtn, { backgroundColor: Colors.info }]}>
-              <Ionicons name="print-outline" size={16} color="#fff" />
-              <Text style={styles.headerBtnText}>{lbl("Print All", "طباعة الكل", "Alle drucken")}</Text>
+              <Ionicons name="print-outline" size={16} color={Colors.white} />
+              <Text style={[styles.headerBtnText, { color: Colors.white }]}>{lbl("Print All", "طباعة الكل", "Alle drucken")}</Text>
             </Pressable>
           )}
         </View>
@@ -704,7 +704,7 @@ const styles = themedStyles((Colors) => ({
     backgroundColor: Colors.accent, paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: 8,
   },
-  generateBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  generateBtnText: { color: Colors.textDark, fontSize: 12, fontWeight: "700" },
 
   // Empty
   emptyState: {

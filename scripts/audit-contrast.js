@@ -19,9 +19,10 @@ const puppeteer = require("puppeteer");
 const fs = require("fs");
 const path = require("path");
 
-const OUT = "C:/Users/KHALE/AppData/Local/Temp/shots-contrast";
+const OUT = `C:/Users/KHALE/AppData/Local/Temp/shots-contrast-${process.argv[2] === "dark" ? "dark" : "light"}`;
 fs.mkdirSync(OUT, { recursive: true });
 
+const THEME = process.argv[2] === "dark" ? "dark" : "light";
 const BASE = "https://kassenta.com";
 const LICENSE = "BARMAGLY-ZRH1-SUSH-0101-2026";
 const EMAIL = "info@sushizen.ch";
@@ -206,14 +207,14 @@ const AUDIT = `(() => {
   const token = auth?.emp?.token || employee?.token;
   console.log("licence:", auth?.lic?.isValid, "| employee:", employee?.name, "\n");
 
-  await page.evaluateOnNewDocument((license, email, tid, emp, tok) => {
+  await page.evaluateOnNewDocument((license, email, tid, emp, tok, theme) => {
     localStorage.setItem("barmagly_license_key", license);
     localStorage.setItem("barmagly_store_email", email);
     if (tid) localStorage.setItem("barmagly_tenant_id", String(tid));
     if (emp) localStorage.setItem("barmagly_employee", JSON.stringify(emp));
     if (tok) localStorage.setItem("kassenta_employee_token", tok);
-    localStorage.setItem("kassenta_theme", "light");
-  }, LICENSE, EMAIL, tenantId, employee, token);
+    localStorage.setItem("kassenta_theme", theme);
+  }, LICENSE, EMAIL, tenantId, employee, token, THEME);
 
   const all = [];
   for (const view of VIEWS) {
