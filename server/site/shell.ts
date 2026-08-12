@@ -113,7 +113,11 @@ export const icons = {
   qr: I(`<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20h1"/>`),
   bell: I(`<path d="M18 15V10a6 6 0 0 0-12 0v5l-1.6 2.4h15.2z"/><path d="M10 20a2 2 0 0 0 4 0"/>`),
   key: I(`<circle cx="8" cy="14" r="4"/><path d="M11 11.5L20 3M17 5.5l2 2M15.5 7l1.5 1.5"/>`),
+  close: I(`<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>`),
 };
+
+/** WhatsApp glyph — filled, so it stays legible at 24px against the green fill. */
+const WHATSAPP_GLYPH = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.87 9.87 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 1.67c2.2 0 4.27.86 5.83 2.42a8.2 8.2 0 0 1 2.41 5.82c0 4.54-3.7 8.24-8.25 8.24a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24zm-3.2 4.4c-.15 0-.4.06-.61.28-.21.22-.8.78-.8 1.9s.82 2.21.94 2.36c.11.15 1.6 2.44 3.88 3.42.54.23.96.37 1.29.48.54.17 1.04.15 1.43.09.44-.07 1.34-.55 1.53-1.08.19-.53.19-.98.13-1.08-.06-.09-.21-.15-.44-.26-.23-.11-1.34-.66-1.55-.74-.21-.07-.36-.11-.51.12-.15.22-.58.73-.71.88-.13.15-.26.17-.49.06-.23-.11-.96-.36-1.83-1.13-.68-.6-1.13-1.35-1.27-1.57-.13-.23-.01-.35.1-.46.1-.1.23-.26.34-.4.11-.13.15-.22.23-.37.07-.15.04-.28-.02-.4-.06-.11-.5-1.23-.7-1.68-.18-.44-.37-.38-.51-.39h-.43z"/></svg>`;
 
 // ── Site map ────────────────────────────────────────────────────────────────
 export interface NavEntry {
@@ -343,9 +347,67 @@ ${body}
 
   ${renderFooter()}
 
+  ${renderWhatsApp()}
+
   <script src="${js.url}" defer></script>
 </body>
 </html>`;
+}
+
+/**
+ * Floating WhatsApp launcher.
+ *
+ * Hand-rolled rather than an embedded widget: the common third-party ones ship
+ * 150–250 KB of script, load fonts from another origin and record a page view
+ * on every visitor, which is a lot to pay for a link. This is one anchor, one
+ * card and ~30 lines of behaviour.
+ *
+ * The number comes from SALES_WHATSAPP so it can be changed without a deploy of
+ * the site source; the fallback is the number the previous site used.
+ */
+function renderWhatsApp(): string {
+  const number = (process.env.SALES_WHATSAPP || "201010254819").replace(/\D/g, "");
+  if (!number) return "";
+
+  const greeting = {
+    en: "Hi, I'd like to know more about Kassenta POS.",
+    de: "Hallo, ich interessiere mich für Kassenta POS.",
+    ar: "مرحبًا، أود معرفة المزيد عن Kassenta POS.",
+  };
+  const link = (lang: keyof typeof greeting) =>
+    `https://wa.me/${number}?text=${encodeURIComponent(greeting[lang])}`;
+
+  return `<div class="wa" id="waWidget">
+    <div class="wa-card" role="dialog" aria-label="Chat on WhatsApp">
+      <button class="wa-close" type="button" onclick="Kassenta.closeWhatsApp()" aria-label="Close">${icons.close}</button>
+      <div class="wa-card-head">
+        <span class="wa-avatar">${WHATSAPP_GLYPH}</span>
+        <span>
+          <b>Kassenta</b>
+          <span class="wa-status"><i class="wa-dot"></i><span ${tAttrs({
+            en: "Typically replies within an hour",
+            de: "Antwortet meist innerhalb einer Stunde",
+            ar: "يردّ عادةً خلال ساعة",
+          })}>Typically replies within an hour</span></span>
+        </span>
+      </div>
+      <p ${tAttrs({
+        en: "Questions about pricing, a specific feature, or moving your menu across? Send us a message.",
+        de: "Fragen zu Preisen, einer bestimmten Funktion oder zur Übernahme Ihrer Karte? Schreiben Sie uns.",
+        ar: "عندك سؤال عن الأسعار أو ميزة معيّنة أو نقل قائمتك؟ ابعتلنا رسالة.",
+      })}>Questions about pricing, a specific feature, or moving your menu across? Send us a message.</p>
+      <a class="btn" href="${link("en")}" target="_blank" rel="noopener"
+         data-wa-en="${esc(link("en"))}" data-wa-de="${esc(link("de"))}" data-wa-ar="${esc(link("ar"))}"
+         ${tAttrs({ en: "Start the chat", de: "Chat starten", ar: "ابدأ المحادثة" })}>Start the chat</a>
+    </div>
+    <a class="wa-btn" href="${link("en")}" target="_blank" rel="noopener"
+       data-wa-en="${esc(link("en"))}" data-wa-de="${esc(link("de"))}" data-wa-ar="${esc(link("ar"))}"
+       aria-label="Chat with Kassenta on WhatsApp"
+       onclick="Kassenta.closeWhatsApp()"
+       onmouseenter="Kassenta.openWhatsApp()" onfocus="Kassenta.openWhatsApp()">
+      ${WHATSAPP_GLYPH}<span ${tAttrs({ en: "Chat with us", de: "Schreiben Sie uns", ar: "تواصل معنا" })}>Chat with us</span>
+    </a>
+  </div>`;
 }
 
 function renderFooter(): string {
@@ -444,6 +506,11 @@ window.Kassenta = (function () {
       var v = el.getAttribute('data-alt-' + l);
       if (v !== null) el.setAttribute('alt', v);
     });
+    // WhatsApp deep links carry a pre-filled message, so they change with the language.
+    document.querySelectorAll('[data-wa-' + l + ']').forEach(function (el) {
+      var v = el.getAttribute('data-wa-' + l);
+      if (v !== null) el.setAttribute('href', v);
+    });
     var label = document.getElementById('langLabel');
     if (label) label.textContent = LANGS[l];
     document.querySelectorAll('.lang-menu button').forEach(function (b) {
@@ -509,6 +576,40 @@ window.Kassenta = (function () {
   else applyLang(read('kassenta_lang') || 'en');
   applyTheme(read('kassenta_theme') === 'dark' ? 'dark' : 'light');
 
-  return { setLang: setLang, toggleTheme: toggleTheme, toggleNav: toggleNav, toggleLangMenu: toggleLangMenu };
+  /* ── WhatsApp launcher ────────────────────────────────────────────────────
+     The greeting card opens itself once per visitor. Dismissing it is
+     remembered, because a bubble that reappears on every page of a seven-page
+     site stops being an invitation and starts being an obstacle. */
+  var wa = document.getElementById('waWidget');
+  var WA_SEEN = 'kassenta_wa_seen';
+
+  function openWhatsApp() { if (wa) wa.classList.add('open'); }
+  function closeWhatsApp() {
+    if (!wa) return;
+    wa.classList.remove('open');
+    store(WA_SEEN, '1');
+  }
+
+  if (wa) {
+    if (!read(WA_SEEN)) {
+      // Late enough that it does not compete with the hero, early enough to be
+      // seen before the visitor scrolls away.
+      setTimeout(openWhatsApp, 5000);
+    }
+    wa.addEventListener('mouseleave', function () { if (read(WA_SEEN)) wa.classList.remove('open'); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeWhatsApp(); });
+    document.addEventListener('click', function (e) {
+      if (wa.classList.contains('open') && !e.target.closest('#waWidget')) wa.classList.remove('open');
+    });
+  }
+
+  return {
+    setLang: setLang,
+    toggleTheme: toggleTheme,
+    toggleNav: toggleNav,
+    toggleLangMenu: toggleLangMenu,
+    openWhatsApp: openWhatsApp,
+    closeWhatsApp: closeWhatsApp,
+  };
 })();
 `;

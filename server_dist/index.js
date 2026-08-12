@@ -6703,6 +6703,131 @@ td strong { color: var(--text); font-weight: 700; }
 .reveal.visible { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; } }
 
+
+/* ── Floating WhatsApp launcher ─────────────────────────────────────────────
+   Self-contained: no third-party widget script, so it costs one button in the
+   DOM instead of a ~200 KB embed that also phones home on every page view. */
+.wa {
+  position: fixed;
+  inset-block-end: max(22px, env(safe-area-inset-bottom));
+  inset-inline-end: max(22px, env(safe-area-inset-right));
+  z-index: 880;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none;
+}
+html[dir="rtl"] .wa { align-items: flex-start; }
+
+.wa-btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  height: 56px;
+  padding: 0;
+  width: 56px;
+  border-radius: 100px;
+  background: #25D366;
+  color: #fff;
+  border: 1px solid rgba(0, 0, 0, .06);
+  box-shadow: 0 6px 20px rgba(37, 211, 102, .34), 0 2px 6px rgba(11, 18, 32, .16);
+  overflow: hidden;
+  white-space: nowrap;
+  transition: width .3s var(--ease), gap .3s var(--ease), box-shadow .2s var(--ease), transform .2s var(--ease);
+}
+.wa-btn svg { width: 27px; height: 27px; flex: none; margin-inline: 14px; }
+.wa-btn span {
+  font-size: .92rem;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  opacity: 0;
+  max-width: 0;
+  transition: opacity .22s var(--ease), max-width .3s var(--ease);
+}
+.wa-btn:hover,
+.wa-btn:focus-visible {
+  width: auto;
+  gap: 0;
+  box-shadow: 0 10px 28px rgba(37, 211, 102, .42), 0 3px 8px rgba(11, 18, 32, .2);
+  transform: translateY(-2px);
+}
+.wa-btn:hover span,
+.wa-btn:focus-visible span { opacity: 1; max-width: 220px; padding-inline-end: 20px; }
+.wa-btn:active { transform: translateY(0); }
+
+/* A single, slow pulse the first time — enough to be noticed, not a strobe. */
+.wa-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 rgba(37, 211, 102, .55);
+  animation: wa-pulse 2.6s var(--ease) 1.5s 3;
+  pointer-events: none;
+}
+@keyframes wa-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, .5); }
+  70% { box-shadow: 0 0 0 16px rgba(37, 211, 102, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
+}
+.wa-btn { position: relative; }
+
+.wa-card {
+  pointer-events: auto;
+  position: relative;
+  width: min(304px, calc(100vw - 44px));
+  padding: 16px 18px 16px 16px;
+  border-radius: 16px 16px 6px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(10px) scale(.97);
+  transform-origin: bottom right;
+  visibility: hidden;
+  transition: opacity .26s var(--ease), transform .26s var(--ease), visibility .26s;
+}
+html[dir="rtl"] .wa-card { border-radius: 16px 16px 16px 6px; transform-origin: bottom left; }
+.wa.open .wa-card { opacity: 1; transform: none; visibility: visible; }
+.wa-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.wa-avatar {
+  width: 34px; height: 34px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; background: #25D366; color: #fff;
+}
+.wa-avatar svg { width: 19px; height: 19px; }
+.wa-card b { display: block; font-size: .9rem; font-weight: 800; color: var(--text); line-height: 1.3; }
+.wa-status { display: flex; align-items: center; gap: 5px; font-size: .74rem; color: var(--text-3); }
+.wa-dot { width: 7px; height: 7px; border-radius: 50%; background: #25D366; flex: none; }
+.wa-card p { font-size: .87rem; line-height: 1.55; margin: 0 0 14px; }
+.wa-card .btn { width: 100%; padding: 10px 16px; font-size: .88rem; background: #25D366; color: #fff; box-shadow: none; }
+.wa-card .btn:hover { background: #1eb85a; box-shadow: 0 6px 16px rgba(37, 211, 102, .3); }
+.wa-close {
+  position: absolute; top: 8px; inset-inline-end: 8px;
+  width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+  color: var(--text-3);
+}
+.wa-close:hover { background: var(--bg-inset); color: var(--text); }
+.wa-close svg { width: 14px; height: 14px; }
+
+/* Keep the launcher out of the way of the collapsed navigation and the footer CTA. */
+@media (max-width: 1040px) {
+  .wa { inset-block-end: max(16px, env(safe-area-inset-bottom)); inset-inline-end: max(16px, env(safe-area-inset-right)); }
+  .wa-btn { width: 52px; height: 52px; }
+  .wa-btn svg { width: 25px; height: 25px; margin-inline: 13px; }
+  .wa-btn:hover span, .wa-btn:focus-visible span { max-width: 0; opacity: 0; padding-inline-end: 0; }
+  .wa-btn:hover, .wa-btn:focus-visible { width: 52px; }
+}
+/* Stand down while the collapsed navigation is open — the sheet covers the
+   viewport and the launcher would sit on top of the menu items. */
+body:has(.nav-links.open) .wa { opacity: 0; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wa-btn::after { animation: none; }
+  .wa-btn, .wa-card { transition: none; }
+}
+
 .skip-link { position: absolute; inset-inline-start: -9999px; top: 8px; z-index: 999; padding: 10px 16px; background: var(--accent); color: var(--accent-ink); border-radius: 8px; font-weight: 700; }
 .skip-link:focus { inset-inline-start: 12px; }
 `;
@@ -6867,9 +6992,52 @@ ${body}
 
   ${renderFooter()}
 
+  ${renderWhatsApp()}
+
   <script src="${js.url}" defer></script>
 </body>
 </html>`;
+}
+function renderWhatsApp() {
+  const number = (process.env.SALES_WHATSAPP || "201010254819").replace(/\D/g, "");
+  if (!number) return "";
+  const greeting = {
+    en: "Hi, I'd like to know more about Kassenta POS.",
+    de: "Hallo, ich interessiere mich f\xFCr Kassenta POS.",
+    ar: "\u0645\u0631\u062D\u0628\u064B\u0627\u060C \u0623\u0648\u062F \u0645\u0639\u0631\u0641\u0629 \u0627\u0644\u0645\u0632\u064A\u062F \u0639\u0646 Kassenta POS."
+  };
+  const link = (lang) => `https://wa.me/${number}?text=${encodeURIComponent(greeting[lang])}`;
+  return `<div class="wa" id="waWidget">
+    <div class="wa-card" role="dialog" aria-label="Chat on WhatsApp">
+      <button class="wa-close" type="button" onclick="Kassenta.closeWhatsApp()" aria-label="Close">${icons.close}</button>
+      <div class="wa-card-head">
+        <span class="wa-avatar">${WHATSAPP_GLYPH}</span>
+        <span>
+          <b>Kassenta</b>
+          <span class="wa-status"><i class="wa-dot"></i><span ${tAttrs({
+    en: "Typically replies within an hour",
+    de: "Antwortet meist innerhalb einer Stunde",
+    ar: "\u064A\u0631\u062F\u0651 \u0639\u0627\u062F\u0629\u064B \u062E\u0644\u0627\u0644 \u0633\u0627\u0639\u0629"
+  })}>Typically replies within an hour</span></span>
+        </span>
+      </div>
+      <p ${tAttrs({
+    en: "Questions about pricing, a specific feature, or moving your menu across? Send us a message.",
+    de: "Fragen zu Preisen, einer bestimmten Funktion oder zur \xDCbernahme Ihrer Karte? Schreiben Sie uns.",
+    ar: "\u0639\u0646\u062F\u0643 \u0633\u0624\u0627\u0644 \u0639\u0646 \u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0623\u0648 \u0645\u064A\u0632\u0629 \u0645\u0639\u064A\u0651\u0646\u0629 \u0623\u0648 \u0646\u0642\u0644 \u0642\u0627\u0626\u0645\u062A\u0643\u061F \u0627\u0628\u0639\u062A\u0644\u0646\u0627 \u0631\u0633\u0627\u0644\u0629."
+  })}>Questions about pricing, a specific feature, or moving your menu across? Send us a message.</p>
+      <a class="btn" href="${link("en")}" target="_blank" rel="noopener"
+         data-wa-en="${esc(link("en"))}" data-wa-de="${esc(link("de"))}" data-wa-ar="${esc(link("ar"))}"
+         ${tAttrs({ en: "Start the chat", de: "Chat starten", ar: "\u0627\u0628\u062F\u0623 \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629" })}>Start the chat</a>
+    </div>
+    <a class="wa-btn" href="${link("en")}" target="_blank" rel="noopener"
+       data-wa-en="${esc(link("en"))}" data-wa-de="${esc(link("de"))}" data-wa-ar="${esc(link("ar"))}"
+       aria-label="Chat with Kassenta on WhatsApp"
+       onclick="Kassenta.closeWhatsApp()"
+       onmouseenter="Kassenta.openWhatsApp()" onfocus="Kassenta.openWhatsApp()">
+      ${WHATSAPP_GLYPH}<span ${tAttrs({ en: "Chat with us", de: "Schreiben Sie uns", ar: "\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627" })}>Chat with us</span>
+    </a>
+  </div>`;
 }
 function renderFooter() {
   const col = (title, links) => `
@@ -6939,7 +7107,7 @@ function renderFooter() {
     </div>
   </footer>`;
 }
-var import_crypto6, hash8, assetCache, I, icons, NAV, FLAGS, SITE_JS;
+var import_crypto6, hash8, assetCache, I, icons, WHATSAPP_GLYPH, NAV, FLAGS, SITE_JS;
 var init_shell = __esm({
   "server/site/shell.ts"() {
     "use strict";
@@ -6980,8 +7148,10 @@ var init_shell = __esm({
       refresh: I(`<path d="M20 11A8 8 0 0 0 6.3 6.3L4 8.5"/><polyline points="4 4 4 8.5 8.5 8.5"/><path d="M4 13a8 8 0 0 0 13.7 4.7L20 15.5"/><polyline points="20 20 20 15.5 15.5 15.5"/>`),
       qr: I(`<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20h1"/>`),
       bell: I(`<path d="M18 15V10a6 6 0 0 0-12 0v5l-1.6 2.4h15.2z"/><path d="M10 20a2 2 0 0 0 4 0"/>`),
-      key: I(`<circle cx="8" cy="14" r="4"/><path d="M11 11.5L20 3M17 5.5l2 2M15.5 7l1.5 1.5"/>`)
+      key: I(`<circle cx="8" cy="14" r="4"/><path d="M11 11.5L20 3M17 5.5l2 2M15.5 7l1.5 1.5"/>`),
+      close: I(`<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>`)
     };
+    WHATSAPP_GLYPH = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.87 9.87 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 1.67c2.2 0 4.27.86 5.83 2.42a8.2 8.2 0 0 1 2.41 5.82c0 4.54-3.7 8.24-8.25 8.24a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24zm-3.2 4.4c-.15 0-.4.06-.61.28-.21.22-.8.78-.8 1.9s.82 2.21.94 2.36c.11.15 1.6 2.44 3.88 3.42.54.23.96.37 1.29.48.54.17 1.04.15 1.43.09.44-.07 1.34-.55 1.53-1.08.19-.53.19-.98.13-1.08-.06-.09-.21-.15-.44-.26-.23-.11-1.34-.66-1.55-.74-.21-.07-.36-.11-.51.12-.15.22-.58.73-.71.88-.13.15-.26.17-.49.06-.23-.11-.96-.36-1.83-1.13-.68-.6-1.13-1.35-1.27-1.57-.13-.23-.01-.35.1-.46.1-.1.23-.26.34-.4.11-.13.15-.22.23-.37.07-.15.04-.28-.02-.4-.06-.11-.5-1.23-.7-1.68-.18-.44-.37-.38-.51-.39h-.43z"/></svg>`;
     NAV = [
       { path: "/features", label: { en: "Features", de: "Funktionen", ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A" } },
       { path: "/solutions", label: { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" } },
@@ -7017,6 +7187,11 @@ window.Kassenta = (function () {
     document.querySelectorAll('[data-alt-' + l + ']').forEach(function (el) {
       var v = el.getAttribute('data-alt-' + l);
       if (v !== null) el.setAttribute('alt', v);
+    });
+    // WhatsApp deep links carry a pre-filled message, so they change with the language.
+    document.querySelectorAll('[data-wa-' + l + ']').forEach(function (el) {
+      var v = el.getAttribute('data-wa-' + l);
+      if (v !== null) el.setAttribute('href', v);
     });
     var label = document.getElementById('langLabel');
     if (label) label.textContent = LANGS[l];
@@ -7083,7 +7258,41 @@ window.Kassenta = (function () {
   else applyLang(read('kassenta_lang') || 'en');
   applyTheme(read('kassenta_theme') === 'dark' ? 'dark' : 'light');
 
-  return { setLang: setLang, toggleTheme: toggleTheme, toggleNav: toggleNav, toggleLangMenu: toggleLangMenu };
+  /* ── WhatsApp launcher ────────────────────────────────────────────────────
+     The greeting card opens itself once per visitor. Dismissing it is
+     remembered, because a bubble that reappears on every page of a seven-page
+     site stops being an invitation and starts being an obstacle. */
+  var wa = document.getElementById('waWidget');
+  var WA_SEEN = 'kassenta_wa_seen';
+
+  function openWhatsApp() { if (wa) wa.classList.add('open'); }
+  function closeWhatsApp() {
+    if (!wa) return;
+    wa.classList.remove('open');
+    store(WA_SEEN, '1');
+  }
+
+  if (wa) {
+    if (!read(WA_SEEN)) {
+      // Late enough that it does not compete with the hero, early enough to be
+      // seen before the visitor scrolls away.
+      setTimeout(openWhatsApp, 5000);
+    }
+    wa.addEventListener('mouseleave', function () { if (read(WA_SEEN)) wa.classList.remove('open'); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeWhatsApp(); });
+    document.addEventListener('click', function (e) {
+      if (wa.classList.contains('open') && !e.target.closest('#waWidget')) wa.classList.remove('open');
+    });
+  }
+
+  return {
+    setLang: setLang,
+    toggleTheme: toggleTheme,
+    toggleNav: toggleNav,
+    toggleLangMenu: toggleLangMenu,
+    openWhatsApp: openWhatsApp,
+    closeWhatsApp: closeWhatsApp,
+  };
 })();
 `;
   }
