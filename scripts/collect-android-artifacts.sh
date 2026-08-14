@@ -46,11 +46,11 @@ copy_and_check() {
 
 fail=0
 copy_and_check /root/pos/android/app/build/outputs \
-  "$WIN/play-store-release" kassenta-pos-v10 \
+  "$WIN/play-store-release" kassenta-pos-v11 \
   "$WIN/upload-keystore.jks" 2d7274cd8622745f633e30c8a9f8f3f5 || fail=1
 
 copy_and_check /root/customer/android/app/build/outputs \
-  "$WIN/customer-app/play-store" kassenta-order-v4 \
+  "$WIN/customer-app/play-store" kassenta-order-v5 \
   /mnt/f/android-toolchain/customer-upload.jks a75f9cd0c7b9cf1ca65a08803aa4879c || fail=1
 
 [ "$fail" -eq 0 ] && echo "both artifacts ready to upload" || echo "one or more checks failed"

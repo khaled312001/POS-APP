@@ -12,18 +12,40 @@ Generated 12 August 2026.
 
 ## 1. What to upload
 
-| | Kassenta POS | Kassenta Order (customer) |
-|---|---|---|
-| Package name | `tech.barmagly.pos` | `com.barmagly.customer` |
-| Play Console app | the existing POS listing | the existing customer listing |
-| New version code | **10** (was 9) | **4** (was 3) |
-| Version name | 1.0.0 | 1.0.0 |
-| Upload file | `play-store-release/kassenta-pos-v10.aab` | `customer-app/play-store/kassenta-order-v4.aab` |
-| Test APK | `play-store-release/kassenta-pos-v10.apk` | `customer-app/play-store/kassenta-order-v4.apk` |
-| Signing key alias | `534fe00c431cca34b5dd50b1be72b8fd` | `dba25bca872c13f4f468e0fc92357100` |
+|                   | Kassenta POS                                | Kassenta Order (customer)                         |
+| ----------------- | ------------------------------------------- | ------------------------------------------------- |
+| Package name      | `tech.barmagly.pos`                       | `com.barmagly.customer`                         |
+| Play Console app  | the existing POS listing                    | the existing customer listing                     |
+| New version code  | **11** (was 10)                       | **5** (was 4)                               |
+| Version name      | 1.0.0                                       | 1.0.0                                             |
+| Upload file       | `play-store-release/kassenta-pos-v11.aab` | `customer-app/play-store/kassenta-order-v5.aab` |
+| Test APK          | `play-store-release/kassenta-pos-v11.apk` | `customer-app/play-store/kassenta-order-v5.apk` |
+| Signing key alias | `534fe00c431cca34b5dd50b1be72b8fd`        | `dba25bca872c13f4f468e0fc92357100`              |
 
 The `.aab` goes to **Production → Create new release**. The `.apk` is for
 installing on a device to check before you publish — Play does not accept it.
+
+### Google sign-in needs four Android OAuth clients, not two
+
+v11 and v5 sign in through Play Services natively — no browser. Google matches
+the request against an Android OAuth client by **package name + signing SHA-1**,
+and Play re-signs every build it distributes. So each app needs two clients:
+
+| App | Package | Which SHA-1 |
+|---|---|---|
+| Kassenta POS | `tech.barmagly.pos` | upload key `BE:C5:EA:81:…:2E:B8` |
+| Kassenta POS | `tech.barmagly.pos` | **Play app signing key** — Play Console → Setup → App signing |
+| Kassenta Order | `com.barmagly.customer` | upload key `9F:8D:45:96:…:BE:9E` |
+| Kassenta Order | `com.barmagly.customer` | **Play app signing key** |
+
+Miss the Play-signing pair and sign-in works on a locally installed APK and
+fails on the build users download — the symptom is `DEVELOPER_ERROR`, which the
+app reports as "This build's signing certificate is not registered with Google".
+
+The ID this release actually carries in code is the *web* client,
+`852311970344-8q8a01gm…` — Google stamps it as the `aud` of every ID token
+regardless of which Android client authorised the request, and that is what the
+server validates.
 
 ---
 
@@ -37,11 +59,11 @@ Kassenta POS
 
 ### Short description (80 characters max)
 
-| Language | Text | Length |
-|---|---|---|
-| English | `Point of sale, online ordering and delivery in one system.` | 58 |
-| Deutsch | `Kasse, Online-Bestellung und Lieferung in einem System.` | 55 |
-| العربية | `كاشير وطلب أونلاين وتوصيل في نظام واحد.` | 39 |
+| Language       | Text                                                                        | Length |
+| -------------- | --------------------------------------------------------------------------- | ------ |
+| English        | `Point of sale, online ordering and delivery in one system.`              | 58     |
+| Deutsch        | `Kasse, Online-Bestellung und Lieferung in einem System.`                 | 55     |
+| العربية | `كاشير وطلب أونلاين وتوصيل في نظام واحد.` | 39     |
 
 ### Full description (4000 characters max)
 
@@ -93,6 +115,7 @@ and dark themes, switchable in one tap.
 A licence key is required. Start a 14-day free trial from the app, or contact us at
 info@kassenta.com for a demo on your own menu.
 ```
+
 </details>
 
 <details>
@@ -143,6 +166,7 @@ Desktop-Browser. Heller und dunkler Modus, mit einem Tap umschaltbar.
 Ein Lizenzschlüssel ist erforderlich. Starten Sie eine 14-tägige Testphase in der App
 oder schreiben Sie an info@kassenta.com für eine Demo mit Ihrer eigenen Karte.
 ```
+
 </details>
 
 <details>
@@ -192,15 +216,16 @@ oder schreiben Sie an info@kassenta.com für eine Demo mit Ihrer eigenen Karte.
 يتطلب مفتاح ترخيص. ابدأ تجربة 14 يومًا من داخل التطبيق، أو راسلنا على
 info@kassenta.com لعرض توضيحي على قائمتك أنت.
 ```
+
 </details>
 
 ### Release notes / What's new (500 characters max per language)
 
-| Language | Text |
-|---|---|
-| English | `New name and look: Barmagly POS is now Kassenta POS.`<br>`• Light mode is now the default, with a one-tap switch to dark`<br>`• Every colour re-checked for readability on both themes`<br>`• Swiss VAT updated to the current 8.1% standard rate`<br>`• Moved to kassenta.com — no action needed, your data is unchanged`<br>`• Faster startup and clearer typography throughout` |
-| Deutsch | `Neuer Name und neues Aussehen: aus Barmagly POS wird Kassenta POS.`<br>`• Heller Modus ist neu die Vorgabe, Umschalten auf Dunkel mit einem Tap`<br>`• Alle Farben auf Lesbarkeit in beiden Modi geprüft`<br>`• Schweizer MwSt. auf den aktuellen Satz von 8,1 % aktualisiert`<br>`• Umzug auf kassenta.com — nichts zu tun, Ihre Daten bleiben unverändert`<br>`• Schnellerer Start und klarere Typografie` |
-| العربية | `اسم وهوية جديدة: Barmagly POS أصبح Kassenta POS.`<br>`• الوضع الفاتح صار الافتراضي، والتبديل للداكن بضغطة واحدة`<br>`• مراجعة كل الألوان للتأكد من وضوحها في الوضعين`<br>`• تحديث الضريبة السويسرية إلى النسبة الحالية 8.1%`<br>`• الانتقال إلى kassenta.com — لا يلزمك أي إجراء، بياناتك كما هي`<br>`• بدء تشغيل أسرع وخطوط أوضح` |
+| Language       | Text                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| English        | `New name and look: Barmagly POS is now Kassenta POS.• Light mode is now the default, with a one-tap switch to dark``• Every colour re-checked for readability on both themes• Swiss VAT updated to the current 8.1% standard rate``• Moved to kassenta.com — no action needed, your data is unchanged• Faster startup and clearer typography throughout`                                                                                                                                                        |
+| Deutsch        | `Neuer Name und neues Aussehen: aus Barmagly POS wird Kassenta POS.• Heller Modus ist neu die Vorgabe, Umschalten auf Dunkel mit einem Tap``• Alle Farben auf Lesbarkeit in beiden Modi geprüft• Schweizer MwSt. auf den aktuellen Satz von 8,1 % aktualisiert``• Umzug auf kassenta.com — nichts zu tun, Ihre Daten bleiben unverändert• Schnellerer Start und klarere Typografie`                                                                                                                            |
+| العربية | `اسم وهوية جديدة: Barmagly POS أصبح Kassenta POS.• الوضع الفاتح صار الافتراضي، والتبديل للداكن بضغطة واحدة``• مراجعة كل الألوان للتأكد من وضوحها في الوضعين• تحديث الضريبة السويسرية إلى النسبة الحالية 8.1%``• الانتقال إلى kassenta.com — لا يلزمك أي إجراء، بياناتك كما هي• بدء تشغيل أسرع وخطوط أوضح` |
 
 ---
 
@@ -214,11 +239,11 @@ Kassenta Order
 
 ### Short description
 
-| Language | Text | Length |
-|---|---|---|
-| English | `Order from your favourite local places and follow it to your door.` | 65 |
-| Deutsch | `Bestellen Sie bei Ihren Lieblingslokalen und verfolgen Sie die Lieferung.` | 72 |
-| العربية | `اطلب من أماكنك المفضّلة وتابع طلبك حتى باب بيتك.` | 47 |
+| Language       | Text                                                                                        | Length |
+| -------------- | ------------------------------------------------------------------------------------------- | ------ |
+| English        | `Order from your favourite local places and follow it to your door.`                      | 65     |
+| Deutsch        | `Bestellen Sie bei Ihren Lieblingslokalen und verfolgen Sie die Lieferung.`               | 72     |
+| العربية | `اطلب من أماكنك المفضّلة وتابع طلبك حتى باب بيتك.` | 47     |
 
 ### Full description
 
@@ -242,6 +267,7 @@ order history.
 
 Questions: info@kassenta.com
 ```
+
 </details>
 
 <details>
@@ -264,6 +290,7 @@ Bestellhistorie zu behalten.
 
 Fragen: info@kassenta.com
 ```
+
 </details>
 
 <details>
@@ -285,24 +312,25 @@ Fragen: info@kassenta.com
 
 للاستفسار: info@kassenta.com
 ```
+
 </details>
 
 ### Release notes
 
-| Language | Text |
-|---|---|
-| English | `New name and look: we are now Kassenta Order.`<br>`• Refreshed design that matches the storefront`<br>`• Moved to kassenta.com — your saved addresses and orders are unchanged`<br>`• Faster menu loading` |
-| Deutsch | `Neuer Name und neues Aussehen: wir heissen jetzt Kassenta Order.`<br>`• Aufgefrischtes Design passend zum Shop`<br>`• Umzug auf kassenta.com — Ihre Adressen und Bestellungen bleiben erhalten`<br>`• Schnelleres Laden der Karte` |
-| العربية | `اسم وهوية جديدة: بقينا Kassenta Order.`<br>`• تصميم مجدَّد مطابق للمتجر`<br>`• الانتقال إلى kassenta.com — عناوينك وطلباتك المحفوظة كما هي`<br>`• تحميل أسرع للقوائم` |
+| Language       | Text                                                                                                                                                                                                                                                         |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| English        | `New name and look: we are now Kassenta Order.• Refreshed design that matches the storefront``• Moved to kassenta.com — your saved addresses and orders are unchanged• Faster menu loading`                                                          |
+| Deutsch        | `Neuer Name und neues Aussehen: wir heissen jetzt Kassenta Order.• Aufgefrischtes Design passend zum Shop``• Umzug auf kassenta.com — Ihre Adressen und Bestellungen bleiben erhalten• Schnelleres Laden der Karte`                                  |
+| العربية | `اسم وهوية جديدة: بقينا Kassenta Order.• تصميم مجدَّد مطابق للمتجر``• الانتقال إلى kassenta.com — عناوينك وطلباتك المحفوظة كما هي• تحميل أسرع للقوائم` |
 
 ---
 
 ## 4. Graphics
 
-| Asset | Requirement | File |
-|---|---|---|
-| App icon | 512 × 512 PNG, **no transparency** | `play-store-release/play-store-icon-512x512.png`<br>`customer-app/play-store/play-store-icon-512x512.png` |
-| Feature graphic | 1024 × 500 PNG | `play-store-release/play-store-feature-graphic-1024x500.png`<br>`customer-app/play-store/play-store-feature-graphic-1024x500.png` |
+| Asset           | Requirement                              | File                                                                                                                          |
+| --------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| App icon        | 512 × 512 PNG,**no transparency** | `play-store-release/play-store-icon-512x512.pngcustomer-app/play-store/play-store-icon-512x512.png`                         |
+| Feature graphic | 1024 × 500 PNG                          | `play-store-release/play-store-feature-graphic-1024x500.pngcustomer-app/play-store/play-store-feature-graphic-1024x500.png` |
 
 Both are regenerated from the brand mark by
 `scripts/generate-play-store-assets.py`, so they match the launcher icons and the
@@ -322,11 +350,20 @@ data, by `scripts/capture-store-screenshots.js`.
 
 ### Kassenta POS — `play-store-release/screenshots/`
 
-| Play tab | Folder | Size | Count | Priority |
-|---|---|---|---|---|
-| **10-inch tablet** | `tablet10/` | 2560 × 1440 | 7 | **primary — upload all 7** |
-| 7-inch tablet | `tablet7/` | 1920 × 1080 | 7 | upload all 7 |
-| Phone | `phone/` | 1080 × 1920 | 7 | upload 4–5 |
+| Play tab                 | Folder             | Size         | Count | Priority                          |
+| ------------------------ | ------------------ | ------------ | ----- | --------------------------------- |
+| **10-inch tablet** | `tablet10/`      | 2560 × 1440 | 7     | **primary — upload all 7** |
+| 7-inch tablet            | `tablet7/`       | 1920 × 1080 | 7     | upload all 7                      |
+| Phone                    | `phone/`         | 1080 × 1920 | 7     | upload 4–5                       |
+| Chromebook (optional)    | reuse`tablet10/` | 2560 × 1440 | 4–8  | worth filling — see below        |
+
+The Chromebook slot takes the same 16:9 constraint and a 1080–7680 px range, so
+the `tablet10/` files qualify unchanged. The POS runs full-screen in a desktop
+browser, so filling this slot is honest rather than padding.
+
+**The existing listing has all three screenshot slots full (8/8).** Play caps
+each slot at eight, so the old shots have to be deleted before the new ones will
+upload.
 
 Order to upload (the first two are what most people see):
 
@@ -340,15 +377,52 @@ Order to upload (the first two are what most people see):
 
 ### Kassenta Order — `customer-app/play-store/screenshots/`
 
-| Play tab | Folder | Size | Count |
-|---|---|---|---|
-| **10-inch tablet** | `tablet10/` | 2560 × 1440 | 3 |
-| 7-inch tablet | `tablet7/` | 1920 × 1080 | 3 |
-| Phone | `phone/` | 1080 × 1920 | 3 |
+Captured by `scripts/capture-customer-screenshots.js` from the hash-routed SPA at
+`/customer/` — the page the WebView actually loads. The earlier set came from
+`/restaurants` and `/order/<slug>`, which are web pages the app never displays.
 
-1. `02_menu` — a real restaurant menu
-2. `01_restaurants` — the browse screen
-3. `03_storefront` — the ordering flow
+| Play tab                 | Folder                | Size         | Count |
+| ------------------------ | --------------------- | ------------ | ----- |
+| **10-inch tablet** | `tablet10/`         | 1440 × 2560 | 5     |
+| 7-inch tablet            | `tablet7/`          | 1080 × 1920 | 5     |
+| Phone                    | `phone/`            | 1080 × 1920 | 5     |
+| Chromebook               | reuse `tablet10/`   | 1440 × 2560 | 5     |
+
+1. `01_home` — greeting, cuisines, featured restaurants, popular dishes
+2. `03_menu` — a real menu with categories, prices and quantity steppers
+3. `04_cart` — the cart drawer with three real items and a CHF total
+4. `02_restaurants` — the browse screen
+5. `05_broadcast` — Quick Order across restaurants
+
+**Why the tablet shots are 720 CSS px wide.** `#app` in `delivery-app/customer.html`
+is capped at `max-width: 720px`, so rendering at 2560 px produced a narrow column
+between two black bars. The capture viewport is 720 px and scaled up instead. That
+matches the app's designed width, but it is a workaround, not a fix: on a real
+10-inch tablet the app still shows a 720 px column with empty space either side.
+Widening the layout for large screens is open work.
+
+**Orders and tracking are deliberately absent.** A fresh guest session has no order
+history, so both screens render an empty state — worse on a listing than one fewer
+screenshot. Real shots need an order placed against a demo tenant first.
+
+---
+
+## 5b. Text that must not survive the update
+
+The listing that is live today still describes the old brand. Whatever else you
+change, these strings have to go, or the store page will contradict the app:
+
+| Live now                                          | Replace with                                          |
+| ------------------------------------------------- | ----------------------------------------------------- |
+| `POS Barmagly`                                  | `Kassenta POS`                                      |
+| `pos.barmagly.tech`                             | `kassenta.com`                                      |
+| `support@barmagly.tech`, `www.barmagly.tech`  | `info@kassenta.com`, `kassenta.com`               |
+| `BARMAGLY-XXXX-XXXX-XXXX-XXXX`                  | drop it — publishing the key format invites guessing |
+| `Barmagly Smart POS — sell smarter…` sign-off | drop it                                               |
+| Any`7.7%` VAT figure                            | `8.1%` (7.7% was abolished in January 2024)         |
+
+The full descriptions in section 2 are already clean; this table is here so a
+partial edit does not leave the old domain sitting in the middle of the page.
 
 ---
 

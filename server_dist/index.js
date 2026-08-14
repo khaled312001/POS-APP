@@ -4233,7 +4233,8 @@ async function seedPizzaLemon() {
       isActive: true,
       isMain: true,
       currency: "CHF",
-      taxRate: "7.70"
+      taxRate: "8.10"
+      // Swiss standard VAT since 1 Jan 2024 (was 7.7%)
     }).$returningId();
     branchId = branch.id;
     await db.insert(warehouses).values({ name: "Hauptlager", branchId, isDefault: true, isActive: true });
@@ -4761,7 +4762,8 @@ async function seedZurichRestaurants() {
         isActive: true,
         isMain: true,
         currency: "CHF",
-        taxRate: "7.70"
+        taxRate: "8.10"
+        // Swiss standard VAT since 1 Jan 2024 (was 7.7%)
       }).$returningId();
       const branchId = branch.id;
       await db.insert(warehouses).values({
@@ -10172,7 +10174,8 @@ function sanitizeDates(data) {
   }
   return result;
 }
-var googleClient = new import_google_auth_library.OAuth2Client("852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com");
+var GOOGLE_WEB_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com";
+var googleClient = new import_google_auth_library.OAuth2Client(GOOGLE_WEB_CLIENT_ID);
 async function registerRoutes(app2) {
   app2.get("/api/store/:slug", async (req, res) => {
     try {
@@ -10473,7 +10476,8 @@ async function registerRoutes(app2) {
       const { idToken, deviceId } = req.body;
       if (!idToken) return res.status(400).json({ error: "idToken is required" });
       const ticket = await googleClient.verifyIdToken({
-        idToken
+        idToken,
+        audience: GOOGLE_WEB_CLIENT_ID
       });
       const payload = ticket.getPayload();
       if (!payload || !payload.email) {

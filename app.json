@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "tech.barmagly.pos",
-      "versionCode": 10,
+      "versionCode": 11,
       "minSdkVersion": 26,
       "targetSdkVersion": 35,
       "permissions": [
@@ -58,6 +58,7 @@
       ],
       "expo-font",
       "expo-web-browser",
+      "@react-native-google-signin/google-signin",
       [
         "expo-camera",
         {

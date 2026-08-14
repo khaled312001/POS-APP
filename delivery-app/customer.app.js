@@ -1625,7 +1625,11 @@
   // Three entry points (intro / login / register) all reuse the same flow.
   // GIS gives us a JWT credential; the server verifies it and issues our
   // own session token, so we never see the user's password.
-  var GOOGLE_CLIENT_ID = "1052668409317-el9e1cccc8607h6tud82b8hqetm9jpkl.apps.googleusercontent.com";
+  // The previous client lived in a different Google Cloud project and was only
+  // ever authorised for pos.barmagly.tech, so it started rejecting every
+  // request the moment the site moved. This one is in the Barmagly project
+  // alongside the Android clients, and carries the kassenta.com origins.
+  var GOOGLE_CLIENT_ID = "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com";
   function handleGoogleCredential(resp) {
     if (!resp || !resp.credential) { toast("Google sign-in failed", "error"); return; }
     api("POST", "/api/delivery/auth/google", { credential: resp.credential, tenantId: 24 })
@@ -1637,7 +1641,36 @@
       })
       .catch(function (err) { toast(err.message || "Google sign-in failed", "error"); });
   }
+  // ─── Native bridge ────────────────────────────────────────────────
+  // Inside the Android app this page runs in a WebView, where Google's own
+  // SDK cannot work: it opens the account chooser with window.open, which the
+  // wrapper pushes out to the system browser, and the result has no route
+  // back. The wrapper sets __KASSENTA_NATIVE__ and performs the sign-in with
+  // Play Services instead, handing the ID token back through this callback.
+  function isNativeApp() {
+    return !!(window.__KASSENTA_NATIVE__ && window.ReactNativeWebView);
+  }
+
+  window.__kassentaGoogleResult = function (res) {
+    if (!res || !res.ok) {
+      if (!res || !res.cancelled) toast((res && res.error) || "Google sign-in failed", "error");
+      return;
+    }
+    api("POST", "/api/delivery/auth/google", { credential: res.idToken, tenantId: 24 })
+      .then(function (data) {
+        state.auth = { token: data.token, customer: data.customer, isGuest: false };
+        save();
+        toast("Welcome, " + (data.customer.name || "friend"), "success");
+        navigate("home");
+      })
+      .catch(function (err) { toast(err.message || "Google sign-in failed", "error"); });
+  };
+
   function startGoogleSignIn() {
+    if (isNativeApp()) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: "google-signin" }));
+      return;
+    }
     if (!window.google || !window.google.accounts || !window.google.accounts.id) {
       toast("Google sign-in is loading… please try again", "error"); return;
     }
@@ -1654,6 +1687,15 @@
         // fall back to the OAuth-style popup so the user still gets in.
         if (notification && (notification.isNotDisplayed && notification.isNotDisplayed()) ||
             (notification && notification.isSkippedMoment && notification.isSkippedMoment())) {
+          // Google reports an unregistered JavaScript origin only here and in
+          // the console — the page never sees it, which is why a domain move
+          // shows up as a generic failure. Log the reason so it is diagnosable.
+          try {
+            var why = (notification.isNotDisplayed && notification.isNotDisplayed())
+              ? notification.getNotDisplayedReason && notification.getNotDisplayedReason()
+              : notification.getSkippedReason && notification.getSkippedReason();
+            console.warn("[google] One Tap suppressed:", why);
+          } catch (e2) {}
           openGooglePopup();
         }
       });
@@ -1691,6 +1733,16 @@
             navigate("home");
           })
           .catch(function (err) { toast(err.message || "Sign-in failed", "error"); });
+      },
+      // Without this the library swallows popup and origin failures, so an
+      // unregistered domain is indistinguishable from the user closing the
+      // window. Both need different fixes, so say which happened.
+      error_callback: function (err) {
+        var type = (err && err.type) || "";
+        console.error("[google] popup failed:", type, err);
+        if (type === "popup_closed") { toast("Sign-in cancelled", "error"); return; }
+        if (type === "popup_failed_to_open") { toast("Allow pop-ups for this site, then try again", "error"); return; }
+        toast("Google sign-in is not configured for this domain", "error");
       },
     });
     client.requestAccessToken({ prompt: "consent" });

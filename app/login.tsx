@@ -13,8 +13,6 @@ import * as Haptics from "expo-haptics";
 import { useLanguage } from "@/lib/language-context";
 import { useLicense } from "@/lib/license-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
 
 
 function getApiUrl() {
@@ -75,50 +73,10 @@ export default function LoginScreen() {
     }
   }, []);
 
-  // Google Sign-In
-  const [request, googleResponse, promptAsync] = Google.useAuthRequest({
-    androidClientId: "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com",
-    webClientId: "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com",
-    redirectUri: Platform.OS === 'web' ? "https://kassenta.com/app" : undefined,
-  });
-
-  useEffect(() => {
-    if (googleResponse?.type === "success") {
-      const { id_token } = googleResponse.params;
-      if (id_token) {
-        handleGoogleLogin(id_token);
-      }
-    } else if (googleResponse?.type === "error" || googleResponse?.type === "cancel") {
-      const details = (googleResponse as any).error?.message || googleResponse?.type;
-      if (googleResponse?.type === "error") {
-        Alert.alert(t("error"), `Google Sign-In failed: ${details}`);
-      }
-    }
-  }, [googleResponse]);
-
-  const handleGoogleLogin = async (idToken: string) => {
-    setLoading(true);
-    try {
-      const apiUrl = getApiUrl();
-      const res = await fetch(`${apiUrl}/api/auth/google`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken })
-      });
-      const data = await res.json();
-      if (data.success && data.employee) {
-        login(data.employee);
-        router.replace("/(tabs)/products");
-      } else {
-        Alert.alert(t("loginFailed"), data.error || "No associated employee found.");
-      }
-    } catch (err) {
-      console.error("Google login error:", err);
-      Alert.alert(t("error"), "Failed to sign in with Google");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Google sign-in used to be wired here through a browser redirect, but it
+  // had no button and expected an `employee` the server never returns — this
+  // screen is the employee PIN pad, reached only once a licence is active.
+  // Google identifies the *store owner*, so it now lives on the licence gate.
   useEffect(() => {
     const sub = Dimensions.addEventListener("change", ({ window }) => setScreenDims(window));
     return () => sub?.remove();
@@ -644,21 +602,6 @@ const styles = themedStyles((Colors) => ({
     gap: 16,
     alignItems: 'center',
     width: '100%',
-  },
-  googleLoginBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#4285F4',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    marginTop: 10,
-  },
-  googleLoginText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
   },
   logoutLicenseBtn: {
     flexDirection: 'row',

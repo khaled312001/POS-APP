@@ -55,7 +55,15 @@ import { addDays, addMonths, addYears } from "date-fns";
 import { OAuth2Client } from "google-auth-library";
 import { rateLimit } from "./rateLimit";
 
-const googleClient = new OAuth2Client("852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com");
+/**
+ * The web OAuth client. Both Android apps sign in natively against their own
+ * Android clients, but Google always stamps the returned ID token with the web
+ * client as its `aud`, so this single value validates every path — POS app,
+ * storefront app, and both in a browser.
+ */
+const GOOGLE_WEB_CLIENT_ID =
+  process.env.GOOGLE_CLIENT_ID || "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com";
+const googleClient = new OAuth2Client(GOOGLE_WEB_CLIENT_ID);
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
@@ -381,8 +389,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { idToken, deviceId } = req.body;
       if (!idToken) return res.status(400).json({ error: "idToken is required" });
 
+      // Without an explicit `audience` the library verifies only the signature,
+      // so an ID token minted for any other Google app would be accepted here
+      // and provision a tenant. Pin it to our own client.
       const ticket = await googleClient.verifyIdToken({
         idToken,
+        audience: GOOGLE_WEB_CLIENT_ID,
       });
       const payload = ticket.getPayload();
       if (!payload || !payload.email) {

@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { useLanguage } from '@/lib/language-context';
+import { signInWithGoogleNative, supportsNativeGoogle, GoogleSignInCancelled } from '@/lib/google-signin';
 
 
 
@@ -15,10 +16,12 @@ const WEBSITE_URL = 'https://kassenta.com/';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function LicenseGate() {
-    const { isValidating, isValid, validateLicense, errorReason, deviceId } = useLicense();
+    const { isValidating, isValid, validateLicense, validateGoogleLogin, errorReason, deviceId } = useLicense();
     const [email, setEmail] = useState('');
     const [key, setKey] = useState('');
     const [loading, setLoading] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
+    const [googleError, setGoogleError] = useState<string | null>(null);
     const [focusedField, setFocusedField] = useState<string | null>(null);
     const router = useRouter();
 
@@ -77,6 +80,25 @@ export default function LicenseGate() {
         setLoading(true);
         await validateLicense(cleanKey, cleanEmail);
         setLoading(false);
+    };
+
+    // Signing in with Google creates the store and its 14-day trial licence on
+    // the server, so this is a route past the key field rather than beside it —
+    // a new owner has no key to type yet.
+    const handleGoogle = async () => {
+        setGoogleError(null);
+        setGoogleLoading(true);
+        try {
+            const idToken = await signInWithGoogleNative();
+            const ok = await validateGoogleLogin(idToken);
+            if (!ok) setGoogleError(t('googleNoStore'));
+        } catch (e: any) {
+            if (!(e instanceof GoogleSignInCancelled)) {
+                setGoogleError(e?.message || 'Google sign-in failed');
+            }
+        } finally {
+            setGoogleLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -235,6 +257,41 @@ export default function LicenseGate() {
                                 </View>
                             )}
                         </TouchableOpacity>
+
+                        {/* Google — native only. On the web build the account
+                            picker is a browser flow, which belongs on the site
+                            rather than inside this gate. */}
+                        {supportsNativeGoogle && (
+                            <>
+                                <View style={[styles.orDivider, { marginTop: 18 }]}>
+                                    <View style={styles.orLine} />
+                                    <Text style={styles.orText}>{t('orLabel')}</Text>
+                                    <View style={styles.orLine} />
+                                </View>
+
+                                <TouchableOpacity
+                                    style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
+                                    onPress={handleGoogle}
+                                    disabled={googleLoading}
+                                    activeOpacity={0.85}
+                                >
+                                    {googleLoading ? (
+                                        <ActivityIndicator color="#fff" />
+                                    ) : (
+                                        <View style={styles.buttonContent}>
+                                            <Ionicons name="logo-google" size={18} color="#fff" />
+                                            <Text style={styles.googleButtonText}>
+                                                {t('continueWithGoogle')}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+
+                                {googleError && (
+                                    <Text style={styles.googleError}>{googleError}</Text>
+                                )}
+                            </>
+                        )}
                     </View>
 
                     {/* Device ID Info */}
@@ -545,6 +602,16 @@ const styles = themedStyles((Colors) => ({
         fontSize: 16,
         fontWeight: '700',
         letterSpacing: 0.3,
+    },
+
+    // googleButton, googleButtonText, orDivider, orLine and orText already
+    // exist above — they were left behind when an earlier Google button was
+    // taken out of the markup. Reused rather than redefined.
+    googleError: {
+        color: Colors.danger,
+        fontSize: 13,
+        textAlign: 'center',
+        marginTop: 10,
     },
 
     // ── Device Info ──

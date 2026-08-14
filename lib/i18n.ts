@@ -637,6 +637,9 @@ const en = {
   // License Gate & Onboarding (New)
   activateStore: "Activate Your Store",
   activateStoreSubtitle: "Enter your store email and license key to get started, or sign in with Google to start your 14-day free trial instantly.",
+  orLabel: "OR",
+  continueWithGoogle: "Continue with Google",
+  googleNoStore: "No store is linked to this Google account.",
   fourteenDayTrial: "14-day free trial",
   signInWithGoogle: "Sign in with Google",
   subscribeNow: "Subscribe Now",
@@ -1482,6 +1485,9 @@ const ar: typeof en = {
   // License Gate & Onboarding (New)
   activateStore: "تفعيل المتجر الخاص بك",
   activateStoreSubtitle: "أدخل البريد الإلكتروني للمتجر ومفتاح الترخيص للبدء، أو سجل الدخول باستخدام جوجل لبدء تجربتك المجانية لمدة 14 يومًا فورًا.",
+  orLabel: "أو",
+  continueWithGoogle: "المتابعة باستخدام جوجل",
+  googleNoStore: "لا يوجد متجر مرتبط بحساب جوجل هذا.",
   fourteenDayTrial: "تجربة مجانية لمدة 14 يومًا",
   signInWithGoogle: "تسجيل الدخول باستخدام جوجل",
   subscribeNow: "اشترك الآن",
@@ -2327,6 +2333,9 @@ const de: typeof en = {
   // License Gate & Onboarding (New)
   activateStore: "Aktivieren Sie Ihren Shop",
   activateStoreSubtitle: "Geben Sie die E-Mail-Adresse Ihres Shops und den Lizenzschlüssel ein, um zu beginnen, oder melden Sie sich mit Google an, um Ihre 14-tägige kostenlose Testversion sofort zu starten.",
+  orLabel: "ODER",
+  continueWithGoogle: "Weiter mit Google",
+  googleNoStore: "Mit diesem Google-Konto ist kein Shop verknüpft.",
   fourteenDayTrial: "14-tägige kostenlose Testversion",
   signInWithGoogle: "Mit Google anmelden",
   subscribeNow: "Jetzt abonnieren",

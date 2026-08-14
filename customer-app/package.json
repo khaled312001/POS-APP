@@ -8,6 +8,7 @@
     "ios": "expo start --ios"
   },
   "dependencies": {
+    "@react-native-google-signin/google-signin": "^16.1.4",
     "expo": "~54.0.27",
     "expo-constants": "~18.0.11",
     "expo-linking": "~8.0.10",
