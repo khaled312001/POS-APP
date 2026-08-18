@@ -151,21 +151,26 @@ h3.mini { font-size: 8.5pt; letter-spacing: 1.8px; text-transform: uppercase;
 .plat .card .url { font-size: 7.5pt; color: var(--teal); word-break: break-all; margin-top: 2mm; display: block; }
 
 /* ── contents ──────────────────────────────────────────────────────────── */
-.toc { column-count: 2; column-gap: 10mm; }
+.toc { column-count: 2; column-gap: 10mm; line-height: 1.5; }
 .toc .sec { break-inside: avoid; margin-bottom: 5mm; }
 .toc .sec b { display: block; color: var(--navy); font-size: 10pt; border-bottom: 1px solid var(--line);
   padding-bottom: 1.5mm; margin-bottom: 1.5mm; }
 .toc .sec b i { color: var(--teal); font-style: normal; margin-right: 2mm; }
-.toc .row { display: flex; justify-content: space-between; font-size: 8.5pt; color: var(--muted); }
+.toc .row { display: flex; justify-content: space-between; font-size: 8.5pt;
+  color: var(--muted); text-decoration: none; }
+.toc .row:hover { color: var(--teal); }
+.toc .row .pg { font-variant-numeric: tabular-nums; }
+.toc .sec b a { color: inherit; text-decoration: none; }
 
 /* ── screen page ───────────────────────────────────────────────────────── */
 .shot-wrap { border: 1px solid var(--line); border-radius: 2.5mm; overflow: hidden;
   background: var(--wash); box-shadow: 0 2mm 6mm rgba(4,14,50,.10); }
 .shot-wrap img { width: 100%; display: block; }
 .shot-land { margin-bottom: 6mm; }
-.split { display: flex; gap: 7mm; align-items: flex-start; }
-.split .shot-wrap { width: 62mm; flex: none; }
-.split .txt { flex: 1; }
+/* Portrait captures are 3:4. At 112mm wide the phone interface reads at
+   roughly two-thirds of life size, which is the point at which individual
+   buttons stop merging into each other. */
+.shot-port { width: 112mm; margin: 0 auto 6mm; }
 
 .desc { color: #333B4D; margin-bottom: 4mm; font-size: 10pt; }
 ul.feat { list-style: none; }
@@ -196,6 +201,9 @@ body.rtl .foot span { direction: ltr; unicode-bidi: isolate; }
 body.rtl .cover-foot,
 body.rtl .foot { direction: rtl; }
 body.rtl .links .card .k { text-align: right; }
+body.rtl .toc { line-height: 1.4; }
+body.rtl .toc .sec { margin-bottom: 4mm; }
+body.rtl .toc .sec b { margin-bottom: 1mm; padding-bottom: 1mm; }
 
 /* ── links page ────────────────────────────────────────────────────────── */
 .links .card { display: flex; align-items: center; gap: 4mm; margin-bottom: 4mm; background: #fff; }
@@ -204,8 +212,11 @@ body.rtl .links .card .k { text-align: right; }
 .links .card .d { font-size: 8.5pt; color: var(--muted); }
 `;
 
-function page(inner, cls = "") {
-  return `<section class="page ${cls}">${inner}</section>`;
+function page(inner, cls = "", id = "") {
+  // The id is what makes the contents clickable: Chrome turns an <a href="#id">
+  // into a real PDF internal destination, so the reader jumps rather than
+  // scrolls hunting for a page number.
+  return `<section class="page ${cls}"${id ? ` id="${id}"` : ""}>${inner}</section>`;
 }
 
 function footer(t, label, n) {
@@ -237,7 +248,11 @@ function build(lang) {
 
   // 1-based page number for each screen, so the contents can point at it.
   const pageOf = new Map();
-  defs.forEach((d, idx) => { if (d.type === "screen") pageOf.set(d.screen.shot, idx + 1); });
+  const dividerOf = new Map();
+  defs.forEach((d, idx) => {
+    if (d.type === "screen") pageOf.set(d.screen.shot, idx + 1);
+    if (d.type === "divider") dividerOf.set(d.sec.id, idx + 1);
+  });
 
   const out = [];
 
@@ -255,7 +270,7 @@ function build(lang) {
       <span><b>Desktop</b> kassenta.com/app</span>
       <span><b>Android</b> Kassenta POS &middot; Kassenta Order</span>
       <span><b>Mail</b> ${esc(LINKS.mail)}</span>
-    </div>`, "cover"));
+    </div>`, "cover", "p1"));
 
   // contents
   out.push(page(`
@@ -266,12 +281,12 @@ function build(lang) {
         if (!list.length) return "";
         return `
         <div class="sec">
-          <b><i>${sec[lang].n}</i>${esc(sec[lang].title)}</b>
-          ${list.map((s) => `<div class="row"><span>${esc(s[lang].title)}</span><span>${pageOf.get(s.shot)}</span></div>`).join("")}
+          <b><a href="#p${dividerOf.get(sec.id)}"><i>${sec[lang].n}</i>${esc(sec[lang].title)}</a></b>
+          ${list.map((s) => `<a class="row" href="#p${pageOf.get(s.shot)}"><span>${esc(s[lang].title)}</span><span class="pg">${pageOf.get(s.shot)}</span></a>`).join("")}
         </div>`;
       }).join("")}
     </div>
-    ${footer(t, t.tocTitle, 2)}`));
+    ${footer(t, t.tocTitle, 2)}`, "", "p2"));
 
   // intro
   out.push(page(`
@@ -286,7 +301,7 @@ function build(lang) {
     <div class="plat">
       ${i.platforms.map(([k, v, u]) => `<div class="card"><b>${esc(k)}</b><span>${esc(v)}</span><span class="url">${esc(u)}</span></div>`).join("")}
     </div>
-    ${footer(t, i.heading, 3)}`));
+    ${footer(t, i.heading, 3)}`, "", "p3"));
 
   // sections, in the order fixed above
   for (let idx = 3; idx < defs.length - 1; idx++) {
@@ -297,7 +312,7 @@ function build(lang) {
         <div class="big">${d.sec[lang].n}</div>
         <h2>${esc(d.sec[lang].title)}</h2>
         <p>${esc(d.sec[lang].sub)}</p>
-        <div class="rule"></div>`, "divider"));
+        <div class="rule"></div>`, "divider", `p${no}`));
       continue;
     }
     const s = d.screen;
@@ -305,19 +320,17 @@ function build(lang) {
     const c = s[lang];
     // Long feature lists read better in two columns than as one thin ribbon
     // down a page that is mostly white space.
-    const cols = !s.portrait && c.features.length > 4 ? " feat-2" : "";
+    const cols = c.features.length > 3 ? " feat-2" : "";
     const feats = `<ul class="feat${cols}">${c.features.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>`;
     const inner = s.portrait
-      ? `<div class="split">
-           <div class="shot-wrap"><img src="${img}" alt=""></div>
-           <div class="txt"><p class="desc">${esc(c.desc)}</p>${feats}</div>
-         </div>`
+      ? `<div class="shot-wrap shot-port"><img src="${img}" alt=""></div>
+         <p class="desc">${esc(c.desc)}</p>${feats}`
       : `<div class="shot-wrap shot-land"><img src="${img}" alt=""></div>
          <p class="desc">${esc(c.desc)}</p>${feats}`;
     out.push(page(`
       <div class="head"><span class="n">${d.sec[lang].n}</span><h2>${esc(c.title)}</h2><span class="s">${esc(c.sub)}</span></div>
       ${inner}
-      ${footer(t, d.sec[lang].title, no)}`));
+      ${footer(t, d.sec[lang].title, no)}`, "", `p${no}`));
   }
 
   const n = defs.length;
@@ -331,7 +344,7 @@ function build(lang) {
       <div class="card"><span class="k">Kassenta Order</span><span><span class="v">${LINKS.order}</span><br><span class="d">${lang === "de" ? "Android — Ihre Kundschaft bestellt und verfolgt." : "Android — your customers order and track."}</span></span></div>
       <div class="card"><span class="k">${lang === "de" ? "Kontakt" : "Contact"}</span><span><span class="v">${LINKS.mail}</span></span></div>
     </div>
-    ${footer(t, t.linksTitle, n)}`));
+    ${footer(t, t.linksTitle, n)}`, "", `p${n}`));
 
   const rtl = t.dir === "rtl";
   const html = `<!doctype html><html lang="${t.lang}" dir="${rtl ? 'rtl' : 'ltr'}"><head><meta charset="utf-8">
@@ -353,7 +366,14 @@ function build(lang) {
 
     const p = await browser.newPage();
     await p.setContent(html, { waitUntil: "load", timeout: 120000 });
-    await p.pdf({ path: pdfPath, format: "A4", printBackground: true,
+    // Printing before the font faces have finished loading makes Chrome embed a
+    // half-built subset. Latin survives it; Arabic came out as an invalid font
+    // program that rendered blank and yielded no extractable text at all.
+    await p.evaluate(() => document.fonts.ready);
+    await new Promise((r) => setTimeout(r, 1500));
+    // page.pdf() carries its own 30s timeout, separate from setContent's.
+    // A 77-page document with 64 embedded screenshots blows straight past it.
+    await p.pdf({ path: pdfPath, format: "A4", printBackground: true, timeout: 0,
       margin: { top: 0, right: 0, bottom: 0, left: 0 } });
     await p.close();
 
