@@ -22,7 +22,9 @@
     },
     "android": {
       "package": "com.barmagly.customer",
-      "versionCode": 5,
+      "versionCode": 6,
+      "minSdkVersion": 24,
+      "targetSdkVersion": 35,
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
@@ -41,7 +43,8 @@
     },
     "plugins": [
       "expo-router",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "./plugins/withDeviceCompatibility"
     ],
     "experiments": {
       "typedRoutes": true

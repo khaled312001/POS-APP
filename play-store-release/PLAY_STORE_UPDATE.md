@@ -33,10 +33,17 @@ and Play re-signs every build it distributes. So each app needs two clients:
 
 | App | Package | Which SHA-1 |
 |---|---|---|
-| Kassenta POS | `tech.barmagly.pos` | upload key `BE:C5:EA:81:…:2E:B8` |
-| Kassenta POS | `tech.barmagly.pos` | **Play app signing key** — Play Console → Setup → App signing |
-| Kassenta Order | `com.barmagly.customer` | upload key `9F:8D:45:96:…:BE:9E` |
-| Kassenta Order | `com.barmagly.customer` | **Play app signing key** |
+| Kassenta POS | `tech.barmagly.pos` | upload key `BE:C5:EA:81:78:22:08:61:43:65:B5:84:3B:25:18:0B:54:77:2E:B8` |
+| Kassenta POS | `tech.barmagly.pos` | **Play app signing key** — read it from Play Console → Setup → App signing |
+| Kassenta Order | `com.barmagly.customer` | upload key `9F:8D:45:96:46:AA:34:11:B7:37:EB:67:C0:AC:53:D4:FE:76:BE:9E` |
+| Kassenta Order | `com.barmagly.customer` | **Play app signing key** `97:1C:85:D2:1F:08:1F:AD:E8:D2:F6:06:17:80:4C:87:4F:07:AA:58` |
+
+Confirmed in practice on 14 Aug 2026: the Order build installed from Play failed
+native sign-in with `DEVELOPER_ERROR` until the last row above was registered.
+The account chooser still appeared before the failure — Play Services draws it
+before it validates the certificate, so seeing the picker does not mean the
+SHA-1 matched. Each app has its own app-signing key, so the POS number is
+different and must be read from that app's own App signing page.
 
 Miss the Play-signing pair and sign-in works on a locally installed APK and
 fails on the build users download — the symptom is `DEVELOPER_ERROR`, which the
