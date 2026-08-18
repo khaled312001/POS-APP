@@ -1,0 +1,22 @@
+{
+  "tenantId": 24,
+  "tenantName": "Pizza Lemon",
+  "employee": {
+    "id": 151,
+    "tenantId": 24,
+    "name": "Terence",
+    "email": "terencegregory.33127@gmail.com",
+    "phone": null,
+    "role": "admin",
+    "branchId": null,
+    "isActive": true,
+    "hourlyRate": null,
+    "commissionRate": "0.00",
+    "avatar": null,
+    "permissions": "[\"all\"]",
+    "createdAt": "2026-08-17T18:39:27.000Z",
+    "updatedAt": "2026-08-17T22:44:51.000Z",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbXBsb3llZUlkIjoxNTEsInRlbmFudElkIjoyNCwiYnJhbmNoSWQiOm51bGwsInJvbGUiOiJhZG1pbiIsIm5hbWUiOiJUZXJlbmNlIiwicGVybWlzc2lvbnMiOltdLCJpYXQiOjE3ODcwMDY3OTIsImV4cCI6MTc4NzA0OTk5Mn0.7Osux8z2XcoV8gIIYnol8S6ORhhDT1jQAe6iVBqh21g"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbXBsb3llZUlkIjoxNTEsInRlbmFudElkIjoyNCwiYnJhbmNoSWQiOm51bGwsInJvbGUiOiJhZG1pbiIsIm5hbWUiOiJUZXJlbmNlIiwicGVybWlzc2lvbnMiOltdLCJpYXQiOjE3ODcwMDY3OTIsImV4cCI6MTc4NzA0OTk5Mn0.7Osux8z2XcoV8gIIYnol8S6ORhhDT1jQAe6iVBqh21g"
+}

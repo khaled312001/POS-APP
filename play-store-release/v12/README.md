@@ -40,7 +40,7 @@ signing SHA-1   BE:C5:EA:81:78:22:08:61:43:65:B5:84:3B:25:18:0B:54:77:2E:B8
 Re-run that check on any future build with:
 
 ```bash
-wsl -d Ubuntu-22.04 -u root -- bash /mnt/f/POS-APP/verify_apk.sh <path-to.apk>
+wsl -d Ubuntu-22.04 -u root -- bash /mnt/f/POS-APP/scripts/verify-apk.sh <path-to.apk>
 ```
 
 ## Note on app.json

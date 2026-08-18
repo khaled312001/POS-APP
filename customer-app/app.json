@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "com.barmagly.customer",
-      "versionCode": 6,
+      "versionCode": 7,
       "minSdkVersion": 24,
       "targetSdkVersion": 35,
       "permissions": [

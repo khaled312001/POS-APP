@@ -13,6 +13,12 @@ const { withAndroidManifest } = require("expo/config-plugins");
  * the features are declared optional. The rest of the list is defensive: a
  * transitive dependency can add a permission later and silently narrow reach
  * again.
+ *
+ * android.hardware.screen.portrait is implied the same way by the app's
+ * `orientation: "portrait"`. Declaring it optional does NOT unlock the app's
+ * rotation — the activity stays portrait — it only stops Play filtering on it.
+ * Android 16 ignores orientation restrictions on large screens regardless, so
+ * the requirement buys nothing and costs reach.
  */
 
 const OPTIONAL_FEATURES = [
@@ -25,6 +31,8 @@ const OPTIONAL_FEATURES = [
   "android.hardware.telephony",
   "android.hardware.touchscreen",
   "android.hardware.wifi",
+  "android.hardware.screen.portrait",
+  "android.hardware.screen.landscape",
 ];
 
 module.exports = function withDeviceCompatibility(config) {
