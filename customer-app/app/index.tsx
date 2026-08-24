@@ -18,13 +18,45 @@ const CUSTOMER_URL =
 
 const ALLOWED_ORIGIN = new URL(CUSTOMER_URL).origin;
 
-/** In-app navigation is confined to the storefront origin. */
+/**
+ * Hosts a payment has to be able to reach *inside* the WebView.
+ *
+ * Confining navigation to the storefront origin is right for ordinary links,
+ * but it silently breaks every redirect-based payment method: 3-D Secure hands
+ * off to hooks.stripe.com, and TWINT bounces through Stripe and back. Pushing
+ * those to the system browser means the customer pays in Chrome and the app
+ * never learns the outcome, so the order sits unpaid.
+ *
+ * Matched on host suffix, so api/js/hooks/m subdomains are all covered.
+ */
+const PAYMENT_HOSTS = [
+  "stripe.com",
+  "stripe.network",
+  "twint.ch",
+];
+
+function hostMatches(host: string, suffix: string): boolean {
+  return host === suffix || host.endsWith("." + suffix);
+}
+
+/** In-app navigation: the storefront, plus the payment hop and its return. */
 function isInAppUrl(url: string): boolean {
   try {
-    return new URL(url).origin === ALLOWED_ORIGIN;
+    const u = new URL(url);
+    if (u.origin === ALLOWED_ORIGIN) return true;
+    if (u.protocol !== "https:") return false;
+    return PAYMENT_HOSTS.some((h) => hostMatches(u.hostname, h));
   } catch {
     return false;
   }
+}
+
+/**
+ * A wallet handing off to its native app (twint://, intent://). These must go
+ * to the OS - the whole point is to leave for the TWINT app and come back.
+ */
+function isAppScheme(url: string): boolean {
+  return /^(?!https?:)[a-z][a-z0-9+.-]*:/i.test(url);
 }
 
 /**
@@ -86,12 +118,15 @@ export default function CustomerWebView() {
         ref={webRef}
         source={{ uri: CUSTOMER_URL }}
         style={styles.web}
-        originWhitelist={[ALLOWED_ORIGIN]}
+        originWhitelist={[ALLOWED_ORIGIN, ...PAYMENT_HOSTS.map((h) => `https://*.${h}`)]}
         onShouldStartLoadWithRequest={(req) => {
           if (isInAppUrl(req.url)) return true;
+          // twint:// and friends must reach the wallet app itself.
           // tel:/mailto:/maps and any third-party link leave the app instead of
           // rendering inside it under the brand's chrome.
-          void Linking.openURL(req.url).catch(() => {});
+          if (isAppScheme(req.url) || /^https?:/i.test(req.url)) {
+            void Linking.openURL(req.url).catch(() => {});
+          }
           return false;
         }}
         allowsBackForwardNavigationGestures

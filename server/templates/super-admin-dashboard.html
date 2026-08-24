@@ -1080,6 +1080,10 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
         </svg>Subscriptions</div>
+      <div class="ni" onclick="show('payments')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        </svg>Payments</div>
       <div class="ni" onclick="show('licenses')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -1485,6 +1489,11 @@
       <div class="view" id="view-subscriptions">
         <div class="sh"><input class="srch" placeholder="Search…" oninput="ft('subTbl',this.value)"><button
             class="btn btn-p" onclick="openM('mSub')">+ New Subscription</button></div>
+        <div style="font-size:12px;color:var(--mu);margin-bottom:12px">What actually lets a tenant in is the
+          <b>license key</b> expiry, not the subscription end date. “+30 days” moves both. A red
+          <b>License until</b> means the tenant is locked out even though the subscription still looks paid — issue or
+          extend a key for them.
+        </div>
         <div class="tw">
           <table>
             <thead>
@@ -1494,18 +1503,123 @@
                 <th>Plan</th>
                 <th>Status</th>
                 <th>Price</th>
-                <th>Expires</th>
+                <th>Subscription ends</th>
+                <th>License until</th>
+                <th>Next payment</th>
+                <th>Stripe</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="subTbl">
               <tr>
-                <td colspan="7" class="ls">
+                <td colspan="10" class="ls">
                   <div class="spin"></div>
                 </td>
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- ══════════ PAYMENTS ══════════ -->
+      <div class="view" id="view-payments">
+        <div class="card" style="margin-bottom:18px">
+          <div class="ct">Stripe Connection</div>
+          <div id="payStripe">
+            <div class="spin"></div>
+          </div>
+        </div>
+
+        <div class="sg" id="paySg" style="margin-bottom:18px">
+          <div class="ls">
+            <div class="spin"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="ct">Payments</div>
+          <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="payTenant"
+              style="padding:8px 12px;background:rgba(0,0,0,.3);border:1px solid var(--bd);border-radius:8px;font-size:13px;color:var(--tx);outline:none;min-width:190px">
+              <option value="">All tenants</option>
+            </select>
+            <select id="paySource"
+              style="padding:8px 12px;background:rgba(0,0,0,.3);border:1px solid var(--bd);border-radius:8px;font-size:13px;color:var(--tx);outline:none">
+              <option value="all">Orders &amp; till sales</option>
+              <option value="online_order">Online orders</option>
+              <option value="pos_sale">Till sales</option>
+            </select>
+            <select id="payStatus"
+              style="padding:8px 12px;background:rgba(0,0,0,.3);border:1px solid var(--bd);border-radius:8px;font-size:13px;color:var(--tx);outline:none">
+              <option value="">Any status</option>
+              <option value="paid">Paid</option>
+              <option value="completed">Completed</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+              <option value="refunded">Refunded</option>
+              <option value="partially_refunded">Partially refunded</option>
+            </select>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mu)">
+              <input type="checkbox" id="payOffline" style="width:14px;height:14px"> Include cash &amp; other
+              non-Stripe rows
+            </label>
+            <button class="btn btn-p" onclick="loadPayList()">Apply</button>
+            <input class="srch" placeholder="Search this page…" oninput="ft('payTbl',this.value)"
+              style="max-width:220px">
+          </div>
+          <div class="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Tenant</th>
+                  <th>Reference</th>
+                  <th>Method</th>
+                  <th>Status</th>
+                  <th style="text-align:right">Amount</th>
+                  <th style="text-align:right">Refunded</th>
+                  <th>PaymentIntent</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="payTbl">
+                <tr>
+                  <td colspan="9" class="ls">
+                    <div class="spin"></div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="font-size:12px;color:var(--mu);margin-top:10px">A refund is written back by Stripe's signed
+            <code>charge.refunded</code> webhook, never by this screen — a row keeps its current status until that
+            delivery lands below.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="ct">Recent Stripe Webhook Deliveries</div>
+          <div class="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>Received</th>
+                  <th>Event</th>
+                  <th>Type</th>
+                  <th>Mode</th>
+                  <th>Status</th>
+                  <th>Processed</th>
+                </tr>
+              </thead>
+              <tbody id="payEvTbl">
+                <tr>
+                  <td colspan="6" class="ls">
+                    <div class="spin"></div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -2206,6 +2320,31 @@
     </div>
   </div>
 
+  <!-- REFUND A PAYMENT -->
+  <div class="mo" id="mRefund">
+    <div class="md">
+      <div class="md-title">Refund Payment</div>
+      <div id="rfSummary"
+        style="background:var(--input-bg);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.7"></div>
+      <div class="fr"><label>PaymentIntent</label><input id="rfPi" readonly style="font-family:monospace"></div>
+      <div class="fr-row">
+        <div class="fr"><label>Amount (blank = full remaining)</label><input id="rfAmount" type="number" step="0.01"
+            min="0.01" placeholder="Full refund"></div>
+        <div class="fr"><label>Reason</label><select id="rfReason">
+            <option value="">Not specified</option>
+            <option value="requested_by_customer">Requested by customer</option>
+            <option value="duplicate">Duplicate</option>
+            <option value="fraudulent">Fraudulent</option>
+          </select></div>
+      </div>
+      <div style="font-size:12px;color:var(--st-warn);margin-top:4px">This moves real money at Stripe and cannot be
+        undone. The order's status changes only once Stripe's <code>charge.refunded</code> webhook is delivered back.
+      </div>
+      <div class="ma"><button class="btn btn-o" onclick="closeM('mRefund')">Cancel</button><button class="btn btn-d"
+          id="rfGo" onclick="doRefund()">Refund</button></div>
+    </div>
+  </div>
+
   <!-- GENERATE LICENSE -->
   <div class="mo" id="mLic">
     <div class="md">
@@ -2393,6 +2532,7 @@
       storemanager: ['Store Manager', 'Full control over any store'],
       tenants: ['Tenants', 'Manage all store tenants'],
       subscriptions: ['Subscriptions', 'Billing & subscription plans'],
+      payments: ['Payments', 'Stripe charges, refunds and webhook deliveries'],
       licenses: ['License Keys', 'Manage software licenses'],
       analytics: ['Analytics', 'Revenue & usage metrics'],
       system: ['System Health', 'Server & database status'],
@@ -2408,12 +2548,19 @@
       whatsapp: ['WhatsApp Integration', 'Send order notifications via WhatsApp'],
     };
     let curView = 'dashboard';
-    function show(v) {
+    // Every routable section. A hash outside this set falls back to the dashboard
+    // instead of throwing, so a stale bookmark can never blank the page.
+    const VIEWS = ['dashboard', 'storemanager', 'landingpages', 'tenants', 'subscriptions', 'payments', 'licenses', 'analytics', 'commission', 'system', 'notifications', 'reports', 'activity', 'expenses', 'shifts', 'backup', 'whatsapp', 'settings'];
+    let suppressHash = false;
+    function show(v, opts) {
+      const target = document.getElementById('view-' + v);
+      // Unknown / not-yet-rendered section: don't crash — send them home.
+      if (!target) { if (v !== 'dashboard') show('dashboard', opts); return; }
       document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
       document.querySelectorAll('.ni').forEach(n => {
         n.classList.toggle('active', n.getAttribute('onclick')?.includes(`'${v}'`));
       });
-      document.getElementById('view-' + v).classList.add('active');
+      target.classList.add('active');
       const m = META[v] || [v, ''];
       document.getElementById('vTitle').textContent = m[0];
       document.getElementById('vSub').textContent = m[1];
@@ -2422,6 +2569,7 @@
       if (v === 'storemanager') initStoreMgr();
       if (v === 'tenants') loadTenants();
       if (v === 'subscriptions') loadSubs();
+      if (v === 'payments') loadPayments();
       if (v === 'licenses') loadLics();
       if (v === 'analytics') loadAnalytics();
       if (v === 'system') loadSystem();
@@ -2434,7 +2582,27 @@
       if (v === 'landingpages') loadLandingPages();
       if (v === 'commission') loadCommission();
       if (v === 'whatsapp') { waRefresh(); waLoadAdminPhone(); }
+      // Reflect the active section in the URL. A plain refresh, the browser's
+      // back/forward buttons, and bookmarks now all restore this section instead
+      // of snapping back to the dashboard. opts.fromHash means we got here BY the
+      // hash already changing, so re-writing it would loop.
+      if (!(opts && opts.fromHash)) {
+        const h = '#/' + v;
+        if (location.hash !== h) { suppressHash = true; location.hash = h; }
+      }
     }
+
+    // The URL's hash is the source of truth for which section is open.
+    function viewFromHash() {
+      const raw = (location.hash || '').replace(/^#\/?/, '').split(/[?&]/)[0];
+      return VIEWS.includes(raw) ? raw : 'dashboard';
+    }
+    // User edited the URL, hit back/forward, or opened a bookmark.
+    window.addEventListener('hashchange', () => {
+      if (suppressHash) { suppressHash = false; return; }
+      const v = viewFromHash();
+      if (v !== curView) show(v, { fromHash: true });
+    });
 
     /* ══════════════════════════════════════════════════════
        MODALS
@@ -2451,7 +2619,7 @@
     function fmtM(n) { const v = parseFloat(n || 0); return 'CHF\u00a0' + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(2)); }
     function n(v) { return v ?? 0; }
     function badge(s) {
-      const m = { active: 'bg', inactive: 'bgr', suspended: 'br', cancelled: 'br', trial: 'bb', expired: 'by', revoked: 'br', pending: 'by', true: 'bg', false: 'bgr', healthy: 'bg', info: 'bb', warning: 'by', success: 'bg', error: 'br', normal: 'bgr', high: 'by', urgent: 'br', cashier: 'bb', manager: 'bm', admin: 'br', waiter: 'bb' };
+      const m = { active: 'bg', inactive: 'bgr', suspended: 'br', cancelled: 'br', trial: 'bb', expired: 'by', revoked: 'br', pending: 'by', true: 'bg', false: 'bgr', healthy: 'bg', info: 'bb', warning: 'by', success: 'bg', error: 'br', normal: 'bgr', high: 'by', urgent: 'br', cashier: 'bb', manager: 'bm', admin: 'br', waiter: 'bb', paid: 'bg', completed: 'bg', succeeded: 'bg', failed: 'br', refunded: 'by', partially_refunded: 'by', past_due: 'br', processed: 'bg', received: 'bb', skipped: 'bgr', ignored: 'bgr' };
       return `<span class="badge ${m[String(s)] || 'bgr'}">${s}</span>`;
     }
     function ft(id, q) {
@@ -3009,14 +3177,35 @@
        SUBSCRIPTIONS
     ══════════════════════════════════════════════════════ */
     async function loadSubs() {
-      const subs = await api('GET', '/subscriptions') || [];
+      // The license expiry is fetched alongside because that, not endDate, is
+      // what tenantAuth actually checks when a tenant tries to log in.
+      const [subs, keys] = await Promise.all([
+        api('GET', '/subscriptions'),
+        api('GET', '/licenses'),
+      ]);
+      const rows = subs || [];
+      const licUntil = {};
+      for (const k of (keys || [])) {
+        if (k.status === 'revoked' || !k.expiresAt) continue;
+        const t = new Date(k.expiresAt).getTime();
+        if (!licUntil[k.tenantId] || t > licUntil[k.tenantId]) licUntil[k.tenantId] = t;
+      }
       const now = new Date();
       const in7 = new Date(now.getTime() + 7 * 86400000);
-      document.getElementById('subTbl').innerHTML = subs.map(s => {
+      document.getElementById('subTbl').innerHTML = rows.map(s => {
         const end = s.endDate ? new Date(s.endDate) : null;
         const expiring = end && end > now && end <= in7 && s.status === 'active';
         const expired = end && end < now;
         const rowClass = expiring ? 'row-warn' : '';
+        const lic = licUntil[s.tenantId] ? new Date(licUntil[s.tenantId]) : null;
+        // A license that dies before the paid period does is a locked-out tenant.
+        const licShort = !lic || lic < now || (end && lic < end);
+        const licCell = lic
+          ? `<span style="${licShort ? 'color:var(--danger);font-weight:600' : ''}">${fmtD(lic)}</span>`
+          : '<span style="color:var(--danger);font-weight:600">no key</span>';
+        const stripeCell = s.stripeSubscriptionId
+          ? `<div style="font-family:monospace;font-size:11px;color:var(--pr)">${s.stripeSubscriptionId}</div>${s.lastPaymentError ? `<div style="font-size:11px;color:var(--danger)">${s.lastPaymentError}</div>` : ''}`
+          : '<span class="badge bgr">manual</span>';
         return `<tr class="${rowClass}">
     <td style="color:var(--mu);font-size:12px">#${s.id}</td>
     <td style="font-weight:500">${s.tenant?.businessName || 'Tenant #' + s.tenantId}</td>
@@ -3024,12 +3213,15 @@
     <td>${badge(s.status)}</td>
     <td style="color:var(--pr);font-weight:700">${fmtM(s.price)}</td>
     <td style="${expiring ? 'color:var(--warn);font-weight:600' : expired ? 'color:var(--danger)' : ''}">${fmtD(s.endDate)}${expiring ? ' ⚠️' : ''}</td>
+    <td>${licCell}</td>
+    <td style="color:var(--mu);font-size:12px">${s.nextPaymentDate ? fmtD(s.nextPaymentDate) : (s.autoRenew ? 'auto-renew, not scheduled' : '—')}</td>
+    <td>${stripeCell}</td>
     <td style="white-space:nowrap">
       ${iBtn('+30 days', 'btn-o btn-sm', `extSub(${s.id})`)}
       ${iBtn('🗑', 'btn-d btn-sm', `delSub(${s.id})`)}
     </td>
   </tr>`;
-      }).join('') || '<tr><td colspan="7" class="empty">No subscriptions</td></tr>';
+      }).join('') || '<tr><td colspan="10" class="empty">No subscriptions</td></tr>';
     }
     async function saveSub() {
       const body = { tenantId: parseInt(document.getElementById('sTenant').value), planType: document.getElementById('sPlan').value, planName: document.getElementById('sPlanName').value, price: document.getElementById('sPrice').value, status: document.getElementById('sStatus').value };
@@ -3038,12 +3230,188 @@
     }
     async function extSub(id) {
       const res = await api('POST', `/subscriptions/${id}/extend`, { days: 30 });
-      if (res?.id) { toast('+30 days added', 'ok'); loadSubs(); } else toast('Failed', 'err');
+      if (!res?.id) { toast('Failed', 'err'); return; }
+      // Say which one actually moved: a subscription with no key still leaves
+      // the tenant locked out, and the operator needs to know that now.
+      if (res.licensesUpdated > 0) {
+        toast(`+30 days — subscription and ${res.licensesUpdated} license key${res.licensesUpdated === 1 ? '' : 's'} now run to ${fmtD(res.licenseExpiresAt)}`, 'ok');
+      } else if (res.licenseTotal > 0) {
+        toast('+30 days on the subscription — this tenant’s license key already runs past that date', 'ok');
+      } else {
+        toast('+30 days on the subscription, but this tenant has no active license key — generate one or they stay locked out', 'err');
+      }
+      loadSubs();
     }
     async function delSub(id) {
       if (!confirm('Delete subscription?')) return;
       const res = await api('DELETE', `/subscriptions/${id}`);
       if (res?.success) { toast('Deleted', 'ok'); loadSubs(); } else toast('Failed', 'err');
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PAYMENTS
+       Read-only. A row's money state is written by Stripe's signed webhook
+       (see server/stripeWebhook.ts) — never from this screen.
+    ══════════════════════════════════════════════════════ */
+    let PAY = [];   // the rows currently on screen, indexed by the refund button
+    let RF = null;  // the row the refund modal is aimed at
+
+    function fmtC(v, cur) { return (cur || 'CHF') + ' ' + parseFloat(v || 0).toFixed(2); }
+
+    async function loadPayments() {
+      if (!allTenants.length) allTenants = await api('GET', '/tenants') || [];
+      const sel = document.getElementById('payTenant');
+      const keep = sel.value;
+      sel.innerHTML = '<option value="">All tenants</option>' + allTenants.map(t => `<option value="${t.id}">${t.businessName}</option>`).join('');
+      sel.value = keep;
+      loadPayStripe();
+      loadPayList();
+      loadPayEvents();
+    }
+
+    async function loadPayStripe() {
+      const el = document.getElementById('payStripe');
+      const h = await api('GET', '/payments/stripe');
+      if (!h) { el.innerHTML = '<div class="ls">Could not reach the Stripe status endpoint.</div>'; return; }
+      if (!h.connected) {
+        el.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="badge br">not connected</span>
+      <span style="font-size:12px;color:var(--mu)">${h.error || 'No Stripe secret key is configured on this server.'}</span>
+    </div>
+    <div style="font-size:12px;color:var(--mu);margin-top:8px">Card and TWINT payments cannot be taken and nothing will appear below until STRIPE_SECRET_KEY is set on the server.</div>`;
+        return;
+      }
+      const methods = h.methods || [];
+      el.innerHTML = `<div class="hg">
+    <div class="hi"><div class="hv">${h.mode === 'live' ? 'LIVE' : 'TEST'}</div><div class="hl">Mode</div></div>
+    <div class="hi"><div class="hv" style="font-size:13px;font-family:monospace">${h.accountId || '—'}</div><div class="hl">Account</div></div>
+    <div class="hi"><div class="hv">${(h.defaultCurrency || '—').toUpperCase()}</div><div class="hl">Default currency</div></div>
+    <div class="hi"><div class="hv">${h.chargesEnabled ? 'Yes' : 'No'}</div><div class="hl">Charges enabled</div></div>
+    <div class="hi"><div class="hv">${h.payoutsEnabled ? 'Yes' : 'No'}</div><div class="hl">Payouts enabled</div></div>
+  </div>
+  <div style="margin-top:12px;font-size:12px;color:var(--mu)">Methods live on this account:
+    ${methods.length ? methods.map(m => `<span class="badge bt" style="margin-right:4px">${m}</span>`).join('') : 'none reported'}
+    ${methods.length && !methods.includes('twint') ? '<div style="margin-top:6px;color:var(--st-warn)">TWINT is not enabled — it is the method Swiss customers expect, and it can only be turned on in the Stripe Dashboard.</div>' : ''}
+  </div>`;
+    }
+
+    async function loadPayList() {
+      const tbl = document.getElementById('payTbl');
+      const sg = document.getElementById('paySg');
+      const offline = document.getElementById('payOffline').checked;
+      const p = new URLSearchParams();
+      const t = document.getElementById('payTenant').value;
+      const src = document.getElementById('paySource').value;
+      const st = document.getElementById('payStatus').value;
+      if (t) p.set('tenantId', t);
+      if (src && src !== 'all') p.set('source', src);
+      if (st) p.set('status', st);
+      if (offline) p.set('includeOffline', '1');
+      p.set('limit', '200');
+
+      const res = await api('GET', '/payments?' + p.toString());
+      if (!res) {
+        sg.innerHTML = '';
+        tbl.innerHTML = '<tr><td colspan="9" class="empty">Failed to load payments.</td></tr>';
+        return;
+      }
+      if (res.error) {
+        sg.innerHTML = '';
+        tbl.innerHTML = `<tr><td colspan="9" class="empty">${res.error}</td></tr>`;
+        return;
+      }
+
+      const s = res.stats || {};
+      sg.innerHTML = [
+        { l: 'Payments', v: n(s.count), s: `${n(s.returned)} shown` },
+        { l: 'Collected', v: fmtM(s.collected), s: 'paid & completed rows' },
+        { l: 'Refunded', v: fmtM(s.refunded), s: 'recorded on online orders' },
+        { l: 'Failed', v: n(s.failed), s: '' },
+        { l: 'Pending', v: n(s.pending), s: '' },
+      ].map(x => `<div class="sc"><div class="sl">${x.l}</div><div class="sv">${x.v}</div>${x.s ? `<div class="ss">${x.s}</div>` : ''}</div>`).join('');
+
+      PAY = res.payments || [];
+      const empty = offline
+        ? 'No payments recorded yet.'
+        : 'No Stripe payments recorded yet. Tick “Include cash & other non-Stripe rows” to see cash orders and till sales.';
+      tbl.innerHTML = PAY.map((r, i) => {
+        // Only a live Stripe charge can be refunded; cash is settled at the till.
+        const refundable = !!r.paymentIntentId && ['paid', 'completed', 'partially_refunded'].includes(r.status);
+        return `<tr>
+    <td style="color:var(--mu);font-size:12px;white-space:nowrap">${fmtDT(r.paidAt || r.createdAt)}</td>
+    <td style="font-weight:500">${r.tenantName || (r.tenantId ? 'Tenant #' + r.tenantId : '—')}</td>
+    <td><div style="font-weight:600">${r.reference || '#' + r.id}</div><div style="font-size:11px;color:var(--mu)">${r.source === 'pos_sale' ? 'till sale' : 'online order'}</div></td>
+    <td style="text-transform:capitalize">${r.method || '—'}</td>
+    <td>${badge(r.status || 'unknown')}${r.paymentError ? `<div style="font-size:11px;color:var(--danger);max-width:220px">${r.paymentError}</div>` : ''}</td>
+    <td style="text-align:right;font-weight:700;color:var(--pr)">${fmtC(r.amount, r.currency)}</td>
+    <td style="text-align:right;color:${r.refunded ? 'var(--st-warn)' : 'var(--mu)'}">${r.refunded ? fmtC(r.refunded, r.currency) : (r.refundId ? 'refunded' : '—')}</td>
+    <td style="font-family:monospace;font-size:11px">${r.paymentIntentId
+            ? `<span style="cursor:pointer;color:var(--pr)" title="Copy" onclick="copyKey('${r.paymentIntentId}')">${r.paymentIntentId}</span>`
+            : '<span style="color:var(--mu)">not a Stripe payment</span>'}</td>
+    <td>${refundable ? iBtn('Refund', 'btn-d btn-sm', `openRefund(${i})`) : ''}</td>
+  </tr>`;
+      }).join('') || `<tr><td colspan="9" class="empty">${empty}</td></tr>`;
+    }
+
+    async function loadPayEvents() {
+      const tbl = document.getElementById('payEvTbl');
+      const res = await api('GET', '/payments/events?limit=40');
+      if (!res) { tbl.innerHTML = '<tr><td colspan="6" class="empty">Failed to load webhook deliveries.</td></tr>'; return; }
+      if (res.error) { tbl.innerHTML = `<tr><td colspan="6" class="empty">${res.error}</td></tr>`; return; }
+      tbl.innerHTML = (res.events || []).map(e => `<tr>
+    <td style="color:var(--mu);font-size:12px;white-space:nowrap">${fmtDT(e.receivedAt)}</td>
+    <td style="font-family:monospace;font-size:11px">${e.id}</td>
+    <td style="font-size:12px">${e.type}</td>
+    <td>${e.livemode ? '<span class="badge bg">live</span>' : '<span class="badge by">test</span>'}</td>
+    <td>${badge(e.status)}${e.error ? `<div style="font-size:11px;color:var(--danger);max-width:280px">${e.error}</div>` : ''}</td>
+    <td style="color:var(--mu);font-size:12px">${e.processedAt ? fmtDT(e.processedAt) : '—'}</td>
+  </tr>`).join('') || '<tr><td colspan="6" class="empty">Stripe has never delivered a webhook to this server. Until it does, no payment can be marked paid.</td></tr>';
+    }
+
+    function openRefund(i) {
+      const r = PAY[i];
+      if (!r?.paymentIntentId) { toast('That row has no Stripe PaymentIntent to refund', 'err'); return; }
+      RF = r;
+      const remaining = Math.max(0, (r.amount || 0) - (r.refunded || 0));
+      document.getElementById('rfSummary').innerHTML = `
+    <div><b>${r.reference || '#' + r.id}</b> · ${r.tenantName || 'Tenant #' + r.tenantId}</div>
+    <div>Charged <b>${fmtC(r.amount, r.currency)}</b>${r.refunded ? ` · already refunded ${fmtC(r.refunded, r.currency)}` : ''}</div>
+    <div>Still refundable <b>${fmtC(remaining, r.currency)}</b>${r.source === 'pos_sale' ? ' — till sales keep no local refunded total, so Stripe is the authority here' : ''}</div>`;
+      document.getElementById('rfPi').value = r.paymentIntentId;
+      document.getElementById('rfAmount').value = '';
+      document.getElementById('rfReason').value = '';
+      openM('mRefund');
+    }
+
+    async function doRefund() {
+      if (!RF) return;
+      const amount = document.getElementById('rfAmount').value.trim();
+      const reason = document.getElementById('rfReason').value;
+      const remaining = Math.max(0, (RF.amount || 0) - (RF.refunded || 0));
+      const shown = amount ? fmtC(amount, RF.currency) : fmtC(remaining, RF.currency) + ' (full remaining)';
+      if (!confirm(`Refund ${shown} on ${RF.reference || '#' + RF.id}?\n\nPaymentIntent: ${RF.paymentIntentId}\n\nThis moves real money at Stripe and cannot be undone.`)) return;
+
+      const btn = document.getElementById('rfGo');
+      btn.disabled = true; btn.textContent = 'Refunding…';
+      let out = null, err = null;
+      try {
+        // Direct fetch rather than api(): Stripe's rejection reason is the whole
+        // point of this dialog and api() swallows the body on a non-200.
+        const r = await fetch('/api/super-admin/payments/refund', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ paymentIntentId: RF.paymentIntentId, amount: amount || null, reason: reason || null }),
+        });
+        out = await r.json();
+        if (!r.ok) err = out?.error || ('HTTP ' + r.status);
+      } catch (e) { err = e.message; }
+      btn.disabled = false; btn.textContent = 'Refund';
+
+      if (err || !out?.refundId) { toast('Refund failed: ' + (err || 'unknown error'), 'err'); return; }
+      closeM('mRefund');
+      toast(`Stripe accepted refund ${out.refundId}. The row changes when the charge.refunded webhook arrives.`, 'ok');
+      // Deliberately NOT patching the row here — the webhook owns that write.
+      loadPayEvents();
     }
 
     /* ══════════════════════════════════════════════════════
@@ -3776,7 +4144,10 @@
     /* ══════════════════════════════════════════════════════
        INIT
     ══════════════════════════════════════════════════════ */
-    loadDash();
+    // Boot straight into whatever section the URL points at (dashboard by
+    // default). fromHash:true keeps show() from rewriting a hash that is already
+    // correct — and avoids stamping "#/dashboard" onto the bare /super_admin URL.
+    show(viewFromHash(), { fromHash: true });
   </script>
 </body>
 

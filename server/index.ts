@@ -8,14 +8,20 @@ import { tenantAuthMiddleware } from "./tenantAuth";
 import { attachEmployee, guardTenantRoutes } from "./employeeAuth";
 import { callerIdService } from "./callerIdService";
 import { whatsappService } from "./whatsappService";
-// stripe-replit-sync uses import.meta.url which crashes in CJS bundles on Hostinger
-// Use dynamic import only when needed
-let runMigrations: any = null;
-import { getStripeSync, getStripePublishableKey, getUncachableStripeClient, getStripeSecretKey } from "./stripeClient";
-import { WebhookHandlers } from "./webhookHandlers";
+import {
+  getStripePublishableKey,
+  getBrowserSafeStripeKey,
+  isStripeConfigured,
+  getStripeMode,
+  getStripeWebhookSecret,
+  requireStripeClient,
+} from "./stripeClient";
+import { registerPaymentRoutes, registerStripeWebhook } from "./paymentRoutes";
+import { runStripeMigrations } from "./stripeMigrations";
 import { DELETE_ACCOUNT_HTML, PRIVACY_POLICY_HTML } from "./legal-pages";
 import { TERMS_HTML, IMPRINT_HTML } from "./site/legal";
-import { isSitePath, renderSitePage, findSiteAsset } from "./site";
+import { isSitePath, renderSitePage, findSiteAsset, SITEMAP_PATHS } from "./site";
+import { PLANS, PLAN_ROWS, CURRENCY, type BillingCycle } from "./site/plans";
 import { rateLimit, clientKey } from "./rateLimit";
 import * as fs from "fs";
 import * as path from "path";
@@ -54,7 +60,13 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("Content-Security-Policy", "frame-ancestors 'self'");
-  res.setHeader("Permissions-Policy", "geolocation=(self), camera=(self), microphone=(), payment=(), interest-cohort=()");
+  // `payment=()` disables the Payment Request API outright, which silently
+  // removes Apple Pay and Google Pay from every Stripe PaymentElement on the
+  // site. Both wallets need `self` plus the Stripe frame that actually calls it.
+  res.setHeader(
+    "Permissions-Policy",
+    'geolocation=(self), camera=(self), microphone=(), payment=(self "https://js.stripe.com"), interest-cohort=()',
+  );
   // Only meaningful over TLS; sending it on plain HTTP is ignored anyway, but
   // gating on the forwarded proto keeps local development honest.
   if ((req.header("x-forwarded-proto") || req.protocol) === "https") {
@@ -388,6 +400,14 @@ function configureExpoAndLanding(app: express.Application) {
             res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
             return res.status(200).send(fs.readFileSync(jsPath, "utf-8"));
           }
+          if (sub === "/pay.js") {
+            // Shared Stripe helper, also used by /order/:slug.
+            const payPath = path.resolve(process.cwd(), "delivery-app", "js", "stripe-payments.js");
+            if (!fs.existsSync(payPath)) return res.status(404).end();
+            res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+            res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+            return res.status(200).send(fs.readFileSync(payPath, "utf-8"));
+          }
           if (sub === "/manifest.json") {
             res.setHeader("Content-Type", "application/manifest+json");
             return res.status(200).json({
@@ -401,9 +421,22 @@ function configureExpoAndLanding(app: express.Application) {
           // Otherwise serve the SPA shell — hash routing handles the path
           const shellPath = path.resolve(process.cwd(), "delivery-app", "customer.html");
           if (!fs.existsSync(shellPath)) return res.status(503).send("<h1>Customer app not deployed</h1>");
+          let shell = fs.readFileSync(shellPath, "utf-8");
+
+          // This page had no config channel at all, which is why it could never
+          // take a payment. Only non-secret values go in: getBrowserSafeStripeKey()
+          // refuses to emit anything that is not a pk_ key.
+          const customerConfig = JSON.stringify({
+            basePath: req.path.startsWith("/api/") ? "/api" : "",
+            currency: process.env.DEFAULT_CURRENCY || "CHF",
+            stripePublishableKey: await getBrowserSafeStripeKey(),
+            language: (req.query.lang as string) || "en",
+          });
+          shell = shell.replace("__KASSENTA_CONFIG__", customerConfig);
+
           res.setHeader("Content-Type", "text/html; charset=utf-8");
           res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-          return res.status(200).send(fs.readFileSync(shellPath, "utf-8"));
+          return res.status(200).send(shell);
         } catch (err) {
           console.error("[/customer] Error:", err);
           return res.status(500).send("<h1>Server error</h1>");
@@ -460,7 +493,7 @@ function configureExpoAndLanding(app: express.Application) {
           storeName: "Kassenta Delivery",
           currency: process.env.DEFAULT_CURRENCY || "CHF",
           language: (req.query.lang as string) || "en",
-          stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
+          stripePublishableKey: await getBrowserSafeStripeKey(),
           primaryColor: "#FF5722",
           accentColor: "#2FD3C6",
           tenantId: null,
@@ -524,7 +557,7 @@ function configureExpoAndLanding(app: express.Application) {
           return res.status(503).send("<h1>Delivery app not yet deployed</h1>");
         }
         let html = fs.readFileSync(deliveryIndexPath, "utf-8");
-        const stripeKey = process.env.STRIPE_PUBLISHABLE_KEY || "";
+        const stripeKey = await getBrowserSafeStripeKey();
         const configJson = JSON.stringify({
           slug,
           tenantId,
@@ -587,7 +620,7 @@ function configureExpoAndLanding(app: express.Application) {
           storeName: "Kassenta Delivery",
           currency: process.env.DEFAULT_CURRENCY || "CHF",
           language: (req.query.lang as string) || "en",
-          stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
+          stripePublishableKey: await getBrowserSafeStripeKey(),
           primaryColor: "#FF5722",
           accentColor: "#2FD3C6",
           tenantId: null,
@@ -797,6 +830,108 @@ function configureExpoAndLanding(app: express.Application) {
     },
   );
 
+  // ── Plan catalogue for the pricing page ─────────────────────────────────
+  // `subscription_plans` is the only authority on what a plan costs:
+  // paymentService prices a Checkout Session from the row and ignores any
+  // amount a caller sends. The pricing page is pre-rendered and CDN-cached, so
+  // it cannot be built against the table — it fetches this instead, rewrites
+  // its own numbers, and buys with the plan id it gets back. server/site/plans
+  // seeds a row when the catalogue is missing one, which is what stops the
+  // site and the checkout from quoting two different ladders again.
+  let planCache: { at: number; body: unknown } | null = null;
+  const PLAN_CACHE_MS = 5 * 60 * 1000;
+
+  const sameText = (a: unknown, b: unknown) =>
+    String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
+
+  /** Lowest id wins, so a duplicated row never changes which plan is sold. */
+  const pickRow = (rows: any[], name: string, interval: BillingCycle) =>
+    rows
+      .filter((r) => sameText(r.name, name) && sameText(r.interval || "monthly", interval))
+      .sort((a, b) => Number(a.id) - Number(b.id))[0];
+
+  async function loadPlanCatalogue() {
+    const { pool } = await import("./db");
+    const read = async (): Promise<any[]> => {
+      const [rows] = await pool.query("SELECT * FROM subscription_plans WHERE is_active = 1");
+      return Array.isArray(rows) ? (rows as any[]) : [];
+    };
+
+    let rows = await read();
+    const missing = PLAN_ROWS.filter((p) => !pickRow(rows, p.name, p.interval));
+    if (missing.length) {
+      for (const p of missing) {
+        await pool.query(
+          "INSERT INTO subscription_plans (name, description, price, `interval`, features, is_active)" +
+            " VALUES (?, ?, ?, ?, ?, 1)",
+          [p.name, p.description, p.price.toFixed(2), p.interval, JSON.stringify(p.features)],
+        );
+      }
+      log(`[plans] seeded ${missing.length} subscription_plans row(s) from the site catalogue`);
+      rows = await read();
+    }
+
+    const plans = PLANS.map((plan) => {
+      const cell = (interval: BillingCycle) => {
+        const row = pickRow(rows, plan.name, interval);
+        return row ? { planId: Number(row.id), price: Number(row.price) } : null;
+      };
+      return { slug: plan.slug, name: plan.name, monthly: cell("monthly"), yearly: cell("yearly") };
+    });
+
+    return {
+      currency: CURRENCY,
+      // Only true when a checkout can actually be created end to end; the page
+      // falls back to /contact/ rather than to a button that goes nowhere.
+      checkout: (await isStripeConfigured()) && plans.every((p) => p.monthly && p.yearly),
+      plans,
+    };
+  }
+
+  app.get("/api/landing/plans", async (_req: Request, res: Response) => {
+    try {
+      if (!planCache || Date.now() - planCache.at > PLAN_CACHE_MS) {
+        planCache = { at: Date.now(), body: await loadPlanCatalogue() };
+      }
+      res.setHeader("Cache-Control", "public, max-age=60");
+      res.json(planCache.body);
+    } catch (e: any) {
+      log(`[plans] catalogue read failed: ${e?.message}`);
+      res.json({ currency: CURRENCY, checkout: false, plans: [] });
+    }
+  });
+
+  // ── Checkout session status, read-only ──────────────────────────────────
+  // What /pay/success asks before it says anything about the payment. It only
+  // reads: nothing here settles a record or writes to the database — the
+  // signed webhook stays the single thing that marks anything paid. A session
+  // id is a bearer secret in the same way a PaymentIntent id is, so holding it
+  // is the authorisation; the limiter is there to stop anyone probing for one.
+  app.get(
+    "/api/landing/checkout-session/:id",
+    rateLimit({ name: "checkout-lookup", max: 60, windowMs: 10 * 60 * 1000 }),
+    async (req: Request, res: Response) => {
+      const id = String(req.params.id || "");
+      if (id.length > 200 || !/^cs_[A-Za-z0-9_]+$/.test(id)) {
+        return res.status(400).json({ error: "Not a checkout session id" });
+      }
+      try {
+        const stripe = await requireStripeClient();
+        const session = await stripe.checkout.sessions.retrieve(id, { expand: ["line_items"] });
+        res.setHeader("Cache-Control", "no-store");
+        res.json({
+          status: session.status,
+          paymentStatus: session.payment_status,
+          amountTotal: session.amount_total,
+          currency: session.currency,
+          planName: session.line_items?.data?.[0]?.description ?? null,
+        });
+      } catch (e: any) {
+        res.status(404).json({ error: "Unknown checkout session" });
+      }
+    },
+  );
+
   // ── SEO: robots.txt + sitemap.xml at the ROOT ───────────────────────────
   // Crawlers only ever look at /robots.txt and /sitemap.xml. Both previously
   // existed under /api/… only, so every crawler got a 404 and the site had no
@@ -814,6 +949,7 @@ function configureExpoAndLanding(app: express.Application) {
         "Disallow: /dashboard",
         "Disallow: /license-gate",
         "Disallow: /login",
+        "Disallow: /pay/",
         "Disallow: /api/",
         "",
         "# Public ordering pages should stay crawlable",
@@ -883,12 +1019,11 @@ function configureExpoAndLanding(app: express.Application) {
         "/compliance/": [img("compliance-audit", "Audit trail and permission settings in the Kassenta console")],
         "/about/": [img("about-team", "The Kassenta team working alongside restaurant staff")],
       };
-      const { SITE_PATHS } = await import("./site");
-
       const entries: Entry[] = [
         { loc: "/", priority: "1.0", changefreq: "weekly", alternates: true },
-        // Every marketing page, derived from the site router so the two can't drift.
-        ...SITE_PATHS.filter((p) => p !== "/").map((loc) => ({
+        // Every indexable marketing page, derived from the site router so the
+        // two can't drift. The Stripe return pages are excluded there.
+        ...SITEMAP_PATHS.filter((p) => p !== "/").map((loc) => ({
           loc: `${loc}/`,
           priority: loc === "/pricing" || loc === "/features" ? "0.9" : "0.8",
           changefreq: "monthly",
@@ -1008,257 +1143,31 @@ function setupErrorHandler(app: express.Application) {
   });
 }
 
+/**
+ * Stripe bootstrap.
+ *
+ * What used to live here - initStripe(), setupStripeWebhook(), setupStripeRoutes(),
+ * setupPaymentGatewayRoutes() and a module-level paymentGatewayConfig object - has
+ * moved to server/paymentRoutes.ts and server/stripeWebhook.ts.
+ *
+ * The old bootstrap could not work in production: it built its webhook URL from
+ * REPLIT_DOMAINS (unset here, giving https://undefined/...), returned early under
+ * usingMySql, and kept gateway settings in a variable that reset on every restart.
+ */
 async function initStripe() {
-  if (usingMySql) {
-    log("MySQL mode detected, skipping Stripe schema sync");
-    return;
-  }
-
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    log('DATABASE_URL not set, skipping Stripe init');
-    return;
-  }
-
-  try {
-    log('Initializing Stripe schema...');
-    try {
-      const stripeSyncModule = await import("stripe-replit-sync");
-      runMigrations = stripeSyncModule.runMigrations;
-      await runMigrations({ databaseUrl });
-      log('Stripe schema ready');
-    } catch (migErr: any) {
-      log('Stripe migrations skipped (stripe-replit-sync not available):', migErr?.message);
-    }
-
-    let stripeSync, secretKey;
-    try {
-      stripeSync = await getStripeSync();
-      secretKey = await getStripeSecretKey();
-    } catch (connErr: any) {
-      log('Stripe connection not available, skipping:', connErr?.message || connErr);
-      return;
-    }
-
-    if (!secretKey || secretKey.includes('dummy')) {
-      log('Stripe: Dummy or missing key detected. Skipping webhook setup and sync.');
-      return;
-    }
-
-    log('Setting up managed webhook...');
-    const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-    const webhookResult = await stripeSync.findOrCreateManagedWebhook(
-      `${webhookBaseUrl}/api/stripe/webhook`
+  const configured = await isStripeConfigured();
+  if (!configured) {
+    log(
+      'Stripe is not configured - set STRIPE_SECRET_KEY (and STRIPE_PUBLISHABLE_KEY, ' +
+      'STRIPE_WEBHOOK_SECRET) to enable card, TWINT and wallet payments.',
     );
-    log(`Webhook configured: ${webhookResult?.webhook?.url || 'ready'}`);
-
-    log('Syncing Stripe data...');
-    stripeSync.syncBackfill()
-      .then(() => log('Stripe data synced'))
-      .catch((err: any) => log('Error syncing Stripe data:', err));
-  } catch (error: any) {
-    log('Stripe init skipped:', error?.message || error);
+    return;
   }
-}
-
-function setupStripeWebhook(app: express.Application) {
-  app.post(
-    '/api/stripe/webhook',
-    express.raw({ type: 'application/json' }),
-    async (req, res) => {
-      const signature = req.headers['stripe-signature'];
-      if (!signature) {
-        return res.status(400).json({ error: 'Missing stripe-signature' });
-      }
-
-      try {
-        const sig = Array.isArray(signature) ? signature[0] : signature;
-        if (!Buffer.isBuffer(req.body)) {
-          return res.status(500).json({ error: 'Webhook processing error' });
-        }
-        await WebhookHandlers.processWebhook(req.body as Buffer, sig);
-        res.status(200).json({ received: true });
-      } catch (error: any) {
-        log('Webhook error:', error.message);
-        res.status(400).json({ error: 'Webhook processing error' });
-      }
-    }
-  );
-}
-
-function setupStripeRoutes(app: express.Application) {
-  app.get('/api/stripe/publishable-key', async (_req, res) => {
-    try {
-      const key = await getStripePublishableKey();
-      res.json({ publishableKey: key });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.post('/api/stripe/create-payment-intent', async (req, res) => {
-    try {
-      const { amount, currency = 'chf', metadata } = req.body;
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ error: 'Valid amount is required' });
-      }
-      const stripe = await getUncachableStripeClient();
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount),
-        currency,
-        metadata: metadata || {},
-        automatic_payment_methods: { enabled: true },
-      });
-      res.json({
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
-      });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.post('/api/stripe/confirm-payment', async (req, res) => {
-    try {
-      const { paymentIntentId } = req.body;
-      if (!paymentIntentId) {
-        return res.status(400).json({ error: 'paymentIntentId is required' });
-      }
-      const stripe = await getUncachableStripeClient();
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      res.json({
-        status: paymentIntent.status,
-        amount: paymentIntent.amount,
-        currency: paymentIntent.currency,
-      });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.get('/api/stripe/payment-methods', async (_req, res) => {
-    try {
-      res.json({
-        methods: ['card'],
-        supportedCards: ['visa', 'mastercard', 'amex'],
-      });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.post('/api/stripe/pos-charge', async (req, res) => {
-    try {
-      const { amount, currency = 'chf', token, metadata } = req.body;
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ error: 'Valid amount is required' });
-      }
-      if (!token) {
-        return res.status(400).json({ error: 'Payment token is required' });
-      }
-      const stripe = await getUncachableStripeClient();
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount),
-        currency,
-        payment_method_data: {
-          type: 'card',
-          card: { token },
-        } as any,
-        confirm: true,
-        automatic_payment_methods: {
-          enabled: true,
-          allow_redirects: 'never',
-        },
-        metadata: metadata || {},
-      });
-      res.json({
-        success: paymentIntent.status === 'succeeded',
-        status: paymentIntent.status,
-        paymentIntentId: paymentIntent.id,
-        amount: paymentIntent.amount,
-        currency: paymentIntent.currency,
-      });
-    } catch (e: any) {
-      const errorMsg = e.type === 'StripeCardError'
-        ? e.message
-        : e.message || 'Payment processing failed';
-      res.status(e.statusCode || 500).json({ error: errorMsg, code: e.code });
-    }
-  });
-}
-
-let paymentGatewayConfig: any = {
-  enabledMethods: ["cash", "card", "mobile", "nfc"],
-  stripe: {
-    enabled: true,
-    mode: "test",
-    currency: "chf",
-    autoCapture: true,
-  },
-  nfc: {
-    enabled: true,
-    provider: "stripe_tap",
-  },
-  cash: {
-    enabled: true,
-    requireExactAmount: false,
-  },
-  mobile: {
-    enabled: true,
-    providers: ["twint", "apple_pay", "google_pay"],
-  },
-};
-
-function setupPaymentGatewayRoutes(app: express.Application) {
-  app.get('/api/payment-gateway/config', async (_req, res) => {
-    try {
-      let stripeStatus = "disconnected";
-      let stripeMode = "test";
-      try {
-        const key = await getStripePublishableKey();
-        if (key) {
-          stripeStatus = "connected";
-          stripeMode = key.startsWith("pk_live") ? "live" : "test";
-        }
-      } catch { }
-      res.json({
-        ...paymentGatewayConfig,
-        stripe: {
-          ...paymentGatewayConfig.stripe,
-          status: stripeStatus,
-          mode: stripeMode,
-        },
-      });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.put('/api/payment-gateway/config', async (req, res) => {
-    try {
-      const updates = req.body;
-      paymentGatewayConfig = { ...paymentGatewayConfig, ...updates };
-      res.json(paymentGatewayConfig);
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.post('/api/payment-gateway/test-stripe', async (_req, res) => {
-    try {
-      const stripe = await getUncachableStripeClient();
-      const balance = await stripe.balance.retrieve();
-      const key = await getStripePublishableKey();
-      res.json({
-        success: true,
-        mode: key.startsWith("pk_live") ? "live" : "test",
-        currency: balance.available?.[0]?.currency || "chf",
-        available: balance.available?.map((b: any) => ({ amount: b.amount, currency: b.currency })),
-      });
-    } catch (e: any) {
-      res.json({ success: false, error: e.message });
-    }
-  });
+  const mode = await getStripeMode();
+  if (!getStripeWebhookSecret()) {
+    log('Stripe: STRIPE_WEBHOOK_SECRET is not set - payments cannot be confirmed.');
+  }
+  log(`Stripe ready in ${mode} mode`);
 }
 
 (async () => {
@@ -1288,9 +1197,15 @@ function setupPaymentGatewayRoutes(app: express.Application) {
     console.log("[Migration] landing_page_config payment fields:", e.message);
   }
 
+  // Payment columns and the webhook-event / gateway-settings tables. Runs
+  // before any route is registered, so the first request already finds them.
+  await runStripeMigrations();
+
   setupCors(app);
 
-  setupStripeWebhook(app);
+  // Raw-body webhook only, and it must stay ahead of setupBodyParsing():
+  // express.json() would consume the buffer the signature check needs.
+  registerStripeWebhook(app);
 
   setupBodyParsing(app);
   setupRequestLogging(app);
@@ -1302,11 +1217,10 @@ function setupPaymentGatewayRoutes(app: express.Application) {
   app.use(attachEmployee());
   app.use(guardTenantRoutes());
 
-  setupStripeRoutes(app);
-  setupPaymentGatewayRoutes(app);
 
   configureExpoAndLanding(app);
 
+  registerPaymentRoutes(app);
   registerSuperAdminRoutes(app);
   registerBroadcastRoutes(app);
   registerCustomerExtraRoutes(app);

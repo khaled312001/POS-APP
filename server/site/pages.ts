@@ -1,4 +1,7 @@
 import { icons, shot, t, tAttrs, esc, type PageMeta, type T3 } from "./shell";
+import {
+  PLANS, CURRENCY, STARTER, PROFESSIONAL, ENTERPRISE, yearlyMonthly, type SitePlan,
+} from "./plans";
 
 // ── Small builders ──────────────────────────────────────────────────────────
 const head = (eyebrow: T3, title: T3, lead?: T3, center = false) => `
@@ -95,10 +98,10 @@ export const home: { meta: PageMeta; body: string } = {
         ],
         offers: {
           "@type": "AggregateOffer",
-          priceCurrency: "CHF",
-          lowPrice: "49",
-          highPrice: "199",
-          offerCount: 3,
+          priceCurrency: CURRENCY,
+          lowPrice: String(Math.min(...PLANS.map((p) => p.monthly))),
+          highPrice: String(Math.max(...PLANS.map((p) => p.monthly))),
+          offerCount: PLANS.length,
           url: "https://kassenta.com/pricing/",
         },
         description:
@@ -805,22 +808,35 @@ export const solutions: { meta: PageMeta; body: string } = {
 // ════════════════════════════════════════════════════════════════════════════
 // PRICING
 // ════════════════════════════════════════════════════════════════════════════
+/**
+ * Prices and the plan name come from `plans.ts`, which mirrors the
+ * `subscription_plans` rows the checkout is priced from. The numbers baked in
+ * here are only what the visitor sees before /api/landing/plans answers —
+ * KassentaPricing rewrites `data-monthly` / `data-yearly` from the live
+ * catalogue as soon as it lands, and the amount Stripe charges is always the
+ * row's, never the page's.
+ *
+ * The call to action stays an anchor to /contact/: with JavaScript off, or
+ * with the catalogue unreachable, the visitor still lands somewhere useful
+ * instead of on a dead button. KassentaPricing.buy() takes the click over only
+ * once it holds a real plan id.
+ */
 const plan = (
+  p: SitePlan,
   name: T3,
-  monthly: number,
   blurb: T3,
   points: T3[],
   featured = false,
   tag?: T3
 ) => `
-        <article class="card price-card${featured ? " featured" : ""} reveal">
+        <article class="card price-card${featured ? " featured" : ""} reveal" data-plan="${p.slug}">
           ${tag ? `<span class="badge price-tag" ${tAttrs(tag)}>${esc(tag.en)}</span>` : ""}
           <h3 ${tAttrs(name)}>${esc(name.en)}</h3>
           <p style="font-size:.9rem" ${tAttrs(blurb)}>${esc(blurb.en)}</p>
-          <div class="price"><span data-monthly="${monthly}" data-yearly="${Math.round(monthly * 0.8)}" class="price-value">${monthly}</span> <small>CHF <span ${tAttrs({ en: "per month", de: "pro Monat", ar: "شهريًا" })}>per month</span></small></div>
+          <div class="price"><span data-monthly="${p.monthly}" data-yearly="${yearlyMonthly(p)}" class="price-value">${p.monthly}</span> <small><span class="price-currency">${CURRENCY}</span> <span ${tAttrs({ en: "per month", de: "pro Monat", ar: "شهريًا" })}>per month</span></small></div>
           <p class="form-note" ${tAttrs({ en: "Per location. VAT excluded.", de: "Pro Standort. Exkl. MwSt.", ar: "لكل فرع. غير شامل الضريبة." })}>Per location. VAT excluded.</p>
           ${ticks(points)}
-          <a class="btn ${featured ? "btn-primary" : "btn-ghost"}" href="/contact/" ${tAttrs({ en: "Start with this plan", de: "Mit diesem Plan starten", ar: "ابدأ بهذه الباقة" })}>Start with this plan</a>
+          <a class="btn ${featured ? "btn-primary" : "btn-ghost"}" href="/contact/" onclick="return KassentaPricing.buy(event, '${p.slug}')" ${tAttrs({ en: "Start with this plan", de: "Mit diesem Plan starten", ar: "ابدأ بهذه الباقة" })}>Start with this plan</a>
         </article>`;
 
 export const pricing: { meta: PageMeta; body: string } = {
@@ -841,35 +857,17 @@ export const pricing: { meta: PageMeta; body: string } = {
           "Point of sale, online ordering and delivery software, priced per location with no commission on your own orders.",
         image: "https://kassenta.com/brand/og-image.jpg",
         brand: { "@type": "Brand", name: "Kassenta" },
-        offers: [
-          {
-            "@type": "Offer",
-            name: "Starter",
-            price: "49",
-            priceCurrency: "CHF",
-            availability: "https://schema.org/InStock",
-            url: "https://kassenta.com/pricing/",
-            description: "One counter, one screen. For a single café, kiosk or small shop.",
-          },
-          {
-            "@type": "Offer",
-            name: "Professional",
-            price: "99",
-            priceCurrency: "CHF",
-            availability: "https://schema.org/InStock",
-            url: "https://kassenta.com/pricing/",
-            description: "Counter plus your own online channel, delivery and loyalty.",
-          },
-          {
-            "@type": "Offer",
-            name: "Enterprise",
-            price: "199",
-            priceCurrency: "CHF",
-            availability: "https://schema.org/InStock",
-            url: "https://kassenta.com/pricing/",
-            description: "Several branches under one roof, with the API and consolidated reporting.",
-          },
-        ],
+        // Built from the same catalogue the cards and the checkout use, so a
+        // price change cannot leave a stale number in the rich result.
+        offers: PLANS.map((p) => ({
+          "@type": "Offer",
+          name: p.name,
+          price: String(p.monthly),
+          priceCurrency: CURRENCY,
+          availability: "https://schema.org/InStock",
+          url: "https://kassenta.com/pricing/",
+          description: p.summary,
+        })),
       },
       {
         "@context": "https://schema.org",
@@ -932,8 +930,8 @@ export const pricing: { meta: PageMeta; body: string } = {
       </div>
       <div class="grid grid-3">
         ${plan(
+          STARTER,
           { en: "Starter", de: "Starter", ar: "المبتدئة" },
-          49,
           { en: "One counter, one screen. For a single café, kiosk or small shop finding its feet.", de: "Eine Kasse, ein Bildschirm. Für ein einzelnes Café, einen Kiosk oder kleinen Laden.", ar: "كاشير واحد وشاشة واحدة. لكافيه أو كشك أو محل صغير في بدايته." },
           [
             { en: "POS on one device, unlimited products and staff PINs", de: "Kasse auf einem Gerät, unbegrenzte Artikel und Mitarbeiter-PINs", ar: "كاشير على جهاز واحد، ومنتجات وأرقام موظفين بلا حد" },
@@ -943,8 +941,8 @@ export const pricing: { meta: PageMeta; body: string } = {
           ]
         )}
         ${plan(
+          PROFESSIONAL,
           { en: "Professional", de: "Professional", ar: "الاحترافية" },
-          99,
           { en: "Counter plus your own online channel. For restaurants that deliver and take table orders.", de: "Kasse plus eigener Online-Kanal. Für Restaurants mit Lieferung und Tischbestellung.", ar: "كاشير مع قناتك الإلكترونية. للمطاعم التي توصّل وتستقبل طلبات الطاولات." },
           [
             { en: "Everything in Starter, on up to five devices", de: "Alles aus Starter, auf bis zu fünf Geräten", ar: "كل ما في المبتدئة، على خمسة أجهزة" },
@@ -958,8 +956,8 @@ export const pricing: { meta: PageMeta; body: string } = {
           { en: "Most chosen", de: "Am häufigsten", ar: "الأكثر اختيارًا" }
         )}
         ${plan(
+          ENTERPRISE,
           { en: "Enterprise", de: "Enterprise", ar: "المؤسسات" },
-          199,
           { en: "Several branches under one roof, with the API and the reporting to match.", de: "Mehrere Filialen unter einem Dach, mit passender API und Auswertung.", ar: "عدة فروع تحت مظلة واحدة، مع واجهة برمجية وتقارير مناسبة." },
           [
             { en: "Everything in Professional, unlimited devices", de: "Alles aus Professional, unbegrenzte Geräte", ar: "كل ما في الاحترافية، وأجهزة بلا حد" },
@@ -1028,17 +1026,206 @@ export const pricing: { meta: PageMeta; body: string } = {
     }
   )}
 
+  <dialog class="buy" id="buyDialog" aria-labelledby="buy-title">
+    <button class="icon-btn buy-close" type="button" onclick="KassentaPricing.close()" aria-label="Close">${icons.close}</button>
+    <h3 id="buy-title" ${tAttrs({ en: "Start with Kassenta", de: "Mit Kassenta starten", ar: "ابدأ مع Kassenta" })}>Start with Kassenta</h3>
+    <p class="buy-plan" id="buy-plan"></p>
+    <form id="buyForm" novalidate style="display:grid;gap:16px">
+      <div class="field">
+        <label for="buy-email" ${tAttrs({ en: "Work email", de: "Geschäftliche E-Mail", ar: "البريد الإلكتروني للعمل" })}>Work email</label>
+        <input id="buy-email" name="email" type="email" required autocomplete="email" inputmode="email">
+        <p class="form-note" ${tAttrs({
+          en: "Your licence key and receipt go to this address.",
+          de: "Lizenzschlüssel und Beleg gehen an diese Adresse.",
+          ar: "يُرسَل مفتاح الترخيص والإيصال إلى هذا العنوان.",
+        })}>Your licence key and receipt go to this address.</p>
+      </div>
+      <div class="form-status" id="buy-status" role="status" aria-live="polite"></div>
+      <button class="btn btn-primary" type="submit" id="buy-submit" ${tAttrs({
+        en: "Continue to secure checkout",
+        de: "Weiter zur sicheren Zahlung",
+        ar: "المتابعة إلى الدفع الآمن",
+      })}>Continue to secure checkout</button>
+    </form>
+    <p class="form-note buy-legal" ${tAttrs({
+      en: "Payment is taken by Stripe on their own page, which is also where the available methods are shown. Your card details never reach us, and nothing is charged until you confirm there.",
+      de: "Die Zahlung läuft bei Stripe auf deren eigener Seite, dort werden auch die verfügbaren Zahlungsarten angezeigt. Ihre Kartendaten erreichen uns nie, und belastet wird erst, wenn Sie dort bestätigen.",
+      ar: "يتم الدفع لدى Stripe على صفحته الخاصة، وهناك أيضًا تظهر طرق الدفع المتاحة. لا تصلنا بيانات بطاقتك أبدًا، ولا يُخصم شيء حتى تؤكّد هناك.",
+    })}>Payment is taken by Stripe on their own page, which is also where the available methods are shown. Your card details never reach us, and nothing is charged until you confirm there.</p>
+  </dialog>
+
   <script>
+    /* The purchase path.
+       ────────────────────────────────────────────────────────────────────────
+       These pages are pre-rendered and sit behind a CDN, so no key and no plan
+       id can be baked into them. The catalogue is fetched at runtime from
+       /api/landing/plans, and the checkout is opened by asking the server for a
+       Stripe-hosted session: the browser never handles a publishable key, an
+       amount or a card. The amount is priced from the subscription_plans row on
+       the server side — sending one from here would not change what is charged. */
     window.KassentaPricing = (function () {
-      function set(cycle) {
+      var cycle = 'monthly';
+      var slug = null;
+      var catalogue = null;
+      var state = 'loading';           /* loading | ready | unavailable */
+      var dlg = document.getElementById('buyDialog');
+      var form = document.getElementById('buyForm');
+      var emailEl = document.getElementById('buy-email');
+      var statusEl = document.getElementById('buy-status');
+      var submitEl = document.getElementById('buy-submit');
+      var planEl = document.getElementById('buy-plan');
+
+      var MSG = {
+        loading: { en: 'Preparing the checkout…', de: 'Zahlung wird vorbereitet…', ar: 'جارٍ تجهيز الدفع…' },
+        opening: { en: 'Opening the secure checkout…', de: 'Sichere Zahlung wird geöffnet…', ar: 'جارٍ فتح صفحة الدفع الآمن…' },
+        invalid: { en: 'Please enter a valid email address.', de: 'Bitte geben Sie eine gültige E-Mail-Adresse ein.', ar: 'يرجى إدخال بريد إلكتروني صحيح.' },
+        down: { en: 'Online checkout is unavailable right now. Write to info@kassenta.com and we will set the plan up for you.', de: 'Die Online-Zahlung ist gerade nicht verfügbar. Schreiben Sie an info@kassenta.com, wir richten den Plan für Sie ein.', ar: 'الدفع الإلكتروني غير متاح حاليًا. راسلنا على info@kassenta.com وسنجهّز الباقة لك.' },
+        failed: { en: 'The checkout could not be opened. Nothing was charged. Please try again or write to info@kassenta.com.', de: 'Die Zahlung konnte nicht geöffnet werden. Es wurde nichts belastet. Bitte erneut versuchen oder an info@kassenta.com schreiben.', ar: 'تعذّر فتح صفحة الدفع ولم يُخصم أي مبلغ. حاول مجددًا أو راسلنا على info@kassenta.com.' }
+      };
+      var PER = {
+        monthly: { en: 'per month, billed monthly', de: 'pro Monat, monatlich abgerechnet', ar: 'شهريًا، بفوترة شهرية' },
+        yearly: { en: 'per month, billed once for twelve months', de: 'pro Monat, einmalig für zwölf Monate abgerechnet', ar: 'شهريًا، تُحصَّل مرة واحدة لاثني عشر شهرًا' }
+      };
+      function lang() { return document.documentElement.lang || 'en'; }
+      function say(msg, cls) {
+        statusEl.textContent = msg[lang()] || msg.en;
+        statusEl.className = 'form-status ' + cls;
+      }
+
+      function set(next) {
+        cycle = next === 'yearly' ? 'yearly' : 'monthly';
         document.querySelectorAll('.billing-toggle button').forEach(function (b) {
           b.classList.toggle('active', b.dataset.cycle === cycle);
         });
         document.querySelectorAll('.price-value').forEach(function (el) {
           el.textContent = el.getAttribute(cycle === 'yearly' ? 'data-yearly' : 'data-monthly');
         });
+        if (dlg && dlg.open) describe();
       }
-      return { set: set };
+
+      /* The catalogue is the authority on both the price and the plan id. The
+         numbers in the HTML are only what the CDN had; these are the ones the
+         charge is built from. */
+      function apply(data) {
+        catalogue = {};
+        (data.plans || []).forEach(function (p) { catalogue[p.slug] = p; });
+        var cur = data.currency || 'CHF';
+        document.querySelectorAll('.price-currency').forEach(function (el) { el.textContent = cur; });
+        document.querySelectorAll('.price-card[data-plan]').forEach(function (card) {
+          var p = catalogue[card.getAttribute('data-plan')];
+          var el = card.querySelector('.price-value');
+          if (!p || !el) return;
+          if (p.monthly && typeof p.monthly.price === 'number') {
+            el.setAttribute('data-monthly', String(p.monthly.price));
+          }
+          if (p.yearly && typeof p.yearly.price === 'number') {
+            el.setAttribute('data-yearly', String(Math.round(p.yearly.price / 12)));
+          }
+        });
+        set(cycle);
+        state = data.checkout ? 'ready' : 'unavailable';
+        if (dlg && dlg.open) { describe(); gate(); }
+      }
+
+      function load() {
+        return fetch('/api/landing/plans', { headers: { Accept: 'application/json' } })
+          .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+          .then(apply)
+          .catch(function () {
+            state = 'unavailable';
+            if (dlg && dlg.open) { gate(); }
+          });
+      }
+
+      function entry() {
+        var p = catalogue && slug ? catalogue[slug] : null;
+        return p ? p[cycle] : null;
+      }
+
+      function describe() {
+        if (!planEl) return;
+        var p = catalogue && slug ? catalogue[slug] : null;
+        var card = document.querySelector('.price-card[data-plan="' + slug + '"] .price-value');
+        var name = (p && p.name) || (slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : '');
+        var shown = card ? card.textContent : '';
+        var cur = document.querySelector('.price-currency');
+        planEl.textContent = name + ' — ' + (cur ? cur.textContent : 'CHF') + ' ' + shown + ' ' +
+          (PER[cycle][lang()] || PER[cycle].en);
+      }
+
+      function gate() {
+        if (state === 'unavailable') {
+          submitEl.disabled = true;
+          say(MSG.down, 'err');
+        } else if (state === 'loading') {
+          submitEl.disabled = true;
+          say(MSG.loading, 'ok');
+        } else {
+          submitEl.disabled = false;
+          statusEl.textContent = '';
+          statusEl.className = 'form-status';
+        }
+      }
+
+      /* Returns true to let the anchor fall through to /contact/, which is what
+         happens when the catalogue never arrived or checkout is switched off. */
+      function buy(e, which) {
+        if (state === 'unavailable' || !dlg || !dlg.showModal) return true;
+        if (e) e.preventDefault();
+        slug = which;
+        describe();
+        gate();
+        dlg.showModal();
+        emailEl.focus();
+        return false;
+      }
+
+      function close() { if (dlg && dlg.open) dlg.close(); }
+
+      function checkout() {
+        var email = String(emailEl.value || '').trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email)) return say(MSG.invalid, 'err');
+
+        var row = entry();
+        if (!row || !row.planId) { state = 'unavailable'; return gate(); }
+
+        submitEl.disabled = true;
+        say(MSG.opening, 'ok');
+
+        /* Stripe substitutes {CHECKOUT_SESSION_ID} on the way back, which is
+           the only handle the success page has to ask the server what happened.
+           Both URLs stay on this origin. */
+        fetch('/api/payments/checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            planId: row.planId,
+            email: email,
+            successUrl: location.origin + '/pay/success/?session_id={CHECKOUT_SESSION_ID}',
+            cancelUrl: location.origin + '/pay/cancelled/'
+          })
+        }).then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.json();
+        }).then(function (data) {
+          if (!data || !data.url) throw new Error('no url');
+          location.href = data.url;
+        }).catch(function () {
+          submitEl.disabled = false;
+          say(MSG.failed, 'err');
+        });
+      }
+
+      if (form) {
+        form.addEventListener('submit', function (e) { e.preventDefault(); checkout(); });
+      }
+      if (dlg) {
+        /* Clicking the backdrop lands on the <dialog> itself, never on a child. */
+        dlg.addEventListener('click', function (e) { if (e.target === dlg) close(); });
+      }
+      load();
+
+      return { set: set, buy: buy, close: close, checkout: checkout };
     })();
   </script>`,
 };

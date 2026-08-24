@@ -1,15 +1,28 @@
 import { renderPage, findSiteAsset, type PageMeta } from "./shell";
 import { PAGES } from "./pages";
+import { PAY_PAGES } from "./pay";
 
 export interface SitePage {
   meta: PageMeta;
   body: string;
 }
 
-const BY_PATH = new Map<string, SitePage>(PAGES.map((p) => [p.meta.path, p]));
+const ALL_PAGES: SitePage[] = [...PAGES, ...PAY_PAGES];
 
-/** All marketing routes, for the router and the sitemap. */
-export const SITE_PATHS: string[] = PAGES.map((p) => p.meta.path);
+const BY_PATH = new Map<string, SitePage>(ALL_PAGES.map((p) => [p.meta.path, p]));
+
+/** Every renderable route, for the router and for the pre-render step. */
+export const SITE_PATHS: string[] = ALL_PAGES.map((p) => p.meta.path);
+
+/**
+ * The indexable subset, for the sitemap. The Stripe Checkout return pages are
+ * real routes that must be rendered and pre-rendered, but listing them for
+ * crawlers would invite them into a page that only means something with a
+ * session id attached.
+ */
+export const SITEMAP_PATHS: string[] = ALL_PAGES.filter((p) => !p.meta.noindex).map(
+  (p) => p.meta.path,
+);
 
 /** Normalises `/features/` and `/features/index.html` onto `/features`. */
 export function normaliseSitePath(pathname: string): string {

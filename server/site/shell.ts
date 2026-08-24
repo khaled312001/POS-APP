@@ -203,6 +203,12 @@ export interface PageMeta {
   description: T3;
   /** Optional JSON-LD blocks appended to <head>. */
   jsonLd?: object[];
+  /**
+   * Kept out of the index and out of the sitemap. Set on the pages a visitor
+   * only ever reaches from somewhere else — the Stripe Checkout return pages
+   * have nothing to rank for and would look like thin duplicates if crawled.
+   */
+  noindex?: boolean;
   /** Slot id of the image to preload — set on pages with an above-the-fold image. */
   heroImage?: string;
   /** Extra keywords for the sitemap's image entries. */
@@ -229,7 +235,7 @@ export function renderPage(meta: PageMeta, body: string, baseUrl: string): strin
   // Breadcrumbs on every inner page: Google renders them in the result snippet
   // instead of the bare URL, and they make the site's shape explicit to crawlers.
   const crumb =
-    meta.path === "/"
+    meta.path === "/" || meta.noindex
       ? null
       : {
           "@context": "https://schema.org",
@@ -258,7 +264,7 @@ export function renderPage(meta: PageMeta, body: string, baseUrl: string): strin
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>${esc(meta.title.en)}</title>
   <meta name="description" content="${esc(meta.description.en)}">
-  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="robots" content="${meta.noindex ? "noindex, follow" : "index, follow, max-image-preview:large"}">
   <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#040E32" media="(prefers-color-scheme: dark)">
   <link rel="canonical" href="${canonical}">

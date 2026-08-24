@@ -378,6 +378,27 @@ td strong { color: var(--text); font-weight: 700; }
 .form-status { padding: 12px 15px; border-radius: 10px; font-size: .88rem; font-weight: 600; display: none; }
 .form-status.ok { display: block; background: var(--accent-soft); color: var(--ok); border: 1px solid var(--accent-line); }
 .form-status.err { display: block; background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent); }
+/* Neither good news nor bad: a payment Stripe has not settled yet. */
+.form-status.wait { display: block; background: var(--bg-inset); color: var(--text-2); border: 1px solid var(--border); }
+
+/* ── Checkout dialog ────────────────────────────────────────────────────── */
+/* Opened from a pricing card to collect the email Stripe puts on the receipt.
+   No card field lives here — the card is only ever entered on Stripe's page. */
+.buy {
+  /* The reset above sets margin 0 on every element, which wipes the auto
+     margin a dialog centres itself with. Put it back explicitly. */
+  margin: auto;
+  width: min(440px, calc(100vw - 32px)); padding: 30px 28px 26px; border: 1px solid var(--border);
+  border-radius: var(--radius-lg); background: var(--surface); color: var(--text);
+  box-shadow: var(--shadow-lg); position: relative; overflow: visible;
+}
+.buy::backdrop { background: rgba(4, 14, 50, .58); backdrop-filter: blur(3px); }
+.buy h3 { font-size: 1.24rem; padding-inline-end: 34px; }
+.buy-plan { font-size: .9rem; font-weight: 700; color: var(--accent); margin: 6px 0 20px; }
+.buy .btn { width: 100%; }
+.buy-legal { margin-top: 16px; }
+.buy-close { position: absolute; inset-inline-end: 16px; top: 16px; }
+@media (max-width: 480px) { .buy .btn { width: 100%; } }
 
 /* ── Footer ─────────────────────────────────────────────────────────────── */
 .footer { border-top: 1px solid var(--border); background: var(--bg-alt); padding: 56px 0 30px; margin-top: 0; }

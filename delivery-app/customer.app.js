@@ -1433,6 +1433,7 @@
 
   // ─── Account ────────────────────────────────────────────────────────
   function renderAccount() {
+    syncThemeControl();
     var c = state.auth.customer || {};
     $("account-sub").textContent = state.auth.isGuest ? "Guest session" : (c.email || c.phone || "");
     $("account-info").innerHTML = ''
@@ -1446,6 +1447,220 @@
       + '</div>';
   }
 
+  // --- Appearance ----------------------------------------------------
+  // Light is the default. The choice is stored under `kassenta_theme`, the
+  // same key the POS app, the marketing site and the dashboards read, so a
+  // customer who switches here sees the same preference elsewhere.
+  //
+  // The stamp itself also happens in an inline <head> script so the right
+  // palette is live on the first painted frame; this half keeps it in sync
+  // afterwards and drives the toggle.
+  var THEME_KEY = "kassenta_theme";
+
+  function storedTheme() {
+    try {
+      var t = localStorage.getItem(THEME_KEY);
+      return t === "dark" || t === "light" ? t : null;
+    } catch (e) { return null; }
+  }
+
+  /** What is actually on screen right now, stored preference or OS default. */
+  function activeTheme() {
+    var explicit = document.documentElement.getAttribute("data-theme");
+    if (explicit === "dark" || explicit === "light") return explicit;
+    try {
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    } catch (e) { return "light"; }
+  }
+
+  function applyTheme(mode) {
+    document.documentElement.setAttribute("data-theme", mode);
+    try { localStorage.setItem(THEME_KEY, mode); } catch (e) {}
+
+    // Keep the browser chrome in step; the static media-query metas cannot
+    // follow an in-page override.
+    var metas = document.querySelectorAll('meta[name="theme-color"]');
+    for (var i = 0; i < metas.length; i++) metas[i].remove();
+    var m = document.createElement("meta");
+    m.name = "theme-color";
+    m.content = mode === "dark" ? "#040E32" : "#F2F6F5";
+    document.head.appendChild(m);
+
+    syncThemeControl();
+  }
+
+  var SUN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+  var MOON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+
+  /** Reflect the live theme in the Account row without re-rendering it. */
+  function syncThemeControl() {
+    var mode = activeTheme();
+    var box = $("theme-toggle");
+    if (box) box.checked = mode === "dark";
+    var hint = $("theme-hint");
+    if (hint) hint.textContent = mode === "dark" ? "Dark theme is on" : "Light theme is on";
+    var icon = $("theme-icon");
+    if (icon) icon.innerHTML = mode === "dark" ? MOON_ICON : SUN_ICON;
+  }
+
+  function initTheme() {
+    var box = $("theme-toggle");
+    if (box) {
+      box.addEventListener("change", function () {
+        applyTheme(box.checked ? "dark" : "light");
+      });
+    }
+    // Follow the OS only while the customer has expressed no preference.
+    try {
+      var mq = window.matchMedia("(prefers-color-scheme: dark)");
+      var onOsChange = function () { if (!storedTheme()) syncThemeControl(); };
+      if (mq.addEventListener) mq.addEventListener("change", onOsChange);
+      else if (mq.addListener) mq.addListener(onOsChange);
+    } catch (e) {}
+    syncThemeControl();
+  }
+
+  // --- Online payment ------------------------------------------------
+  // The customer Android app is a WebView around this page, so this is the
+  // only place online payment can be implemented for it. Card, TWINT, Apple
+  // Pay, Google Pay and Link all come from one Stripe PaymentElement; which
+  // of them appear is decided by the Stripe Dashboard, not by this code.
+  var CFG = window.KASSENTA_CONFIG || {};
+  var payReady = false;
+
+  function initPayments() {
+    if (!window.KassentaPay) return Promise.resolve(null);
+    return KassentaPay.init({ basePath: CFG.basePath || "" }).then(function (cfg) {
+      payReady = KassentaPay.isAvailable();
+      return cfg;
+    });
+  }
+
+  /** Human label for the pay-now option, honest about what is on offer. */
+  function payNowLabel() {
+    var m = KassentaPay.methods();
+    var nice = [];
+    if (m.indexOf("card") >= 0) nice.push("Card");
+    if (m.indexOf("twint") >= 0) nice.push("TWINT");
+    if (m.indexOf("apple_pay") >= 0) nice.push("Apple Pay");
+    if (m.indexOf("google_pay") >= 0) nice.push("Google Pay");
+    if (!nice.length) nice.push("Card");
+    return "Pay now - " + nice.slice(0, 3).join(" / ");
+  }
+
+  /**
+   * Full-screen payment sheet for an order that already exists server-side.
+   * The amount is never passed from here; the server charges the stored total.
+   */
+  function openPaymentSheet(order) {
+    return new Promise(function (resolve) {
+      var wrap = document.createElement("div");
+      wrap.className = "pay-sheet-backdrop open";
+      wrap.setAttribute("style",
+        "position:fixed;inset:0;z-index:9999;background:rgba(4,6,14,.86);" +
+        "display:flex;align-items:flex-end;justify-content:center");
+      wrap.innerHTML =
+        "<div style=\"background:#12151F;color:#fff;width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:20px 18px 26px;max-height:92vh;overflow:auto\">" +
+          "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:4px\">" +
+            "<strong style=\"font-size:17px\">Pay for order " + escHtml(order.orderNumber || "") + "</strong>" +
+            "<button id=\"pay-x\" style=\"background:none;border:0;color:inherit;font-size:26px;line-height:1;cursor:pointer\">&times;</button>" +
+          "</div>" +
+          "<div id=\"pay-amount\" style=\"opacity:.7;font-size:14px;margin-bottom:14px\"></div>" +
+          "<div id=\"pay-element\" style=\"min-height:120px\"></div>" +
+          "<div id=\"pay-error\" style=\"color:#ff5a5a;font-size:13px;margin-top:10px;display:none\"></div>" +
+          "<button id=\"pay-go\" style=\"width:100%;margin-top:16px;padding:14px;border:0;border-radius:12px;background:#FF5722;color:#fff;font-size:16px;font-weight:600;cursor:pointer\">Pay now</button>" +
+          "<button id=\"pay-later\" style=\"width:100%;margin-top:8px;padding:12px;border:0;border-radius:12px;background:transparent;color:inherit;opacity:.65;font-size:14px;cursor:pointer\">Pay on delivery instead</button>" +
+        "</div>";
+      document.body.appendChild(wrap);
+
+      var errEl = wrap.querySelector("#pay-error");
+      var goBtn = wrap.querySelector("#pay-go");
+      var done = false;
+
+      function finish(result) {
+        if (done) return;
+        done = true;
+        wrap.remove();
+        resolve(result);
+      }
+      function showErr(msg) {
+        errEl.textContent = msg;
+        errEl.style.display = "block";
+        goBtn.disabled = false;
+        goBtn.textContent = "Try again";
+      }
+
+      wrap.querySelector("#pay-x").onclick = function () { finish({ paid: false, reason: "closed" }); };
+      wrap.querySelector("#pay-later").onclick = function () { finish({ paid: false, reason: "later" }); };
+
+      goBtn.disabled = true;
+      goBtn.textContent = "Loading...";
+
+      KassentaPay.createOrderIntent(order.orderId, order.trackingToken)
+        .then(function (intent) {
+          wrap.querySelector("#pay-amount").textContent =
+            (intent.currency || "chf").toUpperCase() + " " + (intent.amount / 100).toFixed(2);
+          return KassentaPay.mount(wrap.querySelector("#pay-element"), intent.clientSecret, {
+            dark: true,
+            primaryColor: "#FF5722",
+            locale: state.lang || "auto"
+          });
+        })
+        .then(function () {
+          goBtn.disabled = false;
+          goBtn.textContent = "Pay now";
+          goBtn.onclick = function () {
+            goBtn.disabled = true;
+            goBtn.textContent = "Processing...";
+            errEl.style.display = "none";
+
+            // TWINT and 3-D Secure leave the page here and come back to
+            // returnUrl; the order id rides along so we can resume.
+            var back = KassentaPay.returnUrl({
+              order_id: order.orderId,
+              tracking_token: order.trackingToken
+            });
+
+            KassentaPay.confirm(back)
+              .then(function (intent) {
+                if (!intent) return; // redirected away; resumed on return
+                goBtn.textContent = "Confirming...";
+                return KassentaPay.waitForSettlement(intent.id).then(function (r) {
+                  finish({ paid: r.settled, status: r.status });
+                });
+              })
+              .catch(function (e) { showErr(e.message || "Payment failed"); });
+          };
+        })
+        .catch(function (e) {
+          showErr(e.message || "Could not start payment");
+          goBtn.textContent = "Unavailable";
+        });
+    });
+  }
+
+  /** Resume after a TWINT / 3-D Secure redirect brought the customer back. */
+  function resumePaymentReturn() {
+    if (!window.KassentaPay) return;
+    var ret = KassentaPay.pendingReturn();
+    if (!ret || !ret.paymentIntentId) return;
+    KassentaPay.clearReturn();
+
+    toast("Confirming your payment...");
+    KassentaPay.waitForSettlement(ret.paymentIntentId, { timeoutMs: 40000 }).then(function (r) {
+      if (r.settled) {
+        toast("Payment received - thank you!", "success");
+      } else if (r.status === "pending") {
+        // Legitimate for a slow bank; the webhook will still settle it.
+        toast("Payment is still processing. We will update your order shortly.");
+      } else {
+        toast("Payment was not completed", "error");
+      }
+      if (ret.trackingToken) navigate("track", [ret.trackingToken]);
+      else navigate("orders");
+    });
+  }
+
   // ─── Checkout ──────────────────────────────────────────────────────
   function startCheckout() {
     if (state.cart.length === 0) return;
@@ -1456,10 +1671,14 @@
     fields.push({ key: "email", label: "Email (optional)", type: "email", placeholder: "you@example.com", value: c.email || "" });
     fields.push({ key: "address", label: "Delivery address", placeholder: "Street, number, city", required: true, value: c.address || "" });
     fields.push({ key: "notes", label: "Order notes", type: "textarea", placeholder: "e.g. apartment number, gate code, leave at door" });
-    fields.push({ key: "payment", label: "Payment method", type: "select", options: [
-      { value: "cash", label: "<i class='fa-solid fa-money-bill-wave'></i> Cash on delivery" },
-      { value: "card", label: "<i class='fa-solid fa-credit-card'></i> Card on delivery" },
-    ], value: "cash" });
+    var payOptions = [];
+    // Only offered when Stripe is actually reachable and configured, so the
+    // checkout degrades to cash rather than showing a button that cannot work.
+    if (payReady) payOptions.push({ value: "online", label: payNowLabel() });
+    payOptions.push({ value: "cash", label: "Cash on delivery" });
+    payOptions.push({ value: "card", label: "Card on delivery" });
+    fields.push({ key: "payment", label: "Payment method", type: "select",
+                  options: payOptions, value: payReady ? "online" : "cash" });
 
     dialog.form("Checkout", fields, {
       icon: '<i class="fa-solid fa-box"></i>', iconKind: "", okLabel: "Place order →", cancelLabel: "Cancel",
@@ -1509,6 +1728,24 @@
           notes: notes, subtotal: total, totalAmount: total, paymentMethod: payment, orderType: "delivery",
         }).then(function (resp) {
           state.cart = []; save(); refreshCart(); closeCart();
+
+          // Order first, payment second. The server prices the order from its
+          // own product table and the PaymentIntent is built from that stored
+          // total, so nothing the browser sent can change what is charged.
+          if (payment === "online" && resp && resp.orderId && payReady) {
+            return openPaymentSheet({
+              orderId: resp.orderId,
+              orderNumber: resp.orderNumber,
+              trackingToken: resp.trackingToken
+            }).then(function (r) {
+              if (r && r.paid) toast("Paid - thank you!", "success");
+              else if (r && r.status === "pending") toast("Payment is still processing.");
+              else toast("Order placed. You can pay on delivery.");
+              if (resp.trackingToken) navigate("track", [resp.trackingToken]);
+              else navigate("orders");
+            });
+          }
+
           toast("Order placed!", "success");
           if (resp && resp.trackingToken) navigate("track", [resp.trackingToken]);
           else navigate("orders");
@@ -1780,6 +2017,11 @@
   // First load
   refreshCart();
   connectWS();
+
+  // Learn whether online payment is available, then pick up any customer
+  // returning from a TWINT / 3-D Secure redirect.
+  initTheme();
+  initPayments().then(resumePaymentReturn);
   if (!location.hash) {
     if (state.auth) navigate("home"); else navigate("intro");
   } else {

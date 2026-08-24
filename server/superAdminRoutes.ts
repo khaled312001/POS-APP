@@ -6,9 +6,21 @@ import * as path from "path";
 import { storage } from "./storage";
 import { generateToken, requireSuperAdmin, SuperAdminRequest } from "./superAdminAuth";
 import { addMonths, addYears, addDays } from "date-fns";
-import { db } from "./db";
-import { eq, desc, sql, and, gte, lte, sum } from "drizzle-orm";
+import { db, pool } from "./db";
+import { eq, ne, or, isNull, inArray, desc, sql, and, gte, lte, sum } from "drizzle-orm";
 import { rateLimit } from "./rateLimit";
+import { refundPayment, currencyFor, stripeAccountStatus } from "./paymentService";
+
+/**
+ * Raw SQL escape hatch. The Stripe columns (stripe_payment_intent_id, paid_at,
+ * amount_refunded, …) and the stripe_webhook_events table are created by
+ * stripeMigrations.ts, not by the drizzle schema, so they are unreachable
+ * through `storage` and have to be read directly.
+ */
+async function q(text: string, params: any[] = []): Promise<any[]> {
+  const [rows] = await pool.query(text, params);
+  return Array.isArray(rows) ? (rows as any[]) : [];
+}
 
 // ── BACKUP HELPERS ────────────────────────────────────────────────────────
 const BACKUP_DIR = path.resolve(process.cwd(), "backups");
@@ -459,7 +471,35 @@ export function registerSuperAdminRoutes(app: Express) {
       // Enrich with tenant names
       const tenantList = await storage.getTenants();
       const tenantMap = Object.fromEntries(tenantList.map((t: any) => [t.id, t]));
-      const enriched = subs.map((s: any) => ({ ...s, tenant: tenantMap[s.tenantId] || null }));
+
+      // The Stripe columns live outside the drizzle schema; without them the UI
+      // cannot tell a Stripe-billed subscription from a hand-typed one.
+      const billingMap: Record<number, any> = {};
+      try {
+        const rows = await q(
+          `SELECT id, stripe_customer_id, stripe_subscription_id, stripe_price_id,
+                  last_invoice_id, last_payment_error
+             FROM tenant_subscriptions`,
+        );
+        for (const r of rows) {
+          billingMap[Number(r.id)] = {
+            stripeCustomerId: r.stripe_customer_id || null,
+            stripeSubscriptionId: r.stripe_subscription_id || null,
+            stripePriceId: r.stripe_price_id || null,
+            lastInvoiceId: r.last_invoice_id || null,
+            lastPaymentError: r.last_payment_error || null,
+          };
+        }
+      } catch (e: any) {
+        // Migration has not run on this database yet - report the plain row.
+        console.warn("[super-admin] subscription Stripe columns unavailable:", e?.message || e);
+      }
+
+      const enriched = subs.map((s: any) => ({
+        ...s,
+        tenant: tenantMap[s.tenantId] || null,
+        ...(billingMap[s.id] || {}),
+      }));
       res.json(enriched);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -507,19 +547,65 @@ export function registerSuperAdminRoutes(app: Express) {
     }
   });
 
-  // Extend subscription
+  // Extend subscription.
+  //
+  // Tenant access is gated on license_keys.expiresAt (see tenantAuth.ts), NOT on
+  // tenant_subscriptions.endDate. Bumping only the subscription row therefore
+  // renewed the invoice and left the customer locked out - this button did not
+  // renew anything. Both dates now move together, in one transaction, or
+  // neither moves.
   app.post("/api/super-admin/subscriptions/:id/extend", requireSuperAdmin, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id as string);
-      const { days, months } = req.body;
+      const months = Number(req.body?.months) || 0;
+      const days = Number(req.body?.days) || 0;
+      if (months <= 0 && days <= 0) {
+        return res.status(400).json({ error: "Provide a positive number of days or months" });
+      }
+
       const sub = await storage.getTenantSubscription(id);
       if (!sub) return res.status(404).json({ error: "Subscription not found" });
-      const currentEnd = sub.endDate ? new Date(sub.endDate) : new Date();
-      let newEnd = currentEnd;
-      if (months) newEnd = addMonths(currentEnd, months);
-      else if (days) newEnd = addDays(currentEnd, days);
-      const updated = await storage.updateTenantSubscription(id, { endDate: newEnd, status: "active" });
-      res.json(updated);
+
+      // Extending a lapsed subscription from its old end date can land in the
+      // past and renew nothing, so anything already expired restarts from now.
+      const now = new Date();
+      const currentEnd = sub.endDate ? new Date(sub.endDate) : now;
+      const base = currentEnd > now ? currentEnd : now;
+      const newEnd = months > 0 ? addMonths(base, months) : addDays(base, days);
+
+      const { tenantSubscriptions, licenseKeys } = await import("@shared/schema");
+      // Revoked keys stay revoked: revocation is a deliberate act, not a lapse.
+      const renewable = and(
+        eq(licenseKeys.tenantId, sub.tenantId),
+        or(isNull(licenseKeys.status), ne(licenseKeys.status, "revoked")),
+      );
+
+      let licenseTotal = 0;
+      let licensesUpdated = 0;
+      await db.transaction(async (tx) => {
+        await tx.update(tenantSubscriptions)
+          .set({ endDate: newEnd, status: "active", updatedAt: now })
+          .where(eq(tenantSubscriptions.id, id));
+
+        const keys = await tx
+          .select({ id: licenseKeys.id, expiresAt: licenseKeys.expiresAt })
+          .from(licenseKeys)
+          .where(renewable);
+        licenseTotal = keys.length;
+
+        // A key is only ever moved forward. One that already runs past the new
+        // end date (a yearly key on a monthly plan) must not be cut short.
+        const behind = keys.filter((k) => !k.expiresAt || new Date(k.expiresAt) < newEnd).map((k) => k.id);
+        if (behind.length) {
+          await tx.update(licenseKeys)
+            .set({ expiresAt: newEnd, status: "active", updatedAt: now })
+            .where(inArray(licenseKeys.id, behind));
+        }
+        licensesUpdated = behind.length;
+      });
+
+      const updated = await storage.getTenantSubscription(id);
+      res.json({ ...updated, licenseTotal, licensesUpdated, licenseExpiresAt: licensesUpdated ? newEnd : null });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -586,6 +672,260 @@ export function registerSuperAdminRoutes(app: Express) {
       res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ── PAYMENTS ──────────────────────────────────────────────────────────
+  // A read-only window onto what Stripe actually charged. Every row here is
+  // written by the signed webhook (stripeWebhook.ts); nothing on this surface
+  // marks a record paid, and the refund route below deliberately does not
+  // write back either.
+
+  /** Stripe accepts only these three reasons; anything else is dropped. */
+  const REFUND_REASONS = ["duplicate", "fraudulent", "requested_by_customer"] as const;
+  type RefundReason = (typeof REFUND_REASONS)[number];
+
+  /** One row per charge, unioned across the tables that can hold one. */
+  function paymentSources(opts: {
+    source: string;
+    stripeOnly: boolean;
+    tenantId: number | null;
+    status: string | null;
+  }): { sql: string; params: any[] } {
+    const parts: string[] = [];
+    const params: any[] = [];
+
+    if (opts.source === "all" || opts.source === "online_order") {
+      let where = "1 = 1";
+      if (opts.stripeOnly) where += " AND o.stripe_payment_intent_id IS NOT NULL";
+      if (opts.tenantId) { where += " AND o.tenant_id = ?"; params.push(opts.tenantId); }
+      if (opts.status) { where += " AND o.payment_status = ?"; params.push(opts.status); }
+      parts.push(
+        `SELECT 'online_order' AS source, o.id AS rowId, o.order_number AS reference,
+                o.tenant_id AS tenantId, o.total_amount AS amount,
+                COALESCE(o.amount_refunded, 0) AS refunded,
+                o.payment_method AS method, o.payment_status AS status,
+                o.stripe_payment_intent_id AS paymentIntentId,
+                o.stripe_charge_id AS chargeId, o.stripe_refund_id AS refundId,
+                o.payment_error AS paymentError, o.paid_at AS paidAt, o.created_at AS createdAt
+           FROM online_orders o
+          WHERE ${where}`,
+      );
+    }
+
+    if (opts.source === "all" || opts.source === "pos_sale") {
+      // sales carries no tenant_id of its own; it hangs off the branch.
+      let where = "1 = 1";
+      if (opts.stripeOnly) where += " AND s.stripe_payment_intent_id IS NOT NULL";
+      if (opts.tenantId) { where += " AND b.tenant_id = ?"; params.push(opts.tenantId); }
+      if (opts.status) { where += " AND s.payment_status = ?"; params.push(opts.status); }
+      parts.push(
+        `SELECT 'pos_sale' AS source, s.id AS rowId, s.receipt_number AS reference,
+                b.tenant_id AS tenantId, s.total_amount AS amount,
+                NULL AS refunded,
+                s.payment_method AS method, s.payment_status AS status,
+                s.stripe_payment_intent_id AS paymentIntentId,
+                s.stripe_charge_id AS chargeId, s.stripe_refund_id AS refundId,
+                NULL AS paymentError, s.paid_at AS paidAt, s.created_at AS createdAt
+           FROM sales s
+           LEFT JOIN branches b ON b.id = s.branch_id
+          WHERE ${where}`,
+      );
+    }
+
+    return { sql: parts.join(" UNION ALL "), params };
+  }
+
+  app.get("/api/super-admin/payments", requireSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const source = ["online_order", "pos_sale"].includes(String(req.query.source))
+        ? String(req.query.source)
+        : "all";
+      // The default view is Stripe traffic only; cash till sales would bury it.
+      const stripeOnly = String(req.query.includeOffline || "") !== "1";
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) || null : null;
+      const status = req.query.status ? String(req.query.status).slice(0, 40) : null;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+
+      const union = paymentSources({ source, stripeOnly, tenantId, status });
+
+      let rows: any[] = [];
+      let totals: any = {};
+      try {
+        rows = await q(
+          `SELECT * FROM ( ${union.sql} ) p
+            ORDER BY COALESCE(p.paidAt, p.createdAt) DESC
+            LIMIT ?`,
+          [...union.params, limit],
+        );
+        const agg = await q(
+          `SELECT COUNT(*) AS n,
+                  SUM(CASE WHEN p.status IN ('paid','completed') THEN p.amount ELSE 0 END) AS collected,
+                  SUM(COALESCE(p.refunded, 0)) AS refunded,
+                  SUM(CASE WHEN p.status = 'failed' THEN 1 ELSE 0 END) AS failed,
+                  SUM(CASE WHEN p.status = 'pending' THEN 1 ELSE 0 END) AS pending
+             FROM ( ${union.sql} ) p`,
+          union.params,
+        );
+        totals = agg[0] || {};
+      } catch (e: any) {
+        // The Stripe columns arrive with runStripeMigrations(). Say that plainly
+        // rather than rendering an empty table that reads as "no payments".
+        return res.json({
+          payments: [],
+          stats: null,
+          error: `Payment columns unavailable: ${e?.message || e}`,
+        });
+      }
+
+      const tenantList = await storage.getTenants();
+      const tenantMap = Object.fromEntries(tenantList.map((t: any) => [t.id, t]));
+
+      // Currency is resolved the same way the PaymentIntent resolved it
+      // (payment_gateway_settings, then the platform default), cached per call.
+      const currencyCache = new Map<number, string>();
+      const currencyOf = async (tid: any) => {
+        const key = Number(tid) || 0;
+        if (!currencyCache.has(key)) currencyCache.set(key, await currencyFor(key || null));
+        return currencyCache.get(key)!;
+      };
+
+      const payments: any[] = [];
+      for (const r of rows) {
+        payments.push({
+          source: r.source,
+          id: Number(r.rowId),
+          reference: r.reference,
+          tenantId: r.tenantId != null ? Number(r.tenantId) : null,
+          tenantName: tenantMap[r.tenantId]?.businessName || null,
+          amount: r.amount != null ? Number(r.amount) : null,
+          refunded: r.refunded != null ? Number(r.refunded) : null,
+          currency: (await currencyOf(r.tenantId)).toUpperCase(),
+          method: r.method || null,
+          status: r.status || null,
+          paymentIntentId: r.paymentIntentId || null,
+          chargeId: r.chargeId || null,
+          refundId: r.refundId || null,
+          paymentError: r.paymentError || null,
+          paidAt: r.paidAt || null,
+          createdAt: r.createdAt || null,
+        });
+      }
+
+      res.json({
+        payments,
+        stats: {
+          count: Number(totals.n || 0),
+          collected: Number(totals.collected || 0),
+          refunded: Number(totals.refunded || 0),
+          failed: Number(totals.failed || 0),
+          pending: Number(totals.pending || 0),
+          returned: payments.length,
+        },
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /** Is Stripe reachable at all, and in which mode. Never returns a key. */
+  app.get("/api/super-admin/payments/stripe", requireSuperAdmin, async (_req: Request, res: Response) => {
+    try {
+      res.json(await stripeAccountStatus());
+    } catch (e: any) {
+      res.json({ connected: false, error: e?.message || String(e) });
+    }
+  });
+
+  /** The webhook delivery log - the only proof that settlement actually arrived. */
+  app.get("/api/super-admin/payments/events", requireSuperAdmin, async (req: Request, res: Response) => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 40, 1), 200);
+    try {
+      const rows = await q(
+        `SELECT id, type, status, livemode, error, received_at, processed_at
+           FROM stripe_webhook_events
+          ORDER BY received_at DESC
+          LIMIT ?`,
+        [limit],
+      );
+      res.json({
+        events: rows.map((r: any) => ({
+          id: r.id,
+          type: r.type,
+          status: r.status,
+          livemode: !!r.livemode,
+          error: r.error || null,
+          receivedAt: r.received_at || null,
+          processedAt: r.processed_at || null,
+        })),
+      });
+    } catch (e: any) {
+      res.json({ events: [], error: `Webhook event log unavailable: ${e?.message || e}` });
+    }
+  });
+
+  /**
+   * Issue a refund through Stripe.
+   *
+   * This route only asks Stripe. The row is updated when Stripe sends
+   * charge.refunded back (stripeWebhook.applyRefund) - the same rule that
+   * governs payment: nothing outside the signed webhook decides a record's
+   * money state.
+   */
+  app.post("/api/super-admin/payments/refund", requireSuperAdmin, async (req: SuperAdminRequest, res: Response) => {
+    try {
+      const paymentIntentId = String(req.body?.paymentIntentId || "").trim();
+      if (!/^pi_[A-Za-z0-9_]+$/.test(paymentIntentId)) {
+        return res.status(400).json({ error: "A Stripe PaymentIntent id (pi_...) is required" });
+      }
+
+      // Refund only what this platform recorded: a mistyped id must not reach
+      // an unrelated charge on the same Stripe account.
+      const known = await q(
+        `SELECT total_amount AS amount, COALESCE(amount_refunded, 0) AS refunded
+           FROM online_orders WHERE stripe_payment_intent_id = ?
+          UNION ALL
+         SELECT total_amount AS amount, 0 AS refunded
+           FROM sales WHERE stripe_payment_intent_id = ?`,
+        [paymentIntentId, paymentIntentId],
+      );
+      if (!known.length) {
+        return res.status(404).json({
+          error: "No order or sale on this platform was paid with that PaymentIntent",
+        });
+      }
+
+      let amount: number | null = null;
+      const raw = req.body?.amount;
+      if (raw != null && String(raw).trim() !== "") {
+        amount = Number(raw);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          return res.status(400).json({ error: "Refund amount must be a positive number" });
+        }
+        const refundable = Number(known[0].amount || 0) - Number(known[0].refunded || 0);
+        if (amount > refundable + 0.005) {
+          return res.status(400).json({
+            error: `At most ${refundable.toFixed(2)} is still refundable on this payment`,
+          });
+        }
+      }
+
+      const reason: RefundReason | undefined = REFUND_REASONS.includes(req.body?.reason)
+        ? (req.body.reason as RefundReason)
+        : undefined;
+
+      const result = await refundPayment({ paymentIntentId, amount, reason });
+      console.log(
+        `[super-admin] refund ${result.refundId} of ${result.amount} on ${paymentIntentId} by ${req.admin?.email}`,
+      );
+
+      res.json({
+        ...result,
+        // The table still reads "paid" until the webhook lands. That is correct.
+        note: "Stripe accepted the refund. The order updates when the charge.refunded webhook arrives.",
+      });
+    } catch (e: any) {
+      res.status(e?.statusCode || 500).json({ error: e?.message || String(e) });
     }
   });
 

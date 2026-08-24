@@ -401,6 +401,6 @@ if (fs.existsSync(loginTemplatePath)) {
 }
 
 console.log("[post-export] Done. dist/ structure:");
-console.log("  /             → marketing site (7 pages + terms + imprint)");
+console.log("  /             → marketing site (7 pages + 2 Stripe return pages + terms + imprint)");
 console.log("  /app          → Expo POS app");
 console.log("  /super_admin  → Super Admin dashboard");

@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "expo-router";
 import {
   StyleSheet, Text, View, FlatList, Pressable, TextInput,
-  ScrollView, Modal, Alert, Platform, Dimensions, Image, Animated, ActivityIndicator,
+  ScrollView, Modal, Alert, Platform, Dimensions, Image, Animated, ActivityIndicator, Linking,
 } from "react-native";
+import Svg, { Path as SvgPath, Rect as SvgRect } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -59,6 +60,97 @@ const AnimatedProductImage = ({ uri }: { uri: string }) => {
   );
 };
 
+// ── Stripe capture at the till ───────────────────────────────────────────────
+// The shop has no card reader, and Stripe Terminal cannot do TWINT anyway, so a
+// card/TWINT/wallet sale is captured by showing the customer a Stripe-hosted
+// Checkout link — as a QR they scan and as a tappable link — which they pay on
+// their own phone. The sale row is written with paymentStatus "pending" and only
+// the signature-verified Stripe webhook ever flips it to "paid"; the till just
+// polls the sale until the server says so.
+const STRIPE_METHODS = ["card", "wallet"] as const;
+const isStripeMethod = (pm: string) => (STRIPE_METHODS as readonly string[]).includes(pm);
+
+/** How often the till asks the server whether the webhook has landed. */
+const STRIPE_POLL_MS = 2500;
+/** Give up polling after this long — the cashier can resume or take cash. */
+const STRIPE_POLL_TIMEOUT_MS = 10 * 60 * 1000;
+
+type StripeCapture = {
+  saleId: number;
+  sale: any;
+  checkoutUrl: string;
+  paymentIntentId: string | null;
+  /** Minor units, priced by the server — the till never sends an amount. */
+  amountMinor: number;
+  currency: string;
+};
+
+const QR_QUIET_ZONE = 2;
+
+/**
+ * Same run-length walk the `qrcode` package's own SVG renderer uses: one
+ * horizontal stroke per run of dark modules, so the whole symbol is a single
+ * <Path> instead of a few hundred rects.
+ */
+function qrModulesToPath(data: Uint8Array, size: number, margin: number): string {
+  let path = "";
+  let moveBy = 0;
+  let newRow = false;
+  let lineLength = 0;
+  for (let i = 0; i < data.length; i++) {
+    const col = i % size;
+    const row = Math.floor(i / size);
+    if (!col && !newRow) newRow = true;
+    if (data[i]) {
+      lineLength++;
+      if (!(i > 0 && col > 0 && data[i - 1])) {
+        path += newRow ? `M${col + margin} ${0.5 + row + margin}` : `m${moveBy} 0`;
+        moveBy = 0;
+        newRow = false;
+      }
+      if (!(col + 1 < size && data[i + 1])) {
+        path += `h${lineLength}`;
+        lineLength = 0;
+      }
+    } else {
+      moveBy++;
+    }
+  }
+  return path;
+}
+
+/**
+ * QR drawn locally from the bundled `qrcode` dependency. Deliberately not an
+ * image service — an earlier audit caught api.qrserver.com being handed live
+ * checkout links. `QRCode.create` is pure JS (no canvas), so this also renders
+ * inside the Android build, unlike the `toDataURL` path used for receipts.
+ */
+const PaymentQrCode = ({ value, size }: { value: string; size: number }) => {
+  const qr = React.useMemo(() => {
+    try {
+      const QRCode = require("qrcode");
+      const { modules } = QRCode.create(value, { errorCorrectionLevel: "M" });
+      return {
+        d: qrModulesToPath(modules.data, modules.size, QR_QUIET_ZONE),
+        span: modules.size + QR_QUIET_ZONE * 2,
+      };
+    } catch {
+      return null;
+    }
+  }, [value]);
+
+  if (!qr) return null;
+  // Always black on white: a themed QR is a QR that will not scan.
+  return (
+    <View style={{ backgroundColor: "#FFFFFF", padding: 10, borderRadius: 14 }}>
+      <Svg width={size} height={size} viewBox={`0 0 ${qr.span} ${qr.span}`}>
+        <SvgRect x={0} y={0} width={qr.span} height={qr.span} fill="#FFFFFF" />
+        <SvgPath d={qr.d} stroke="#000000" strokeWidth={1} fill="none" />
+      </Svg>
+    </View>
+  );
+};
+
 export default function POSScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -92,7 +184,6 @@ export default function POSScreen() {
   const [manualAdjustment, setManualAdjustment] = useState(0);
   const [showScanner, setShowScanner] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
   const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
 
   useEffect(() => {
@@ -102,12 +193,10 @@ export default function POSScreen() {
     return () => clearTimeout(timer);
   }, [customerSearch]);
 
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvc, setCardCvc] = useState("");
-  const [cardProcessing, setCardProcessing] = useState(false);
-  const [cardError, setCardError] = useState("");
-  const [nfcStatus, setNfcStatus] = useState<"waiting" | "reading" | "success" | "error">("waiting");
-  const [nfcPulse, setNfcPulse] = useState(0);
+  // Card / TWINT / wallet capture — see STRIPE_METHODS above.
+  const [stripeCapture, setStripeCapture] = useState<StripeCapture | null>(null);
+  const [stripeStage, setStripeStage] = useState<"idle" | "creating" | "waiting" | "paid" | "failed">("idle");
+  const [stripeError, setStripeError] = useState("");
   const [showInvoiceHistory, setShowInvoiceHistory] = useState(false);
   const [invoiceFilter24h, setInvoiceFilter24h] = useState(true); // default: last 24h
   const [invoiceSearch, setInvoiceSearch] = useState("");
@@ -130,7 +219,6 @@ export default function POSScreen() {
   const [editingCartItemId, setEditingCartItemId] = useState<number | null>(null);
   const [phoneInput, setPhoneInput] = useState("");
   const [customerPhoneLoading, setCustomerPhoneLoading] = useState(false);
-  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [leftHandMode, setLeftHandMode] = useState(false);
   const [expandedSizeProductId, setExpandedSizeProductId] = useState<number | null>(null);
   const [showMobileCart, setShowMobileCart] = useState(false);
@@ -366,6 +454,18 @@ export default function POSScreen() {
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });
+
+  // Publishable config only — the secret key never leaves the server. Used to
+  // decide whether the card/TWINT/wallet buttons can honestly be offered.
+  const { data: paymentsConfig } = useQuery<any>({
+    queryKey: ["/api/payments/config", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryFn: getQueryFn({ on401: "throw" }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const stripeReady = paymentsConfig?.stripe?.status === "connected";
+  // Raw Stripe method ids ("apple_pay") read badly in a label.
+  const stripeMethods: string[] = (paymentsConfig?.stripe?.availableMethods || [])
+    .map((m: string) => m.replace(/_/g, " "));
 
   const generateThermalReceiptHTML = (saleData: any, qrUrl: string | null = null, options: { isKitchen?: boolean, isPartial?: boolean, title?: string } = {}) => {
     const { isKitchen = false, isPartial = false, title = isKitchen ? "KÜCHENBON" : (t("viewReceipt" as any) || "RECHNUNG") } = options;
@@ -878,26 +978,8 @@ export default function POSScreen() {
     } catch { }
   };
 
-  const formatCardNumber = (text: string) => {
-    const cleaned = text.replace(/\D/g, "").slice(0, 16);
-    const groups = cleaned.match(/.{1,4}/g);
-    return groups ? groups.join(" ") : cleaned;
-  };
-
-  const formatExpiry = (text: string) => {
-    const cleaned = text.replace(/\D/g, "").slice(0, 4);
-    if (cleaned.length >= 3) return cleaned.slice(0, 2) + "/" + cleaned.slice(2);
-    return cleaned;
-  };
-
-  const isCardValid = () => {
-    const num = cardNumber.replace(/\s/g, "");
-    const [mm, yy] = cardExpiry.split("/");
-    return num.length >= 15 && mm && yy && mm.length === 2 && yy.length >= 2 && cardCvc.length >= 3;
-  };
-
-
-  const completeSaleAfterPayment = (saleData: any) => {
+  const completeSaleAfterPayment = (saleData: any, pmOverride?: string) => {
+    const pm = pmOverride ?? paymentMethod;
     playAddSound();
     const saleItems = cart.items.map((i) => ({ name: i.name, quantity: i.quantity, price: i.price, total: i.price * i.quantity }));
     const custName = selectedCustomer?.name || t("walkIn");
@@ -907,7 +989,7 @@ export default function POSScreen() {
     const vehicleObj = cart.vehicleId ? (vehicles as any[]).find((v: any) => v.id === cart.vehicleId) : undefined;
     autoPrint3Copies(
       saleData, cart.items, cart.subtotal, cart.tax, cart.discount, cart.serviceFee, cart.total + manualAdjustment, cart.deliveryFee,
-      paymentMethod, cashAmt, custName, empName, selectedCustomer, vehicleObj, cart.minimumOrderSurcharge,
+      pm, cashAmt, custName, empName, selectedCustomer, vehicleObj, cart.minimumOrderSurcharge,
       storeSettings, tenant, categories as any[]
     );
     setManualAdjustment(0);
@@ -921,9 +1003,9 @@ export default function POSScreen() {
       deliveryFee: cart.deliveryFee,
       minimumOrderSurcharge: cart.minimumOrderSurcharge,
       total: cart.total,
-      paymentMethod,
+      paymentMethod: pm,
       cashReceived: cashAmt,
-      change: paymentMethod === "cash" && cashReceived ? cashAmt - cart.total : 0,
+      change: pm === "cash" && cashReceived ? cashAmt - cart.total : 0,
       customerName: custName,
       employeeName: empName,
       date: new Date().toLocaleString(),
@@ -943,12 +1025,9 @@ export default function POSScreen() {
     setOrderNotes("");
     setShowCheckout(false);
     setCashReceived("");
-    setCardNumber("");
-    setCardExpiry("");
-    setCardCvc("");
-    setCardError("");
-    setNfcStatus("waiting");
-    setPaymentConfirmed(false);
+    closeStripeCapture();
+    // Cash is the common path — always drop back to it for the next customer.
+    setPaymentMethod("cash");
     // Receipt modal hidden — auto-print already handles output
     // setShowReceipt(true);
     qc.invalidateQueries({ queryKey: ["/api/sales"] });
@@ -957,7 +1036,12 @@ export default function POSScreen() {
     qc.invalidateQueries({ queryKey: ["/api/customers"] });
   };
 
-  const createSale = async (pm: string, stripePaymentId: string | null) => {
+  /**
+   * `paymentStatus` is "completed" for cash only. A card/TWINT/wallet sale is
+   * written "pending" and stays that way until the Stripe webhook says
+   * otherwise — the till must never call a sale paid on its own.
+   */
+  const createSale = async (pm: string, stripePaymentId: string | null, paymentStatus: string = "completed") => {
     const saleItems = cart.items.map((i) => ({
       productId: i.productId,
       productName: i.name,
@@ -977,12 +1061,12 @@ export default function POSScreen() {
       minimumOrderSurcharge: cart.minimumOrderSurcharge.toFixed(2),
       totalAmount: (cart.total + manualAdjustment).toFixed(2),
       paymentMethod: pm,
-      paymentStatus: "completed",
+      paymentStatus,
       status: "completed",
       tableNumber: cart.tableNumber || null,
       orderType: cart.orderType,
       vehicleId: cart.vehicleId || null,
-      changeAmount: paymentMethod === "cash" && cashReceived
+      changeAmount: pm === "cash" && cashReceived
         ? (Number(cashReceived) - (cart.total + manualAdjustment)).toFixed(2) : "0",
       items: saleItems,
       callId: activeCallId,
@@ -1029,9 +1113,11 @@ export default function POSScreen() {
         return t("customerAddressRequired" as any) || "Delivery requires customer address";
       }
     }
-    // Non-cash: confirm payment received via external device
-    if (paymentMethod !== "cash" && !paymentConfirmed) {
-      return t("paymentNotConfirmed" as any) || "Please confirm payment has been received";
+    // Card / TWINT / wallet are captured through Stripe, so the only thing to
+    // check here is that Stripe is actually reachable — the payment itself is
+    // confirmed by the webhook, never by the cashier.
+    if (isStripeMethod(paymentMethod) && !stripeReady) {
+      return t("stripeNotConnected");
     }
     return null;
   };
@@ -1069,6 +1155,194 @@ export default function POSScreen() {
       Alert.alert(t("error"), e.message || "Failed to complete sale");
     },
   });
+
+  // ── card / TWINT / wallet capture ─────────────────────────────────────────
+  const stripeFinishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const closeStripeCapture = useCallback(() => {
+    if (stripeFinishTimer.current) {
+      clearTimeout(stripeFinishTimer.current);
+      stripeFinishTimer.current = null;
+    }
+    setStripeCapture(null);
+    setStripeStage("idle");
+    setStripeError("");
+  }, []);
+
+  useEffect(() => () => {
+    if (stripeFinishTimer.current) clearTimeout(stripeFinishTimer.current);
+  }, []);
+
+  /**
+   * Records the sale unpaid, then asks the server for a Stripe-hosted Checkout
+   * link for it. No amount is ever sent — the server prices the sale from the
+   * row it just wrote.
+   */
+  const stripeCaptureMutation = useMutation({
+    mutationFn: async (): Promise<StripeCapture> => {
+      const sale = await createSale(paymentMethod, null, "pending");
+      if (!sale?.id) throw new Error(t("saleNotFound"));
+
+      // Publish the sale before talking to Stripe. The row (and the stock it
+      // just consumed) exists from here on, so if either call below fails the
+      // cashier must still be able to settle it in cash rather than ring it up
+      // a second time.
+      const bound: StripeCapture = {
+        saleId: sale.id,
+        sale,
+        checkoutUrl: "",
+        paymentIntentId: null,
+        amountMinor: Math.round((cart.total + manualAdjustment) * 100),
+        currency: String(paymentsConfig?.currency || "CHF").toUpperCase(),
+      };
+      setStripeCapture(bound);
+
+      // Prices the sale server-side and refuses if it is already paid. It also
+      // stamps sales.stripe_payment_intent_id, which is what the webhook later
+      // reconciles against.
+      const intentRes = await apiRequest("POST", `/api/payments/sale/${sale.id}/intent`, {});
+      const intent = await intentRes.json();
+
+      // No successUrl/cancelUrl: the server owns those pages (/pay/success,
+      // /pay/cancelled) and no amount is passed — it prices the sale itself.
+      const sessionRes = await apiRequest("POST", "/api/payments/checkout-session", {
+        saleId: sale.id,
+      });
+      const session = await sessionRes.json();
+      if (!session?.url) throw new Error(session?.error || t("paymentLinkFailed"));
+
+      return {
+        ...bound,
+        checkoutUrl: String(session.url),
+        paymentIntentId: intent?.paymentIntentId ?? null,
+        amountMinor: Number(session.amount ?? intent?.amount ?? bound.amountMinor),
+        currency: String(session.currency || intent?.currency || bound.currency).toUpperCase(),
+      };
+    },
+    onSuccess: (capture) => {
+      setStripeCapture(capture);
+      setStripeError("");
+      setStripeStage("waiting");
+    },
+    onError: (e: any) => {
+      // Deliberately keeps whatever the mutation already bound, so a half-built
+      // capture still offers "take cash instead" for the sale that now exists.
+      setStripeError(e?.message || t("paymentLinkFailed"));
+      setStripeStage("failed");
+    },
+  });
+
+  /**
+   * Poll until the server says the sale is settled. The sale row is the
+   * authority: only the signature-verified webhook writes "paid" to it.
+   *
+   * Note we poll the sale rather than /api/payments/status/:paymentIntentId —
+   * that endpoint reports the intent we created above, whereas Checkout mints
+   * its own intent, and it only joins online_orders, never sales.
+   */
+  useEffect(() => {
+    if (stripeStage !== "waiting" || !stripeCapture) return;
+    const saleId = stripeCapture.saleId;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const startedAt = Date.now();
+
+    const poll = async () => {
+      if (cancelled) return;
+      try {
+        const res = await apiRequest("GET", `/api/sales/${saleId}`);
+        const fresh = await res.json();
+        if (cancelled) return;
+        if (fresh?.paymentStatus === "paid") {
+          setStripeCapture((c) => (c ? { ...c, sale: { ...c.sale, ...fresh } } : c));
+          setStripeStage("paid");
+          stripeFinishTimer.current = setTimeout(() => {
+            stripeFinishTimer.current = null;
+            completeSaleAfterPayment({ ...stripeCapture.sale, ...fresh });
+          }, 900);
+          return;
+        }
+        if (fresh?.paymentStatus === "failed") {
+          setStripeError(t("paymentFailed"));
+          setStripeStage("failed");
+          return;
+        }
+      } catch {
+        // Transient network blip at the till — keep waiting.
+      }
+      if (cancelled) return;
+      if (Date.now() - startedAt > STRIPE_POLL_TIMEOUT_MS) {
+        setStripeError(t("paymentTimedOut"));
+        setStripeStage("failed");
+        return;
+      }
+      timer = setTimeout(poll, STRIPE_POLL_MS);
+    };
+
+    timer = setTimeout(poll, STRIPE_POLL_MS);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [stripeStage, stripeCapture?.saleId]);
+
+  /** Escape hatch: the customer gives up on their phone and pays with cash. */
+  const switchStripeSaleToCash = useMutation({
+    mutationFn: async () => {
+      if (!stripeCapture) throw new Error(t("saleNotFound"));
+      // PUT /api/sales/:id answers with the driver's result header, not the row,
+      // so patch the copy we already hold rather than merging the response.
+      await apiRequest("PUT", `/api/sales/${stripeCapture.saleId}`, {
+        paymentMethod: "cash",
+        paymentStatus: "completed",
+      });
+      return { ...stripeCapture.sale, paymentMethod: "cash", paymentStatus: "completed" };
+    },
+    onSuccess: (sale) => {
+      completeSaleAfterPayment(sale, "cash");
+    },
+    onError: (e: any) => {
+      setStripeError(e?.message || t("paymentLinkFailed"));
+      setStripeStage("failed");
+    },
+  });
+
+  /**
+   * The customer walked off without paying. The sale row stays exactly as it is
+   * — unpaid, and still accounting for the stock it consumed — and the till
+   * moves on with an empty cart so the order cannot be rung up twice. Nothing
+   * is printed: there is no payment to give a receipt for. If the customer pays
+   * the link later, the webhook still settles the row.
+   */
+  const parkStripeSale = useCallback(() => {
+    setManualAdjustment(0);
+    cart.clearCart();
+    setPhoneInput("");
+    setCallerCustomer(null);
+    setActiveCallId(null);
+    setOrderNotes("");
+    setShowCheckout(false);
+    setCashReceived("");
+    setPaymentMethod("cash");
+    closeStripeCapture();
+    qc.invalidateQueries({ queryKey: ["/api/sales"] });
+    qc.invalidateQueries({ queryKey: ["/api/inventory"] });
+  }, [cart, qc, closeStripeCapture]);
+
+  /** Dismiss: park a sale that was already created, otherwise just close. */
+  const dismissStripeCapture = useCallback(() => {
+    if (stripeCapture) parkStripeSale();
+    else closeStripeCapture();
+  }, [stripeCapture, parkStripeSale, closeStripeCapture]);
+
+  const checkoutBusy = saleMutation.isPending || stripeCaptureMutation.isPending || stripeStage !== "idle";
+
+  const openCheckoutLink = useCallback(() => {
+    if (!stripeCapture) return;
+    Linking.openURL(stripeCapture.checkoutUrl).catch(() => {
+      Alert.alert(t("error"), t("paymentLinkFailed"));
+    });
+  }, [stripeCapture]);
 
   const handleAddToCart = useCallback((product: any) => {
     const variants = getProductVariantOptions(product);
@@ -1925,7 +2199,7 @@ export default function POSScreen() {
           <Animated.View style={{ transform: [{ scale: checkoutPulse }] }}>
             <Pressable
               style={[styles.checkoutBtn, !cart.items.length && styles.checkoutBtnDisabled]}
-              onPress={() => { if (cart.items.length > 0) { playClickSound("heavy"); setPaymentConfirmed(false); setShowCheckout(true); } }}
+              onPress={() => { if (cart.items.length > 0) { playClickSound("heavy"); setShowCheckout(true); } }}
               disabled={!cart.items.length}
             >
               <LinearGradient
@@ -2054,7 +2328,6 @@ export default function POSScreen() {
                   onPress={() => {
                     if (cart.items.length > 0) {
                       playClickSound("heavy");
-                      setPaymentConfirmed(false);
                       setShowMobileCart(false);
                       setShowCheckout(true);
                     }
@@ -2366,19 +2639,27 @@ export default function POSScreen() {
                 {[
                   { key: "cash", icon: "cash" as const, label: t("cash") },
                   { key: "card", icon: "card" as const, label: t("card") },
-                  { key: "twint", icon: "phone-portrait" as const, label: "TWINT" },
-                  { key: "nfc", icon: "wifi" as const, label: t("nfcPay") },
-                ].map((m) => (
-                  <Pressable
-                    key={m.key}
-                    style={[styles.paymentBtn, paymentMethod === m.key && styles.paymentBtnActive]}
-                    onPress={() => { setPaymentMethod(m.key); setPaymentConfirmed(false); }}
-                  >
-                    <Ionicons name={m.icon} size={22} color={paymentMethod === m.key ? Colors.accent : Colors.textSecondary} />
-                    <Text style={[styles.paymentBtnText, paymentMethod === m.key && { color: Colors.accent }]}>{m.label}</Text>
-                  </Pressable>
-                ))}
+                  { key: "wallet", icon: "wallet-outline" as const, label: t("walletPay") },
+                ].map((m) => {
+                  // Nothing here talks to a card reader, so the non-cash buttons
+                  // are only offered when Stripe is actually connected.
+                  const blocked = isStripeMethod(m.key) && !stripeReady;
+                  return (
+                    <Pressable
+                      key={m.key}
+                      style={[styles.paymentBtn, paymentMethod === m.key && styles.paymentBtnActive, blocked && { opacity: 0.45 }]}
+                      onPress={() => { if (!blocked) setPaymentMethod(m.key); }}
+                      disabled={blocked}
+                    >
+                      <Ionicons name={m.icon} size={22} color={paymentMethod === m.key ? Colors.accent : Colors.textSecondary} />
+                      <Text style={[styles.paymentBtnText, paymentMethod === m.key && { color: Colors.accent }]}>{m.label}</Text>
+                    </Pressable>
+                  );
+                })}
               </View>
+              {paymentsConfig !== undefined && !stripeReady && (
+                <Text style={[styles.payHint, rtlTextAlign]}>{t("stripeNotConnected")}</Text>
+              )}
 
               {paymentMethod === "cash" && (
                 <View style={styles.cashSection}>
@@ -2397,34 +2678,17 @@ export default function POSScreen() {
                 </View>
               )}
 
-              {paymentMethod === "nfc" && (
-                <Pressable
-                  style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10, backgroundColor: paymentConfirmed ? Colors.success + "15" : Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1.5, borderColor: paymentConfirmed ? Colors.success : Colors.cardBorder }]}
-                  onPress={() => setPaymentConfirmed(!paymentConfirmed)}
-                >
-                  <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: paymentConfirmed ? Colors.success : Colors.textMuted, backgroundColor: paymentConfirmed ? Colors.success : "transparent", justifyContent: "center", alignItems: "center" }}>
-                    {paymentConfirmed && <Ionicons name="checkmark" size={14} color={Colors.white} />}
+              {isStripeMethod(paymentMethod) && stripeReady && (
+                <View style={styles.payNotice}>
+                  <View style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8 }]}>
+                    <Ionicons name="qr-code-outline" size={18} color={Colors.accent} />
+                    <Text style={[styles.payNoticeTitle, rtlTextAlign]}>{t("payOnCustomerPhone")}</Text>
                   </View>
-                  <Ionicons name="wifi" size={18} color={paymentConfirmed ? Colors.success : Colors.textSecondary} />
-                  <Text style={[{ color: paymentConfirmed ? Colors.success : Colors.text, fontSize: 13, fontWeight: "600", flex: 1 }, rtlTextAlign]}>
-                    {t("confirmPayment" as any) || "Confirm NFC payment"} — CHF {(cart.total + manualAdjustment).toFixed(2)}
-                  </Text>
-                </Pressable>
-              )}
-
-              {paymentMethod === "card" && (
-                <Pressable
-                  style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10, backgroundColor: paymentConfirmed ? Colors.success + "15" : Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1.5, borderColor: paymentConfirmed ? Colors.success : Colors.cardBorder }]}
-                  onPress={() => setPaymentConfirmed(!paymentConfirmed)}
-                >
-                  <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: paymentConfirmed ? Colors.success : Colors.textMuted, backgroundColor: paymentConfirmed ? Colors.success : "transparent", justifyContent: "center", alignItems: "center" }}>
-                    {paymentConfirmed && <Ionicons name="checkmark" size={14} color={Colors.white} />}
-                  </View>
-                  <Ionicons name="card" size={18} color={paymentConfirmed ? Colors.success : Colors.textSecondary} />
-                  <Text style={[{ color: paymentConfirmed ? Colors.success : Colors.text, fontSize: 13, fontWeight: "600", flex: 1 }, rtlTextAlign]}>
-                    {t("confirmPayment" as any) || "Confirm card payment via terminal"} — CHF {(cart.total + manualAdjustment).toFixed(2)}
-                  </Text>
-                </Pressable>
+                  <Text style={[styles.payNoticeText, rtlTextAlign]}>{t("payOnCustomerPhoneHint")}</Text>
+                  {stripeMethods.length > 0 && (
+                    <Text style={[styles.payNoticeMethods, rtlTextAlign]}>{stripeMethods.join(" · ")}</Text>
+                  )}
+                </View>
               )}
 
               <Text style={[styles.sectionLabel, rtlTextAlign]}>{t("orderSummary")}</Text>
@@ -2519,43 +2783,132 @@ export default function POSScreen() {
                 </View>
               </View>
 
-              {/* Payment confirmation checkbox for TWINT/QR payments */}
-              {(paymentMethod === "twint" || paymentMethod === "qr") && (
-                <Pressable
-                  style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10, backgroundColor: paymentConfirmed ? Colors.success + "15" : Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1.5, borderColor: paymentConfirmed ? Colors.success : Colors.cardBorder }]}
-                  onPress={() => setPaymentConfirmed(!paymentConfirmed)}
-                >
-                  <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: paymentConfirmed ? Colors.success : Colors.textMuted, backgroundColor: paymentConfirmed ? Colors.success : "transparent", justifyContent: "center", alignItems: "center" }}>
-                    {paymentConfirmed && <Ionicons name="checkmark" size={14} color={Colors.white} />}
-                  </View>
-                  <Text style={[{ color: paymentConfirmed ? Colors.success : Colors.text, fontSize: 13, fontWeight: "600", flex: 1 }, rtlTextAlign]}>
-                    {t("confirmPayment" as any)} — CHF {(cart.total + manualAdjustment).toFixed(2)}
-                  </Text>
-                </Pressable>
-              )}
-
               <Pressable
-                style={[styles.completeBtn, saleMutation.isPending && { opacity: 0.5 }]}
+                style={[styles.completeBtn, checkoutBusy && { opacity: 0.5 }]}
                 onPress={() => {
                   const validationError = validateBeforeComplete();
                   if (validationError) {
                     Alert.alert(t("error"), validationError);
                     return;
                   }
-                  if (!saleMutation.isPending) {
+                  if (checkoutBusy) return;
+                  if (isStripeMethod(paymentMethod)) {
+                    setStripeError("");
+                    setStripeStage("creating");
+                    stripeCaptureMutation.mutate();
+                  } else {
                     saleMutation.mutate();
                   }
                 }}
-                disabled={saleMutation.isPending}
+                disabled={checkoutBusy}
               >
                 <LinearGradient colors={[Colors.success, "#059669"]} style={[styles.completeBtnGradient, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Ionicons name="checkmark-circle" size={22} color={Colors.white} />
+                  <Ionicons name={isStripeMethod(paymentMethod) ? "qr-code-outline" : "checkmark-circle"} size={22} color={Colors.white} />
                   <Text style={styles.completeBtnText}>
-                    {saleMutation.isPending ? t("processing") : t("completeSale")}
+                    {checkoutBusy
+                      ? t("processing")
+                      : isStripeMethod(paymentMethod) ? t("requestPayment") : t("completeSale")}
                   </Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Card / TWINT / wallet capture ──────────────────────────────────────
+          The customer pays on their own phone via Stripe-hosted Checkout. The
+          till shows the link as a QR and waits for the webhook; it never marks
+          the sale paid itself. */}
+      <Modal visible={stripeStage !== "idle"} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.payModal}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={[styles.modalTitle, rtlTextAlign]}>
+                {stripeStage === "paid" ? t("paymentSuccess") : t("awaitingPayment")}
+              </Text>
+              {(stripeStage === "waiting" || stripeStage === "failed") && (
+                <Pressable onPress={dismissStripeCapture} disabled={switchStripeSaleToCash.isPending}>
+                  <Ionicons name="close" size={24} color={Colors.text} />
+                </Pressable>
+              )}
+            </View>
+
+            {stripeStage === "creating" && (
+              <View style={styles.payCentre}>
+                <ActivityIndicator size="large" color={Colors.accent} />
+                <Text style={[styles.payNoticeText, { textAlign: "center" }]}>{t("creatingPaymentLink")}</Text>
+              </View>
+            )}
+
+            {stripeStage === "waiting" && !!stripeCapture?.checkoutUrl && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.modalTotal}>
+                  {stripeCapture.currency} {(stripeCapture.amountMinor / 100).toFixed(2)}
+                </Text>
+
+                <View style={styles.payCentre}>
+                  <PaymentQrCode value={stripeCapture.checkoutUrl} size={220} />
+                  <Text style={[styles.payNoticeText, { textAlign: "center" }]}>{t("scanToPay")}</Text>
+                </View>
+
+                <Pressable style={styles.payLinkBtn} onPress={openCheckoutLink}>
+                  <Ionicons name="open-outline" size={18} color={Colors.accent} />
+                  <Text style={styles.payLinkBtnText} numberOfLines={1}>{t("openPaymentLink")}</Text>
+                </Pressable>
+
+                <View style={[styles.payWaitRow, isRTL && { flexDirection: "row-reverse" }]}>
+                  <ActivityIndicator size="small" color={Colors.accent} />
+                  <Text style={[styles.payNoticeText, { flex: 1 }, rtlTextAlign]}>{t("waitingForPayment")}</Text>
+                </View>
+
+                <Pressable
+                  style={[styles.payCashBtn, switchStripeSaleToCash.isPending && { opacity: 0.5 }]}
+                  onPress={() => { if (!switchStripeSaleToCash.isPending) switchStripeSaleToCash.mutate(); }}
+                  disabled={switchStripeSaleToCash.isPending}
+                >
+                  <Ionicons name="cash-outline" size={18} color={Colors.warning} />
+                  <Text style={styles.payCashBtnText}>{t("takeCashInstead")}</Text>
+                </Pressable>
+
+                <Pressable style={styles.modalCancelBtn} onPress={dismissStripeCapture} disabled={switchStripeSaleToCash.isPending}>
+                  <Text style={styles.modalCancelBtnText}>{t("leavePaymentPending")}</Text>
+                </Pressable>
+              </ScrollView>
+            )}
+
+            {stripeStage === "paid" && (
+              <View style={styles.payCentre}>
+                <Ionicons name="checkmark-circle" size={64} color={Colors.success} />
+                <Text style={[styles.payNoticeTitle, { textAlign: "center" }]}>{t("paymentSuccess")}</Text>
+              </View>
+            )}
+
+            {stripeStage === "failed" && (
+              <View style={styles.payCentre}>
+                <Ionicons name="alert-circle" size={48} color={Colors.danger} />
+                <Text style={[styles.payNoticeText, { textAlign: "center" }]}>{stripeError || t("paymentFailed")}</Text>
+                {!!stripeCapture?.checkoutUrl && (
+                  <Pressable style={styles.payLinkBtn} onPress={() => { setStripeError(""); setStripeStage("waiting"); }}>
+                    <Ionicons name="refresh" size={18} color={Colors.accent} />
+                    <Text style={styles.payLinkBtnText}>{t("keepWaiting")}</Text>
+                  </Pressable>
+                )}
+                {!!stripeCapture && (
+                  <Pressable
+                    style={[styles.payCashBtn, switchStripeSaleToCash.isPending && { opacity: 0.5 }]}
+                    onPress={() => { if (!switchStripeSaleToCash.isPending) switchStripeSaleToCash.mutate(); }}
+                    disabled={switchStripeSaleToCash.isPending}
+                  >
+                    <Ionicons name="cash-outline" size={18} color={Colors.warning} />
+                    <Text style={styles.payCashBtnText}>{t("takeCashInstead")}</Text>
+                  </Pressable>
+                )}
+                <Pressable style={styles.modalCancelBtn} onPress={dismissStripeCapture} disabled={switchStripeSaleToCash.isPending}>
+                  <Text style={styles.modalCancelBtnText}>{stripeCapture ? t("leavePaymentPending") : t("close")}</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -4271,34 +4624,21 @@ const styles = themedStyles((Colors) => ({
   cashSection: { marginBottom: 16 },
   cashInput: { backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, color: Colors.text, fontSize: 18, fontWeight: "700", borderWidth: 1, borderColor: Colors.inputBorder, textAlign: "center" },
   changeText: { color: Colors.success, fontSize: 16, fontWeight: "700", textAlign: "center", marginTop: 8 },
-  nfcPaySection: { alignItems: "center", paddingVertical: 20, gap: 10, marginBottom: 16 },
-  nfcIconContainer: { width: 120, height: 120, alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  nfcRing: { position: "absolute", borderRadius: 999, borderWidth: 2, borderColor: "rgba(47,211,198,0.15)" },
-  nfcRingOuter: { width: 120, height: 120 },
-  nfcRingMiddle: { width: 90, height: 90, borderColor: "rgba(47,211,198,0.25)" },
-  nfcRingInner: { width: 60, height: 60, borderColor: "rgba(47,211,198,0.4)" },
-  nfcCenterIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.accent, alignItems: "center", justifyContent: "center", transform: [{ rotate: "90deg" }] },
-  nfcPayTitle: { color: Colors.text, fontSize: 18, fontWeight: "700" },
-  nfcPaySubtitle: { color: Colors.textSecondary, fontSize: 13 },
-  nfcPayAmount: { color: Colors.accent, fontSize: 28, fontWeight: "800" },
-  nfcStatusBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(47,211,198,0.15)", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginTop: 4 },
-  nfcStatusText: { color: Colors.accent, fontSize: 13, fontWeight: "600" },
-  nfcBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(47,211,198,0.15)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  nfcText: { color: Colors.accent, fontSize: 13, fontWeight: "600" },
-  cardInputSection: { backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.cardBorder },
-  cardInputHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14 },
-  cardInputTitle: { color: Colors.text, fontSize: 15, fontWeight: "700", flex: 1 },
-  cardBrands: { flexDirection: "row", gap: 4 },
-  cardBrand: { color: Colors.textMuted, fontSize: 10, fontWeight: "700", backgroundColor: Colors.surface, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: "hidden" },
-  cardField: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 0, borderWidth: 1, borderColor: Colors.cardBorder, marginBottom: 8, height: 48 },
-  cardInput: { flex: 1, color: Colors.text, fontSize: 15, fontWeight: "500", height: 48 },
-  cardRow: { flexDirection: "row", gap: 0 },
-  cardErrorRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-  cardErrorText: { color: Colors.danger, fontSize: 12, fontWeight: "500", flex: 1 },
-  cardProcessingRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-  cardProcessingText: { color: Colors.accent, fontSize: 12, fontWeight: "500" },
-  cardSecureRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8, justifyContent: "center" },
-  cardSecureText: { color: Colors.textMuted, fontSize: 11 },
+  // ── Card / TWINT / wallet capture (Stripe-hosted Checkout on the
+  // customer's own phone). The old fake card form and its NFC dressing lived
+  // here; nothing implemented either, so both are gone.
+  payHint: { color: Colors.textMuted, fontSize: 12, marginBottom: 12, marginTop: -8 },
+  payNotice: { backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: Colors.cardBorder, gap: 6 },
+  payNoticeTitle: { color: Colors.text, fontSize: 14, fontWeight: "700" },
+  payNoticeText: { color: Colors.textSecondary, fontSize: 13, lineHeight: 19 },
+  payNoticeMethods: { color: Colors.accent, fontSize: 11, fontWeight: "600", textTransform: "uppercase" as const, letterSpacing: 0.5 },
+  payModal: { backgroundColor: Colors.surface, borderRadius: 20, padding: 24, width: "90%", maxWidth: 420, maxHeight: "88%" },
+  payCentre: { alignItems: "center", gap: 14, paddingVertical: 18 },
+  payLinkBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.accent, borderRadius: 12, paddingVertical: 13, paddingHorizontal: 14, marginTop: 12 },
+  payLinkBtnText: { color: Colors.accent, fontSize: 14, fontWeight: "700" },
+  payWaitRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 14, backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12 },
+  payCashBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: Colors.warning, borderRadius: 12, paddingVertical: 13, marginTop: 12 },
+  payCashBtnText: { color: Colors.warning, fontSize: 14, fontWeight: "700" },
   checkoutItem: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
   checkoutItemName: { color: Colors.textSecondary, fontSize: 13 },
   checkoutItemTotal: { color: Colors.text, fontSize: 13, fontWeight: "600" },

@@ -1512,9 +1512,9 @@ var init_storage = __esm({
       async getEmployeesByTenant(tenantId) {
         const tenantBranches = await this.getBranchesByTenant(tenantId);
         const branchIds = tenantBranches.map((b) => b.id);
-        const { inArray: inArray2 } = await import("drizzle-orm");
+        const { inArray: inArray3 } = await import("drizzle-orm");
         if (branchIds.length > 0) {
-          return db.select().from(employees).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(employees.isActive, true), (0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(employees.tenantId, tenantId), inArray2(employees.branchId, branchIds)))).orderBy((0, import_drizzle_orm.desc)(employees.createdAt));
+          return db.select().from(employees).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(employees.isActive, true), (0, import_drizzle_orm.or)((0, import_drizzle_orm.eq)(employees.tenantId, tenantId), inArray3(employees.branchId, branchIds)))).orderBy((0, import_drizzle_orm.desc)(employees.createdAt));
         }
         return db.select().from(employees).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(employees.isActive, true), (0, import_drizzle_orm.eq)(employees.tenantId, tenantId))).orderBy((0, import_drizzle_orm.desc)(employees.createdAt));
       },
@@ -1565,16 +1565,16 @@ var init_storage = __esm({
       // Products
       async getProducts(search) {
         if (search) {
-          const q = `%${search.toLowerCase()}%`;
+          const q5 = `%${search.toLowerCase()}%`;
           return db.select().from(products).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q}`,
-                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q}`,
-                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q}`,
-                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q}`,
-                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q}`
+                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q5}`,
+                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q5}`,
+                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q5}`,
+                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q5}`,
+                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q5}`
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -1583,17 +1583,17 @@ var init_storage = __esm({
       },
       async getProductsByTenant(tenantId, search) {
         if (search) {
-          const q = `%${search.toLowerCase()}%`;
+          const q5 = `%${search.toLowerCase()}%`;
           return db.select().from(products).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(products.tenantId, tenantId),
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q}`,
-                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q}`,
-                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q}`,
-                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q}`,
-                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q}`
+                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q5}`,
+                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q5}`,
+                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q5}`,
+                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q5}`,
+                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q5}`
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -1630,8 +1630,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(inventory).where(inArray2(inventory.branchId, branchIds));
+            const { inArray: inArray3 } = await import("drizzle-orm");
+            return db.select().from(inventory).where(inArray3(inventory.branchId, branchIds));
           }
           return [];
         }
@@ -1664,12 +1664,12 @@ var init_storage = __esm({
         return inv;
       },
       async getLowStockItems(branchId) {
-        const { inArray: inArray2, notInArray, lte: ltEq } = await import("drizzle-orm");
+        const { inArray: inArray3, notInArray, lte: ltEq } = await import("drizzle-orm");
         const restaurantTenants = await db.select({ id: tenants.id }).from(tenants).where((0, import_drizzle_orm.eq)(tenants.storeType, "restaurant"));
         const restaurantTenantIds = restaurantTenants.map((t2) => t2.id);
         let excludedBranchIds = [];
         if (restaurantTenantIds.length > 0) {
-          const restaurantBranches = await db.select({ id: branches.id }).from(branches).where(inArray2(branches.tenantId, restaurantTenantIds));
+          const restaurantBranches = await db.select({ id: branches.id }).from(branches).where(inArray3(branches.tenantId, restaurantTenantIds));
           excludedBranchIds = restaurantBranches.map((b) => b.id);
         }
         const conditions = [
@@ -1808,8 +1808,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(filters.tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            conditions.push(inArray2(sales.branchId, branchIds));
+            const { inArray: inArray3 } = await import("drizzle-orm");
+            conditions.push(inArray3(sales.branchId, branchIds));
           } else {
             return [];
           }
@@ -1875,8 +1875,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(purchaseOrders).where(inArray2(purchaseOrders.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(purchaseOrders.createdAt));
+            const { inArray: inArray3 } = await import("drizzle-orm");
+            return db.select().from(purchaseOrders).where(inArray3(purchaseOrders.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(purchaseOrders.createdAt));
           }
           return [];
         }
@@ -1922,8 +1922,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(shifts).where(inArray2(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
+            const { inArray: inArray3 } = await import("drizzle-orm");
+            return db.select().from(shifts).where(inArray3(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
           }
           return [];
         }
@@ -1934,8 +1934,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray2(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
+            const { inArray: inArray3 } = await import("drizzle-orm");
+            return db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray3(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
           }
           return [];
         }
@@ -2070,8 +2070,8 @@ var init_storage = __esm({
           const emps = await this.getEmployeesByTenant(tenantId);
           const empIds = emps.map((e) => e.id);
           if (empIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(activityLog).where(inArray2(activityLog.employeeId, empIds)).orderBy((0, import_drizzle_orm.desc)(activityLog.createdAt)).limit(l);
+            const { inArray: inArray3 } = await import("drizzle-orm");
+            return db.select().from(activityLog).where(inArray3(activityLog.employeeId, empIds)).orderBy((0, import_drizzle_orm.desc)(activityLog.createdAt)).limit(l);
           }
           return [];
         }
@@ -2116,8 +2116,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(returns).where(inArray2(returns.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(returns.createdAt));
+            const { inArray: inArray3 } = await import("drizzle-orm");
+            return db.select().from(returns).where(inArray3(returns.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(returns.createdAt));
           }
           return [];
         }
@@ -2207,24 +2207,24 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            salesCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(sales).where(inArray2(sales.branchId, branchIds));
-            totalRevenueQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)` }).from(sales).where(inArray2(sales.branchId, branchIds));
+            const { inArray: inArray3 } = await import("drizzle-orm");
+            salesCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(sales).where(inArray3(sales.branchId, branchIds));
+            totalRevenueQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)` }).from(sales).where(inArray3(sales.branchId, branchIds));
             customerCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(customers).where((0, import_drizzle_orm.eq)(customers.tenantId, tenantId));
             productCountQuery = db.select({ count: import_drizzle_orm.sql`count(*)` }).from(products).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(products.tenantId, tenantId), (0, import_drizzle_orm.eq)(products.isActive, true)));
             const [tenant] = await db.select().from(tenants).where((0, import_drizzle_orm.eq)(tenants.id, tenantId));
             const isRestaurant = tenant?.storeType === "restaurant";
-            lowStockQuery = isRestaurant ? db.select({ count: import_drizzle_orm.sql`cast(0 as integer)` }).from(branches).limit(1) : db.select({ count: import_drizzle_orm.sql`count(*)` }).from(inventory).where((0, import_drizzle_orm.and)(import_drizzle_orm.sql`quantity <= low_stock_threshold`, inArray2(inventory.branchId, branchIds)));
+            lowStockQuery = isRestaurant ? db.select({ count: import_drizzle_orm.sql`cast(0 as integer)` }).from(branches).limit(1) : db.select({ count: import_drizzle_orm.sql`count(*)` }).from(inventory).where((0, import_drizzle_orm.and)(import_drizzle_orm.sql`quantity <= low_stock_threshold`, inArray3(inventory.branchId, branchIds)));
             todaySalesQuery = db.select({
               count: import_drizzle_orm.sql`count(*)`,
               total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
-            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray2(sales.branchId, branchIds)));
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray3(sales.branchId, branchIds)));
             weekSalesQuery = db.select({
               total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
-            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, weekStart), inArray2(sales.branchId, branchIds)));
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, weekStart), inArray3(sales.branchId, branchIds)));
             monthSalesQuery = db.select({
               total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
-            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, monthStart), inArray2(sales.branchId, branchIds)));
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, monthStart), inArray3(sales.branchId, branchIds)));
             totalExpensesQuery = db.select({ total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}), 0)` }).from(expenses).where((0, import_drizzle_orm.eq)(expenses.tenantId, tenantId));
             todayExpensesQuery = db.select({
               total: import_drizzle_orm.sql`coalesce(sum(${expenses.amount}), 0)`
@@ -2235,16 +2235,16 @@ var init_storage = __esm({
               name: saleItems.productName,
               totalSold: import_drizzle_orm.sql`sum(${saleItems.quantity})`,
               revenue: import_drizzle_orm.sql`sum(${saleItems.total})`
-            }).from(saleItems).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray2(sales.branchId, branchIds)).groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
+            }).from(saleItems).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray3(sales.branchId, branchIds)).groupBy(saleItems.productId, saleItems.productName).orderBy(import_drizzle_orm.sql`sum(${saleItems.quantity}) desc`).limit(topLimit);
             salesByPaymentMethodQuery = db.select({
               method: sales.paymentMethod,
               count: import_drizzle_orm.sql`count(*)`,
               total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}), 0)`
-            }).from(sales).where(inArray2(sales.branchId, branchIds)).groupBy(sales.paymentMethod);
-            recentSalesQuery = db.select().from(sales).where(inArray2(sales.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(sales.createdAt)).limit(5);
+            }).from(sales).where(inArray3(sales.branchId, branchIds)).groupBy(sales.paymentMethod);
+            recentSalesQuery = db.select().from(sales).where(inArray3(sales.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(sales.createdAt)).limit(5);
             profitRowQuery = db.select({
               totalCost: import_drizzle_orm.sql`coalesce(sum(${products.costPrice} * ${saleItems.quantity}), 0)`
-            }).from(saleItems).innerJoin(products, (0, import_drizzle_orm.eq)(saleItems.productId, products.id)).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray2(sales.branchId, branchIds));
+            }).from(saleItems).innerJoin(products, (0, import_drizzle_orm.eq)(saleItems.productId, products.id)).innerJoin(sales, (0, import_drizzle_orm.eq)(saleItems.saleId, sales.id)).where(inArray3(sales.branchId, branchIds));
           } else {
             return {
               totalSales: 0,
@@ -2418,8 +2418,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            return db.select().from(warehouses).where((0, import_drizzle_orm.and)(inArray2(warehouses.branchId, branchIds), (0, import_drizzle_orm.eq)(warehouses.isActive, true)));
+            const { inArray: inArray3 } = await import("drizzle-orm");
+            return db.select().from(warehouses).where((0, import_drizzle_orm.and)(inArray3(warehouses.branchId, branchIds), (0, import_drizzle_orm.eq)(warehouses.isActive, true)));
           }
           return [];
         }
@@ -2451,8 +2451,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            conditions.push(inArray2(productBatches.branchId, branchIds));
+            const { inArray: inArray3 } = await import("drizzle-orm");
+            conditions.push(inArray3(productBatches.branchId, branchIds));
           } else {
             return [];
           }
@@ -2665,8 +2665,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            activeShifts = await db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray2(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
+            const { inArray: inArray3 } = await import("drizzle-orm");
+            activeShifts = await db.select().from(shifts).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(shifts.status, "open"), inArray3(shifts.branchId, branchIds))).orderBy((0, import_drizzle_orm.desc)(shifts.startTime));
           } else {
             activeShifts = [];
           }
@@ -2687,8 +2687,8 @@ var init_storage = __esm({
           const tenantBranches = await this.getBranchesByTenant(tenantId);
           const branchIds = tenantBranches.map((b) => b.id);
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
-            allShifts = await db.select().from(shifts).where(inArray2(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime)).limit(100);
+            const { inArray: inArray3 } = await import("drizzle-orm");
+            allShifts = await db.select().from(shifts).where(inArray3(shifts.branchId, branchIds)).orderBy((0, import_drizzle_orm.desc)(shifts.startTime)).limit(100);
           } else {
             allShifts = [];
           }
@@ -2828,12 +2828,12 @@ var init_storage = __esm({
           const tenantEmployees = await this.getEmployeesByTenant(tenant.id);
           let salesToday = "0.00";
           if (branchIds.length > 0) {
-            const { inArray: inArray2 } = await import("drizzle-orm");
+            const { inArray: inArray3 } = await import("drizzle-orm");
             const todayStart = /* @__PURE__ */ new Date();
             todayStart.setHours(0, 0, 0, 0);
             const [todaySales] = await db.select({
               total: import_drizzle_orm.sql`coalesce(sum(total_amount), 0)`
-            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray2(sales.branchId, branchIds)));
+            }).from(sales).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.gte)(sales.createdAt, todayStart), inArray3(sales.branchId, branchIds)));
             salesToday = Number(todaySales?.total || 0).toFixed(2);
           }
           results.push({
@@ -2939,7 +2939,7 @@ var init_storage = __esm({
       // Bulk Operations
       async bulkCreateCustomers(data) {
         if (data.length === 0) return [];
-        const { inArray: inArray2 } = await import("drizzle-orm");
+        const { inArray: inArray3 } = await import("drizzle-orm");
         const sanitizedRows = data.map((row) => {
           const { id, createdAt, updatedAt, ...payload } = row;
           return payload;
@@ -2962,7 +2962,7 @@ var init_storage = __esm({
           const existingCustomers = await db.select().from(customers).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(customers.tenantId, Number(tenantId)),
-              inArray2(customers.phone, phones)
+              inArray3(customers.phone, phones)
             )
           );
           for (const existing of existingCustomers) {
@@ -3451,14 +3451,14 @@ var init_storage = __esm({
       },
       // ── Delivery Management ─────────────────────────────────────────────────────
       async getDeliveryOrders(tenantId, filters) {
-        let q = db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId));
+        let q5 = db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId));
         if (filters?.status) {
-          q = q.where((0, import_drizzle_orm.eq)(onlineOrders.status, filters.status));
+          q5 = q5.where((0, import_drizzle_orm.eq)(onlineOrders.status, filters.status));
         }
         if (filters?.orderType) {
-          q = q.where((0, import_drizzle_orm.eq)(onlineOrders.orderType, filters.orderType));
+          q5 = q5.where((0, import_drizzle_orm.eq)(onlineOrders.orderType, filters.orderType));
         }
-        return q.orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
+        return q5.orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
       },
       async assignDriverToOrder(orderId, vehicleId) {
         await db.update(onlineOrders).set({ driverId: vehicleId }).where((0, import_drizzle_orm.eq)(onlineOrders.id, orderId));
@@ -6294,2439 +6294,8 @@ var init_seedAllDemoData = __esm({
   }
 });
 
-// server/site/design.ts
-var SITE_CSS;
-var init_design = __esm({
-  "server/site/design.ts"() {
-    "use strict";
-    SITE_CSS = String.raw`
-:root {
-  color-scheme: light;
-
-  --navy: #040E32;
-  --teal: #00C1B0;
-  --teal-deep: #0C8F85;
-
-  --bg: #FFFFFF;
-  --bg-alt: #F5F8FC;
-  --bg-inset: #EEF3F9;
-  --surface: #FFFFFF;
-  --surface-2: #F8FAFD;
-  --border: #E1E8F0;
-  --border-strong: #CBD6E3;
-
-  --text: #0B1220;
-  --text-2: #46566C;
-  --text-3: #6B7B90;
-
-  --accent: #0C8F85;
-  --accent-ink: #FFFFFF;
-  --accent-soft: #E6F6F4;
-  --accent-line: #B7E3DE;
-
-  --gold: #B7791F;
-  --danger: #C2321F;
-  --ok: #047857;
-
-  --shadow-sm: 0 1px 2px rgba(11, 18, 32, .06), 0 1px 3px rgba(11, 18, 32, .04);
-  --shadow-md: 0 4px 12px rgba(11, 18, 32, .07), 0 2px 4px rgba(11, 18, 32, .04);
-  --shadow-lg: 0 18px 48px rgba(11, 18, 32, .10), 0 4px 12px rgba(11, 18, 32, .05);
-
-  --radius: 14px;
-  --radius-sm: 9px;
-  --radius-lg: 22px;
-  --maxw: 1180px;
-  --nav-h: 68px;
-
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-ar: 'Noto Kufi Arabic', 'Inter', sans-serif;
-  --ease: cubic-bezier(.4, 0, .2, 1);
-}
-
-[data-theme="dark"] {
-  color-scheme: dark;
-
-  --bg: #040E32;
-  --bg-alt: #071444;
-  --bg-inset: #0A1A4D;
-  --surface: #0D1A44;
-  --surface-2: #12224F;
-  --border: #22305C;
-  --border-strong: #2E3E6E;
-
-  --text: #FFFFFF;
-  --text-2: #B9C3D8;
-  --text-3: #8A94AD;
-
-  --accent: #00C1B0;
-  --accent-ink: #04121F;
-  --accent-soft: rgba(0, 193, 176, .10);
-  --accent-line: rgba(0, 193, 176, .28);
-
-  --gold: #F0B429;
-  --danger: #F87171;
-  --ok: #34D399;
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .40);
-  --shadow-md: 0 6px 18px rgba(0, 0, 0, .45);
-  --shadow-lg: 0 22px 60px rgba(0, 0, 0, .55);
-}
-
-*, *::before, *::after { box-sizing: border-box; }
-* { margin: 0; padding: 0; }
-
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--nav-h) + 16px); }
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
-}
-
-body {
-  font-family: var(--font);
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.65;
-  font-size: 16px;
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
-  transition: background-color .25s var(--ease), color .25s var(--ease);
-}
-html[dir="rtl"] body { font-family: var(--font-ar); }
-
-img, svg, video { max-width: 100%; height: auto; display: block; }
-a { color: inherit; text-decoration: none; }
-button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
-
-/* ── Layout ─────────────────────────────────────────────────────────────── */
-.wrap { width: 100%; max-width: var(--maxw); margin-inline: auto; padding-inline: 24px; }
-.section { padding: 88px 0; }
-.section--tight { padding: 60px 0; }
-.section--alt { background: var(--bg-alt); }
-.section--inset { background: var(--bg-inset); }
-@media (max-width: 720px) {
-  .section { padding: 56px 0; }
-  .wrap { padding-inline: 18px; }
-}
-
-.grid { display: grid; gap: 24px; }
-.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-@media (max-width: 980px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 700px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); } }
-
-.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: center; }
-.split--wide-left { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); }
-@media (max-width: 900px) { .split, .split--wide-left { grid-template-columns: minmax(0, 1fr); gap: 32px; } }
-
-/* ── Type ───────────────────────────────────────────────────────────────── */
-h1, h2, h3, h4 { line-height: 1.18; letter-spacing: -.02em; font-weight: 800; }
-h1 { font-size: clamp(2.1rem, 1.3rem + 3.2vw, 3.8rem); letter-spacing: -.03em; }
-h2 { font-size: clamp(1.6rem, 1.1rem + 2vw, 2.6rem); }
-h3 { font-size: clamp(1.12rem, 1rem + .5vw, 1.35rem); }
-h4 { font-size: 1rem; }
-p { color: var(--text-2); }
-.lead { font-size: clamp(1.02rem, .96rem + .35vw, 1.2rem); color: var(--text-2); max-width: 62ch; }
-.eyebrow {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-size: .74rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase;
-  color: var(--accent); margin-bottom: 14px;
-}
-.eyebrow::before { content: ""; width: 22px; height: 2px; background: var(--accent); border-radius: 2px; }
-.section-head { max-width: 720px; margin-bottom: 44px; }
-.section-head--center { margin-inline: auto; text-align: center; }
-.section-head--center .eyebrow { justify-content: center; }
-.section-head p { margin-top: 14px; }
-.muted { color: var(--text-3); }
-.nowrap { white-space: nowrap; }
-
-/* ── Buttons ────────────────────────────────────────────────────────────── */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
-  padding: 13px 24px; border-radius: 11px; font-weight: 700; font-size: .94rem;
-  border: 1px solid transparent; transition: transform .18s var(--ease), box-shadow .18s var(--ease), background-color .18s var(--ease), border-color .18s var(--ease);
-  white-space: nowrap;
-}
-.btn svg { width: 17px; height: 17px; flex: none; }
-.btn:hover { transform: translateY(-1px); }
-.btn:active { transform: translateY(0); }
-.btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow-md); }
-.btn-primary:hover { box-shadow: var(--shadow-lg); }
-.btn-ghost { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
-.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-.btn-quiet { padding-inline: 4px; color: var(--accent); }
-.btn-quiet:hover { text-decoration: underline; text-underline-offset: 4px; }
-.btn-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
-@media (max-width: 480px) { .btn { width: 100%; } .btn-row { flex-direction: column; } }
-
-/* ── Cards ──────────────────────────────────────────────────────────────── */
-.card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 26px; box-shadow: var(--shadow-sm);
-  transition: transform .22s var(--ease), box-shadow .22s var(--ease), border-color .22s var(--ease);
-}
-.card--hover:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--accent-line); }
-.card h3 { margin-bottom: 8px; }
-.card p { font-size: .93rem; }
-.card-icon {
-  width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center;
-  background: var(--accent-soft); color: var(--accent); margin-bottom: 16px; border: 1px solid var(--accent-line);
-}
-.card-icon svg { width: 21px; height: 21px; }
-
-.badge {
-  display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 100px;
-  font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
-  background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line);
-}
-.badge--neutral { background: var(--bg-inset); color: var(--text-2); border-color: var(--border); }
-
-.tick-list { list-style: none; display: grid; gap: 11px; }
-.tick-list li { display: flex; gap: 11px; align-items: flex-start; font-size: .94rem; color: var(--text-2); }
-.tick-list svg { width: 19px; height: 19px; flex: none; color: var(--accent); margin-top: 2px; }
-
-/* ── Image slots ────────────────────────────────────────────────────────── */
-.shot {
-  position: relative; border-radius: var(--radius-lg); overflow: hidden;
-  border: 1px solid var(--border); background: var(--surface-2); box-shadow: var(--shadow-lg);
-  aspect-ratio: var(--ar, 16 / 10);
-}
-.shot img { width: 100%; height: 100%; object-fit: cover; }
-.shot--contain img { object-fit: contain; padding: 6%; }
-/* Cut-out artwork: no frame, so the transparent background picks up the section. */
-.shot--bare { border: 0; background: transparent; box-shadow: none; border-radius: 0; }
-.shot--bare img { object-fit: contain; }
-.shot-ph {
-  display: none; position: absolute; inset: 0; flex-direction: column; gap: 6px;
-  align-items: center; justify-content: center; text-align: center; padding: 20px;
-  background:
-    repeating-linear-gradient(45deg, transparent, transparent 12px, var(--bg-inset) 12px, var(--bg-inset) 24px),
-    var(--surface-2);
-  color: var(--text-3);
-}
-.shot.is-empty img { visibility: hidden; }
-.shot.is-empty .shot-ph { display: flex; }
-.shot-ph b { font-size: .84rem; font-weight: 800; color: var(--text-2); letter-spacing: .02em; }
-.shot-ph small { font-size: .72rem; font-variant-numeric: tabular-nums; }
-.shot-caption { margin-top: 10px; font-size: .78rem; color: var(--text-3); text-align: center; }
-
-/* ── Navigation ─────────────────────────────────────────────────────────── */
-.nav {
-  position: sticky; top: 0; z-index: 900; height: var(--nav-h);
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: saturate(180%) blur(14px);
-  -webkit-backdrop-filter: saturate(180%) blur(14px);
-  border-bottom: 1px solid transparent; transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
-}
-.nav.scrolled { border-bottom-color: var(--border); box-shadow: var(--shadow-sm); }
-.nav-inner { height: 100%; display: flex; align-items: center; gap: 18px; }
-.brand { display: flex; align-items: center; gap: 10px; flex: none; }
-.brand img { height: 30px; width: auto; }
-.brand-name { font-weight: 800; font-size: 1.06rem; letter-spacing: -.02em; }
-.nav-links { display: flex; align-items: center; gap: 4px; margin-inline-start: 14px; flex: 1 1 auto; }
-.nav-links a {
-  padding: 8px 13px; border-radius: 9px; font-size: .91rem; font-weight: 600; color: var(--text-2);
-  transition: background-color .16s var(--ease), color .16s var(--ease);
-}
-.nav-links a:hover { background: var(--bg-inset); color: var(--text); }
-.nav-links a[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
-.nav-actions { display: flex; align-items: center; gap: 8px; flex: none; }
-
-.icon-btn {
-  width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
-  border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
-  transition: border-color .16s var(--ease), color .16s var(--ease), background-color .16s var(--ease);
-}
-.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
-.icon-btn svg { width: 18px; height: 18px; }
-.theme-btn .i-moon { display: none; }
-[data-theme="dark"] .theme-btn .i-sun { display: none; }
-[data-theme="dark"] .theme-btn .i-moon { display: block; }
-
-.lang { position: relative; }
-.lang-btn { display: flex; align-items: center; gap: 7px; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); font-size: .84rem; font-weight: 700; color: var(--text-2); }
-.lang-btn:hover { border-color: var(--accent); color: var(--accent); }
-.lang-menu {
-  position: absolute; inset-inline-end: 0; top: calc(100% + 8px); min-width: 156px; padding: 6px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg);
-  opacity: 0; visibility: hidden; transform: translateY(-6px); transition: all .18s var(--ease); z-index: 950;
-}
-.lang.open .lang-menu { opacity: 1; visibility: visible; transform: translateY(0); }
-.lang-menu button { display: flex; width: 100%; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 8px; font-size: .88rem; font-weight: 600; color: var(--text-2); text-align: start; }
-.lang-menu button:hover { background: var(--bg-inset); color: var(--text); }
-.lang-menu button.active { color: var(--accent); background: var(--accent-soft); }
-.lang-menu .flag { width: 20px; height: 14px; border-radius: 2px; flex: none; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
-
-.nav-toggle { display: none; }
-.cta-mobile { display: none; }
-@media (max-width: 1040px) {
-  .nav-toggle { display: grid; }
-  .nav-links {
-    position: fixed; inset: var(--nav-h) 0 auto 0; flex-direction: column; align-items: stretch; gap: 2px;
-    background: var(--bg); border-bottom: 1px solid var(--border); padding: 14px 18px 20px;
-    box-shadow: var(--shadow-lg); display: none; margin: 0; max-height: calc(100dvh - var(--nav-h)); overflow-y: auto;
-  }
-  .nav-links.open { display: flex; }
-  .nav-links a { padding: 12px 14px; font-size: .98rem; }
-  .nav .cta-desktop { display: none; }
-  .nav-links .cta-mobile { display: inline-flex; }
-}
-
-/* ── Hero ───────────────────────────────────────────────────────────────── */
-.hero { position: relative; padding: 84px 0 72px; overflow: hidden; }
-.hero::before {
-  content: ""; position: absolute; inset: -40% -20% auto -20%; height: 620px; pointer-events: none; z-index: 0;
-  background:
-    radial-gradient(ellipse 46% 44% at 26% 42%, color-mix(in srgb, var(--accent) 16%, transparent) 0%, transparent 66%),
-    radial-gradient(ellipse 40% 40% at 78% 30%, color-mix(in srgb, var(--navy) 10%, transparent) 0%, transparent 62%);
-}
-[data-theme="dark"] .hero::before { background: radial-gradient(ellipse 46% 44% at 26% 42%, rgba(0,193,176,.14) 0%, transparent 66%), radial-gradient(ellipse 40% 40% at 78% 30%, rgba(99,102,241,.12) 0%, transparent 62%); }
-.hero .wrap { position: relative; z-index: 1; }
-.hero h1 { margin-bottom: 20px; }
-.hero .lead { margin-bottom: 4px; }
-.hero-meta { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--border); }
-.hero-meta div { min-width: 92px; }
-.hero-meta b { display: block; font-size: 1.5rem; font-weight: 800; letter-spacing: -.02em; }
-.hero-meta span { font-size: .78rem; color: var(--text-3); }
-
-/* ── Page header (inner pages) ──────────────────────────────────────────── */
-.page-head { padding: 62px 0 44px; border-bottom: 1px solid var(--border); background: var(--bg-alt); }
-.page-head h1 { font-size: clamp(1.9rem, 1.3rem + 2.4vw, 3rem); margin-bottom: 14px; }
-.crumbs { display: flex; gap: 8px; align-items: center; font-size: .8rem; color: var(--text-3); margin-bottom: 16px; }
-.crumbs a:hover { color: var(--accent); }
-
-/* ── Stats / logos ──────────────────────────────────────────────────────── */
-.stat-strip { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-.stat-strip div { background: var(--surface); padding: 24px 20px; text-align: center; }
-.stat-strip b { display: block; font-size: 1.85rem; font-weight: 800; letter-spacing: -.03em; color: var(--text); }
-.stat-strip span { font-size: .8rem; color: var(--text-3); }
-@media (max-width: 700px) { .stat-strip { grid-template-columns: repeat(2, minmax(0,1fr)); } }
-
-/* ── Pricing ────────────────────────────────────────────────────────────── */
-.price-card { display: flex; flex-direction: column; position: relative; }
-.price-card.featured { border-color: var(--accent); box-shadow: var(--shadow-lg); }
-.price-card .price { font-size: 2.5rem; font-weight: 800; letter-spacing: -.03em; margin: 12px 0 2px; }
-.price-card .price small { font-size: .88rem; font-weight: 600; color: var(--text-3); letter-spacing: 0; }
-.price-card .tick-list { margin: 20px 0 26px; }
-.price-card .btn { margin-top: auto; width: 100%; }
-.price-tag { position: absolute; inset-inline-end: 18px; top: -11px; }
-.billing-toggle { display: inline-flex; padding: 4px; gap: 4px; border: 1px solid var(--border); background: var(--surface); border-radius: 100px; margin: 0 auto 36px; }
-.billing-toggle button { padding: 8px 20px; border-radius: 100px; font-size: .86rem; font-weight: 700; color: var(--text-3); }
-.billing-toggle button.active { background: var(--accent); color: var(--accent-ink); }
-
-/* ── FAQ ────────────────────────────────────────────────────────────────── */
-.faq { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
-.faq details { border-bottom: 1px solid var(--border); }
-.faq details:last-child { border-bottom: 0; }
-.faq summary { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 19px 22px; font-weight: 700; font-size: .97rem; cursor: pointer; list-style: none; }
-.faq summary::-webkit-details-marker { display: none; }
-.faq summary::after { content: ""; width: 10px; height: 10px; flex: none; border-right: 2px solid var(--text-3); border-bottom: 2px solid var(--text-3); transform: rotate(45deg) translateY(-3px); transition: transform .2s var(--ease); }
-.faq details[open] summary::after { transform: rotate(225deg) translateY(-3px); }
-.faq details[open] summary { color: var(--accent); }
-.faq .answer { padding: 0 22px 20px; font-size: .93rem; color: var(--text-2); }
-
-/* ── Steps / timeline ───────────────────────────────────────────────────── */
-.steps { counter-reset: step; display: grid; gap: 18px; }
-.step { display: grid; grid-template-columns: 44px minmax(0,1fr); gap: 18px; align-items: start; }
-.step::before {
-  counter-increment: step; content: counter(step, decimal-leading-zero);
-  width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
-  background: var(--accent-soft); border: 1px solid var(--accent-line); color: var(--accent);
-  font-weight: 800; font-size: .86rem; font-variant-numeric: tabular-nums;
-}
-.step h3 { margin-bottom: 5px; }
-.step p { font-size: .93rem; }
-
-/* ── Compliance table ───────────────────────────────────────────────────── */
-.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); -webkit-overflow-scrolling: touch; }
-table { width: 100%; border-collapse: collapse; min-width: 620px; font-size: .9rem; }
-th, td { padding: 14px 18px; text-align: start; border-bottom: 1px solid var(--border); }
-th { background: var(--bg-inset); font-weight: 700; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
-tbody tr:last-child td { border-bottom: 0; }
-td { color: var(--text-2); }
-td strong { color: var(--text); font-weight: 700; }
-
-/* ── CTA band ───────────────────────────────────────────────────────────── */
-.cta-band { background: var(--navy); color: #fff; border-radius: var(--radius-lg); padding: 54px 44px; text-align: center; position: relative; overflow: hidden; }
-.cta-band::after { content: ""; position: absolute; inset: auto -10% -60% -10%; height: 260px; background: radial-gradient(ellipse 50% 100% at 50% 100%, rgba(0,193,176,.30) 0%, transparent 70%); pointer-events: none; }
-.cta-band h2, .cta-band p { color: #fff; position: relative; z-index: 1; }
-.cta-band p { color: rgba(255,255,255,.76); margin: 14px auto 0; max-width: 56ch; }
-.cta-band .btn-row { justify-content: center; position: relative; z-index: 1; }
-.cta-band .btn-primary { background: var(--teal); color: #04121F; }
-.cta-band .btn-ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.34); }
-.cta-band .btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
-@media (max-width: 640px) { .cta-band { padding: 40px 22px; } }
-
-/* ── Forms ──────────────────────────────────────────────────────────────── */
-.field { display: grid; gap: 7px; }
-.field label { font-size: .82rem; font-weight: 700; color: var(--text-2); }
-.field input, .field select, .field textarea {
-  width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-strong);
-  background: var(--surface); color: var(--text); font: inherit; font-size: .93rem;
-  transition: border-color .16s var(--ease), box-shadow .16s var(--ease);
-}
-.field textarea { min-height: 132px; resize: vertical; }
-.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.form-note { font-size: .8rem; color: var(--text-3); }
-.form-status { padding: 12px 15px; border-radius: 10px; font-size: .88rem; font-weight: 600; display: none; }
-.form-status.ok { display: block; background: var(--accent-soft); color: var(--ok); border: 1px solid var(--accent-line); }
-.form-status.err { display: block; background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent); }
-
-/* ── Footer ─────────────────────────────────────────────────────────────── */
-.footer { border-top: 1px solid var(--border); background: var(--bg-alt); padding: 56px 0 30px; margin-top: 0; }
-.footer-grid { display: grid; grid-template-columns: 1.6fr repeat(3, 1fr); gap: 40px; }
-@media (max-width: 860px) { .footer-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 30px; } }
-@media (max-width: 480px) { .footer-grid { grid-template-columns: minmax(0,1fr); } }
-.footer p { font-size: .88rem; max-width: 34ch; margin-top: 14px; }
-.footer-col h4 { font-size: .76rem; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 14px; }
-.footer-col a, .footer-col span { display: block; font-size: .89rem; color: var(--text-2); padding: 5px 0; }
-.footer-col a:hover { color: var(--accent); }
-.footer-bottom { display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between; align-items: center; margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--border); font-size: .82rem; color: var(--text-3); }
-.footer-legal { display: flex; flex-wrap: wrap; gap: 18px; }
-.footer-maker {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
-  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
-  font-size: .8rem; color: var(--text-3);
-}
-.footer-maker a { color: var(--accent); font-weight: 700; }
-.footer-maker a:hover { text-decoration: underline; text-underline-offset: 3px; }
-.footer-maker .uid {
-  display: inline-flex; align-items: center; gap: 7px; margin-inline-start: auto;
-  padding: 4px 11px; border-radius: 100px;
-  background: var(--bg-inset); border: 1px solid var(--border);
-  font-variant-numeric: tabular-nums;
-}
-.footer-maker .uid b { color: var(--text-2); font-weight: 700; letter-spacing: .01em; }
-@media (max-width: 620px) { .footer-maker .uid { margin-inline-start: 0; } }
-
-/* ── Reveal ─────────────────────────────────────────────────────────────── */
-.reveal { opacity: 0; transform: translateY(16px); transition: opacity .55s var(--ease), transform .55s var(--ease); }
-.reveal.visible { opacity: 1; transform: none; }
-@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; } }
-
-
-/* ── Floating WhatsApp launcher ─────────────────────────────────────────────
-   Self-contained: no third-party widget script, so it costs one button in the
-   DOM instead of a ~200 KB embed that also phones home on every page view. */
-.wa {
-  position: fixed;
-  inset-block-end: max(22px, env(safe-area-inset-bottom));
-  inset-inline-end: max(22px, env(safe-area-inset-right));
-  z-index: 880;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
-  pointer-events: none;
-}
-html[dir="rtl"] .wa { align-items: flex-start; }
-
-.wa-btn {
-  pointer-events: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-  height: 56px;
-  padding: 0;
-  width: 56px;
-  border-radius: 100px;
-  background: #25D366;
-  color: #fff;
-  border: 1px solid rgba(0, 0, 0, .06);
-  box-shadow: 0 6px 20px rgba(37, 211, 102, .34), 0 2px 6px rgba(11, 18, 32, .16);
-  overflow: hidden;
-  white-space: nowrap;
-  transition: width .3s var(--ease), gap .3s var(--ease), box-shadow .2s var(--ease), transform .2s var(--ease);
-}
-.wa-btn svg { width: 27px; height: 27px; flex: none; margin-inline: 14px; }
-.wa-btn span {
-  font-size: .92rem;
-  font-weight: 700;
-  letter-spacing: -.01em;
-  opacity: 0;
-  max-width: 0;
-  transition: opacity .22s var(--ease), max-width .3s var(--ease);
-}
-.wa-btn:hover,
-.wa-btn:focus-visible {
-  width: auto;
-  gap: 0;
-  box-shadow: 0 10px 28px rgba(37, 211, 102, .42), 0 3px 8px rgba(11, 18, 32, .2);
-  transform: translateY(-2px);
-}
-.wa-btn:hover span,
-.wa-btn:focus-visible span { opacity: 1; max-width: 220px; padding-inline-end: 20px; }
-.wa-btn:active { transform: translateY(0); }
-
-/* A single, slow pulse the first time — enough to be noticed, not a strobe. */
-.wa-btn::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: 0 0 0 0 rgba(37, 211, 102, .55);
-  animation: wa-pulse 2.6s var(--ease) 1.5s 3;
-  pointer-events: none;
-}
-@keyframes wa-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, .5); }
-  70% { box-shadow: 0 0 0 16px rgba(37, 211, 102, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
-}
-.wa-btn { position: relative; }
-
-.wa-card {
-  pointer-events: auto;
-  position: relative;
-  width: min(304px, calc(100vw - 44px));
-  padding: 16px 18px 16px 16px;
-  border-radius: 16px 16px 6px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
-  opacity: 0;
-  transform: translateY(10px) scale(.97);
-  transform-origin: bottom right;
-  visibility: hidden;
-  transition: opacity .26s var(--ease), transform .26s var(--ease), visibility .26s;
-}
-html[dir="rtl"] .wa-card { border-radius: 16px 16px 16px 6px; transform-origin: bottom left; }
-.wa.open .wa-card { opacity: 1; transform: none; visibility: visible; }
-.wa-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.wa-avatar {
-  width: 34px; height: 34px; border-radius: 50%; flex: none;
-  display: grid; place-items: center; background: #25D366; color: #fff;
-}
-.wa-avatar svg { width: 19px; height: 19px; }
-.wa-card b { display: block; font-size: .9rem; font-weight: 800; color: var(--text); line-height: 1.3; }
-.wa-status { display: flex; align-items: center; gap: 5px; font-size: .74rem; color: var(--text-3); }
-.wa-dot { width: 7px; height: 7px; border-radius: 50%; background: #25D366; flex: none; }
-.wa-card p { font-size: .87rem; line-height: 1.55; margin: 0 0 14px; }
-.wa-card .btn { width: 100%; padding: 10px 16px; font-size: .88rem; background: #25D366; color: #fff; box-shadow: none; }
-.wa-card .btn:hover { background: #1eb85a; box-shadow: 0 6px 16px rgba(37, 211, 102, .3); }
-.wa-close {
-  position: absolute; top: 8px; inset-inline-end: 8px;
-  width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
-  color: var(--text-3);
-}
-.wa-close:hover { background: var(--bg-inset); color: var(--text); }
-.wa-close svg { width: 14px; height: 14px; }
-
-/* Keep the launcher out of the way of the collapsed navigation and the footer CTA. */
-@media (max-width: 1040px) {
-  .wa { inset-block-end: max(16px, env(safe-area-inset-bottom)); inset-inline-end: max(16px, env(safe-area-inset-right)); }
-  .wa-btn { width: 52px; height: 52px; }
-  .wa-btn svg { width: 25px; height: 25px; margin-inline: 13px; }
-  .wa-btn:hover span, .wa-btn:focus-visible span { max-width: 0; opacity: 0; padding-inline-end: 0; }
-  .wa-btn:hover, .wa-btn:focus-visible { width: 52px; }
-}
-/* Stand down while the collapsed navigation is open — the sheet covers the
-   viewport and the launcher would sit on top of the menu items. */
-body:has(.nav-links.open) .wa { opacity: 0; pointer-events: none; }
-
-@media (prefers-reduced-motion: reduce) {
-  .wa-btn::after { animation: none; }
-  .wa-btn, .wa-card { transition: none; }
-}
-
-.skip-link { position: absolute; inset-inline-start: -9999px; top: 8px; z-index: 999; padding: 10px 16px; background: var(--accent); color: var(--accent-ink); border-radius: 8px; font-weight: 700; }
-.skip-link:focus { inset-inline-start: 12px; }
-`;
-  }
-});
-
-// server/site/shell.ts
-function href(routePath) {
-  return routePath === "/" ? "/" : `${routePath}/`;
-}
-function siteAssets() {
-  if (!assetCache) {
-    assetCache = {
-      css: { url: `/assets/site.${hash8(SITE_CSS)}.css`, body: SITE_CSS, contentType: "text/css; charset=utf-8" },
-      js: { url: `/assets/site.${hash8(SITE_JS)}.js`, body: SITE_JS, contentType: "application/javascript; charset=utf-8" }
-    };
-  }
-  return assetCache;
-}
-function findSiteAsset(pathname) {
-  const { css, js } = siteAssets();
-  if (pathname === css.url) return css;
-  if (pathname === js.url) return js;
-  return null;
-}
-function tAttrs(v) {
-  return `data-en="${esc(v.en)}" data-de="${esc(v.de)}" data-ar="${esc(v.ar)}"`;
-}
-function esc(s) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-function parseSize(size) {
-  const m = size.match(/(\d+)\s*[×x]\s*(\d+)/);
-  return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
-}
-function shot(slot) {
-  const src = `/brand/site/${slot.id}.webp`;
-  const dim = parseSize(slot.size);
-  const dimAttrs = dim ? ` width="${dim.w}" height="${dim.h}"` : "";
-  const loadAttrs = slot.priority ? ` loading="eager" fetchpriority="high" decoding="async"` : ` loading="lazy" decoding="async"`;
-  const variant = `${slot.contain ? " shot--contain" : ""}${slot.bare ? " shot--bare" : ""}`;
-  return `<figure class="shot is-empty${variant}" style="--ar:${slot.ratio}">
-  <img src="${src}" alt="${esc(slot.alt.en)}" ${tAttrs(slot.alt).replace(/data-(en|de|ar)=/g, "data-alt-$1=")}${dimAttrs}${loadAttrs}
-       onload="this.closest('.shot').classList.remove('is-empty')" onerror="this.closest('.shot').classList.add('is-empty')">
-  <figcaption class="shot-ph" dir="ltr"><b>${esc(slot.id)}</b><small>${esc(slot.size)}</small></figcaption>
-</figure>${slot.caption ? `<p class="shot-caption" ${tAttrs(slot.caption)}>${esc(slot.caption.en)}</p>` : ""}`;
-}
-function renderPage(meta, body, baseUrl) {
-  const canonical = `${baseUrl}${meta.path === "/" ? "/" : href(meta.path)}`;
-  const { css, js } = siteAssets();
-  const navHtml = NAV.map(
-    (n) => `<a href="${href(n.path)}"${n.path === meta.path ? ' aria-current="page"' : ""} ${tAttrs(n.label)}>${esc(n.label.en)}</a>`
-  ).join("\n        ");
-  const langButtons = ["en", "de", "ar"].map(
-    (l) => `<button type="button" role="menuitemradio" data-lang="${l}" onclick="Kassenta.setLang('${l}')">${FLAGS[l]}<span>${{ en: "English", de: "Deutsch", ar: "\u0627\u0644\u0639\u0631\u0628\u064A\u0629" }[l]}</span></button>`
-  ).join("");
-  const crumb = meta.path === "/" ? null : {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
-      { "@type": "ListItem", position: 2, name: meta.title.en.split(" \u2014 ")[0], item: canonical }
-    ]
-  };
-  const blocks = [...meta.jsonLd ?? [], ...crumb ? [crumb] : []];
-  const jsonLd = blocks.map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join("\n  ");
-  const heroPreload = meta.heroImage ? `
-  <link rel="preload" as="image" href="/brand/site/${meta.heroImage}.webp" fetchpriority="high" type="image/webp">` : "";
-  return `<!DOCTYPE html>
-<html lang="en" dir="ltr">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>${esc(meta.title.en)}</title>
-  <meta name="description" content="${esc(meta.description.en)}">
-  <meta name="robots" content="index, follow, max-image-preview:large">
-  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#040E32" media="(prefers-color-scheme: dark)">
-  <link rel="canonical" href="${canonical}">
-  <link rel="alternate" hreflang="en" href="${canonical}?lang=en">
-  <link rel="alternate" hreflang="de" href="${canonical}?lang=de">
-  <link rel="alternate" hreflang="ar" href="${canonical}?lang=ar">
-  <link rel="alternate" hreflang="x-default" href="${canonical}">
-  <link rel="icon" href="/brand/favicon.ico" sizes="any">
-  <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
-  <link rel="apple-touch-icon" href="/brand/favicon-180.png">
-  <link rel="manifest" href="/site.webmanifest">
-
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Kassenta POS">
-  <meta property="og:locale" content="en_US">
-  <meta property="og:locale:alternate" content="de_CH">
-  <meta property="og:locale:alternate" content="ar_EG">
-  <meta property="og:title" content="${esc(meta.title.en)}">
-  <meta property="og:description" content="${esc(meta.description.en)}">
-  <meta property="og:url" content="${canonical}">
-  <meta property="og:image" content="${baseUrl}/brand/og-image.jpg">
-  <meta property="og:image:type" content="image/jpeg">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Kassenta POS running on a tablet, showing the ordering screen">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${esc(meta.title.en)}">
-  <meta name="twitter:description" content="${esc(meta.description.en)}">
-  <meta name="twitter:image" content="${baseUrl}/brand/og-image.jpg">
-  <meta name="twitter:image:alt" content="Kassenta POS running on a tablet, showing the ordering screen">
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Kufi+Arabic:wght@400;600;700&display=swap" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
-
-  <link rel="preload" as="style" href="${css.url}">
-  <link rel="stylesheet" href="${css.url}">${heroPreload}
-  <script>
-    // Paint the stored theme/language before first render to avoid a flash.
-    (function () {
-      try {
-        var th = localStorage.getItem('kassenta_theme');
-        if (th !== 'dark' && th !== 'light') th = 'light';
-        document.documentElement.setAttribute('data-theme', th);
-        var lg = localStorage.getItem('kassenta_lang');
-        if (lg === 'de' || lg === 'ar') {
-          document.documentElement.lang = lg;
-          document.documentElement.dir = lg === 'ar' ? 'rtl' : 'ltr';
-        }
-      } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
-    })();
-  </script>
-  ${jsonLd}
-</head>
-<body>
-  <a class="skip-link" href="#main" ${tAttrs({ en: "Skip to content", de: "Zum Inhalt springen", ar: "\u062A\u062E\u0637\u064E\u0651 \u0625\u0644\u0649 \u0627\u0644\u0645\u062D\u062A\u0648\u0649" })}>Skip to content</a>
-
-  <header class="nav" id="nav">
-    <div class="wrap nav-inner">
-      <a class="brand" href="/" aria-label="Kassenta POS \u2014 home">
-        <img src="/brand/logo-mark.png" alt="" width="30" height="30">
-        <span class="brand-name">Kassenta</span>
-      </a>
-      <nav class="nav-links" id="navLinks" aria-label="Main">
-        ${navHtml}
-        <a class="btn btn-primary cta-mobile" href="/contact/" style="margin-top:10px" ${tAttrs({ en: "Book a demo", de: "Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627" })}>Book a demo</a>
-      </nav>
-      <div class="nav-actions">
-        <button class="icon-btn theme-btn" type="button" onclick="Kassenta.toggleTheme()" aria-label="Toggle colour theme">${icons.sun}${icons.moon}</button>
-        <div class="lang" id="langWrap">
-          <button class="lang-btn" type="button" onclick="Kassenta.toggleLangMenu(event)" aria-haspopup="true" aria-expanded="false">
-            ${icons.globe}<span id="langLabel">EN</span>
-          </button>
-          <div class="lang-menu" role="menu">${langButtons}</div>
-        </div>
-        <a class="btn btn-primary cta-desktop" href="/contact/" ${tAttrs({ en: "Book a demo", de: "Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627" })}>Book a demo</a>
-        <button class="icon-btn nav-toggle" type="button" onclick="Kassenta.toggleNav()" aria-label="Toggle navigation" aria-expanded="false">${icons.menu}</button>
-      </div>
-    </div>
-  </header>
-
-  <main id="main">
-${body}
-  </main>
-
-  ${renderFooter()}
-
-  ${renderWhatsApp()}
-
-  <script src="${js.url}" defer></script>
-</body>
-</html>`;
-}
-function renderWhatsApp() {
-  const number = (process.env.SALES_WHATSAPP || "201010254819").replace(/\D/g, "");
-  if (!number) return "";
-  const greeting = {
-    en: "Hi, I'd like to know more about Kassenta POS.",
-    de: "Hallo, ich interessiere mich f\xFCr Kassenta POS.",
-    ar: "\u0645\u0631\u062D\u0628\u064B\u0627\u060C \u0623\u0648\u062F \u0645\u0639\u0631\u0641\u0629 \u0627\u0644\u0645\u0632\u064A\u062F \u0639\u0646 Kassenta POS."
-  };
-  const link = (lang) => `https://wa.me/${number}?text=${encodeURIComponent(greeting[lang])}`;
-  return `<div class="wa" id="waWidget">
-    <div class="wa-card" role="dialog" aria-label="Chat on WhatsApp">
-      <button class="wa-close" type="button" onclick="Kassenta.closeWhatsApp()" aria-label="Close">${icons.close}</button>
-      <div class="wa-card-head">
-        <span class="wa-avatar">${WHATSAPP_GLYPH}</span>
-        <span>
-          <b>Kassenta</b>
-          <span class="wa-status"><i class="wa-dot"></i><span ${tAttrs({
-    en: "Typically replies within an hour",
-    de: "Antwortet meist innerhalb einer Stunde",
-    ar: "\u064A\u0631\u062F\u0651 \u0639\u0627\u062F\u0629\u064B \u062E\u0644\u0627\u0644 \u0633\u0627\u0639\u0629"
-  })}>Typically replies within an hour</span></span>
-        </span>
-      </div>
-      <p ${tAttrs({
-    en: "Questions about pricing, a specific feature, or moving your menu across? Send us a message.",
-    de: "Fragen zu Preisen, einer bestimmten Funktion oder zur \xDCbernahme Ihrer Karte? Schreiben Sie uns.",
-    ar: "\u0639\u0646\u062F\u0643 \u0633\u0624\u0627\u0644 \u0639\u0646 \u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0623\u0648 \u0645\u064A\u0632\u0629 \u0645\u0639\u064A\u0651\u0646\u0629 \u0623\u0648 \u0646\u0642\u0644 \u0642\u0627\u0626\u0645\u062A\u0643\u061F \u0627\u0628\u0639\u062A\u0644\u0646\u0627 \u0631\u0633\u0627\u0644\u0629."
-  })}>Questions about pricing, a specific feature, or moving your menu across? Send us a message.</p>
-      <a class="btn" href="${link("en")}" target="_blank" rel="noopener"
-         data-wa-en="${esc(link("en"))}" data-wa-de="${esc(link("de"))}" data-wa-ar="${esc(link("ar"))}"
-         ${tAttrs({ en: "Start the chat", de: "Chat starten", ar: "\u0627\u0628\u062F\u0623 \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629" })}>Start the chat</a>
-    </div>
-    <a class="wa-btn" href="${link("en")}" target="_blank" rel="noopener"
-       data-wa-en="${esc(link("en"))}" data-wa-de="${esc(link("de"))}" data-wa-ar="${esc(link("ar"))}"
-       aria-label="Chat with Kassenta on WhatsApp"
-       onclick="Kassenta.closeWhatsApp()"
-       onmouseenter="Kassenta.openWhatsApp()" onfocus="Kassenta.openWhatsApp()">
-      ${WHATSAPP_GLYPH}<span ${tAttrs({ en: "Chat with us", de: "Schreiben Sie uns", ar: "\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627" })}>Chat with us</span>
-    </a>
-  </div>`;
-}
-function renderFooter() {
-  const col = (title, links) => `
-        <div class="footer-col">
-          <h4 ${tAttrs(title)}>${esc(title.en)}</h4>
-          ${links.map(
-    (l) => `<a href="${l.href}"${l.external ? ' target="_blank" rel="noopener"' : ""} ${tAttrs(l.label)}>${esc(l.label.en)}</a>`
-  ).join("\n          ")}
-        </div>`;
-  return `<footer class="footer">
-    <div class="wrap">
-      <div class="footer-grid">
-        <div>
-          <a class="brand" href="/"><img src="/brand/logo-mark.png" alt="" width="30" height="30"><span class="brand-name">Kassenta</span></a>
-          <p ${tAttrs({
-    en: "Point of sale, online ordering and delivery in one system. Built for Swiss and European hospitality and retail.",
-    de: "Kasse, Online-Bestellung und Lieferung in einem System. Entwickelt f\xFCr Gastronomie und Handel in der Schweiz und Europa.",
-    ar: "\u0646\u0642\u0637\u0629 \u0628\u064A\u0639 \u0648\u0637\u0644\u0628 \u0623\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u062A\u0648\u0635\u064A\u0644 \u0641\u064A \u0646\u0638\u0627\u0645 \u0648\u0627\u062D\u062F. \u0645\u0635\u0645\u064E\u0651\u0645 \u0644\u0642\u0637\u0627\u0639 \u0627\u0644\u0636\u064A\u0627\u0641\u0629 \u0648\u0627\u0644\u062A\u062C\u0632\u0626\u0629 \u0641\u064A \u0633\u0648\u064A\u0633\u0631\u0627 \u0648\u0623\u0648\u0631\u0648\u0628\u0627."
-  })}>Point of sale, online ordering and delivery in one system. Built for Swiss and European hospitality and retail.</p>
-        </div>
-        ${col({ en: "Product", de: "Produkt", ar: "\u0627\u0644\u0645\u0646\u062A\u062C" }, [
-    { href: "/features/", label: { en: "Features", de: "Funktionen", ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A" } },
-    { href: "/solutions/", label: { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" } },
-    { href: "/pricing/", label: { en: "Pricing", de: "Preise", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631" } },
-    { href: "/compliance/", label: { en: "Compliance", de: "Compliance", ar: "\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644" } }
-  ])}
-        ${col({ en: "Company", de: "Unternehmen", ar: "\u0627\u0644\u0634\u0631\u0643\u0629" }, [
-    { href: "/about/", label: { en: "About", de: "\xDCber uns", ar: "\u0645\u0646 \u0646\u062D\u0646" } },
-    { href: "/contact/", label: { en: "Contact", de: "Kontakt", ar: "\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627" } },
-    { href: "mailto:info@kassenta.com", label: { en: "info@kassenta.com", de: "info@kassenta.com", ar: "info@kassenta.com" } }
-  ])}
-        ${col({ en: "Access", de: "Zugang", ar: "\u0627\u0644\u062F\u062E\u0648\u0644" }, [
-    { href: "/app", label: { en: "Open the POS", de: "Kasse \xF6ffnen", ar: "\u0627\u0641\u062A\u062D \u0646\u0642\u0637\u0629 \u0627\u0644\u0628\u064A\u0639" } },
-    { href: "/restaurants", label: { en: "Order online", de: "Online bestellen", ar: "\u0627\u0637\u0644\u0628 \u0623\u0648\u0646\u0644\u0627\u064A\u0646" } },
-    { href: "/super_admin/login", label: { en: "Admin login", de: "Admin-Login", ar: "\u062F\u062E\u0648\u0644 \u0627\u0644\u0645\u0634\u0631\u0641" } }
-  ])}
-      </div>
-      <div class="footer-bottom">
-        <span>\xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} Kassenta POS. <span ${tAttrs({
-    en: "All rights reserved.",
-    de: "Alle Rechte vorbehalten.",
-    ar: "\u062C\u0645\u064A\u0639 \u0627\u0644\u062D\u0642\u0648\u0642 \u0645\u062D\u0641\u0648\u0638\u0629."
-  })}>All rights reserved.</span></span>
-        <div class="footer-legal">
-          <a href="/privacy" ${tAttrs({ en: "Privacy", de: "Datenschutz", ar: "\u0627\u0644\u062E\u0635\u0648\u0635\u064A\u0629" })}>Privacy</a>
-          <a href="/terms/" ${tAttrs({ en: "Terms", de: "AGB", ar: "\u0627\u0644\u0634\u0631\u0648\u0637" })}>Terms</a>
-          <a href="/imprint/" ${tAttrs({ en: "Imprint", de: "Impressum", ar: "\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0646\u0627\u0634\u0631" })}>Imprint</a>
-          <a href="/delete-account" ${tAttrs({ en: "Delete account", de: "Konto l\xF6schen", ar: "\u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628" })}>Delete account</a>
-        </div>
-      </div>
-      <div class="footer-maker">
-        <span ${tAttrs({
-    en: "Built by Barmagly",
-    de: "Entwickelt von Barmagly",
-    ar: "\u062A\u0645\u062A \u0627\u0644\u0628\u0631\u0645\u062C\u0629 \u0628\u0648\u0627\u0633\u0637\u0629 \u0634\u0631\u0643\u0629 \u0628\u0631\u0645\u062C\u0644\u064A"
-  })}>Built by Barmagly</span>
-        <a href="https://barmagly.tech/" target="_blank" rel="noopener">barmagly.tech</a>
-        <span class="uid" dir="ltr" title="Swiss company identification number">
-          <span ${tAttrs({
-    en: "Swiss company ID",
-    de: "Schweizer UID",
-    ar: "\u062A\u0631\u062E\u064A\u0635 \u0633\u0648\u064A\u0633\u0631\u064A \u0631\u0633\u0645\u064A"
-  })}>Swiss company ID</span>
-          <b>CHE-154.312.079</b>
-        </span>
-      </div>
-    </div>
-  </footer>`;
-}
-var import_crypto6, hash8, assetCache, I, icons, WHATSAPP_GLYPH, NAV, FLAGS, SITE_JS;
-var init_shell = __esm({
-  "server/site/shell.ts"() {
-    "use strict";
-    import_crypto6 = require("crypto");
-    init_design();
-    hash8 = (s) => (0, import_crypto6.createHash)("sha256").update(s).digest("hex").slice(0, 8);
-    assetCache = null;
-    I = (d, extra = "") => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${d}</svg>`;
-    icons = {
-      check: I(`<polyline points="20 6 9 17 4 12"/>`),
-      arrowRight: I(`<line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/>`),
-      sun: I(`<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>`, ` class="i-sun"`),
-      moon: I(`<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>`, ` class="i-moon"`),
-      menu: I(`<line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>`),
-      globe: I(`<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z"/>`),
-      register: I(`<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v3M7 13h4M7 16h2"/>`),
-      chart: I(`<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>`),
-      truck: I(`<path d="M2 7h11v9H2zM13 10h4l4 3.2V16h-8z"/><circle cx="6.5" cy="18.5" r="1.6"/><circle cx="17" cy="18.5" r="1.6"/>`),
-      phone: I(`<path d="M5 3h3l2 5-2.2 1.3a12 12 0 0 0 5.9 5.9L15 13l5 2v3a2 2 0 0 1-2.2 2A17 17 0 0 1 3 5.2 2 2 0 0 1 5 3z"/>`),
-      shield: I(`<path d="M12 3l7 3v6c0 4.6-3 8-7 9-4-1-7-4.4-7-9V6z"/><polyline points="9 12 11.2 14.2 15.5 9.9"/>`),
-      cloud: I(`<path d="M7 18h9.5a3.5 3.5 0 0 0 .4-7A5.5 5.5 0 0 0 6.3 9.6 4.2 4.2 0 0 0 7 18z"/>`),
-      users: I(`<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.3a3.2 3.2 0 0 1 0 6.4M17.5 20a5.6 5.6 0 0 0-2-4.3"/>`),
-      box: I(`<path d="M12 3l8 4.2v9.6L12 21l-8-4.2V7.2z"/><path d="M4 7.2l8 4.2 8-4.2M12 11.4V21"/>`),
-      tag: I(`<path d="M3 12.5V4a1 1 0 0 1 1-1h8.5L21 11.5 12.5 20z"/><circle cx="7.5" cy="7.5" r="1.3"/>`),
-      clock: I(`<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>`),
-      layers: I(`<path d="M12 3l9 4.5-9 4.5-9-4.5z"/><path d="M3 12.5l9 4.5 9-4.5M3 17l9 4.5 9-4.5"/>`),
-      printer: I(`<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="7" rx="2"/><rect x="7" y="14" width="10" height="7" rx="1"/>`),
-      wifiOff: I(`<path d="M2 8.8A16 16 0 0 1 8 5.4M22 8.8a16 16 0 0 0-5.4-3.2M5.5 12.6A11 11 0 0 1 9 10.6M18.5 12.6a11 11 0 0 0-2.6-1.6M8.8 16.3a6 6 0 0 1 6.4 0"/><circle cx="12" cy="20" r="1"/><line x1="3" y1="3" x2="21" y2="21"/>`),
-      lock: I(`<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>`),
-      scale: I(`<path d="M12 3v18M7 21h10M6 7l-3 6h6zM18 7l-3 6h6zM4 7h16"/>`),
-      pill: I(`<rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-45 12 12)"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/>`),
-      cart: I(`<circle cx="9.5" cy="19" r="1.5"/><circle cx="17.5" cy="19" r="1.5"/><path d="M2 3h2.2l2.6 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.5L20 7H6"/>`),
-      coffee: I(`<path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 9.5h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M7 2.5v2M11 2.5v2"/>`),
-      mail: I(`<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3.5 6.5 12 12.8 20.5 6.5"/>`),
-      pin: I(`<path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>`),
-      building: I(`<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/>`),
-      puzzle: I(`<path d="M10 4h4v2.2a1.8 1.8 0 1 0 3.6 0V4H20v4h-2.2a1.8 1.8 0 1 0 0 3.6H20V20h-4v-2.2a1.8 1.8 0 1 0-3.6 0V20H4v-4h2.2a1.8 1.8 0 1 0 0-3.6H4V8h6z"/>`),
-      refresh: I(`<path d="M20 11A8 8 0 0 0 6.3 6.3L4 8.5"/><polyline points="4 4 4 8.5 8.5 8.5"/><path d="M4 13a8 8 0 0 0 13.7 4.7L20 15.5"/><polyline points="20 20 20 15.5 15.5 15.5"/>`),
-      qr: I(`<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20h1"/>`),
-      bell: I(`<path d="M18 15V10a6 6 0 0 0-12 0v5l-1.6 2.4h15.2z"/><path d="M10 20a2 2 0 0 0 4 0"/>`),
-      key: I(`<circle cx="8" cy="14" r="4"/><path d="M11 11.5L20 3M17 5.5l2 2M15.5 7l1.5 1.5"/>`),
-      close: I(`<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>`)
-    };
-    WHATSAPP_GLYPH = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.87 9.87 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 1.67c2.2 0 4.27.86 5.83 2.42a8.2 8.2 0 0 1 2.41 5.82c0 4.54-3.7 8.24-8.25 8.24a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24zm-3.2 4.4c-.15 0-.4.06-.61.28-.21.22-.8.78-.8 1.9s.82 2.21.94 2.36c.11.15 1.6 2.44 3.88 3.42.54.23.96.37 1.29.48.54.17 1.04.15 1.43.09.44-.07 1.34-.55 1.53-1.08.19-.53.19-.98.13-1.08-.06-.09-.21-.15-.44-.26-.23-.11-1.34-.66-1.55-.74-.21-.07-.36-.11-.51.12-.15.22-.58.73-.71.88-.13.15-.26.17-.49.06-.23-.11-.96-.36-1.83-1.13-.68-.6-1.13-1.35-1.27-1.57-.13-.23-.01-.35.1-.46.1-.1.23-.26.34-.4.11-.13.15-.22.23-.37.07-.15.04-.28-.02-.4-.06-.11-.5-1.23-.7-1.68-.18-.44-.37-.38-.51-.39h-.43z"/></svg>`;
-    NAV = [
-      { path: "/features", label: { en: "Features", de: "Funktionen", ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A" } },
-      { path: "/solutions", label: { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" } },
-      { path: "/pricing", label: { en: "Pricing", de: "Preise", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631" } },
-      { path: "/compliance", label: { en: "Compliance", de: "Compliance", ar: "\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644" } },
-      { path: "/about", label: { en: "About", de: "\xDCber uns", ar: "\u0645\u0646 \u0646\u062D\u0646" } },
-      { path: "/contact", label: { en: "Contact", de: "Kontakt", ar: "\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627" } }
-    ];
-    FLAGS = {
-      en: `<svg class="flag" viewBox="0 0 60 30"><clipPath id="fen"><path d="M0 0h60v30H0z"/></clipPath><g clip-path="url(#fen)"><path d="M0 0h60v30H0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30m0-30L0 30" stroke="#C8102E" stroke-width="4"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/></g></svg>`,
-      de: `<svg class="flag" viewBox="0 0 5 3"><path fill="#000" d="M0 0h5v1H0z"/><path fill="#D00" d="M0 1h5v1H0z"/><path fill="#FFCE00" d="M0 2h5v1H0z"/></svg>`,
-      ar: `<svg class="flag" viewBox="0 0 6 4"><path fill="#007A3D" d="M0 0h6v4H0z"/><path fill="#fff" d="M2 1.4h2.4v.5H2zM2 2.1h2.4v.5H2z"/></svg>`
-    };
-    SITE_JS = String.raw`
-window.Kassenta = (function () {
-  var LANGS = { en: 'EN', de: 'DE', ar: 'AR' };
-  var DIR = { en: 'ltr', de: 'ltr', ar: 'rtl' };
-  var lang = 'en';
-
-  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-  function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-
-  function applyLang(l) {
-    if (!LANGS[l]) l = 'en';
-    lang = l;
-    var root = document.documentElement;
-    root.lang = l;
-    root.dir = DIR[l];
-    document.querySelectorAll('[data-' + l + ']').forEach(function (el) {
-      var v = el.getAttribute('data-' + l);
-      if (v !== null) el.textContent = v;
-    });
-    document.querySelectorAll('[data-alt-' + l + ']').forEach(function (el) {
-      var v = el.getAttribute('data-alt-' + l);
-      if (v !== null) el.setAttribute('alt', v);
-    });
-    // WhatsApp deep links carry a pre-filled message, so they change with the language.
-    document.querySelectorAll('[data-wa-' + l + ']').forEach(function (el) {
-      var v = el.getAttribute('data-wa-' + l);
-      if (v !== null) el.setAttribute('href', v);
-    });
-    var label = document.getElementById('langLabel');
-    if (label) label.textContent = LANGS[l];
-    document.querySelectorAll('.lang-menu button').forEach(function (b) {
-      var on = b.dataset.lang === l;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-checked', on ? 'true' : 'false');
-    });
-  }
-
-  function setLang(l) { store('kassenta_lang', l); applyLang(l); closeLangMenu(); }
-
-  function applyTheme(mode) {
-    document.documentElement.setAttribute('data-theme', mode);
-    var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', mode === 'dark' ? '#040E32' : '#FFFFFF');
-  }
-  function toggleTheme() {
-    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    store('kassenta_theme', next);
-    applyTheme(next);
-  }
-
-  function toggleNav() {
-    var el = document.getElementById('navLinks');
-    var btn = document.querySelector('.nav-toggle');
-    var open = el.classList.toggle('open');
-    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  }
-  function toggleLangMenu(e) {
-    if (e) e.stopPropagation();
-    var w = document.getElementById('langWrap');
-    var open = w.classList.toggle('open');
-    w.querySelector('.lang-btn').setAttribute('aria-expanded', open ? 'true' : 'false');
-  }
-  function closeLangMenu() {
-    var w = document.getElementById('langWrap');
-    if (!w) return;
-    w.classList.remove('open');
-    w.querySelector('.lang-btn').setAttribute('aria-expanded', 'false');
-  }
-
-  document.addEventListener('click', function (e) { if (!e.target.closest('.lang')) closeLangMenu(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeLangMenu(); });
-
-  var nav = document.getElementById('nav');
-  var onScroll = function () { nav.classList.toggle('scrolled', window.scrollY > 24); };
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
-
-  if ('IntersectionObserver' in window) {
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('visible'); io.unobserve(en.target); } });
-    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
-    document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
-  } else {
-    document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('visible'); });
-  }
-
-  // ?lang=de wins over the stored preference so hreflang links land on the
-  // right language for a first-time visitor arriving from search.
-  var urlLang = new URLSearchParams(location.search).get('lang');
-  if (urlLang && LANGS[urlLang]) { store('kassenta_lang', urlLang); applyLang(urlLang); }
-  else applyLang(read('kassenta_lang') || 'en');
-  applyTheme(read('kassenta_theme') === 'dark' ? 'dark' : 'light');
-
-  /* ── WhatsApp launcher ────────────────────────────────────────────────────
-     The greeting card opens itself once per visitor. Dismissing it is
-     remembered, because a bubble that reappears on every page of a seven-page
-     site stops being an invitation and starts being an obstacle. */
-  var wa = document.getElementById('waWidget');
-  var WA_SEEN = 'kassenta_wa_seen';
-
-  function openWhatsApp() { if (wa) wa.classList.add('open'); }
-  function closeWhatsApp() {
-    if (!wa) return;
-    wa.classList.remove('open');
-    store(WA_SEEN, '1');
-  }
-
-  if (wa) {
-    if (!read(WA_SEEN)) {
-      // Late enough that it does not compete with the hero, early enough to be
-      // seen before the visitor scrolls away.
-      setTimeout(openWhatsApp, 5000);
-    }
-    wa.addEventListener('mouseleave', function () { if (read(WA_SEEN)) wa.classList.remove('open'); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeWhatsApp(); });
-    document.addEventListener('click', function (e) {
-      if (wa.classList.contains('open') && !e.target.closest('#waWidget')) wa.classList.remove('open');
-    });
-  }
-
-  return {
-    setLang: setLang,
-    toggleTheme: toggleTheme,
-    toggleNav: toggleNav,
-    toggleLangMenu: toggleLangMenu,
-    openWhatsApp: openWhatsApp,
-    closeWhatsApp: closeWhatsApp,
-  };
-})();
-`;
-  }
-});
-
-// server/site/pages.ts
-var head, card, ticks, faq, ctaBand, pageHead, home, features, INDUSTRY_ART, vertical, solutions, plan, pricing, compliance, about, contact, PAGES;
-var init_pages = __esm({
-  "server/site/pages.ts"() {
-    "use strict";
-    init_shell();
-    head = (eyebrow, title, lead, center = false) => `
-      <div class="section-head${center ? " section-head--center" : ""} reveal">
-        <span class="eyebrow" ${tAttrs(eyebrow)}>${esc(eyebrow.en)}</span>
-        <h2 ${tAttrs(title)}>${esc(title.en)}</h2>
-        ${lead ? `<p class="lead"${center ? ' style="margin-inline:auto"' : ""} ${tAttrs(lead)}>${esc(lead.en)}</p>` : ""}
-      </div>`;
-    card = (icon, title, body) => `
-        <article class="card card--hover reveal">
-          <div class="card-icon">${icon}</div>
-          <h3 ${tAttrs(title)}>${esc(title.en)}</h3>
-          <p ${tAttrs(body)}>${esc(body.en)}</p>
-        </article>`;
-    ticks = (items) => `<ul class="tick-list">${items.map((i) => `<li>${icons.check}<span ${tAttrs(i)}>${esc(i.en)}</span></li>`).join("")}</ul>`;
-    faq = (items) => `
-      <div class="faq reveal">
-        ${items.map(
-      (i) => `<details>
-          <summary><span ${tAttrs(i.q)}>${esc(i.q.en)}</span></summary>
-          <div class="answer" ${tAttrs(i.a)}>${esc(i.a.en)}</div>
-        </details>`
-    ).join("")}
-      </div>`;
-    ctaBand = (title, body) => `
-  <section class="section">
-    <div class="wrap">
-      <div class="cta-band reveal">
-        <h2 ${tAttrs(title)}>${esc(title.en)}</h2>
-        <p ${tAttrs(body)}>${esc(body.en)}</p>
-        <div class="btn-row">
-          <a class="btn btn-primary" href="/contact/" ${tAttrs({ en: "Book a demo", de: "Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u062A\u0648\u0636\u064A\u062D\u064A\u064B\u0627" })}>Book a demo</a>
-          <a class="btn btn-ghost" href="/pricing/" ${tAttrs({ en: "See pricing", de: "Preise ansehen", ar: "\u0634\u0627\u0647\u062F \u0627\u0644\u0623\u0633\u0639\u0627\u0631" })}>See pricing</a>
-        </div>
-      </div>
-    </div>
-  </section>`;
-    pageHead = (title, lead, crumb) => `
-  <section class="page-head">
-    <div class="wrap">
-      <div class="crumbs"><a href="/" ${tAttrs({ en: "Home", de: "Start", ar: "\u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629" })}>Home</a><span>/</span><span ${tAttrs(crumb)}>${esc(crumb.en)}</span></div>
-      <h1 ${tAttrs(title)}>${esc(title.en)}</h1>
-      <p class="lead" ${tAttrs(lead)}>${esc(lead.en)}</p>
-    </div>
-  </section>`;
-    home = {
-      meta: {
-        path: "/",
-        title: {
-          en: "Kassenta POS \u2014 till, online ordering and delivery",
-          de: "Kassenta POS \u2014 Kasse, Online-Bestellung und Lieferung",
-          ar: "Kassenta POS \u2014 \u0643\u0627\u0634\u064A\u0631 \u0648\u0637\u0644\u0628 \u0623\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u062A\u0648\u0635\u064A\u0644"
-        },
-        description: {
-          en: "One system for the till, your own online shop and delivery. Swiss VAT, CHF rounding and TWINT built in. Runs on phone, tablet and desktop.",
-          de: "Ein System f\xFCr Kasse, eigenen Online-Shop und Lieferung. Schweizer MwSt., Rappenrundung und TWINT integriert. F\xFCr Handy, Tablet und Desktop.",
-          ar: "\u0646\u0638\u0627\u0645 \u0648\u0627\u062D\u062F \u0644\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0645\u062A\u062C\u0631\u0643 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644. \u0636\u0631\u064A\u0628\u0629 \u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u062A\u0642\u0631\u064A\u0628 CHF \u0648TWINT \u0645\u062F\u0645\u062C\u0629. \u064A\u0639\u0645\u0644 \u0639\u0644\u0649 \u0627\u0644\u0647\u0627\u062A\u0641 \u0648\u0627\u0644\u062A\u0627\u0628\u0644\u062A \u0648\u0627\u0644\u0643\u0645\u0628\u064A\u0648\u062A\u0631."
-        },
-        heroImage: "hero-pos-tablet",
-        jsonLd: [
-          {
-            "@context": "https://schema.org",
-            "@type": "SoftwareApplication",
-            name: "Kassenta POS",
-            applicationCategory: "BusinessApplication",
-            applicationSubCategory: "Point of Sale",
-            operatingSystem: "Web, Android, iOS",
-            url: "https://kassenta.com/",
-            image: "https://kassenta.com/brand/og-image.jpg",
-            inLanguage: ["en", "de", "ar"],
-            featureList: [
-              "Touch point of sale",
-              "Branded online storefront",
-              "Table QR ordering",
-              "Delivery dispatch and driver tracking",
-              "Inventory and stock counts",
-              "Customer records and loyalty",
-              "Swiss VAT and CHF cash rounding",
-              "VAT-ready reporting with CSV export"
-            ],
-            offers: {
-              "@type": "AggregateOffer",
-              priceCurrency: "CHF",
-              lowPrice: "49",
-              highPrice: "199",
-              offerCount: 3,
-              url: "https://kassenta.com/pricing/"
-            },
-            description: "Point of sale, online ordering and delivery management for hospitality and retail in Switzerland and Europe."
-          },
-          {
-            "@context": "https://schema.org",
-            "@type": "Organization",
-            name: "Kassenta",
-            alternateName: "Kassenta POS System",
-            url: "https://kassenta.com",
-            logo: "https://kassenta.com/brand/logo-mark.png",
-            image: "https://kassenta.com/brand/og-image.jpg",
-            email: "info@kassenta.com",
-            areaServed: ["CH", "DE", "AT", "FR", "IT"],
-            identifier: {
-              "@type": "PropertyValue",
-              propertyID: "CHE",
-              name: "Swiss company identification number (UID)",
-              value: "CHE-154.312.079"
-            },
-            parentOrganization: { "@type": "Organization", name: "Barmagly", url: "https://barmagly.tech/" },
-            contactPoint: {
-              "@type": "ContactPoint",
-              contactType: "sales",
-              email: "info@kassenta.com",
-              availableLanguage: ["English", "German", "Arabic"]
-            }
-          },
-          {
-            "@context": "https://schema.org",
-            "@type": "WebSite",
-            name: "Kassenta POS",
-            url: "https://kassenta.com/",
-            inLanguage: ["en", "de", "ar"],
-            publisher: { "@type": "Organization", name: "Kassenta" }
-          },
-          {
-            // Mirrors the FAQ section below — Google can surface these directly in
-            // the result. Keep the two in sync when the copy changes.
-            "@context": "https://schema.org",
-            "@type": "FAQPage",
-            mainEntity: [
-              {
-                "@type": "Question",
-                name: "Do I need to buy special hardware?",
-                acceptedAnswer: {
-                  "@type": "Answer",
-                  text: "No. Kassenta runs in any modern browser and as an app on Android and iOS, so an existing tablet or laptop is enough to start. Receipt printers, cash drawers and barcode scanners are supported but optional."
-                }
-              },
-              {
-                "@type": "Question",
-                name: "What happens if the internet drops?",
-                acceptedAnswer: {
-                  "@type": "Answer",
-                  text: "The POS keeps taking orders and payments from its local cache and syncs the queue once the connection returns. Online ordering and driver tracking need connectivity, since they involve people outside the building."
-                }
-              },
-              {
-                "@type": "Question",
-                name: "Can I move my existing products and customers in?",
-                acceptedAnswer: {
-                  "@type": "Answer",
-                  text: "Yes. Products, categories and customers import from CSV, and we do the first import with you during onboarding so the mapping is right before you go live."
-                }
-              },
-              {
-                "@type": "Question",
-                name: "How many branches can one account hold?",
-                acceptedAnswer: {
-                  "@type": "Answer",
-                  text: "As many as you need. Each branch keeps its own stock, staff and prices while the owner console reports across all of them together."
-                }
-              },
-              {
-                "@type": "Question",
-                name: "Is my data locked in?",
-                acceptedAnswer: {
-                  "@type": "Answer",
-                  text: "No. Sales, products and customers can be exported to CSV at any time from the reporting screens, and a full export can be requested from support."
-                }
-              }
-            ]
-          }
-        ]
-      },
-      body: `
-  <section class="hero">
-    <div class="wrap">
-      <div class="split split--wide-left">
-        <div>
-          <span class="badge" ${tAttrs({ en: "Built for Switzerland and the EU", de: "F\xFCr die Schweiz und die EU gebaut", ar: "\u0645\u0635\u0645\u064E\u0651\u0645 \u0644\u0633\u0648\u064A\u0633\u0631\u0627 \u0648\u0627\u0644\u0627\u062A\u062D\u0627\u062F \u0627\u0644\u0623\u0648\u0631\u0648\u0628\u064A" })}>Built for Switzerland and the EU</span>
-          <h1 style="margin-top:18px" ${tAttrs({
-        en: "One system for the till, the shop and the road",
-        de: "Ein System f\xFCr Kasse, Shop und Lieferung",
-        ar: "\u0646\u0638\u0627\u0645 \u0648\u0627\u062D\u062F \u0644\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0627\u0644\u0645\u062A\u062C\u0631 \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644"
-      })}>One system for the till, the shop and the road</h1>
-          <p class="lead" ${tAttrs({
-        en: "Kassenta replaces the patchwork of a POS terminal, an ordering website, a delivery app and a spreadsheet. Every order \u2014 counter, table QR, phone or online \u2014 lands in the same queue, with the same stock and the same reports.",
-        de: "Kassenta ersetzt das Flickwerk aus Kassenterminal, Bestellwebsite, Liefer-App und Tabellenkalkulation. Jede Bestellung \u2014 Theke, Tisch-QR, Telefon oder online \u2014 landet in derselben Warteschlange, mit demselben Bestand und denselben Berichten.",
-        ar: "\u064A\u0633\u062A\u0628\u062F\u0644 Kassenta \u062E\u0644\u064A\u0637 \u0623\u062C\u0647\u0632\u0629 \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0645\u0648\u0642\u0639 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0648\u062A\u0637\u0628\u064A\u0642 \u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u0648\u062C\u062F\u0627\u0648\u0644 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A. \u0643\u0644 \u0637\u0644\u0628 \u2014 \u0645\u0646 \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0623\u0648 QR \u0627\u0644\u0637\u0627\u0648\u0644\u0629 \u0623\u0648 \u0627\u0644\u0647\u0627\u062A\u0641 \u0623\u0648 \u0627\u0644\u0625\u0646\u062A\u0631\u0646\u062A \u2014 \u064A\u0635\u0644 \u0625\u0644\u0649 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0646\u0641\u0633\u0647\u0627\u060C \u0628\u0627\u0644\u0645\u062E\u0632\u0648\u0646 \u0646\u0641\u0633\u0647 \u0648\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631 \u0646\u0641\u0633\u0647\u0627."
-      })}>Kassenta replaces the patchwork of a POS terminal, an ordering website, a delivery app and a spreadsheet. Every order \u2014 counter, table QR, phone or online \u2014 lands in the same queue, with the same stock and the same reports.</p>
-          <div class="btn-row">
-            <a class="btn btn-primary" href="/contact/">${icons.arrowRight}<span ${tAttrs({ en: "Book a live demo", de: "Live-Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u0645\u0628\u0627\u0634\u0631\u064B\u0627" })}>Book a live demo</span></a>
-            <a class="btn btn-ghost" href="/features/" ${tAttrs({ en: "Explore the platform", de: "Plattform ansehen", ar: "\u0627\u0633\u062A\u0643\u0634\u0641 \u0627\u0644\u0645\u0646\u0635\u0629" })}>Explore the platform</a>
-          </div>
-          <div class="hero-meta">
-            <div><b>3</b><span ${tAttrs({ en: "Languages: EN / DE / AR", de: "Sprachen: EN / DE / AR", ar: "\u0644\u063A\u0627\u062A: EN / DE / AR" })}>Languages: EN / DE / AR</span></div>
-            <div><b>8.1%</b><span ${tAttrs({ en: "Swiss VAT handled", de: "Schweizer MwSt. ber\xFCcksichtigt", ar: "\u0636\u0631\u064A\u0628\u0629 \u0633\u0648\u064A\u0633\u0631\u0627 \u0645\u062F\u0639\u0648\u0645\u0629" })}>Swiss VAT handled</span></div>
-            <div><b>0.05</b><span ${tAttrs({ en: "CHF cash rounding", de: "CHF-Rappenrundung", ar: "\u062A\u0642\u0631\u064A\u0628 \u0646\u0642\u062F\u064A CHF" })}>CHF cash rounding</span></div>
-            <div><b>24/7</b><span ${tAttrs({ en: "Cloud availability", de: "Cloud-Verf\xFCgbarkeit", ar: "\u062A\u0648\u0627\u0641\u0631 \u0633\u062D\u0627\u0628\u064A" })}>Cloud availability</span></div>
-          </div>
-        </div>
-        <div class="reveal">
-          ${shot({ id: "hero-pos-tablet", ratio: "4 / 5", size: "1122 \xD7 1402", priority: true, alt: { en: "Kassenta POS running on a tablet at a restaurant counter", de: "Kassenta POS auf einem Tablet an der Theke eines Restaurants", ar: "Kassenta POS \u064A\u0639\u0645\u0644 \u0639\u0644\u0649 \u062A\u0627\u0628\u0644\u062A \u0639\u0646\u062F \u0643\u0627\u0634\u064A\u0631 \u0645\u0637\u0639\u0645" } })}
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section--tight">
-    <div class="wrap">
-      <div class="stat-strip reveal">
-        <div><b ${tAttrs({ en: "Counter", de: "Theke", ar: "\u0627\u0644\u0643\u0627\u0634\u064A\u0631" })}>Counter</b><span ${tAttrs({ en: "Touch POS on any screen", de: "Touch-Kasse auf jedem Bildschirm", ar: "\u0643\u0627\u0634\u064A\u0631 \u0644\u0645\u0633\u064A \u0639\u0644\u0649 \u0623\u064A \u0634\u0627\u0634\u0629" })}>Touch POS on any screen</span></div>
-        <div><b ${tAttrs({ en: "Online", de: "Online", ar: "\u0623\u0648\u0646\u0644\u0627\u064A\u0646" })}>Online</b><span ${tAttrs({ en: "Your own branded storefront", de: "Eigener Shop im Branding", ar: "\u0645\u062A\u062C\u0631\u0643 \u0628\u0647\u0648\u064A\u062A\u0643 \u0627\u0644\u062E\u0627\u0635\u0629" })}>Your own branded storefront</span></div>
-        <div><b ${tAttrs({ en: "Tables", de: "Tische", ar: "\u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A" })}>Tables</b><span ${tAttrs({ en: "QR ordering per seat", de: "QR-Bestellung pro Platz", ar: "\u0637\u0644\u0628 \u0628\u0640QR \u0644\u0643\u0644 \u0637\u0627\u0648\u0644\u0629" })}>QR ordering per seat</span></div>
-        <div><b ${tAttrs({ en: "Delivery", de: "Lieferung", ar: "\u0627\u0644\u062A\u0648\u0635\u064A\u0644" })}>Delivery</b><span ${tAttrs({ en: "Drivers, zones and tracking", de: "Fahrer, Zonen und Tracking", ar: "\u0633\u0627\u0626\u0642\u0648\u0646 \u0648\u0645\u0646\u0627\u0637\u0642 \u0648\u062A\u062A\u0628\u0651\u0639" })}>Drivers, zones and tracking</span></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section section--alt">
-    <div class="wrap">
-      ${head(
-        { en: "The platform", de: "Die Plattform", ar: "\u0627\u0644\u0645\u0646\u0635\u0629" },
-        { en: "Four products, one database", de: "Vier Produkte, eine Datenbank", ar: "\u0623\u0631\u0628\u0639\u0629 \u0645\u0646\u062A\u062C\u0627\u062A\u060C \u0642\u0627\u0639\u062F\u0629 \u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0627\u062D\u062F\u0629" },
-        {
-          en: "Stock, prices, customers and taxes are defined once. Every surface reads from the same place, so a sold-out item disappears from the online menu the second the counter sells the last one.",
-          de: "Bestand, Preise, Kunden und Steuern werden einmal definiert. Jede Oberfl\xE4che liest aus derselben Quelle \u2014 ein ausverkaufter Artikel verschwindet in dem Moment aus der Online-Karte, in dem die Theke den letzten verkauft.",
-          ar: "\u064A\u064F\u0639\u0631\u064E\u0651\u0641 \u0627\u0644\u0645\u062E\u0632\u0648\u0646 \u0648\u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0648\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u0627\u0644\u0636\u0631\u0627\u0626\u0628 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629. \u0643\u0644 \u0627\u0644\u0648\u0627\u062C\u0647\u0627\u062A \u062A\u0642\u0631\u0623 \u0645\u0646 \u0627\u0644\u0645\u0635\u062F\u0631 \u0646\u0641\u0633\u0647\u060C \u0641\u064A\u062E\u062A\u0641\u064A \u0627\u0644\u0635\u0646\u0641 \u0627\u0644\u0645\u0646\u062A\u0647\u064A \u0645\u0646 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0629 \u0644\u062D\u0638\u0629 \u0628\u064A\u0639 \u0622\u062E\u0631 \u0642\u0637\u0639\u0629 \u0639\u0644\u0649 \u0627\u0644\u0643\u0627\u0634\u064A\u0631."
-        },
-        true
-      )}
-      <div class="grid grid-4">
-        ${card(icons.register, { en: "POS application", de: "Kassen-App", ar: "\u062A\u0637\u0628\u064A\u0642 \u0627\u0644\u0643\u0627\u0634\u064A\u0631" }, {
-        en: "Touch-first ordering, split payments, discounts, shift handover and end-of-day cash-up. Runs in the browser and as a native Android and iOS app.",
-        de: "Touch-orientierte Bestellung, Teilzahlungen, Rabatte, Schicht\xFCbergabe und Tagesabschluss. L\xE4uft im Browser sowie als native Android- und iOS-App.",
-        ar: "\u0637\u0644\u0628 \u0628\u0627\u0644\u0644\u0645\u0633\u060C \u0648\u062F\u0641\u0639 \u0645\u0642\u0633\u064E\u0651\u0645\u060C \u0648\u062E\u0635\u0648\u0645\u0627\u062A\u060C \u0648\u062A\u0633\u0644\u064A\u0645 \u0627\u0644\u0648\u0631\u062F\u064A\u0627\u062A\u060C \u0648\u062A\u0642\u0641\u064A\u0644 \u0627\u0644\u064A\u0648\u0645. \u064A\u0639\u0645\u0644 \u0641\u064A \u0627\u0644\u0645\u062A\u0635\u0641\u062D \u0648\u0643\u062A\u0637\u0628\u064A\u0642 \u0623\u0646\u062F\u0631\u0648\u064A\u062F \u0648iOS \u0623\u0635\u0644\u064A."
-      })}
-        ${card(icons.cart, { en: "Customer storefront", de: "Kunden-Shop", ar: "\u0645\u062A\u062C\u0631 \u0627\u0644\u0639\u0645\u0644\u0627\u0621" }, {
-        en: "A branded ordering page per business, with menus, options, promo codes, scheduled orders and delivery-zone pricing.",
-        de: "Eine gebrandete Bestellseite pro Betrieb, mit Karte, Optionen, Gutscheinen, Vorbestellungen und Zonenpreisen.",
-        ar: "\u0635\u0641\u062D\u0629 \u0637\u0644\u0628 \u0628\u0647\u0648\u064A\u0629 \u0643\u0644 \u0645\u062A\u062C\u0631\u060C \u0645\u0639 \u0627\u0644\u0642\u0648\u0627\u0626\u0645 \u0648\u0627\u0644\u062E\u064A\u0627\u0631\u0627\u062A \u0648\u0623\u0643\u0648\u0627\u062F \u0627\u0644\u062E\u0635\u0645 \u0648\u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u0645\u062C\u062F\u0648\u0644\u0629 \u0648\u062A\u0633\u0639\u064A\u0631 \u0645\u0646\u0627\u0637\u0642 \u0627\u0644\u062A\u0648\u0635\u064A\u0644."
-      })}
-        ${card(icons.truck, { en: "Delivery operations", de: "Lieferbetrieb", ar: "\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062A\u0648\u0635\u064A\u0644" }, {
-        en: "Assign drivers, broadcast open orders, follow the status pipeline and send customers a live tracking link.",
-        de: "Fahrer zuweisen, offene Auftr\xE4ge ausschreiben, Statusverlauf verfolgen und Kunden einen Live-Tracking-Link senden.",
-        ar: "\u0625\u0633\u0646\u0627\u062F \u0627\u0644\u0633\u0627\u0626\u0642\u064A\u0646\u060C \u0648\u0628\u062B\u0651 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u0645\u0641\u062A\u0648\u062D\u0629\u060C \u0648\u0645\u062A\u0627\u0628\u0639\u0629 \u0645\u0631\u0627\u062D\u0644 \u0627\u0644\u062D\u0627\u0644\u0629\u060C \u0648\u0625\u0631\u0633\u0627\u0644 \u0631\u0627\u0628\u0637 \u062A\u062A\u0628\u0651\u0639 \u0645\u0628\u0627\u0634\u0631 \u0644\u0644\u0639\u0645\u064A\u0644."
-      })}
-        ${card(icons.layers, { en: "Owner console", de: "Betreiber-Konsole", ar: "\u0644\u0648\u062D\u0629 \u0627\u0644\u0645\u0627\u0644\u0643" }, {
-        en: "Multi-branch overview, licences, staff roles and reporting across every location from one login.",
-        de: "Filial\xFCbersicht, Lizenzen, Mitarbeiterrollen und Auswertungen \xFCber alle Standorte mit einem Login.",
-        ar: "\u0646\u0638\u0631\u0629 \u0634\u0627\u0645\u0644\u0629 \u0639\u0644\u0649 \u0627\u0644\u0641\u0631\u0648\u0639\u060C \u0648\u0627\u0644\u062A\u0631\u0627\u062E\u064A\u0635\u060C \u0648\u0623\u062F\u0648\u0627\u0631 \u0627\u0644\u0645\u0648\u0638\u0641\u064A\u0646\u060C \u0648\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631 \u0644\u0643\u0644 \u0627\u0644\u0645\u0648\u0627\u0642\u0639 \u0645\u0646 \u062D\u0633\u0627\u0628 \u0648\u0627\u062D\u062F."
-      })}
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="wrap">
-      <div class="split">
-        <div class="reveal">
-          ${shot({ id: "home-order-flow", ratio: "16 / 9", size: "1600 \xD7 900", alt: { en: "Order flow from customer to kitchen to driver", de: "Bestellablauf vom Kunden \xFCber die K\xFCche zum Fahrer", ar: "\u0645\u0633\u0627\u0631 \u0627\u0644\u0637\u0644\u0628 \u0645\u0646 \u0627\u0644\u0639\u0645\u064A\u0644 \u0625\u0644\u0649 \u0627\u0644\u0645\u0637\u0628\u062E \u0625\u0644\u0649 \u0627\u0644\u0633\u0627\u0626\u0642" } })}
-        </div>
-        <div>
-          ${head(
-        { en: "How it flows", de: "Der Ablauf", ar: "\u0643\u064A\u0641 \u064A\u0633\u064A\u0631 \u0627\u0644\u0639\u0645\u0644" },
-        { en: "From tap to doorstep without re-typing anything", de: "Vom Tippen bis zur Haust\xFCr \u2014 ohne Doppelerfassung", ar: "\u0645\u0646 \u0627\u0644\u0636\u063A\u0637\u0629 \u0625\u0644\u0649 \u0628\u0627\u0628 \u0627\u0644\u0639\u0645\u064A\u0644 \u062F\u0648\u0646 \u0625\u0639\u0627\u062F\u0629 \u0625\u062F\u062E\u0627\u0644" }
-      )}
-          <div class="steps">
-            <div class="step reveal"><div><h3 ${tAttrs({ en: "The order arrives", de: "Die Bestellung trifft ein", ar: "\u064A\u0635\u0644 \u0627\u0644\u0637\u0644\u0628" })}>The order arrives</h3><p ${tAttrs({
-        en: "From the counter, a table QR code, an inbound phone call with caller ID, or your online storefront.",
-        de: "Von der Theke, per Tisch-QR-Code, \xFCber einen Anruf mit Rufnummernerkennung oder aus Ihrem Online-Shop.",
-        ar: "\u0645\u0646 \u0627\u0644\u0643\u0627\u0634\u064A\u0631\u060C \u0623\u0648 QR \u0627\u0644\u0637\u0627\u0648\u0644\u0629\u060C \u0623\u0648 \u0645\u0643\u0627\u0644\u0645\u0629 \u0648\u0627\u0631\u062F\u0629 \u0645\u0639 \u062A\u0639\u0631\u064A\u0641 \u0627\u0644\u0645\u062A\u0635\u0644\u060C \u0623\u0648 \u0645\u062A\u062C\u0631\u0643 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A."
-      })}>From the counter, a table QR code, an inbound phone call with caller ID, or your online storefront.</p></div></div>
-            <div class="step reveal"><div><h3 ${tAttrs({ en: "The kitchen sees it", de: "Die K\xFCche sieht sie", ar: "\u064A\u0631\u0627\u0647 \u0627\u0644\u0645\u0637\u0628\u062E" })}>The kitchen sees it</h3><p ${tAttrs({
-        en: "It appears in the live queue with modifiers, allergen notes and the promised time. Print a ticket or work from the screen.",
-        de: "Sie erscheint in der Live-Warteschlange mit Optionen, Allergenhinweisen und Zusagezeit. Bon drucken oder direkt am Bildschirm arbeiten.",
-        ar: "\u064A\u0638\u0647\u0631 \u0641\u064A \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u062D\u064A\u0651\u0629 \u0645\u0639 \u0627\u0644\u0625\u0636\u0627\u0641\u0627\u062A \u0648\u0645\u0644\u0627\u062D\u0638\u0627\u062A \u0627\u0644\u062D\u0633\u0627\u0633\u064A\u0629 \u0648\u0627\u0644\u0648\u0642\u062A \u0627\u0644\u0645\u062A\u0648\u0642\u0639. \u0627\u0637\u0628\u0639 \u062A\u0630\u0643\u0631\u0629 \u0623\u0648 \u0627\u0639\u0645\u0644 \u0645\u0646 \u0627\u0644\u0634\u0627\u0634\u0629."
-      })}>It appears in the live queue with modifiers, allergen notes and the promised time. Print a ticket or work from the screen.</p></div></div>
-            <div class="step reveal"><div><h3 ${tAttrs({ en: "A driver takes it", de: "Ein Fahrer \xFCbernimmt", ar: "\u064A\u0633\u062A\u0644\u0645\u0647 \u0627\u0644\u0633\u0627\u0626\u0642" })}>A driver takes it</h3><p ${tAttrs({
-        en: "Assign directly or broadcast to available drivers. The customer gets a tracking link; you get the timestamps.",
-        de: "Direkt zuweisen oder an verf\xFCgbare Fahrer ausschreiben. Der Kunde erh\xE4lt einen Tracking-Link, Sie die Zeitstempel.",
-        ar: "\u0623\u0633\u0646\u0650\u062F\u0647 \u0645\u0628\u0627\u0634\u0631\u0629 \u0623\u0648 \u0627\u0628\u062B\u0651\u0647 \u0644\u0644\u0633\u0627\u0626\u0642\u064A\u0646 \u0627\u0644\u0645\u062A\u0627\u062D\u064A\u0646. \u064A\u062D\u0635\u0644 \u0627\u0644\u0639\u0645\u064A\u0644 \u0639\u0644\u0649 \u0631\u0627\u0628\u0637 \u062A\u062A\u0628\u0651\u0639\u060C \u0648\u062A\u062D\u0635\u0644 \u0623\u0646\u062A \u0639\u0644\u0649 \u0627\u0644\u0623\u0648\u0642\u0627\u062A."
-      })}>Assign directly or broadcast to available drivers. The customer gets a tracking link; you get the timestamps.</p></div></div>
-            <div class="step reveal"><div><h3 ${tAttrs({ en: "The books close themselves", de: "Der Abschluss l\xE4uft von selbst", ar: "\u062A\u064F\u0642\u0641\u0644 \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u062A\u0644\u0642\u0627\u0626\u064A\u064B\u0627" })}>The books close themselves</h3><p ${tAttrs({
-        en: "Cash-up compares counted cash to expected, files the shift, and pushes the day into your VAT-ready reports.",
-        de: "Der Kassensturz vergleicht Ist- mit Sollbestand, schliesst die Schicht ab und \xFCbertr\xE4gt den Tag in Ihre MwSt.-f\xE4higen Berichte.",
-        ar: "\u064A\u0642\u0627\u0631\u0646 \u0627\u0644\u062A\u0642\u0641\u064A\u0644 \u0627\u0644\u0646\u0642\u062F \u0627\u0644\u0645\u0639\u062F\u0648\u062F \u0628\u0627\u0644\u0645\u062A\u0648\u0642\u0639\u060C \u0648\u064A\u063A\u0644\u0642 \u0627\u0644\u0648\u0631\u062F\u064A\u0629\u060C \u0648\u064A\u0636\u064A\u0641 \u0627\u0644\u064A\u0648\u0645 \u0625\u0644\u0649 \u062A\u0642\u0627\u0631\u064A\u0631 \u062C\u0627\u0647\u0632\u0629 \u0644\u0644\u0636\u0631\u064A\u0628\u0629."
-      })}>Cash-up compares counted cash to expected, files the shift, and pushes the day into your VAT-ready reports.</p></div></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section section--inset">
-    <div class="wrap">
-      ${head(
-        { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" },
-        { en: "Configured for how your trade actually works", de: "Auf Ihre Branche zugeschnitten", ar: "\u0645\u0647\u064A\u064E\u0651\u0623 \u062D\u0633\u0628 \u0637\u0628\u064A\u0639\u0629 \u0646\u0634\u0627\u0637\u0643" },
-        {
-          en: "A pharmacy needs batch numbers; a bakery needs scale integration; a caf\xE9 needs a two-tap flat white. Kassenta ships a preset per vertical and lets you adjust every part of it.",
-          de: "Eine Apotheke braucht Chargennummern, eine B\xE4ckerei Waagenanbindung, ein Caf\xE9 einen Flat White in zwei Taps. Kassenta liefert je Branche eine Vorlage \u2014 und l\xE4sst Sie alles daran anpassen.",
-          ar: "\u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0629 \u062A\u062D\u062A\u0627\u062C \u0623\u0631\u0642\u0627\u0645 \u062A\u0634\u063A\u064A\u0644\u0627\u062A\u060C \u0648\u0627\u0644\u0645\u062E\u0628\u0632 \u064A\u062D\u062A\u0627\u062C \u0645\u064A\u0632\u0627\u0646\u064B\u0627\u060C \u0648\u0627\u0644\u0643\u0627\u0641\u064A\u0647 \u064A\u062D\u062A\u0627\u062C \u0637\u0644\u0628\u064B\u0627 \u0628\u0636\u063A\u0637\u062A\u064A\u0646. \u064A\u0648\u0641\u0651\u0631 Kassenta \u0625\u0639\u062F\u0627\u062F\u064B\u0627 \u062C\u0627\u0647\u0632\u064B\u0627 \u0644\u0643\u0644 \u0646\u0634\u0627\u0637 \u0645\u0639 \u0625\u0645\u0643\u0627\u0646\u064A\u0629 \u062A\u0639\u062F\u064A\u0644 \u0643\u0644 \u062A\u0641\u0635\u064A\u0644\u0629."
-        },
-        true
-      )}
-      <div class="grid grid-3">
-        ${card(icons.coffee, { en: "Caf\xE9s and bars", de: "Caf\xE9s und Bars", ar: "\u0627\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u0627\u0644\u0628\u0627\u0631\u0627\u062A" }, {
-        en: "Fast repeat orders, cup sizes and milk options as modifiers, tab handling and a tip line on the receipt.",
-        de: "Schnelle Wiederholbestellungen, Gr\xF6ssen und Milchoptionen als Optionen, Deckel-Verwaltung und Trinkgeldzeile auf dem Bon.",
-        ar: "\u0637\u0644\u0628\u0627\u062A \u0645\u062A\u0643\u0631\u0631\u0629 \u0633\u0631\u064A\u0639\u0629\u060C \u0648\u0623\u062D\u062C\u0627\u0645 \u0648\u062E\u064A\u0627\u0631\u0627\u062A \u062D\u0644\u064A\u0628 \u0643\u0625\u0636\u0627\u0641\u0627\u062A\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062D\u0633\u0627\u0628 \u0627\u0644\u0645\u0641\u062A\u0648\u062D\u060C \u0648\u0633\u0637\u0631 \u0628\u0642\u0634\u064A\u0634 \u0641\u064A \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629."
-      })}
-        ${card(icons.register, { en: "Restaurants", de: "Restaurants", ar: "\u0627\u0644\u0645\u0637\u0627\u0639\u0645" }, {
-        en: "Table plan, course timing, dine-in versus takeaway VAT, split bills and QR ordering from the table.",
-        de: "Tischplan, Gangsteuerung, MwSt. f\xFCr Vor-Ort und Takeaway, Rechnungsteilung und QR-Bestellung am Tisch.",
-        ar: "\u0645\u062E\u0637\u0637 \u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A\u060C \u0648\u062A\u0648\u0642\u064A\u062A \u0627\u0644\u0623\u0637\u0628\u0627\u0642\u060C \u0648\u0636\u0631\u064A\u0628\u0629 \u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0645\u0642\u0627\u0628\u0644 \u062A\u064A\u0643 \u0623\u0648\u0627\u064A\u060C \u0648\u062A\u0642\u0633\u064A\u0645 \u0627\u0644\u0641\u0648\u0627\u062A\u064A\u0631\u060C \u0648\u0637\u0644\u0628 QR \u0645\u0646 \u0627\u0644\u0637\u0627\u0648\u0644\u0629."
-      })}
-        ${card(icons.cart, { en: "Supermarkets", de: "Superm\xE4rkte", ar: "\u0627\u0644\u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A" }, {
-        en: "Barcode scanning, weighed goods, deposit handling and fast multi-item checkout with a customer display.",
-        de: "Barcode-Scanning, Gewichtsware, Pfandverwaltung und schneller Multi-Artikel-Checkout mit Kundendisplay.",
-        ar: "\u0645\u0633\u062D \u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062F\u060C \u0648\u0627\u0644\u0633\u0644\u0639 \u0628\u0627\u0644\u0648\u0632\u0646\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062A\u0623\u0645\u064A\u0646 \u0627\u0644\u0645\u0633\u062A\u0631\u062F\u060C \u0648\u062F\u0641\u0639 \u0633\u0631\u064A\u0639 \u0644\u0623\u0635\u0646\u0627\u0641 \u0645\u062A\u0639\u062F\u062F\u0629 \u0645\u0639 \u0634\u0627\u0634\u0629 \u0639\u0645\u064A\u0644."
-      })}
-        ${card(icons.pill, { en: "Pharmacies", de: "Apotheken", ar: "\u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0627\u062A" }, {
-        en: "Reduced VAT categories, batch and expiry tracking, restricted-item prompts and per-operator audit trails.",
-        de: "Reduzierte MwSt.-Kategorien, Chargen- und Verfallsverfolgung, Hinweise bei rezeptpflichtigen Artikeln und Audit-Trails je Mitarbeiter.",
-        ar: "\u0641\u0626\u0627\u062A \u0636\u0631\u064A\u0628\u0629 \u0645\u062E\u0641\u064E\u0651\u0636\u0629\u060C \u0648\u062A\u062A\u0628\u0651\u0639 \u0627\u0644\u062A\u0634\u063A\u064A\u0644\u0627\u062A \u0648\u062A\u0648\u0627\u0631\u064A\u062E \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0629\u060C \u0648\u062A\u0646\u0628\u064A\u0647\u0627\u062A \u0627\u0644\u0623\u0635\u0646\u0627\u0641 \u0627\u0644\u0645\u0642\u064A\u064E\u0651\u062F\u0629\u060C \u0648\u0633\u062C\u0644 \u062A\u062F\u0642\u064A\u0642 \u0644\u0643\u0644 \u0645\u0633\u062A\u062E\u062F\u0645."
-      })}
-        ${card(icons.box, { en: "Bakeries", de: "B\xE4ckereien", ar: "\u0627\u0644\u0645\u062E\u0627\u0628\u0632" }, {
-        en: "Weight-based pricing, morning pre-orders, production planning and waste recording at close.",
-        de: "Preis nach Gewicht, Vorbestellungen am Morgen, Produktionsplanung und Retourenerfassung beim Abschluss.",
-        ar: "\u062A\u0633\u0639\u064A\u0631 \u0628\u0627\u0644\u0648\u0632\u0646\u060C \u0648\u0637\u0644\u0628\u0627\u062A \u0645\u0633\u0628\u0642\u0629 \u0635\u0628\u0627\u062D\u064A\u0629\u060C \u0648\u062A\u062E\u0637\u064A\u0637 \u0627\u0644\u0625\u0646\u062A\u0627\u062C\u060C \u0648\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0647\u062F\u0631 \u0639\u0646\u062F \u0627\u0644\u0625\u063A\u0644\u0627\u0642."
-      })}
-        ${card(icons.tag, { en: "Retail", de: "Einzelhandel", ar: "\u0627\u0644\u062A\u062C\u0632\u0626\u0629" }, {
-        en: "Variants by size and colour, stock counts, returns with reason codes and supplier purchase records.",
-        de: "Varianten nach Gr\xF6sse und Farbe, Inventuren, Retouren mit Grundcodes und Lieferantenbelege.",
-        ar: "\u0645\u062A\u063A\u064A\u0651\u0631\u0627\u062A \u0628\u0627\u0644\u0645\u0642\u0627\u0633 \u0648\u0627\u0644\u0644\u0648\u0646\u060C \u0648\u062C\u0631\u062F \u0627\u0644\u0645\u062E\u0632\u0648\u0646\u060C \u0648\u0645\u0631\u062A\u062C\u0639\u0627\u062A \u0628\u0623\u0633\u0628\u0627\u0628 \u0645\u062D\u062F\u064E\u0651\u062F\u0629\u060C \u0648\u0633\u062C\u0644\u0627\u062A \u0645\u0634\u062A\u0631\u064A\u0627\u062A \u0627\u0644\u0645\u0648\u0631\u062F\u064A\u0646."
-      })}
-      </div>
-      <div class="btn-row" style="justify-content:center">
-        <a class="btn btn-ghost" href="/solutions/" ${tAttrs({ en: "Compare all industry presets", de: "Alle Branchenvorlagen vergleichen", ar: "\u0642\u0627\u0631\u0646 \u0643\u0644 \u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" })}>Compare all industry presets</a>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="wrap">
-      <div class="split">
-        <div>
-          ${head(
-        { en: "Built in, not bolted on", de: "Eingebaut, nicht angeflanscht", ar: "\u0645\u062F\u0645\u062C \u0644\u0627 \u0645\u0636\u0627\u0641" },
-        { en: "The Swiss details that usually cost extra", de: "Die Schweizer Details, die sonst extra kosten", ar: "\u062A\u0641\u0627\u0635\u064A\u0644 \u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0639\u0627\u062F\u0629\u064B \u0645\u0627 \u062A\u064F\u0643\u0644\u0651\u0641 \u0625\u0636\u0627\u0641\u064A\u064B\u0627" }
-      )}
-          ${ticks([
-        { en: "8.1% standard and 2.6% reduced VAT, with the dine-in versus takeaway distinction applied per line.", de: "8,1 % Normal- und 2,6 % reduzierter MwSt.-Satz, mit Unterscheidung Vor-Ort/Takeaway pro Position.", ar: "\u0636\u0631\u064A\u0628\u0629 8.1% \u0639\u0627\u062F\u064A\u0629 \u06482.6% \u0645\u062E\u0641\u064E\u0651\u0636\u0629\u060C \u0645\u0639 \u0627\u0644\u062A\u0641\u0631\u0642\u0629 \u0628\u064A\u0646 \u0627\u0644\u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0648\u0627\u0644\u062A\u064A\u0643 \u0623\u0648\u0627\u064A \u0644\u0643\u0644 \u0628\u0646\u062F." },
-        { en: "Cash totals rounded to the nearest CHF 0.05 while card and TWINT keep the exact amount.", de: "Barbetr\xE4ge auf 5 Rappen gerundet, Karte und TWINT bleiben exakt.", ar: "\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F \u0644\u0623\u0642\u0631\u0628 0.05 \u0641\u0631\u0646\u0643 \u0645\u0639 \u0625\u0628\u0642\u0627\u0621 \u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0642\u064A\u0642 \u0644\u0644\u0628\u0637\u0627\u0642\u0629 \u0648TWINT." },
-        { en: "TWINT, card, cash and invoice as first-class payment methods on the receipt and in reports.", de: "TWINT, Karte, Bar und Rechnung als gleichwertige Zahlungsarten auf Bon und in Berichten.", ar: "TWINT \u0648\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0648\u0627\u0644\u0646\u0642\u062F \u0648\u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0643\u0648\u0633\u0627\u0626\u0644 \u062F\u0641\u0639 \u0623\u0633\u0627\u0633\u064A\u0629 \u0641\u064A \u0627\u0644\u0625\u064A\u0635\u0627\u0644 \u0648\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631." },
-        { en: "German, English and Arabic across the whole product, including right-to-left layout.", de: "Deutsch, Englisch und Arabisch im gesamten Produkt, inklusive Rechts-nach-links-Layout.", ar: "\u0627\u0644\u0623\u0644\u0645\u0627\u0646\u064A\u0629 \u0648\u0627\u0644\u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629 \u0648\u0627\u0644\u0639\u0631\u0628\u064A\u0629 \u0641\u064A \u0643\u0644 \u0627\u0644\u0645\u0646\u062A\u062C\u060C \u0628\u0645\u0627 \u0641\u064A \u0630\u0644\u0643 \u0627\u0644\u062A\u062E\u0637\u064A\u0637 \u0645\u0646 \u0627\u0644\u064A\u0645\u064A\u0646 \u0644\u0644\u064A\u0633\u0627\u0631." },
-        { en: "Data hosted in Europe, with GDPR and nDSG deletion and export requests handled from the console.", de: "Daten in Europa gehostet, DSGVO- und nDSG-L\xF6sch- sowie Exportanfragen direkt in der Konsole.", ar: "\u0627\u0633\u062A\u0636\u0627\u0641\u0629 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0641\u064A \u0623\u0648\u0631\u0648\u0628\u0627\u060C \u0645\u0639 \u0645\u0639\u0627\u0644\u062C\u0629 \u0637\u0644\u0628\u0627\u062A \u0627\u0644\u062D\u0630\u0641 \u0648\u0627\u0644\u062A\u0635\u062F\u064A\u0631 \u0648\u0641\u0642 GDPR \u0648nDSG \u0645\u0646 \u0627\u0644\u0644\u0648\u062D\u0629." }
-      ])}
-          <div class="btn-row">
-            <a class="btn btn-ghost" href="/compliance/" ${tAttrs({ en: "Read the compliance detail", de: "Compliance-Details lesen", ar: "\u0627\u0642\u0631\u0623 \u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644" })}>Read the compliance detail</a>
-          </div>
-        </div>
-        <div class="reveal">
-          ${shot({ id: "home-swiss-receipt", ratio: "4 / 5", size: "1122 \xD7 1402", alt: { en: "Receipt showing Swiss VAT split and cash rounding", de: "Bon mit Schweizer MwSt.-Aufteilung und Rappenrundung", ar: "\u0625\u064A\u0635\u0627\u0644 \u064A\u0648\u0636\u0651\u062D \u062A\u0642\u0633\u064A\u0645 \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A" } })}
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section section--alt">
-    <div class="wrap">
-      ${head(
-        { en: "Everywhere you work", de: "\xDCberall im Einsatz", ar: "\u0623\u064A\u0646\u0645\u0627 \u062A\u0639\u0645\u0644" },
-        { en: "Phone in the aisle, tablet at the counter, browser in the office", de: "Handy im Gang, Tablet an der Theke, Browser im B\xFCro", ar: "\u0647\u0627\u062A\u0641 \u0628\u064A\u0646 \u0627\u0644\u0631\u0641\u0648\u0641\u060C \u062A\u0627\u0628\u0644\u062A \u0639\u0644\u0649 \u0627\u0644\u0643\u0627\u0634\u064A\u0631\u060C \u0645\u062A\u0635\u0641\u062D \u0641\u064A \u0627\u0644\u0645\u0643\u062A\u0628" },
-        {
-          en: "One codebase, three form factors. The layout adapts rather than shrinking: the cart becomes a sheet on a phone, a sidebar on a tablet and a fixed panel on a desktop.",
-          de: "Eine Codebasis, drei Formate. Das Layout passt sich an, statt nur zu schrumpfen: Der Warenkorb wird zum Sheet am Handy, zur Seitenleiste am Tablet und zum festen Panel am Desktop.",
-          ar: "\u0642\u0627\u0639\u062F\u0629 \u0643\u0648\u062F \u0648\u0627\u062D\u062F\u0629 \u0648\u062B\u0644\u0627\u062B\u0629 \u0623\u062D\u062C\u0627\u0645. \u0627\u0644\u062A\u062E\u0637\u064A\u0637 \u064A\u062A\u0643\u064A\u0651\u0641 \u0628\u062F\u0644 \u0623\u0646 \u064A\u0646\u0643\u0645\u0634: \u0627\u0644\u0633\u0644\u0629 \u062A\u0635\u0628\u062D \u0644\u0648\u062D\u064B\u0627 \u0641\u064A \u0627\u0644\u0647\u0627\u062A\u0641\u060C \u0648\u0634\u0631\u064A\u0637\u064B\u0627 \u062C\u0627\u0646\u0628\u064A\u064B\u0627 \u0641\u064A \u0627\u0644\u062A\u0627\u0628\u0644\u062A\u060C \u0648\u0644\u0648\u062D\u0629 \u062B\u0627\u0628\u062A\u0629 \u0641\u064A \u0627\u0644\u0643\u0645\u0628\u064A\u0648\u062A\u0631."
-        },
-        true
-      )}
-      <div class="reveal">
-        ${shot({ id: "home-devices", ratio: "3 / 2", size: "1536 \xD7 1024", bare: true, alt: { en: "Kassenta shown on a phone, a tablet and a desktop browser", de: "Kassenta auf Smartphone, Tablet und Desktop-Browser", ar: "Kassenta \u0639\u0644\u0649 \u0647\u0627\u062A\u0641 \u0648\u062A\u0627\u0628\u0644\u062A \u0648\u0645\u062A\u0635\u0641\u062D \u0643\u0645\u0628\u064A\u0648\u062A\u0631" } })}
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="wrap" style="max-width:860px">
-      ${head({ en: "Questions", de: "Fragen", ar: "\u0623\u0633\u0626\u0644\u0629" }, { en: "Frequently asked", de: "H\xE4ufig gefragt", ar: "\u0627\u0644\u0623\u0643\u062B\u0631 \u062A\u0643\u0631\u0627\u0631\u064B\u0627" }, void 0, true)}
-      ${faq([
-        {
-          q: { en: "Do I need to buy special hardware?", de: "Brauche ich spezielle Hardware?", ar: "\u0647\u0644 \u0623\u062D\u062A\u0627\u062C \u0623\u062C\u0647\u0632\u0629 \u062E\u0627\u0635\u0629\u061F" },
-          a: {
-            en: "No. Kassenta runs in any modern browser and as an app on Android and iOS, so an existing tablet or laptop is enough to start. Receipt printers, cash drawers and barcode scanners are supported but optional.",
-            de: "Nein. Kassenta l\xE4uft in jedem modernen Browser sowie als App unter Android und iOS \u2014 ein vorhandenes Tablet oder Notebook gen\xFCgt f\xFCr den Start. Bondrucker, Kassenladen und Barcodescanner werden unterst\xFCtzt, sind aber optional.",
-            ar: "\u0644\u0627. \u064A\u0639\u0645\u0644 Kassenta \u0641\u064A \u0623\u064A \u0645\u062A\u0635\u0641\u062D \u062D\u062F\u064A\u062B \u0648\u0643\u062A\u0637\u0628\u064A\u0642 \u0639\u0644\u0649 \u0623\u0646\u062F\u0631\u0648\u064A\u062F \u0648iOS\u060C \u0644\u0630\u0627 \u064A\u0643\u0641\u064A \u062A\u0627\u0628\u0644\u062A \u0623\u0648 \u0644\u0627\u0628\u062A\u0648\u0628 \u0644\u062F\u064A\u0643 \u0644\u0644\u0628\u062F\u0621. \u0627\u0644\u0637\u0627\u0628\u0639\u0627\u062A \u0648\u0623\u062F\u0631\u0627\u062C \u0627\u0644\u0646\u0642\u062F \u0648\u0642\u0627\u0631\u0626\u0627\u062A \u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062F \u0645\u062F\u0639\u0648\u0645\u0629 \u0644\u0643\u0646\u0647\u0627 \u0627\u062E\u062A\u064A\u0627\u0631\u064A\u0629."
-          }
-        },
-        {
-          q: { en: "What happens if the internet drops?", de: "Was passiert bei Internetausfall?", ar: "\u0645\u0627\u0630\u0627 \u0644\u0648 \u0627\u0646\u0642\u0637\u0639 \u0627\u0644\u0625\u0646\u062A\u0631\u0646\u062A\u061F" },
-          a: {
-            en: "The POS keeps taking orders and payments from its local cache and syncs the queue once the connection returns. Online ordering and driver tracking need connectivity, since they involve people outside the building.",
-            de: "Die Kasse nimmt weiterhin Bestellungen und Zahlungen aus dem lokalen Cache entgegen und synchronisiert die Warteschlange, sobald die Verbindung zur\xFCck ist. Online-Bestellung und Fahrer-Tracking ben\xF6tigen eine Verbindung, da Personen ausserhalb beteiligt sind.",
-            ar: "\u064A\u0648\u0627\u0635\u0644 \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0627\u0633\u062A\u0642\u0628\u0627\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0648\u0627\u0644\u0645\u062F\u0641\u0648\u0639\u0627\u062A \u0645\u0646 \u0627\u0644\u0630\u0627\u0643\u0631\u0629 \u0627\u0644\u0645\u062D\u0644\u064A\u0629 \u062B\u0645 \u064A\u0632\u0627\u0645\u0646 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0641\u0648\u0631 \u0639\u0648\u062F\u0629 \u0627\u0644\u0627\u062A\u0635\u0627\u0644. \u0623\u0645\u0627 \u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0648\u062A\u062A\u0628\u0651\u0639 \u0627\u0644\u0633\u0627\u0626\u0642\u064A\u0646 \u0641\u064A\u062D\u062A\u0627\u062C\u0627\u0646 \u0627\u062A\u0635\u0627\u0644\u064B\u0627 \u0644\u0623\u0646\u0647\u0645\u0627 \u064A\u0634\u0645\u0644\u0627\u0646 \u0623\u0634\u062E\u0627\u0635\u064B\u0627 \u062E\u0627\u0631\u062C \u0627\u0644\u0645\u062D\u0644."
-          }
-        },
-        {
-          q: { en: "Can I move my existing products and customers in?", de: "Kann ich bestehende Artikel und Kunden \xFCbernehmen?", ar: "\u0647\u0644 \u064A\u0645\u0643\u0646 \u0646\u0642\u0644 \u0645\u0646\u062A\u062C\u0627\u062A\u064A \u0648\u0639\u0645\u0644\u0627\u0626\u064A \u0627\u0644\u062D\u0627\u0644\u064A\u064A\u0646\u061F" },
-          a: {
-            en: "Yes. Products, categories and customers import from CSV, and we do the first import with you during onboarding so the mapping is right before you go live.",
-            de: "Ja. Artikel, Kategorien und Kunden werden per CSV importiert; den ersten Import machen wir beim Onboarding gemeinsam, damit die Zuordnung vor dem Livegang stimmt.",
-            ar: "\u0646\u0639\u0645. \u062A\u064F\u0633\u062A\u0648\u0631\u062F \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0627\u0644\u0641\u0626\u0627\u062A \u0648\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0645\u0646 \u0645\u0644\u0641 CSV\u060C \u0648\u0646\u0642\u0648\u0645 \u0628\u0623\u0648\u0644 \u0627\u0633\u062A\u064A\u0631\u0627\u062F \u0645\u0639\u0643 \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u062A\u0647\u064A\u0626\u0629 \u0644\u0636\u0645\u0627\u0646 \u0635\u062D\u0629 \u0627\u0644\u0631\u0628\u0637 \u0642\u0628\u0644 \u0627\u0644\u062A\u0634\u063A\u064A\u0644."
-          }
-        },
-        {
-          q: { en: "How many branches can one account hold?", de: "Wie viele Filialen kann ein Konto haben?", ar: "\u0643\u0645 \u0641\u0631\u0639\u064B\u0627 \u064A\u0633\u062A\u0648\u0639\u0628 \u0627\u0644\u062D\u0633\u0627\u0628 \u0627\u0644\u0648\u0627\u062D\u062F\u061F" },
-          a: {
-            en: "As many as you need. Each branch keeps its own stock, staff and prices while the owner console reports across all of them together.",
-            de: "So viele wie n\xF6tig. Jede Filiale f\xFChrt eigenen Bestand, Personal und Preise, w\xE4hrend die Betreiber-Konsole filial\xFCbergreifend auswertet.",
-            ar: "\u0628\u0644\u0627 \u062D\u062F. \u0644\u0643\u0644 \u0641\u0631\u0639 \u0645\u062E\u0632\u0648\u0646\u0647 \u0648\u0645\u0648\u0638\u0641\u0648\u0647 \u0648\u0623\u0633\u0639\u0627\u0631\u0647\u060C \u0628\u064A\u0646\u0645\u0627 \u062A\u0639\u0631\u0636 \u0644\u0648\u062D\u0629 \u0627\u0644\u0645\u0627\u0644\u0643 \u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u062C\u0645\u0651\u0639\u0629 \u0644\u0643\u0644 \u0627\u0644\u0641\u0631\u0648\u0639."
-          }
-        },
-        {
-          q: { en: "Is my data locked in?", de: "Sind meine Daten eingeschlossen?", ar: "\u0647\u0644 \u0628\u064A\u0627\u0646\u0627\u062A\u064A \u0645\u062D\u062A\u062C\u0632\u0629\u061F" },
-          a: {
-            en: "No. Sales, products and customers can be exported to CSV at any time from the reporting screens, and a full export can be requested from support.",
-            de: "Nein. Ums\xE4tze, Artikel und Kunden lassen sich jederzeit aus den Berichten als CSV exportieren; einen Vollexport erhalten Sie \xFCber den Support.",
-            ar: "\u0644\u0627. \u064A\u0645\u0643\u0646 \u062A\u0635\u062F\u064A\u0631 \u0627\u0644\u0645\u0628\u064A\u0639\u0627\u062A \u0648\u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0625\u0644\u0649 CSV \u0641\u064A \u0623\u064A \u0648\u0642\u062A \u0645\u0646 \u0634\u0627\u0634\u0627\u062A \u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631\u060C \u0648\u0637\u0644\u0628 \u062A\u0635\u062F\u064A\u0631 \u0643\u0627\u0645\u0644 \u0639\u0628\u0631 \u0627\u0644\u062F\u0639\u0645."
-          }
-        }
-      ])}
-    </div>
-  </section>
-
-  ${ctaBand(
-        { en: "See it running on your own menu", de: "Sehen Sie es mit Ihrer eigenen Karte", ar: "\u0634\u0627\u0647\u062F\u0647 \u064A\u0639\u0645\u0644 \u0639\u0644\u0649 \u0642\u0627\u0626\u0645\u062A\u0643 \u0623\u0646\u062A" },
-        {
-          en: "Send us your current menu or product list. We load it into a demo account and walk you through a normal service \u2014 counter, online order and delivery \u2014 in about 30 minutes.",
-          de: "Senden Sie uns Ihre aktuelle Karte oder Artikelliste. Wir laden sie in ein Demo-Konto und zeigen Ihnen in rund 30 Minuten einen normalen Serviceablauf \u2014 Theke, Online-Bestellung und Lieferung.",
-          ar: "\u0623\u0631\u0633\u0644 \u0644\u0646\u0627 \u0642\u0627\u0626\u0645\u062A\u0643 \u0623\u0648 \u0642\u0627\u0626\u0645\u0629 \u0645\u0646\u062A\u062C\u0627\u062A\u0643 \u0627\u0644\u062D\u0627\u0644\u064A\u0629. \u0646\u062D\u0645\u0651\u0644\u0647\u0627 \u0641\u064A \u062D\u0633\u0627\u0628 \u062A\u062C\u0631\u064A\u0628\u064A \u0648\u0646\u0639\u0631\u0636 \u0644\u0643 \u062F\u0648\u0631\u0629 \u0639\u0645\u0644 \u0643\u0627\u0645\u0644\u0629 \u2014 \u0643\u0627\u0634\u064A\u0631 \u0648\u0637\u0644\u0628 \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0648\u062A\u0648\u0635\u064A\u0644 \u2014 \u0641\u064A \u0646\u062D\u0648 30 \u062F\u0642\u064A\u0642\u0629."
-        }
-      )}`
-    };
-    features = {
-      meta: {
-        path: "/features",
-        title: {
-          en: "POS features: till, table QR, delivery \u2014 Kassenta",
-          de: "Kassen-Funktionen: Theke, Tisch-QR, Lieferung \u2014 Kassenta",
-          ar: "\u0645\u0645\u064A\u0632\u0627\u062A \u0627\u0644\u0643\u0627\u0634\u064A\u0631: \u0627\u0644\u0628\u064A\u0639 \u0648QR \u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u2014 Kassenta"
-        },
-        description: {
-          en: "Touch POS, table QR ordering, delivery dispatch, inventory, CRM and loyalty, staff shifts and VAT-ready reporting \u2014 every module in the Kassenta platform.",
-          de: "Touch-Kasse, Tisch-QR-Bestellung, Lieferdisposition, Lagerhaltung, CRM und Treueprogramm, Schichten und MwSt.-f\xE4hige Auswertungen \u2014 alle Module der Kassenta-Plattform.",
-          ar: "\u0643\u0627\u0634\u064A\u0631 \u0644\u0645\u0633\u064A\u060C \u0648\u0637\u0644\u0628 QR \u0644\u0644\u0637\u0627\u0648\u0644\u0627\u062A\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062A\u0648\u0635\u064A\u0644\u060C \u0648\u0627\u0644\u0645\u062E\u0632\u0648\u0646\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u0627\u0644\u0648\u0644\u0627\u0621\u060C \u0648\u0648\u0631\u062F\u064A\u0627\u062A \u0627\u0644\u0645\u0648\u0638\u0641\u064A\u0646\u060C \u0648\u062A\u0642\u0627\u0631\u064A\u0631 \u062C\u0627\u0647\u0632\u0629 \u0644\u0644\u0636\u0631\u064A\u0628\u0629 \u2014 \u0643\u0644 \u0648\u062D\u062F\u0627\u062A \u0645\u0646\u0635\u0629 Kassenta."
-        }
-      },
-      body: `
-  ${pageHead(
-        { en: "Everything the floor, the kitchen and the office need", de: "Alles f\xFCr Verkaufsfl\xE4che, K\xFCche und B\xFCro", ar: "\u0643\u0644 \u0645\u0627 \u062A\u062D\u062A\u0627\u062C\u0647 \u0627\u0644\u0635\u0627\u0644\u0629 \u0648\u0627\u0644\u0645\u0637\u0628\u062E \u0648\u0627\u0644\u0625\u062F\u0627\u0631\u0629" },
-        {
-          en: "Kassenta is one application with modules you switch on as you grow. Nothing here is a separate purchase or a separate login.",
-          de: "Kassenta ist eine Anwendung mit Modulen, die Sie beim Wachsen zuschalten. Nichts davon ist ein separater Kauf oder ein separates Login.",
-          ar: "Kassenta \u062A\u0637\u0628\u064A\u0642 \u0648\u0627\u062D\u062F \u0628\u0648\u062D\u062F\u0627\u062A \u062A\u0641\u0639\u0651\u0644\u0647\u0627 \u0645\u0639 \u0646\u0645\u0648\u0651\u0643. \u0644\u0627 \u0634\u064A\u0621 \u0647\u0646\u0627 \u0634\u0631\u0627\u0621 \u0645\u0646\u0641\u0635\u0644 \u0623\u0648 \u062D\u0633\u0627\u0628 \u0645\u0646\u0641\u0635\u0644."
-        },
-        { en: "Features", de: "Funktionen", ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A" }
-      )}
-
-  <section class="section">
-    <div class="wrap">
-      <div class="split">
-        <div>
-          ${head({ en: "Selling", de: "Verkauf", ar: "\u0627\u0644\u0628\u064A\u0639" }, { en: "A till that keeps up with a queue", de: "Eine Kasse, die mit der Schlange mith\xE4lt", ar: "\u0643\u0627\u0634\u064A\u0631 \u064A\u0648\u0627\u0643\u0628 \u0627\u0644\u0637\u0627\u0628\u0648\u0631" })}
-          ${ticks([
-        { en: "Category and search-first product grid, tuned so a regular order takes three taps.", de: "Raster nach Kategorie und Suche, so abgestimmt, dass eine Standardbestellung drei Taps braucht.", ar: "\u0634\u0628\u0643\u0629 \u0645\u0646\u062A\u062C\u0627\u062A \u0628\u0627\u0644\u0641\u0626\u0627\u062A \u0648\u0627\u0644\u0628\u062D\u062B\u060C \u0645\u0636\u0628\u0648\u0637\u0629 \u0644\u064A\u062A\u0645 \u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u0645\u0639\u062A\u0627\u062F \u0628\u062B\u0644\u0627\u062B \u0636\u063A\u0637\u0627\u062A." },
-        { en: "Variants and modifiers with price deltas \u2014 sizes, extras, removals and free-text kitchen notes.", de: "Varianten und Optionen mit Preisdifferenz \u2014 Gr\xF6ssen, Extras, Abwahl und freie K\xFCchennotizen.", ar: "\u0645\u062A\u063A\u064A\u0651\u0631\u0627\u062A \u0648\u0625\u0636\u0627\u0641\u0627\u062A \u0628\u0641\u0631\u0648\u0642 \u0633\u0639\u0631\u064A\u0629 \u2014 \u0623\u062D\u062C\u0627\u0645 \u0648\u0625\u0636\u0627\u0641\u0627\u062A \u0648\u062D\u0630\u0641 \u0648\u0645\u0644\u0627\u062D\u0638\u0627\u062A \u0645\u0637\u0628\u062E \u062D\u0631\u0629." },
-        { en: "Percentage or fixed discounts per line or per ticket, with a reason recorded against the operator.", de: "Prozentuale oder feste Rabatte je Position oder Bon, mit Begr\xFCndung und Zuordnung zum Mitarbeiter.", ar: "\u062E\u0635\u0648\u0645\u0627\u062A \u0646\u0633\u0628\u064A\u0629 \u0623\u0648 \u062B\u0627\u0628\u062A\u0629 \u0644\u0643\u0644 \u0628\u0646\u062F \u0623\u0648 \u0641\u0627\u062A\u0648\u0631\u0629\u060C \u0645\u0639 \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0633\u0628\u0628 \u0628\u0627\u0633\u0645 \u0627\u0644\u0645\u0648\u0638\u0641." },
-        { en: "Split payments across cash, card, TWINT and wallet on a single ticket.", de: "Teilzahlungen \xFCber Bar, Karte, TWINT und Guthaben auf einem Bon.", ar: "\u062F\u0641\u0639 \u0645\u0642\u0633\u064E\u0651\u0645 \u0628\u064A\u0646 \u0627\u0644\u0646\u0642\u062F \u0648\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0648TWINT \u0648\u0627\u0644\u0645\u062D\u0641\u0638\u0629 \u0641\u064A \u0641\u0627\u062A\u0648\u0631\u0629 \u0648\u0627\u062D\u062F\u0629." },
-        { en: "Held tickets, quick reprint and a searchable invoice history with a 24-hour and full-range view.", de: "Geparkte Bons, Schnell-Nachdruck und durchsuchbare Beleghistorie mit 24-Stunden- und Gesamtansicht.", ar: "\u0641\u0648\u0627\u062A\u064A\u0631 \u0645\u0639\u0644\u064E\u0651\u0642\u0629\u060C \u0648\u0625\u0639\u0627\u062F\u0629 \u0637\u0628\u0627\u0639\u0629 \u0633\u0631\u064A\u0639\u0629\u060C \u0648\u0633\u062C\u0644 \u0641\u0648\u0627\u062A\u064A\u0631 \u0642\u0627\u0628\u0644 \u0644\u0644\u0628\u062D\u062B \u0628\u0639\u0631\u0636 24 \u0633\u0627\u0639\u0629 \u0623\u0648 \u0643\u0627\u0645\u0644 \u0627\u0644\u0645\u062F\u0629." },
-        { en: "Barcode scanning from the device camera or a USB or Bluetooth scanner.", de: "Barcode-Scan \xFCber Ger\xE4tekamera oder USB-/Bluetooth-Scanner.", ar: "\u0645\u0633\u062D \u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062F \u0645\u0646 \u0643\u0627\u0645\u064A\u0631\u0627 \u0627\u0644\u062C\u0647\u0627\u0632 \u0623\u0648 \u0645\u0627\u0633\u062D USB \u0623\u0648 \u0628\u0644\u0648\u062A\u0648\u062B." }
-      ])}
-        </div>
-        <div class="reveal">${shot({ id: "feature-pos-grid", ratio: "4 / 3", size: "1448 \xD7 1086", alt: { en: "The Kassenta product grid and cart during a busy service", de: "Artikelraster und Warenkorb von Kassenta im laufenden Betrieb", ar: "\u0634\u0628\u0643\u0629 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0633\u0644\u0629 Kassenta \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u062E\u062F\u0645\u0629" } })}</div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section section--alt">
-    <div class="wrap">
-      <div class="split">
-        <div class="reveal">${shot({ id: "feature-online-store", ratio: "2 / 3", size: "1024 \xD7 1536", alt: { en: "A branded Kassenta online storefront on a phone", de: "Gebrandeter Kassenta-Onlineshop auf dem Smartphone", ar: "\u0645\u062A\u062C\u0631 Kassenta \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0628\u0647\u0648\u064A\u0629 \u0627\u0644\u0645\u062A\u062C\u0631 \u0639\u0644\u0649 \u0627\u0644\u0647\u0627\u062A\u0641" } })}</div>
-        <div>
-          ${head({ en: "Online and tables", de: "Online und Tische", ar: "\u0623\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A" }, { en: "Your own ordering channel, not a marketplace listing", de: "Ihr eigener Bestellkanal statt eines Marktplatz-Eintrags", ar: "\u0642\u0646\u0627\u0629 \u0637\u0644\u0628 \u062E\u0627\u0635\u0629 \u0628\u0643 \u0644\u0627 \u0645\u062C\u0631\u062F \u0625\u062F\u0631\u0627\u062C \u0641\u064A \u062A\u0637\u0628\u064A\u0642 \u0648\u0633\u064A\u0637" })}
-          ${ticks([
-        { en: "A storefront at your own address, with your logo, colours, opening hours and promo banner.", de: "Ein Shop unter Ihrer eigenen Adresse, mit Logo, Farben, \xD6ffnungszeiten und Aktionsbanner.", ar: "\u0645\u062A\u062C\u0631 \u0639\u0644\u0649 \u0639\u0646\u0648\u0627\u0646\u0643 \u0627\u0644\u062E\u0627\u0635\u060C \u0628\u0634\u0639\u0627\u0631\u0643 \u0648\u0623\u0644\u0648\u0627\u0646\u0643 \u0648\u0645\u0648\u0627\u0639\u064A\u062F\u0643 \u0648\u0634\u0631\u064A\u0637 \u0639\u0631\u0648\u0636\u0643." },
-        { en: "Per-table QR codes that open the menu with the table already attached to the order.", de: "QR-Codes je Tisch, die die Karte mit bereits zugeordnetem Tisch \xF6ffnen.", ar: "\u0623\u0643\u0648\u0627\u062F QR \u0644\u0643\u0644 \u0637\u0627\u0648\u0644\u0629 \u062A\u0641\u062A\u062D \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0648\u0627\u0644\u0637\u0627\u0648\u0644\u0629 \u0645\u0631\u062A\u0628\u0637\u0629 \u0628\u0627\u0644\u0637\u0644\u0628 \u062A\u0644\u0642\u0627\u0626\u064A\u064B\u0627." },
-        { en: "Delivery, pickup and dine-in as separate flows, each with its own fee, minimum and VAT treatment.", de: "Lieferung, Abholung und Vor-Ort als getrennte Abl\xE4ufe mit eigener Geb\xFChr, Mindestbestellwert und MwSt.-Behandlung.", ar: "\u062A\u0648\u0635\u064A\u0644 \u0648\u0627\u0633\u062A\u0644\u0627\u0645 \u0648\u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0643\u0645\u0633\u0627\u0631\u0627\u062A \u0645\u0646\u0641\u0635\u0644\u0629\u060C \u0644\u0643\u0644 \u0645\u0646\u0647\u0627 \u0631\u0633\u0648\u0645 \u0648\u062D\u062F \u0623\u062F\u0646\u0649 \u0648\u0645\u0639\u0627\u0644\u062C\u0629 \u0636\u0631\u064A\u0628\u064A\u0629 \u062E\u0627\u0635\u0629." },
-        { en: "Scheduled orders for a later slot, with the kitchen queue ordering itself by promised time.", de: "Vorbestellungen f\xFCr ein sp\xE4teres Zeitfenster; die K\xFCchenwarteschlange sortiert sich nach Zusagezeit.", ar: "\u0637\u0644\u0628\u0627\u062A \u0645\u062C\u062F\u0648\u0644\u0629 \u0644\u0648\u0642\u062A \u0644\u0627\u062D\u0642\u060C \u0645\u0639 \u062A\u0631\u062A\u064A\u0628 \u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0637\u0628\u062E \u062A\u0644\u0642\u0627\u0626\u064A\u064B\u0627 \u062D\u0633\u0628 \u0627\u0644\u0648\u0642\u062A \u0627\u0644\u0645\u062A\u0641\u0642 \u0639\u0644\u064A\u0647." },
-        { en: "Promo codes with usage limits, validity windows and per-code reporting.", de: "Gutscheincodes mit Nutzungslimits, G\xFCltigkeitszeitr\xE4umen und Auswertung je Code.", ar: "\u0623\u0643\u0648\u0627\u062F \u062E\u0635\u0645 \u0628\u062D\u062F\u0648\u062F \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0648\u0641\u062A\u0631\u0627\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0648\u062A\u0642\u0627\u0631\u064A\u0631 \u0644\u0643\u0644 \u0643\u0648\u062F." }
-      ])}
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="wrap">
-      ${head(
-        { en: "Modules", de: "Module", ar: "\u0627\u0644\u0648\u062D\u062F\u0627\u062A" },
-        { en: "The rest of the operation", de: "Der Rest des Betriebs", ar: "\u0628\u0642\u064A\u0629 \u0627\u0644\u0639\u0645\u0644\u064A\u0627\u062A" },
-        void 0,
-        true
-      )}
-      <div class="grid grid-3">
-        ${card(icons.truck, { en: "Delivery dispatch", de: "Lieferdisposition", ar: "\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062A\u0648\u0635\u064A\u0644" }, {
-        en: "Driver roster with online, busy and offline states. Assign an order to a driver or broadcast it to everyone free and let the first to accept take it.",
-        de: "Fahrer\xFCbersicht mit Status online, besch\xE4ftigt und offline. Auftrag direkt zuweisen oder an alle freien Fahrer ausschreiben \u2014 wer zuerst annimmt, f\xE4hrt.",
-        ar: "\u0642\u0627\u0626\u0645\u0629 \u0633\u0627\u0626\u0642\u064A\u0646 \u0628\u062D\u0627\u0644\u0627\u062A \u0645\u062A\u0627\u062D \u0648\u0645\u0634\u063A\u0648\u0644 \u0648\u063A\u064A\u0631 \u0645\u062A\u0635\u0644. \u0623\u0633\u0646\u0650\u062F \u0627\u0644\u0637\u0644\u0628 \u0644\u0633\u0627\u0626\u0642 \u0623\u0648 \u0627\u0628\u062B\u0651\u0647 \u0644\u0643\u0644 \u0627\u0644\u0645\u062A\u0627\u062D\u064A\u0646 \u0644\u064A\u0623\u062E\u0630\u0647 \u0623\u0648\u0644 \u0645\u0646 \u064A\u0642\u0628\u0644\u0647."
-      })}
-        ${card(icons.pin, { en: "Delivery zones", de: "Lieferzonen", ar: "\u0645\u0646\u0627\u0637\u0642 \u0627\u0644\u062A\u0648\u0635\u064A\u0644" }, {
-        en: "Draw zones by postcode or radius, each with its own fee, minimum order value and estimated time shown to the customer.",
-        de: "Zonen nach Postleitzahl oder Radius festlegen, je mit eigener Geb\xFChr, Mindestbestellwert und angezeigter Lieferzeit.",
-        ar: "\u062D\u062F\u0650\u0651\u062F \u0627\u0644\u0645\u0646\u0627\u0637\u0642 \u0628\u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0628\u0631\u064A\u062F\u064A \u0623\u0648 \u0646\u0635\u0641 \u0627\u0644\u0642\u0637\u0631\u060C \u0644\u0643\u0644 \u0645\u0646\u0647\u0627 \u0631\u0633\u0648\u0645 \u0648\u062D\u062F \u0623\u062F\u0646\u0649 \u0648\u0648\u0642\u062A \u0645\u062A\u0648\u0642\u0639 \u064A\u0638\u0647\u0631 \u0644\u0644\u0639\u0645\u064A\u0644."
-      })}
-        ${card(icons.box, { en: "Inventory", de: "Lagerhaltung", ar: "\u0627\u0644\u0645\u062E\u0632\u0648\u0646" }, {
-        en: "Stock levels per branch, low-stock alerts, stock counts with variance, returns with reason codes and supplier records.",
-        de: "Best\xE4nde je Filiale, Warnungen bei Mindestbestand, Inventuren mit Abweichung, Retouren mit Grundcodes und Lieferantenbelege.",
-        ar: "\u0623\u0631\u0635\u062F\u0629 \u0644\u0643\u0644 \u0641\u0631\u0639\u060C \u0648\u062A\u0646\u0628\u064A\u0647\u0627\u062A \u0646\u0642\u0635\u060C \u0648\u062C\u0631\u062F \u0645\u0639 \u0641\u0631\u0648\u0642\u0627\u062A\u060C \u0648\u0645\u0631\u062A\u062C\u0639\u0627\u062A \u0628\u0623\u0633\u0628\u0627\u0628\u060C \u0648\u0633\u062C\u0644\u0627\u062A \u0645\u0648\u0631\u062F\u064A\u0646."
-      })}
-        ${card(icons.users, { en: "Customers and loyalty", de: "Kunden und Treue", ar: "\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u0627\u0644\u0648\u0644\u0627\u0621" }, {
-        en: "Full customer records with addresses and order history, a store wallet, referral codes and bronze to platinum loyalty tiers.",
-        de: "Vollst\xE4ndige Kundenakten mit Adressen und Bestellhistorie, Guthabenkonto, Empfehlungscodes und Treuestufen von Bronze bis Platin.",
-        ar: "\u0633\u062C\u0644\u0627\u062A \u0639\u0645\u0644\u0627\u0621 \u0643\u0627\u0645\u0644\u0629 \u0628\u0627\u0644\u0639\u0646\u0627\u0648\u064A\u0646 \u0648\u0633\u062C\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062A\u060C \u0648\u0645\u062D\u0641\u0638\u0629 \u062F\u0627\u062E\u0644 \u0627\u0644\u0645\u062A\u062C\u0631\u060C \u0648\u0623\u0643\u0648\u0627\u062F \u0625\u062D\u0627\u0644\u0629\u060C \u0648\u0645\u0633\u062A\u0648\u064A\u0627\u062A \u0648\u0644\u0627\u0621 \u0645\u0646 \u0627\u0644\u0628\u0631\u0648\u0646\u0632\u064A \u0644\u0644\u0628\u0644\u0627\u062A\u064A\u0646\u064A."
-      })}
-        ${card(icons.clock, { en: "Staff and shifts", de: "Personal und Schichten", ar: "\u0627\u0644\u0645\u0648\u0638\u0641\u0648\u0646 \u0648\u0627\u0644\u0648\u0631\u062F\u064A\u0627\u062A" }, {
-        en: "PIN login per employee, role-based permissions, attendance, cash drawer opening and closing floats and a per-shift audit trail.",
-        de: "PIN-Login je Mitarbeiter, rollenbasierte Rechte, Anwesenheit, Kassenbestand bei \xD6ffnung und Abschluss sowie Audit-Trail je Schicht.",
-        ar: "\u062F\u062E\u0648\u0644 \u0628\u0631\u0642\u0645 \u0633\u0631\u064A \u0644\u0643\u0644 \u0645\u0648\u0638\u0641\u060C \u0648\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u062D\u0633\u0628 \u0627\u0644\u062F\u0648\u0631\u060C \u0648\u062D\u0636\u0648\u0631\u060C \u0648\u0631\u0635\u064A\u062F \u062F\u0631\u062C \u0627\u0644\u0646\u0642\u062F \u0639\u0646\u062F \u0627\u0644\u0641\u062A\u062D \u0648\u0627\u0644\u0625\u063A\u0644\u0627\u0642\u060C \u0648\u0633\u062C\u0644 \u062A\u062F\u0642\u064A\u0642 \u0644\u0643\u0644 \u0648\u0631\u062F\u064A\u0629."
-      })}
-        ${card(icons.chart, { en: "Reporting", de: "Auswertungen", ar: "\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631" }, {
-        en: "Sales, inventory, returns, delivery, finance and activity views, filterable by date, branch and operator, exportable to CSV.",
-        de: "Ansichten f\xFCr Umsatz, Bestand, Retouren, Lieferung, Finanzen und Aktivit\xE4t \u2014 filterbar nach Datum, Filiale und Mitarbeiter, als CSV exportierbar.",
-        ar: "\u0639\u0631\u0648\u0636 \u0644\u0644\u0645\u0628\u064A\u0639\u0627\u062A \u0648\u0627\u0644\u0645\u062E\u0632\u0648\u0646 \u0648\u0627\u0644\u0645\u0631\u062A\u062C\u0639\u0627\u062A \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u0648\u0627\u0644\u0645\u0627\u0644\u064A\u0629 \u0648\u0627\u0644\u0646\u0634\u0627\u0637\u060C \u0628\u0641\u0644\u0627\u062A\u0631 \u0644\u0644\u062A\u0627\u0631\u064A\u062E \u0648\u0627\u0644\u0641\u0631\u0639 \u0648\u0627\u0644\u0645\u0648\u0638\u0641\u060C \u0648\u062A\u0635\u062F\u064A\u0631 \u0625\u0644\u0649 CSV."
-      })}
-        ${card(icons.phone, { en: "Caller ID", de: "Rufnummernerkennung", ar: "\u062A\u0639\u0631\u064A\u0641 \u0627\u0644\u0645\u062A\u0635\u0644" }, {
-        en: "Incoming calls match against the customer database and open the record with the last order ready to repeat.",
-        de: "Eingehende Anrufe werden mit der Kundendatenbank abgeglichen und \xF6ffnen den Datensatz samt letzter Bestellung zum Wiederholen.",
-        ar: "\u062A\u064F\u0637\u0627\u0628\u064E\u0642 \u0627\u0644\u0645\u0643\u0627\u0644\u0645\u0627\u062A \u0627\u0644\u0648\u0627\u0631\u062F\u0629 \u0645\u0639 \u0642\u0627\u0639\u062F\u0629 \u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u062A\u0641\u062A\u062D \u0627\u0644\u0633\u062C\u0644 \u0645\u0639 \u0622\u062E\u0631 \u0637\u0644\u0628 \u062C\u0627\u0647\u0632 \u0644\u0644\u062A\u0643\u0631\u0627\u0631."
-      })}
-        ${card(icons.bell, { en: "Notifications", de: "Benachrichtigungen", ar: "\u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062A" }, {
-        en: "Web push to the counter, email confirmations to the customer and WhatsApp messages for order and delivery updates.",
-        de: "Web-Push an die Theke, E-Mail-Best\xE4tigungen an Kunden und WhatsApp-Nachrichten zu Bestell- und Lieferstatus.",
-        ar: "\u0625\u0634\u0639\u0627\u0631\u0627\u062A \u0641\u0648\u0631\u064A\u0629 \u0644\u0644\u0643\u0627\u0634\u064A\u0631\u060C \u0648\u062A\u0623\u0643\u064A\u062F\u0627\u062A \u0628\u0627\u0644\u0628\u0631\u064A\u062F \u0644\u0644\u0639\u0645\u064A\u0644\u060C \u0648\u0631\u0633\u0627\u0626\u0644 \u0648\u0627\u062A\u0633\u0627\u0628 \u0644\u062A\u062D\u062F\u064A\u062B\u0627\u062A \u0627\u0644\u0637\u0644\u0628 \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644."
-      })}
-        ${card(icons.printer, { en: "Printing", de: "Druck", ar: "\u0627\u0644\u0637\u0628\u0627\u0639\u0629" }, {
-        en: "Thermal receipts, kitchen tickets and A4 PDF invoices, with a printer profile per station.",
-        de: "Thermobons, K\xFCchenbons und A4-PDF-Rechnungen, mit Druckerprofil je Station.",
-        ar: "\u0625\u064A\u0635\u0627\u0644\u0627\u062A \u062D\u0631\u0627\u0631\u064A\u0629 \u0648\u062A\u0630\u0627\u0643\u0631 \u0645\u0637\u0628\u062E \u0648\u0641\u0648\u0627\u062A\u064A\u0631 PDF \u0628\u062D\u062C\u0645 A4\u060C \u0645\u0639 \u0645\u0644\u0641 \u0637\u0627\u0628\u0639\u0629 \u0644\u0643\u0644 \u0645\u062D\u0637\u0629."
-      })}
-      </div>
-    </div>
-  </section>
-
-  <section class="section section--inset">
-    <div class="wrap">
-      <div class="split">
-        <div>
-          ${head({ en: "Platform", de: "Plattform", ar: "\u0627\u0644\u0645\u0646\u0635\u0629" }, { en: "Made to be extended", de: "F\xFCr Erweiterung gebaut", ar: "\u0645\u0628\u0646\u064A\u0651 \u0644\u0644\u062A\u0648\u0633\u0651\u0639" })}
-          ${ticks([
-        { en: "Modules are switched on per business, so a caf\xE9 never sees pharmacy fields and a pharmacy never sees table plans.", de: "Module werden je Betrieb aktiviert \u2014 ein Caf\xE9 sieht nie Apothekenfelder, eine Apotheke nie Tischpl\xE4ne.", ar: "\u062A\u064F\u0641\u0639\u064E\u0651\u0644 \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0644\u0643\u0644 \u0646\u0634\u0627\u0637\u060C \u0641\u0644\u0627 \u064A\u0631\u0649 \u0627\u0644\u0643\u0627\u0641\u064A\u0647 \u062D\u0642\u0648\u0644 \u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0629 \u0648\u0644\u0627 \u062A\u0631\u0649 \u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0629 \u0645\u062E\u0637\u0637 \u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A." },
-        { en: "A documented REST API for stock, orders and customers, so accounting and ERP tools can read and write.", de: "Dokumentierte REST-API f\xFCr Bestand, Bestellungen und Kunden, damit Buchhaltung und ERP lesen und schreiben k\xF6nnen.", ar: "\u0648\u0627\u062C\u0647\u0629 REST \u0645\u0648\u062B\u0651\u0642\u0629 \u0644\u0644\u0645\u062E\u0632\u0648\u0646 \u0648\u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0648\u0627\u0644\u0639\u0645\u0644\u0627\u0621\u060C \u0644\u062A\u0642\u0631\u0623 \u0648\u062A\u0643\u062A\u0628 \u0623\u062F\u0648\u0627\u062A \u0627\u0644\u0645\u062D\u0627\u0633\u0628\u0629 \u0648ERP." },
-        { en: "Webhooks on order created, paid, dispatched and delivered.", de: "Webhooks bei Bestellung erstellt, bezahlt, versendet und geliefert.", ar: "Webhooks \u0639\u0646\u062F \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0637\u0644\u0628 \u0648\u062F\u0641\u0639\u0647 \u0648\u0625\u0631\u0633\u0627\u0644\u0647 \u0648\u062A\u0633\u0644\u064A\u0645\u0647." },
-        { en: "Role and permission model that also governs the API, not just the screens.", de: "Rollen- und Rechtemodell, das auch die API steuert, nicht nur die Oberfl\xE4chen.", ar: "\u0646\u0645\u0648\u0630\u062C \u0623\u062F\u0648\u0627\u0631 \u0648\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u064A\u062D\u0643\u0645 \u0627\u0644\u0648\u0627\u062C\u0647\u0629 \u0627\u0644\u0628\u0631\u0645\u062C\u064A\u0629 \u0623\u064A\u0636\u064B\u0627 \u0644\u0627 \u0627\u0644\u0634\u0627\u0634\u0627\u062A \u0641\u0642\u0637." }
-      ])}
-        </div>
-        <div class="reveal">${shot({ id: "feature-modules", ratio: "3 / 2", size: "1536 \xD7 1024", alt: { en: "Module switches in the Kassenta owner console", de: "Modulschalter in der Kassenta-Betreiberkonsole", ar: "\u0645\u0641\u0627\u062A\u064A\u062D \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0641\u064A \u0644\u0648\u062D\u0629 \u0645\u0627\u0644\u0643 Kassenta" } })}</div>
-      </div>
-    </div>
-  </section>
-
-  ${ctaBand(
-        { en: "Want a module we have not listed?", de: "Fehlt Ihnen ein Modul?", ar: "\u062A\u062D\u062A\u0627\u062C \u0648\u062D\u062F\u0629 \u063A\u064A\u0631 \u0645\u0630\u0643\u0648\u0631\u0629\u061F" },
-        {
-          en: "Tell us what your trade needs. The platform is built so a new vertical module is a configuration, not a rewrite.",
-          de: "Sagen Sie uns, was Ihre Branche braucht. Die Plattform ist so gebaut, dass ein neues Branchenmodul eine Konfiguration ist \u2014 kein Neubau.",
-          ar: "\u0623\u062E\u0628\u0631\u0646\u0627 \u0628\u0645\u0627 \u064A\u062D\u062A\u0627\u062C\u0647 \u0646\u0634\u0627\u0637\u0643. \u0627\u0644\u0645\u0646\u0635\u0629 \u0645\u0628\u0646\u064A\u0629 \u0628\u062D\u064A\u062B \u062A\u0643\u0648\u0646 \u0627\u0644\u0648\u062D\u062F\u0629 \u0627\u0644\u062C\u062F\u064A\u062F\u0629 \u0625\u0639\u062F\u0627\u062F\u064B\u0627 \u0644\u0627 \u0625\u0639\u0627\u062F\u0629 \u0628\u0646\u0627\u0621."
-        }
-      )}`
-    };
-    INDUSTRY_ART = {
-      "industry-cafe": { ratio: "4 / 5", size: "1122 \xD7 1402" },
-      "industry-restaurant": { ratio: "4 / 5", size: "1122 \xD7 1402" },
-      "industry-supermarket": { ratio: "4 / 5", size: "1122 \xD7 1402" },
-      "industry-pharmacy": { ratio: "5 / 4", size: "1402 \xD7 1122" },
-      "industry-bakery": { ratio: "21 / 23", size: "1198 \xD7 1313" },
-      "industry-retail": { ratio: "5 / 4", size: "1402 \xD7 1122" }
-    };
-    vertical = (id, icon, name, intro, points, alt) => `
-  <section class="section" id="${id}">
-    <div class="wrap">
-      <div class="split">
-        <div>
-          <div class="card-icon">${icon}</div>
-          <h2 ${tAttrs(name)}>${esc(name.en)}</h2>
-          <p class="lead" style="margin:14px 0 24px" ${tAttrs(intro)}>${esc(intro.en)}</p>
-          ${ticks(points)}
-        </div>
-        <div class="reveal">${shot({ id, ratio: INDUSTRY_ART[id]?.ratio ?? "4 / 3", size: INDUSTRY_ART[id]?.size ?? "1400 \xD7 1050", alt })}</div>
-      </div>
-    </div>
-  </section>`;
-    solutions = {
-      meta: {
-        path: "/solutions",
-        title: { en: "POS for caf\xE9s, restaurants, retail \u2014 Kassenta", de: "Kasse f\xFCr Caf\xE9, Restaurant, Handel \u2014 Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u0644\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u0627\u0644\u0645\u0637\u0627\u0639\u0645 \u0648\u0627\u0644\u062A\u062C\u0632\u0626\u0629 \u2014 Kassenta" },
-        description: {
-          en: "Ready-made setups for caf\xE9s, restaurants, supermarkets, pharmacies, bakeries and retail \u2014 each with the fields, taxes and workflows that trade uses.",
-          de: "Fertige Konfigurationen f\xFCr Caf\xE9s, Restaurants, Superm\xE4rkte, Apotheken, B\xE4ckereien und Einzelhandel \u2014 je mit den Feldern, Steuers\xE4tzen und Abl\xE4ufen der Branche.",
-          ar: "\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u062C\u0627\u0647\u0632\u0629 \u0644\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u0627\u0644\u0645\u0637\u0627\u0639\u0645 \u0648\u0627\u0644\u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A \u0648\u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0627\u062A \u0648\u0627\u0644\u0645\u062E\u0627\u0628\u0632 \u0648\u0627\u0644\u062A\u062C\u0632\u0626\u0629 \u2014 \u0644\u0643\u0644 \u0645\u0646\u0647\u0627 \u0627\u0644\u062D\u0642\u0648\u0644 \u0648\u0627\u0644\u0636\u0631\u0627\u0626\u0628 \u0648\u0633\u064A\u0631 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0645\u0646\u0627\u0633\u0628."
-        },
-        jsonLd: [
-          {
-            "@context": "https://schema.org",
-            "@type": "ItemList",
-            name: "Industries Kassenta is configured for",
-            itemListElement: [
-              ["Caf\xE9s and bars", "industry-cafe"],
-              ["Restaurants", "industry-restaurant"],
-              ["Supermarkets and grocers", "industry-supermarket"],
-              ["Pharmacies", "industry-pharmacy"],
-              ["Bakeries", "industry-bakery"],
-              ["Retail", "industry-retail"]
-            ].map(([name, anchor], i) => ({
-              "@type": "ListItem",
-              position: i + 1,
-              name,
-              url: `https://kassenta.com/solutions/#${anchor}`
-            }))
-          }
-        ]
-      },
-      body: `
-  ${pageHead(
-        { en: "One platform, six ready-made shapes", de: "Eine Plattform, sechs fertige Auspr\xE4gungen", ar: "\u0645\u0646\u0635\u0629 \u0648\u0627\u062D\u062F\u0629\u060C \u0633\u062A\u0629 \u0625\u0639\u062F\u0627\u062F\u0627\u062A \u062C\u0627\u0647\u0632\u0629" },
-        {
-          en: "Choosing your industry at setup switches on the right modules, tax categories, product fields and receipt layout. Everything stays editable afterwards.",
-          de: "Die Branchenwahl bei der Einrichtung aktiviert die passenden Module, Steuerkategorien, Artikelfelder und das Bonlayout. Alles bleibt danach \xE4nderbar.",
-          ar: "\u0627\u062E\u062A\u064A\u0627\u0631 \u0645\u062C\u0627\u0644\u0643 \u0639\u0646\u062F \u0627\u0644\u062A\u0647\u064A\u0626\u0629 \u064A\u0641\u0639\u0651\u0644 \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0648\u0641\u0626\u0627\u062A \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0648\u062D\u0642\u0648\u0644 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u062A\u0646\u0633\u064A\u0642 \u0627\u0644\u0625\u064A\u0635\u0627\u0644 \u0627\u0644\u0645\u0646\u0627\u0633\u0628\u0629. \u0648\u064A\u0628\u0642\u0649 \u0643\u0644 \u0634\u064A\u0621 \u0642\u0627\u0628\u0644\u064B\u0627 \u0644\u0644\u062A\u0639\u062F\u064A\u0644 \u0628\u0639\u062F\u0647\u0627."
-        },
-        { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" }
-      )}
-
-  ${vertical(
-        "industry-cafe",
-        icons.coffee,
-        { en: "Caf\xE9s and bars", de: "Caf\xE9s und Bars", ar: "\u0627\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u0627\u0644\u0628\u0627\u0631\u0627\u062A" },
-        {
-          en: "Speed is the whole product. The preset puts the twelve items that make up most of the day on the first screen and turns everything else into a modifier.",
-          de: "Tempo ist das Produkt. Die Vorlage legt die zw\xF6lf Artikel, die den Grossteil des Tages ausmachen, auf den ersten Bildschirm und macht den Rest zur Option.",
-          ar: "\u0627\u0644\u0633\u0631\u0639\u0629 \u0647\u064A \u0627\u0644\u0645\u0646\u062A\u062C \u0643\u0644\u0647. \u064A\u0636\u0639 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0627\u0644\u062C\u0627\u0647\u0632 \u0627\u0644\u0623\u0635\u0646\u0627\u0641 \u0627\u0644\u0627\u062B\u0646\u064A \u0639\u0634\u0631 \u0627\u0644\u0623\u0643\u062B\u0631 \u0645\u0628\u064A\u0639\u064B\u0627 \u0641\u064A \u0627\u0644\u0634\u0627\u0634\u0629 \u0627\u0644\u0623\u0648\u0644\u0649 \u0648\u064A\u062D\u0648\u0651\u0644 \u0627\u0644\u0628\u0627\u0642\u064A \u0625\u0644\u0649 \u0625\u0636\u0627\u0641\u0627\u062A."
-        },
-        [
-          { en: "Size and milk options as one-tap modifiers with automatic price deltas.", de: "Gr\xF6ssen und Milchoptionen als Ein-Tap-Optionen mit automatischer Preisdifferenz.", ar: "\u0623\u062D\u062C\u0627\u0645 \u0648\u062E\u064A\u0627\u0631\u0627\u062A \u062D\u0644\u064A\u0628 \u0628\u0636\u063A\u0637\u0629 \u0648\u0627\u062D\u062F\u0629 \u0645\u0639 \u0641\u0631\u0648\u0642 \u0633\u0639\u0631 \u062A\u0644\u0642\u0627\u0626\u064A\u0629." },
-          { en: "Open tabs per table or per guest name, settled at the end of the visit.", de: "Offene Deckel je Tisch oder Gastname, am Ende des Besuchs abgerechnet.", ar: "\u062D\u0633\u0627\u0628\u0627\u062A \u0645\u0641\u062A\u0648\u062D\u0629 \u0644\u0643\u0644 \u0637\u0627\u0648\u0644\u0629 \u0623\u0648 \u0628\u0627\u0633\u0645 \u0627\u0644\u0636\u064A\u0641\u060C \u062A\u064F\u0633\u062F\u064E\u0651\u062F \u0646\u0647\u0627\u064A\u0629 \u0627\u0644\u0632\u064A\u0627\u0631\u0629." },
-          { en: "Tip line on the receipt and a tip report per employee per shift.", de: "Trinkgeldzeile auf dem Bon und Trinkgeldbericht je Mitarbeiter und Schicht.", ar: "\u0633\u0637\u0631 \u0628\u0642\u0634\u064A\u0634 \u0641\u064A \u0627\u0644\u0625\u064A\u0635\u0627\u0644 \u0648\u062A\u0642\u0631\u064A\u0631 \u0628\u0642\u0634\u064A\u0634 \u0644\u0643\u0644 \u0645\u0648\u0638\u0641 \u0641\u064A \u0643\u0644 \u0648\u0631\u062F\u064A\u0629." },
-          { en: "Loyalty stamps that convert into a free item automatically at the till.", de: "Treuestempel, die an der Kasse automatisch zu einem Gratisartikel werden.", ar: "\u0623\u062E\u062A\u0627\u0645 \u0648\u0644\u0627\u0621 \u062A\u062A\u062D\u0648\u0651\u0644 \u062A\u0644\u0642\u0627\u0626\u064A\u064B\u0627 \u0625\u0644\u0649 \u0635\u0646\u0641 \u0645\u062C\u0627\u0646\u064A \u0639\u0646\u062F \u0627\u0644\u0643\u0627\u0634\u064A\u0631." }
-        ],
-        { en: "Kassenta on a caf\xE9 counter with a fast-order grid", de: "Kassenta an der Caf\xE9-Theke mit Schnellbestellraster", ar: "Kassenta \u0639\u0644\u0649 \u0643\u0627\u0634\u064A\u0631 \u0643\u0627\u0641\u064A\u0647 \u0628\u0634\u0628\u0643\u0629 \u0637\u0644\u0628 \u0633\u0631\u064A\u0639" }
-      )}
-
-  ${vertical(
-        "industry-restaurant",
-        icons.register,
-        { en: "Restaurants", de: "Restaurants", ar: "\u0627\u0644\u0645\u0637\u0627\u0639\u0645" },
-        {
-          en: "Service happens in parallel: tables, phone orders, walk-ins and delivery all at once. The preset keeps them in one queue with clear promised times.",
-          de: "Service l\xE4uft parallel: Tische, Telefonbestellungen, Laufkundschaft und Lieferung gleichzeitig. Die Vorlage h\xE4lt alles in einer Warteschlange mit klaren Zusagezeiten.",
-          ar: "\u0627\u0644\u062E\u062F\u0645\u0629 \u062A\u0633\u064A\u0631 \u0628\u0627\u0644\u062A\u0648\u0627\u0632\u064A: \u0637\u0627\u0648\u0644\u0627\u062A \u0648\u0645\u0643\u0627\u0644\u0645\u0627\u062A \u0648\u0632\u0628\u0627\u0626\u0646 \u0639\u0627\u0628\u0631\u0648\u0646 \u0648\u062A\u0648\u0635\u064A\u0644 \u0641\u064A \u0622\u0646 \u0648\u0627\u062D\u062F. \u064A\u0628\u0642\u064A\u0647\u0627 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0641\u064A \u0642\u0627\u0626\u0645\u0629 \u0648\u0627\u062D\u062F\u0629 \u0628\u0623\u0648\u0642\u0627\u062A \u0648\u0627\u0636\u062D\u0629."
-        },
-        [
-          { en: "Table plan with availability, occupancy and reservation states.", de: "Tischplan mit Verf\xFCgbarkeit, Belegung und Reservierungsstatus.", ar: "\u0645\u062E\u0637\u0637 \u0637\u0627\u0648\u0644\u0627\u062A \u0628\u062D\u0627\u0644\u0627\u062A \u0627\u0644\u0625\u062A\u0627\u062D\u0629 \u0648\u0627\u0644\u0625\u0634\u063A\u0627\u0644 \u0648\u0627\u0644\u062D\u062C\u0632." },
-          { en: "Dine-in and takeaway VAT applied per line, so a mixed ticket is still correct.", de: "MwSt. f\xFCr Vor-Ort und Takeaway je Position \u2014 auch ein gemischter Bon bleibt korrekt.", ar: "\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0648\u0627\u0644\u062A\u064A\u0643 \u0623\u0648\u0627\u064A \u0644\u0643\u0644 \u0628\u0646\u062F\u060C \u0641\u062A\u0628\u0642\u0649 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0627\u0644\u0645\u062E\u062A\u0644\u0637\u0629 \u0635\u062D\u064A\u062D\u0629." },
-          { en: "Split a bill by guest, by item or evenly, with separate receipts.", de: "Rechnung nach Gast, nach Artikel oder gleichm\xE4ssig teilen, mit separaten Bons.", ar: "\u062A\u0642\u0633\u064A\u0645 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u062D\u0633\u0628 \u0627\u0644\u0636\u064A\u0641 \u0623\u0648 \u0627\u0644\u0635\u0646\u0641 \u0623\u0648 \u0628\u0627\u0644\u062A\u0633\u0627\u0648\u064A\u060C \u0645\u0639 \u0625\u064A\u0635\u0627\u0644\u0627\u062A \u0645\u0646\u0641\u0635\u0644\u0629." },
-          { en: "Kitchen tickets grouped by course, printed or shown on a screen.", de: "K\xFCchenbons nach Gang gruppiert, gedruckt oder auf dem Bildschirm.", ar: "\u062A\u0630\u0627\u0643\u0631 \u0645\u0637\u0628\u062E \u0645\u062C\u0645\u064E\u0651\u0639\u0629 \u062D\u0633\u0628 \u0627\u0644\u0637\u0628\u0642\u060C \u0645\u0637\u0628\u0648\u0639\u0629 \u0623\u0648 \u0645\u0639\u0631\u0648\u0636\u0629 \u0639\u0644\u0649 \u0634\u0627\u0634\u0629." }
-        ],
-        { en: "Restaurant table plan and live order queue in Kassenta", de: "Restaurant-Tischplan und Live-Bestellliste in Kassenta", ar: "\u0645\u062E\u0637\u0637 \u0637\u0627\u0648\u0644\u0627\u062A \u0627\u0644\u0645\u0637\u0639\u0645 \u0648\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u062D\u064A\u0651\u0629 \u0641\u064A Kassenta" }
-      )}
-
-  ${vertical(
-        "industry-supermarket",
-        icons.cart,
-        { en: "Supermarkets and grocers", de: "Superm\xE4rkte und Lebensmittelhandel", ar: "\u0627\u0644\u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A \u0648\u0627\u0644\u0628\u0642\u0627\u0644\u0629" },
-        {
-          en: "High item counts and low margins mean the checkout has to be exact and fast. The preset optimises for scanning rather than browsing.",
-          de: "Viele Artikel und schmale Margen verlangen eine exakte und schnelle Kasse. Die Vorlage optimiert auf Scannen statt Bl\xE4ttern.",
-          ar: "\u0643\u062B\u0631\u0629 \u0627\u0644\u0623\u0635\u0646\u0627\u0641 \u0648\u0636\u0622\u0644\u0629 \u0627\u0644\u0647\u0627\u0645\u0634 \u062A\u062A\u0637\u0644\u0628\u0627\u0646 \u062F\u0641\u0639\u064B\u0627 \u062F\u0642\u064A\u0642\u064B\u0627 \u0648\u0633\u0631\u064A\u0639\u064B\u0627. \u064A\u0631\u0643\u0651\u0632 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0639\u0644\u0649 \u0627\u0644\u0645\u0633\u062D \u0644\u0627 \u0627\u0644\u062A\u0635\u0641\u0651\u062D."
-        },
-        [
-          { en: "Continuous barcode scanning with quantity multipliers and instant subtotal.", de: "Durchgehendes Barcode-Scannen mit Mengenmultiplikatoren und sofortiger Zwischensumme.", ar: "\u0645\u0633\u062D \u0628\u0627\u0631\u0643\u0648\u062F \u0645\u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0645\u0636\u0627\u0639\u0650\u0641\u0627\u062A \u0627\u0644\u0643\u0645\u064A\u0629 \u0648\u0645\u062C\u0645\u0648\u0639 \u0641\u0648\u0631\u064A." },
-          { en: "Weighed goods priced per kilogram, from a connected scale or manual entry.", de: "Gewichtsware mit Kilopreis, von angeschlossener Waage oder manueller Eingabe.", ar: "\u0633\u0644\u0639 \u0628\u0627\u0644\u0648\u0632\u0646 \u0645\u0633\u0639\u064E\u0651\u0631\u0629 \u0628\u0627\u0644\u0643\u064A\u0644\u0648\u060C \u0645\u0646 \u0645\u064A\u0632\u0627\u0646 \u0645\u062A\u0635\u0644 \u0623\u0648 \u0628\u0625\u062F\u062E\u0627\u0644 \u064A\u062F\u0648\u064A." },
-          { en: "Reduced VAT for food handled separately from standard-rate non-food.", de: "Reduzierte MwSt. f\xFCr Lebensmittel getrennt vom Normalsatz f\xFCr Non-Food.", ar: "\u0636\u0631\u064A\u0628\u0629 \u0645\u062E\u0641\u064E\u0651\u0636\u0629 \u0644\u0644\u0623\u063A\u0630\u064A\u0629 \u0645\u0646\u0641\u0635\u0644\u0629 \u0639\u0646 \u0627\u0644\u0646\u0633\u0628\u0629 \u0627\u0644\u0639\u0627\u062F\u064A\u0629 \u0644\u063A\u064A\u0631 \u0627\u0644\u0623\u063A\u0630\u064A\u0629." },
-          { en: "Deposit and return handling as a distinct line, not a discount.", de: "Pfand und R\xFCckgabe als eigene Position, nicht als Rabatt.", ar: "\u0627\u0644\u062A\u0623\u0645\u064A\u0646 \u0627\u0644\u0645\u0633\u062A\u0631\u062F \u0643\u0633\u0637\u0631 \u0645\u0633\u062A\u0642\u0644 \u0644\u0627 \u0643\u062E\u0635\u0645." }
-        ],
-        { en: "Supermarket checkout with barcode scanning in Kassenta", de: "Supermarktkasse mit Barcode-Scan in Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A \u0645\u0639 \u0645\u0633\u062D \u0628\u0627\u0631\u0643\u0648\u062F \u0641\u064A Kassenta" }
-      )}
-
-  ${vertical(
-        "industry-pharmacy",
-        icons.pill,
-        { en: "Pharmacies", de: "Apotheken", ar: "\u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0627\u062A" },
-        {
-          en: "Traceability matters more than speed. The preset adds the fields a regulator asks for and records who did what.",
-          de: "Nachvollziehbarkeit z\xE4hlt mehr als Tempo. Die Vorlage erg\xE4nzt die von Beh\xF6rden geforderten Felder und protokolliert, wer was getan hat.",
-          ar: "\u0627\u0644\u062A\u062A\u0628\u0651\u0639 \u0623\u0647\u0645 \u0645\u0646 \u0627\u0644\u0633\u0631\u0639\u0629. \u064A\u0636\u064A\u0641 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0627\u0644\u062D\u0642\u0648\u0644 \u0627\u0644\u062A\u064A \u062A\u0637\u0644\u0628\u0647\u0627 \u0627\u0644\u062C\u0647\u0627\u062A \u0627\u0644\u0631\u0642\u0627\u0628\u064A\u0629 \u0648\u064A\u0633\u062C\u0651\u0644 \u0645\u0646 \u0641\u0639\u0644 \u0645\u0627\u0630\u0627."
-        },
-        [
-          { en: "Batch number and expiry date per item, with an alert before stock expires.", de: "Chargennummer und Verfallsdatum je Artikel, mit Warnung vor Ablauf.", ar: "\u0631\u0642\u0645 \u0627\u0644\u062A\u0634\u063A\u064A\u0644\u0629 \u0648\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0629 \u0644\u0643\u0644 \u0635\u0646\u0641\u060C \u0645\u0639 \u062A\u0646\u0628\u064A\u0647 \u0642\u0628\u0644 \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621." },
-          { en: "Restricted-item prompts that require a supervisor PIN before the sale completes.", de: "Hinweise bei eingeschr\xE4nkten Artikeln, die vor Abschluss eine Vorgesetzten-PIN verlangen.", ar: "\u062A\u0646\u0628\u064A\u0647\u0627\u062A \u0627\u0644\u0623\u0635\u0646\u0627\u0641 \u0627\u0644\u0645\u0642\u064A\u064E\u0651\u062F\u0629 \u062A\u062A\u0637\u0644\u0628 \u0631\u0642\u0645 \u0645\u0634\u0631\u0641 \u0642\u0628\u0644 \u0625\u062A\u0645\u0627\u0645 \u0627\u0644\u0628\u064A\u0639." },
-          { en: "Per-operator audit trail on every sale, void, discount and price override.", de: "Audit-Trail je Mitarbeiter f\xFCr jeden Verkauf, Storno, Rabatt und jede Preis\xE4nderung.", ar: "\u0633\u062C\u0644 \u062A\u062F\u0642\u064A\u0642 \u0644\u0643\u0644 \u0645\u0648\u0638\u0641 \u0639\u0644\u0649 \u0643\u0644 \u0628\u064A\u0639 \u0648\u0625\u0644\u063A\u0627\u0621 \u0648\u062E\u0635\u0645 \u0648\u062A\u0639\u062F\u064A\u0644 \u0633\u0639\u0631." },
-          { en: "Reduced VAT categories separated from standard-rate cosmetics and accessories.", de: "Reduzierte MwSt.-Kategorien getrennt von Kosmetik und Zubeh\xF6r zum Normalsatz.", ar: "\u0641\u0626\u0627\u062A \u0636\u0631\u064A\u0628\u0629 \u0645\u062E\u0641\u064E\u0651\u0636\u0629 \u0645\u0646\u0641\u0635\u0644\u0629 \u0639\u0646 \u0645\u0633\u062A\u062D\u0636\u0631\u0627\u062A \u0627\u0644\u062A\u062C\u0645\u064A\u0644 \u0648\u0627\u0644\u0645\u0644\u062D\u0642\u0627\u062A \u0628\u0627\u0644\u0646\u0633\u0628\u0629 \u0627\u0644\u0639\u0627\u062F\u064A\u0629." }
-        ],
-        { en: "Pharmacy counter with batch and expiry fields in Kassenta", de: "Apothekentresen mit Chargen- und Verfallsfeldern in Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u0635\u064A\u062F\u0644\u064A\u0629 \u0645\u0639 \u062D\u0642\u0648\u0644 \u0627\u0644\u062A\u0634\u063A\u064A\u0644\u0629 \u0648\u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0629 \u0641\u064A Kassenta" }
-      )}
-
-  ${vertical(
-        "industry-bakery",
-        icons.scale,
-        { en: "Bakeries", de: "B\xE4ckereien", ar: "\u0627\u0644\u0645\u062E\u0627\u0628\u0632" },
-        {
-          en: "Everything sells in four hours and what is left is waste. The preset ties pre-orders, production and end-of-day waste into one number.",
-          de: "Alles verkauft sich in vier Stunden, der Rest ist Ausschuss. Die Vorlage verbindet Vorbestellungen, Produktion und Tagesende-Retouren zu einer Kennzahl.",
-          ar: "\u0643\u0644 \u0634\u064A\u0621 \u064A\u064F\u0628\u0627\u0639 \u0641\u064A \u0623\u0631\u0628\u0639 \u0633\u0627\u0639\u0627\u062A \u0648\u0645\u0627 \u064A\u062A\u0628\u0642\u0651\u0649 \u0647\u062F\u0631. \u064A\u0631\u0628\u0637 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u0645\u0633\u0628\u0642\u0629 \u0648\u0627\u0644\u0625\u0646\u062A\u0627\u062C \u0648\u0647\u062F\u0631 \u0646\u0647\u0627\u064A\u0629 \u0627\u0644\u064A\u0648\u0645 \u0641\u064A \u0631\u0642\u0645 \u0648\u0627\u062D\u062F."
-        },
-        [
-          { en: "Price by weight or by piece on the same product, chosen at the till.", de: "Preis nach Gewicht oder St\xFCck beim selben Artikel, an der Kasse w\xE4hlbar.", ar: "\u062A\u0633\u0639\u064A\u0631 \u0628\u0627\u0644\u0648\u0632\u0646 \u0623\u0648 \u0628\u0627\u0644\u0642\u0637\u0639\u0629 \u0644\u0644\u0645\u0646\u062A\u062C \u0646\u0641\u0633\u0647\u060C \u064A\u064F\u062E\u062A\u0627\u0631 \u0639\u0646\u062F \u0627\u0644\u0643\u0627\u0634\u064A\u0631." },
-          { en: "Pre-orders for a named pickup time, listed for the morning shift.", de: "Vorbestellungen mit fester Abholzeit, f\xFCr die Fr\xFChschicht aufgelistet.", ar: "\u0637\u0644\u0628\u0627\u062A \u0645\u0633\u0628\u0642\u0629 \u0628\u0648\u0642\u062A \u0627\u0633\u062A\u0644\u0627\u0645 \u0645\u062D\u062F\u064E\u0651\u062F\u060C \u062A\u0638\u0647\u0631 \u0644\u0648\u0631\u062F\u064A\u0629 \u0627\u0644\u0635\u0628\u0627\u062D." },
-          { en: "Production plan generated from yesterday's sales and today's pre-orders.", de: "Produktionsplan aus den gestrigen Verk\xE4ufen und heutigen Vorbestellungen.", ar: "\u062E\u0637\u0629 \u0625\u0646\u062A\u0627\u062C \u062A\u064F\u0628\u0646\u0649 \u0645\u0646 \u0645\u0628\u064A\u0639\u0627\u062A \u0627\u0644\u0623\u0645\u0633 \u0648\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u064A\u0648\u0645 \u0627\u0644\u0645\u0633\u0628\u0642\u0629." },
-          { en: "Waste recorded at close as a separate figure so margin stays honest.", de: "Retouren beim Abschluss separat erfasst, damit die Marge ehrlich bleibt.", ar: "\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0647\u062F\u0631 \u0639\u0646\u062F \u0627\u0644\u0625\u063A\u0644\u0627\u0642 \u0643\u0631\u0642\u0645 \u0645\u0646\u0641\u0635\u0644 \u0644\u064A\u0628\u0642\u0649 \u0627\u0644\u0647\u0627\u0645\u0634 \u0635\u0627\u062F\u0642\u064B\u0627." }
-        ],
-        { en: "Bakery counter with weight-based pricing in Kassenta", de: "B\xE4ckereitheke mit Preis nach Gewicht in Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u0645\u062E\u0628\u0632 \u0645\u0639 \u062A\u0633\u0639\u064A\u0631 \u0628\u0627\u0644\u0648\u0632\u0646 \u0641\u064A Kassenta" }
-      )}
-
-  ${vertical(
-        "industry-retail",
-        icons.tag,
-        { en: "Retail", de: "Einzelhandel", ar: "\u0627\u0644\u062A\u062C\u0632\u0626\u0629" },
-        {
-          en: "The same shirt in five sizes and three colours is fifteen stock lines. The preset keeps that manageable at the counter.",
-          de: "Dasselbe Hemd in f\xFCnf Gr\xF6ssen und drei Farben sind f\xFCnfzehn Bestandszeilen. Die Vorlage h\xE4lt das an der Kasse handhabbar.",
-          ar: "\u0627\u0644\u0642\u0645\u064A\u0635 \u0646\u0641\u0633\u0647 \u0628\u062E\u0645\u0633\u0629 \u0645\u0642\u0627\u0633\u0627\u062A \u0648\u062B\u0644\u0627\u062B\u0629 \u0623\u0644\u0648\u0627\u0646 \u064A\u0639\u0646\u064A \u062E\u0645\u0633\u0629 \u0639\u0634\u0631 \u0633\u0637\u0631 \u0645\u062E\u0632\u0648\u0646. \u064A\u0628\u0642\u064A\u0647\u0627 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0633\u0647\u0644\u0629 \u0639\u0646\u062F \u0627\u0644\u0643\u0627\u0634\u064A\u0631."
-        },
-        [
-          { en: "Variant matrix by size and colour with per-variant stock and barcode.", de: "Variantenmatrix nach Gr\xF6sse und Farbe mit Bestand und Barcode je Variante.", ar: "\u0645\u0635\u0641\u0648\u0641\u0629 \u0645\u062A\u063A\u064A\u0651\u0631\u0627\u062A \u0628\u0627\u0644\u0645\u0642\u0627\u0633 \u0648\u0627\u0644\u0644\u0648\u0646 \u0645\u0639 \u0645\u062E\u0632\u0648\u0646 \u0648\u0628\u0627\u0631\u0643\u0648\u062F \u0644\u0643\u0644 \u0645\u062A\u063A\u064A\u0651\u0631." },
-          { en: "Returns and exchanges with reason codes that feed the returns report.", de: "Retouren und Umtausch mit Grundcodes, die in den Retourenbericht fliessen.", ar: "\u0645\u0631\u062A\u062C\u0639\u0627\u062A \u0648\u0627\u0633\u062A\u0628\u062F\u0627\u0644 \u0628\u0623\u0633\u0628\u0627\u0628 \u0645\u062D\u062F\u064E\u0651\u062F\u0629 \u062A\u063A\u0630\u0651\u064A \u062A\u0642\u0631\u064A\u0631 \u0627\u0644\u0645\u0631\u062A\u062C\u0639\u0627\u062A." },
-          { en: "Customer records that show past purchases when a return has no receipt.", de: "Kundenakten mit fr\xFCheren K\xE4ufen, wenn eine Retoure ohne Beleg kommt.", ar: "\u0633\u062C\u0644\u0627\u062A \u0639\u0645\u0644\u0627\u0621 \u062A\u064F\u0638\u0647\u0631 \u0627\u0644\u0645\u0634\u062A\u0631\u064A\u0627\u062A \u0627\u0644\u0633\u0627\u0628\u0642\u0629 \u0639\u0646\u062F \u0645\u0631\u062A\u062C\u0639 \u0628\u0644\u0627 \u0625\u064A\u0635\u0627\u0644." },
-          { en: "Seasonal price lists scheduled to start and end on set dates.", de: "Saisonale Preislisten mit geplantem Start- und Enddatum.", ar: "\u0642\u0648\u0627\u0626\u0645 \u0623\u0633\u0639\u0627\u0631 \u0645\u0648\u0633\u0645\u064A\u0629 \u062A\u0628\u062F\u0623 \u0648\u062A\u0646\u062A\u0647\u064A \u0641\u064A \u062A\u0648\u0627\u0631\u064A\u062E \u0645\u062D\u062F\u064E\u0651\u062F\u0629." }
-        ],
-        { en: "Retail counter with size and colour variants in Kassenta", de: "Einzelhandelskasse mit Gr\xF6ssen- und Farbvarianten in Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u062A\u062C\u0632\u0626\u0629 \u0645\u0639 \u0645\u062A\u063A\u064A\u0651\u0631\u0627\u062A \u0627\u0644\u0645\u0642\u0627\u0633 \u0648\u0627\u0644\u0644\u0648\u0646 \u0641\u064A Kassenta" }
-      )}
-
-  ${ctaBand(
-        { en: "Not on the list?", de: "Nicht dabei?", ar: "\u0645\u062C\u0627\u0644\u0643 \u063A\u064A\u0631 \u0645\u0630\u0643\u0648\u0631\u061F" },
-        {
-          en: "Butchers, florists, kiosks and salons all run on Kassenta today with a custom preset. Tell us the fields and rules your trade needs.",
-          de: "Metzgereien, Floristen, Kioske und Salons arbeiten heute mit einer eigenen Vorlage auf Kassenta. Nennen Sie uns die Felder und Regeln Ihrer Branche.",
-          ar: "\u0627\u0644\u062C\u0632\u0627\u0631\u0648\u0646 \u0648\u0628\u0627\u0626\u0639\u0648 \u0627\u0644\u0632\u0647\u0648\u0631 \u0648\u0627\u0644\u0623\u0643\u0634\u0627\u0643 \u0648\u0627\u0644\u0635\u0627\u0644\u0648\u0646\u0627\u062A \u064A\u0639\u0645\u0644\u0648\u0646 \u0627\u0644\u064A\u0648\u0645 \u0639\u0644\u0649 Kassenta \u0628\u0625\u0639\u062F\u0627\u062F \u0645\u062E\u0635\u064E\u0651\u0635. \u0623\u062E\u0628\u0631\u0646\u0627 \u0628\u0627\u0644\u062D\u0642\u0648\u0644 \u0648\u0627\u0644\u0642\u0648\u0627\u0639\u062F \u0627\u0644\u062A\u064A \u064A\u062D\u062A\u0627\u062C\u0647\u0627 \u0646\u0634\u0627\u0637\u0643."
-        }
-      )}`
-    };
-    plan = (name, monthly, blurb, points, featured = false, tag) => `
-        <article class="card price-card${featured ? " featured" : ""} reveal">
-          ${tag ? `<span class="badge price-tag" ${tAttrs(tag)}>${esc(tag.en)}</span>` : ""}
-          <h3 ${tAttrs(name)}>${esc(name.en)}</h3>
-          <p style="font-size:.9rem" ${tAttrs(blurb)}>${esc(blurb.en)}</p>
-          <div class="price"><span data-monthly="${monthly}" data-yearly="${Math.round(monthly * 0.8)}" class="price-value">${monthly}</span> <small>CHF <span ${tAttrs({ en: "per month", de: "pro Monat", ar: "\u0634\u0647\u0631\u064A\u064B\u0627" })}>per month</span></small></div>
-          <p class="form-note" ${tAttrs({ en: "Per location. VAT excluded.", de: "Pro Standort. Exkl. MwSt.", ar: "\u0644\u0643\u0644 \u0641\u0631\u0639. \u063A\u064A\u0631 \u0634\u0627\u0645\u0644 \u0627\u0644\u0636\u0631\u064A\u0628\u0629." })}>Per location. VAT excluded.</p>
-          ${ticks(points)}
-          <a class="btn ${featured ? "btn-primary" : "btn-ghost"}" href="/contact/" ${tAttrs({ en: "Start with this plan", de: "Mit diesem Plan starten", ar: "\u0627\u0628\u062F\u0623 \u0628\u0647\u0630\u0647 \u0627\u0644\u0628\u0627\u0642\u0629" })}>Start with this plan</a>
-        </article>`;
-    pricing = {
-      meta: {
-        path: "/pricing",
-        title: { en: "Pricing \u2014 flat fee per location, no commission", de: "Preise \u2014 Pauschale je Standort, keine Provision", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u2014 \u0631\u0633\u0645 \u062B\u0627\u0628\u062A \u0644\u0643\u0644 \u0641\u0631\u0639 \u0628\u0644\u0627 \u0639\u0645\u0648\u0644\u0629" },
-        description: {
-          en: "Transparent per-location pricing in CHF. No commission on your own orders, no setup fee, and every plan includes onboarding and support.",
-          de: "Transparente Preise je Standort in CHF. Keine Provision auf eigene Bestellungen, keine Einrichtungsgeb\xFChr, Onboarding und Support in jedem Plan.",
-          ar: "\u0623\u0633\u0639\u0627\u0631 \u0634\u0641\u0627\u0641\u0629 \u0644\u0643\u0644 \u0641\u0631\u0639 \u0628\u0627\u0644\u0641\u0631\u0646\u0643 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A. \u0628\u0644\u0627 \u0639\u0645\u0648\u0644\u0629 \u0639\u0644\u0649 \u0637\u0644\u0628\u0627\u062A\u0643\u060C \u0648\u0628\u0644\u0627 \u0631\u0633\u0648\u0645 \u062A\u0623\u0633\u064A\u0633\u060C \u0648\u0645\u0639 \u062A\u0647\u064A\u0626\u0629 \u0648\u062F\u0639\u0645 \u0641\u064A \u0643\u0644 \u0627\u0644\u0628\u0627\u0642\u0627\u062A."
-        },
-        jsonLd: [
-          {
-            "@context": "https://schema.org",
-            "@type": "Product",
-            name: "Kassenta POS",
-            description: "Point of sale, online ordering and delivery software, priced per location with no commission on your own orders.",
-            image: "https://kassenta.com/brand/og-image.jpg",
-            brand: { "@type": "Brand", name: "Kassenta" },
-            offers: [
-              {
-                "@type": "Offer",
-                name: "Starter",
-                price: "49",
-                priceCurrency: "CHF",
-                availability: "https://schema.org/InStock",
-                url: "https://kassenta.com/pricing/",
-                description: "One counter, one screen. For a single caf\xE9, kiosk or small shop."
-              },
-              {
-                "@type": "Offer",
-                name: "Professional",
-                price: "99",
-                priceCurrency: "CHF",
-                availability: "https://schema.org/InStock",
-                url: "https://kassenta.com/pricing/",
-                description: "Counter plus your own online channel, delivery and loyalty."
-              },
-              {
-                "@type": "Offer",
-                name: "Enterprise",
-                price: "199",
-                priceCurrency: "CHF",
-                availability: "https://schema.org/InStock",
-                url: "https://kassenta.com/pricing/",
-                description: "Several branches under one roof, with the API and consolidated reporting."
-              }
-            ]
-          },
-          {
-            "@context": "https://schema.org",
-            "@type": "FAQPage",
-            mainEntity: [
-              {
-                "@type": "Question",
-                name: "Is there a minimum contract?",
-                acceptedAnswer: {
-                  "@type": "Answer",
-                  text: "Monthly plans run month to month and can be cancelled at the end of any period. Yearly plans run for twelve months and are billed once."
-                }
-              },
-              {
-                "@type": "Question",
-                name: "What counts as a location?",
-                acceptedAnswer: {
-                  "@type": "Answer",
-                  text: "One physical address. Devices inside that address are covered by the plan's device limit; a second shop needs a second location."
-                }
-              },
-              {
-                "@type": "Question",
-                name: "Do you take a cut of card or TWINT payments?",
-                acceptedAnswer: {
-                  "@type": "Answer",
-                  text: "No. You keep your own acquirer contract and its rates. Kassenta records the payment and never sits between you and the money."
-                }
-              },
-              {
-                "@type": "Question",
-                name: "Can I change plan later?",
-                acceptedAnswer: {
-                  "@type": "Answer",
-                  text: "Yes, in both directions, effective from the next billing period. Your data and settings are untouched by a plan change."
-                }
-              }
-            ]
-          }
-        ]
-      },
-      body: `
-  ${pageHead(
-        { en: "Pay for locations, not for orders", de: "Zahlen Sie f\xFCr Standorte, nicht f\xFCr Bestellungen", ar: "\u0627\u062F\u0641\u0639 \u0645\u0642\u0627\u0628\u0644 \u0627\u0644\u0641\u0631\u0648\u0639 \u0644\u0627 \u0645\u0642\u0627\u0628\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062A" },
-        {
-          en: "Delivery marketplaces take a share of every order. Kassenta charges a flat fee per location, so the more you sell through your own channel, the less each order costs you.",
-          de: "Lieferplattformen behalten einen Anteil jeder Bestellung. Kassenta berechnet eine Pauschale je Standort \u2014 je mehr Sie \xFCber den eigenen Kanal verkaufen, desto g\xFCnstiger wird jede Bestellung.",
-          ar: "\u062A\u0623\u062E\u0630 \u0645\u0646\u0635\u0627\u062A \u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u0646\u0633\u0628\u0629 \u0645\u0646 \u0643\u0644 \u0637\u0644\u0628. \u064A\u0641\u0631\u0636 Kassenta \u0631\u0633\u0645\u064B\u0627 \u062B\u0627\u0628\u062A\u064B\u0627 \u0644\u0643\u0644 \u0641\u0631\u0639\u060C \u0641\u0643\u0644\u0645\u0627 \u0628\u0639\u062A \u0623\u0643\u062B\u0631 \u0639\u0628\u0631 \u0642\u0646\u0627\u062A\u0643 \u0627\u0644\u062E\u0627\u0635\u0629 \u0642\u0644\u0651\u062A \u062A\u0643\u0644\u0641\u0629 \u0627\u0644\u0637\u0644\u0628."
-        },
-        { en: "Pricing", de: "Preise", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631" }
-      )}
-
-  <section class="section">
-    <div class="wrap">
-      <div style="text-align:center">
-        <div class="billing-toggle" role="group" aria-label="Billing period">
-          <button type="button" class="active" data-cycle="monthly" onclick="KassentaPricing.set('monthly')" ${tAttrs({ en: "Monthly", de: "Monatlich", ar: "\u0634\u0647\u0631\u064A" })}>Monthly</button>
-          <button type="button" data-cycle="yearly" onclick="KassentaPricing.set('yearly')" ${tAttrs({ en: "Yearly \u2014 save 20%", de: "J\xE4hrlich \u2014 20% sparen", ar: "\u0633\u0646\u0648\u064A \u2014 \u0648\u0641\u0651\u0631 20%" })}>Yearly \u2014 save 20%</button>
-        </div>
-      </div>
-      <div class="grid grid-3">
-        ${plan(
-        { en: "Starter", de: "Starter", ar: "\u0627\u0644\u0645\u0628\u062A\u062F\u0626\u0629" },
-        49,
-        { en: "One counter, one screen. For a single caf\xE9, kiosk or small shop finding its feet.", de: "Eine Kasse, ein Bildschirm. F\xFCr ein einzelnes Caf\xE9, einen Kiosk oder kleinen Laden.", ar: "\u0643\u0627\u0634\u064A\u0631 \u0648\u0627\u062D\u062F \u0648\u0634\u0627\u0634\u0629 \u0648\u0627\u062D\u062F\u0629. \u0644\u0643\u0627\u0641\u064A\u0647 \u0623\u0648 \u0643\u0634\u0643 \u0623\u0648 \u0645\u062D\u0644 \u0635\u063A\u064A\u0631 \u0641\u064A \u0628\u062F\u0627\u064A\u062A\u0647." },
-        [
-          { en: "POS on one device, unlimited products and staff PINs", de: "Kasse auf einem Ger\xE4t, unbegrenzte Artikel und Mitarbeiter-PINs", ar: "\u0643\u0627\u0634\u064A\u0631 \u0639\u0644\u0649 \u062C\u0647\u0627\u0632 \u0648\u0627\u062D\u062F\u060C \u0648\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0623\u0631\u0642\u0627\u0645 \u0645\u0648\u0638\u0641\u064A\u0646 \u0628\u0644\u0627 \u062D\u062F" },
-          { en: "Swiss VAT, cash rounding and TWINT", de: "Schweizer MwSt., Rappenrundung und TWINT", ar: "\u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A \u0648TWINT" },
-          { en: "Sales and inventory reports with CSV export", de: "Umsatz- und Bestandsberichte mit CSV-Export", ar: "\u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u0628\u064A\u0639\u0627\u062A \u0648\u0645\u062E\u0632\u0648\u0646 \u0645\u0639 \u062A\u0635\u062F\u064A\u0631 CSV" },
-          { en: "Email support, next business day", de: "E-Mail-Support am n\xE4chsten Werktag", ar: "\u062F\u0639\u0645 \u0628\u0627\u0644\u0628\u0631\u064A\u062F \u0641\u064A \u064A\u0648\u0645 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u062A\u0627\u0644\u064A" }
-        ]
-      )}
-        ${plan(
-        { en: "Professional", de: "Professional", ar: "\u0627\u0644\u0627\u062D\u062A\u0631\u0627\u0641\u064A\u0629" },
-        99,
-        { en: "Counter plus your own online channel. For restaurants that deliver and take table orders.", de: "Kasse plus eigener Online-Kanal. F\xFCr Restaurants mit Lieferung und Tischbestellung.", ar: "\u0643\u0627\u0634\u064A\u0631 \u0645\u0639 \u0642\u0646\u0627\u062A\u0643 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0629. \u0644\u0644\u0645\u0637\u0627\u0639\u0645 \u0627\u0644\u062A\u064A \u062A\u0648\u0635\u0651\u0644 \u0648\u062A\u0633\u062A\u0642\u0628\u0644 \u0637\u0644\u0628\u0627\u062A \u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A." },
-        [
-          { en: "Everything in Starter, on up to five devices", de: "Alles aus Starter, auf bis zu f\xFCnf Ger\xE4ten", ar: "\u0643\u0644 \u0645\u0627 \u0641\u064A \u0627\u0644\u0645\u0628\u062A\u062F\u0626\u0629\u060C \u0639\u0644\u0649 \u062E\u0645\u0633\u0629 \u0623\u062C\u0647\u0632\u0629" },
-          { en: "Branded online storefront and table QR ordering", de: "Gebrandeter Onlineshop und Tisch-QR-Bestellung", ar: "\u0645\u062A\u062C\u0631 \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0628\u0647\u0648\u064A\u062A\u0643 \u0648\u0637\u0644\u0628 QR \u0644\u0644\u0637\u0627\u0648\u0644\u0627\u062A" },
-          { en: "Delivery zones, drivers and customer tracking links", de: "Lieferzonen, Fahrer und Tracking-Links f\xFCr Kunden", ar: "\u0645\u0646\u0627\u0637\u0642 \u062A\u0648\u0635\u064A\u0644 \u0648\u0633\u0627\u0626\u0642\u0648\u0646 \u0648\u0631\u0648\u0627\u0628\u0637 \u062A\u062A\u0628\u0651\u0639 \u0644\u0644\u0639\u0645\u0644\u0627\u0621" },
-          { en: "Loyalty tiers, wallet, promo codes and referrals", de: "Treuestufen, Guthaben, Gutscheincodes und Empfehlungen", ar: "\u0645\u0633\u062A\u0648\u064A\u0627\u062A \u0648\u0644\u0627\u0621 \u0648\u0645\u062D\u0641\u0638\u0629 \u0648\u0623\u0643\u0648\u0627\u062F \u062E\u0635\u0645 \u0648\u0625\u062D\u0627\u0644\u0627\u062A" },
-          { en: "WhatsApp and email order notifications", de: "Bestellbenachrichtigungen per WhatsApp und E-Mail", ar: "\u0625\u0634\u0639\u0627\u0631\u0627\u062A \u0637\u0644\u0628\u0627\u062A \u0639\u0628\u0631 \u0648\u0627\u062A\u0633\u0627\u0628 \u0648\u0627\u0644\u0628\u0631\u064A\u062F" },
-          { en: "Phone and chat support during business hours", de: "Telefon- und Chat-Support zu Gesch\xE4ftszeiten", ar: "\u062F\u0639\u0645 \u0647\u0627\u062A\u0641\u064A \u0648\u0645\u062D\u0627\u062F\u062B\u0629 \u062E\u0644\u0627\u0644 \u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0639\u0645\u0644" }
-        ],
-        true,
-        { en: "Most chosen", de: "Am h\xE4ufigsten", ar: "\u0627\u0644\u0623\u0643\u062B\u0631 \u0627\u062E\u062A\u064A\u0627\u0631\u064B\u0627" }
-      )}
-        ${plan(
-        { en: "Enterprise", de: "Enterprise", ar: "\u0627\u0644\u0645\u0624\u0633\u0633\u0627\u062A" },
-        199,
-        { en: "Several branches under one roof, with the API and the reporting to match.", de: "Mehrere Filialen unter einem Dach, mit passender API und Auswertung.", ar: "\u0639\u062F\u0629 \u0641\u0631\u0648\u0639 \u062A\u062D\u062A \u0645\u0638\u0644\u0629 \u0648\u0627\u062D\u062F\u0629\u060C \u0645\u0639 \u0648\u0627\u062C\u0647\u0629 \u0628\u0631\u0645\u062C\u064A\u0629 \u0648\u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u0646\u0627\u0633\u0628\u0629." },
-        [
-          { en: "Everything in Professional, unlimited devices", de: "Alles aus Professional, unbegrenzte Ger\xE4te", ar: "\u0643\u0644 \u0645\u0627 \u0641\u064A \u0627\u0644\u0627\u062D\u062A\u0631\u0627\u0641\u064A\u0629\u060C \u0648\u0623\u062C\u0647\u0632\u0629 \u0628\u0644\u0627 \u062D\u062F" },
-          { en: "Multi-branch console with consolidated reporting", de: "Filialkonsole mit konsolidierter Auswertung", ar: "\u0644\u0648\u062D\u0629 \u0645\u062A\u0639\u062F\u062F\u0629 \u0627\u0644\u0641\u0631\u0648\u0639 \u0628\u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u062C\u0645\u0651\u0639\u0629" },
-          { en: "REST API, webhooks and accounting export", de: "REST-API, Webhooks und Buchhaltungsexport", ar: "\u0648\u0627\u062C\u0647\u0629 REST \u0648Webhooks \u0648\u062A\u0635\u062F\u064A\u0631 \u0645\u062D\u0627\u0633\u0628\u064A" },
-          { en: "Caller ID integration and custom vertical modules", de: "Rufnummernerkennung und eigene Branchenmodule", ar: "\u062A\u0639\u0631\u064A\u0641 \u0627\u0644\u0645\u062A\u0635\u0644 \u0648\u0648\u062D\u062F\u0627\u062A \u0645\u062E\u0635\u064E\u0651\u0635\u0629 \u0644\u0645\u062C\u0627\u0644\u0643" },
-          { en: "Named contact, priority response and on-site onboarding", de: "Fester Ansprechpartner, priorisierte Reaktion und Onboarding vor Ort", ar: "\u0645\u0633\u0624\u0648\u0644 \u0645\u062E\u0635\u064E\u0651\u0635 \u0648\u0627\u0633\u062A\u062C\u0627\u0628\u0629 \u0630\u0627\u062A \u0623\u0648\u0644\u0648\u064A\u0629 \u0648\u062A\u0647\u064A\u0626\u0629 \u0641\u064A \u0627\u0644\u0645\u0648\u0642\u0639" }
-        ]
-      )}
-      </div>
-      <p class="form-note" style="text-align:center;margin-top:24px" ${tAttrs({
-        en: "Prices are per location in CHF, excluding VAT. Yearly billing is charged once for twelve months.",
-        de: "Preise je Standort in CHF, exkl. MwSt. Die Jahresabrechnung erfolgt einmalig f\xFCr zw\xF6lf Monate.",
-        ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0644\u0643\u0644 \u0641\u0631\u0639 \u0628\u0627\u0644\u0641\u0631\u0646\u0643 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A \u0648\u063A\u064A\u0631 \u0634\u0627\u0645\u0644\u0629 \u0627\u0644\u0636\u0631\u064A\u0628\u0629. \u062A\u064F\u062D\u0635\u064E\u0651\u0644 \u0627\u0644\u0641\u0648\u062A\u0631\u0629 \u0627\u0644\u0633\u0646\u0648\u064A\u0629 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629 \u0644\u0627\u062B\u0646\u064A \u0639\u0634\u0631 \u0634\u0647\u0631\u064B\u0627."
-      })}>Prices are per location in CHF, excluding VAT. Yearly billing is charged once for twelve months.</p>
-    </div>
-  </section>
-
-  <section class="section section--alt">
-    <div class="wrap">
-      ${head(
-        { en: "Included everywhere", de: "\xDCberall enthalten", ar: "\u0645\u0634\u0645\u0648\u0644 \u0641\u064A \u0643\u0644 \u0627\u0644\u0628\u0627\u0642\u0627\u062A" },
-        { en: "Things other vendors invoice separately", de: "Was andere Anbieter separat berechnen", ar: "\u0623\u0645\u0648\u0631 \u064A\u0641\u0648\u062A\u0631\u0647\u0627 \u0622\u062E\u0631\u0648\u0646 \u0645\u0646\u0641\u0635\u0644\u0629" },
-        void 0,
-        true
-      )}
-      <div class="grid grid-4">
-        ${card(icons.refresh, { en: "Updates", de: "Updates", ar: "\u0627\u0644\u062A\u062D\u062F\u064A\u062B\u0627\u062A" }, { en: "Every release, including new modules, at no extra cost.", de: "Jede Version, inklusive neuer Module, ohne Aufpreis.", ar: "\u0643\u0644 \u0625\u0635\u062F\u0627\u0631\u060C \u0628\u0645\u0627 \u0641\u064A\u0647 \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0627\u0644\u062C\u062F\u064A\u062F\u0629\u060C \u062F\u0648\u0646 \u062A\u0643\u0644\u0641\u0629 \u0625\u0636\u0627\u0641\u064A\u0629." })}
-        ${card(icons.cloud, { en: "Hosting and backups", de: "Hosting und Backups", ar: "\u0627\u0644\u0627\u0633\u062A\u0636\u0627\u0641\u0629 \u0648\u0627\u0644\u0646\u0633\u062E \u0627\u0644\u0627\u062D\u062A\u064A\u0627\u0637\u064A" }, { en: "European hosting with daily backups and point-in-time restore.", de: "Europ\xE4isches Hosting mit t\xE4glichen Backups und Point-in-Time-Restore.", ar: "\u0627\u0633\u062A\u0636\u0627\u0641\u0629 \u0623\u0648\u0631\u0648\u0628\u064A\u0629 \u0645\u0639 \u0646\u0633\u062E \u064A\u0648\u0645\u064A \u0648\u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0644\u0623\u064A \u0644\u062D\u0638\u0629." })}
-        ${card(icons.users, { en: "Onboarding", de: "Onboarding", ar: "\u0627\u0644\u062A\u0647\u064A\u0626\u0629" }, { en: "We import your menu and train your team before you go live.", de: "Wir importieren Ihre Karte und schulen Ihr Team vor dem Livegang.", ar: "\u0646\u0633\u062A\u0648\u0631\u062F \u0642\u0627\u0626\u0645\u062A\u0643 \u0648\u0646\u062F\u0631\u0651\u0628 \u0641\u0631\u064A\u0642\u0643 \u0642\u0628\u0644 \u0627\u0644\u062A\u0634\u063A\u064A\u0644." })}
-        ${card(icons.key, { en: "No commission", de: "Keine Provision", ar: "\u0628\u0644\u0627 \u0639\u0645\u0648\u0644\u0629" }, { en: "Orders through your own storefront cost you nothing per order.", de: "Bestellungen \xFCber Ihren eigenen Shop kosten pro Bestellung nichts.", ar: "\u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0639\u0628\u0631 \u0645\u062A\u062C\u0631\u0643 \u0644\u0627 \u062A\u0643\u0644\u0651\u0641\u0643 \u0634\u064A\u0626\u064B\u0627 \u0644\u0643\u0644 \u0637\u0644\u0628." })}
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="wrap" style="max-width:860px">
-      ${head({ en: "Billing", de: "Abrechnung", ar: "\u0627\u0644\u0641\u0648\u062A\u0631\u0629" }, { en: "Common questions", de: "H\xE4ufige Fragen", ar: "\u0623\u0633\u0626\u0644\u0629 \u0634\u0627\u0626\u0639\u0629" }, void 0, true)}
-      ${faq([
-        {
-          q: { en: "Is there a minimum contract?", de: "Gibt es eine Mindestlaufzeit?", ar: "\u0647\u0644 \u0647\u0646\u0627\u0643 \u062D\u062F \u0623\u062F\u0646\u0649 \u0644\u0644\u062A\u0639\u0627\u0642\u062F\u061F" },
-          a: { en: "Monthly plans run month to month and can be cancelled at the end of any period. Yearly plans run for twelve months and are billed once.", de: "Monatspl\xE4ne laufen monatlich und k\xF6nnen zum Periodenende gek\xFCndigt werden. Jahrespl\xE4ne laufen zw\xF6lf Monate und werden einmalig abgerechnet.", ar: "\u0627\u0644\u0628\u0627\u0642\u0627\u062A \u0627\u0644\u0634\u0647\u0631\u064A\u0629 \u062A\u064F\u062C\u062F\u064E\u0651\u062F \u0634\u0647\u0631\u064A\u064B\u0627 \u0648\u064A\u0645\u0643\u0646 \u0625\u0644\u063A\u0627\u0624\u0647\u0627 \u0646\u0647\u0627\u064A\u0629 \u0623\u064A \u0641\u062A\u0631\u0629. \u0627\u0644\u0628\u0627\u0642\u0627\u062A \u0627\u0644\u0633\u0646\u0648\u064A\u0629 \u0644\u0627\u062B\u0646\u064A \u0639\u0634\u0631 \u0634\u0647\u0631\u064B\u0627 \u0648\u062A\u064F\u062D\u0635\u064E\u0651\u0644 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629." }
-        },
-        {
-          q: { en: "What counts as a location?", de: "Was z\xE4hlt als Standort?", ar: "\u0645\u0627 \u0627\u0644\u0630\u064A \u064A\u064F\u062D\u062A\u0633\u0628 \u0641\u0631\u0639\u064B\u0627\u061F" },
-          a: { en: "One physical address. Devices inside that address are covered by the plan's device limit; a second shop needs a second location.", de: "Eine physische Adresse. Ger\xE4te an dieser Adresse fallen unter das Ger\xE4telimit des Plans; ein zweites Gesch\xE4ft ben\xF6tigt einen zweiten Standort.", ar: "\u0639\u0646\u0648\u0627\u0646 \u0641\u0639\u0644\u064A \u0648\u0627\u062D\u062F. \u0627\u0644\u0623\u062C\u0647\u0632\u0629 \u062F\u0627\u062E\u0644 \u0647\u0630\u0627 \u0627\u0644\u0639\u0646\u0648\u0627\u0646 \u062A\u062F\u062E\u0644 \u0636\u0645\u0646 \u062D\u062F \u0627\u0644\u0628\u0627\u0642\u0629\u061B \u0648\u0627\u0644\u0645\u062D\u0644 \u0627\u0644\u062B\u0627\u0646\u064A \u064A\u062D\u062A\u0627\u062C \u0641\u0631\u0639\u064B\u0627 \u062B\u0627\u0646\u064A\u064B\u0627." }
-        },
-        {
-          q: { en: "Do you take a cut of card or TWINT payments?", de: "Behalten Sie einen Anteil an Karten- oder TWINT-Zahlungen?", ar: "\u0647\u0644 \u062A\u0623\u062E\u0630\u0648\u0646 \u0646\u0633\u0628\u0629 \u0645\u0646 \u0645\u062F\u0641\u0648\u0639\u0627\u062A \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0623\u0648 TWINT\u061F" },
-          a: { en: "No. You keep your own acquirer contract and its rates. Kassenta records the payment and never sits between you and the money.", de: "Nein. Sie behalten Ihren eigenen Acquirer-Vertrag und dessen Konditionen. Kassenta erfasst die Zahlung und steht nie zwischen Ihnen und dem Geld.", ar: "\u0644\u0627. \u062A\u062D\u062A\u0641\u0638 \u0628\u0639\u0642\u062F \u0645\u0632\u0648\u0651\u062F \u0627\u0644\u062F\u0641\u0639 \u0627\u0644\u062E\u0627\u0635 \u0628\u0643 \u0648\u0623\u0633\u0639\u0627\u0631\u0647. \u064A\u0633\u062C\u0651\u0644 Kassenta \u0627\u0644\u062F\u0641\u0639\u0629 \u0648\u0644\u0627 \u064A\u0642\u0641 \u0623\u0628\u062F\u064B\u0627 \u0628\u064A\u0646\u0643 \u0648\u0628\u064A\u0646 \u0623\u0645\u0648\u0627\u0644\u0643." }
-        },
-        {
-          q: { en: "Can I change plan later?", de: "Kann ich den Plan sp\xE4ter wechseln?", ar: "\u0647\u0644 \u064A\u0645\u0643\u0646\u0646\u064A \u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u0628\u0627\u0642\u0629 \u0644\u0627\u062D\u0642\u064B\u0627\u061F" },
-          a: { en: "Yes, in both directions, effective from the next billing period. Your data and settings are untouched by a plan change.", de: "Ja, in beide Richtungen, wirksam ab der n\xE4chsten Abrechnungsperiode. Daten und Einstellungen bleiben unver\xE4ndert.", ar: "\u0646\u0639\u0645\u060C \u0641\u064A \u0627\u0644\u0627\u062A\u062C\u0627\u0647\u064A\u0646\u060C \u0627\u0639\u062A\u0628\u0627\u0631\u064B\u0627 \u0645\u0646 \u0641\u062A\u0631\u0629 \u0627\u0644\u0641\u0648\u062A\u0631\u0629 \u0627\u0644\u062A\u0627\u0644\u064A\u0629. \u0644\u0627 \u064A\u0645\u0633\u0651 \u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u0628\u0627\u0642\u0629 \u0628\u064A\u0627\u0646\u0627\u062A\u0643 \u0648\u0625\u0639\u062F\u0627\u062F\u0627\u062A\u0643." }
-        }
-      ])}
-    </div>
-  </section>
-
-  ${ctaBand(
-        { en: "Run the numbers with us", de: "Rechnen wir gemeinsam", ar: "\u0644\u0646\u062D\u0633\u0628 \u0627\u0644\u0623\u0631\u0642\u0627\u0645 \u0645\u0639\u064B\u0627" },
-        {
-          en: "Send your current monthly order volume and platform commission. We will show you the break-even point in writing before you commit to anything.",
-          de: "Senden Sie uns Ihr monatliches Bestellvolumen und die Plattformprovision. Wir zeigen Ihnen den Break-even schriftlich, bevor Sie sich festlegen.",
-          ar: "\u0623\u0631\u0633\u0644 \u062D\u062C\u0645 \u0637\u0644\u0628\u0627\u062A\u0643 \u0627\u0644\u0634\u0647\u0631\u064A \u0648\u0639\u0645\u0648\u0644\u0629 \u0627\u0644\u0645\u0646\u0635\u0629 \u0627\u0644\u062D\u0627\u0644\u064A\u0629. \u0633\u0646\u0639\u0631\u0636 \u0644\u0643 \u0646\u0642\u0637\u0629 \u0627\u0644\u062A\u0639\u0627\u062F\u0644 \u0643\u062A\u0627\u0628\u064A\u064B\u0627 \u0642\u0628\u0644 \u0623\u064A \u0627\u0644\u062A\u0632\u0627\u0645."
-        }
-      )}
-
-  <script>
-    window.KassentaPricing = (function () {
-      function set(cycle) {
-        document.querySelectorAll('.billing-toggle button').forEach(function (b) {
-          b.classList.toggle('active', b.dataset.cycle === cycle);
-        });
-        document.querySelectorAll('.price-value').forEach(function (el) {
-          el.textContent = el.getAttribute(cycle === 'yearly' ? 'data-yearly' : 'data-monthly');
-        });
-      }
-      return { set: set };
-    })();
-  </script>`
-    };
-    compliance = {
-      meta: {
-        path: "/compliance",
-        title: { en: "Swiss VAT, GDPR and EU fiscalisation \u2014 Kassenta", de: "Schweizer MwSt., DSGVO und Fiskalisierung \u2014 Kassenta", ar: "\u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648GDPR \u0648\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0627\u0644\u0623\u0648\u0631\u0648\u0628\u064A \u2014 Kassenta" },
-        description: {
-          en: "Swiss VAT rates and cash rounding, GDPR and nDSG handling, audit trails, and our roadmap for German, Austrian, French and Italian fiscalisation.",
-          de: "Schweizer MwSt.-S\xE4tze und Rappenrundung, DSGVO- und nDSG-Umsetzung, Audit-Trails und unsere Roadmap zur Fiskalisierung in Deutschland, \xD6sterreich, Frankreich und Italien.",
-          ar: "\u0646\u0633\u0628 \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A\u060C \u0648\u0627\u0644\u062A\u0632\u0627\u0645 GDPR \u0648nDSG\u060C \u0648\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u062A\u062F\u0642\u064A\u0642\u060C \u0648\u062E\u0637\u062A\u0646\u0627 \u0644\u0644\u0623\u0646\u0638\u0645\u0629 \u0627\u0644\u0636\u0631\u064A\u0628\u064A\u0629 \u0641\u064A \u0623\u0644\u0645\u0627\u0646\u064A\u0627 \u0648\u0627\u0644\u0646\u0645\u0633\u0627 \u0648\u0641\u0631\u0646\u0633\u0627 \u0648\u0625\u064A\u0637\u0627\u0644\u064A\u0627."
-        }
-      },
-      body: `
-  ${pageHead(
-        { en: "What we handle, and what is still on the roadmap", de: "Was wir abdecken \u2014 und was noch aussteht", ar: "\u0645\u0627 \u0646\u063A\u0637\u0651\u064A\u0647 \u0648\u0645\u0627 \u0644\u0627 \u064A\u0632\u0627\u0644 \u0641\u064A \u0627\u0644\u062E\u0637\u0629" },
-        {
-          en: "Fiscal rules differ in every market and vendors are often vague about which ones they actually implement. This page states our position plainly so you can check it against your accountant's list.",
-          de: "Steuerliche Vorgaben unterscheiden sich je Markt, und Anbieter bleiben oft vage, was sie tats\xE4chlich umsetzen. Diese Seite nennt unsere Position klar, damit Sie sie mit der Liste Ihrer Treuhand abgleichen k\xF6nnen.",
-          ar: "\u062A\u062E\u062A\u0644\u0641 \u0627\u0644\u0642\u0648\u0627\u0639\u062F \u0627\u0644\u0636\u0631\u064A\u0628\u064A\u0629 \u0628\u064A\u0646 \u0627\u0644\u0623\u0633\u0648\u0627\u0642 \u0648\u0643\u062B\u064A\u0631\u064B\u0627 \u0645\u0627 \u064A\u0643\u0648\u0646 \u0627\u0644\u0645\u0648\u0631\u062F\u0648\u0646 \u063A\u0627\u0645\u0636\u064A\u0646 \u0628\u0634\u0623\u0646 \u0645\u0627 \u064A\u0646\u0641\u0651\u0630\u0648\u0646\u0647 \u0641\u0639\u0644\u064A\u064B\u0627. \u062A\u0639\u0631\u0636 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062D\u0629 \u0645\u0648\u0642\u0641\u0646\u0627 \u0628\u0648\u0636\u0648\u062D \u0644\u062A\u0642\u0627\u0631\u0646\u0647 \u0628\u0642\u0627\u0626\u0645\u0629 \u0645\u062D\u0627\u0633\u0628\u0643."
-        },
-        { en: "Compliance", de: "Compliance", ar: "\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644" }
-      )}
-
-  <section class="section">
-    <div class="wrap">
-      ${head(
-        { en: "Switzerland", de: "Schweiz", ar: "\u0633\u0648\u064A\u0633\u0631\u0627" },
-        { en: "The home market, implemented in full", de: "Der Heimatmarkt, vollst\xE4ndig umgesetzt", ar: "\u0627\u0644\u0633\u0648\u0642 \u0627\u0644\u0623\u0633\u0627\u0633\u064A\u060C \u0645\u0646\u0641\u064E\u0651\u0630 \u0628\u0627\u0644\u0643\u0627\u0645\u0644" }
-      )}
-      <div class="grid grid-2">
-        ${card(icons.scale, { en: "VAT rates", de: "MwSt.-S\xE4tze", ar: "\u0646\u0633\u0628 \u0627\u0644\u0636\u0631\u064A\u0628\u0629" }, {
-        en: "8.1% standard, 2.6% reduced and 3.8% accommodation, applied per product category. Dine-in and takeaway are treated separately on the same ticket.",
-        de: "8,1 % Normalsatz, 2,6 % reduziert und 3,8 % Beherbergung, je Artikelkategorie angewendet. Vor-Ort und Takeaway werden auf demselben Bon getrennt behandelt.",
-        ar: "8.1% \u0639\u0627\u062F\u064A\u0629 \u06482.6% \u0645\u062E\u0641\u064E\u0651\u0636\u0629 \u06483.8% \u0625\u0642\u0627\u0645\u0629\u060C \u062A\u064F\u0637\u0628\u064E\u0651\u0642 \u062D\u0633\u0628 \u0641\u0626\u0629 \u0627\u0644\u0645\u0646\u062A\u062C. \u0648\u064A\u064F\u0639\u0627\u0644\u064E\u062C \u0627\u0644\u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0648\u0627\u0644\u062A\u064A\u0643 \u0623\u0648\u0627\u064A \u0628\u0634\u0643\u0644 \u0645\u0646\u0641\u0635\u0644 \u0641\u064A \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0646\u0641\u0633\u0647\u0627."
-      })}
-        ${card(icons.register, { en: "Cash rounding", de: "Rappenrundung", ar: "\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A" }, {
-        en: "Cash totals round to the nearest CHF 0.05 at the ticket level. Card, TWINT and invoice keep the exact amount, and the difference is posted as a rounding line.",
-        de: "Barbetr\xE4ge runden auf 5 Rappen je Bon. Karte, TWINT und Rechnung behalten den exakten Betrag; die Differenz wird als Rundungsposition gebucht.",
-        ar: "\u062A\u064F\u0642\u0631\u064E\u0651\u0628 \u0645\u0628\u0627\u0644\u063A \u0627\u0644\u0646\u0642\u062F \u0644\u0623\u0642\u0631\u0628 0.05 \u0641\u0631\u0646\u0643 \u0639\u0644\u0649 \u0645\u0633\u062A\u0648\u0649 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629. \u0648\u062A\u062D\u062A\u0641\u0638 \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0648TWINT \u0648\u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0628\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0642\u064A\u0642\u060C \u0648\u064A\u064F\u0642\u064A\u064E\u0651\u062F \u0627\u0644\u0641\u0631\u0642 \u0643\u0633\u0637\u0631 \u062A\u0642\u0631\u064A\u0628."
-      })}
-        ${card(icons.lock, { en: "nDSG and GDPR", de: "nDSG und DSGVO", ar: "nDSG \u0648GDPR" }, {
-        en: "Data is hosted in Europe. Customers can request export or deletion, and both are executed from the console with a record of who approved them.",
-        de: "Daten werden in Europa gehostet. Kunden k\xF6nnen Export oder L\xF6schung verlangen; beides wird in der Konsole ausgef\xFChrt und protokolliert.",
-        ar: "\u062A\u064F\u0633\u062A\u0636\u0627\u0641 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0641\u064A \u0623\u0648\u0631\u0648\u0628\u0627. \u0648\u064A\u0645\u0643\u0646 \u0644\u0644\u0639\u0645\u0644\u0627\u0621 \u0637\u0644\u0628 \u0627\u0644\u062A\u0635\u062F\u064A\u0631 \u0623\u0648 \u0627\u0644\u062D\u0630\u0641\u060C \u0648\u064A\u064F\u0646\u0641\u064E\u0651\u0630\u0627\u0646 \u0645\u0646 \u0627\u0644\u0644\u0648\u062D\u0629 \u0645\u0639 \u062A\u0633\u062C\u064A\u0644 \u0645\u0646 \u0648\u0627\u0641\u0642 \u0639\u0644\u064A\u0647\u0645\u0627."
-      })}
-        ${card(icons.shield, { en: "Audit trail", de: "Audit-Trail", ar: "\u0633\u062C\u0644 \u0627\u0644\u062A\u062F\u0642\u064A\u0642" }, {
-        en: "Every sale, void, discount, price override and cash movement records the operator, the device and the timestamp. Records are append-only.",
-        de: "Jeder Verkauf, Storno, Rabatt, jede Preis\xE4nderung und Kassenbewegung erfasst Mitarbeiter, Ger\xE4t und Zeitstempel. Eintr\xE4ge sind nur anf\xFCgbar.",
-        ar: "\u0643\u0644 \u0628\u064A\u0639 \u0648\u0625\u0644\u063A\u0627\u0621 \u0648\u062E\u0635\u0645 \u0648\u062A\u0639\u062F\u064A\u0644 \u0633\u0639\u0631 \u0648\u062D\u0631\u0643\u0629 \u0646\u0642\u062F\u064A\u0629 \u064A\u0633\u062C\u0651\u0644 \u0627\u0644\u0645\u0648\u0638\u0641 \u0648\u0627\u0644\u062C\u0647\u0627\u0632 \u0648\u0627\u0644\u0648\u0642\u062A. \u0648\u0627\u0644\u0633\u062C\u0644\u0627\u062A \u0625\u0636\u0627\u0641\u064A\u0629 \u0641\u0642\u0637 \u0644\u0627 \u062A\u064F\u0639\u062F\u064E\u0651\u0644."
-      })}
-      </div>
-    </div>
-  </section>
-
-  <section class="section section--alt">
-    <div class="wrap">
-      ${head(
-        { en: "European Union", de: "Europ\xE4ische Union", ar: "\u0627\u0644\u0627\u062A\u062D\u0627\u062F \u0627\u0644\u0623\u0648\u0631\u0648\u0628\u064A" },
-        { en: "Where each market stands today", de: "Wo jeder Markt heute steht", ar: "\u0648\u0636\u0639 \u0643\u0644 \u0633\u0648\u0642 \u0627\u0644\u064A\u0648\u0645" },
-        {
-          en: "Fiscalisation means certified hardware or software signatures in several EU countries. We list the exact requirement and our current status rather than a single claim of European compliance.",
-          de: "Fiskalisierung bedeutet in mehreren EU-L\xE4ndern zertifizierte Hardware oder Software-Signaturen. Wir nennen die konkrete Anforderung und unseren aktuellen Stand statt einer pauschalen Compliance-Aussage.",
-          ar: "\u062A\u0639\u0646\u064A \u0627\u0644\u0641\u0648\u062A\u0631\u0629 \u0627\u0644\u0636\u0631\u064A\u0628\u064A\u0629 \u0641\u064A \u0639\u062F\u0629 \u062F\u0648\u0644 \u0623\u0648\u0631\u0648\u0628\u064A\u0629 \u0623\u062C\u0647\u0632\u0629 \u0645\u0639\u062A\u0645\u062F\u0629 \u0623\u0648 \u062A\u0648\u0642\u064A\u0639\u0627\u062A \u0628\u0631\u0645\u062C\u064A\u0629. \u0646\u0639\u0631\u0636 \u0627\u0644\u0645\u062A\u0637\u0644\u064E\u0651\u0628 \u0628\u062F\u0642\u0629 \u0648\u0648\u0636\u0639\u0646\u0627 \u0627\u0644\u062D\u0627\u0644\u064A \u0628\u062F\u0644 \u0627\u062F\u0639\u0627\u0621 \u0627\u0645\u062A\u062B\u0627\u0644 \u0623\u0648\u0631\u0648\u0628\u064A \u0639\u0627\u0645."
-        }
-      )}
-      <div class="table-wrap reveal">
-        <table>
-          <thead>
-            <tr>
-              <th ${tAttrs({ en: "Market", de: "Markt", ar: "\u0627\u0644\u0633\u0648\u0642" })}>Market</th>
-              <th ${tAttrs({ en: "Requirement", de: "Anforderung", ar: "\u0627\u0644\u0645\u062A\u0637\u0644\u064E\u0651\u0628" })}>Requirement</th>
-              <th ${tAttrs({ en: "Status", de: "Status", ar: "\u0627\u0644\u062D\u0627\u0644\u0629" })}>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong>Switzerland</strong></td>
-              <td ${tAttrs({ en: "VAT rates, cash rounding, retention of records", de: "MwSt.-S\xE4tze, Rappenrundung, Aufbewahrung", ar: "\u0646\u0633\u0628 \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A \u0648\u062D\u0641\u0638 \u0627\u0644\u0633\u062C\u0644\u0627\u062A" })}>VAT rates, cash rounding, retention of records</td>
-              <td><span class="badge" ${tAttrs({ en: "Available", de: "Verf\xFCgbar", ar: "\u0645\u062A\u0627\u062D" })}>Available</span></td>
-            </tr>
-            <tr>
-              <td><strong>Germany</strong></td>
-              <td ${tAttrs({ en: "KassenSichV with a certified TSE, DSFinV-K export", de: "KassenSichV mit zertifizierter TSE, DSFinV-K-Export", ar: "KassenSichV \u0645\u0639 TSE \u0645\u0639\u062A\u0645\u062F \u0648\u062A\u0635\u062F\u064A\u0631 DSFinV-K" })}>KassenSichV with a certified TSE, DSFinV-K export</td>
-              <td><span class="badge badge--neutral" ${tAttrs({ en: "In progress", de: "In Arbeit", ar: "\u0642\u064A\u062F \u0627\u0644\u062A\u0646\u0641\u064A\u0630" })}>In progress</span></td>
-            </tr>
-            <tr>
-              <td><strong>Austria</strong></td>
-              <td ${tAttrs({ en: "RKSV signature device and receipt QR chain", de: "RKSV-Signatureinheit und Beleg-QR-Kette", ar: "\u062C\u0647\u0627\u0632 \u062A\u0648\u0642\u064A\u0639 RKSV \u0648\u0633\u0644\u0633\u0644\u0629 QR \u0644\u0644\u0625\u064A\u0635\u0627\u0644\u0627\u062A" })}>RKSV signature device and receipt QR chain</td>
-              <td><span class="badge badge--neutral" ${tAttrs({ en: "In progress", de: "In Arbeit", ar: "\u0642\u064A\u062F \u0627\u0644\u062A\u0646\u0641\u064A\u0630" })}>In progress</span></td>
-            </tr>
-            <tr>
-              <td><strong>France</strong></td>
-              <td ${tAttrs({ en: "NF525 certification for cash register software", de: "NF525-Zertifizierung f\xFCr Kassensoftware", ar: "\u0634\u0647\u0627\u062F\u0629 NF525 \u0644\u0628\u0631\u0627\u0645\u062C \u0627\u0644\u0643\u0627\u0634\u064A\u0631" })}>NF525 certification for cash register software</td>
-              <td><span class="badge badge--neutral" ${tAttrs({ en: "Planned", de: "Geplant", ar: "\u0645\u062E\u0637\u064E\u0651\u0637" })}>Planned</span></td>
-            </tr>
-            <tr>
-              <td><strong>Italy</strong></td>
-              <td ${tAttrs({ en: "Registratore Telematico daily transmission", de: "Registratore Telematico mit Tages\xFCbermittlung", ar: "Registratore Telematico \u0628\u0625\u0631\u0633\u0627\u0644 \u064A\u0648\u0645\u064A" })}>Registratore Telematico daily transmission</td>
-              <td><span class="badge badge--neutral" ${tAttrs({ en: "Planned", de: "Geplant", ar: "\u0645\u062E\u0637\u064E\u0651\u0637" })}>Planned</span></td>
-            </tr>
-            <tr>
-              <td><strong>EU-wide</strong></td>
-              <td ${tAttrs({ en: "GDPR: lawful basis, export, deletion, processor agreement", de: "DSGVO: Rechtsgrundlage, Export, L\xF6schung, AV-Vertrag", ar: "GDPR: \u0627\u0644\u0623\u0633\u0627\u0633 \u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A \u0648\u0627\u0644\u062A\u0635\u062F\u064A\u0631 \u0648\u0627\u0644\u062D\u0630\u0641 \u0648\u0627\u062A\u0641\u0627\u0642\u064A\u0629 \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629" })}>GDPR: lawful basis, export, deletion, processor agreement</td>
-              <td><span class="badge" ${tAttrs({ en: "Available", de: "Verf\xFCgbar", ar: "\u0645\u062A\u0627\u062D" })}>Available</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="form-note" style="margin-top:16px" ${tAttrs({
-        en: "If your market requires certification we have not completed, we will say so before you sign rather than after.",
-        de: "Wenn Ihr Markt eine Zertifizierung verlangt, die wir noch nicht abgeschlossen haben, sagen wir das vor Vertragsabschluss \u2014 nicht danach.",
-        ar: "\u0625\u0630\u0627 \u0643\u0627\u0646 \u0633\u0648\u0642\u0643 \u064A\u062A\u0637\u0644\u0628 \u0634\u0647\u0627\u062F\u0629 \u0644\u0645 \u0646\u0643\u0645\u0644\u0647\u0627 \u0628\u0639\u062F\u060C \u0641\u0633\u0646\u062E\u0628\u0631\u0643 \u0642\u0628\u0644 \u0627\u0644\u062A\u0648\u0642\u064A\u0639 \u0644\u0627 \u0628\u0639\u062F\u0647."
-      })}>If your market requires certification we have not completed, we will say so before you sign rather than after.</p>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="wrap">
-      <div class="split">
-        <div>
-          ${head({ en: "Security", de: "Sicherheit", ar: "\u0627\u0644\u0623\u0645\u0627\u0646" }, { en: "How the system protects the data", de: "Wie das System die Daten sch\xFCtzt", ar: "\u0643\u064A\u0641 \u064A\u062D\u0645\u064A \u0627\u0644\u0646\u0638\u0627\u0645 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A" })}
-          ${ticks([
-        { en: "Traffic is encrypted in transit with TLS; passwords and staff PINs are stored as bcrypt hashes, never in plain text.", de: "Datenverkehr wird per TLS verschl\xFCsselt; Passw\xF6rter und Mitarbeiter-PINs werden als bcrypt-Hashes gespeichert, nie im Klartext.", ar: "\u062A\u064F\u0634\u0641\u064E\u0651\u0631 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u0646\u0642\u0644 \u0628\u0640TLS\u060C \u0648\u062A\u064F\u062E\u0632\u064E\u0651\u0646 \u0643\u0644\u0645\u0627\u062A \u0627\u0644\u0645\u0631\u0648\u0631 \u0648\u0623\u0631\u0642\u0627\u0645 \u0627\u0644\u0645\u0648\u0638\u0641\u064A\u0646 \u0643\u062A\u062C\u0632\u0626\u0627\u062A bcrypt \u0644\u0627 \u0643\u0646\u0635 \u0635\u0631\u064A\u062D." },
-        { en: "Each business is isolated by tenant, and every request is checked against both the licence and the employee's role.", de: "Jeder Betrieb ist mandantengetrennt; jede Anfrage wird gegen Lizenz und Mitarbeiterrolle gepr\xFCft.", ar: "\u0643\u0644 \u0646\u0634\u0627\u0637 \u0645\u0639\u0632\u0648\u0644 \u0643\u0645\u0633\u062A\u0623\u062C\u0631 \u0645\u0633\u062A\u0642\u0644\u060C \u0648\u0643\u0644 \u0637\u0644\u0628 \u064A\u064F\u0641\u062D\u0635 \u0645\u0642\u0627\u0628\u0644 \u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u0648\u062F\u0648\u0631 \u0627\u0644\u0645\u0648\u0638\u0641 \u0645\u0639\u064B\u0627." },
-        { en: "Sessions expire and can be revoked centrally when a device is lost or an employee leaves.", de: "Sitzungen laufen ab und k\xF6nnen zentral widerrufen werden, wenn ein Ger\xE4t verloren geht oder jemand ausscheidet.", ar: "\u062A\u0646\u062A\u0647\u064A \u0627\u0644\u062C\u0644\u0633\u0627\u062A \u0648\u064A\u0645\u0643\u0646 \u0625\u0628\u0637\u0627\u0644\u0647\u0627 \u0645\u0631\u0643\u0632\u064A\u064B\u0627 \u0639\u0646\u062F \u0641\u0642\u062F \u062C\u0647\u0627\u0632 \u0623\u0648 \u0645\u063A\u0627\u062F\u0631\u0629 \u0645\u0648\u0638\u0641." },
-        { en: "Daily encrypted backups with point-in-time restore, tested on a schedule rather than assumed to work.", de: "T\xE4glich verschl\xFCsselte Backups mit Point-in-Time-Restore, planm\xE4ssig getestet statt nur angenommen.", ar: "\u0646\u0633\u062E \u0627\u062D\u062A\u064A\u0627\u0637\u064A \u064A\u0648\u0645\u064A \u0645\u0634\u0641\u064E\u0651\u0631 \u0645\u0639 \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0644\u0623\u064A \u0644\u062D\u0638\u0629\u060C \u062A\u064F\u062E\u062A\u0628\u0631 \u062F\u0648\u0631\u064A\u064B\u0627 \u0644\u0627 \u064A\u064F\u0641\u062A\u0631\u0636 \u0646\u062C\u0627\u062D\u0647\u0627." }
-      ])}
-        </div>
-        <div class="reveal">${shot({ id: "compliance-audit", ratio: "5 / 4", size: "1402 \xD7 1122", alt: { en: "Audit trail and permission settings in the Kassenta console", de: "Audit-Trail und Berechtigungen in der Kassenta-Konsole", ar: "\u0633\u062C\u0644 \u0627\u0644\u062A\u062F\u0642\u064A\u0642 \u0648\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0641\u064A \u0644\u0648\u062D\u0629 Kassenta" } })}</div>
-      </div>
-    </div>
-  </section>
-
-  ${ctaBand(
-        { en: "Send this page to your accountant", de: "Senden Sie diese Seite Ihrer Treuhand", ar: "\u0623\u0631\u0633\u0644 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062D\u0629 \u0625\u0644\u0649 \u0645\u062D\u0627\u0633\u0628\u0643" },
-        {
-          en: "We are happy to answer their questions directly, in writing, before you make a decision. Compliance is not a sales conversation.",
-          de: "Wir beantworten deren Fragen gerne direkt und schriftlich, bevor Sie entscheiden. Compliance ist kein Verkaufsgespr\xE4ch.",
-          ar: "\u064A\u0633\u0639\u062F\u0646\u0627 \u0627\u0644\u0625\u062C\u0627\u0628\u0629 \u0639\u0644\u0649 \u0623\u0633\u0626\u0644\u062A\u0647 \u0645\u0628\u0627\u0634\u0631\u0629 \u0648\u0643\u062A\u0627\u0628\u064A\u064B\u0627 \u0642\u0628\u0644 \u0623\u0646 \u062A\u0642\u0631\u0631. \u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0644\u064A\u0633 \u062D\u062F\u064A\u062B \u0645\u0628\u064A\u0639\u0627\u062A."
-        }
-      )}`
-    };
-    about = {
-      meta: {
-        path: "/about",
-        title: { en: "About Kassenta \u2014 built behind the counter", de: "\xDCber Kassenta \u2014 hinter der Theke entstanden", ar: "\u0639\u0646 Kassenta \u2014 \u0648\u064F\u0644\u062F \u062E\u0644\u0641 \u0627\u0644\u0643\u0627\u0634\u064A\u0631" },
-        description: {
-          en: "Kassenta was built inside working restaurants rather than in a boardroom. Our approach to product, pricing and support, and how to reach us.",
-          de: "Kassenta entstand in laufenden Restaurants, nicht im Sitzungszimmer. Unser Ansatz zu Produkt, Preisen und Support \u2014 und wie Sie uns erreichen.",
-          ar: "\u0648\u064F\u0644\u062F Kassenta \u062F\u0627\u062E\u0644 \u0645\u0637\u0627\u0639\u0645 \u0639\u0627\u0645\u0644\u0629 \u0644\u0627 \u0641\u064A \u0642\u0627\u0639\u0629 \u0627\u062C\u062A\u0645\u0627\u0639\u0627\u062A. \u0646\u0647\u062C\u0646\u0627 \u0641\u064A \u0627\u0644\u0645\u0646\u062A\u062C \u0648\u0627\u0644\u062A\u0633\u0639\u064A\u0631 \u0648\u0627\u0644\u062F\u0639\u0645\u060C \u0648\u0643\u064A\u0641\u064A\u0629 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627."
-        }
-      },
-      body: `
-  ${pageHead(
-        { en: "Built behind the counter", de: "Hinter der Theke entstanden", ar: "\u0648\u064F\u0644\u062F \u062E\u0644\u0641 \u0627\u0644\u0643\u0627\u0634\u064A\u0631" },
-        {
-          en: "Kassenta started because a restaurant we worked with was paying three vendors for tools that refused to talk to each other, and a commission on top of that to a delivery platform.",
-          de: "Kassenta entstand, weil ein Restaurant, mit dem wir arbeiteten, drei Anbieter f\xFCr Werkzeuge bezahlte, die nicht miteinander sprachen \u2014 plus Provision an eine Lieferplattform.",
-          ar: "\u0628\u062F\u0623 Kassenta \u0644\u0623\u0646 \u0645\u0637\u0639\u0645\u064B\u0627 \u0639\u0645\u0644\u0646\u0627 \u0645\u0639\u0647 \u0643\u0627\u0646 \u064A\u062F\u0641\u0639 \u0644\u062B\u0644\u0627\u062B\u0629 \u0645\u0648\u0631\u062F\u064A\u0646 \u0644\u0623\u062F\u0648\u0627\u062A \u0644\u0627 \u062A\u062A\u062D\u062F\u062B \u0645\u0639 \u0628\u0639\u0636\u0647\u0627\u060C \u0648\u0639\u0645\u0648\u0644\u0629 \u0641\u0648\u0642 \u0630\u0644\u0643 \u0644\u0645\u0646\u0635\u0629 \u062A\u0648\u0635\u064A\u0644."
-        },
-        { en: "About", de: "\xDCber uns", ar: "\u0645\u0646 \u0646\u062D\u0646" }
-      )}
-
-  <section class="section">
-    <div class="wrap">
-      <div class="split">
-        <div>
-          ${head({ en: "Our approach", de: "Unser Ansatz", ar: "\u0646\u0647\u062C\u0646\u0627" }, { en: "Three rules we hold to", de: "Drei Regeln, an die wir uns halten", ar: "\u062B\u0644\u0627\u062B \u0642\u0648\u0627\u0639\u062F \u0646\u0644\u062A\u0632\u0645 \u0628\u0647\u0627" })}
-          <div class="steps">
-            <div class="step reveal"><div><h3 ${tAttrs({ en: "Ship what we can demonstrate", de: "Nur liefern, was wir zeigen k\xF6nnen", ar: "\u0646\u0637\u0631\u062D \u0645\u0627 \u0646\u0633\u062A\u0637\u064A\u0639 \u0639\u0631\u0636\u0647" })}>Ship what we can demonstrate</h3><p ${tAttrs({
-        en: "If a feature is on this site, you can see it working in a demo the same week. Anything still on the roadmap is labelled as such, including on the compliance page.",
-        de: "Steht eine Funktion auf dieser Seite, sehen Sie sie in derselben Woche in einer Demo. Was noch auf der Roadmap ist, kennzeichnen wir als solches \u2014 auch auf der Compliance-Seite.",
-        ar: "\u0625\u0646 \u0630\u064F\u0643\u0631\u062A \u0645\u064A\u0632\u0629 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0645\u0648\u0642\u0639 \u0641\u064A\u0645\u0643\u0646\u0643 \u0631\u0624\u064A\u062A\u0647\u0627 \u062A\u0639\u0645\u0644 \u0641\u064A \u0639\u0631\u0636 \u062E\u0644\u0627\u0644 \u0627\u0644\u0623\u0633\u0628\u0648\u0639 \u0646\u0641\u0633\u0647. \u0648\u0645\u0627 \u0632\u0627\u0644 \u0641\u064A \u0627\u0644\u062E\u0637\u0629 \u0646\u0636\u0639 \u0639\u0644\u064A\u0647 \u0639\u0644\u0627\u0645\u0629 \u0648\u0627\u0636\u062D\u0629\u060C \u0628\u0645\u0627 \u0641\u064A \u0630\u0644\u0643 \u0641\u064A \u0635\u0641\u062D\u0629 \u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644."
-      })}>If a feature is on this site, you can see it working in a demo the same week. Anything still on the roadmap is labelled as such, including on the compliance page.</p></div></div>
-            <div class="step reveal"><div><h3 ${tAttrs({ en: "Never charge per order", de: "Niemals pro Bestellung abrechnen", ar: "\u0644\u0627 \u0646\u062D\u0627\u0633\u0628 \u0639\u0644\u0649 \u0643\u0644 \u0637\u0644\u0628" })}>Never charge per order</h3><p ${tAttrs({
-        en: "A percentage of revenue punishes you for growing. A flat fee per location means our incentive is to keep you running, not to take a slice of every ticket.",
-        de: "Ein Umsatzanteil bestraft Wachstum. Eine Pauschale je Standort bedeutet: Unser Anreiz ist, dass Sie laufen \u2014 nicht ein Anteil an jedem Bon.",
-        ar: "\u0627\u0644\u0646\u0633\u0628\u0629 \u0645\u0646 \u0627\u0644\u0625\u064A\u0631\u0627\u062F \u062A\u0639\u0627\u0642\u0628\u0643 \u0639\u0644\u0649 \u0627\u0644\u0646\u0645\u0648. \u0627\u0644\u0631\u0633\u0645 \u0627\u0644\u062B\u0627\u0628\u062A \u0644\u0643\u0644 \u0641\u0631\u0639 \u064A\u062C\u0639\u0644 \u0645\u0635\u0644\u062D\u062A\u0646\u0627 \u0623\u0646 \u062A\u0633\u062A\u0645\u0631 \u0628\u0646\u062C\u0627\u062D \u0644\u0627 \u0623\u0646 \u0646\u0642\u062A\u0637\u0639 \u0645\u0646 \u0643\u0644 \u0641\u0627\u062A\u0648\u0631\u0629."
-      })}>A percentage of revenue punishes you for growing. A flat fee per location means our incentive is to keep you running, not to take a slice of every ticket.</p></div></div>
-            <div class="step reveal"><div><h3 ${tAttrs({ en: "Your data stays yours", de: "Ihre Daten bleiben Ihre", ar: "\u0628\u064A\u0627\u0646\u0627\u062A\u0643 \u062A\u0628\u0642\u0649 \u0645\u0644\u0643\u0643" })}>Your data stays yours</h3><p ${tAttrs({
-        en: "Customers, recipes and sales history export to CSV whenever you want. We do not resell aggregated data, and we do not market to your customers.",
-        de: "Kunden, Rezepturen und Verkaufshistorie exportieren Sie jederzeit als CSV. Wir verkaufen keine aggregierten Daten weiter und bewerben Ihre Kunden nicht.",
-        ar: "\u064A\u0645\u0643\u0646\u0643 \u062A\u0635\u062F\u064A\u0631 \u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u0627\u0644\u0648\u0635\u0641\u0627\u062A \u0648\u0633\u062C\u0644 \u0627\u0644\u0645\u0628\u064A\u0639\u0627\u062A \u0625\u0644\u0649 CSV \u0645\u062A\u0649 \u0634\u0626\u062A. \u0644\u0627 \u0646\u0628\u064A\u0639 \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u062C\u0645\u064E\u0651\u0639\u0629 \u0648\u0644\u0627 \u0646\u0633\u0648\u0651\u0642 \u0644\u0639\u0645\u0644\u0627\u0626\u0643."
-      })}>Customers, recipes and sales history export to CSV whenever you want. We do not resell aggregated data, and we do not market to your customers.</p></div></div>
-          </div>
-        </div>
-        <div class="reveal">${shot({ id: "about-team", ratio: "2 / 3", size: "1023 \xD7 1537", alt: { en: "The Kassenta team working alongside restaurant staff", de: "Das Kassenta-Team arbeitet mit Restaurantmitarbeitenden", ar: "\u0641\u0631\u064A\u0642 Kassenta \u064A\u0639\u0645\u0644 \u0645\u0639 \u0637\u0627\u0642\u0645 \u0627\u0644\u0645\u0637\u0639\u0645" } })}</div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section section--alt">
-    <div class="wrap">
-      ${head({ en: "Support", de: "Support", ar: "\u0627\u0644\u062F\u0639\u0645" }, { en: "What happens when something breaks at 19:00", de: "Was passiert, wenn um 19:00 etwas ausf\xE4llt", ar: "\u0645\u0627\u0630\u0627 \u064A\u062D\u062F\u062B \u0625\u0646 \u062A\u0639\u0637\u0651\u0644 \u0634\u064A\u0621 \u0627\u0644\u0633\u0627\u0639\u0629 19:00" }, void 0, true)}
-      <div class="grid grid-3">
-        ${card(icons.phone, { en: "Reach a person", de: "Erreichen Sie einen Menschen", ar: "\u062A\u0635\u0644 \u0625\u0644\u0649 \u0625\u0646\u0633\u0627\u0646" }, {
-        en: "Phone and WhatsApp during business hours on Professional and above, with a named contact on Enterprise.",
-        de: "Telefon und WhatsApp zu Gesch\xE4ftszeiten ab Professional, mit festem Ansprechpartner bei Enterprise.",
-        ar: "\u0647\u0627\u062A\u0641 \u0648\u0648\u0627\u062A\u0633\u0627\u0628 \u062E\u0644\u0627\u0644 \u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0639\u0645\u0644 \u0641\u064A \u0627\u0644\u0627\u062D\u062A\u0631\u0627\u0641\u064A\u0629 \u0641\u0645\u0627 \u0641\u0648\u0642\u060C \u0645\u0639 \u0645\u0633\u0624\u0648\u0644 \u0645\u062E\u0635\u064E\u0651\u0635 \u0641\u064A \u0628\u0627\u0642\u0629 \u0627\u0644\u0645\u0624\u0633\u0633\u0627\u062A."
-      })}
-        ${card(icons.wifiOff, { en: "Keep selling meanwhile", de: "Weiterverkaufen in der Zwischenzeit", ar: "\u0627\u0633\u062A\u0645\u0631 \u0641\u064A \u0627\u0644\u0628\u064A\u0639 \u0623\u062B\u0646\u0627\u0621 \u0630\u0644\u0643" }, {
-        en: "The POS holds orders locally when the connection drops, so a network problem is an inconvenience rather than a closed till.",
-        de: "Die Kasse h\xE4lt Bestellungen lokal, wenn die Verbindung abbricht \u2014 ein Netzproblem ist l\xE4stig, aber keine geschlossene Kasse.",
-        ar: "\u064A\u062D\u062A\u0641\u0638 \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0628\u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0645\u062D\u0644\u064A\u064B\u0627 \u0639\u0646\u062F \u0627\u0646\u0642\u0637\u0627\u0639 \u0627\u0644\u0627\u062A\u0635\u0627\u0644\u060C \u0641\u062A\u0635\u0628\u062D \u0645\u0634\u0643\u0644\u0629 \u0627\u0644\u0634\u0628\u0643\u0629 \u0625\u0632\u0639\u0627\u062C\u064B\u0627 \u0644\u0627 \u062A\u0648\u0642\u0641\u064B\u0627 \u0639\u0646 \u0627\u0644\u0628\u064A\u0639."
-      })}
-        ${card(icons.refresh, { en: "Fix, then explain", de: "Erst beheben, dann erkl\xE4ren", ar: "\u0646\u064F\u0635\u0644\u062D \u062B\u0645 \u0646\u0634\u0631\u062D" }, {
-        en: "We restore service first and send a written explanation afterwards, including what we changed so it does not recur.",
-        de: "Wir stellen zuerst den Betrieb wieder her und senden danach eine schriftliche Erkl\xE4rung inklusive der \xC4nderungen, damit es nicht wieder passiert.",
-        ar: "\u0646\u0639\u064A\u062F \u0627\u0644\u062E\u062F\u0645\u0629 \u0623\u0648\u0644\u064B\u0627 \u062B\u0645 \u0646\u0631\u0633\u0644 \u0634\u0631\u062D\u064B\u0627 \u0645\u0643\u062A\u0648\u0628\u064B\u0627 \u064A\u0634\u0645\u0644 \u0645\u0627 \u063A\u064A\u0651\u0631\u0646\u0627\u0647 \u0643\u064A \u0644\u0627 \u064A\u062A\u0643\u0631\u0631."
-      })}
-      </div>
-    </div>
-  </section>
-
-  ${ctaBand(
-        { en: "Come and take it apart", de: "Nehmen Sie es auseinander", ar: "\u062A\u0639\u0627\u0644 \u0648\u0627\u0641\u062D\u0635\u0647 \u0628\u0646\u0641\u0633\u0643" },
-        {
-          en: "The fastest way to judge a POS is to run a real service on it. Bring your busiest hour and we will set it up.",
-          de: "Am schnellsten beurteilen Sie eine Kasse, indem Sie einen echten Service darauf fahren. Bringen Sie Ihre Stosszeit mit \u2014 wir richten es ein.",
-          ar: "\u0623\u0633\u0631\u0639 \u0637\u0631\u064A\u0642\u0629 \u0644\u0644\u062D\u0643\u0645 \u0639\u0644\u0649 \u0646\u0638\u0627\u0645 \u0643\u0627\u0634\u064A\u0631 \u0647\u064A \u062A\u0634\u063A\u064A\u0644 \u062E\u062F\u0645\u0629 \u062D\u0642\u064A\u0642\u064A\u0629 \u0639\u0644\u064A\u0647. \u0623\u062D\u0636\u0631 \u0623\u0643\u062B\u0631 \u0633\u0627\u0639\u0627\u062A\u0643 \u0627\u0632\u062F\u062D\u0627\u0645\u064B\u0627 \u0648\u0633\u0646\u062C\u0647\u0651\u0632\u0647."
-        }
-      )}`
-    };
-    contact = {
-      meta: {
-        path: "/contact",
-        title: { en: "Book a demo on your own menu \u2014 Kassenta POS", de: "Demo mit Ihrer eigenen Karte \u2014 Kassenta POS", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u0639\u0644\u0649 \u0642\u0627\u0626\u0645\u062A\u0643 \u2014 Kassenta POS" },
-        description: {
-          en: "Book a 30-minute demo on your own menu, or email info@kassenta.com. We answer every message from a real person, usually within one business day.",
-          de: "Buchen Sie eine 30-min\xFCtige Demo mit Ihrer eigenen Karte oder schreiben Sie an info@kassenta.com. Jede Nachricht wird von einem Menschen beantwortet, meist innerhalb eines Werktags.",
-          ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u0644\u0645\u062F\u0629 30 \u062F\u0642\u064A\u0642\u0629 \u0639\u0644\u0649 \u0642\u0627\u0626\u0645\u062A\u0643\u060C \u0623\u0648 \u0631\u0627\u0633\u0644\u0646\u0627 \u0639\u0644\u0649 info@kassenta.com. \u0646\u0631\u062F\u0651 \u0639\u0644\u0649 \u0643\u0644 \u0631\u0633\u0627\u0644\u0629 \u0628\u0634\u0643\u0644 \u0634\u062E\u0635\u064A\u060C \u063A\u0627\u0644\u0628\u064B\u0627 \u062E\u0644\u0627\u0644 \u064A\u0648\u0645 \u0639\u0645\u0644."
-        },
-        jsonLd: [
-          {
-            "@context": "https://schema.org",
-            "@type": "ContactPage",
-            name: "Contact Kassenta",
-            url: "https://kassenta.com/contact/",
-            mainEntity: {
-              "@type": "Organization",
-              name: "Kassenta",
-              email: "info@kassenta.com",
-              url: "https://kassenta.com",
-              contactPoint: {
-                "@type": "ContactPoint",
-                contactType: "sales",
-                email: "info@kassenta.com",
-                availableLanguage: ["English", "German", "Arabic"]
-              }
-            }
-          }
-        ]
-      },
-      body: `
-  ${pageHead(
-        { en: "Talk to us", de: "Sprechen Sie mit uns", ar: "\u062A\u062D\u062F\u0651\u062B \u0625\u0644\u064A\u0646\u0627" },
-        {
-          en: "Send your menu or product list with the form and we will load it into a demo account before the call, so you see your own business rather than a sample restaurant.",
-          de: "Senden Sie Ihre Karte oder Artikelliste \xFCber das Formular; wir laden sie vor dem Termin in ein Demo-Konto, damit Sie Ihren eigenen Betrieb sehen \u2014 kein Musterrestaurant.",
-          ar: "\u0623\u0631\u0633\u0644 \u0642\u0627\u0626\u0645\u062A\u0643 \u0623\u0648 \u0645\u0646\u062A\u062C\u0627\u062A\u0643 \u0639\u0628\u0631 \u0627\u0644\u0646\u0645\u0648\u0630\u062C \u0648\u0633\u0646\u062D\u0645\u0651\u0644\u0647\u0627 \u0641\u064A \u062D\u0633\u0627\u0628 \u062A\u062C\u0631\u064A\u0628\u064A \u0642\u0628\u0644 \u0627\u0644\u0645\u0643\u0627\u0644\u0645\u0629\u060C \u0644\u062A\u0631\u0649 \u0646\u0634\u0627\u0637\u0643 \u0623\u0646\u062A \u0644\u0627 \u0645\u0637\u0639\u0645\u064B\u0627 \u0646\u0645\u0648\u0630\u062C\u064A\u064B\u0627."
-        },
-        { en: "Contact", de: "Kontakt", ar: "\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627" }
-      )}
-
-  <section class="section">
-    <div class="wrap">
-      <div class="split">
-        <div>
-          <form class="card" id="contactForm" novalidate style="display:grid;gap:18px">
-            <div class="grid grid-2" style="gap:16px">
-              <div class="field">
-                <label for="cf-name" ${tAttrs({ en: "Your name", de: "Ihr Name", ar: "\u0627\u0633\u0645\u0643" })}>Your name</label>
-                <input id="cf-name" name="name" type="text" required autocomplete="name">
-              </div>
-              <div class="field">
-                <label for="cf-business" ${tAttrs({ en: "Business name", de: "Betriebsname", ar: "\u0627\u0633\u0645 \u0627\u0644\u0646\u0634\u0627\u0637" })}>Business name</label>
-                <input id="cf-business" name="business" type="text" autocomplete="organization">
-              </div>
-            </div>
-            <div class="grid grid-2" style="gap:16px">
-              <div class="field">
-                <label for="cf-email" ${tAttrs({ en: "Email", de: "E-Mail", ar: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A" })}>Email</label>
-                <input id="cf-email" name="email" type="email" required autocomplete="email" inputmode="email">
-              </div>
-              <div class="field">
-                <label for="cf-phone" ${tAttrs({ en: "Phone or WhatsApp", de: "Telefon oder WhatsApp", ar: "\u0627\u0644\u0647\u0627\u062A\u0641 \u0623\u0648 \u0648\u0627\u062A\u0633\u0627\u0628" })}>Phone or WhatsApp</label>
-                <input id="cf-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel">
-              </div>
-            </div>
-            <div class="field">
-              <label for="cf-industry" ${tAttrs({ en: "Industry", de: "Branche", ar: "\u0627\u0644\u0645\u062C\u0627\u0644" })}>Industry</label>
-              <select id="cf-industry" name="industry">
-                <option value="restaurant" ${tAttrs({ en: "Restaurant", de: "Restaurant", ar: "\u0645\u0637\u0639\u0645" })}>Restaurant</option>
-                <option value="cafe" ${tAttrs({ en: "Caf\xE9 or bar", de: "Caf\xE9 oder Bar", ar: "\u0643\u0627\u0641\u064A\u0647 \u0623\u0648 \u0628\u0627\u0631" })}>Caf\xE9 or bar</option>
-                <option value="supermarket" ${tAttrs({ en: "Supermarket or grocer", de: "Supermarkt oder Lebensmittel", ar: "\u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A \u0623\u0648 \u0628\u0642\u0627\u0644\u0629" })}>Supermarket or grocer</option>
-                <option value="pharmacy" ${tAttrs({ en: "Pharmacy", de: "Apotheke", ar: "\u0635\u064A\u062F\u0644\u064A\u0629" })}>Pharmacy</option>
-                <option value="bakery" ${tAttrs({ en: "Bakery", de: "B\xE4ckerei", ar: "\u0645\u062E\u0628\u0632" })}>Bakery</option>
-                <option value="retail" ${tAttrs({ en: "Retail", de: "Einzelhandel", ar: "\u062A\u062C\u0632\u0626\u0629" })}>Retail</option>
-                <option value="other" ${tAttrs({ en: "Something else", de: "Etwas anderes", ar: "\u0634\u064A\u0621 \u0622\u062E\u0631" })}>Something else</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="cf-message" ${tAttrs({ en: "What would you like to see?", de: "Was m\xF6chten Sie sehen?", ar: "\u0645\u0627 \u0627\u0644\u0630\u064A \u062A\u0648\u062F\u0651 \u0631\u0624\u064A\u062A\u0647\u061F" })}>What would you like to see?</label>
-              <textarea id="cf-message" name="message" placeholder="e.g. we run two branches, take phone orders and deliver in a 5 km radius"></textarea>
-            </div>
-            <div class="form-status" id="cf-status" role="status" aria-live="polite"></div>
-            <button class="btn btn-primary" type="submit" id="cf-submit" ${tAttrs({ en: "Request a demo", de: "Demo anfragen", ar: "\u0627\u0637\u0644\u0628 \u0639\u0631\u0636\u064B\u0627 \u062A\u0648\u0636\u064A\u062D\u064A\u064B\u0627" })}>Request a demo</button>
-            <p class="form-note" ${tAttrs({
-        en: "We use your details only to answer this enquiry. No newsletter, no third parties.",
-        de: "Wir verwenden Ihre Angaben nur zur Beantwortung dieser Anfrage. Kein Newsletter, keine Dritten.",
-        ar: "\u0646\u0633\u062A\u062E\u062F\u0645 \u0628\u064A\u0627\u0646\u0627\u062A\u0643 \u0644\u0644\u0631\u062F\u0651 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628 \u0641\u0642\u0637. \u0628\u0644\u0627 \u0646\u0634\u0631\u0627\u062A \u0628\u0631\u064A\u062F\u064A\u0629 \u0648\u0628\u0644\u0627 \u0623\u0637\u0631\u0627\u0641 \u062B\u0627\u0644\u062B\u0629."
-      })}>We use your details only to answer this enquiry. No newsletter, no third parties.</p>
-          </form>
-        </div>
-        <div>
-          ${head({ en: "Direct", de: "Direkt", ar: "\u0645\u0628\u0627\u0634\u0631\u0629" }, { en: "Or skip the form", de: "Oder ohne Formular", ar: "\u0623\u0648 \u062A\u062C\u0627\u0648\u0632 \u0627\u0644\u0646\u0645\u0648\u0630\u062C" })}
-          <div class="grid" style="gap:16px">
-            <article class="card">
-              <div class="card-icon">${icons.mail}</div>
-              <h3 ${tAttrs({ en: "Email", de: "E-Mail", ar: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A" })}>Email</h3>
-              <p><a href="mailto:info@kassenta.com" style="color:var(--accent);font-weight:700">info@kassenta.com</a></p>
-            </article>
-            <article class="card">
-              <div class="card-icon">${icons.building}</div>
-              <h3 ${tAttrs({ en: "Existing customer?", de: "Bestandskunde?", ar: "\u0639\u0645\u064A\u0644 \u062D\u0627\u0644\u064A\u061F" })}>Existing customer?</h3>
-              <p ${tAttrs({
-        en: "Open the POS and use the support entry in Settings so your licence and branch come through with the message.",
-        de: "\xD6ffnen Sie die Kasse und nutzen Sie den Support-Eintrag in den Einstellungen, damit Lizenz und Filiale mitgesendet werden.",
-        ar: "\u0627\u0641\u062A\u062D \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0627\u0633\u062A\u062E\u062F\u0645 \u0645\u062F\u062E\u0644 \u0627\u0644\u062F\u0639\u0645 \u0641\u064A \u0627\u0644\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0644\u064A\u0635\u0644\u0646\u0627 \u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u0648\u0627\u0644\u0641\u0631\u0639 \u0645\u0639 \u0627\u0644\u0631\u0633\u0627\u0644\u0629."
-      })}>Open the POS and use the support entry in Settings so your licence and branch come through with the message.</p>
-              <p style="margin-top:12px"><a class="btn-quiet" href="/app" ${tAttrs({ en: "Open the POS", de: "Kasse \xF6ffnen", ar: "\u0627\u0641\u062A\u062D \u0627\u0644\u0643\u0627\u0634\u064A\u0631" })}>Open the POS</a></p>
-            </article>
-            <article class="card">
-              <div class="card-icon">${icons.clock}</div>
-              <h3 ${tAttrs({ en: "Response time", de: "Antwortzeit", ar: "\u0632\u0645\u0646 \u0627\u0644\u0627\u0633\u062A\u062C\u0627\u0628\u0629" })}>Response time</h3>
-              <p ${tAttrs({
-        en: "Enquiries are answered within one business day. Support tickets from live customers are answered the same day during business hours.",
-        de: "Anfragen beantworten wir innerhalb eines Werktags. Support-Tickets aktiver Kunden am selben Tag zu Gesch\xE4ftszeiten.",
-        ar: "\u0646\u0631\u062F\u0651 \u0639\u0644\u0649 \u0627\u0644\u0627\u0633\u062A\u0641\u0633\u0627\u0631\u0627\u062A \u062E\u0644\u0627\u0644 \u064A\u0648\u0645 \u0639\u0645\u0644. \u0648\u062A\u064F\u062C\u0627\u0628 \u062A\u0630\u0627\u0643\u0631 \u062F\u0639\u0645 \u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0627\u0644\u0646\u0634\u0637\u064A\u0646 \u0641\u064A \u0627\u0644\u064A\u0648\u0645 \u0646\u0641\u0633\u0647 \u062E\u0644\u0627\u0644 \u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0639\u0645\u0644."
-      })}>Enquiries are answered within one business day. Support tickets from live customers are answered the same day during business hours.</p>
-            </article>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <script>
-    (function () {
-      var form = document.getElementById('contactForm');
-      var status = document.getElementById('cf-status');
-      var btn = document.getElementById('cf-submit');
-      if (!form) return;
-      var MSG = {
-        sending: { en: 'Sending\u2026', de: 'Wird gesendet\u2026', ar: '\u062C\u0627\u0631\u064D \u0627\u0644\u0625\u0631\u0633\u0627\u0644\u2026' },
-        ok: { en: 'Thank you. We will reply within one business day.', de: 'Danke. Wir antworten innerhalb eines Werktags.', ar: '\u0634\u0643\u0631\u064B\u0627 \u0644\u0643. \u0633\u0646\u0631\u062F\u0651 \u062E\u0644\u0627\u0644 \u064A\u0648\u0645 \u0639\u0645\u0644.' },
-        err: { en: 'Could not send. Please email info@kassenta.com instead.', de: 'Senden fehlgeschlagen. Bitte schreiben Sie an info@kassenta.com.', ar: '\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u0625\u0631\u0633\u0627\u0644. \u064A\u0631\u062C\u0649 \u0627\u0644\u0645\u0631\u0627\u0633\u0644\u0629 \u0639\u0644\u0649 info@kassenta.com.' },
-        invalid: { en: 'Please fill in your name and a valid email address.', de: 'Bitte Name und eine g\xFCltige E-Mail-Adresse angeben.', ar: '\u064A\u0631\u062C\u0649 \u0625\u062F\u062E\u0627\u0644 \u0627\u0644\u0627\u0633\u0645 \u0648\u0628\u0631\u064A\u062F \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0635\u062D\u064A\u062D.' }
-      };
-      function say(kind, cls) {
-        var lang = document.documentElement.lang || 'en';
-        status.textContent = MSG[kind][lang] || MSG[kind].en;
-        status.className = 'form-status ' + cls;
-      }
-      form.addEventListener('submit', function (e) {
-        e.preventDefault();
-        var data = Object.fromEntries(new FormData(form).entries());
-        if (!data.name || !/^[^@s]+@[^@s]+.[^@s]+$/.test(String(data.email || ''))) {
-          return say('invalid', 'err');
-        }
-        btn.disabled = true;
-        say('sending', 'ok');
-        fetch('/api/contact', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        }).then(function (r) {
-          if (!r.ok) throw new Error(String(r.status));
-          form.reset();
-          say('ok', 'ok');
-        }).catch(function () {
-          say('err', 'err');
-        }).finally(function () { btn.disabled = false; });
-      });
-    })();
-  </script>`
-    };
-    PAGES = [home, features, solutions, pricing, compliance, about, contact];
-  }
-});
-
-// server/site/index.ts
-var site_exports = {};
-__export(site_exports, {
-  SITE_PATHS: () => SITE_PATHS,
-  findSiteAsset: () => findSiteAsset,
-  isSitePath: () => isSitePath,
-  normaliseSitePath: () => normaliseSitePath,
-  renderPage: () => renderPage,
-  renderSitePage: () => renderSitePage
-});
-function normaliseSitePath(pathname) {
-  if (pathname === "/" || pathname === "/index.html") return "/";
-  let p = pathname.replace(/\/index\.html$/i, "");
-  if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
-  return p.toLowerCase();
-}
-function isSitePath(pathname) {
-  return BY_PATH.has(normaliseSitePath(pathname));
-}
-function renderSitePage(pathname, baseUrl) {
-  const page = BY_PATH.get(normaliseSitePath(pathname));
-  if (!page) return null;
-  return renderPage(page.meta, page.body, baseUrl);
-}
-var BY_PATH, SITE_PATHS;
-var init_site = __esm({
-  "server/site/index.ts"() {
-    "use strict";
-    init_shell();
-    init_pages();
-    BY_PATH = new Map(PAGES.map((p) => [p.meta.path, p]));
-    SITE_PATHS = PAGES.map((p) => p.meta.path);
-  }
-});
-
 // server/index.ts
-var import_express = __toESM(require("express"));
+var import_express2 = __toESM(require("express"));
 
 // server/routes.ts
 var import_node_http = require("node:http");
@@ -9136,71 +6705,280 @@ function guardTenantRoutes() {
 
 // server/stripeClient.ts
 var import_stripe = __toESM(require("stripe"));
-var connectionSettings;
-async function getCredentials() {
+var cached = null;
+var replitCache = null;
+function clean(v) {
+  if (!v) return null;
+  const t2 = v.trim().replace(/^["']|["']$/g, "");
+  return t2.length ? t2 : null;
+}
+function modeOf(secretKey) {
+  return secretKey.startsWith("sk_live_") || secretKey.startsWith("rk_live_") ? "live" : "test";
+}
+function envCredentials() {
+  const secretKey = clean(process.env.STRIPE_SECRET_KEY);
+  if (!secretKey) return null;
+  if (!/^(sk|rk)_(live|test)_/.test(secretKey)) {
+    console.warn(
+      "[stripe] STRIPE_SECRET_KEY is set but does not look like a Stripe secret key (expected sk_live_ / sk_test_ / rk_live_ / rk_test_). Ignoring it."
+    );
+    return null;
+  }
+  const publishableKey = clean(process.env.STRIPE_PUBLISHABLE_KEY);
+  const mode = modeOf(secretKey);
+  if (publishableKey) {
+    const pubMode = publishableKey.startsWith("pk_live_") ? "live" : "test";
+    if (pubMode !== mode) {
+      console.warn(
+        `[stripe] key mode mismatch: secret is ${mode} but publishable is ${pubMode}. Payments will fail until both come from the same Stripe environment.`
+      );
+    }
+  }
+  return { secretKey, publishableKey, mode, source: "env" };
+}
+async function replitCredentials() {
+  if (replitCache) {
+    return {
+      secretKey: replitCache.secretKey,
+      publishableKey: replitCache.publishableKey,
+      mode: modeOf(replitCache.secretKey),
+      source: "replit"
+    };
+  }
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY ? "repl " + process.env.REPL_IDENTITY : process.env.WEB_REPL_RENEWAL ? "depl " + process.env.WEB_REPL_RENEWAL : null;
-  if (!xReplitToken) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn("X-Replit-Token not found. Using dummy credentials for local development.");
-      return {
-        publishableKey: "pk_test_dummy",
-        secretKey: "sk_test_dummy"
-      };
-    }
-    throw new Error("X-Replit-Token not found for repl/depl");
+  if (!hostname || !xReplitToken) return null;
+  try {
+    const isProduction = process.env.REPLIT_DEPLOYMENT === "1";
+    const url = new URL(`https://${hostname}/api/v2/connection`);
+    url.searchParams.set("include_secrets", "true");
+    url.searchParams.set("connector_names", "stripe");
+    url.searchParams.set("environment", isProduction ? "production" : "development");
+    const response = await fetch(url.toString(), {
+      headers: { Accept: "application/json", "X-Replit-Token": xReplitToken }
+    });
+    const data = await response.json();
+    const settings = data.items?.[0]?.settings;
+    if (!settings?.secret) return null;
+    replitCache = { publishableKey: settings.publishable, secretKey: settings.secret };
+    return {
+      secretKey: settings.secret,
+      publishableKey: settings.publishable ?? null,
+      mode: modeOf(settings.secret),
+      source: "replit"
+    };
+  } catch (err) {
+    console.warn("[stripe] Replit connector lookup failed:", err?.message || err);
+    return null;
   }
-  const connectorName = "stripe";
-  const isProduction = process.env.REPLIT_DEPLOYMENT === "1";
-  const targetEnvironment = isProduction ? "production" : "development";
-  const url = new URL(`https://${hostname}/api/v2/connection`);
-  url.searchParams.set("include_secrets", "true");
-  url.searchParams.set("connector_names", connectorName);
-  url.searchParams.set("environment", targetEnvironment);
-  const response = await fetch(url.toString(), {
-    headers: {
-      "Accept": "application/json",
-      "X-Replit-Token": xReplitToken
-    }
-  });
-  const data = await response.json();
-  connectionSettings = data.items?.[0];
-  if (!connectionSettings || (!connectionSettings.settings.publishable || !connectionSettings.settings.secret)) {
-    throw new Error(`Stripe ${targetEnvironment} connection not found`);
-  }
-  return {
-    publishableKey: connectionSettings.settings.publishable,
-    secretKey: connectionSettings.settings.secret
+}
+async function getStripeCredentials() {
+  if (cached) return cached.creds;
+  const creds = envCredentials() ?? await replitCredentials();
+  if (!creds) return null;
+  const apiVersion = clean(process.env.STRIPE_API_VERSION);
+  cached = {
+    creds,
+    client: new import_stripe.default(creds.secretKey, {
+      // Omitting apiVersion pins the SDK's own version, which is what the
+      // bundled TypeScript types describe. STRIPE_API_VERSION is an escape
+      // hatch for pinning to the account default instead.
+      ...apiVersion ? { apiVersion } : {},
+      appInfo: { name: "Kassenta POS", url: "https://kassenta.com" },
+      maxNetworkRetries: 2,
+      timeout: 2e4
+    })
   };
+  console.log(
+    `[stripe] configured from ${creds.source} in ${creds.mode} mode` + (creds.publishableKey ? "" : " (no publishable key set)")
+  );
+  return cached.creds;
+}
+async function isStripeConfigured() {
+  return await getStripeCredentials() !== null;
+}
+async function getStripeMode() {
+  const creds = await getStripeCredentials();
+  return creds ? creds.mode : null;
+}
+async function getStripeClient() {
+  await getStripeCredentials();
+  return cached ? cached.client : null;
+}
+async function requireStripeClient() {
+  const client2 = await getStripeClient();
+  if (!client2) {
+    const err = new Error(
+      "Stripe is not configured. Set STRIPE_SECRET_KEY (and STRIPE_PUBLISHABLE_KEY) in the server environment."
+    );
+    err.code = "STRIPE_NOT_CONFIGURED";
+    err.statusCode = 503;
+    throw err;
+  }
+  return client2;
 }
 async function getUncachableStripeClient() {
-  const { secretKey } = await getCredentials();
-  return new import_stripe.default(secretKey, {
-    apiVersion: "2025-08-27.basil"
-  });
+  return requireStripeClient();
 }
 async function getStripePublishableKey() {
-  const { publishableKey } = await getCredentials();
-  return publishableKey;
+  const creds = await getStripeCredentials();
+  return creds ? creds.publishableKey : null;
 }
-async function getStripeSecretKey() {
-  const { secretKey } = await getCredentials();
-  return secretKey;
+async function getBrowserSafeStripeKey() {
+  const key = await getStripePublishableKey();
+  if (!key) return "";
+  if (!key.startsWith("pk_")) {
+    console.error(
+      "[stripe] REFUSING to expose STRIPE_PUBLISHABLE_KEY to a browser: it does not start with pk_. Check the environment - a secret key may be in the wrong slot."
+    );
+    return "";
+  }
+  return key;
 }
-var stripeSync = null;
-async function getStripeSync() {
-  if (!stripeSync) {
-    const { StripeSync } = await import("stripe-replit-sync");
-    const secretKey = await getStripeSecretKey();
-    stripeSync = new StripeSync({
-      poolConfig: {
-        connectionString: process.env.DATABASE_URL,
-        max: 2
-      },
-      stripeSecretKey: secretKey
+function getStripeWebhookSecret() {
+  return clean(process.env.STRIPE_WEBHOOK_SECRET);
+}
+
+// server/orderPricing.ts
+init_db();
+var PricingError = class extends Error {
+  statusCode = 400;
+  constructor(message) {
+    super(message);
+    this.name = "PricingError";
+  }
+};
+function num(v, fallback = 0) {
+  const n = typeof v === "number" ? v : Number.parseFloat(String(v ?? ""));
+  return Number.isFinite(n) ? n : fallback;
+}
+function money(n) {
+  return Math.round(n * 100) / 100;
+}
+function asArray(v) {
+  if (Array.isArray(v)) return v.map((x) => String(x));
+  if (typeof v === "string" && v.trim()) return [v];
+  return [];
+}
+function parseJson(v, fallback) {
+  if (v == null) return fallback;
+  if (typeof v === "object") return v;
+  try {
+    return JSON.parse(String(v));
+  } catch {
+    return fallback;
+  }
+}
+function priceModifierLine(line, groups) {
+  const colon = line.indexOf(":");
+  const groupName = colon >= 0 ? line.slice(0, colon).trim().toLowerCase() : null;
+  const labelsRaw = colon >= 0 ? line.slice(colon + 1) : line;
+  const labels = labelsRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const candidates = groupName ? groups.filter((g) => String(g.name ?? "").trim().toLowerCase() === groupName) : [];
+  const searchIn = candidates.length ? candidates : groups;
+  let sum2 = 0;
+  for (const label of labels) {
+    for (const g of searchIn) {
+      const opt = (g.options ?? []).find(
+        (o) => String(o.label ?? o.name ?? "").trim().toLowerCase() === label
+      );
+      if (opt) {
+        sum2 += num(opt.price, 0);
+        break;
+      }
+    }
+  }
+  return sum2;
+}
+async function repriceOrder(opts) {
+  const { tenantId } = opts;
+  const incoming = Array.isArray(opts.items) ? opts.items : [];
+  if (!incoming.length) throw new PricingError("Order has no items");
+  const ids = Array.from(
+    new Set(
+      incoming.map((i) => Number.parseInt(String(i.productId ?? ""), 10)).filter((n) => Number.isFinite(n))
+    )
+  );
+  if (!ids.length) throw new PricingError("No valid productId on any line");
+  const placeholders = ids.map(() => "?").join(",");
+  const [rows] = await pool.query(
+    `SELECT id, name, price, is_active, modifiers, variants, tenant_id
+       FROM products
+      WHERE id IN (${placeholders}) AND tenant_id = ?`,
+    [...ids, tenantId]
+  );
+  const byId = /* @__PURE__ */ new Map();
+  for (const r of rows) byId.set(Number(r.id), r);
+  const priced = [];
+  let subtotal = 0;
+  for (const line of incoming) {
+    const pid = Number.parseInt(String(line.productId ?? ""), 10);
+    const product = byId.get(pid);
+    if (!product) {
+      throw new PricingError(`Product ${line.productId} is not available in this store`);
+    }
+    if (product.is_active === 0 || product.is_active === false) {
+      throw new PricingError(`"${product.name}" is no longer available`);
+    }
+    const qty = Math.max(1, Math.floor(num(line.quantity ?? line.qty, 1)));
+    if (qty > 999) throw new PricingError("Quantity is unreasonably large");
+    const variants = parseJson(product.variants, []) ?? [];
+    const groups = parseJson(product.modifiers, []) ?? [];
+    let base = num(product.price, 0);
+    const wantedVariant = line.variant ? String(line.variant).trim().toLowerCase() : null;
+    if (wantedVariant) {
+      const v = variants.find((x) => String(x.name ?? "").trim().toLowerCase() === wantedVariant);
+      if (!v) throw new PricingError(`Unknown option "${line.variant}" for ${product.name}`);
+      base = num(v.price, base);
+    } else if (variants.length > 0) {
+      const cheapest = Math.min(...variants.map((v) => num(v.price, base)));
+      base = Number.isFinite(cheapest) ? cheapest : base;
+    }
+    const modLines = asArray(line.modifiers);
+    const modTotal = modLines.reduce((s, m) => s + priceModifierLine(m, groups), 0);
+    const unitPrice = money(base + modTotal);
+    const total = money(unitPrice * qty);
+    subtotal += total;
+    priced.push({
+      productId: pid,
+      name: String(line.name ?? line.productName ?? product.name),
+      quantity: qty,
+      unitPrice,
+      total,
+      variant: line.variant ? String(line.variant) : null,
+      modifiers: modLines,
+      notes: line.notes ? String(line.notes) : null
     });
   }
-  return stripeSync;
+  subtotal = money(subtotal);
+  let deliveryFee = 0;
+  if ((opts.orderType ?? "delivery") === "delivery") {
+    const requested = num(opts.clientDeliveryFee, NaN);
+    const [zoneRows] = await pool.query(
+      `SELECT delivery_fee FROM delivery_zones WHERE tenant_id = ? AND is_active = 1`,
+      [tenantId]
+    );
+    const allowed = zoneRows.map((z) => money(num(z.delivery_fee, 0)));
+    const [branchRows] = await pool.query(
+      `SELECT delivery_fee FROM branches WHERE tenant_id = ? LIMIT 1`,
+      [tenantId]
+    );
+    const branchFee = money(num(branchRows?.[0]?.delivery_fee, 0));
+    if (!allowed.includes(branchFee)) allowed.push(branchFee);
+    deliveryFee = Number.isFinite(requested) && allowed.includes(money(requested)) ? money(requested) : branchFee;
+  }
+  const discountAmount = Math.min(money(Math.max(0, num(opts.discountAmount, 0))), subtotal);
+  const walletUsed = Math.max(0, money(num(opts.walletUsed, 0)));
+  const gross = money(subtotal - discountAmount + deliveryFee);
+  const totalAmount = money(Math.max(0, gross - walletUsed));
+  const clientTotal = num(opts.clientTotal, NaN);
+  const mismatch = Number.isFinite(clientTotal) && Math.abs(clientTotal - totalAmount) > 0.01 ? { clientTotal: money(clientTotal), serverTotal: totalAmount } : null;
+  if (mismatch) {
+    console.warn(
+      `[pricing] tenant ${tenantId}: client said ${mismatch.clientTotal}, server priced ${mismatch.serverTotal}. Using the server total.`
+    );
+  }
+  return { items: priced, subtotal, deliveryFee, discountAmount, walletUsed, totalAmount, mismatch };
 }
 
 // server/routes.ts
@@ -11906,7 +9684,7 @@ async function registerRoutes(app2) {
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
       const allTables = await storage.getTables(branchId ? Number(branchId) : void 0);
       const existing = await storage.getTableQrCodes(Number(tenantId));
-      const existingTableIds = new Set(existing.map((q) => q.tableId));
+      const existingTableIds = new Set(existing.map((q5) => q5.tableId));
       const created = [];
       for (const table of allTables) {
         if (existingTableIds.has(table.id)) continue;
@@ -12086,12 +9864,12 @@ async function registerRoutes(app2) {
   app2.get("/api/fix-schema-and-seed", async (_req, res) => {
     try {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { sql: sql7 } = await import("drizzle-orm");
+      const { sql: sql8 } = await import("drizzle-orm");
       console.log("[API-SEED] Fixing schema...");
       const tables2 = ["branches", "products", "employees", "sales", "inventory", "customers", "suppliers"];
       for (const table of tables2) {
         try {
-          await db2.execute(sql7.raw(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id integer`));
+          await db2.execute(sql8.raw(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id integer`));
           console.log(`[API-SEED] Table ${table} fixed`);
         } catch (e) {
           console.log(`[API-SEED] Table ${table} skip: ${e.message}`);
@@ -13570,7 +11348,7 @@ async function test(){
     }
     try {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { sql: sql7 } = await import("drizzle-orm");
+      const { sql: sql8 } = await import("drizzle-orm");
       const firstTenant = (await storage.getTenants())[0];
       if (!firstTenant) {
         return res.status(404).json({ error: "No tenants found" });
@@ -13611,7 +11389,7 @@ async function test(){
       for (const table of tables2) {
         try {
           const r = await db2.execute(
-            sql7.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`)
+            sql8.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`)
           );
           results[table] = r[0]?.affectedRows ?? 0;
         } catch (e) {
@@ -14067,6 +11845,22 @@ Valid for 10 minutes.`);
           return res.status(400).json({ error: walletResult.error });
         }
       }
+      let pricing2;
+      try {
+        pricing2 = await repriceOrder({
+          tenantId: Number(tenantId),
+          items,
+          clientSubtotal: subtotal,
+          clientDeliveryFee: deliveryFee,
+          clientTotal: totalAmount,
+          discountAmount: finalDiscount,
+          walletUsed,
+          orderType: orderType || "delivery"
+        });
+      } catch (e) {
+        if (e instanceof PricingError) return res.status(400).json({ error: e.message });
+        throw e;
+      }
       const order = await storage.createOnlineOrder({
         tenantId: Number(tenantId),
         orderNumber,
@@ -14074,11 +11868,11 @@ Valid for 10 minutes.`);
         customerPhone,
         customerEmail: customerEmail ?? null,
         customerAddress: customerAddress ?? null,
-        items: items || [],
-        subtotal: Number(subtotal).toFixed(2),
+        items: pricing2.items,
+        subtotal: pricing2.subtotal.toFixed(2),
         taxAmount: "0",
-        deliveryFee: Number(deliveryFee ?? 0).toFixed(2),
-        totalAmount: Number(totalAmount).toFixed(2),
+        deliveryFee: pricing2.deliveryFee.toFixed(2),
+        totalAmount: pricing2.totalAmount.toFixed(2),
         paymentMethod: paymentMethod || "cash",
         paymentStatus: "pending",
         status: "pending",
@@ -14778,14 +12572,14 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
   });
   app2.get("/api/delivery/search", async (req, res) => {
     try {
-      const q = (req.query.q || "").trim();
+      const q5 = (req.query.q || "").trim();
       const tenantId = Number(req.query.tenantId);
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
-      if (!q) return res.json([]);
+      if (!q5) return res.json([]);
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { products: products2, categories: categories2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq10, and: and7, or: or4, like: like2, sql: sql7 } = await import("drizzle-orm");
-      const pattern = `%${q}%`;
+      const { eq: eq10, and: and7, or: or5, like: like2, sql: sql8 } = await import("drizzle-orm");
+      const pattern = `%${q5}%`;
       const results = await db2.select({
         id: products2.id,
         name: products2.name,
@@ -14798,7 +12592,7 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
       }).from(products2).leftJoin(categories2, eq10(categories2.id, products2.categoryId)).where(and7(
         eq10(products2.tenantId, tenantId),
         eq10(products2.isActive, true),
-        or4(
+        or5(
           like2(products2.name, pattern),
           like2(products2.nameAr, pattern),
           like2(products2.description, pattern)
@@ -14981,9 +12775,9 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
       const tid = parseInt(req.query.tenantId) || req.tenantId;
       if (!tid) return res.json({ popular: [], recentlyOrdered: [] });
       const cacheKey = `reco_${tid}`;
-      const cached = _recoCache.get(cacheKey);
-      if (cached && Date.now() - cached.ts < RECO_TTL) {
-        return res.json(cached.data);
+      const cached2 = _recoCache.get(cacheKey);
+      if (cached2 && Date.now() - cached2.ts < RECO_TTL) {
+        return res.json(cached2.data);
       }
       const products2 = await storage.getProductsByTenant(tid);
       const popular = products2.filter((p) => p.isActive !== false && parseFloat(p.price || "0") > 0).sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0)).slice(0, 10).map((p) => ({
@@ -15024,6 +12818,643 @@ init_storage();
 var import_date_fns5 = require("date-fns");
 init_db();
 var import_drizzle_orm7 = require("drizzle-orm");
+
+// server/paymentService.ts
+init_db();
+
+// server/stripeWebhook.ts
+init_db();
+var MK = {
+  kind: "kassenta_kind",
+  orderId: "kassenta_order_id",
+  saleId: "kassenta_sale_id",
+  tenantId: "kassenta_tenant_id",
+  customerId: "kassenta_customer_id"
+};
+async function q(sqlText, params = []) {
+  const [rows] = await pool.query(sqlText, params);
+  return Array.isArray(rows) ? rows : [];
+}
+function toMajor(minor) {
+  return ((minor ?? 0) / 100).toFixed(2);
+}
+function meta(obj, key) {
+  const v = obj.metadata?.[key];
+  return v === void 0 || v === null || v === "" ? null : String(v);
+}
+function metaInt(obj, key) {
+  const v = meta(obj, key);
+  if (v === null) return null;
+  const n = Number.parseInt(v, 10);
+  return Number.isFinite(n) ? n : null;
+}
+async function markOnlineOrderPaid(pi) {
+  const orderId = metaInt(pi, MK.orderId);
+  if (!orderId) return "no order id in metadata";
+  const chargeId = typeof pi.latest_charge === "string" ? pi.latest_charge : pi.latest_charge?.id ?? null;
+  const res = await pool.query(
+    `UPDATE online_orders
+        SET payment_status = 'paid',
+            stripe_payment_intent_id = ?,
+            stripe_charge_id = COALESCE(?, stripe_charge_id),
+            paid_at = COALESCE(paid_at, NOW()),
+            payment_error = NULL
+      WHERE id = ? AND payment_status <> 'paid'`,
+    [pi.id, chargeId, orderId]
+  );
+  const changed = res?.[0]?.affectedRows ?? 0;
+  return changed ? `order ${orderId} -> paid` : `order ${orderId} already paid`;
+}
+async function markOnlineOrderFailed(pi) {
+  const orderId = metaInt(pi, MK.orderId);
+  if (!orderId) return "no order id in metadata";
+  const reason = pi.last_payment_error?.message ?? pi.last_payment_error?.code ?? "payment failed";
+  await q(
+    `UPDATE online_orders
+        SET payment_status = 'failed',
+            stripe_payment_intent_id = ?,
+            payment_error = ?
+      WHERE id = ? AND payment_status <> 'paid'`,
+    [pi.id, String(reason).slice(0, 500), orderId]
+  );
+  return `order ${orderId} -> failed (${reason})`;
+}
+async function markSalePaid(pi) {
+  const saleId = metaInt(pi, MK.saleId);
+  if (!saleId) return "no sale id in metadata";
+  const chargeId = typeof pi.latest_charge === "string" ? pi.latest_charge : pi.latest_charge?.id ?? null;
+  await q(
+    `UPDATE sales
+        SET payment_status = 'paid',
+            stripe_payment_intent_id = ?,
+            stripe_charge_id = COALESCE(?, stripe_charge_id),
+            paid_at = COALESCE(paid_at, NOW())
+      WHERE id = ? AND payment_status <> 'paid'`,
+    [pi.id, chargeId, saleId]
+  );
+  return `sale ${saleId} -> paid`;
+}
+async function creditWallet2(pi) {
+  const customerId = metaInt(pi, MK.customerId);
+  const tenantId = metaInt(pi, MK.tenantId);
+  if (!customerId || !tenantId) return "missing customer/tenant in metadata";
+  const existing = await q(
+    `SELECT id FROM wallet_transactions WHERE stripe_payment_intent_id = ? LIMIT 1`,
+    [pi.id]
+  );
+  if (existing.length) return `wallet already credited for ${pi.id}`;
+  const amount = toMajor(pi.amount_received || pi.amount);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.query(
+      `SELECT wallet_balance FROM customers WHERE id = ? FOR UPDATE`,
+      [customerId]
+    );
+    if (!rows?.length) {
+      await conn.rollback();
+      return `customer ${customerId} not found`;
+    }
+    const before = Number(rows[0].wallet_balance ?? 0);
+    const after = before + Number(amount);
+    await conn.query(`UPDATE customers SET wallet_balance = ? WHERE id = ?`, [
+      after.toFixed(2),
+      customerId
+    ]);
+    await conn.query(
+      `INSERT INTO wallet_transactions
+         (customer_id, tenant_id, type, amount, balance_before, balance_after,
+          stripe_payment_intent_id, description, created_at)
+       VALUES (?, ?, 'top_up', ?, ?, ?, ?, ?, NOW())`,
+      [
+        customerId,
+        tenantId,
+        amount,
+        before.toFixed(2),
+        after.toFixed(2),
+        pi.id,
+        "Stripe top-up"
+      ]
+    );
+    await conn.commit();
+    return `wallet +${amount} for customer ${customerId} (now ${after.toFixed(2)})`;
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally {
+    conn.release();
+  }
+}
+async function activateSubscription(pi) {
+  const tenantId = metaInt(pi, MK.tenantId);
+  if (!tenantId) return "no tenant id in metadata";
+  await q(
+    `UPDATE tenant_subscriptions
+        SET status = 'active',
+            last_payment_date = NOW(),
+            last_payment_error = NULL
+      WHERE tenant_id = ?`,
+    [tenantId]
+  );
+  await q(`UPDATE tenants SET status = 'active' WHERE id = ?`, [tenantId]);
+  return `tenant ${tenantId} subscription -> active`;
+}
+async function applyRefund(charge) {
+  const piId = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent?.id;
+  if (!piId) return "charge has no payment intent";
+  const refundId = charge.refunds?.data?.[0]?.id ?? null;
+  const refunded = toMajor(charge.amount_refunded);
+  const fully = charge.amount_refunded >= charge.amount;
+  const res = await pool.query(
+    `UPDATE online_orders
+        SET payment_status = ?,
+            amount_refunded = ?,
+            stripe_refund_id = COALESCE(?, stripe_refund_id),
+            refunded_at = COALESCE(refunded_at, NOW())
+      WHERE stripe_payment_intent_id = ?`,
+    [fully ? "refunded" : "partially_refunded", refunded, refundId, piId]
+  );
+  await q(
+    `UPDATE sales
+        SET payment_status = ?,
+            stripe_refund_id = COALESCE(?, stripe_refund_id)
+      WHERE stripe_payment_intent_id = ?`,
+    [fully ? "refunded" : "partially_refunded", refundId, piId]
+  );
+  const n = res?.[0]?.affectedRows ?? 0;
+  return `refund ${refunded} on ${piId} (${n} order row(s), ${fully ? "full" : "partial"})`;
+}
+async function onPaymentIntentSucceeded(pi) {
+  const kind = meta(pi, MK.kind) ?? "";
+  switch (kind) {
+    case "online_order":
+      return markOnlineOrderPaid(pi);
+    case "pos_sale":
+      return markSalePaid(pi);
+    case "wallet_topup":
+      return creditWallet2(pi);
+    case "tenant_subscription":
+      return activateSubscription(pi);
+    default:
+      if (metaInt(pi, MK.orderId)) return markOnlineOrderPaid(pi);
+      await q(
+        `UPDATE online_orders SET payment_status = 'paid', paid_at = COALESCE(paid_at, NOW())
+          WHERE stripe_payment_intent_id = ? AND payment_status <> 'paid'`,
+        [pi.id]
+      );
+      return `no kind metadata; settled by intent id ${pi.id}`;
+  }
+}
+async function onCheckoutCompleted(session) {
+  const tenantId = metaInt(session, MK.tenantId);
+  const kind = meta(session, MK.kind);
+  if (kind === "tenant_subscription" && tenantId) {
+    const subId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null;
+    const custId = typeof session.customer === "string" ? session.customer : session.customer?.id ?? null;
+    await q(
+      `UPDATE tenant_subscriptions
+          SET status = 'active',
+              stripe_subscription_id = COALESCE(?, stripe_subscription_id),
+              stripe_customer_id = COALESCE(?, stripe_customer_id),
+              last_payment_date = NOW()
+        WHERE tenant_id = ?`,
+      [subId, custId, tenantId]
+    );
+    if (custId) {
+      await q(`UPDATE tenants SET stripe_customer_id = ?, status = 'active' WHERE id = ?`, [
+        custId,
+        tenantId
+      ]);
+    }
+    return `checkout completed for tenant ${tenantId}`;
+  }
+  const orderId = metaInt(session, MK.orderId);
+  if (orderId && session.payment_status === "paid") {
+    const piId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null;
+    await q(
+      `UPDATE online_orders
+          SET payment_status = 'paid',
+              stripe_payment_intent_id = COALESCE(?, stripe_payment_intent_id),
+              paid_at = COALESCE(paid_at, NOW())
+        WHERE id = ? AND payment_status <> 'paid'`,
+      [piId, orderId]
+    );
+    return `checkout completed for order ${orderId}`;
+  }
+  return "checkout session ignored (no recognised metadata)";
+}
+async function onInvoice(invoice, paid) {
+  const custId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id ?? null;
+  if (!custId) return "invoice has no customer";
+  if (paid) {
+    await q(
+      `UPDATE tenant_subscriptions
+          SET status = 'active',
+              last_payment_date = NOW(),
+              last_invoice_id = ?,
+              last_payment_error = NULL
+        WHERE stripe_customer_id = ?`,
+      [invoice.id, custId]
+    );
+    return `invoice ${invoice.id} paid for customer ${custId}`;
+  }
+  await q(
+    `UPDATE tenant_subscriptions
+        SET status = 'past_due',
+            last_invoice_id = ?,
+            last_payment_error = ?
+      WHERE stripe_customer_id = ?`,
+    [invoice.id, "invoice payment failed", custId]
+  );
+  return `invoice ${invoice.id} failed for customer ${custId}`;
+}
+async function onSubscriptionChanged(sub) {
+  const custId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+  if (!custId) return "subscription has no customer";
+  const status2 = sub.status === "active" || sub.status === "trialing" ? "active" : sub.status === "past_due" || sub.status === "unpaid" ? "past_due" : "cancelled";
+  await q(
+    `UPDATE tenant_subscriptions
+        SET status = ?,
+            stripe_subscription_id = ?,
+            auto_renew = ?,
+            cancelled_at = CASE WHEN ? = 'cancelled' THEN COALESCE(cancelled_at, NOW()) ELSE cancelled_at END
+      WHERE stripe_customer_id = ?`,
+    [status2, sub.id, sub.cancel_at_period_end ? 0 : 1, status2, custId]
+  );
+  if (status2 === "cancelled") {
+    await q(`UPDATE tenants SET status = 'suspended' WHERE stripe_customer_id = ?`, [custId]);
+  }
+  return `subscription ${sub.id} -> ${status2}`;
+}
+async function dispatchStripeEvent(event) {
+  const obj = event.data.object;
+  switch (event.type) {
+    case "payment_intent.succeeded":
+      return onPaymentIntentSucceeded(obj);
+    case "payment_intent.payment_failed":
+      return markOnlineOrderFailed(obj);
+    case "payment_intent.canceled":
+      return markOnlineOrderFailed(obj);
+    case "charge.refunded":
+      return applyRefund(obj);
+    case "checkout.session.completed":
+    case "checkout.session.async_payment_succeeded":
+      return onCheckoutCompleted(obj);
+    case "invoice.paid":
+    case "invoice.payment_succeeded":
+      return onInvoice(obj, true);
+    case "invoice.payment_failed":
+      return onInvoice(obj, false);
+    case "customer.subscription.updated":
+    case "customer.subscription.deleted":
+    case "customer.subscription.created":
+      return onSubscriptionChanged(obj);
+    default:
+      return `ignored (${event.type})`;
+  }
+}
+async function processStripeWebhook(rawBody, signature) {
+  if (!Buffer.isBuffer(rawBody)) {
+    throw new Error(
+      "Stripe webhook payload must be a raw Buffer. The webhook route has to be registered before express.json()."
+    );
+  }
+  const secret = getStripeWebhookSecret();
+  if (!secret) {
+    const err = new Error("STRIPE_WEBHOOK_SECRET is not set");
+    err.statusCode = 503;
+    throw err;
+  }
+  const stripe = await requireStripeClient();
+  const event = stripe.webhooks.constructEvent(rawBody, signature, secret);
+  try {
+    await q(
+      `INSERT INTO stripe_webhook_events (id, type, api_version, livemode, status, payload)
+       VALUES (?, ?, ?, ?, 'received', ?)`,
+      [
+        event.id,
+        event.type,
+        event.api_version ?? null,
+        event.livemode ? 1 : 0,
+        JSON.stringify(event).slice(0, 4e6)
+      ]
+    );
+  } catch (e) {
+    if (e?.code === "ER_DUP_ENTRY" || /duplicate/i.test(String(e?.message))) {
+      return { received: true, eventId: event.id, outcome: "duplicate, ignored" };
+    }
+    console.warn("[stripe-webhook] could not record event:", e?.message || e);
+  }
+  try {
+    const outcome = await dispatchStripeEvent(event);
+    await q(
+      `UPDATE stripe_webhook_events SET status='processed', processed_at=NOW(), error=? WHERE id=?`,
+      [outcome.slice(0, 500), event.id]
+    ).catch(() => {
+    });
+    console.log(`[stripe-webhook] ${event.type} ${event.id}: ${outcome}`);
+    return { received: true, eventId: event.id, outcome };
+  } catch (e) {
+    const msg = String(e?.message || e);
+    await q(
+      `UPDATE stripe_webhook_events SET status='failed', error=? WHERE id=?`,
+      [msg.slice(0, 500), event.id]
+    ).catch(() => {
+    });
+    console.error(`[stripe-webhook] ${event.type} ${event.id} FAILED: ${msg}`);
+    throw e;
+  }
+}
+
+// server/paymentService.ts
+var DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || "CHF").toLowerCase();
+var MIN_MAJOR = 0.5;
+var MAX_MAJOR = 2e4;
+async function q2(sqlText, params = []) {
+  const [rows] = await pool.query(sqlText, params);
+  return Array.isArray(rows) ? rows : [];
+}
+function badRequest(message, status2 = 400) {
+  const err = new Error(message);
+  err.statusCode = status2;
+  return err;
+}
+function toMinor(major, label) {
+  const n = typeof major === "string" ? Number.parseFloat(major) : major;
+  if (!Number.isFinite(n)) throw badRequest(`${label}: amount is not a number`);
+  if (n < MIN_MAJOR) throw badRequest(`${label}: amount ${n} is below the ${MIN_MAJOR} minimum`);
+  if (n > MAX_MAJOR) throw badRequest(`${label}: amount ${n} exceeds the ${MAX_MAJOR} maximum`);
+  return Math.round(n * 100);
+}
+async function currencyFor(tenantId) {
+  if (!tenantId) return DEFAULT_CURRENCY;
+  try {
+    const rows = await q2(
+      `SELECT currency FROM payment_gateway_settings WHERE tenant_id IN (?, 0)
+        ORDER BY tenant_id DESC LIMIT 1`,
+      [tenantId]
+    );
+    const c = rows[0]?.currency;
+    return c ? String(c).toLowerCase() : DEFAULT_CURRENCY;
+  } catch {
+    return DEFAULT_CURRENCY;
+  }
+}
+async function buildIntent(opts) {
+  const stripe = await requireStripeClient();
+  const metadata = { [MK.kind]: opts.kind };
+  if (opts.tenantId) metadata[MK.tenantId] = String(opts.tenantId);
+  if (opts.orderId) metadata[MK.orderId] = String(opts.orderId);
+  if (opts.saleId) metadata[MK.saleId] = String(opts.saleId);
+  if (opts.customerId) metadata[MK.customerId] = String(opts.customerId);
+  const params = {
+    amount: opts.amountMinor,
+    currency: opts.currency,
+    metadata,
+    description: opts.description,
+    // Lets the Dashboard decide which methods are offered, per device and
+    // currency, without a redeploy.
+    automatic_payment_methods: { enabled: true }
+  };
+  if (opts.receiptEmail) params.receipt_email = opts.receiptEmail;
+  if (opts.stripeCustomerId) params.customer = opts.stripeCustomerId;
+  const intent = await stripe.paymentIntents.create(
+    params,
+    // Retrying the same order must not create a second charge.
+    opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : void 0
+  );
+  return {
+    clientSecret: intent.client_secret,
+    paymentIntentId: intent.id,
+    publishableKey: await getStripePublishableKey(),
+    amount: opts.amountMinor,
+    currency: opts.currency
+  };
+}
+async function createOrderPaymentIntent(orderId) {
+  const rows = await q2(
+    `SELECT id, tenant_id, order_number, total_amount, payment_status,
+            customer_email, stripe_payment_intent_id
+       FROM online_orders WHERE id = ? LIMIT 1`,
+    [orderId]
+  );
+  const order = rows[0];
+  if (!order) throw badRequest(`Order ${orderId} not found`, 404);
+  if (order.payment_status === "paid") throw badRequest("Order is already paid", 409);
+  const currency = await currencyFor(order.tenant_id);
+  const amountMinor = toMinor(order.total_amount, `order ${orderId}`);
+  if (order.stripe_payment_intent_id) {
+    try {
+      const stripe = await requireStripeClient();
+      const existing = await stripe.paymentIntents.retrieve(order.stripe_payment_intent_id);
+      const reusable = existing.amount === amountMinor && existing.currency === currency && ["requires_payment_method", "requires_confirmation", "requires_action", "processing"].includes(
+        existing.status
+      );
+      if (reusable) {
+        return {
+          clientSecret: existing.client_secret,
+          paymentIntentId: existing.id,
+          publishableKey: await getStripePublishableKey(),
+          amount: existing.amount,
+          currency: existing.currency
+        };
+      }
+    } catch {
+    }
+  }
+  const result = await buildIntent({
+    amountMinor,
+    currency,
+    kind: "online_order",
+    tenantId: order.tenant_id,
+    orderId: order.id,
+    description: `Order ${order.order_number}`,
+    receiptEmail: order.customer_email || null,
+    idempotencyKey: `order-${order.id}-${amountMinor}`
+  });
+  await q2(`UPDATE online_orders SET stripe_payment_intent_id = ? WHERE id = ?`, [
+    result.paymentIntentId,
+    orderId
+  ]);
+  return result;
+}
+async function createSalePaymentIntent(saleId) {
+  const rows = await q2(
+    `SELECT s.id, s.receipt_number, s.total_amount, s.payment_status, b.tenant_id
+       FROM sales s LEFT JOIN branches b ON b.id = s.branch_id
+      WHERE s.id = ? LIMIT 1`,
+    [saleId]
+  );
+  const sale = rows[0];
+  if (!sale) throw badRequest(`Sale ${saleId} not found`, 404);
+  if (sale.payment_status === "paid") throw badRequest("Sale is already paid", 409);
+  const currency = await currencyFor(sale.tenant_id);
+  const amountMinor = toMinor(sale.total_amount, `sale ${saleId}`);
+  const result = await buildIntent({
+    amountMinor,
+    currency,
+    kind: "pos_sale",
+    tenantId: sale.tenant_id,
+    saleId: sale.id,
+    description: `Receipt ${sale.receipt_number}`,
+    idempotencyKey: `sale-${sale.id}-${amountMinor}`
+  });
+  await q2(`UPDATE sales SET stripe_payment_intent_id = ? WHERE id = ?`, [
+    result.paymentIntentId,
+    saleId
+  ]);
+  return result;
+}
+async function createWalletTopupIntent(opts) {
+  const rows = await q2(`SELECT id, email, tenant_id FROM customers WHERE id = ? LIMIT 1`, [
+    opts.customerId
+  ]);
+  const customer = rows[0];
+  if (!customer) throw badRequest(`Customer ${opts.customerId} not found`, 404);
+  if (Number(customer.tenant_id) !== Number(opts.tenantId)) {
+    throw badRequest("Customer does not belong to this tenant", 403);
+  }
+  const currency = await currencyFor(opts.tenantId);
+  const amountMinor = toMinor(opts.amount, "wallet top-up");
+  return buildIntent({
+    amountMinor,
+    currency,
+    kind: "wallet_topup",
+    tenantId: opts.tenantId,
+    customerId: opts.customerId,
+    description: "Wallet top-up",
+    receiptEmail: customer.email || null
+  });
+}
+async function createSubscriptionIntent(opts) {
+  let amount = opts.amount ?? null;
+  if (opts.planId) {
+    const rows = await q2(`SELECT id, name, price FROM subscription_plans WHERE id = ? LIMIT 1`, [
+      opts.planId
+    ]);
+    if (!rows.length) throw badRequest(`Plan ${opts.planId} not found`, 404);
+    amount = Number(rows[0].price);
+  }
+  if (amount === null) throw badRequest("Either planId or amount is required");
+  const currency = await currencyFor(opts.tenantId);
+  return buildIntent({
+    amountMinor: toMinor(amount, "subscription"),
+    currency,
+    kind: "tenant_subscription",
+    tenantId: opts.tenantId,
+    description: "Kassenta subscription",
+    receiptEmail: opts.email ?? null
+  });
+}
+async function refundPayment(opts) {
+  const stripe = await requireStripeClient();
+  const params = { payment_intent: opts.paymentIntentId };
+  if (opts.amount != null) params.amount = toMinor(opts.amount, "refund");
+  if (opts.reason) params.reason = opts.reason;
+  const refund = await stripe.refunds.create(params);
+  return { refundId: refund.id, amount: refund.amount, status: refund.status };
+}
+async function listAvailablePaymentMethods() {
+  const stripe = await requireStripeClient();
+  try {
+    const configs = await stripe.paymentMethodConfigurations.list({ limit: 1 });
+    const cfg = configs.data[0];
+    if (!cfg) return { methods: [], configuration: null };
+    const methods = Object.entries(cfg).filter(([, v]) => v && typeof v === "object" && v.display_preference).filter(
+      ([, v]) => ["on", "default"].includes(v.display_preference.value ?? v.display_preference.preference)
+    ).map(([k]) => k).sort();
+    return { methods, configuration: cfg.id ?? null };
+  } catch (e) {
+    console.warn("[stripe] could not list payment method configurations:", e?.message || e);
+    return { methods: [], configuration: null };
+  }
+}
+async function stripeAccountStatus() {
+  try {
+    const stripe = await requireStripeClient();
+    const account = await stripe.accounts.retrieve();
+    const { methods } = await listAvailablePaymentMethods();
+    const pk = await getStripePublishableKey();
+    return {
+      connected: true,
+      mode: pk?.startsWith("pk_live") ? "live" : "test",
+      accountId: account.id,
+      country: account.country ?? void 0,
+      defaultCurrency: account.default_currency ?? void 0,
+      chargesEnabled: account.charges_enabled ?? void 0,
+      payoutsEnabled: account.payouts_enabled ?? void 0,
+      methods
+    };
+  } catch (e) {
+    return { connected: false, error: e?.message || String(e) };
+  }
+}
+async function createCheckoutSession(opts) {
+  const stripe = await requireStripeClient();
+  let amount = opts.amount ?? null;
+  let label = opts.description ?? "Kassenta";
+  if (opts.planId) {
+    const rows = await q2(`SELECT id, name, price FROM subscription_plans WHERE id = ? LIMIT 1`, [
+      opts.planId
+    ]);
+    if (!rows.length) throw badRequest(`Plan ${opts.planId} not found`, 404);
+    amount = Number(rows[0].price);
+    label = `Kassenta ${rows[0].name}`;
+  } else if (opts.orderId) {
+    const rows = await q2(
+      `SELECT order_number, total_amount, tenant_id FROM online_orders WHERE id = ? LIMIT 1`,
+      [opts.orderId]
+    );
+    if (!rows.length) throw badRequest(`Order ${opts.orderId} not found`, 404);
+    amount = Number(rows[0].total_amount);
+    label = `Order ${rows[0].order_number}`;
+  } else if (opts.saleId) {
+    const rows = await q2(
+      `SELECT s.receipt_number, s.total_amount, b.tenant_id
+         FROM sales s LEFT JOIN branches b ON b.id = s.branch_id
+        WHERE s.id = ? LIMIT 1`,
+      [opts.saleId]
+    );
+    if (!rows.length) throw badRequest(`Sale ${opts.saleId} not found`, 404);
+    amount = Number(rows[0].total_amount);
+    label = `Receipt ${rows[0].receipt_number}`;
+  }
+  if (amount === null) throw badRequest("Nothing to charge: pass planId, orderId, saleId or amount");
+  const currency = await currencyFor(opts.tenantId ?? null);
+  const amountMinor = toMinor(amount, label);
+  const metadata = { [MK.kind]: opts.kind };
+  if (opts.tenantId) metadata[MK.tenantId] = String(opts.tenantId);
+  if (opts.orderId) metadata[MK.orderId] = String(opts.orderId);
+  if (opts.saleId) metadata[MK.saleId] = String(opts.saleId);
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    // Omitting payment_method_types lets the Dashboard decide, which is how
+    // TWINT / Klarna / PayPal appear without a code change.
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency,
+          unit_amount: amountMinor,
+          product_data: { name: label }
+        }
+      }
+    ],
+    metadata,
+    // Mirrored onto the PaymentIntent so the webhook can settle either object.
+    payment_intent_data: { metadata },
+    customer_email: opts.email ?? void 0,
+    success_url: opts.successUrl,
+    cancel_url: opts.cancelUrl
+  });
+  return { id: session.id, url: session.url, amount: amountMinor, currency };
+}
+
+// server/superAdminRoutes.ts
+async function q3(text2, params = []) {
+  const [rows] = await pool.query(text2, params);
+  return Array.isArray(rows) ? rows : [];
+}
 var BACKUP_DIR = path3.resolve(process.cwd(), "backups");
 if (!fs4.existsSync(BACKUP_DIR)) fs4.mkdirSync(BACKUP_DIR, { recursive: true });
 async function createTenantBackup(tenantId) {
@@ -15433,7 +13864,30 @@ function registerSuperAdminRoutes(app2) {
       const subs = await storage.getTenantSubscriptions();
       const tenantList = await storage.getTenants();
       const tenantMap = Object.fromEntries(tenantList.map((t2) => [t2.id, t2]));
-      const enriched = subs.map((s) => ({ ...s, tenant: tenantMap[s.tenantId] || null }));
+      const billingMap = {};
+      try {
+        const rows = await q3(
+          `SELECT id, stripe_customer_id, stripe_subscription_id, stripe_price_id,
+                  last_invoice_id, last_payment_error
+             FROM tenant_subscriptions`
+        );
+        for (const r of rows) {
+          billingMap[Number(r.id)] = {
+            stripeCustomerId: r.stripe_customer_id || null,
+            stripeSubscriptionId: r.stripe_subscription_id || null,
+            stripePriceId: r.stripe_price_id || null,
+            lastInvoiceId: r.last_invoice_id || null,
+            lastPaymentError: r.last_payment_error || null
+          };
+        }
+      } catch (e) {
+        console.warn("[super-admin] subscription Stripe columns unavailable:", e?.message || e);
+      }
+      const enriched = subs.map((s) => ({
+        ...s,
+        tenant: tenantMap[s.tenantId] || null,
+        ...billingMap[s.id] || {}
+      }));
       res.json(enriched);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -15484,15 +13938,36 @@ function registerSuperAdminRoutes(app2) {
   app2.post("/api/super-admin/subscriptions/:id/extend", requireSuperAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { days, months } = req.body;
+      const months = Number(req.body?.months) || 0;
+      const days = Number(req.body?.days) || 0;
+      if (months <= 0 && days <= 0) {
+        return res.status(400).json({ error: "Provide a positive number of days or months" });
+      }
       const sub = await storage.getTenantSubscription(id);
       if (!sub) return res.status(404).json({ error: "Subscription not found" });
-      const currentEnd = sub.endDate ? new Date(sub.endDate) : /* @__PURE__ */ new Date();
-      let newEnd = currentEnd;
-      if (months) newEnd = (0, import_date_fns5.addMonths)(currentEnd, months);
-      else if (days) newEnd = (0, import_date_fns5.addDays)(currentEnd, days);
-      const updated = await storage.updateTenantSubscription(id, { endDate: newEnd, status: "active" });
-      res.json(updated);
+      const now = /* @__PURE__ */ new Date();
+      const currentEnd = sub.endDate ? new Date(sub.endDate) : now;
+      const base = currentEnd > now ? currentEnd : now;
+      const newEnd = months > 0 ? (0, import_date_fns5.addMonths)(base, months) : (0, import_date_fns5.addDays)(base, days);
+      const { tenantSubscriptions: tenantSubscriptions2, licenseKeys: licenseKeys2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const renewable = (0, import_drizzle_orm7.and)(
+        (0, import_drizzle_orm7.eq)(licenseKeys2.tenantId, sub.tenantId),
+        (0, import_drizzle_orm7.or)((0, import_drizzle_orm7.isNull)(licenseKeys2.status), (0, import_drizzle_orm7.ne)(licenseKeys2.status, "revoked"))
+      );
+      let licenseTotal = 0;
+      let licensesUpdated = 0;
+      await db.transaction(async (tx) => {
+        await tx.update(tenantSubscriptions2).set({ endDate: newEnd, status: "active", updatedAt: now }).where((0, import_drizzle_orm7.eq)(tenantSubscriptions2.id, id));
+        const keys = await tx.select({ id: licenseKeys2.id, expiresAt: licenseKeys2.expiresAt }).from(licenseKeys2).where(renewable);
+        licenseTotal = keys.length;
+        const behind = keys.filter((k) => !k.expiresAt || new Date(k.expiresAt) < newEnd).map((k) => k.id);
+        if (behind.length) {
+          await tx.update(licenseKeys2).set({ expiresAt: newEnd, status: "active", updatedAt: now }).where((0, import_drizzle_orm7.inArray)(licenseKeys2.id, behind));
+        }
+        licensesUpdated = behind.length;
+      });
+      const updated = await storage.getTenantSubscription(id);
+      res.json({ ...updated, licenseTotal, licensesUpdated, licenseExpiresAt: licensesUpdated ? newEnd : null });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -15553,6 +14028,216 @@ function registerSuperAdminRoutes(app2) {
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: e.message });
+    }
+  });
+  const REFUND_REASONS = ["duplicate", "fraudulent", "requested_by_customer"];
+  function paymentSources(opts) {
+    const parts = [];
+    const params = [];
+    if (opts.source === "all" || opts.source === "online_order") {
+      let where = "1 = 1";
+      if (opts.stripeOnly) where += " AND o.stripe_payment_intent_id IS NOT NULL";
+      if (opts.tenantId) {
+        where += " AND o.tenant_id = ?";
+        params.push(opts.tenantId);
+      }
+      if (opts.status) {
+        where += " AND o.payment_status = ?";
+        params.push(opts.status);
+      }
+      parts.push(
+        `SELECT 'online_order' AS source, o.id AS rowId, o.order_number AS reference,
+                o.tenant_id AS tenantId, o.total_amount AS amount,
+                COALESCE(o.amount_refunded, 0) AS refunded,
+                o.payment_method AS method, o.payment_status AS status,
+                o.stripe_payment_intent_id AS paymentIntentId,
+                o.stripe_charge_id AS chargeId, o.stripe_refund_id AS refundId,
+                o.payment_error AS paymentError, o.paid_at AS paidAt, o.created_at AS createdAt
+           FROM online_orders o
+          WHERE ${where}`
+      );
+    }
+    if (opts.source === "all" || opts.source === "pos_sale") {
+      let where = "1 = 1";
+      if (opts.stripeOnly) where += " AND s.stripe_payment_intent_id IS NOT NULL";
+      if (opts.tenantId) {
+        where += " AND b.tenant_id = ?";
+        params.push(opts.tenantId);
+      }
+      if (opts.status) {
+        where += " AND s.payment_status = ?";
+        params.push(opts.status);
+      }
+      parts.push(
+        `SELECT 'pos_sale' AS source, s.id AS rowId, s.receipt_number AS reference,
+                b.tenant_id AS tenantId, s.total_amount AS amount,
+                NULL AS refunded,
+                s.payment_method AS method, s.payment_status AS status,
+                s.stripe_payment_intent_id AS paymentIntentId,
+                s.stripe_charge_id AS chargeId, s.stripe_refund_id AS refundId,
+                NULL AS paymentError, s.paid_at AS paidAt, s.created_at AS createdAt
+           FROM sales s
+           LEFT JOIN branches b ON b.id = s.branch_id
+          WHERE ${where}`
+      );
+    }
+    return { sql: parts.join(" UNION ALL "), params };
+  }
+  app2.get("/api/super-admin/payments", requireSuperAdmin, async (req, res) => {
+    try {
+      const source = ["online_order", "pos_sale"].includes(String(req.query.source)) ? String(req.query.source) : "all";
+      const stripeOnly = String(req.query.includeOffline || "") !== "1";
+      const tenantId = req.query.tenantId ? Number(req.query.tenantId) || null : null;
+      const status2 = req.query.status ? String(req.query.status).slice(0, 40) : null;
+      const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+      const union = paymentSources({ source, stripeOnly, tenantId, status: status2 });
+      let rows = [];
+      let totals = {};
+      try {
+        rows = await q3(
+          `SELECT * FROM ( ${union.sql} ) p
+            ORDER BY COALESCE(p.paidAt, p.createdAt) DESC
+            LIMIT ?`,
+          [...union.params, limit]
+        );
+        const agg = await q3(
+          `SELECT COUNT(*) AS n,
+                  SUM(CASE WHEN p.status IN ('paid','completed') THEN p.amount ELSE 0 END) AS collected,
+                  SUM(COALESCE(p.refunded, 0)) AS refunded,
+                  SUM(CASE WHEN p.status = 'failed' THEN 1 ELSE 0 END) AS failed,
+                  SUM(CASE WHEN p.status = 'pending' THEN 1 ELSE 0 END) AS pending
+             FROM ( ${union.sql} ) p`,
+          union.params
+        );
+        totals = agg[0] || {};
+      } catch (e) {
+        return res.json({
+          payments: [],
+          stats: null,
+          error: `Payment columns unavailable: ${e?.message || e}`
+        });
+      }
+      const tenantList = await storage.getTenants();
+      const tenantMap = Object.fromEntries(tenantList.map((t2) => [t2.id, t2]));
+      const currencyCache = /* @__PURE__ */ new Map();
+      const currencyOf = async (tid) => {
+        const key = Number(tid) || 0;
+        if (!currencyCache.has(key)) currencyCache.set(key, await currencyFor(key || null));
+        return currencyCache.get(key);
+      };
+      const payments = [];
+      for (const r of rows) {
+        payments.push({
+          source: r.source,
+          id: Number(r.rowId),
+          reference: r.reference,
+          tenantId: r.tenantId != null ? Number(r.tenantId) : null,
+          tenantName: tenantMap[r.tenantId]?.businessName || null,
+          amount: r.amount != null ? Number(r.amount) : null,
+          refunded: r.refunded != null ? Number(r.refunded) : null,
+          currency: (await currencyOf(r.tenantId)).toUpperCase(),
+          method: r.method || null,
+          status: r.status || null,
+          paymentIntentId: r.paymentIntentId || null,
+          chargeId: r.chargeId || null,
+          refundId: r.refundId || null,
+          paymentError: r.paymentError || null,
+          paidAt: r.paidAt || null,
+          createdAt: r.createdAt || null
+        });
+      }
+      res.json({
+        payments,
+        stats: {
+          count: Number(totals.n || 0),
+          collected: Number(totals.collected || 0),
+          refunded: Number(totals.refunded || 0),
+          failed: Number(totals.failed || 0),
+          pending: Number(totals.pending || 0),
+          returned: payments.length
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app2.get("/api/super-admin/payments/stripe", requireSuperAdmin, async (_req, res) => {
+    try {
+      res.json(await stripeAccountStatus());
+    } catch (e) {
+      res.json({ connected: false, error: e?.message || String(e) });
+    }
+  });
+  app2.get("/api/super-admin/payments/events", requireSuperAdmin, async (req, res) => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 40, 1), 200);
+    try {
+      const rows = await q3(
+        `SELECT id, type, status, livemode, error, received_at, processed_at
+           FROM stripe_webhook_events
+          ORDER BY received_at DESC
+          LIMIT ?`,
+        [limit]
+      );
+      res.json({
+        events: rows.map((r) => ({
+          id: r.id,
+          type: r.type,
+          status: r.status,
+          livemode: !!r.livemode,
+          error: r.error || null,
+          receivedAt: r.received_at || null,
+          processedAt: r.processed_at || null
+        }))
+      });
+    } catch (e) {
+      res.json({ events: [], error: `Webhook event log unavailable: ${e?.message || e}` });
+    }
+  });
+  app2.post("/api/super-admin/payments/refund", requireSuperAdmin, async (req, res) => {
+    try {
+      const paymentIntentId = String(req.body?.paymentIntentId || "").trim();
+      if (!/^pi_[A-Za-z0-9_]+$/.test(paymentIntentId)) {
+        return res.status(400).json({ error: "A Stripe PaymentIntent id (pi_...) is required" });
+      }
+      const known = await q3(
+        `SELECT total_amount AS amount, COALESCE(amount_refunded, 0) AS refunded
+           FROM online_orders WHERE stripe_payment_intent_id = ?
+          UNION ALL
+         SELECT total_amount AS amount, 0 AS refunded
+           FROM sales WHERE stripe_payment_intent_id = ?`,
+        [paymentIntentId, paymentIntentId]
+      );
+      if (!known.length) {
+        return res.status(404).json({
+          error: "No order or sale on this platform was paid with that PaymentIntent"
+        });
+      }
+      let amount = null;
+      const raw = req.body?.amount;
+      if (raw != null && String(raw).trim() !== "") {
+        amount = Number(raw);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          return res.status(400).json({ error: "Refund amount must be a positive number" });
+        }
+        const refundable = Number(known[0].amount || 0) - Number(known[0].refunded || 0);
+        if (amount > refundable + 5e-3) {
+          return res.status(400).json({
+            error: `At most ${refundable.toFixed(2)} is still refundable on this payment`
+          });
+        }
+      }
+      const reason = REFUND_REASONS.includes(req.body?.reason) ? req.body.reason : void 0;
+      const result = await refundPayment({ paymentIntentId, amount, reason });
+      console.log(
+        `[super-admin] refund ${result.refundId} of ${result.amount} on ${paymentIntentId} by ${req.admin?.email}`
+      );
+      res.json({
+        ...result,
+        // The table still reads "paid" until the webhook lands. That is correct.
+        note: "Stripe accepted the refund. The order updates when the charge.refunded webhook arrives."
+      });
+    } catch (e) {
+      res.status(e?.statusCode || 500).json({ error: e?.message || String(e) });
     }
   });
   app2.get("/api/super-admin/all-stores", requireSuperAdmin, async (_req, res) => {
@@ -15953,8 +14638,8 @@ function registerSuperAdminRoutes(app2) {
         const branchIds = branchesList.map((b) => b.id);
         let total = 0;
         if (branchIds.length > 0) {
-          const { inArray: inArray2 } = await import("drizzle-orm");
-          const rows = await db.select().from(expenses2).where(inArray2(expenses2.branchId, branchIds));
+          const { inArray: inArray3 } = await import("drizzle-orm");
+          const rows = await db.select().from(expenses2).where(inArray3(expenses2.branchId, branchIds));
           total = rows.reduce((acc, e) => acc + parseFloat(e.amount || "0"), 0);
         }
         result.push({ tenantId: t2.id, businessName: t2.businessName, totalExpenses: total });
@@ -16291,7 +14976,7 @@ function registerBroadcastRoutes(app2) {
       }).from(categories).where((0, import_drizzle_orm8.inArray)(categories.tenantId, tenantIds));
       const catMap = new Map(cats.map((c) => [`${c.tenantId}:${c.id}`, c.name]));
       const tMap = new Map(activeTenants.map((t2) => [t2.id, t2]));
-      const parseJson = (v) => {
+      const parseJson2 = (v) => {
         if (Array.isArray(v) || v && typeof v === "object") return v;
         if (typeof v === "string" && v.trim()) {
           try {
@@ -16317,8 +15002,8 @@ function registerBroadcastRoutes(app2) {
           price: Number(p.price),
           imageUrl: p.imageUrl,
           category: catMap.get(`${p.tenantId}:${p.categoryId}`) || "Other",
-          modifiers: parseJson(p.modifiers),
-          variants: parseJson(p.variants),
+          modifiers: parseJson2(p.modifiers),
+          variants: parseJson2(p.variants),
           isAddon: !!p.isAddon
         };
       };
@@ -16922,6 +15607,10 @@ var PUBLIC_ROUTES = [
   "/api/license/validate",
   "/api/auth/google",
   "/api/landing/subscribe",
+  "/api/landing/plans",
+  // Public plan catalogue for the pricing page
+  "/api/landing/checkout-session",
+  // Read-only Checkout status for /pay/success
   "/api/landing-page-config",
   "/api/store/",
   "/api/store-public/",
@@ -16929,6 +15618,20 @@ var PUBLIC_ROUTES = [
   "/api/stripe/webhook",
   "/api/stripe/publishable-key",
   "/api/payment-gateway/config",
+  // ── Payments ──
+  // Only the routes a guest checkout genuinely needs. Everything else under
+  // /api/payments/ (sale intents, refunds, health) deliberately stays behind
+  // the licence/employee check, so this must NOT become a bare "/api/payments/".
+  "/api/payments/webhook",
+  // signature-verified, see stripeWebhook.ts
+  "/api/payments/config",
+  // publishable key + offered methods
+  "/api/payments/order/",
+  // guarded by the order's tracking token
+  "/api/payments/status/",
+  // PaymentIntent id is already a bearer secret
+  "/api/payments/checkout-session",
+  // plan price comes from the DB, never the caller
   "/api/products/template",
   "/api/dashboard/subscriptions",
   "/api/caller-id/incoming",
@@ -17110,18 +15813,428 @@ function tenantAuthMiddleware() {
 // server/index.ts
 init_callerIdService();
 
-// server/webhookHandlers.ts
-var WebhookHandlers = class {
-  static async processWebhook(payload, signature) {
-    if (!Buffer.isBuffer(payload)) {
-      throw new Error(
-        "STRIPE WEBHOOK ERROR: Payload must be a Buffer. Received type: " + typeof payload + ". This usually means express.json() parsed the body before reaching this handler. FIX: Ensure webhook route is registered BEFORE app.use(express.json())."
-      );
-    }
-    const sync = await getStripeSync();
-    await sync.processWebhook(payload, signature);
-  }
+// server/paymentRoutes.ts
+var import_express = __toESM(require("express"));
+init_db();
+async function q4(sqlText, params = []) {
+  const [rows] = await pool.query(sqlText, params);
+  return Array.isArray(rows) ? rows : [];
+}
+function fail(res, e, fallback = 500) {
+  const status2 = e?.statusCode ?? (e?.code === "STRIPE_NOT_CONFIGURED" ? 503 : fallback);
+  const message = e?.message || "Payment error";
+  if (status2 >= 500) console.error("[payments]", message);
+  res.status(status2).json({ error: message, code: e?.code });
+}
+var DEFAULT_GATEWAY = {
+  enabledMethods: ["cash", "card", "mobile", "nfc"],
+  stripe: { enabled: true, mode: "test", currency: "CHF", autoCapture: true },
+  nfc: { enabled: true, provider: "stripe_tap" },
+  cash: { enabled: true, requireExactAmount: false },
+  mobile: { enabled: true, providers: ["apple_pay", "google_pay"] }
 };
+async function loadGatewaySettings(tenantId) {
+  try {
+    const rows = await q4(
+      `SELECT config_json FROM payment_gateway_settings
+        WHERE tenant_id IN (?, 0) ORDER BY tenant_id DESC LIMIT 1`,
+      [tenantId || 0]
+    );
+    if (rows[0]?.config_json) {
+      const parsed = typeof rows[0].config_json === "string" ? JSON.parse(rows[0].config_json) : rows[0].config_json;
+      return { ...DEFAULT_GATEWAY, ...parsed };
+    }
+  } catch (e) {
+    console.warn("[payments] gateway settings read failed:", e?.message || e);
+  }
+  return { ...DEFAULT_GATEWAY };
+}
+async function saveGatewaySettings(tenantId, config) {
+  const currency = config?.stripe?.currency || "CHF";
+  await q4(
+    `INSERT INTO payment_gateway_settings (tenant_id, config_json, currency, enabled_methods)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE config_json = VALUES(config_json),
+                             currency = VALUES(currency),
+                             enabled_methods = VALUES(enabled_methods)`,
+    [
+      tenantId || 0,
+      JSON.stringify(config),
+      currency,
+      JSON.stringify(config?.enabledMethods ?? DEFAULT_GATEWAY.enabledMethods)
+    ]
+  );
+}
+function registerStripeWebhook(app2) {
+  const webhook = async (req, res) => {
+    const signature = req.headers["stripe-signature"];
+    if (!signature) return res.status(400).json({ error: "Missing stripe-signature header" });
+    try {
+      const sig = Array.isArray(signature) ? signature[0] : signature;
+      const result = await processStripeWebhook(req.body, sig);
+      res.status(200).json(result);
+    } catch (e) {
+      console.error("[payments] webhook rejected:", e?.message || e);
+      res.status(e?.statusCode === 503 ? 503 : 400).json({ error: e?.message || "Webhook error" });
+    }
+  };
+  const rawJson = import_express.default.raw({ type: "application/json" });
+  app2.post("/api/stripe/webhook", rawJson, webhook);
+  app2.post("/api/payments/webhook", rawJson, webhook);
+}
+function registerPaymentRoutes(app2) {
+  const config = async (req, res) => {
+    try {
+      const tenantId = Number(req.query.tenantId ?? req.tenantId ?? 0) || 0;
+      const settings = await loadGatewaySettings(tenantId);
+      const configured = await isStripeConfigured();
+      const mode = await getStripeMode();
+      const publishableKey = await getStripePublishableKey();
+      const methods = configured ? (await listAvailablePaymentMethods()).methods : [];
+      res.json({
+        ...settings,
+        currency: (await currencyFor(tenantId)).toUpperCase(),
+        stripe: {
+          ...settings.stripe,
+          status: configured && publishableKey ? "connected" : "disconnected",
+          mode: mode ?? settings.stripe?.mode ?? "test",
+          // Safe to publish; this is the whole point of a publishable key.
+          publishableKey: publishableKey ?? null,
+          availableMethods: methods
+        }
+      });
+    } catch (e) {
+      fail(res, e);
+    }
+  };
+  app2.get("/api/payments/config", config);
+  app2.get("/api/payment-gateway/config", config);
+  app2.put("/api/payment-gateway/config", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = Number(req.tenantId ?? 0) || 0;
+      const current = await loadGatewaySettings(tenantId);
+      const merged = { ...current, ...req.body };
+      delete merged.secretKey;
+      delete merged.publishableKey;
+      if (merged.stripe) {
+        delete merged.stripe.secretKey;
+        delete merged.stripe.publishableKey;
+      }
+      await saveGatewaySettings(tenantId, merged);
+      res.json(merged);
+    } catch (e) {
+      fail(res, e);
+    }
+  });
+  app2.post("/api/payments/order/:orderId/intent", async (req, res) => {
+    try {
+      const orderId = Number.parseInt(String(req.params.orderId), 10);
+      if (!Number.isFinite(orderId)) return res.status(400).json({ error: "Invalid order id" });
+      const token = String(req.body?.trackingToken ?? req.query.trackingToken ?? "");
+      const rows = await q4(
+        `SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`,
+        [orderId]
+      );
+      if (!rows.length) return res.status(404).json({ error: "Order not found" });
+      const expected = rows[0].tracking_token;
+      if (expected && token !== expected) {
+        return res.status(403).json({ error: "Invalid tracking token for this order" });
+      }
+      res.json(await createOrderPaymentIntent(orderId));
+    } catch (e) {
+      fail(res, e);
+    }
+  });
+  app2.get("/api/payments/status/:paymentIntentId", async (req, res) => {
+    try {
+      const stripe = await requireStripeClient();
+      const pi = await stripe.paymentIntents.retrieve(String(req.params.paymentIntentId));
+      const orderRows = await q4(
+        `SELECT id, order_number, payment_status, tracking_token
+           FROM online_orders WHERE stripe_payment_intent_id = ? LIMIT 1`,
+        [pi.id]
+      );
+      res.json({
+        status: pi.status,
+        amount: pi.amount,
+        currency: pi.currency,
+        // Our own record is the authority on whether the order is settled.
+        order: orderRows[0] ? {
+          id: orderRows[0].id,
+          orderNumber: orderRows[0].order_number,
+          paymentStatus: orderRows[0].payment_status,
+          trackingToken: orderRows[0].tracking_token
+        } : null
+      });
+    } catch (e) {
+      fail(res, e);
+    }
+  });
+  app2.post("/api/payments/sale/:saleId/intent", async (req, res) => {
+    try {
+      const saleId = Number.parseInt(String(req.params.saleId), 10);
+      if (!Number.isFinite(saleId)) return res.status(400).json({ error: "Invalid sale id" });
+      res.json(await createSalePaymentIntent(saleId));
+    } catch (e) {
+      fail(res, e);
+    }
+  });
+  app2.post("/api/payments/wallet/topup", async (req, res) => {
+    try {
+      const { customerId, amount } = req.body ?? {};
+      const tenantId = Number(req.body?.tenantId ?? req.tenantId ?? 0);
+      if (!tenantId || !customerId) {
+        return res.status(400).json({ error: "tenantId and customerId are required" });
+      }
+      res.json(
+        await createWalletTopupIntent({
+          tenantId,
+          customerId: Number(customerId),
+          amount: Number(amount)
+        })
+      );
+    } catch (e) {
+      fail(res, e);
+    }
+  });
+  app2.post("/api/payments/subscription/intent", async (req, res) => {
+    try {
+      const { tenantId, planId, amount, email } = req.body ?? {};
+      const tid = Number(tenantId ?? req.tenantId ?? 0);
+      if (!tid) return res.status(400).json({ error: "tenantId is required" });
+      res.json(
+        await createSubscriptionIntent({
+          tenantId: tid,
+          planId: planId ? Number(planId) : null,
+          amount: amount != null ? Number(amount) : null,
+          email: email ?? null
+        })
+      );
+    } catch (e) {
+      fail(res, e);
+    }
+  });
+  app2.post("/api/payments/checkout-session", async (req, res) => {
+    try {
+      const { planId, orderId, saleId, email, successUrl, cancelUrl } = req.body ?? {};
+      if (!planId && !orderId && !saleId) {
+        return res.status(400).json({ error: "planId, orderId or saleId is required" });
+      }
+      const base = process.env.PUBLIC_BASE_URL || `https://${req.get("host")}`;
+      const kind = planId ? "tenant_subscription" : orderId ? "online_order" : "pos_sale";
+      res.json(
+        await createCheckoutSession({
+          kind,
+          planId: planId ? Number(planId) : null,
+          orderId: orderId ? Number(orderId) : null,
+          saleId: saleId ? Number(saleId) : null,
+          tenantId: Number(req.tenantId ?? 0) || null,
+          email: email ?? null,
+          successUrl: String(successUrl || `${base}/pay/success`),
+          cancelUrl: String(cancelUrl || `${base}/pay/cancelled`)
+        })
+      );
+    } catch (e) {
+      fail(res, e);
+    }
+  });
+  app2.post("/api/payments/refund", requireAdmin, async (req, res) => {
+    try {
+      const { paymentIntentId, amount, reason } = req.body ?? {};
+      if (!paymentIntentId) {
+        return res.status(400).json({ error: "paymentIntentId is required" });
+      }
+      res.json(
+        await refundPayment({
+          paymentIntentId: String(paymentIntentId),
+          amount: amount != null ? Number(amount) : null,
+          reason
+        })
+      );
+    } catch (e) {
+      fail(res, e);
+    }
+  });
+  const health = async (_req, res) => {
+    res.json(await stripeAccountStatus());
+  };
+  app2.get("/api/payments/health", health);
+  app2.post("/api/payment-gateway/test-stripe", async (_req, res) => {
+    const status2 = await stripeAccountStatus();
+    res.json({ success: status2.connected, ...status2 });
+  });
+  app2.get("/api/stripe/publishable-key", async (_req, res) => {
+    const key = await getStripePublishableKey();
+    if (!key) {
+      return res.status(503).json({ error: "Stripe is not configured", publishableKey: null });
+    }
+    res.json({ publishableKey: key });
+  });
+  app2.get("/api/stripe/payment-methods", async (_req, res) => {
+    try {
+      res.json(await listAvailablePaymentMethods());
+    } catch (e) {
+      fail(res, e);
+    }
+  });
+  app2.post("/api/stripe/create-payment-intent", async (req, res) => {
+    const orderId = req.body?.orderId ?? req.body?.metadata?.orderId;
+    if (orderId) {
+      try {
+        return res.json(await createOrderPaymentIntent(Number(orderId)));
+      } catch (e) {
+        return fail(res, e);
+      }
+    }
+    res.status(410).json({
+      error: "This endpoint no longer accepts a client-supplied amount. Create the order first, then call POST /api/payments/order/:orderId/intent.",
+      code: "USE_ORDER_INTENT"
+    });
+  });
+  app2.post("/api/stripe/confirm-payment", async (req, res) => {
+    try {
+      const { paymentIntentId } = req.body ?? {};
+      if (!paymentIntentId) {
+        return res.status(400).json({ error: "paymentIntentId is required" });
+      }
+      const stripe = await requireStripeClient();
+      const pi = await stripe.paymentIntents.retrieve(String(paymentIntentId));
+      res.json({ status: pi.status, amount: pi.amount, currency: pi.currency });
+    } catch (e) {
+      fail(res, e);
+    }
+  });
+}
+
+// server/stripeMigrations.ts
+var import_drizzle_orm10 = require("drizzle-orm");
+init_db();
+var COLUMNS = {
+  // Which Stripe objects paid for an online order, and when.
+  online_orders: [
+    "stripe_charge_id varchar(255)",
+    "stripe_refund_id varchar(255)",
+    "paid_at timestamp NULL DEFAULT NULL",
+    "refunded_at timestamp NULL DEFAULT NULL",
+    "amount_refunded decimal(10,2) DEFAULT 0",
+    "payment_error text"
+  ],
+  // Till sales taken by card/TWINT rather than cash.
+  sales: [
+    "stripe_payment_intent_id varchar(255)",
+    "stripe_charge_id varchar(255)",
+    "stripe_refund_id varchar(255)",
+    "paid_at timestamp NULL DEFAULT NULL"
+  ],
+  // A refund issued from the POS needs to point back at the Stripe refund.
+  //
+  // online_order_id closes a real gap: returns.original_sale_id points at
+  // `sales` only, so the online orders that are the ones actually paid by card
+  // or TWINT could not be refunded through the schema at all.
+  returns: [
+    "stripe_refund_id varchar(255)",
+    "refund_status varchar(40)",
+    "online_order_id int NULL DEFAULT NULL"
+  ],
+  // Billing identity for the shop owner, used for subscriptions and receipts.
+  //
+  // stripe_account_id is for Stripe Connect: if each restaurant's takings should
+  // land in ITS own Stripe account rather than the platform's, that id goes here
+  // and paymentService.buildIntent() gains on_behalf_of / transfer_data /
+  // application_fee_amount. The column exists now so enabling Connect later is a
+  // switch rather than a migration. Today the platform collects everything.
+  tenants: [
+    "stripe_customer_id varchar(255)",
+    "stripe_account_id varchar(255)"
+  ],
+  tenant_subscriptions: [
+    "stripe_customer_id varchar(255)",
+    "stripe_subscription_id varchar(255)",
+    "stripe_price_id varchar(255)",
+    "last_invoice_id varchar(255)",
+    "last_payment_error text"
+  ],
+  subscription_plans: [
+    "stripe_price_id varchar(255)",
+    "stripe_product_id varchar(255)"
+  ]
+};
+var INDEXES = [
+  { table: "online_orders", name: "idx_online_orders_pi", cols: "stripe_payment_intent_id(64)" },
+  { table: "sales", name: "idx_sales_pi", cols: "stripe_payment_intent_id(64)" },
+  { table: "wallet_transactions", name: "idx_wallet_tx_pi", cols: "stripe_payment_intent_id(64)" }
+];
+var EVENTS_TABLE = `
+  CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+    id            varchar(255) NOT NULL PRIMARY KEY,
+    type          varchar(120) NOT NULL,
+    api_version   varchar(40),
+    livemode      tinyint(1) NOT NULL DEFAULT 0,
+    status        varchar(20) NOT NULL DEFAULT 'received',
+    error         text,
+    payload       longtext,
+    received_at   timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    processed_at  timestamp NULL DEFAULT NULL,
+    KEY idx_stripe_events_type (type),
+    KEY idx_stripe_events_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+`;
+var GATEWAY_TABLE = `
+  CREATE TABLE IF NOT EXISTS payment_gateway_settings (
+    id               int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    tenant_id        int NOT NULL DEFAULT 0,
+    enabled_methods  text,
+    stripe_enabled   tinyint(1) NOT NULL DEFAULT 1,
+    currency         varchar(10) NOT NULL DEFAULT 'CHF',
+    auto_capture     tinyint(1) NOT NULL DEFAULT 1,
+    cash_enabled     tinyint(1) NOT NULL DEFAULT 1,
+    twint_enabled    tinyint(1) NOT NULL DEFAULT 1,
+    apple_pay_enabled tinyint(1) NOT NULL DEFAULT 1,
+    google_pay_enabled tinyint(1) NOT NULL DEFAULT 1,
+    card_enabled     tinyint(1) NOT NULL DEFAULT 1,
+    statement_descriptor varchar(40),
+    config_json      longtext,
+    created_at       timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_gateway_tenant (tenant_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+`;
+async function run(label, statement) {
+  try {
+    await db.execute(import_drizzle_orm10.sql.raw(statement));
+    return true;
+  } catch (e) {
+    const msg = String(e?.message || e);
+    if (/duplicate|already exists|exists/i.test(msg)) return false;
+    console.log(`[stripe-migration] ${label}: ${msg}`);
+    return false;
+  }
+}
+async function runStripeMigrations() {
+  let added = 0;
+  for (const [table, cols] of Object.entries(COLUMNS)) {
+    for (const col of cols) {
+      const name = col.split(/\s+/)[0];
+      const ok = await run(
+        `${table}.${name}`,
+        `ALTER TABLE \`${table}\` ADD COLUMN IF NOT EXISTS ${col}`
+      );
+      if (ok) added++;
+    }
+  }
+  for (const stmt of [EVENTS_TABLE, GATEWAY_TABLE]) {
+    await run("create table", stmt);
+  }
+  for (const ix of INDEXES) {
+    await run(
+      `${ix.table}.${ix.name}`,
+      `ALTER TABLE \`${ix.table}\` ADD INDEX ${ix.name} (${ix.cols})`
+    );
+  }
+  console.log(
+    added > 0 ? `[stripe-migration] added ${added} column(s); tables and indexes ensured` : "[stripe-migration] schema already up to date"
+  );
+}
 
 // server/legal-pages.ts
 var DELETE_ACCOUNT_HTML = String.raw`<!DOCTYPE html>
@@ -17674,8 +16787,1023 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 </body>
 </html>`;
 
+// server/site/shell.ts
+var import_crypto6 = require("crypto");
+
+// server/site/design.ts
+var SITE_CSS = String.raw`
+:root {
+  color-scheme: light;
+
+  --navy: #040E32;
+  --teal: #00C1B0;
+  --teal-deep: #0C8F85;
+
+  --bg: #FFFFFF;
+  --bg-alt: #F5F8FC;
+  --bg-inset: #EEF3F9;
+  --surface: #FFFFFF;
+  --surface-2: #F8FAFD;
+  --border: #E1E8F0;
+  --border-strong: #CBD6E3;
+
+  --text: #0B1220;
+  --text-2: #46566C;
+  --text-3: #6B7B90;
+
+  --accent: #0C8F85;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #E6F6F4;
+  --accent-line: #B7E3DE;
+
+  --gold: #B7791F;
+  --danger: #C2321F;
+  --ok: #047857;
+
+  --shadow-sm: 0 1px 2px rgba(11, 18, 32, .06), 0 1px 3px rgba(11, 18, 32, .04);
+  --shadow-md: 0 4px 12px rgba(11, 18, 32, .07), 0 2px 4px rgba(11, 18, 32, .04);
+  --shadow-lg: 0 18px 48px rgba(11, 18, 32, .10), 0 4px 12px rgba(11, 18, 32, .05);
+
+  --radius: 14px;
+  --radius-sm: 9px;
+  --radius-lg: 22px;
+  --maxw: 1180px;
+  --nav-h: 68px;
+
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-ar: 'Noto Kufi Arabic', 'Inter', sans-serif;
+  --ease: cubic-bezier(.4, 0, .2, 1);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #040E32;
+  --bg-alt: #071444;
+  --bg-inset: #0A1A4D;
+  --surface: #0D1A44;
+  --surface-2: #12224F;
+  --border: #22305C;
+  --border-strong: #2E3E6E;
+
+  --text: #FFFFFF;
+  --text-2: #B9C3D8;
+  --text-3: #8A94AD;
+
+  --accent: #00C1B0;
+  --accent-ink: #04121F;
+  --accent-soft: rgba(0, 193, 176, .10);
+  --accent-line: rgba(0, 193, 176, .28);
+
+  --gold: #F0B429;
+  --danger: #F87171;
+  --ok: #34D399;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .40);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, .45);
+  --shadow-lg: 0 22px 60px rgba(0, 0, 0, .55);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--nav-h) + 16px); }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  transition: background-color .25s var(--ease), color .25s var(--ease);
+}
+html[dir="rtl"] body { font-family: var(--font-ar); }
+
+img, svg, video { max-width: 100%; height: auto; display: block; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.wrap { width: 100%; max-width: var(--maxw); margin-inline: auto; padding-inline: 24px; }
+.section { padding: 88px 0; }
+.section--tight { padding: 60px 0; }
+.section--alt { background: var(--bg-alt); }
+.section--inset { background: var(--bg-inset); }
+@media (max-width: 720px) {
+  .section { padding: 56px 0; }
+  .wrap { padding-inline: 18px; }
+}
+
+.grid { display: grid; gap: 24px; }
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 980px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); } }
+
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: center; }
+.split--wide-left { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); }
+@media (max-width: 900px) { .split, .split--wide-left { grid-template-columns: minmax(0, 1fr); gap: 32px; } }
+
+/* ── Type ───────────────────────────────────────────────────────────────── */
+h1, h2, h3, h4 { line-height: 1.18; letter-spacing: -.02em; font-weight: 800; }
+h1 { font-size: clamp(2.1rem, 1.3rem + 3.2vw, 3.8rem); letter-spacing: -.03em; }
+h2 { font-size: clamp(1.6rem, 1.1rem + 2vw, 2.6rem); }
+h3 { font-size: clamp(1.12rem, 1rem + .5vw, 1.35rem); }
+h4 { font-size: 1rem; }
+p { color: var(--text-2); }
+.lead { font-size: clamp(1.02rem, .96rem + .35vw, 1.2rem); color: var(--text-2); max-width: 62ch; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: .74rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 14px;
+}
+.eyebrow::before { content: ""; width: 22px; height: 2px; background: var(--accent); border-radius: 2px; }
+.section-head { max-width: 720px; margin-bottom: 44px; }
+.section-head--center { margin-inline: auto; text-align: center; }
+.section-head--center .eyebrow { justify-content: center; }
+.section-head p { margin-top: 14px; }
+.muted { color: var(--text-3); }
+.nowrap { white-space: nowrap; }
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  padding: 13px 24px; border-radius: 11px; font-weight: 700; font-size: .94rem;
+  border: 1px solid transparent; transition: transform .18s var(--ease), box-shadow .18s var(--ease), background-color .18s var(--ease), border-color .18s var(--ease);
+  white-space: nowrap;
+}
+.btn svg { width: 17px; height: 17px; flex: none; }
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow-md); }
+.btn-primary:hover { box-shadow: var(--shadow-lg); }
+.btn-ghost { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-quiet { padding-inline: 4px; color: var(--accent); }
+.btn-quiet:hover { text-decoration: underline; text-underline-offset: 4px; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+@media (max-width: 480px) { .btn { width: 100%; } .btn-row { flex-direction: column; } }
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 26px; box-shadow: var(--shadow-sm);
+  transition: transform .22s var(--ease), box-shadow .22s var(--ease), border-color .22s var(--ease);
+}
+.card--hover:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--accent-line); }
+.card h3 { margin-bottom: 8px; }
+.card p { font-size: .93rem; }
+.card-icon {
+  width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); margin-bottom: 16px; border: 1px solid var(--accent-line);
+}
+.card-icon svg { width: 21px; height: 21px; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 100px;
+  font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line);
+}
+.badge--neutral { background: var(--bg-inset); color: var(--text-2); border-color: var(--border); }
+
+.tick-list { list-style: none; display: grid; gap: 11px; }
+.tick-list li { display: flex; gap: 11px; align-items: flex-start; font-size: .94rem; color: var(--text-2); }
+.tick-list svg { width: 19px; height: 19px; flex: none; color: var(--accent); margin-top: 2px; }
+
+/* ── Image slots ────────────────────────────────────────────────────────── */
+.shot {
+  position: relative; border-radius: var(--radius-lg); overflow: hidden;
+  border: 1px solid var(--border); background: var(--surface-2); box-shadow: var(--shadow-lg);
+  aspect-ratio: var(--ar, 16 / 10);
+}
+.shot img { width: 100%; height: 100%; object-fit: cover; }
+.shot--contain img { object-fit: contain; padding: 6%; }
+/* Cut-out artwork: no frame, so the transparent background picks up the section. */
+.shot--bare { border: 0; background: transparent; box-shadow: none; border-radius: 0; }
+.shot--bare img { object-fit: contain; }
+.shot-ph {
+  display: none; position: absolute; inset: 0; flex-direction: column; gap: 6px;
+  align-items: center; justify-content: center; text-align: center; padding: 20px;
+  background:
+    repeating-linear-gradient(45deg, transparent, transparent 12px, var(--bg-inset) 12px, var(--bg-inset) 24px),
+    var(--surface-2);
+  color: var(--text-3);
+}
+.shot.is-empty img { visibility: hidden; }
+.shot.is-empty .shot-ph { display: flex; }
+.shot-ph b { font-size: .84rem; font-weight: 800; color: var(--text-2); letter-spacing: .02em; }
+.shot-ph small { font-size: .72rem; font-variant-numeric: tabular-nums; }
+.shot-caption { margin-top: 10px; font-size: .78rem; color: var(--text-3); text-align: center; }
+
+/* ── Navigation ─────────────────────────────────────────────────────────── */
+.nav {
+  position: sticky; top: 0; z-index: 900; height: var(--nav-h);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid transparent; transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.nav.scrolled { border-bottom-color: var(--border); box-shadow: var(--shadow-sm); }
+.nav-inner { height: 100%; display: flex; align-items: center; gap: 18px; }
+.brand { display: flex; align-items: center; gap: 10px; flex: none; }
+.brand img { height: 30px; width: auto; }
+.brand-name { font-weight: 800; font-size: 1.06rem; letter-spacing: -.02em; }
+.nav-links { display: flex; align-items: center; gap: 4px; margin-inline-start: 14px; flex: 1 1 auto; }
+.nav-links a {
+  padding: 8px 13px; border-radius: 9px; font-size: .91rem; font-weight: 600; color: var(--text-2);
+  transition: background-color .16s var(--ease), color .16s var(--ease);
+}
+.nav-links a:hover { background: var(--bg-inset); color: var(--text); }
+.nav-links a[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
+.nav-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+
+.icon-btn {
+  width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+  transition: border-color .16s var(--ease), color .16s var(--ease), background-color .16s var(--ease);
+}
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+.icon-btn svg { width: 18px; height: 18px; }
+.theme-btn .i-moon { display: none; }
+[data-theme="dark"] .theme-btn .i-sun { display: none; }
+[data-theme="dark"] .theme-btn .i-moon { display: block; }
+
+.lang { position: relative; }
+.lang-btn { display: flex; align-items: center; gap: 7px; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); font-size: .84rem; font-weight: 700; color: var(--text-2); }
+.lang-btn:hover { border-color: var(--accent); color: var(--accent); }
+.lang-menu {
+  position: absolute; inset-inline-end: 0; top: calc(100% + 8px); min-width: 156px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg);
+  opacity: 0; visibility: hidden; transform: translateY(-6px); transition: all .18s var(--ease); z-index: 950;
+}
+.lang.open .lang-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+.lang-menu button { display: flex; width: 100%; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 8px; font-size: .88rem; font-weight: 600; color: var(--text-2); text-align: start; }
+.lang-menu button:hover { background: var(--bg-inset); color: var(--text); }
+.lang-menu button.active { color: var(--accent); background: var(--accent-soft); }
+.lang-menu .flag { width: 20px; height: 14px; border-radius: 2px; flex: none; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+
+.nav-toggle { display: none; }
+.cta-mobile { display: none; }
+@media (max-width: 1040px) {
+  .nav-toggle { display: grid; }
+  .nav-links {
+    position: fixed; inset: var(--nav-h) 0 auto 0; flex-direction: column; align-items: stretch; gap: 2px;
+    background: var(--bg); border-bottom: 1px solid var(--border); padding: 14px 18px 20px;
+    box-shadow: var(--shadow-lg); display: none; margin: 0; max-height: calc(100dvh - var(--nav-h)); overflow-y: auto;
+  }
+  .nav-links.open { display: flex; }
+  .nav-links a { padding: 12px 14px; font-size: .98rem; }
+  .nav .cta-desktop { display: none; }
+  .nav-links .cta-mobile { display: inline-flex; }
+}
+
+/* ── Hero ───────────────────────────────────────────────────────────────── */
+.hero { position: relative; padding: 84px 0 72px; overflow: hidden; }
+.hero::before {
+  content: ""; position: absolute; inset: -40% -20% auto -20%; height: 620px; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse 46% 44% at 26% 42%, color-mix(in srgb, var(--accent) 16%, transparent) 0%, transparent 66%),
+    radial-gradient(ellipse 40% 40% at 78% 30%, color-mix(in srgb, var(--navy) 10%, transparent) 0%, transparent 62%);
+}
+[data-theme="dark"] .hero::before { background: radial-gradient(ellipse 46% 44% at 26% 42%, rgba(0,193,176,.14) 0%, transparent 66%), radial-gradient(ellipse 40% 40% at 78% 30%, rgba(99,102,241,.12) 0%, transparent 62%); }
+.hero .wrap { position: relative; z-index: 1; }
+.hero h1 { margin-bottom: 20px; }
+.hero .lead { margin-bottom: 4px; }
+.hero-meta { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--border); }
+.hero-meta div { min-width: 92px; }
+.hero-meta b { display: block; font-size: 1.5rem; font-weight: 800; letter-spacing: -.02em; }
+.hero-meta span { font-size: .78rem; color: var(--text-3); }
+
+/* ── Page header (inner pages) ──────────────────────────────────────────── */
+.page-head { padding: 62px 0 44px; border-bottom: 1px solid var(--border); background: var(--bg-alt); }
+.page-head h1 { font-size: clamp(1.9rem, 1.3rem + 2.4vw, 3rem); margin-bottom: 14px; }
+.crumbs { display: flex; gap: 8px; align-items: center; font-size: .8rem; color: var(--text-3); margin-bottom: 16px; }
+.crumbs a:hover { color: var(--accent); }
+
+/* ── Stats / logos ──────────────────────────────────────────────────────── */
+.stat-strip { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.stat-strip div { background: var(--surface); padding: 24px 20px; text-align: center; }
+.stat-strip b { display: block; font-size: 1.85rem; font-weight: 800; letter-spacing: -.03em; color: var(--text); }
+.stat-strip span { font-size: .8rem; color: var(--text-3); }
+@media (max-width: 700px) { .stat-strip { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+/* ── Pricing ────────────────────────────────────────────────────────────── */
+.price-card { display: flex; flex-direction: column; position: relative; }
+.price-card.featured { border-color: var(--accent); box-shadow: var(--shadow-lg); }
+.price-card .price { font-size: 2.5rem; font-weight: 800; letter-spacing: -.03em; margin: 12px 0 2px; }
+.price-card .price small { font-size: .88rem; font-weight: 600; color: var(--text-3); letter-spacing: 0; }
+.price-card .tick-list { margin: 20px 0 26px; }
+.price-card .btn { margin-top: auto; width: 100%; }
+.price-tag { position: absolute; inset-inline-end: 18px; top: -11px; }
+.billing-toggle { display: inline-flex; padding: 4px; gap: 4px; border: 1px solid var(--border); background: var(--surface); border-radius: 100px; margin: 0 auto 36px; }
+.billing-toggle button { padding: 8px 20px; border-radius: 100px; font-size: .86rem; font-weight: 700; color: var(--text-3); }
+.billing-toggle button.active { background: var(--accent); color: var(--accent-ink); }
+
+/* ── FAQ ────────────────────────────────────────────────────────────────── */
+.faq { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.faq details { border-bottom: 1px solid var(--border); }
+.faq details:last-child { border-bottom: 0; }
+.faq summary { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 19px 22px; font-weight: 700; font-size: .97rem; cursor: pointer; list-style: none; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: ""; width: 10px; height: 10px; flex: none; border-right: 2px solid var(--text-3); border-bottom: 2px solid var(--text-3); transform: rotate(45deg) translateY(-3px); transition: transform .2s var(--ease); }
+.faq details[open] summary::after { transform: rotate(225deg) translateY(-3px); }
+.faq details[open] summary { color: var(--accent); }
+.faq .answer { padding: 0 22px 20px; font-size: .93rem; color: var(--text-2); }
+
+/* ── Steps / timeline ───────────────────────────────────────────────────── */
+.steps { counter-reset: step; display: grid; gap: 18px; }
+.step { display: grid; grid-template-columns: 44px minmax(0,1fr); gap: 18px; align-items: start; }
+.step::before {
+  counter-increment: step; content: counter(step, decimal-leading-zero);
+  width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--accent-soft); border: 1px solid var(--accent-line); color: var(--accent);
+  font-weight: 800; font-size: .86rem; font-variant-numeric: tabular-nums;
+}
+.step h3 { margin-bottom: 5px; }
+.step p { font-size: .93rem; }
+
+/* ── Compliance table ───────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; min-width: 620px; font-size: .9rem; }
+th, td { padding: 14px 18px; text-align: start; border-bottom: 1px solid var(--border); }
+th { background: var(--bg-inset); font-weight: 700; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+tbody tr:last-child td { border-bottom: 0; }
+td { color: var(--text-2); }
+td strong { color: var(--text); font-weight: 700; }
+
+/* ── CTA band ───────────────────────────────────────────────────────────── */
+.cta-band { background: var(--navy); color: #fff; border-radius: var(--radius-lg); padding: 54px 44px; text-align: center; position: relative; overflow: hidden; }
+.cta-band::after { content: ""; position: absolute; inset: auto -10% -60% -10%; height: 260px; background: radial-gradient(ellipse 50% 100% at 50% 100%, rgba(0,193,176,.30) 0%, transparent 70%); pointer-events: none; }
+.cta-band h2, .cta-band p { color: #fff; position: relative; z-index: 1; }
+.cta-band p { color: rgba(255,255,255,.76); margin: 14px auto 0; max-width: 56ch; }
+.cta-band .btn-row { justify-content: center; position: relative; z-index: 1; }
+.cta-band .btn-primary { background: var(--teal); color: #04121F; }
+.cta-band .btn-ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.34); }
+.cta-band .btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
+@media (max-width: 640px) { .cta-band { padding: 40px 22px; } }
+
+/* ── Forms ──────────────────────────────────────────────────────────────── */
+.field { display: grid; gap: 7px; }
+.field label { font-size: .82rem; font-weight: 700; color: var(--text-2); }
+.field input, .field select, .field textarea {
+  width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--text); font: inherit; font-size: .93rem;
+  transition: border-color .16s var(--ease), box-shadow .16s var(--ease);
+}
+.field textarea { min-height: 132px; resize: vertical; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.form-note { font-size: .8rem; color: var(--text-3); }
+.form-status { padding: 12px 15px; border-radius: 10px; font-size: .88rem; font-weight: 600; display: none; }
+.form-status.ok { display: block; background: var(--accent-soft); color: var(--ok); border: 1px solid var(--accent-line); }
+.form-status.err { display: block; background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent); }
+/* Neither good news nor bad: a payment Stripe has not settled yet. */
+.form-status.wait { display: block; background: var(--bg-inset); color: var(--text-2); border: 1px solid var(--border); }
+
+/* ── Checkout dialog ────────────────────────────────────────────────────── */
+/* Opened from a pricing card to collect the email Stripe puts on the receipt.
+   No card field lives here — the card is only ever entered on Stripe's page. */
+.buy {
+  /* The reset above sets margin 0 on every element, which wipes the auto
+     margin a dialog centres itself with. Put it back explicitly. */
+  margin: auto;
+  width: min(440px, calc(100vw - 32px)); padding: 30px 28px 26px; border: 1px solid var(--border);
+  border-radius: var(--radius-lg); background: var(--surface); color: var(--text);
+  box-shadow: var(--shadow-lg); position: relative; overflow: visible;
+}
+.buy::backdrop { background: rgba(4, 14, 50, .58); backdrop-filter: blur(3px); }
+.buy h3 { font-size: 1.24rem; padding-inline-end: 34px; }
+.buy-plan { font-size: .9rem; font-weight: 700; color: var(--accent); margin: 6px 0 20px; }
+.buy .btn { width: 100%; }
+.buy-legal { margin-top: 16px; }
+.buy-close { position: absolute; inset-inline-end: 16px; top: 16px; }
+@media (max-width: 480px) { .buy .btn { width: 100%; } }
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.footer { border-top: 1px solid var(--border); background: var(--bg-alt); padding: 56px 0 30px; margin-top: 0; }
+.footer-grid { display: grid; grid-template-columns: 1.6fr repeat(3, 1fr); gap: 40px; }
+@media (max-width: 860px) { .footer-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 30px; } }
+@media (max-width: 480px) { .footer-grid { grid-template-columns: minmax(0,1fr); } }
+.footer p { font-size: .88rem; max-width: 34ch; margin-top: 14px; }
+.footer-col h4 { font-size: .76rem; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 14px; }
+.footer-col a, .footer-col span { display: block; font-size: .89rem; color: var(--text-2); padding: 5px 0; }
+.footer-col a:hover { color: var(--accent); }
+.footer-bottom { display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between; align-items: center; margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--border); font-size: .82rem; color: var(--text-3); }
+.footer-legal { display: flex; flex-wrap: wrap; gap: 18px; }
+.footer-maker {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+  font-size: .8rem; color: var(--text-3);
+}
+.footer-maker a { color: var(--accent); font-weight: 700; }
+.footer-maker a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.footer-maker .uid {
+  display: inline-flex; align-items: center; gap: 7px; margin-inline-start: auto;
+  padding: 4px 11px; border-radius: 100px;
+  background: var(--bg-inset); border: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.footer-maker .uid b { color: var(--text-2); font-weight: 700; letter-spacing: .01em; }
+@media (max-width: 620px) { .footer-maker .uid { margin-inline-start: 0; } }
+
+/* ── Reveal ─────────────────────────────────────────────────────────────── */
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity .55s var(--ease), transform .55s var(--ease); }
+.reveal.visible { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; } }
+
+
+/* ── Floating WhatsApp launcher ─────────────────────────────────────────────
+   Self-contained: no third-party widget script, so it costs one button in the
+   DOM instead of a ~200 KB embed that also phones home on every page view. */
+.wa {
+  position: fixed;
+  inset-block-end: max(22px, env(safe-area-inset-bottom));
+  inset-inline-end: max(22px, env(safe-area-inset-right));
+  z-index: 880;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none;
+}
+html[dir="rtl"] .wa { align-items: flex-start; }
+
+.wa-btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  height: 56px;
+  padding: 0;
+  width: 56px;
+  border-radius: 100px;
+  background: #25D366;
+  color: #fff;
+  border: 1px solid rgba(0, 0, 0, .06);
+  box-shadow: 0 6px 20px rgba(37, 211, 102, .34), 0 2px 6px rgba(11, 18, 32, .16);
+  overflow: hidden;
+  white-space: nowrap;
+  transition: width .3s var(--ease), gap .3s var(--ease), box-shadow .2s var(--ease), transform .2s var(--ease);
+}
+.wa-btn svg { width: 27px; height: 27px; flex: none; margin-inline: 14px; }
+.wa-btn span {
+  font-size: .92rem;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  opacity: 0;
+  max-width: 0;
+  transition: opacity .22s var(--ease), max-width .3s var(--ease);
+}
+.wa-btn:hover,
+.wa-btn:focus-visible {
+  width: auto;
+  gap: 0;
+  box-shadow: 0 10px 28px rgba(37, 211, 102, .42), 0 3px 8px rgba(11, 18, 32, .2);
+  transform: translateY(-2px);
+}
+.wa-btn:hover span,
+.wa-btn:focus-visible span { opacity: 1; max-width: 220px; padding-inline-end: 20px; }
+.wa-btn:active { transform: translateY(0); }
+
+/* A single, slow pulse the first time — enough to be noticed, not a strobe. */
+.wa-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 rgba(37, 211, 102, .55);
+  animation: wa-pulse 2.6s var(--ease) 1.5s 3;
+  pointer-events: none;
+}
+@keyframes wa-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, .5); }
+  70% { box-shadow: 0 0 0 16px rgba(37, 211, 102, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
+}
+.wa-btn { position: relative; }
+
+.wa-card {
+  pointer-events: auto;
+  position: relative;
+  width: min(304px, calc(100vw - 44px));
+  padding: 16px 18px 16px 16px;
+  border-radius: 16px 16px 6px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(10px) scale(.97);
+  transform-origin: bottom right;
+  visibility: hidden;
+  transition: opacity .26s var(--ease), transform .26s var(--ease), visibility .26s;
+}
+html[dir="rtl"] .wa-card { border-radius: 16px 16px 16px 6px; transform-origin: bottom left; }
+.wa.open .wa-card { opacity: 1; transform: none; visibility: visible; }
+.wa-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.wa-avatar {
+  width: 34px; height: 34px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; background: #25D366; color: #fff;
+}
+.wa-avatar svg { width: 19px; height: 19px; }
+.wa-card b { display: block; font-size: .9rem; font-weight: 800; color: var(--text); line-height: 1.3; }
+.wa-status { display: flex; align-items: center; gap: 5px; font-size: .74rem; color: var(--text-3); }
+.wa-dot { width: 7px; height: 7px; border-radius: 50%; background: #25D366; flex: none; }
+.wa-card p { font-size: .87rem; line-height: 1.55; margin: 0 0 14px; }
+.wa-card .btn { width: 100%; padding: 10px 16px; font-size: .88rem; background: #25D366; color: #fff; box-shadow: none; }
+.wa-card .btn:hover { background: #1eb85a; box-shadow: 0 6px 16px rgba(37, 211, 102, .3); }
+.wa-close {
+  position: absolute; top: 8px; inset-inline-end: 8px;
+  width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+  color: var(--text-3);
+}
+.wa-close:hover { background: var(--bg-inset); color: var(--text); }
+.wa-close svg { width: 14px; height: 14px; }
+
+/* Keep the launcher out of the way of the collapsed navigation and the footer CTA. */
+@media (max-width: 1040px) {
+  .wa { inset-block-end: max(16px, env(safe-area-inset-bottom)); inset-inline-end: max(16px, env(safe-area-inset-right)); }
+  .wa-btn { width: 52px; height: 52px; }
+  .wa-btn svg { width: 25px; height: 25px; margin-inline: 13px; }
+  .wa-btn:hover span, .wa-btn:focus-visible span { max-width: 0; opacity: 0; padding-inline-end: 0; }
+  .wa-btn:hover, .wa-btn:focus-visible { width: 52px; }
+}
+/* Stand down while the collapsed navigation is open — the sheet covers the
+   viewport and the launcher would sit on top of the menu items. */
+body:has(.nav-links.open) .wa { opacity: 0; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wa-btn::after { animation: none; }
+  .wa-btn, .wa-card { transition: none; }
+}
+
+.skip-link { position: absolute; inset-inline-start: -9999px; top: 8px; z-index: 999; padding: 10px 16px; background: var(--accent); color: var(--accent-ink); border-radius: 8px; font-weight: 700; }
+.skip-link:focus { inset-inline-start: 12px; }
+`;
+
+// server/site/shell.ts
+function href(routePath) {
+  return routePath === "/" ? "/" : `${routePath}/`;
+}
+var hash8 = (s) => (0, import_crypto6.createHash)("sha256").update(s).digest("hex").slice(0, 8);
+var assetCache = null;
+function siteAssets() {
+  if (!assetCache) {
+    assetCache = {
+      css: { url: `/assets/site.${hash8(SITE_CSS)}.css`, body: SITE_CSS, contentType: "text/css; charset=utf-8" },
+      js: { url: `/assets/site.${hash8(SITE_JS)}.js`, body: SITE_JS, contentType: "application/javascript; charset=utf-8" }
+    };
+  }
+  return assetCache;
+}
+function findSiteAsset(pathname) {
+  const { css, js } = siteAssets();
+  if (pathname === css.url) return css;
+  if (pathname === js.url) return js;
+  return null;
+}
+function tAttrs(v) {
+  return `data-en="${esc(v.en)}" data-de="${esc(v.de)}" data-ar="${esc(v.ar)}"`;
+}
+function esc(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+var I = (d, extra = "") => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${d}</svg>`;
+var icons = {
+  check: I(`<polyline points="20 6 9 17 4 12"/>`),
+  arrowRight: I(`<line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/>`),
+  sun: I(`<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>`, ` class="i-sun"`),
+  moon: I(`<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>`, ` class="i-moon"`),
+  menu: I(`<line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>`),
+  globe: I(`<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z"/>`),
+  register: I(`<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v3M7 13h4M7 16h2"/>`),
+  chart: I(`<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>`),
+  truck: I(`<path d="M2 7h11v9H2zM13 10h4l4 3.2V16h-8z"/><circle cx="6.5" cy="18.5" r="1.6"/><circle cx="17" cy="18.5" r="1.6"/>`),
+  phone: I(`<path d="M5 3h3l2 5-2.2 1.3a12 12 0 0 0 5.9 5.9L15 13l5 2v3a2 2 0 0 1-2.2 2A17 17 0 0 1 3 5.2 2 2 0 0 1 5 3z"/>`),
+  shield: I(`<path d="M12 3l7 3v6c0 4.6-3 8-7 9-4-1-7-4.4-7-9V6z"/><polyline points="9 12 11.2 14.2 15.5 9.9"/>`),
+  cloud: I(`<path d="M7 18h9.5a3.5 3.5 0 0 0 .4-7A5.5 5.5 0 0 0 6.3 9.6 4.2 4.2 0 0 0 7 18z"/>`),
+  users: I(`<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.3a3.2 3.2 0 0 1 0 6.4M17.5 20a5.6 5.6 0 0 0-2-4.3"/>`),
+  box: I(`<path d="M12 3l8 4.2v9.6L12 21l-8-4.2V7.2z"/><path d="M4 7.2l8 4.2 8-4.2M12 11.4V21"/>`),
+  tag: I(`<path d="M3 12.5V4a1 1 0 0 1 1-1h8.5L21 11.5 12.5 20z"/><circle cx="7.5" cy="7.5" r="1.3"/>`),
+  clock: I(`<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>`),
+  layers: I(`<path d="M12 3l9 4.5-9 4.5-9-4.5z"/><path d="M3 12.5l9 4.5 9-4.5M3 17l9 4.5 9-4.5"/>`),
+  printer: I(`<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="7" rx="2"/><rect x="7" y="14" width="10" height="7" rx="1"/>`),
+  wifiOff: I(`<path d="M2 8.8A16 16 0 0 1 8 5.4M22 8.8a16 16 0 0 0-5.4-3.2M5.5 12.6A11 11 0 0 1 9 10.6M18.5 12.6a11 11 0 0 0-2.6-1.6M8.8 16.3a6 6 0 0 1 6.4 0"/><circle cx="12" cy="20" r="1"/><line x1="3" y1="3" x2="21" y2="21"/>`),
+  lock: I(`<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>`),
+  scale: I(`<path d="M12 3v18M7 21h10M6 7l-3 6h6zM18 7l-3 6h6zM4 7h16"/>`),
+  pill: I(`<rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-45 12 12)"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/>`),
+  cart: I(`<circle cx="9.5" cy="19" r="1.5"/><circle cx="17.5" cy="19" r="1.5"/><path d="M2 3h2.2l2.6 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.5L20 7H6"/>`),
+  coffee: I(`<path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 9.5h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M7 2.5v2M11 2.5v2"/>`),
+  mail: I(`<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3.5 6.5 12 12.8 20.5 6.5"/>`),
+  pin: I(`<path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>`),
+  building: I(`<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/>`),
+  puzzle: I(`<path d="M10 4h4v2.2a1.8 1.8 0 1 0 3.6 0V4H20v4h-2.2a1.8 1.8 0 1 0 0 3.6H20V20h-4v-2.2a1.8 1.8 0 1 0-3.6 0V20H4v-4h2.2a1.8 1.8 0 1 0 0-3.6H4V8h6z"/>`),
+  refresh: I(`<path d="M20 11A8 8 0 0 0 6.3 6.3L4 8.5"/><polyline points="4 4 4 8.5 8.5 8.5"/><path d="M4 13a8 8 0 0 0 13.7 4.7L20 15.5"/><polyline points="20 20 20 15.5 15.5 15.5"/>`),
+  qr: I(`<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20h1"/>`),
+  bell: I(`<path d="M18 15V10a6 6 0 0 0-12 0v5l-1.6 2.4h15.2z"/><path d="M10 20a2 2 0 0 0 4 0"/>`),
+  key: I(`<circle cx="8" cy="14" r="4"/><path d="M11 11.5L20 3M17 5.5l2 2M15.5 7l1.5 1.5"/>`),
+  close: I(`<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>`)
+};
+var WHATSAPP_GLYPH = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.87 9.87 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 1.67c2.2 0 4.27.86 5.83 2.42a8.2 8.2 0 0 1 2.41 5.82c0 4.54-3.7 8.24-8.25 8.24a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24zm-3.2 4.4c-.15 0-.4.06-.61.28-.21.22-.8.78-.8 1.9s.82 2.21.94 2.36c.11.15 1.6 2.44 3.88 3.42.54.23.96.37 1.29.48.54.17 1.04.15 1.43.09.44-.07 1.34-.55 1.53-1.08.19-.53.19-.98.13-1.08-.06-.09-.21-.15-.44-.26-.23-.11-1.34-.66-1.55-.74-.21-.07-.36-.11-.51.12-.15.22-.58.73-.71.88-.13.15-.26.17-.49.06-.23-.11-.96-.36-1.83-1.13-.68-.6-1.13-1.35-1.27-1.57-.13-.23-.01-.35.1-.46.1-.1.23-.26.34-.4.11-.13.15-.22.23-.37.07-.15.04-.28-.02-.4-.06-.11-.5-1.23-.7-1.68-.18-.44-.37-.38-.51-.39h-.43z"/></svg>`;
+var NAV = [
+  { path: "/features", label: { en: "Features", de: "Funktionen", ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A" } },
+  { path: "/solutions", label: { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" } },
+  { path: "/pricing", label: { en: "Pricing", de: "Preise", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631" } },
+  { path: "/compliance", label: { en: "Compliance", de: "Compliance", ar: "\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644" } },
+  { path: "/about", label: { en: "About", de: "\xDCber uns", ar: "\u0645\u0646 \u0646\u062D\u0646" } },
+  { path: "/contact", label: { en: "Contact", de: "Kontakt", ar: "\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627" } }
+];
+var FLAGS = {
+  en: `<svg class="flag" viewBox="0 0 60 30"><clipPath id="fen"><path d="M0 0h60v30H0z"/></clipPath><g clip-path="url(#fen)"><path d="M0 0h60v30H0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30m0-30L0 30" stroke="#C8102E" stroke-width="4"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/></g></svg>`,
+  de: `<svg class="flag" viewBox="0 0 5 3"><path fill="#000" d="M0 0h5v1H0z"/><path fill="#D00" d="M0 1h5v1H0z"/><path fill="#FFCE00" d="M0 2h5v1H0z"/></svg>`,
+  ar: `<svg class="flag" viewBox="0 0 6 4"><path fill="#007A3D" d="M0 0h6v4H0z"/><path fill="#fff" d="M2 1.4h2.4v.5H2zM2 2.1h2.4v.5H2z"/></svg>`
+};
+function parseSize(size) {
+  const m = size.match(/(\d+)\s*[×x]\s*(\d+)/);
+  return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
+}
+function shot(slot) {
+  const src = `/brand/site/${slot.id}.webp`;
+  const dim = parseSize(slot.size);
+  const dimAttrs = dim ? ` width="${dim.w}" height="${dim.h}"` : "";
+  const loadAttrs = slot.priority ? ` loading="eager" fetchpriority="high" decoding="async"` : ` loading="lazy" decoding="async"`;
+  const variant = `${slot.contain ? " shot--contain" : ""}${slot.bare ? " shot--bare" : ""}`;
+  return `<figure class="shot is-empty${variant}" style="--ar:${slot.ratio}">
+  <img src="${src}" alt="${esc(slot.alt.en)}" ${tAttrs(slot.alt).replace(/data-(en|de|ar)=/g, "data-alt-$1=")}${dimAttrs}${loadAttrs}
+       onload="this.closest('.shot').classList.remove('is-empty')" onerror="this.closest('.shot').classList.add('is-empty')">
+  <figcaption class="shot-ph" dir="ltr"><b>${esc(slot.id)}</b><small>${esc(slot.size)}</small></figcaption>
+</figure>${slot.caption ? `<p class="shot-caption" ${tAttrs(slot.caption)}>${esc(slot.caption.en)}</p>` : ""}`;
+}
+function renderPage(meta2, body, baseUrl) {
+  const canonical = `${baseUrl}${meta2.path === "/" ? "/" : href(meta2.path)}`;
+  const { css, js } = siteAssets();
+  const navHtml = NAV.map(
+    (n) => `<a href="${href(n.path)}"${n.path === meta2.path ? ' aria-current="page"' : ""} ${tAttrs(n.label)}>${esc(n.label.en)}</a>`
+  ).join("\n        ");
+  const langButtons = ["en", "de", "ar"].map(
+    (l) => `<button type="button" role="menuitemradio" data-lang="${l}" onclick="Kassenta.setLang('${l}')">${FLAGS[l]}<span>${{ en: "English", de: "Deutsch", ar: "\u0627\u0644\u0639\u0631\u0628\u064A\u0629" }[l]}</span></button>`
+  ).join("");
+  const crumb = meta2.path === "/" || meta2.noindex ? null : {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+      { "@type": "ListItem", position: 2, name: meta2.title.en.split(" \u2014 ")[0], item: canonical }
+    ]
+  };
+  const blocks = [...meta2.jsonLd ?? [], ...crumb ? [crumb] : []];
+  const jsonLd = blocks.map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join("\n  ");
+  const heroPreload = meta2.heroImage ? `
+  <link rel="preload" as="image" href="/brand/site/${meta2.heroImage}.webp" fetchpriority="high" type="image/webp">` : "";
+  return `<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>${esc(meta2.title.en)}</title>
+  <meta name="description" content="${esc(meta2.description.en)}">
+  <meta name="robots" content="${meta2.noindex ? "noindex, follow" : "index, follow, max-image-preview:large"}">
+  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#040E32" media="(prefers-color-scheme: dark)">
+  <link rel="canonical" href="${canonical}">
+  <link rel="alternate" hreflang="en" href="${canonical}?lang=en">
+  <link rel="alternate" hreflang="de" href="${canonical}?lang=de">
+  <link rel="alternate" hreflang="ar" href="${canonical}?lang=ar">
+  <link rel="alternate" hreflang="x-default" href="${canonical}">
+  <link rel="icon" href="/brand/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+  <link rel="apple-touch-icon" href="/brand/favicon-180.png">
+  <link rel="manifest" href="/site.webmanifest">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Kassenta POS">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="de_CH">
+  <meta property="og:locale:alternate" content="ar_EG">
+  <meta property="og:title" content="${esc(meta2.title.en)}">
+  <meta property="og:description" content="${esc(meta2.description.en)}">
+  <meta property="og:url" content="${canonical}">
+  <meta property="og:image" content="${baseUrl}/brand/og-image.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Kassenta POS running on a tablet, showing the ordering screen">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${esc(meta2.title.en)}">
+  <meta name="twitter:description" content="${esc(meta2.description.en)}">
+  <meta name="twitter:image" content="${baseUrl}/brand/og-image.jpg">
+  <meta name="twitter:image:alt" content="Kassenta POS running on a tablet, showing the ordering screen">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Kufi+Arabic:wght@400;600;700&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
+
+  <link rel="preload" as="style" href="${css.url}">
+  <link rel="stylesheet" href="${css.url}">${heroPreload}
+  <script>
+    // Paint the stored theme/language before first render to avoid a flash.
+    (function () {
+      try {
+        var th = localStorage.getItem('kassenta_theme');
+        if (th !== 'dark' && th !== 'light') th = 'light';
+        document.documentElement.setAttribute('data-theme', th);
+        var lg = localStorage.getItem('kassenta_lang');
+        if (lg === 'de' || lg === 'ar') {
+          document.documentElement.lang = lg;
+          document.documentElement.dir = lg === 'ar' ? 'rtl' : 'ltr';
+        }
+      } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+    })();
+  </script>
+  ${jsonLd}
+</head>
+<body>
+  <a class="skip-link" href="#main" ${tAttrs({ en: "Skip to content", de: "Zum Inhalt springen", ar: "\u062A\u062E\u0637\u064E\u0651 \u0625\u0644\u0649 \u0627\u0644\u0645\u062D\u062A\u0648\u0649" })}>Skip to content</a>
+
+  <header class="nav" id="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="/" aria-label="Kassenta POS \u2014 home">
+        <img src="/brand/logo-mark.png" alt="" width="30" height="30">
+        <span class="brand-name">Kassenta</span>
+      </a>
+      <nav class="nav-links" id="navLinks" aria-label="Main">
+        ${navHtml}
+        <a class="btn btn-primary cta-mobile" href="/contact/" style="margin-top:10px" ${tAttrs({ en: "Book a demo", de: "Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627" })}>Book a demo</a>
+      </nav>
+      <div class="nav-actions">
+        <button class="icon-btn theme-btn" type="button" onclick="Kassenta.toggleTheme()" aria-label="Toggle colour theme">${icons.sun}${icons.moon}</button>
+        <div class="lang" id="langWrap">
+          <button class="lang-btn" type="button" onclick="Kassenta.toggleLangMenu(event)" aria-haspopup="true" aria-expanded="false">
+            ${icons.globe}<span id="langLabel">EN</span>
+          </button>
+          <div class="lang-menu" role="menu">${langButtons}</div>
+        </div>
+        <a class="btn btn-primary cta-desktop" href="/contact/" ${tAttrs({ en: "Book a demo", de: "Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627" })}>Book a demo</a>
+        <button class="icon-btn nav-toggle" type="button" onclick="Kassenta.toggleNav()" aria-label="Toggle navigation" aria-expanded="false">${icons.menu}</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+${body}
+  </main>
+
+  ${renderFooter()}
+
+  ${renderWhatsApp()}
+
+  <script src="${js.url}" defer></script>
+</body>
+</html>`;
+}
+function renderWhatsApp() {
+  const number = (process.env.SALES_WHATSAPP || "201010254819").replace(/\D/g, "");
+  if (!number) return "";
+  const greeting = {
+    en: "Hi, I'd like to know more about Kassenta POS.",
+    de: "Hallo, ich interessiere mich f\xFCr Kassenta POS.",
+    ar: "\u0645\u0631\u062D\u0628\u064B\u0627\u060C \u0623\u0648\u062F \u0645\u0639\u0631\u0641\u0629 \u0627\u0644\u0645\u0632\u064A\u062F \u0639\u0646 Kassenta POS."
+  };
+  const link = (lang) => `https://wa.me/${number}?text=${encodeURIComponent(greeting[lang])}`;
+  return `<div class="wa" id="waWidget">
+    <div class="wa-card" role="dialog" aria-label="Chat on WhatsApp">
+      <button class="wa-close" type="button" onclick="Kassenta.closeWhatsApp()" aria-label="Close">${icons.close}</button>
+      <div class="wa-card-head">
+        <span class="wa-avatar">${WHATSAPP_GLYPH}</span>
+        <span>
+          <b>Kassenta</b>
+          <span class="wa-status"><i class="wa-dot"></i><span ${tAttrs({
+    en: "Typically replies within an hour",
+    de: "Antwortet meist innerhalb einer Stunde",
+    ar: "\u064A\u0631\u062F\u0651 \u0639\u0627\u062F\u0629\u064B \u062E\u0644\u0627\u0644 \u0633\u0627\u0639\u0629"
+  })}>Typically replies within an hour</span></span>
+        </span>
+      </div>
+      <p ${tAttrs({
+    en: "Questions about pricing, a specific feature, or moving your menu across? Send us a message.",
+    de: "Fragen zu Preisen, einer bestimmten Funktion oder zur \xDCbernahme Ihrer Karte? Schreiben Sie uns.",
+    ar: "\u0639\u0646\u062F\u0643 \u0633\u0624\u0627\u0644 \u0639\u0646 \u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0623\u0648 \u0645\u064A\u0632\u0629 \u0645\u0639\u064A\u0651\u0646\u0629 \u0623\u0648 \u0646\u0642\u0644 \u0642\u0627\u0626\u0645\u062A\u0643\u061F \u0627\u0628\u0639\u062A\u0644\u0646\u0627 \u0631\u0633\u0627\u0644\u0629."
+  })}>Questions about pricing, a specific feature, or moving your menu across? Send us a message.</p>
+      <a class="btn" href="${link("en")}" target="_blank" rel="noopener"
+         data-wa-en="${esc(link("en"))}" data-wa-de="${esc(link("de"))}" data-wa-ar="${esc(link("ar"))}"
+         ${tAttrs({ en: "Start the chat", de: "Chat starten", ar: "\u0627\u0628\u062F\u0623 \u0627\u0644\u0645\u062D\u0627\u062F\u062B\u0629" })}>Start the chat</a>
+    </div>
+    <a class="wa-btn" href="${link("en")}" target="_blank" rel="noopener"
+       data-wa-en="${esc(link("en"))}" data-wa-de="${esc(link("de"))}" data-wa-ar="${esc(link("ar"))}"
+       aria-label="Chat with Kassenta on WhatsApp"
+       onclick="Kassenta.closeWhatsApp()"
+       onmouseenter="Kassenta.openWhatsApp()" onfocus="Kassenta.openWhatsApp()">
+      ${WHATSAPP_GLYPH}<span ${tAttrs({ en: "Chat with us", de: "Schreiben Sie uns", ar: "\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627" })}>Chat with us</span>
+    </a>
+  </div>`;
+}
+function renderFooter() {
+  const col = (title, links) => `
+        <div class="footer-col">
+          <h4 ${tAttrs(title)}>${esc(title.en)}</h4>
+          ${links.map(
+    (l) => `<a href="${l.href}"${l.external ? ' target="_blank" rel="noopener"' : ""} ${tAttrs(l.label)}>${esc(l.label.en)}</a>`
+  ).join("\n          ")}
+        </div>`;
+  return `<footer class="footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <a class="brand" href="/"><img src="/brand/logo-mark.png" alt="" width="30" height="30"><span class="brand-name">Kassenta</span></a>
+          <p ${tAttrs({
+    en: "Point of sale, online ordering and delivery in one system. Built for Swiss and European hospitality and retail.",
+    de: "Kasse, Online-Bestellung und Lieferung in einem System. Entwickelt f\xFCr Gastronomie und Handel in der Schweiz und Europa.",
+    ar: "\u0646\u0642\u0637\u0629 \u0628\u064A\u0639 \u0648\u0637\u0644\u0628 \u0623\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u062A\u0648\u0635\u064A\u0644 \u0641\u064A \u0646\u0638\u0627\u0645 \u0648\u0627\u062D\u062F. \u0645\u0635\u0645\u064E\u0651\u0645 \u0644\u0642\u0637\u0627\u0639 \u0627\u0644\u0636\u064A\u0627\u0641\u0629 \u0648\u0627\u0644\u062A\u062C\u0632\u0626\u0629 \u0641\u064A \u0633\u0648\u064A\u0633\u0631\u0627 \u0648\u0623\u0648\u0631\u0648\u0628\u0627."
+  })}>Point of sale, online ordering and delivery in one system. Built for Swiss and European hospitality and retail.</p>
+        </div>
+        ${col({ en: "Product", de: "Produkt", ar: "\u0627\u0644\u0645\u0646\u062A\u062C" }, [
+    { href: "/features/", label: { en: "Features", de: "Funktionen", ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A" } },
+    { href: "/solutions/", label: { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" } },
+    { href: "/pricing/", label: { en: "Pricing", de: "Preise", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631" } },
+    { href: "/compliance/", label: { en: "Compliance", de: "Compliance", ar: "\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644" } }
+  ])}
+        ${col({ en: "Company", de: "Unternehmen", ar: "\u0627\u0644\u0634\u0631\u0643\u0629" }, [
+    { href: "/about/", label: { en: "About", de: "\xDCber uns", ar: "\u0645\u0646 \u0646\u062D\u0646" } },
+    { href: "/contact/", label: { en: "Contact", de: "Kontakt", ar: "\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627" } },
+    { href: "mailto:info@kassenta.com", label: { en: "info@kassenta.com", de: "info@kassenta.com", ar: "info@kassenta.com" } }
+  ])}
+        ${col({ en: "Access", de: "Zugang", ar: "\u0627\u0644\u062F\u062E\u0648\u0644" }, [
+    { href: "/app", label: { en: "Open the POS", de: "Kasse \xF6ffnen", ar: "\u0627\u0641\u062A\u062D \u0646\u0642\u0637\u0629 \u0627\u0644\u0628\u064A\u0639" } },
+    { href: "/restaurants", label: { en: "Order online", de: "Online bestellen", ar: "\u0627\u0637\u0644\u0628 \u0623\u0648\u0646\u0644\u0627\u064A\u0646" } },
+    { href: "/super_admin/login", label: { en: "Admin login", de: "Admin-Login", ar: "\u062F\u062E\u0648\u0644 \u0627\u0644\u0645\u0634\u0631\u0641" } }
+  ])}
+      </div>
+      <div class="footer-bottom">
+        <span>\xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} Kassenta POS. <span ${tAttrs({
+    en: "All rights reserved.",
+    de: "Alle Rechte vorbehalten.",
+    ar: "\u062C\u0645\u064A\u0639 \u0627\u0644\u062D\u0642\u0648\u0642 \u0645\u062D\u0641\u0648\u0638\u0629."
+  })}>All rights reserved.</span></span>
+        <div class="footer-legal">
+          <a href="/privacy" ${tAttrs({ en: "Privacy", de: "Datenschutz", ar: "\u0627\u0644\u062E\u0635\u0648\u0635\u064A\u0629" })}>Privacy</a>
+          <a href="/terms/" ${tAttrs({ en: "Terms", de: "AGB", ar: "\u0627\u0644\u0634\u0631\u0648\u0637" })}>Terms</a>
+          <a href="/imprint/" ${tAttrs({ en: "Imprint", de: "Impressum", ar: "\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0646\u0627\u0634\u0631" })}>Imprint</a>
+          <a href="/delete-account" ${tAttrs({ en: "Delete account", de: "Konto l\xF6schen", ar: "\u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628" })}>Delete account</a>
+        </div>
+      </div>
+      <div class="footer-maker">
+        <span ${tAttrs({
+    en: "Built by Barmagly",
+    de: "Entwickelt von Barmagly",
+    ar: "\u062A\u0645\u062A \u0627\u0644\u0628\u0631\u0645\u062C\u0629 \u0628\u0648\u0627\u0633\u0637\u0629 \u0634\u0631\u0643\u0629 \u0628\u0631\u0645\u062C\u0644\u064A"
+  })}>Built by Barmagly</span>
+        <a href="https://barmagly.tech/" target="_blank" rel="noopener">barmagly.tech</a>
+        <span class="uid" dir="ltr" title="Swiss company identification number">
+          <span ${tAttrs({
+    en: "Swiss company ID",
+    de: "Schweizer UID",
+    ar: "\u062A\u0631\u062E\u064A\u0635 \u0633\u0648\u064A\u0633\u0631\u064A \u0631\u0633\u0645\u064A"
+  })}>Swiss company ID</span>
+          <b>CHE-154.312.079</b>
+        </span>
+      </div>
+    </div>
+  </footer>`;
+}
+var SITE_JS = String.raw`
+window.Kassenta = (function () {
+  var LANGS = { en: 'EN', de: 'DE', ar: 'AR' };
+  var DIR = { en: 'ltr', de: 'ltr', ar: 'rtl' };
+  var lang = 'en';
+
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  function applyLang(l) {
+    if (!LANGS[l]) l = 'en';
+    lang = l;
+    var root = document.documentElement;
+    root.lang = l;
+    root.dir = DIR[l];
+    document.querySelectorAll('[data-' + l + ']').forEach(function (el) {
+      var v = el.getAttribute('data-' + l);
+      if (v !== null) el.textContent = v;
+    });
+    document.querySelectorAll('[data-alt-' + l + ']').forEach(function (el) {
+      var v = el.getAttribute('data-alt-' + l);
+      if (v !== null) el.setAttribute('alt', v);
+    });
+    // WhatsApp deep links carry a pre-filled message, so they change with the language.
+    document.querySelectorAll('[data-wa-' + l + ']').forEach(function (el) {
+      var v = el.getAttribute('data-wa-' + l);
+      if (v !== null) el.setAttribute('href', v);
+    });
+    var label = document.getElementById('langLabel');
+    if (label) label.textContent = LANGS[l];
+    document.querySelectorAll('.lang-menu button').forEach(function (b) {
+      var on = b.dataset.lang === l;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+
+  function setLang(l) { store('kassenta_lang', l); applyLang(l); closeLangMenu(); }
+
+  function applyTheme(mode) {
+    document.documentElement.setAttribute('data-theme', mode);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', mode === 'dark' ? '#040E32' : '#FFFFFF');
+  }
+  function toggleTheme() {
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    store('kassenta_theme', next);
+    applyTheme(next);
+  }
+
+  function toggleNav() {
+    var el = document.getElementById('navLinks');
+    var btn = document.querySelector('.nav-toggle');
+    var open = el.classList.toggle('open');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function toggleLangMenu(e) {
+    if (e) e.stopPropagation();
+    var w = document.getElementById('langWrap');
+    var open = w.classList.toggle('open');
+    w.querySelector('.lang-btn').setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function closeLangMenu() {
+    var w = document.getElementById('langWrap');
+    if (!w) return;
+    w.classList.remove('open');
+    w.querySelector('.lang-btn').setAttribute('aria-expanded', 'false');
+  }
+
+  document.addEventListener('click', function (e) { if (!e.target.closest('.lang')) closeLangMenu(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeLangMenu(); });
+
+  var nav = document.getElementById('nav');
+  var onScroll = function () { nav.classList.toggle('scrolled', window.scrollY > 24); };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('visible'); io.unobserve(en.target); } });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+  } else {
+    document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('visible'); });
+  }
+
+  // ?lang=de wins over the stored preference so hreflang links land on the
+  // right language for a first-time visitor arriving from search.
+  var urlLang = new URLSearchParams(location.search).get('lang');
+  if (urlLang && LANGS[urlLang]) { store('kassenta_lang', urlLang); applyLang(urlLang); }
+  else applyLang(read('kassenta_lang') || 'en');
+  applyTheme(read('kassenta_theme') === 'dark' ? 'dark' : 'light');
+
+  /* ── WhatsApp launcher ────────────────────────────────────────────────────
+     The greeting card opens itself once per visitor. Dismissing it is
+     remembered, because a bubble that reappears on every page of a seven-page
+     site stops being an invitation and starts being an obstacle. */
+  var wa = document.getElementById('waWidget');
+  var WA_SEEN = 'kassenta_wa_seen';
+
+  function openWhatsApp() { if (wa) wa.classList.add('open'); }
+  function closeWhatsApp() {
+    if (!wa) return;
+    wa.classList.remove('open');
+    store(WA_SEEN, '1');
+  }
+
+  if (wa) {
+    if (!read(WA_SEEN)) {
+      // Late enough that it does not compete with the hero, early enough to be
+      // seen before the visitor scrolls away.
+      setTimeout(openWhatsApp, 5000);
+    }
+    wa.addEventListener('mouseleave', function () { if (read(WA_SEEN)) wa.classList.remove('open'); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeWhatsApp(); });
+    document.addEventListener('click', function (e) {
+      if (wa.classList.contains('open') && !e.target.closest('#waWidget')) wa.classList.remove('open');
+    });
+  }
+
+  return {
+    setLang: setLang,
+    toggleTheme: toggleTheme,
+    toggleNav: toggleNav,
+    toggleLangMenu: toggleLangMenu,
+    openWhatsApp: openWhatsApp,
+    closeWhatsApp: closeWhatsApp,
+  };
+})();
+`;
+
 // server/site/legal.ts
-init_shell();
 var LEGAL_BASE = process.env.PUBLIC_BASE_URL || "https://kassenta.com";
 var LEGAL_CSS = `<style>
   .legal { padding: 52px 0 80px; }
@@ -17820,11 +17948,1928 @@ var IMPRINT_HTML = renderPage(
   LEGAL_BASE
 );
 
+// server/site/plans.ts
+var CURRENCY = "CHF";
+var YEARLY_DISCOUNT = 0.2;
+var STARTER = {
+  slug: "starter",
+  name: "Starter",
+  monthly: 49,
+  summary: "One counter, one screen. For a single cafe, kiosk or small shop.",
+  features: [
+    "POS on one device, unlimited products and staff PINs",
+    "Swiss VAT, cash rounding and TWINT",
+    "Sales and inventory reports with CSV export",
+    "Email support, next business day"
+  ]
+};
+var PROFESSIONAL = {
+  slug: "professional",
+  name: "Professional",
+  monthly: 99,
+  summary: "Counter plus your own online channel, delivery and loyalty.",
+  features: [
+    "Everything in Starter, on up to five devices",
+    "Branded online storefront and table QR ordering",
+    "Delivery zones, drivers and customer tracking links",
+    "Loyalty tiers, wallet, promo codes and referrals",
+    "WhatsApp and email order notifications",
+    "Phone and chat support during business hours"
+  ]
+};
+var ENTERPRISE = {
+  slug: "enterprise",
+  name: "Enterprise",
+  monthly: 199,
+  summary: "Several branches under one roof, with the API and consolidated reporting.",
+  features: [
+    "Everything in Professional, unlimited devices",
+    "Multi-branch console with consolidated reporting",
+    "REST API, webhooks and accounting export",
+    "Caller ID integration and custom vertical modules",
+    "Named contact, priority response and on-site onboarding"
+  ]
+};
+var PLANS = [STARTER, PROFESSIONAL, ENTERPRISE];
+function yearlyMonthly(plan2) {
+  return Math.round(plan2.monthly * (1 - YEARLY_DISCOUNT));
+}
+function yearlyTotal(plan2) {
+  return yearlyMonthly(plan2) * 12;
+}
+var PLAN_ROWS = PLANS.flatMap((plan2) => [
+  {
+    slug: plan2.slug,
+    name: plan2.name,
+    interval: "monthly",
+    price: plan2.monthly,
+    description: plan2.summary,
+    features: plan2.features
+  },
+  {
+    slug: plan2.slug,
+    name: plan2.name,
+    interval: "yearly",
+    price: yearlyTotal(plan2),
+    description: `${plan2.summary} Billed once for twelve months.`,
+    features: plan2.features
+  }
+]);
+
+// server/site/pages.ts
+var head = (eyebrow, title, lead, center = false) => `
+      <div class="section-head${center ? " section-head--center" : ""} reveal">
+        <span class="eyebrow" ${tAttrs(eyebrow)}>${esc(eyebrow.en)}</span>
+        <h2 ${tAttrs(title)}>${esc(title.en)}</h2>
+        ${lead ? `<p class="lead"${center ? ' style="margin-inline:auto"' : ""} ${tAttrs(lead)}>${esc(lead.en)}</p>` : ""}
+      </div>`;
+var card = (icon, title, body) => `
+        <article class="card card--hover reveal">
+          <div class="card-icon">${icon}</div>
+          <h3 ${tAttrs(title)}>${esc(title.en)}</h3>
+          <p ${tAttrs(body)}>${esc(body.en)}</p>
+        </article>`;
+var ticks = (items) => `<ul class="tick-list">${items.map((i) => `<li>${icons.check}<span ${tAttrs(i)}>${esc(i.en)}</span></li>`).join("")}</ul>`;
+var faq = (items) => `
+      <div class="faq reveal">
+        ${items.map(
+  (i) => `<details>
+          <summary><span ${tAttrs(i.q)}>${esc(i.q.en)}</span></summary>
+          <div class="answer" ${tAttrs(i.a)}>${esc(i.a.en)}</div>
+        </details>`
+).join("")}
+      </div>`;
+var ctaBand = (title, body) => `
+  <section class="section">
+    <div class="wrap">
+      <div class="cta-band reveal">
+        <h2 ${tAttrs(title)}>${esc(title.en)}</h2>
+        <p ${tAttrs(body)}>${esc(body.en)}</p>
+        <div class="btn-row">
+          <a class="btn btn-primary" href="/contact/" ${tAttrs({ en: "Book a demo", de: "Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u062A\u0648\u0636\u064A\u062D\u064A\u064B\u0627" })}>Book a demo</a>
+          <a class="btn btn-ghost" href="/pricing/" ${tAttrs({ en: "See pricing", de: "Preise ansehen", ar: "\u0634\u0627\u0647\u062F \u0627\u0644\u0623\u0633\u0639\u0627\u0631" })}>See pricing</a>
+        </div>
+      </div>
+    </div>
+  </section>`;
+var pageHead = (title, lead, crumb) => `
+  <section class="page-head">
+    <div class="wrap">
+      <div class="crumbs"><a href="/" ${tAttrs({ en: "Home", de: "Start", ar: "\u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629" })}>Home</a><span>/</span><span ${tAttrs(crumb)}>${esc(crumb.en)}</span></div>
+      <h1 ${tAttrs(title)}>${esc(title.en)}</h1>
+      <p class="lead" ${tAttrs(lead)}>${esc(lead.en)}</p>
+    </div>
+  </section>`;
+var home = {
+  meta: {
+    path: "/",
+    title: {
+      en: "Kassenta POS \u2014 till, online ordering and delivery",
+      de: "Kassenta POS \u2014 Kasse, Online-Bestellung und Lieferung",
+      ar: "Kassenta POS \u2014 \u0643\u0627\u0634\u064A\u0631 \u0648\u0637\u0644\u0628 \u0623\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u062A\u0648\u0635\u064A\u0644"
+    },
+    description: {
+      en: "One system for the till, your own online shop and delivery. Swiss VAT, CHF rounding and TWINT built in. Runs on phone, tablet and desktop.",
+      de: "Ein System f\xFCr Kasse, eigenen Online-Shop und Lieferung. Schweizer MwSt., Rappenrundung und TWINT integriert. F\xFCr Handy, Tablet und Desktop.",
+      ar: "\u0646\u0638\u0627\u0645 \u0648\u0627\u062D\u062F \u0644\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0645\u062A\u062C\u0631\u0643 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644. \u0636\u0631\u064A\u0628\u0629 \u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u062A\u0642\u0631\u064A\u0628 CHF \u0648TWINT \u0645\u062F\u0645\u062C\u0629. \u064A\u0639\u0645\u0644 \u0639\u0644\u0649 \u0627\u0644\u0647\u0627\u062A\u0641 \u0648\u0627\u0644\u062A\u0627\u0628\u0644\u062A \u0648\u0627\u0644\u0643\u0645\u0628\u064A\u0648\u062A\u0631."
+    },
+    heroImage: "hero-pos-tablet",
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        name: "Kassenta POS",
+        applicationCategory: "BusinessApplication",
+        applicationSubCategory: "Point of Sale",
+        operatingSystem: "Web, Android, iOS",
+        url: "https://kassenta.com/",
+        image: "https://kassenta.com/brand/og-image.jpg",
+        inLanguage: ["en", "de", "ar"],
+        featureList: [
+          "Touch point of sale",
+          "Branded online storefront",
+          "Table QR ordering",
+          "Delivery dispatch and driver tracking",
+          "Inventory and stock counts",
+          "Customer records and loyalty",
+          "Swiss VAT and CHF cash rounding",
+          "VAT-ready reporting with CSV export"
+        ],
+        offers: {
+          "@type": "AggregateOffer",
+          priceCurrency: CURRENCY,
+          lowPrice: String(Math.min(...PLANS.map((p) => p.monthly))),
+          highPrice: String(Math.max(...PLANS.map((p) => p.monthly))),
+          offerCount: PLANS.length,
+          url: "https://kassenta.com/pricing/"
+        },
+        description: "Point of sale, online ordering and delivery management for hospitality and retail in Switzerland and Europe."
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: "Kassenta",
+        alternateName: "Kassenta POS System",
+        url: "https://kassenta.com",
+        logo: "https://kassenta.com/brand/logo-mark.png",
+        image: "https://kassenta.com/brand/og-image.jpg",
+        email: "info@kassenta.com",
+        areaServed: ["CH", "DE", "AT", "FR", "IT"],
+        identifier: {
+          "@type": "PropertyValue",
+          propertyID: "CHE",
+          name: "Swiss company identification number (UID)",
+          value: "CHE-154.312.079"
+        },
+        parentOrganization: { "@type": "Organization", name: "Barmagly", url: "https://barmagly.tech/" },
+        contactPoint: {
+          "@type": "ContactPoint",
+          contactType: "sales",
+          email: "info@kassenta.com",
+          availableLanguage: ["English", "German", "Arabic"]
+        }
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: "Kassenta POS",
+        url: "https://kassenta.com/",
+        inLanguage: ["en", "de", "ar"],
+        publisher: { "@type": "Organization", name: "Kassenta" }
+      },
+      {
+        // Mirrors the FAQ section below — Google can surface these directly in
+        // the result. Keep the two in sync when the copy changes.
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: [
+          {
+            "@type": "Question",
+            name: "Do I need to buy special hardware?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "No. Kassenta runs in any modern browser and as an app on Android and iOS, so an existing tablet or laptop is enough to start. Receipt printers, cash drawers and barcode scanners are supported but optional."
+            }
+          },
+          {
+            "@type": "Question",
+            name: "What happens if the internet drops?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "The POS keeps taking orders and payments from its local cache and syncs the queue once the connection returns. Online ordering and driver tracking need connectivity, since they involve people outside the building."
+            }
+          },
+          {
+            "@type": "Question",
+            name: "Can I move my existing products and customers in?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Yes. Products, categories and customers import from CSV, and we do the first import with you during onboarding so the mapping is right before you go live."
+            }
+          },
+          {
+            "@type": "Question",
+            name: "How many branches can one account hold?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "As many as you need. Each branch keeps its own stock, staff and prices while the owner console reports across all of them together."
+            }
+          },
+          {
+            "@type": "Question",
+            name: "Is my data locked in?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "No. Sales, products and customers can be exported to CSV at any time from the reporting screens, and a full export can be requested from support."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  body: `
+  <section class="hero">
+    <div class="wrap">
+      <div class="split split--wide-left">
+        <div>
+          <span class="badge" ${tAttrs({ en: "Built for Switzerland and the EU", de: "F\xFCr die Schweiz und die EU gebaut", ar: "\u0645\u0635\u0645\u064E\u0651\u0645 \u0644\u0633\u0648\u064A\u0633\u0631\u0627 \u0648\u0627\u0644\u0627\u062A\u062D\u0627\u062F \u0627\u0644\u0623\u0648\u0631\u0648\u0628\u064A" })}>Built for Switzerland and the EU</span>
+          <h1 style="margin-top:18px" ${tAttrs({
+    en: "One system for the till, the shop and the road",
+    de: "Ein System f\xFCr Kasse, Shop und Lieferung",
+    ar: "\u0646\u0638\u0627\u0645 \u0648\u0627\u062D\u062F \u0644\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0627\u0644\u0645\u062A\u062C\u0631 \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644"
+  })}>One system for the till, the shop and the road</h1>
+          <p class="lead" ${tAttrs({
+    en: "Kassenta replaces the patchwork of a POS terminal, an ordering website, a delivery app and a spreadsheet. Every order \u2014 counter, table QR, phone or online \u2014 lands in the same queue, with the same stock and the same reports.",
+    de: "Kassenta ersetzt das Flickwerk aus Kassenterminal, Bestellwebsite, Liefer-App und Tabellenkalkulation. Jede Bestellung \u2014 Theke, Tisch-QR, Telefon oder online \u2014 landet in derselben Warteschlange, mit demselben Bestand und denselben Berichten.",
+    ar: "\u064A\u0633\u062A\u0628\u062F\u0644 Kassenta \u062E\u0644\u064A\u0637 \u0623\u062C\u0647\u0632\u0629 \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0645\u0648\u0642\u0639 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0648\u062A\u0637\u0628\u064A\u0642 \u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u0648\u062C\u062F\u0627\u0648\u0644 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A. \u0643\u0644 \u0637\u0644\u0628 \u2014 \u0645\u0646 \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0623\u0648 QR \u0627\u0644\u0637\u0627\u0648\u0644\u0629 \u0623\u0648 \u0627\u0644\u0647\u0627\u062A\u0641 \u0623\u0648 \u0627\u0644\u0625\u0646\u062A\u0631\u0646\u062A \u2014 \u064A\u0635\u0644 \u0625\u0644\u0649 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0646\u0641\u0633\u0647\u0627\u060C \u0628\u0627\u0644\u0645\u062E\u0632\u0648\u0646 \u0646\u0641\u0633\u0647 \u0648\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631 \u0646\u0641\u0633\u0647\u0627."
+  })}>Kassenta replaces the patchwork of a POS terminal, an ordering website, a delivery app and a spreadsheet. Every order \u2014 counter, table QR, phone or online \u2014 lands in the same queue, with the same stock and the same reports.</p>
+          <div class="btn-row">
+            <a class="btn btn-primary" href="/contact/">${icons.arrowRight}<span ${tAttrs({ en: "Book a live demo", de: "Live-Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u0645\u0628\u0627\u0634\u0631\u064B\u0627" })}>Book a live demo</span></a>
+            <a class="btn btn-ghost" href="/features/" ${tAttrs({ en: "Explore the platform", de: "Plattform ansehen", ar: "\u0627\u0633\u062A\u0643\u0634\u0641 \u0627\u0644\u0645\u0646\u0635\u0629" })}>Explore the platform</a>
+          </div>
+          <div class="hero-meta">
+            <div><b>3</b><span ${tAttrs({ en: "Languages: EN / DE / AR", de: "Sprachen: EN / DE / AR", ar: "\u0644\u063A\u0627\u062A: EN / DE / AR" })}>Languages: EN / DE / AR</span></div>
+            <div><b>8.1%</b><span ${tAttrs({ en: "Swiss VAT handled", de: "Schweizer MwSt. ber\xFCcksichtigt", ar: "\u0636\u0631\u064A\u0628\u0629 \u0633\u0648\u064A\u0633\u0631\u0627 \u0645\u062F\u0639\u0648\u0645\u0629" })}>Swiss VAT handled</span></div>
+            <div><b>0.05</b><span ${tAttrs({ en: "CHF cash rounding", de: "CHF-Rappenrundung", ar: "\u062A\u0642\u0631\u064A\u0628 \u0646\u0642\u062F\u064A CHF" })}>CHF cash rounding</span></div>
+            <div><b>24/7</b><span ${tAttrs({ en: "Cloud availability", de: "Cloud-Verf\xFCgbarkeit", ar: "\u062A\u0648\u0627\u0641\u0631 \u0633\u062D\u0627\u0628\u064A" })}>Cloud availability</span></div>
+          </div>
+        </div>
+        <div class="reveal">
+          ${shot({ id: "hero-pos-tablet", ratio: "4 / 5", size: "1122 \xD7 1402", priority: true, alt: { en: "Kassenta POS running on a tablet at a restaurant counter", de: "Kassenta POS auf einem Tablet an der Theke eines Restaurants", ar: "Kassenta POS \u064A\u0639\u0645\u0644 \u0639\u0644\u0649 \u062A\u0627\u0628\u0644\u062A \u0639\u0646\u062F \u0643\u0627\u0634\u064A\u0631 \u0645\u0637\u0639\u0645" } })}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section--tight">
+    <div class="wrap">
+      <div class="stat-strip reveal">
+        <div><b ${tAttrs({ en: "Counter", de: "Theke", ar: "\u0627\u0644\u0643\u0627\u0634\u064A\u0631" })}>Counter</b><span ${tAttrs({ en: "Touch POS on any screen", de: "Touch-Kasse auf jedem Bildschirm", ar: "\u0643\u0627\u0634\u064A\u0631 \u0644\u0645\u0633\u064A \u0639\u0644\u0649 \u0623\u064A \u0634\u0627\u0634\u0629" })}>Touch POS on any screen</span></div>
+        <div><b ${tAttrs({ en: "Online", de: "Online", ar: "\u0623\u0648\u0646\u0644\u0627\u064A\u0646" })}>Online</b><span ${tAttrs({ en: "Your own branded storefront", de: "Eigener Shop im Branding", ar: "\u0645\u062A\u062C\u0631\u0643 \u0628\u0647\u0648\u064A\u062A\u0643 \u0627\u0644\u062E\u0627\u0635\u0629" })}>Your own branded storefront</span></div>
+        <div><b ${tAttrs({ en: "Tables", de: "Tische", ar: "\u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A" })}>Tables</b><span ${tAttrs({ en: "QR ordering per seat", de: "QR-Bestellung pro Platz", ar: "\u0637\u0644\u0628 \u0628\u0640QR \u0644\u0643\u0644 \u0637\u0627\u0648\u0644\u0629" })}>QR ordering per seat</span></div>
+        <div><b ${tAttrs({ en: "Delivery", de: "Lieferung", ar: "\u0627\u0644\u062A\u0648\u0635\u064A\u0644" })}>Delivery</b><span ${tAttrs({ en: "Drivers, zones and tracking", de: "Fahrer, Zonen und Tracking", ar: "\u0633\u0627\u0626\u0642\u0648\u0646 \u0648\u0645\u0646\u0627\u0637\u0642 \u0648\u062A\u062A\u0628\u0651\u0639" })}>Drivers, zones and tracking</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="wrap">
+      ${head(
+    { en: "The platform", de: "Die Plattform", ar: "\u0627\u0644\u0645\u0646\u0635\u0629" },
+    { en: "Four products, one database", de: "Vier Produkte, eine Datenbank", ar: "\u0623\u0631\u0628\u0639\u0629 \u0645\u0646\u062A\u062C\u0627\u062A\u060C \u0642\u0627\u0639\u062F\u0629 \u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0627\u062D\u062F\u0629" },
+    {
+      en: "Stock, prices, customers and taxes are defined once. Every surface reads from the same place, so a sold-out item disappears from the online menu the second the counter sells the last one.",
+      de: "Bestand, Preise, Kunden und Steuern werden einmal definiert. Jede Oberfl\xE4che liest aus derselben Quelle \u2014 ein ausverkaufter Artikel verschwindet in dem Moment aus der Online-Karte, in dem die Theke den letzten verkauft.",
+      ar: "\u064A\u064F\u0639\u0631\u064E\u0651\u0641 \u0627\u0644\u0645\u062E\u0632\u0648\u0646 \u0648\u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0648\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u0627\u0644\u0636\u0631\u0627\u0626\u0628 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629. \u0643\u0644 \u0627\u0644\u0648\u0627\u062C\u0647\u0627\u062A \u062A\u0642\u0631\u0623 \u0645\u0646 \u0627\u0644\u0645\u0635\u062F\u0631 \u0646\u0641\u0633\u0647\u060C \u0641\u064A\u062E\u062A\u0641\u064A \u0627\u0644\u0635\u0646\u0641 \u0627\u0644\u0645\u0646\u062A\u0647\u064A \u0645\u0646 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0629 \u0644\u062D\u0638\u0629 \u0628\u064A\u0639 \u0622\u062E\u0631 \u0642\u0637\u0639\u0629 \u0639\u0644\u0649 \u0627\u0644\u0643\u0627\u0634\u064A\u0631."
+    },
+    true
+  )}
+      <div class="grid grid-4">
+        ${card(icons.register, { en: "POS application", de: "Kassen-App", ar: "\u062A\u0637\u0628\u064A\u0642 \u0627\u0644\u0643\u0627\u0634\u064A\u0631" }, {
+    en: "Touch-first ordering, split payments, discounts, shift handover and end-of-day cash-up. Runs in the browser and as a native Android and iOS app.",
+    de: "Touch-orientierte Bestellung, Teilzahlungen, Rabatte, Schicht\xFCbergabe und Tagesabschluss. L\xE4uft im Browser sowie als native Android- und iOS-App.",
+    ar: "\u0637\u0644\u0628 \u0628\u0627\u0644\u0644\u0645\u0633\u060C \u0648\u062F\u0641\u0639 \u0645\u0642\u0633\u064E\u0651\u0645\u060C \u0648\u062E\u0635\u0648\u0645\u0627\u062A\u060C \u0648\u062A\u0633\u0644\u064A\u0645 \u0627\u0644\u0648\u0631\u062F\u064A\u0627\u062A\u060C \u0648\u062A\u0642\u0641\u064A\u0644 \u0627\u0644\u064A\u0648\u0645. \u064A\u0639\u0645\u0644 \u0641\u064A \u0627\u0644\u0645\u062A\u0635\u0641\u062D \u0648\u0643\u062A\u0637\u0628\u064A\u0642 \u0623\u0646\u062F\u0631\u0648\u064A\u062F \u0648iOS \u0623\u0635\u0644\u064A."
+  })}
+        ${card(icons.cart, { en: "Customer storefront", de: "Kunden-Shop", ar: "\u0645\u062A\u062C\u0631 \u0627\u0644\u0639\u0645\u0644\u0627\u0621" }, {
+    en: "A branded ordering page per business, with menus, options, promo codes, scheduled orders and delivery-zone pricing.",
+    de: "Eine gebrandete Bestellseite pro Betrieb, mit Karte, Optionen, Gutscheinen, Vorbestellungen und Zonenpreisen.",
+    ar: "\u0635\u0641\u062D\u0629 \u0637\u0644\u0628 \u0628\u0647\u0648\u064A\u0629 \u0643\u0644 \u0645\u062A\u062C\u0631\u060C \u0645\u0639 \u0627\u0644\u0642\u0648\u0627\u0626\u0645 \u0648\u0627\u0644\u062E\u064A\u0627\u0631\u0627\u062A \u0648\u0623\u0643\u0648\u0627\u062F \u0627\u0644\u062E\u0635\u0645 \u0648\u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u0645\u062C\u062F\u0648\u0644\u0629 \u0648\u062A\u0633\u0639\u064A\u0631 \u0645\u0646\u0627\u0637\u0642 \u0627\u0644\u062A\u0648\u0635\u064A\u0644."
+  })}
+        ${card(icons.truck, { en: "Delivery operations", de: "Lieferbetrieb", ar: "\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062A\u0648\u0635\u064A\u0644" }, {
+    en: "Assign drivers, broadcast open orders, follow the status pipeline and send customers a live tracking link.",
+    de: "Fahrer zuweisen, offene Auftr\xE4ge ausschreiben, Statusverlauf verfolgen und Kunden einen Live-Tracking-Link senden.",
+    ar: "\u0625\u0633\u0646\u0627\u062F \u0627\u0644\u0633\u0627\u0626\u0642\u064A\u0646\u060C \u0648\u0628\u062B\u0651 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u0645\u0641\u062A\u0648\u062D\u0629\u060C \u0648\u0645\u062A\u0627\u0628\u0639\u0629 \u0645\u0631\u0627\u062D\u0644 \u0627\u0644\u062D\u0627\u0644\u0629\u060C \u0648\u0625\u0631\u0633\u0627\u0644 \u0631\u0627\u0628\u0637 \u062A\u062A\u0628\u0651\u0639 \u0645\u0628\u0627\u0634\u0631 \u0644\u0644\u0639\u0645\u064A\u0644."
+  })}
+        ${card(icons.layers, { en: "Owner console", de: "Betreiber-Konsole", ar: "\u0644\u0648\u062D\u0629 \u0627\u0644\u0645\u0627\u0644\u0643" }, {
+    en: "Multi-branch overview, licences, staff roles and reporting across every location from one login.",
+    de: "Filial\xFCbersicht, Lizenzen, Mitarbeiterrollen und Auswertungen \xFCber alle Standorte mit einem Login.",
+    ar: "\u0646\u0638\u0631\u0629 \u0634\u0627\u0645\u0644\u0629 \u0639\u0644\u0649 \u0627\u0644\u0641\u0631\u0648\u0639\u060C \u0648\u0627\u0644\u062A\u0631\u0627\u062E\u064A\u0635\u060C \u0648\u0623\u062F\u0648\u0627\u0631 \u0627\u0644\u0645\u0648\u0638\u0641\u064A\u0646\u060C \u0648\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631 \u0644\u0643\u0644 \u0627\u0644\u0645\u0648\u0627\u0642\u0639 \u0645\u0646 \u062D\u0633\u0627\u0628 \u0648\u0627\u062D\u062F."
+  })}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="split">
+        <div class="reveal">
+          ${shot({ id: "home-order-flow", ratio: "16 / 9", size: "1600 \xD7 900", alt: { en: "Order flow from customer to kitchen to driver", de: "Bestellablauf vom Kunden \xFCber die K\xFCche zum Fahrer", ar: "\u0645\u0633\u0627\u0631 \u0627\u0644\u0637\u0644\u0628 \u0645\u0646 \u0627\u0644\u0639\u0645\u064A\u0644 \u0625\u0644\u0649 \u0627\u0644\u0645\u0637\u0628\u062E \u0625\u0644\u0649 \u0627\u0644\u0633\u0627\u0626\u0642" } })}
+        </div>
+        <div>
+          ${head(
+    { en: "How it flows", de: "Der Ablauf", ar: "\u0643\u064A\u0641 \u064A\u0633\u064A\u0631 \u0627\u0644\u0639\u0645\u0644" },
+    { en: "From tap to doorstep without re-typing anything", de: "Vom Tippen bis zur Haust\xFCr \u2014 ohne Doppelerfassung", ar: "\u0645\u0646 \u0627\u0644\u0636\u063A\u0637\u0629 \u0625\u0644\u0649 \u0628\u0627\u0628 \u0627\u0644\u0639\u0645\u064A\u0644 \u062F\u0648\u0646 \u0625\u0639\u0627\u062F\u0629 \u0625\u062F\u062E\u0627\u0644" }
+  )}
+          <div class="steps">
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "The order arrives", de: "Die Bestellung trifft ein", ar: "\u064A\u0635\u0644 \u0627\u0644\u0637\u0644\u0628" })}>The order arrives</h3><p ${tAttrs({
+    en: "From the counter, a table QR code, an inbound phone call with caller ID, or your online storefront.",
+    de: "Von der Theke, per Tisch-QR-Code, \xFCber einen Anruf mit Rufnummernerkennung oder aus Ihrem Online-Shop.",
+    ar: "\u0645\u0646 \u0627\u0644\u0643\u0627\u0634\u064A\u0631\u060C \u0623\u0648 QR \u0627\u0644\u0637\u0627\u0648\u0644\u0629\u060C \u0623\u0648 \u0645\u0643\u0627\u0644\u0645\u0629 \u0648\u0627\u0631\u062F\u0629 \u0645\u0639 \u062A\u0639\u0631\u064A\u0641 \u0627\u0644\u0645\u062A\u0635\u0644\u060C \u0623\u0648 \u0645\u062A\u062C\u0631\u0643 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A."
+  })}>From the counter, a table QR code, an inbound phone call with caller ID, or your online storefront.</p></div></div>
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "The kitchen sees it", de: "Die K\xFCche sieht sie", ar: "\u064A\u0631\u0627\u0647 \u0627\u0644\u0645\u0637\u0628\u062E" })}>The kitchen sees it</h3><p ${tAttrs({
+    en: "It appears in the live queue with modifiers, allergen notes and the promised time. Print a ticket or work from the screen.",
+    de: "Sie erscheint in der Live-Warteschlange mit Optionen, Allergenhinweisen und Zusagezeit. Bon drucken oder direkt am Bildschirm arbeiten.",
+    ar: "\u064A\u0638\u0647\u0631 \u0641\u064A \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u062D\u064A\u0651\u0629 \u0645\u0639 \u0627\u0644\u0625\u0636\u0627\u0641\u0627\u062A \u0648\u0645\u0644\u0627\u062D\u0638\u0627\u062A \u0627\u0644\u062D\u0633\u0627\u0633\u064A\u0629 \u0648\u0627\u0644\u0648\u0642\u062A \u0627\u0644\u0645\u062A\u0648\u0642\u0639. \u0627\u0637\u0628\u0639 \u062A\u0630\u0643\u0631\u0629 \u0623\u0648 \u0627\u0639\u0645\u0644 \u0645\u0646 \u0627\u0644\u0634\u0627\u0634\u0629."
+  })}>It appears in the live queue with modifiers, allergen notes and the promised time. Print a ticket or work from the screen.</p></div></div>
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "A driver takes it", de: "Ein Fahrer \xFCbernimmt", ar: "\u064A\u0633\u062A\u0644\u0645\u0647 \u0627\u0644\u0633\u0627\u0626\u0642" })}>A driver takes it</h3><p ${tAttrs({
+    en: "Assign directly or broadcast to available drivers. The customer gets a tracking link; you get the timestamps.",
+    de: "Direkt zuweisen oder an verf\xFCgbare Fahrer ausschreiben. Der Kunde erh\xE4lt einen Tracking-Link, Sie die Zeitstempel.",
+    ar: "\u0623\u0633\u0646\u0650\u062F\u0647 \u0645\u0628\u0627\u0634\u0631\u0629 \u0623\u0648 \u0627\u0628\u062B\u0651\u0647 \u0644\u0644\u0633\u0627\u0626\u0642\u064A\u0646 \u0627\u0644\u0645\u062A\u0627\u062D\u064A\u0646. \u064A\u062D\u0635\u0644 \u0627\u0644\u0639\u0645\u064A\u0644 \u0639\u0644\u0649 \u0631\u0627\u0628\u0637 \u062A\u062A\u0628\u0651\u0639\u060C \u0648\u062A\u062D\u0635\u0644 \u0623\u0646\u062A \u0639\u0644\u0649 \u0627\u0644\u0623\u0648\u0642\u0627\u062A."
+  })}>Assign directly or broadcast to available drivers. The customer gets a tracking link; you get the timestamps.</p></div></div>
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "The books close themselves", de: "Der Abschluss l\xE4uft von selbst", ar: "\u062A\u064F\u0642\u0641\u0644 \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u062A\u0644\u0642\u0627\u0626\u064A\u064B\u0627" })}>The books close themselves</h3><p ${tAttrs({
+    en: "Cash-up compares counted cash to expected, files the shift, and pushes the day into your VAT-ready reports.",
+    de: "Der Kassensturz vergleicht Ist- mit Sollbestand, schliesst die Schicht ab und \xFCbertr\xE4gt den Tag in Ihre MwSt.-f\xE4higen Berichte.",
+    ar: "\u064A\u0642\u0627\u0631\u0646 \u0627\u0644\u062A\u0642\u0641\u064A\u0644 \u0627\u0644\u0646\u0642\u062F \u0627\u0644\u0645\u0639\u062F\u0648\u062F \u0628\u0627\u0644\u0645\u062A\u0648\u0642\u0639\u060C \u0648\u064A\u063A\u0644\u0642 \u0627\u0644\u0648\u0631\u062F\u064A\u0629\u060C \u0648\u064A\u0636\u064A\u0641 \u0627\u0644\u064A\u0648\u0645 \u0625\u0644\u0649 \u062A\u0642\u0627\u0631\u064A\u0631 \u062C\u0627\u0647\u0632\u0629 \u0644\u0644\u0636\u0631\u064A\u0628\u0629."
+  })}>Cash-up compares counted cash to expected, files the shift, and pushes the day into your VAT-ready reports.</p></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--inset">
+    <div class="wrap">
+      ${head(
+    { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" },
+    { en: "Configured for how your trade actually works", de: "Auf Ihre Branche zugeschnitten", ar: "\u0645\u0647\u064A\u064E\u0651\u0623 \u062D\u0633\u0628 \u0637\u0628\u064A\u0639\u0629 \u0646\u0634\u0627\u0637\u0643" },
+    {
+      en: "A pharmacy needs batch numbers; a bakery needs scale integration; a caf\xE9 needs a two-tap flat white. Kassenta ships a preset per vertical and lets you adjust every part of it.",
+      de: "Eine Apotheke braucht Chargennummern, eine B\xE4ckerei Waagenanbindung, ein Caf\xE9 einen Flat White in zwei Taps. Kassenta liefert je Branche eine Vorlage \u2014 und l\xE4sst Sie alles daran anpassen.",
+      ar: "\u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0629 \u062A\u062D\u062A\u0627\u062C \u0623\u0631\u0642\u0627\u0645 \u062A\u0634\u063A\u064A\u0644\u0627\u062A\u060C \u0648\u0627\u0644\u0645\u062E\u0628\u0632 \u064A\u062D\u062A\u0627\u062C \u0645\u064A\u0632\u0627\u0646\u064B\u0627\u060C \u0648\u0627\u0644\u0643\u0627\u0641\u064A\u0647 \u064A\u062D\u062A\u0627\u062C \u0637\u0644\u0628\u064B\u0627 \u0628\u0636\u063A\u0637\u062A\u064A\u0646. \u064A\u0648\u0641\u0651\u0631 Kassenta \u0625\u0639\u062F\u0627\u062F\u064B\u0627 \u062C\u0627\u0647\u0632\u064B\u0627 \u0644\u0643\u0644 \u0646\u0634\u0627\u0637 \u0645\u0639 \u0625\u0645\u0643\u0627\u0646\u064A\u0629 \u062A\u0639\u062F\u064A\u0644 \u0643\u0644 \u062A\u0641\u0635\u064A\u0644\u0629."
+    },
+    true
+  )}
+      <div class="grid grid-3">
+        ${card(icons.coffee, { en: "Caf\xE9s and bars", de: "Caf\xE9s und Bars", ar: "\u0627\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u0627\u0644\u0628\u0627\u0631\u0627\u062A" }, {
+    en: "Fast repeat orders, cup sizes and milk options as modifiers, tab handling and a tip line on the receipt.",
+    de: "Schnelle Wiederholbestellungen, Gr\xF6ssen und Milchoptionen als Optionen, Deckel-Verwaltung und Trinkgeldzeile auf dem Bon.",
+    ar: "\u0637\u0644\u0628\u0627\u062A \u0645\u062A\u0643\u0631\u0631\u0629 \u0633\u0631\u064A\u0639\u0629\u060C \u0648\u0623\u062D\u062C\u0627\u0645 \u0648\u062E\u064A\u0627\u0631\u0627\u062A \u062D\u0644\u064A\u0628 \u0643\u0625\u0636\u0627\u0641\u0627\u062A\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062D\u0633\u0627\u0628 \u0627\u0644\u0645\u0641\u062A\u0648\u062D\u060C \u0648\u0633\u0637\u0631 \u0628\u0642\u0634\u064A\u0634 \u0641\u064A \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629."
+  })}
+        ${card(icons.register, { en: "Restaurants", de: "Restaurants", ar: "\u0627\u0644\u0645\u0637\u0627\u0639\u0645" }, {
+    en: "Table plan, course timing, dine-in versus takeaway VAT, split bills and QR ordering from the table.",
+    de: "Tischplan, Gangsteuerung, MwSt. f\xFCr Vor-Ort und Takeaway, Rechnungsteilung und QR-Bestellung am Tisch.",
+    ar: "\u0645\u062E\u0637\u0637 \u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A\u060C \u0648\u062A\u0648\u0642\u064A\u062A \u0627\u0644\u0623\u0637\u0628\u0627\u0642\u060C \u0648\u0636\u0631\u064A\u0628\u0629 \u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0645\u0642\u0627\u0628\u0644 \u062A\u064A\u0643 \u0623\u0648\u0627\u064A\u060C \u0648\u062A\u0642\u0633\u064A\u0645 \u0627\u0644\u0641\u0648\u0627\u062A\u064A\u0631\u060C \u0648\u0637\u0644\u0628 QR \u0645\u0646 \u0627\u0644\u0637\u0627\u0648\u0644\u0629."
+  })}
+        ${card(icons.cart, { en: "Supermarkets", de: "Superm\xE4rkte", ar: "\u0627\u0644\u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A" }, {
+    en: "Barcode scanning, weighed goods, deposit handling and fast multi-item checkout with a customer display.",
+    de: "Barcode-Scanning, Gewichtsware, Pfandverwaltung und schneller Multi-Artikel-Checkout mit Kundendisplay.",
+    ar: "\u0645\u0633\u062D \u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062F\u060C \u0648\u0627\u0644\u0633\u0644\u0639 \u0628\u0627\u0644\u0648\u0632\u0646\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062A\u0623\u0645\u064A\u0646 \u0627\u0644\u0645\u0633\u062A\u0631\u062F\u060C \u0648\u062F\u0641\u0639 \u0633\u0631\u064A\u0639 \u0644\u0623\u0635\u0646\u0627\u0641 \u0645\u062A\u0639\u062F\u062F\u0629 \u0645\u0639 \u0634\u0627\u0634\u0629 \u0639\u0645\u064A\u0644."
+  })}
+        ${card(icons.pill, { en: "Pharmacies", de: "Apotheken", ar: "\u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0627\u062A" }, {
+    en: "Reduced VAT categories, batch and expiry tracking, restricted-item prompts and per-operator audit trails.",
+    de: "Reduzierte MwSt.-Kategorien, Chargen- und Verfallsverfolgung, Hinweise bei rezeptpflichtigen Artikeln und Audit-Trails je Mitarbeiter.",
+    ar: "\u0641\u0626\u0627\u062A \u0636\u0631\u064A\u0628\u0629 \u0645\u062E\u0641\u064E\u0651\u0636\u0629\u060C \u0648\u062A\u062A\u0628\u0651\u0639 \u0627\u0644\u062A\u0634\u063A\u064A\u0644\u0627\u062A \u0648\u062A\u0648\u0627\u0631\u064A\u062E \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0629\u060C \u0648\u062A\u0646\u0628\u064A\u0647\u0627\u062A \u0627\u0644\u0623\u0635\u0646\u0627\u0641 \u0627\u0644\u0645\u0642\u064A\u064E\u0651\u062F\u0629\u060C \u0648\u0633\u062C\u0644 \u062A\u062F\u0642\u064A\u0642 \u0644\u0643\u0644 \u0645\u0633\u062A\u062E\u062F\u0645."
+  })}
+        ${card(icons.box, { en: "Bakeries", de: "B\xE4ckereien", ar: "\u0627\u0644\u0645\u062E\u0627\u0628\u0632" }, {
+    en: "Weight-based pricing, morning pre-orders, production planning and waste recording at close.",
+    de: "Preis nach Gewicht, Vorbestellungen am Morgen, Produktionsplanung und Retourenerfassung beim Abschluss.",
+    ar: "\u062A\u0633\u0639\u064A\u0631 \u0628\u0627\u0644\u0648\u0632\u0646\u060C \u0648\u0637\u0644\u0628\u0627\u062A \u0645\u0633\u0628\u0642\u0629 \u0635\u0628\u0627\u062D\u064A\u0629\u060C \u0648\u062A\u062E\u0637\u064A\u0637 \u0627\u0644\u0625\u0646\u062A\u0627\u062C\u060C \u0648\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0647\u062F\u0631 \u0639\u0646\u062F \u0627\u0644\u0625\u063A\u0644\u0627\u0642."
+  })}
+        ${card(icons.tag, { en: "Retail", de: "Einzelhandel", ar: "\u0627\u0644\u062A\u062C\u0632\u0626\u0629" }, {
+    en: "Variants by size and colour, stock counts, returns with reason codes and supplier purchase records.",
+    de: "Varianten nach Gr\xF6sse und Farbe, Inventuren, Retouren mit Grundcodes und Lieferantenbelege.",
+    ar: "\u0645\u062A\u063A\u064A\u0651\u0631\u0627\u062A \u0628\u0627\u0644\u0645\u0642\u0627\u0633 \u0648\u0627\u0644\u0644\u0648\u0646\u060C \u0648\u062C\u0631\u062F \u0627\u0644\u0645\u062E\u0632\u0648\u0646\u060C \u0648\u0645\u0631\u062A\u062C\u0639\u0627\u062A \u0628\u0623\u0633\u0628\u0627\u0628 \u0645\u062D\u062F\u064E\u0651\u062F\u0629\u060C \u0648\u0633\u062C\u0644\u0627\u062A \u0645\u0634\u062A\u0631\u064A\u0627\u062A \u0627\u0644\u0645\u0648\u0631\u062F\u064A\u0646."
+  })}
+      </div>
+      <div class="btn-row" style="justify-content:center">
+        <a class="btn btn-ghost" href="/solutions/" ${tAttrs({ en: "Compare all industry presets", de: "Alle Branchenvorlagen vergleichen", ar: "\u0642\u0627\u0631\u0646 \u0643\u0644 \u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" })}>Compare all industry presets</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          ${head(
+    { en: "Built in, not bolted on", de: "Eingebaut, nicht angeflanscht", ar: "\u0645\u062F\u0645\u062C \u0644\u0627 \u0645\u0636\u0627\u0641" },
+    { en: "The Swiss details that usually cost extra", de: "Die Schweizer Details, die sonst extra kosten", ar: "\u062A\u0641\u0627\u0635\u064A\u0644 \u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0639\u0627\u062F\u0629\u064B \u0645\u0627 \u062A\u064F\u0643\u0644\u0651\u0641 \u0625\u0636\u0627\u0641\u064A\u064B\u0627" }
+  )}
+          ${ticks([
+    { en: "8.1% standard and 2.6% reduced VAT, with the dine-in versus takeaway distinction applied per line.", de: "8,1 % Normal- und 2,6 % reduzierter MwSt.-Satz, mit Unterscheidung Vor-Ort/Takeaway pro Position.", ar: "\u0636\u0631\u064A\u0628\u0629 8.1% \u0639\u0627\u062F\u064A\u0629 \u06482.6% \u0645\u062E\u0641\u064E\u0651\u0636\u0629\u060C \u0645\u0639 \u0627\u0644\u062A\u0641\u0631\u0642\u0629 \u0628\u064A\u0646 \u0627\u0644\u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0648\u0627\u0644\u062A\u064A\u0643 \u0623\u0648\u0627\u064A \u0644\u0643\u0644 \u0628\u0646\u062F." },
+    { en: "Cash totals rounded to the nearest CHF 0.05 while card and TWINT keep the exact amount.", de: "Barbetr\xE4ge auf 5 Rappen gerundet, Karte und TWINT bleiben exakt.", ar: "\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F \u0644\u0623\u0642\u0631\u0628 0.05 \u0641\u0631\u0646\u0643 \u0645\u0639 \u0625\u0628\u0642\u0627\u0621 \u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0642\u064A\u0642 \u0644\u0644\u0628\u0637\u0627\u0642\u0629 \u0648TWINT." },
+    { en: "TWINT, card, cash and invoice as first-class payment methods on the receipt and in reports.", de: "TWINT, Karte, Bar und Rechnung als gleichwertige Zahlungsarten auf Bon und in Berichten.", ar: "TWINT \u0648\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0648\u0627\u0644\u0646\u0642\u062F \u0648\u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0643\u0648\u0633\u0627\u0626\u0644 \u062F\u0641\u0639 \u0623\u0633\u0627\u0633\u064A\u0629 \u0641\u064A \u0627\u0644\u0625\u064A\u0635\u0627\u0644 \u0648\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631." },
+    { en: "German, English and Arabic across the whole product, including right-to-left layout.", de: "Deutsch, Englisch und Arabisch im gesamten Produkt, inklusive Rechts-nach-links-Layout.", ar: "\u0627\u0644\u0623\u0644\u0645\u0627\u0646\u064A\u0629 \u0648\u0627\u0644\u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629 \u0648\u0627\u0644\u0639\u0631\u0628\u064A\u0629 \u0641\u064A \u0643\u0644 \u0627\u0644\u0645\u0646\u062A\u062C\u060C \u0628\u0645\u0627 \u0641\u064A \u0630\u0644\u0643 \u0627\u0644\u062A\u062E\u0637\u064A\u0637 \u0645\u0646 \u0627\u0644\u064A\u0645\u064A\u0646 \u0644\u0644\u064A\u0633\u0627\u0631." },
+    { en: "Data hosted in Europe, with GDPR and nDSG deletion and export requests handled from the console.", de: "Daten in Europa gehostet, DSGVO- und nDSG-L\xF6sch- sowie Exportanfragen direkt in der Konsole.", ar: "\u0627\u0633\u062A\u0636\u0627\u0641\u0629 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0641\u064A \u0623\u0648\u0631\u0648\u0628\u0627\u060C \u0645\u0639 \u0645\u0639\u0627\u0644\u062C\u0629 \u0637\u0644\u0628\u0627\u062A \u0627\u0644\u062D\u0630\u0641 \u0648\u0627\u0644\u062A\u0635\u062F\u064A\u0631 \u0648\u0641\u0642 GDPR \u0648nDSG \u0645\u0646 \u0627\u0644\u0644\u0648\u062D\u0629." }
+  ])}
+          <div class="btn-row">
+            <a class="btn btn-ghost" href="/compliance/" ${tAttrs({ en: "Read the compliance detail", de: "Compliance-Details lesen", ar: "\u0627\u0642\u0631\u0623 \u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644" })}>Read the compliance detail</a>
+          </div>
+        </div>
+        <div class="reveal">
+          ${shot({ id: "home-swiss-receipt", ratio: "4 / 5", size: "1122 \xD7 1402", alt: { en: "Receipt showing Swiss VAT split and cash rounding", de: "Bon mit Schweizer MwSt.-Aufteilung und Rappenrundung", ar: "\u0625\u064A\u0635\u0627\u0644 \u064A\u0648\u0636\u0651\u062D \u062A\u0642\u0633\u064A\u0645 \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A" } })}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="wrap">
+      ${head(
+    { en: "Everywhere you work", de: "\xDCberall im Einsatz", ar: "\u0623\u064A\u0646\u0645\u0627 \u062A\u0639\u0645\u0644" },
+    { en: "Phone in the aisle, tablet at the counter, browser in the office", de: "Handy im Gang, Tablet an der Theke, Browser im B\xFCro", ar: "\u0647\u0627\u062A\u0641 \u0628\u064A\u0646 \u0627\u0644\u0631\u0641\u0648\u0641\u060C \u062A\u0627\u0628\u0644\u062A \u0639\u0644\u0649 \u0627\u0644\u0643\u0627\u0634\u064A\u0631\u060C \u0645\u062A\u0635\u0641\u062D \u0641\u064A \u0627\u0644\u0645\u0643\u062A\u0628" },
+    {
+      en: "One codebase, three form factors. The layout adapts rather than shrinking: the cart becomes a sheet on a phone, a sidebar on a tablet and a fixed panel on a desktop.",
+      de: "Eine Codebasis, drei Formate. Das Layout passt sich an, statt nur zu schrumpfen: Der Warenkorb wird zum Sheet am Handy, zur Seitenleiste am Tablet und zum festen Panel am Desktop.",
+      ar: "\u0642\u0627\u0639\u062F\u0629 \u0643\u0648\u062F \u0648\u0627\u062D\u062F\u0629 \u0648\u062B\u0644\u0627\u062B\u0629 \u0623\u062D\u062C\u0627\u0645. \u0627\u0644\u062A\u062E\u0637\u064A\u0637 \u064A\u062A\u0643\u064A\u0651\u0641 \u0628\u062F\u0644 \u0623\u0646 \u064A\u0646\u0643\u0645\u0634: \u0627\u0644\u0633\u0644\u0629 \u062A\u0635\u0628\u062D \u0644\u0648\u062D\u064B\u0627 \u0641\u064A \u0627\u0644\u0647\u0627\u062A\u0641\u060C \u0648\u0634\u0631\u064A\u0637\u064B\u0627 \u062C\u0627\u0646\u0628\u064A\u064B\u0627 \u0641\u064A \u0627\u0644\u062A\u0627\u0628\u0644\u062A\u060C \u0648\u0644\u0648\u062D\u0629 \u062B\u0627\u0628\u062A\u0629 \u0641\u064A \u0627\u0644\u0643\u0645\u0628\u064A\u0648\u062A\u0631."
+    },
+    true
+  )}
+      <div class="reveal">
+        ${shot({ id: "home-devices", ratio: "3 / 2", size: "1536 \xD7 1024", bare: true, alt: { en: "Kassenta shown on a phone, a tablet and a desktop browser", de: "Kassenta auf Smartphone, Tablet und Desktop-Browser", ar: "Kassenta \u0639\u0644\u0649 \u0647\u0627\u062A\u0641 \u0648\u062A\u0627\u0628\u0644\u062A \u0648\u0645\u062A\u0635\u0641\u062D \u0643\u0645\u0628\u064A\u0648\u062A\u0631" } })}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap" style="max-width:860px">
+      ${head({ en: "Questions", de: "Fragen", ar: "\u0623\u0633\u0626\u0644\u0629" }, { en: "Frequently asked", de: "H\xE4ufig gefragt", ar: "\u0627\u0644\u0623\u0643\u062B\u0631 \u062A\u0643\u0631\u0627\u0631\u064B\u0627" }, void 0, true)}
+      ${faq([
+    {
+      q: { en: "Do I need to buy special hardware?", de: "Brauche ich spezielle Hardware?", ar: "\u0647\u0644 \u0623\u062D\u062A\u0627\u062C \u0623\u062C\u0647\u0632\u0629 \u062E\u0627\u0635\u0629\u061F" },
+      a: {
+        en: "No. Kassenta runs in any modern browser and as an app on Android and iOS, so an existing tablet or laptop is enough to start. Receipt printers, cash drawers and barcode scanners are supported but optional.",
+        de: "Nein. Kassenta l\xE4uft in jedem modernen Browser sowie als App unter Android und iOS \u2014 ein vorhandenes Tablet oder Notebook gen\xFCgt f\xFCr den Start. Bondrucker, Kassenladen und Barcodescanner werden unterst\xFCtzt, sind aber optional.",
+        ar: "\u0644\u0627. \u064A\u0639\u0645\u0644 Kassenta \u0641\u064A \u0623\u064A \u0645\u062A\u0635\u0641\u062D \u062D\u062F\u064A\u062B \u0648\u0643\u062A\u0637\u0628\u064A\u0642 \u0639\u0644\u0649 \u0623\u0646\u062F\u0631\u0648\u064A\u062F \u0648iOS\u060C \u0644\u0630\u0627 \u064A\u0643\u0641\u064A \u062A\u0627\u0628\u0644\u062A \u0623\u0648 \u0644\u0627\u0628\u062A\u0648\u0628 \u0644\u062F\u064A\u0643 \u0644\u0644\u0628\u062F\u0621. \u0627\u0644\u0637\u0627\u0628\u0639\u0627\u062A \u0648\u0623\u062F\u0631\u0627\u062C \u0627\u0644\u0646\u0642\u062F \u0648\u0642\u0627\u0631\u0626\u0627\u062A \u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062F \u0645\u062F\u0639\u0648\u0645\u0629 \u0644\u0643\u0646\u0647\u0627 \u0627\u062E\u062A\u064A\u0627\u0631\u064A\u0629."
+      }
+    },
+    {
+      q: { en: "What happens if the internet drops?", de: "Was passiert bei Internetausfall?", ar: "\u0645\u0627\u0630\u0627 \u0644\u0648 \u0627\u0646\u0642\u0637\u0639 \u0627\u0644\u0625\u0646\u062A\u0631\u0646\u062A\u061F" },
+      a: {
+        en: "The POS keeps taking orders and payments from its local cache and syncs the queue once the connection returns. Online ordering and driver tracking need connectivity, since they involve people outside the building.",
+        de: "Die Kasse nimmt weiterhin Bestellungen und Zahlungen aus dem lokalen Cache entgegen und synchronisiert die Warteschlange, sobald die Verbindung zur\xFCck ist. Online-Bestellung und Fahrer-Tracking ben\xF6tigen eine Verbindung, da Personen ausserhalb beteiligt sind.",
+        ar: "\u064A\u0648\u0627\u0635\u0644 \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0627\u0633\u062A\u0642\u0628\u0627\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0648\u0627\u0644\u0645\u062F\u0641\u0648\u0639\u0627\u062A \u0645\u0646 \u0627\u0644\u0630\u0627\u0643\u0631\u0629 \u0627\u0644\u0645\u062D\u0644\u064A\u0629 \u062B\u0645 \u064A\u0632\u0627\u0645\u0646 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0641\u0648\u0631 \u0639\u0648\u062F\u0629 \u0627\u0644\u0627\u062A\u0635\u0627\u0644. \u0623\u0645\u0627 \u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0648\u062A\u062A\u0628\u0651\u0639 \u0627\u0644\u0633\u0627\u0626\u0642\u064A\u0646 \u0641\u064A\u062D\u062A\u0627\u062C\u0627\u0646 \u0627\u062A\u0635\u0627\u0644\u064B\u0627 \u0644\u0623\u0646\u0647\u0645\u0627 \u064A\u0634\u0645\u0644\u0627\u0646 \u0623\u0634\u062E\u0627\u0635\u064B\u0627 \u062E\u0627\u0631\u062C \u0627\u0644\u0645\u062D\u0644."
+      }
+    },
+    {
+      q: { en: "Can I move my existing products and customers in?", de: "Kann ich bestehende Artikel und Kunden \xFCbernehmen?", ar: "\u0647\u0644 \u064A\u0645\u0643\u0646 \u0646\u0642\u0644 \u0645\u0646\u062A\u062C\u0627\u062A\u064A \u0648\u0639\u0645\u0644\u0627\u0626\u064A \u0627\u0644\u062D\u0627\u0644\u064A\u064A\u0646\u061F" },
+      a: {
+        en: "Yes. Products, categories and customers import from CSV, and we do the first import with you during onboarding so the mapping is right before you go live.",
+        de: "Ja. Artikel, Kategorien und Kunden werden per CSV importiert; den ersten Import machen wir beim Onboarding gemeinsam, damit die Zuordnung vor dem Livegang stimmt.",
+        ar: "\u0646\u0639\u0645. \u062A\u064F\u0633\u062A\u0648\u0631\u062F \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0627\u0644\u0641\u0626\u0627\u062A \u0648\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0645\u0646 \u0645\u0644\u0641 CSV\u060C \u0648\u0646\u0642\u0648\u0645 \u0628\u0623\u0648\u0644 \u0627\u0633\u062A\u064A\u0631\u0627\u062F \u0645\u0639\u0643 \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u062A\u0647\u064A\u0626\u0629 \u0644\u0636\u0645\u0627\u0646 \u0635\u062D\u0629 \u0627\u0644\u0631\u0628\u0637 \u0642\u0628\u0644 \u0627\u0644\u062A\u0634\u063A\u064A\u0644."
+      }
+    },
+    {
+      q: { en: "How many branches can one account hold?", de: "Wie viele Filialen kann ein Konto haben?", ar: "\u0643\u0645 \u0641\u0631\u0639\u064B\u0627 \u064A\u0633\u062A\u0648\u0639\u0628 \u0627\u0644\u062D\u0633\u0627\u0628 \u0627\u0644\u0648\u0627\u062D\u062F\u061F" },
+      a: {
+        en: "As many as you need. Each branch keeps its own stock, staff and prices while the owner console reports across all of them together.",
+        de: "So viele wie n\xF6tig. Jede Filiale f\xFChrt eigenen Bestand, Personal und Preise, w\xE4hrend die Betreiber-Konsole filial\xFCbergreifend auswertet.",
+        ar: "\u0628\u0644\u0627 \u062D\u062F. \u0644\u0643\u0644 \u0641\u0631\u0639 \u0645\u062E\u0632\u0648\u0646\u0647 \u0648\u0645\u0648\u0638\u0641\u0648\u0647 \u0648\u0623\u0633\u0639\u0627\u0631\u0647\u060C \u0628\u064A\u0646\u0645\u0627 \u062A\u0639\u0631\u0636 \u0644\u0648\u062D\u0629 \u0627\u0644\u0645\u0627\u0644\u0643 \u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u062C\u0645\u0651\u0639\u0629 \u0644\u0643\u0644 \u0627\u0644\u0641\u0631\u0648\u0639."
+      }
+    },
+    {
+      q: { en: "Is my data locked in?", de: "Sind meine Daten eingeschlossen?", ar: "\u0647\u0644 \u0628\u064A\u0627\u0646\u0627\u062A\u064A \u0645\u062D\u062A\u062C\u0632\u0629\u061F" },
+      a: {
+        en: "No. Sales, products and customers can be exported to CSV at any time from the reporting screens, and a full export can be requested from support.",
+        de: "Nein. Ums\xE4tze, Artikel und Kunden lassen sich jederzeit aus den Berichten als CSV exportieren; einen Vollexport erhalten Sie \xFCber den Support.",
+        ar: "\u0644\u0627. \u064A\u0645\u0643\u0646 \u062A\u0635\u062F\u064A\u0631 \u0627\u0644\u0645\u0628\u064A\u0639\u0627\u062A \u0648\u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0625\u0644\u0649 CSV \u0641\u064A \u0623\u064A \u0648\u0642\u062A \u0645\u0646 \u0634\u0627\u0634\u0627\u062A \u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631\u060C \u0648\u0637\u0644\u0628 \u062A\u0635\u062F\u064A\u0631 \u0643\u0627\u0645\u0644 \u0639\u0628\u0631 \u0627\u0644\u062F\u0639\u0645."
+      }
+    }
+  ])}
+    </div>
+  </section>
+
+  ${ctaBand(
+    { en: "See it running on your own menu", de: "Sehen Sie es mit Ihrer eigenen Karte", ar: "\u0634\u0627\u0647\u062F\u0647 \u064A\u0639\u0645\u0644 \u0639\u0644\u0649 \u0642\u0627\u0626\u0645\u062A\u0643 \u0623\u0646\u062A" },
+    {
+      en: "Send us your current menu or product list. We load it into a demo account and walk you through a normal service \u2014 counter, online order and delivery \u2014 in about 30 minutes.",
+      de: "Senden Sie uns Ihre aktuelle Karte oder Artikelliste. Wir laden sie in ein Demo-Konto und zeigen Ihnen in rund 30 Minuten einen normalen Serviceablauf \u2014 Theke, Online-Bestellung und Lieferung.",
+      ar: "\u0623\u0631\u0633\u0644 \u0644\u0646\u0627 \u0642\u0627\u0626\u0645\u062A\u0643 \u0623\u0648 \u0642\u0627\u0626\u0645\u0629 \u0645\u0646\u062A\u062C\u0627\u062A\u0643 \u0627\u0644\u062D\u0627\u0644\u064A\u0629. \u0646\u062D\u0645\u0651\u0644\u0647\u0627 \u0641\u064A \u062D\u0633\u0627\u0628 \u062A\u062C\u0631\u064A\u0628\u064A \u0648\u0646\u0639\u0631\u0636 \u0644\u0643 \u062F\u0648\u0631\u0629 \u0639\u0645\u0644 \u0643\u0627\u0645\u0644\u0629 \u2014 \u0643\u0627\u0634\u064A\u0631 \u0648\u0637\u0644\u0628 \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0648\u062A\u0648\u0635\u064A\u0644 \u2014 \u0641\u064A \u0646\u062D\u0648 30 \u062F\u0642\u064A\u0642\u0629."
+    }
+  )}`
+};
+var features = {
+  meta: {
+    path: "/features",
+    title: {
+      en: "POS features: till, table QR, delivery \u2014 Kassenta",
+      de: "Kassen-Funktionen: Theke, Tisch-QR, Lieferung \u2014 Kassenta",
+      ar: "\u0645\u0645\u064A\u0632\u0627\u062A \u0627\u0644\u0643\u0627\u0634\u064A\u0631: \u0627\u0644\u0628\u064A\u0639 \u0648QR \u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u2014 Kassenta"
+    },
+    description: {
+      en: "Touch POS, table QR ordering, delivery dispatch, inventory, CRM and loyalty, staff shifts and VAT-ready reporting \u2014 every module in the Kassenta platform.",
+      de: "Touch-Kasse, Tisch-QR-Bestellung, Lieferdisposition, Lagerhaltung, CRM und Treueprogramm, Schichten und MwSt.-f\xE4hige Auswertungen \u2014 alle Module der Kassenta-Plattform.",
+      ar: "\u0643\u0627\u0634\u064A\u0631 \u0644\u0645\u0633\u064A\u060C \u0648\u0637\u0644\u0628 QR \u0644\u0644\u0637\u0627\u0648\u0644\u0627\u062A\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062A\u0648\u0635\u064A\u0644\u060C \u0648\u0627\u0644\u0645\u062E\u0632\u0648\u0646\u060C \u0648\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u0627\u0644\u0648\u0644\u0627\u0621\u060C \u0648\u0648\u0631\u062F\u064A\u0627\u062A \u0627\u0644\u0645\u0648\u0638\u0641\u064A\u0646\u060C \u0648\u062A\u0642\u0627\u0631\u064A\u0631 \u062C\u0627\u0647\u0632\u0629 \u0644\u0644\u0636\u0631\u064A\u0628\u0629 \u2014 \u0643\u0644 \u0648\u062D\u062F\u0627\u062A \u0645\u0646\u0635\u0629 Kassenta."
+    }
+  },
+  body: `
+  ${pageHead(
+    { en: "Everything the floor, the kitchen and the office need", de: "Alles f\xFCr Verkaufsfl\xE4che, K\xFCche und B\xFCro", ar: "\u0643\u0644 \u0645\u0627 \u062A\u062D\u062A\u0627\u062C\u0647 \u0627\u0644\u0635\u0627\u0644\u0629 \u0648\u0627\u0644\u0645\u0637\u0628\u062E \u0648\u0627\u0644\u0625\u062F\u0627\u0631\u0629" },
+    {
+      en: "Kassenta is one application with modules you switch on as you grow. Nothing here is a separate purchase or a separate login.",
+      de: "Kassenta ist eine Anwendung mit Modulen, die Sie beim Wachsen zuschalten. Nichts davon ist ein separater Kauf oder ein separates Login.",
+      ar: "Kassenta \u062A\u0637\u0628\u064A\u0642 \u0648\u0627\u062D\u062F \u0628\u0648\u062D\u062F\u0627\u062A \u062A\u0641\u0639\u0651\u0644\u0647\u0627 \u0645\u0639 \u0646\u0645\u0648\u0651\u0643. \u0644\u0627 \u0634\u064A\u0621 \u0647\u0646\u0627 \u0634\u0631\u0627\u0621 \u0645\u0646\u0641\u0635\u0644 \u0623\u0648 \u062D\u0633\u0627\u0628 \u0645\u0646\u0641\u0635\u0644."
+    },
+    { en: "Features", de: "Funktionen", ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A" }
+  )}
+
+  <section class="section">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          ${head({ en: "Selling", de: "Verkauf", ar: "\u0627\u0644\u0628\u064A\u0639" }, { en: "A till that keeps up with a queue", de: "Eine Kasse, die mit der Schlange mith\xE4lt", ar: "\u0643\u0627\u0634\u064A\u0631 \u064A\u0648\u0627\u0643\u0628 \u0627\u0644\u0637\u0627\u0628\u0648\u0631" })}
+          ${ticks([
+    { en: "Category and search-first product grid, tuned so a regular order takes three taps.", de: "Raster nach Kategorie und Suche, so abgestimmt, dass eine Standardbestellung drei Taps braucht.", ar: "\u0634\u0628\u0643\u0629 \u0645\u0646\u062A\u062C\u0627\u062A \u0628\u0627\u0644\u0641\u0626\u0627\u062A \u0648\u0627\u0644\u0628\u062D\u062B\u060C \u0645\u0636\u0628\u0648\u0637\u0629 \u0644\u064A\u062A\u0645 \u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u0645\u0639\u062A\u0627\u062F \u0628\u062B\u0644\u0627\u062B \u0636\u063A\u0637\u0627\u062A." },
+    { en: "Variants and modifiers with price deltas \u2014 sizes, extras, removals and free-text kitchen notes.", de: "Varianten und Optionen mit Preisdifferenz \u2014 Gr\xF6ssen, Extras, Abwahl und freie K\xFCchennotizen.", ar: "\u0645\u062A\u063A\u064A\u0651\u0631\u0627\u062A \u0648\u0625\u0636\u0627\u0641\u0627\u062A \u0628\u0641\u0631\u0648\u0642 \u0633\u0639\u0631\u064A\u0629 \u2014 \u0623\u062D\u062C\u0627\u0645 \u0648\u0625\u0636\u0627\u0641\u0627\u062A \u0648\u062D\u0630\u0641 \u0648\u0645\u0644\u0627\u062D\u0638\u0627\u062A \u0645\u0637\u0628\u062E \u062D\u0631\u0629." },
+    { en: "Percentage or fixed discounts per line or per ticket, with a reason recorded against the operator.", de: "Prozentuale oder feste Rabatte je Position oder Bon, mit Begr\xFCndung und Zuordnung zum Mitarbeiter.", ar: "\u062E\u0635\u0648\u0645\u0627\u062A \u0646\u0633\u0628\u064A\u0629 \u0623\u0648 \u062B\u0627\u0628\u062A\u0629 \u0644\u0643\u0644 \u0628\u0646\u062F \u0623\u0648 \u0641\u0627\u062A\u0648\u0631\u0629\u060C \u0645\u0639 \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0633\u0628\u0628 \u0628\u0627\u0633\u0645 \u0627\u0644\u0645\u0648\u0638\u0641." },
+    { en: "Split payments across cash, card, TWINT and wallet on a single ticket.", de: "Teilzahlungen \xFCber Bar, Karte, TWINT und Guthaben auf einem Bon.", ar: "\u062F\u0641\u0639 \u0645\u0642\u0633\u064E\u0651\u0645 \u0628\u064A\u0646 \u0627\u0644\u0646\u0642\u062F \u0648\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0648TWINT \u0648\u0627\u0644\u0645\u062D\u0641\u0638\u0629 \u0641\u064A \u0641\u0627\u062A\u0648\u0631\u0629 \u0648\u0627\u062D\u062F\u0629." },
+    { en: "Held tickets, quick reprint and a searchable invoice history with a 24-hour and full-range view.", de: "Geparkte Bons, Schnell-Nachdruck und durchsuchbare Beleghistorie mit 24-Stunden- und Gesamtansicht.", ar: "\u0641\u0648\u0627\u062A\u064A\u0631 \u0645\u0639\u0644\u064E\u0651\u0642\u0629\u060C \u0648\u0625\u0639\u0627\u062F\u0629 \u0637\u0628\u0627\u0639\u0629 \u0633\u0631\u064A\u0639\u0629\u060C \u0648\u0633\u062C\u0644 \u0641\u0648\u0627\u062A\u064A\u0631 \u0642\u0627\u0628\u0644 \u0644\u0644\u0628\u062D\u062B \u0628\u0639\u0631\u0636 24 \u0633\u0627\u0639\u0629 \u0623\u0648 \u0643\u0627\u0645\u0644 \u0627\u0644\u0645\u062F\u0629." },
+    { en: "Barcode scanning from the device camera or a USB or Bluetooth scanner.", de: "Barcode-Scan \xFCber Ger\xE4tekamera oder USB-/Bluetooth-Scanner.", ar: "\u0645\u0633\u062D \u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062F \u0645\u0646 \u0643\u0627\u0645\u064A\u0631\u0627 \u0627\u0644\u062C\u0647\u0627\u0632 \u0623\u0648 \u0645\u0627\u0633\u062D USB \u0623\u0648 \u0628\u0644\u0648\u062A\u0648\u062B." }
+  ])}
+        </div>
+        <div class="reveal">${shot({ id: "feature-pos-grid", ratio: "4 / 3", size: "1448 \xD7 1086", alt: { en: "The Kassenta product grid and cart during a busy service", de: "Artikelraster und Warenkorb von Kassenta im laufenden Betrieb", ar: "\u0634\u0628\u0643\u0629 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0633\u0644\u0629 Kassenta \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u062E\u062F\u0645\u0629" } })}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="wrap">
+      <div class="split">
+        <div class="reveal">${shot({ id: "feature-online-store", ratio: "2 / 3", size: "1024 \xD7 1536", alt: { en: "A branded Kassenta online storefront on a phone", de: "Gebrandeter Kassenta-Onlineshop auf dem Smartphone", ar: "\u0645\u062A\u062C\u0631 Kassenta \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0628\u0647\u0648\u064A\u0629 \u0627\u0644\u0645\u062A\u062C\u0631 \u0639\u0644\u0649 \u0627\u0644\u0647\u0627\u062A\u0641" } })}</div>
+        <div>
+          ${head({ en: "Online and tables", de: "Online und Tische", ar: "\u0623\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A" }, { en: "Your own ordering channel, not a marketplace listing", de: "Ihr eigener Bestellkanal statt eines Marktplatz-Eintrags", ar: "\u0642\u0646\u0627\u0629 \u0637\u0644\u0628 \u062E\u0627\u0635\u0629 \u0628\u0643 \u0644\u0627 \u0645\u062C\u0631\u062F \u0625\u062F\u0631\u0627\u062C \u0641\u064A \u062A\u0637\u0628\u064A\u0642 \u0648\u0633\u064A\u0637" })}
+          ${ticks([
+    { en: "A storefront at your own address, with your logo, colours, opening hours and promo banner.", de: "Ein Shop unter Ihrer eigenen Adresse, mit Logo, Farben, \xD6ffnungszeiten und Aktionsbanner.", ar: "\u0645\u062A\u062C\u0631 \u0639\u0644\u0649 \u0639\u0646\u0648\u0627\u0646\u0643 \u0627\u0644\u062E\u0627\u0635\u060C \u0628\u0634\u0639\u0627\u0631\u0643 \u0648\u0623\u0644\u0648\u0627\u0646\u0643 \u0648\u0645\u0648\u0627\u0639\u064A\u062F\u0643 \u0648\u0634\u0631\u064A\u0637 \u0639\u0631\u0648\u0636\u0643." },
+    { en: "Per-table QR codes that open the menu with the table already attached to the order.", de: "QR-Codes je Tisch, die die Karte mit bereits zugeordnetem Tisch \xF6ffnen.", ar: "\u0623\u0643\u0648\u0627\u062F QR \u0644\u0643\u0644 \u0637\u0627\u0648\u0644\u0629 \u062A\u0641\u062A\u062D \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0648\u0627\u0644\u0637\u0627\u0648\u0644\u0629 \u0645\u0631\u062A\u0628\u0637\u0629 \u0628\u0627\u0644\u0637\u0644\u0628 \u062A\u0644\u0642\u0627\u0626\u064A\u064B\u0627." },
+    { en: "Delivery, pickup and dine-in as separate flows, each with its own fee, minimum and VAT treatment.", de: "Lieferung, Abholung und Vor-Ort als getrennte Abl\xE4ufe mit eigener Geb\xFChr, Mindestbestellwert und MwSt.-Behandlung.", ar: "\u062A\u0648\u0635\u064A\u0644 \u0648\u0627\u0633\u062A\u0644\u0627\u0645 \u0648\u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0643\u0645\u0633\u0627\u0631\u0627\u062A \u0645\u0646\u0641\u0635\u0644\u0629\u060C \u0644\u0643\u0644 \u0645\u0646\u0647\u0627 \u0631\u0633\u0648\u0645 \u0648\u062D\u062F \u0623\u062F\u0646\u0649 \u0648\u0645\u0639\u0627\u0644\u062C\u0629 \u0636\u0631\u064A\u0628\u064A\u0629 \u062E\u0627\u0635\u0629." },
+    { en: "Scheduled orders for a later slot, with the kitchen queue ordering itself by promised time.", de: "Vorbestellungen f\xFCr ein sp\xE4teres Zeitfenster; die K\xFCchenwarteschlange sortiert sich nach Zusagezeit.", ar: "\u0637\u0644\u0628\u0627\u062A \u0645\u062C\u062F\u0648\u0644\u0629 \u0644\u0648\u0642\u062A \u0644\u0627\u062D\u0642\u060C \u0645\u0639 \u062A\u0631\u062A\u064A\u0628 \u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0637\u0628\u062E \u062A\u0644\u0642\u0627\u0626\u064A\u064B\u0627 \u062D\u0633\u0628 \u0627\u0644\u0648\u0642\u062A \u0627\u0644\u0645\u062A\u0641\u0642 \u0639\u0644\u064A\u0647." },
+    { en: "Promo codes with usage limits, validity windows and per-code reporting.", de: "Gutscheincodes mit Nutzungslimits, G\xFCltigkeitszeitr\xE4umen und Auswertung je Code.", ar: "\u0623\u0643\u0648\u0627\u062F \u062E\u0635\u0645 \u0628\u062D\u062F\u0648\u062F \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0648\u0641\u062A\u0631\u0627\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0648\u062A\u0642\u0627\u0631\u064A\u0631 \u0644\u0643\u0644 \u0643\u0648\u062F." }
+  ])}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      ${head(
+    { en: "Modules", de: "Module", ar: "\u0627\u0644\u0648\u062D\u062F\u0627\u062A" },
+    { en: "The rest of the operation", de: "Der Rest des Betriebs", ar: "\u0628\u0642\u064A\u0629 \u0627\u0644\u0639\u0645\u0644\u064A\u0627\u062A" },
+    void 0,
+    true
+  )}
+      <div class="grid grid-3">
+        ${card(icons.truck, { en: "Delivery dispatch", de: "Lieferdisposition", ar: "\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062A\u0648\u0635\u064A\u0644" }, {
+    en: "Driver roster with online, busy and offline states. Assign an order to a driver or broadcast it to everyone free and let the first to accept take it.",
+    de: "Fahrer\xFCbersicht mit Status online, besch\xE4ftigt und offline. Auftrag direkt zuweisen oder an alle freien Fahrer ausschreiben \u2014 wer zuerst annimmt, f\xE4hrt.",
+    ar: "\u0642\u0627\u0626\u0645\u0629 \u0633\u0627\u0626\u0642\u064A\u0646 \u0628\u062D\u0627\u0644\u0627\u062A \u0645\u062A\u0627\u062D \u0648\u0645\u0634\u063A\u0648\u0644 \u0648\u063A\u064A\u0631 \u0645\u062A\u0635\u0644. \u0623\u0633\u0646\u0650\u062F \u0627\u0644\u0637\u0644\u0628 \u0644\u0633\u0627\u0626\u0642 \u0623\u0648 \u0627\u0628\u062B\u0651\u0647 \u0644\u0643\u0644 \u0627\u0644\u0645\u062A\u0627\u062D\u064A\u0646 \u0644\u064A\u0623\u062E\u0630\u0647 \u0623\u0648\u0644 \u0645\u0646 \u064A\u0642\u0628\u0644\u0647."
+  })}
+        ${card(icons.pin, { en: "Delivery zones", de: "Lieferzonen", ar: "\u0645\u0646\u0627\u0637\u0642 \u0627\u0644\u062A\u0648\u0635\u064A\u0644" }, {
+    en: "Draw zones by postcode or radius, each with its own fee, minimum order value and estimated time shown to the customer.",
+    de: "Zonen nach Postleitzahl oder Radius festlegen, je mit eigener Geb\xFChr, Mindestbestellwert und angezeigter Lieferzeit.",
+    ar: "\u062D\u062F\u0650\u0651\u062F \u0627\u0644\u0645\u0646\u0627\u0637\u0642 \u0628\u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0628\u0631\u064A\u062F\u064A \u0623\u0648 \u0646\u0635\u0641 \u0627\u0644\u0642\u0637\u0631\u060C \u0644\u0643\u0644 \u0645\u0646\u0647\u0627 \u0631\u0633\u0648\u0645 \u0648\u062D\u062F \u0623\u062F\u0646\u0649 \u0648\u0648\u0642\u062A \u0645\u062A\u0648\u0642\u0639 \u064A\u0638\u0647\u0631 \u0644\u0644\u0639\u0645\u064A\u0644."
+  })}
+        ${card(icons.box, { en: "Inventory", de: "Lagerhaltung", ar: "\u0627\u0644\u0645\u062E\u0632\u0648\u0646" }, {
+    en: "Stock levels per branch, low-stock alerts, stock counts with variance, returns with reason codes and supplier records.",
+    de: "Best\xE4nde je Filiale, Warnungen bei Mindestbestand, Inventuren mit Abweichung, Retouren mit Grundcodes und Lieferantenbelege.",
+    ar: "\u0623\u0631\u0635\u062F\u0629 \u0644\u0643\u0644 \u0641\u0631\u0639\u060C \u0648\u062A\u0646\u0628\u064A\u0647\u0627\u062A \u0646\u0642\u0635\u060C \u0648\u062C\u0631\u062F \u0645\u0639 \u0641\u0631\u0648\u0642\u0627\u062A\u060C \u0648\u0645\u0631\u062A\u062C\u0639\u0627\u062A \u0628\u0623\u0633\u0628\u0627\u0628\u060C \u0648\u0633\u062C\u0644\u0627\u062A \u0645\u0648\u0631\u062F\u064A\u0646."
+  })}
+        ${card(icons.users, { en: "Customers and loyalty", de: "Kunden und Treue", ar: "\u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u0627\u0644\u0648\u0644\u0627\u0621" }, {
+    en: "Full customer records with addresses and order history, a store wallet, referral codes and bronze to platinum loyalty tiers.",
+    de: "Vollst\xE4ndige Kundenakten mit Adressen und Bestellhistorie, Guthabenkonto, Empfehlungscodes und Treuestufen von Bronze bis Platin.",
+    ar: "\u0633\u062C\u0644\u0627\u062A \u0639\u0645\u0644\u0627\u0621 \u0643\u0627\u0645\u0644\u0629 \u0628\u0627\u0644\u0639\u0646\u0627\u0648\u064A\u0646 \u0648\u0633\u062C\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062A\u060C \u0648\u0645\u062D\u0641\u0638\u0629 \u062F\u0627\u062E\u0644 \u0627\u0644\u0645\u062A\u062C\u0631\u060C \u0648\u0623\u0643\u0648\u0627\u062F \u0625\u062D\u0627\u0644\u0629\u060C \u0648\u0645\u0633\u062A\u0648\u064A\u0627\u062A \u0648\u0644\u0627\u0621 \u0645\u0646 \u0627\u0644\u0628\u0631\u0648\u0646\u0632\u064A \u0644\u0644\u0628\u0644\u0627\u062A\u064A\u0646\u064A."
+  })}
+        ${card(icons.clock, { en: "Staff and shifts", de: "Personal und Schichten", ar: "\u0627\u0644\u0645\u0648\u0638\u0641\u0648\u0646 \u0648\u0627\u0644\u0648\u0631\u062F\u064A\u0627\u062A" }, {
+    en: "PIN login per employee, role-based permissions, attendance, cash drawer opening and closing floats and a per-shift audit trail.",
+    de: "PIN-Login je Mitarbeiter, rollenbasierte Rechte, Anwesenheit, Kassenbestand bei \xD6ffnung und Abschluss sowie Audit-Trail je Schicht.",
+    ar: "\u062F\u062E\u0648\u0644 \u0628\u0631\u0642\u0645 \u0633\u0631\u064A \u0644\u0643\u0644 \u0645\u0648\u0638\u0641\u060C \u0648\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u062D\u0633\u0628 \u0627\u0644\u062F\u0648\u0631\u060C \u0648\u062D\u0636\u0648\u0631\u060C \u0648\u0631\u0635\u064A\u062F \u062F\u0631\u062C \u0627\u0644\u0646\u0642\u062F \u0639\u0646\u062F \u0627\u0644\u0641\u062A\u062D \u0648\u0627\u0644\u0625\u063A\u0644\u0627\u0642\u060C \u0648\u0633\u062C\u0644 \u062A\u062F\u0642\u064A\u0642 \u0644\u0643\u0644 \u0648\u0631\u062F\u064A\u0629."
+  })}
+        ${card(icons.chart, { en: "Reporting", de: "Auswertungen", ar: "\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631" }, {
+    en: "Sales, inventory, returns, delivery, finance and activity views, filterable by date, branch and operator, exportable to CSV.",
+    de: "Ansichten f\xFCr Umsatz, Bestand, Retouren, Lieferung, Finanzen und Aktivit\xE4t \u2014 filterbar nach Datum, Filiale und Mitarbeiter, als CSV exportierbar.",
+    ar: "\u0639\u0631\u0648\u0636 \u0644\u0644\u0645\u0628\u064A\u0639\u0627\u062A \u0648\u0627\u0644\u0645\u062E\u0632\u0648\u0646 \u0648\u0627\u0644\u0645\u0631\u062A\u062C\u0639\u0627\u062A \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u0648\u0627\u0644\u0645\u0627\u0644\u064A\u0629 \u0648\u0627\u0644\u0646\u0634\u0627\u0637\u060C \u0628\u0641\u0644\u0627\u062A\u0631 \u0644\u0644\u062A\u0627\u0631\u064A\u062E \u0648\u0627\u0644\u0641\u0631\u0639 \u0648\u0627\u0644\u0645\u0648\u0638\u0641\u060C \u0648\u062A\u0635\u062F\u064A\u0631 \u0625\u0644\u0649 CSV."
+  })}
+        ${card(icons.phone, { en: "Caller ID", de: "Rufnummernerkennung", ar: "\u062A\u0639\u0631\u064A\u0641 \u0627\u0644\u0645\u062A\u0635\u0644" }, {
+    en: "Incoming calls match against the customer database and open the record with the last order ready to repeat.",
+    de: "Eingehende Anrufe werden mit der Kundendatenbank abgeglichen und \xF6ffnen den Datensatz samt letzter Bestellung zum Wiederholen.",
+    ar: "\u062A\u064F\u0637\u0627\u0628\u064E\u0642 \u0627\u0644\u0645\u0643\u0627\u0644\u0645\u0627\u062A \u0627\u0644\u0648\u0627\u0631\u062F\u0629 \u0645\u0639 \u0642\u0627\u0639\u062F\u0629 \u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u062A\u0641\u062A\u062D \u0627\u0644\u0633\u062C\u0644 \u0645\u0639 \u0622\u062E\u0631 \u0637\u0644\u0628 \u062C\u0627\u0647\u0632 \u0644\u0644\u062A\u0643\u0631\u0627\u0631."
+  })}
+        ${card(icons.bell, { en: "Notifications", de: "Benachrichtigungen", ar: "\u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062A" }, {
+    en: "Web push to the counter, email confirmations to the customer and WhatsApp messages for order and delivery updates.",
+    de: "Web-Push an die Theke, E-Mail-Best\xE4tigungen an Kunden und WhatsApp-Nachrichten zu Bestell- und Lieferstatus.",
+    ar: "\u0625\u0634\u0639\u0627\u0631\u0627\u062A \u0641\u0648\u0631\u064A\u0629 \u0644\u0644\u0643\u0627\u0634\u064A\u0631\u060C \u0648\u062A\u0623\u0643\u064A\u062F\u0627\u062A \u0628\u0627\u0644\u0628\u0631\u064A\u062F \u0644\u0644\u0639\u0645\u064A\u0644\u060C \u0648\u0631\u0633\u0627\u0626\u0644 \u0648\u0627\u062A\u0633\u0627\u0628 \u0644\u062A\u062D\u062F\u064A\u062B\u0627\u062A \u0627\u0644\u0637\u0644\u0628 \u0648\u0627\u0644\u062A\u0648\u0635\u064A\u0644."
+  })}
+        ${card(icons.printer, { en: "Printing", de: "Druck", ar: "\u0627\u0644\u0637\u0628\u0627\u0639\u0629" }, {
+    en: "Thermal receipts, kitchen tickets and A4 PDF invoices, with a printer profile per station.",
+    de: "Thermobons, K\xFCchenbons und A4-PDF-Rechnungen, mit Druckerprofil je Station.",
+    ar: "\u0625\u064A\u0635\u0627\u0644\u0627\u062A \u062D\u0631\u0627\u0631\u064A\u0629 \u0648\u062A\u0630\u0627\u0643\u0631 \u0645\u0637\u0628\u062E \u0648\u0641\u0648\u0627\u062A\u064A\u0631 PDF \u0628\u062D\u062C\u0645 A4\u060C \u0645\u0639 \u0645\u0644\u0641 \u0637\u0627\u0628\u0639\u0629 \u0644\u0643\u0644 \u0645\u062D\u0637\u0629."
+  })}
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--inset">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          ${head({ en: "Platform", de: "Plattform", ar: "\u0627\u0644\u0645\u0646\u0635\u0629" }, { en: "Made to be extended", de: "F\xFCr Erweiterung gebaut", ar: "\u0645\u0628\u0646\u064A\u0651 \u0644\u0644\u062A\u0648\u0633\u0651\u0639" })}
+          ${ticks([
+    { en: "Modules are switched on per business, so a caf\xE9 never sees pharmacy fields and a pharmacy never sees table plans.", de: "Module werden je Betrieb aktiviert \u2014 ein Caf\xE9 sieht nie Apothekenfelder, eine Apotheke nie Tischpl\xE4ne.", ar: "\u062A\u064F\u0641\u0639\u064E\u0651\u0644 \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0644\u0643\u0644 \u0646\u0634\u0627\u0637\u060C \u0641\u0644\u0627 \u064A\u0631\u0649 \u0627\u0644\u0643\u0627\u0641\u064A\u0647 \u062D\u0642\u0648\u0644 \u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0629 \u0648\u0644\u0627 \u062A\u0631\u0649 \u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0629 \u0645\u062E\u0637\u0637 \u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A." },
+    { en: "A documented REST API for stock, orders and customers, so accounting and ERP tools can read and write.", de: "Dokumentierte REST-API f\xFCr Bestand, Bestellungen und Kunden, damit Buchhaltung und ERP lesen und schreiben k\xF6nnen.", ar: "\u0648\u0627\u062C\u0647\u0629 REST \u0645\u0648\u062B\u0651\u0642\u0629 \u0644\u0644\u0645\u062E\u0632\u0648\u0646 \u0648\u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0648\u0627\u0644\u0639\u0645\u0644\u0627\u0621\u060C \u0644\u062A\u0642\u0631\u0623 \u0648\u062A\u0643\u062A\u0628 \u0623\u062F\u0648\u0627\u062A \u0627\u0644\u0645\u062D\u0627\u0633\u0628\u0629 \u0648ERP." },
+    { en: "Webhooks on order created, paid, dispatched and delivered.", de: "Webhooks bei Bestellung erstellt, bezahlt, versendet und geliefert.", ar: "Webhooks \u0639\u0646\u062F \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0637\u0644\u0628 \u0648\u062F\u0641\u0639\u0647 \u0648\u0625\u0631\u0633\u0627\u0644\u0647 \u0648\u062A\u0633\u0644\u064A\u0645\u0647." },
+    { en: "Role and permission model that also governs the API, not just the screens.", de: "Rollen- und Rechtemodell, das auch die API steuert, nicht nur die Oberfl\xE4chen.", ar: "\u0646\u0645\u0648\u0630\u062C \u0623\u062F\u0648\u0627\u0631 \u0648\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u064A\u062D\u0643\u0645 \u0627\u0644\u0648\u0627\u062C\u0647\u0629 \u0627\u0644\u0628\u0631\u0645\u062C\u064A\u0629 \u0623\u064A\u0636\u064B\u0627 \u0644\u0627 \u0627\u0644\u0634\u0627\u0634\u0627\u062A \u0641\u0642\u0637." }
+  ])}
+        </div>
+        <div class="reveal">${shot({ id: "feature-modules", ratio: "3 / 2", size: "1536 \xD7 1024", alt: { en: "Module switches in the Kassenta owner console", de: "Modulschalter in der Kassenta-Betreiberkonsole", ar: "\u0645\u0641\u0627\u062A\u064A\u062D \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0641\u064A \u0644\u0648\u062D\u0629 \u0645\u0627\u0644\u0643 Kassenta" } })}</div>
+      </div>
+    </div>
+  </section>
+
+  ${ctaBand(
+    { en: "Want a module we have not listed?", de: "Fehlt Ihnen ein Modul?", ar: "\u062A\u062D\u062A\u0627\u062C \u0648\u062D\u062F\u0629 \u063A\u064A\u0631 \u0645\u0630\u0643\u0648\u0631\u0629\u061F" },
+    {
+      en: "Tell us what your trade needs. The platform is built so a new vertical module is a configuration, not a rewrite.",
+      de: "Sagen Sie uns, was Ihre Branche braucht. Die Plattform ist so gebaut, dass ein neues Branchenmodul eine Konfiguration ist \u2014 kein Neubau.",
+      ar: "\u0623\u062E\u0628\u0631\u0646\u0627 \u0628\u0645\u0627 \u064A\u062D\u062A\u0627\u062C\u0647 \u0646\u0634\u0627\u0637\u0643. \u0627\u0644\u0645\u0646\u0635\u0629 \u0645\u0628\u0646\u064A\u0629 \u0628\u062D\u064A\u062B \u062A\u0643\u0648\u0646 \u0627\u0644\u0648\u062D\u062F\u0629 \u0627\u0644\u062C\u062F\u064A\u062F\u0629 \u0625\u0639\u062F\u0627\u062F\u064B\u0627 \u0644\u0627 \u0625\u0639\u0627\u062F\u0629 \u0628\u0646\u0627\u0621."
+    }
+  )}`
+};
+var INDUSTRY_ART = {
+  "industry-cafe": { ratio: "4 / 5", size: "1122 \xD7 1402" },
+  "industry-restaurant": { ratio: "4 / 5", size: "1122 \xD7 1402" },
+  "industry-supermarket": { ratio: "4 / 5", size: "1122 \xD7 1402" },
+  "industry-pharmacy": { ratio: "5 / 4", size: "1402 \xD7 1122" },
+  "industry-bakery": { ratio: "21 / 23", size: "1198 \xD7 1313" },
+  "industry-retail": { ratio: "5 / 4", size: "1402 \xD7 1122" }
+};
+var vertical = (id, icon, name, intro, points, alt) => `
+  <section class="section" id="${id}">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          <div class="card-icon">${icon}</div>
+          <h2 ${tAttrs(name)}>${esc(name.en)}</h2>
+          <p class="lead" style="margin:14px 0 24px" ${tAttrs(intro)}>${esc(intro.en)}</p>
+          ${ticks(points)}
+        </div>
+        <div class="reveal">${shot({ id, ratio: INDUSTRY_ART[id]?.ratio ?? "4 / 3", size: INDUSTRY_ART[id]?.size ?? "1400 \xD7 1050", alt })}</div>
+      </div>
+    </div>
+  </section>`;
+var solutions = {
+  meta: {
+    path: "/solutions",
+    title: { en: "POS for caf\xE9s, restaurants, retail \u2014 Kassenta", de: "Kasse f\xFCr Caf\xE9, Restaurant, Handel \u2014 Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u0644\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u0627\u0644\u0645\u0637\u0627\u0639\u0645 \u0648\u0627\u0644\u062A\u062C\u0632\u0626\u0629 \u2014 Kassenta" },
+    description: {
+      en: "Ready-made setups for caf\xE9s, restaurants, supermarkets, pharmacies, bakeries and retail \u2014 each with the fields, taxes and workflows that trade uses.",
+      de: "Fertige Konfigurationen f\xFCr Caf\xE9s, Restaurants, Superm\xE4rkte, Apotheken, B\xE4ckereien und Einzelhandel \u2014 je mit den Feldern, Steuers\xE4tzen und Abl\xE4ufen der Branche.",
+      ar: "\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u062C\u0627\u0647\u0632\u0629 \u0644\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u0627\u0644\u0645\u0637\u0627\u0639\u0645 \u0648\u0627\u0644\u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A \u0648\u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0627\u062A \u0648\u0627\u0644\u0645\u062E\u0627\u0628\u0632 \u0648\u0627\u0644\u062A\u062C\u0632\u0626\u0629 \u2014 \u0644\u0643\u0644 \u0645\u0646\u0647\u0627 \u0627\u0644\u062D\u0642\u0648\u0644 \u0648\u0627\u0644\u0636\u0631\u0627\u0626\u0628 \u0648\u0633\u064A\u0631 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0645\u0646\u0627\u0633\u0628."
+    },
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: "Industries Kassenta is configured for",
+        itemListElement: [
+          ["Caf\xE9s and bars", "industry-cafe"],
+          ["Restaurants", "industry-restaurant"],
+          ["Supermarkets and grocers", "industry-supermarket"],
+          ["Pharmacies", "industry-pharmacy"],
+          ["Bakeries", "industry-bakery"],
+          ["Retail", "industry-retail"]
+        ].map(([name, anchor], i) => ({
+          "@type": "ListItem",
+          position: i + 1,
+          name,
+          url: `https://kassenta.com/solutions/#${anchor}`
+        }))
+      }
+    ]
+  },
+  body: `
+  ${pageHead(
+    { en: "One platform, six ready-made shapes", de: "Eine Plattform, sechs fertige Auspr\xE4gungen", ar: "\u0645\u0646\u0635\u0629 \u0648\u0627\u062D\u062F\u0629\u060C \u0633\u062A\u0629 \u0625\u0639\u062F\u0627\u062F\u0627\u062A \u062C\u0627\u0647\u0632\u0629" },
+    {
+      en: "Choosing your industry at setup switches on the right modules, tax categories, product fields and receipt layout. Everything stays editable afterwards.",
+      de: "Die Branchenwahl bei der Einrichtung aktiviert die passenden Module, Steuerkategorien, Artikelfelder und das Bonlayout. Alles bleibt danach \xE4nderbar.",
+      ar: "\u0627\u062E\u062A\u064A\u0627\u0631 \u0645\u062C\u0627\u0644\u0643 \u0639\u0646\u062F \u0627\u0644\u062A\u0647\u064A\u0626\u0629 \u064A\u0641\u0639\u0651\u0644 \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0648\u0641\u0626\u0627\u062A \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0648\u062D\u0642\u0648\u0644 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u062A\u0646\u0633\u064A\u0642 \u0627\u0644\u0625\u064A\u0635\u0627\u0644 \u0627\u0644\u0645\u0646\u0627\u0633\u0628\u0629. \u0648\u064A\u0628\u0642\u0649 \u0643\u0644 \u0634\u064A\u0621 \u0642\u0627\u0628\u0644\u064B\u0627 \u0644\u0644\u062A\u0639\u062F\u064A\u0644 \u0628\u0639\u062F\u0647\u0627."
+    },
+    { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" }
+  )}
+
+  ${vertical(
+    "industry-cafe",
+    icons.coffee,
+    { en: "Caf\xE9s and bars", de: "Caf\xE9s und Bars", ar: "\u0627\u0644\u0645\u0642\u0627\u0647\u064A \u0648\u0627\u0644\u0628\u0627\u0631\u0627\u062A" },
+    {
+      en: "Speed is the whole product. The preset puts the twelve items that make up most of the day on the first screen and turns everything else into a modifier.",
+      de: "Tempo ist das Produkt. Die Vorlage legt die zw\xF6lf Artikel, die den Grossteil des Tages ausmachen, auf den ersten Bildschirm und macht den Rest zur Option.",
+      ar: "\u0627\u0644\u0633\u0631\u0639\u0629 \u0647\u064A \u0627\u0644\u0645\u0646\u062A\u062C \u0643\u0644\u0647. \u064A\u0636\u0639 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0627\u0644\u062C\u0627\u0647\u0632 \u0627\u0644\u0623\u0635\u0646\u0627\u0641 \u0627\u0644\u0627\u062B\u0646\u064A \u0639\u0634\u0631 \u0627\u0644\u0623\u0643\u062B\u0631 \u0645\u0628\u064A\u0639\u064B\u0627 \u0641\u064A \u0627\u0644\u0634\u0627\u0634\u0629 \u0627\u0644\u0623\u0648\u0644\u0649 \u0648\u064A\u062D\u0648\u0651\u0644 \u0627\u0644\u0628\u0627\u0642\u064A \u0625\u0644\u0649 \u0625\u0636\u0627\u0641\u0627\u062A."
+    },
+    [
+      { en: "Size and milk options as one-tap modifiers with automatic price deltas.", de: "Gr\xF6ssen und Milchoptionen als Ein-Tap-Optionen mit automatischer Preisdifferenz.", ar: "\u0623\u062D\u062C\u0627\u0645 \u0648\u062E\u064A\u0627\u0631\u0627\u062A \u062D\u0644\u064A\u0628 \u0628\u0636\u063A\u0637\u0629 \u0648\u0627\u062D\u062F\u0629 \u0645\u0639 \u0641\u0631\u0648\u0642 \u0633\u0639\u0631 \u062A\u0644\u0642\u0627\u0626\u064A\u0629." },
+      { en: "Open tabs per table or per guest name, settled at the end of the visit.", de: "Offene Deckel je Tisch oder Gastname, am Ende des Besuchs abgerechnet.", ar: "\u062D\u0633\u0627\u0628\u0627\u062A \u0645\u0641\u062A\u0648\u062D\u0629 \u0644\u0643\u0644 \u0637\u0627\u0648\u0644\u0629 \u0623\u0648 \u0628\u0627\u0633\u0645 \u0627\u0644\u0636\u064A\u0641\u060C \u062A\u064F\u0633\u062F\u064E\u0651\u062F \u0646\u0647\u0627\u064A\u0629 \u0627\u0644\u0632\u064A\u0627\u0631\u0629." },
+      { en: "Tip line on the receipt and a tip report per employee per shift.", de: "Trinkgeldzeile auf dem Bon und Trinkgeldbericht je Mitarbeiter und Schicht.", ar: "\u0633\u0637\u0631 \u0628\u0642\u0634\u064A\u0634 \u0641\u064A \u0627\u0644\u0625\u064A\u0635\u0627\u0644 \u0648\u062A\u0642\u0631\u064A\u0631 \u0628\u0642\u0634\u064A\u0634 \u0644\u0643\u0644 \u0645\u0648\u0638\u0641 \u0641\u064A \u0643\u0644 \u0648\u0631\u062F\u064A\u0629." },
+      { en: "Loyalty stamps that convert into a free item automatically at the till.", de: "Treuestempel, die an der Kasse automatisch zu einem Gratisartikel werden.", ar: "\u0623\u062E\u062A\u0627\u0645 \u0648\u0644\u0627\u0621 \u062A\u062A\u062D\u0648\u0651\u0644 \u062A\u0644\u0642\u0627\u0626\u064A\u064B\u0627 \u0625\u0644\u0649 \u0635\u0646\u0641 \u0645\u062C\u0627\u0646\u064A \u0639\u0646\u062F \u0627\u0644\u0643\u0627\u0634\u064A\u0631." }
+    ],
+    { en: "Kassenta on a caf\xE9 counter with a fast-order grid", de: "Kassenta an der Caf\xE9-Theke mit Schnellbestellraster", ar: "Kassenta \u0639\u0644\u0649 \u0643\u0627\u0634\u064A\u0631 \u0643\u0627\u0641\u064A\u0647 \u0628\u0634\u0628\u0643\u0629 \u0637\u0644\u0628 \u0633\u0631\u064A\u0639" }
+  )}
+
+  ${vertical(
+    "industry-restaurant",
+    icons.register,
+    { en: "Restaurants", de: "Restaurants", ar: "\u0627\u0644\u0645\u0637\u0627\u0639\u0645" },
+    {
+      en: "Service happens in parallel: tables, phone orders, walk-ins and delivery all at once. The preset keeps them in one queue with clear promised times.",
+      de: "Service l\xE4uft parallel: Tische, Telefonbestellungen, Laufkundschaft und Lieferung gleichzeitig. Die Vorlage h\xE4lt alles in einer Warteschlange mit klaren Zusagezeiten.",
+      ar: "\u0627\u0644\u062E\u062F\u0645\u0629 \u062A\u0633\u064A\u0631 \u0628\u0627\u0644\u062A\u0648\u0627\u0632\u064A: \u0637\u0627\u0648\u0644\u0627\u062A \u0648\u0645\u0643\u0627\u0644\u0645\u0627\u062A \u0648\u0632\u0628\u0627\u0626\u0646 \u0639\u0627\u0628\u0631\u0648\u0646 \u0648\u062A\u0648\u0635\u064A\u0644 \u0641\u064A \u0622\u0646 \u0648\u0627\u062D\u062F. \u064A\u0628\u0642\u064A\u0647\u0627 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0641\u064A \u0642\u0627\u0626\u0645\u0629 \u0648\u0627\u062D\u062F\u0629 \u0628\u0623\u0648\u0642\u0627\u062A \u0648\u0627\u0636\u062D\u0629."
+    },
+    [
+      { en: "Table plan with availability, occupancy and reservation states.", de: "Tischplan mit Verf\xFCgbarkeit, Belegung und Reservierungsstatus.", ar: "\u0645\u062E\u0637\u0637 \u0637\u0627\u0648\u0644\u0627\u062A \u0628\u062D\u0627\u0644\u0627\u062A \u0627\u0644\u0625\u062A\u0627\u062D\u0629 \u0648\u0627\u0644\u0625\u0634\u063A\u0627\u0644 \u0648\u0627\u0644\u062D\u062C\u0632." },
+      { en: "Dine-in and takeaway VAT applied per line, so a mixed ticket is still correct.", de: "MwSt. f\xFCr Vor-Ort und Takeaway je Position \u2014 auch ein gemischter Bon bleibt korrekt.", ar: "\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0648\u0627\u0644\u062A\u064A\u0643 \u0623\u0648\u0627\u064A \u0644\u0643\u0644 \u0628\u0646\u062F\u060C \u0641\u062A\u0628\u0642\u0649 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0627\u0644\u0645\u062E\u062A\u0644\u0637\u0629 \u0635\u062D\u064A\u062D\u0629." },
+      { en: "Split a bill by guest, by item or evenly, with separate receipts.", de: "Rechnung nach Gast, nach Artikel oder gleichm\xE4ssig teilen, mit separaten Bons.", ar: "\u062A\u0642\u0633\u064A\u0645 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u062D\u0633\u0628 \u0627\u0644\u0636\u064A\u0641 \u0623\u0648 \u0627\u0644\u0635\u0646\u0641 \u0623\u0648 \u0628\u0627\u0644\u062A\u0633\u0627\u0648\u064A\u060C \u0645\u0639 \u0625\u064A\u0635\u0627\u0644\u0627\u062A \u0645\u0646\u0641\u0635\u0644\u0629." },
+      { en: "Kitchen tickets grouped by course, printed or shown on a screen.", de: "K\xFCchenbons nach Gang gruppiert, gedruckt oder auf dem Bildschirm.", ar: "\u062A\u0630\u0627\u0643\u0631 \u0645\u0637\u0628\u062E \u0645\u062C\u0645\u064E\u0651\u0639\u0629 \u062D\u0633\u0628 \u0627\u0644\u0637\u0628\u0642\u060C \u0645\u0637\u0628\u0648\u0639\u0629 \u0623\u0648 \u0645\u0639\u0631\u0648\u0636\u0629 \u0639\u0644\u0649 \u0634\u0627\u0634\u0629." }
+    ],
+    { en: "Restaurant table plan and live order queue in Kassenta", de: "Restaurant-Tischplan und Live-Bestellliste in Kassenta", ar: "\u0645\u062E\u0637\u0637 \u0637\u0627\u0648\u0644\u0627\u062A \u0627\u0644\u0645\u0637\u0639\u0645 \u0648\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u062D\u064A\u0651\u0629 \u0641\u064A Kassenta" }
+  )}
+
+  ${vertical(
+    "industry-supermarket",
+    icons.cart,
+    { en: "Supermarkets and grocers", de: "Superm\xE4rkte und Lebensmittelhandel", ar: "\u0627\u0644\u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A \u0648\u0627\u0644\u0628\u0642\u0627\u0644\u0629" },
+    {
+      en: "High item counts and low margins mean the checkout has to be exact and fast. The preset optimises for scanning rather than browsing.",
+      de: "Viele Artikel und schmale Margen verlangen eine exakte und schnelle Kasse. Die Vorlage optimiert auf Scannen statt Bl\xE4ttern.",
+      ar: "\u0643\u062B\u0631\u0629 \u0627\u0644\u0623\u0635\u0646\u0627\u0641 \u0648\u0636\u0622\u0644\u0629 \u0627\u0644\u0647\u0627\u0645\u0634 \u062A\u062A\u0637\u0644\u0628\u0627\u0646 \u062F\u0641\u0639\u064B\u0627 \u062F\u0642\u064A\u0642\u064B\u0627 \u0648\u0633\u0631\u064A\u0639\u064B\u0627. \u064A\u0631\u0643\u0651\u0632 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0639\u0644\u0649 \u0627\u0644\u0645\u0633\u062D \u0644\u0627 \u0627\u0644\u062A\u0635\u0641\u0651\u062D."
+    },
+    [
+      { en: "Continuous barcode scanning with quantity multipliers and instant subtotal.", de: "Durchgehendes Barcode-Scannen mit Mengenmultiplikatoren und sofortiger Zwischensumme.", ar: "\u0645\u0633\u062D \u0628\u0627\u0631\u0643\u0648\u062F \u0645\u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0645\u0636\u0627\u0639\u0650\u0641\u0627\u062A \u0627\u0644\u0643\u0645\u064A\u0629 \u0648\u0645\u062C\u0645\u0648\u0639 \u0641\u0648\u0631\u064A." },
+      { en: "Weighed goods priced per kilogram, from a connected scale or manual entry.", de: "Gewichtsware mit Kilopreis, von angeschlossener Waage oder manueller Eingabe.", ar: "\u0633\u0644\u0639 \u0628\u0627\u0644\u0648\u0632\u0646 \u0645\u0633\u0639\u064E\u0651\u0631\u0629 \u0628\u0627\u0644\u0643\u064A\u0644\u0648\u060C \u0645\u0646 \u0645\u064A\u0632\u0627\u0646 \u0645\u062A\u0635\u0644 \u0623\u0648 \u0628\u0625\u062F\u062E\u0627\u0644 \u064A\u062F\u0648\u064A." },
+      { en: "Reduced VAT for food handled separately from standard-rate non-food.", de: "Reduzierte MwSt. f\xFCr Lebensmittel getrennt vom Normalsatz f\xFCr Non-Food.", ar: "\u0636\u0631\u064A\u0628\u0629 \u0645\u062E\u0641\u064E\u0651\u0636\u0629 \u0644\u0644\u0623\u063A\u0630\u064A\u0629 \u0645\u0646\u0641\u0635\u0644\u0629 \u0639\u0646 \u0627\u0644\u0646\u0633\u0628\u0629 \u0627\u0644\u0639\u0627\u062F\u064A\u0629 \u0644\u063A\u064A\u0631 \u0627\u0644\u0623\u063A\u0630\u064A\u0629." },
+      { en: "Deposit and return handling as a distinct line, not a discount.", de: "Pfand und R\xFCckgabe als eigene Position, nicht als Rabatt.", ar: "\u0627\u0644\u062A\u0623\u0645\u064A\u0646 \u0627\u0644\u0645\u0633\u062A\u0631\u062F \u0643\u0633\u0637\u0631 \u0645\u0633\u062A\u0642\u0644 \u0644\u0627 \u0643\u062E\u0635\u0645." }
+    ],
+    { en: "Supermarket checkout with barcode scanning in Kassenta", de: "Supermarktkasse mit Barcode-Scan in Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A \u0645\u0639 \u0645\u0633\u062D \u0628\u0627\u0631\u0643\u0648\u062F \u0641\u064A Kassenta" }
+  )}
+
+  ${vertical(
+    "industry-pharmacy",
+    icons.pill,
+    { en: "Pharmacies", de: "Apotheken", ar: "\u0627\u0644\u0635\u064A\u062F\u0644\u064A\u0627\u062A" },
+    {
+      en: "Traceability matters more than speed. The preset adds the fields a regulator asks for and records who did what.",
+      de: "Nachvollziehbarkeit z\xE4hlt mehr als Tempo. Die Vorlage erg\xE4nzt die von Beh\xF6rden geforderten Felder und protokolliert, wer was getan hat.",
+      ar: "\u0627\u0644\u062A\u062A\u0628\u0651\u0639 \u0623\u0647\u0645 \u0645\u0646 \u0627\u0644\u0633\u0631\u0639\u0629. \u064A\u0636\u064A\u0641 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0627\u0644\u062D\u0642\u0648\u0644 \u0627\u0644\u062A\u064A \u062A\u0637\u0644\u0628\u0647\u0627 \u0627\u0644\u062C\u0647\u0627\u062A \u0627\u0644\u0631\u0642\u0627\u0628\u064A\u0629 \u0648\u064A\u0633\u062C\u0651\u0644 \u0645\u0646 \u0641\u0639\u0644 \u0645\u0627\u0630\u0627."
+    },
+    [
+      { en: "Batch number and expiry date per item, with an alert before stock expires.", de: "Chargennummer und Verfallsdatum je Artikel, mit Warnung vor Ablauf.", ar: "\u0631\u0642\u0645 \u0627\u0644\u062A\u0634\u063A\u064A\u0644\u0629 \u0648\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0629 \u0644\u0643\u0644 \u0635\u0646\u0641\u060C \u0645\u0639 \u062A\u0646\u0628\u064A\u0647 \u0642\u0628\u0644 \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621." },
+      { en: "Restricted-item prompts that require a supervisor PIN before the sale completes.", de: "Hinweise bei eingeschr\xE4nkten Artikeln, die vor Abschluss eine Vorgesetzten-PIN verlangen.", ar: "\u062A\u0646\u0628\u064A\u0647\u0627\u062A \u0627\u0644\u0623\u0635\u0646\u0627\u0641 \u0627\u0644\u0645\u0642\u064A\u064E\u0651\u062F\u0629 \u062A\u062A\u0637\u0644\u0628 \u0631\u0642\u0645 \u0645\u0634\u0631\u0641 \u0642\u0628\u0644 \u0625\u062A\u0645\u0627\u0645 \u0627\u0644\u0628\u064A\u0639." },
+      { en: "Per-operator audit trail on every sale, void, discount and price override.", de: "Audit-Trail je Mitarbeiter f\xFCr jeden Verkauf, Storno, Rabatt und jede Preis\xE4nderung.", ar: "\u0633\u062C\u0644 \u062A\u062F\u0642\u064A\u0642 \u0644\u0643\u0644 \u0645\u0648\u0638\u0641 \u0639\u0644\u0649 \u0643\u0644 \u0628\u064A\u0639 \u0648\u0625\u0644\u063A\u0627\u0621 \u0648\u062E\u0635\u0645 \u0648\u062A\u0639\u062F\u064A\u0644 \u0633\u0639\u0631." },
+      { en: "Reduced VAT categories separated from standard-rate cosmetics and accessories.", de: "Reduzierte MwSt.-Kategorien getrennt von Kosmetik und Zubeh\xF6r zum Normalsatz.", ar: "\u0641\u0626\u0627\u062A \u0636\u0631\u064A\u0628\u0629 \u0645\u062E\u0641\u064E\u0651\u0636\u0629 \u0645\u0646\u0641\u0635\u0644\u0629 \u0639\u0646 \u0645\u0633\u062A\u062D\u0636\u0631\u0627\u062A \u0627\u0644\u062A\u062C\u0645\u064A\u0644 \u0648\u0627\u0644\u0645\u0644\u062D\u0642\u0627\u062A \u0628\u0627\u0644\u0646\u0633\u0628\u0629 \u0627\u0644\u0639\u0627\u062F\u064A\u0629." }
+    ],
+    { en: "Pharmacy counter with batch and expiry fields in Kassenta", de: "Apothekentresen mit Chargen- und Verfallsfeldern in Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u0635\u064A\u062F\u0644\u064A\u0629 \u0645\u0639 \u062D\u0642\u0648\u0644 \u0627\u0644\u062A\u0634\u063A\u064A\u0644\u0629 \u0648\u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0629 \u0641\u064A Kassenta" }
+  )}
+
+  ${vertical(
+    "industry-bakery",
+    icons.scale,
+    { en: "Bakeries", de: "B\xE4ckereien", ar: "\u0627\u0644\u0645\u062E\u0627\u0628\u0632" },
+    {
+      en: "Everything sells in four hours and what is left is waste. The preset ties pre-orders, production and end-of-day waste into one number.",
+      de: "Alles verkauft sich in vier Stunden, der Rest ist Ausschuss. Die Vorlage verbindet Vorbestellungen, Produktion und Tagesende-Retouren zu einer Kennzahl.",
+      ar: "\u0643\u0644 \u0634\u064A\u0621 \u064A\u064F\u0628\u0627\u0639 \u0641\u064A \u0623\u0631\u0628\u0639 \u0633\u0627\u0639\u0627\u062A \u0648\u0645\u0627 \u064A\u062A\u0628\u0642\u0651\u0649 \u0647\u062F\u0631. \u064A\u0631\u0628\u0637 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u0645\u0633\u0628\u0642\u0629 \u0648\u0627\u0644\u0625\u0646\u062A\u0627\u062C \u0648\u0647\u062F\u0631 \u0646\u0647\u0627\u064A\u0629 \u0627\u0644\u064A\u0648\u0645 \u0641\u064A \u0631\u0642\u0645 \u0648\u0627\u062D\u062F."
+    },
+    [
+      { en: "Price by weight or by piece on the same product, chosen at the till.", de: "Preis nach Gewicht oder St\xFCck beim selben Artikel, an der Kasse w\xE4hlbar.", ar: "\u062A\u0633\u0639\u064A\u0631 \u0628\u0627\u0644\u0648\u0632\u0646 \u0623\u0648 \u0628\u0627\u0644\u0642\u0637\u0639\u0629 \u0644\u0644\u0645\u0646\u062A\u062C \u0646\u0641\u0633\u0647\u060C \u064A\u064F\u062E\u062A\u0627\u0631 \u0639\u0646\u062F \u0627\u0644\u0643\u0627\u0634\u064A\u0631." },
+      { en: "Pre-orders for a named pickup time, listed for the morning shift.", de: "Vorbestellungen mit fester Abholzeit, f\xFCr die Fr\xFChschicht aufgelistet.", ar: "\u0637\u0644\u0628\u0627\u062A \u0645\u0633\u0628\u0642\u0629 \u0628\u0648\u0642\u062A \u0627\u0633\u062A\u0644\u0627\u0645 \u0645\u062D\u062F\u064E\u0651\u062F\u060C \u062A\u0638\u0647\u0631 \u0644\u0648\u0631\u062F\u064A\u0629 \u0627\u0644\u0635\u0628\u0627\u062D." },
+      { en: "Production plan generated from yesterday's sales and today's pre-orders.", de: "Produktionsplan aus den gestrigen Verk\xE4ufen und heutigen Vorbestellungen.", ar: "\u062E\u0637\u0629 \u0625\u0646\u062A\u0627\u062C \u062A\u064F\u0628\u0646\u0649 \u0645\u0646 \u0645\u0628\u064A\u0639\u0627\u062A \u0627\u0644\u0623\u0645\u0633 \u0648\u0637\u0644\u0628\u0627\u062A \u0627\u0644\u064A\u0648\u0645 \u0627\u0644\u0645\u0633\u0628\u0642\u0629." },
+      { en: "Waste recorded at close as a separate figure so margin stays honest.", de: "Retouren beim Abschluss separat erfasst, damit die Marge ehrlich bleibt.", ar: "\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0647\u062F\u0631 \u0639\u0646\u062F \u0627\u0644\u0625\u063A\u0644\u0627\u0642 \u0643\u0631\u0642\u0645 \u0645\u0646\u0641\u0635\u0644 \u0644\u064A\u0628\u0642\u0649 \u0627\u0644\u0647\u0627\u0645\u0634 \u0635\u0627\u062F\u0642\u064B\u0627." }
+    ],
+    { en: "Bakery counter with weight-based pricing in Kassenta", de: "B\xE4ckereitheke mit Preis nach Gewicht in Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u0645\u062E\u0628\u0632 \u0645\u0639 \u062A\u0633\u0639\u064A\u0631 \u0628\u0627\u0644\u0648\u0632\u0646 \u0641\u064A Kassenta" }
+  )}
+
+  ${vertical(
+    "industry-retail",
+    icons.tag,
+    { en: "Retail", de: "Einzelhandel", ar: "\u0627\u0644\u062A\u062C\u0632\u0626\u0629" },
+    {
+      en: "The same shirt in five sizes and three colours is fifteen stock lines. The preset keeps that manageable at the counter.",
+      de: "Dasselbe Hemd in f\xFCnf Gr\xF6ssen und drei Farben sind f\xFCnfzehn Bestandszeilen. Die Vorlage h\xE4lt das an der Kasse handhabbar.",
+      ar: "\u0627\u0644\u0642\u0645\u064A\u0635 \u0646\u0641\u0633\u0647 \u0628\u062E\u0645\u0633\u0629 \u0645\u0642\u0627\u0633\u0627\u062A \u0648\u062B\u0644\u0627\u062B\u0629 \u0623\u0644\u0648\u0627\u0646 \u064A\u0639\u0646\u064A \u062E\u0645\u0633\u0629 \u0639\u0634\u0631 \u0633\u0637\u0631 \u0645\u062E\u0632\u0648\u0646. \u064A\u0628\u0642\u064A\u0647\u0627 \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0633\u0647\u0644\u0629 \u0639\u0646\u062F \u0627\u0644\u0643\u0627\u0634\u064A\u0631."
+    },
+    [
+      { en: "Variant matrix by size and colour with per-variant stock and barcode.", de: "Variantenmatrix nach Gr\xF6sse und Farbe mit Bestand und Barcode je Variante.", ar: "\u0645\u0635\u0641\u0648\u0641\u0629 \u0645\u062A\u063A\u064A\u0651\u0631\u0627\u062A \u0628\u0627\u0644\u0645\u0642\u0627\u0633 \u0648\u0627\u0644\u0644\u0648\u0646 \u0645\u0639 \u0645\u062E\u0632\u0648\u0646 \u0648\u0628\u0627\u0631\u0643\u0648\u062F \u0644\u0643\u0644 \u0645\u062A\u063A\u064A\u0651\u0631." },
+      { en: "Returns and exchanges with reason codes that feed the returns report.", de: "Retouren und Umtausch mit Grundcodes, die in den Retourenbericht fliessen.", ar: "\u0645\u0631\u062A\u062C\u0639\u0627\u062A \u0648\u0627\u0633\u062A\u0628\u062F\u0627\u0644 \u0628\u0623\u0633\u0628\u0627\u0628 \u0645\u062D\u062F\u064E\u0651\u062F\u0629 \u062A\u063A\u0630\u0651\u064A \u062A\u0642\u0631\u064A\u0631 \u0627\u0644\u0645\u0631\u062A\u062C\u0639\u0627\u062A." },
+      { en: "Customer records that show past purchases when a return has no receipt.", de: "Kundenakten mit fr\xFCheren K\xE4ufen, wenn eine Retoure ohne Beleg kommt.", ar: "\u0633\u062C\u0644\u0627\u062A \u0639\u0645\u0644\u0627\u0621 \u062A\u064F\u0638\u0647\u0631 \u0627\u0644\u0645\u0634\u062A\u0631\u064A\u0627\u062A \u0627\u0644\u0633\u0627\u0628\u0642\u0629 \u0639\u0646\u062F \u0645\u0631\u062A\u062C\u0639 \u0628\u0644\u0627 \u0625\u064A\u0635\u0627\u0644." },
+      { en: "Seasonal price lists scheduled to start and end on set dates.", de: "Saisonale Preislisten mit geplantem Start- und Enddatum.", ar: "\u0642\u0648\u0627\u0626\u0645 \u0623\u0633\u0639\u0627\u0631 \u0645\u0648\u0633\u0645\u064A\u0629 \u062A\u0628\u062F\u0623 \u0648\u062A\u0646\u062A\u0647\u064A \u0641\u064A \u062A\u0648\u0627\u0631\u064A\u062E \u0645\u062D\u062F\u064E\u0651\u062F\u0629." }
+    ],
+    { en: "Retail counter with size and colour variants in Kassenta", de: "Einzelhandelskasse mit Gr\xF6ssen- und Farbvarianten in Kassenta", ar: "\u0643\u0627\u0634\u064A\u0631 \u062A\u062C\u0632\u0626\u0629 \u0645\u0639 \u0645\u062A\u063A\u064A\u0651\u0631\u0627\u062A \u0627\u0644\u0645\u0642\u0627\u0633 \u0648\u0627\u0644\u0644\u0648\u0646 \u0641\u064A Kassenta" }
+  )}
+
+  ${ctaBand(
+    { en: "Not on the list?", de: "Nicht dabei?", ar: "\u0645\u062C\u0627\u0644\u0643 \u063A\u064A\u0631 \u0645\u0630\u0643\u0648\u0631\u061F" },
+    {
+      en: "Butchers, florists, kiosks and salons all run on Kassenta today with a custom preset. Tell us the fields and rules your trade needs.",
+      de: "Metzgereien, Floristen, Kioske und Salons arbeiten heute mit einer eigenen Vorlage auf Kassenta. Nennen Sie uns die Felder und Regeln Ihrer Branche.",
+      ar: "\u0627\u0644\u062C\u0632\u0627\u0631\u0648\u0646 \u0648\u0628\u0627\u0626\u0639\u0648 \u0627\u0644\u0632\u0647\u0648\u0631 \u0648\u0627\u0644\u0623\u0643\u0634\u0627\u0643 \u0648\u0627\u0644\u0635\u0627\u0644\u0648\u0646\u0627\u062A \u064A\u0639\u0645\u0644\u0648\u0646 \u0627\u0644\u064A\u0648\u0645 \u0639\u0644\u0649 Kassenta \u0628\u0625\u0639\u062F\u0627\u062F \u0645\u062E\u0635\u064E\u0651\u0635. \u0623\u062E\u0628\u0631\u0646\u0627 \u0628\u0627\u0644\u062D\u0642\u0648\u0644 \u0648\u0627\u0644\u0642\u0648\u0627\u0639\u062F \u0627\u0644\u062A\u064A \u064A\u062D\u062A\u0627\u062C\u0647\u0627 \u0646\u0634\u0627\u0637\u0643."
+    }
+  )}`
+};
+var plan = (p, name, blurb, points, featured = false, tag) => `
+        <article class="card price-card${featured ? " featured" : ""} reveal" data-plan="${p.slug}">
+          ${tag ? `<span class="badge price-tag" ${tAttrs(tag)}>${esc(tag.en)}</span>` : ""}
+          <h3 ${tAttrs(name)}>${esc(name.en)}</h3>
+          <p style="font-size:.9rem" ${tAttrs(blurb)}>${esc(blurb.en)}</p>
+          <div class="price"><span data-monthly="${p.monthly}" data-yearly="${yearlyMonthly(p)}" class="price-value">${p.monthly}</span> <small><span class="price-currency">${CURRENCY}</span> <span ${tAttrs({ en: "per month", de: "pro Monat", ar: "\u0634\u0647\u0631\u064A\u064B\u0627" })}>per month</span></small></div>
+          <p class="form-note" ${tAttrs({ en: "Per location. VAT excluded.", de: "Pro Standort. Exkl. MwSt.", ar: "\u0644\u0643\u0644 \u0641\u0631\u0639. \u063A\u064A\u0631 \u0634\u0627\u0645\u0644 \u0627\u0644\u0636\u0631\u064A\u0628\u0629." })}>Per location. VAT excluded.</p>
+          ${ticks(points)}
+          <a class="btn ${featured ? "btn-primary" : "btn-ghost"}" href="/contact/" onclick="return KassentaPricing.buy(event, '${p.slug}')" ${tAttrs({ en: "Start with this plan", de: "Mit diesem Plan starten", ar: "\u0627\u0628\u062F\u0623 \u0628\u0647\u0630\u0647 \u0627\u0644\u0628\u0627\u0642\u0629" })}>Start with this plan</a>
+        </article>`;
+var pricing = {
+  meta: {
+    path: "/pricing",
+    title: { en: "Pricing \u2014 flat fee per location, no commission", de: "Preise \u2014 Pauschale je Standort, keine Provision", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u2014 \u0631\u0633\u0645 \u062B\u0627\u0628\u062A \u0644\u0643\u0644 \u0641\u0631\u0639 \u0628\u0644\u0627 \u0639\u0645\u0648\u0644\u0629" },
+    description: {
+      en: "Transparent per-location pricing in CHF. No commission on your own orders, no setup fee, and every plan includes onboarding and support.",
+      de: "Transparente Preise je Standort in CHF. Keine Provision auf eigene Bestellungen, keine Einrichtungsgeb\xFChr, Onboarding und Support in jedem Plan.",
+      ar: "\u0623\u0633\u0639\u0627\u0631 \u0634\u0641\u0627\u0641\u0629 \u0644\u0643\u0644 \u0641\u0631\u0639 \u0628\u0627\u0644\u0641\u0631\u0646\u0643 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A. \u0628\u0644\u0627 \u0639\u0645\u0648\u0644\u0629 \u0639\u0644\u0649 \u0637\u0644\u0628\u0627\u062A\u0643\u060C \u0648\u0628\u0644\u0627 \u0631\u0633\u0648\u0645 \u062A\u0623\u0633\u064A\u0633\u060C \u0648\u0645\u0639 \u062A\u0647\u064A\u0626\u0629 \u0648\u062F\u0639\u0645 \u0641\u064A \u0643\u0644 \u0627\u0644\u0628\u0627\u0642\u0627\u062A."
+    },
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: "Kassenta POS",
+        description: "Point of sale, online ordering and delivery software, priced per location with no commission on your own orders.",
+        image: "https://kassenta.com/brand/og-image.jpg",
+        brand: { "@type": "Brand", name: "Kassenta" },
+        // Built from the same catalogue the cards and the checkout use, so a
+        // price change cannot leave a stale number in the rich result.
+        offers: PLANS.map((p) => ({
+          "@type": "Offer",
+          name: p.name,
+          price: String(p.monthly),
+          priceCurrency: CURRENCY,
+          availability: "https://schema.org/InStock",
+          url: "https://kassenta.com/pricing/",
+          description: p.summary
+        }))
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: [
+          {
+            "@type": "Question",
+            name: "Is there a minimum contract?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Monthly plans run month to month and can be cancelled at the end of any period. Yearly plans run for twelve months and are billed once."
+            }
+          },
+          {
+            "@type": "Question",
+            name: "What counts as a location?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "One physical address. Devices inside that address are covered by the plan's device limit; a second shop needs a second location."
+            }
+          },
+          {
+            "@type": "Question",
+            name: "Do you take a cut of card or TWINT payments?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "No. You keep your own acquirer contract and its rates. Kassenta records the payment and never sits between you and the money."
+            }
+          },
+          {
+            "@type": "Question",
+            name: "Can I change plan later?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Yes, in both directions, effective from the next billing period. Your data and settings are untouched by a plan change."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  body: `
+  ${pageHead(
+    { en: "Pay for locations, not for orders", de: "Zahlen Sie f\xFCr Standorte, nicht f\xFCr Bestellungen", ar: "\u0627\u062F\u0641\u0639 \u0645\u0642\u0627\u0628\u0644 \u0627\u0644\u0641\u0631\u0648\u0639 \u0644\u0627 \u0645\u0642\u0627\u0628\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062A" },
+    {
+      en: "Delivery marketplaces take a share of every order. Kassenta charges a flat fee per location, so the more you sell through your own channel, the less each order costs you.",
+      de: "Lieferplattformen behalten einen Anteil jeder Bestellung. Kassenta berechnet eine Pauschale je Standort \u2014 je mehr Sie \xFCber den eigenen Kanal verkaufen, desto g\xFCnstiger wird jede Bestellung.",
+      ar: "\u062A\u0623\u062E\u0630 \u0645\u0646\u0635\u0627\u062A \u0627\u0644\u062A\u0648\u0635\u064A\u0644 \u0646\u0633\u0628\u0629 \u0645\u0646 \u0643\u0644 \u0637\u0644\u0628. \u064A\u0641\u0631\u0636 Kassenta \u0631\u0633\u0645\u064B\u0627 \u062B\u0627\u0628\u062A\u064B\u0627 \u0644\u0643\u0644 \u0641\u0631\u0639\u060C \u0641\u0643\u0644\u0645\u0627 \u0628\u0639\u062A \u0623\u0643\u062B\u0631 \u0639\u0628\u0631 \u0642\u0646\u0627\u062A\u0643 \u0627\u0644\u062E\u0627\u0635\u0629 \u0642\u0644\u0651\u062A \u062A\u0643\u0644\u0641\u0629 \u0627\u0644\u0637\u0644\u0628."
+    },
+    { en: "Pricing", de: "Preise", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631" }
+  )}
+
+  <section class="section">
+    <div class="wrap">
+      <div style="text-align:center">
+        <div class="billing-toggle" role="group" aria-label="Billing period">
+          <button type="button" class="active" data-cycle="monthly" onclick="KassentaPricing.set('monthly')" ${tAttrs({ en: "Monthly", de: "Monatlich", ar: "\u0634\u0647\u0631\u064A" })}>Monthly</button>
+          <button type="button" data-cycle="yearly" onclick="KassentaPricing.set('yearly')" ${tAttrs({ en: "Yearly \u2014 save 20%", de: "J\xE4hrlich \u2014 20% sparen", ar: "\u0633\u0646\u0648\u064A \u2014 \u0648\u0641\u0651\u0631 20%" })}>Yearly \u2014 save 20%</button>
+        </div>
+      </div>
+      <div class="grid grid-3">
+        ${plan(
+    STARTER,
+    { en: "Starter", de: "Starter", ar: "\u0627\u0644\u0645\u0628\u062A\u062F\u0626\u0629" },
+    { en: "One counter, one screen. For a single caf\xE9, kiosk or small shop finding its feet.", de: "Eine Kasse, ein Bildschirm. F\xFCr ein einzelnes Caf\xE9, einen Kiosk oder kleinen Laden.", ar: "\u0643\u0627\u0634\u064A\u0631 \u0648\u0627\u062D\u062F \u0648\u0634\u0627\u0634\u0629 \u0648\u0627\u062D\u062F\u0629. \u0644\u0643\u0627\u0641\u064A\u0647 \u0623\u0648 \u0643\u0634\u0643 \u0623\u0648 \u0645\u062D\u0644 \u0635\u063A\u064A\u0631 \u0641\u064A \u0628\u062F\u0627\u064A\u062A\u0647." },
+    [
+      { en: "POS on one device, unlimited products and staff PINs", de: "Kasse auf einem Ger\xE4t, unbegrenzte Artikel und Mitarbeiter-PINs", ar: "\u0643\u0627\u0634\u064A\u0631 \u0639\u0644\u0649 \u062C\u0647\u0627\u0632 \u0648\u0627\u062D\u062F\u060C \u0648\u0645\u0646\u062A\u062C\u0627\u062A \u0648\u0623\u0631\u0642\u0627\u0645 \u0645\u0648\u0638\u0641\u064A\u0646 \u0628\u0644\u0627 \u062D\u062F" },
+      { en: "Swiss VAT, cash rounding and TWINT", de: "Schweizer MwSt., Rappenrundung und TWINT", ar: "\u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A \u0648TWINT" },
+      { en: "Sales and inventory reports with CSV export", de: "Umsatz- und Bestandsberichte mit CSV-Export", ar: "\u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u0628\u064A\u0639\u0627\u062A \u0648\u0645\u062E\u0632\u0648\u0646 \u0645\u0639 \u062A\u0635\u062F\u064A\u0631 CSV" },
+      { en: "Email support, next business day", de: "E-Mail-Support am n\xE4chsten Werktag", ar: "\u062F\u0639\u0645 \u0628\u0627\u0644\u0628\u0631\u064A\u062F \u0641\u064A \u064A\u0648\u0645 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u062A\u0627\u0644\u064A" }
+    ]
+  )}
+        ${plan(
+    PROFESSIONAL,
+    { en: "Professional", de: "Professional", ar: "\u0627\u0644\u0627\u062D\u062A\u0631\u0627\u0641\u064A\u0629" },
+    { en: "Counter plus your own online channel. For restaurants that deliver and take table orders.", de: "Kasse plus eigener Online-Kanal. F\xFCr Restaurants mit Lieferung und Tischbestellung.", ar: "\u0643\u0627\u0634\u064A\u0631 \u0645\u0639 \u0642\u0646\u0627\u062A\u0643 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0629. \u0644\u0644\u0645\u0637\u0627\u0639\u0645 \u0627\u0644\u062A\u064A \u062A\u0648\u0635\u0651\u0644 \u0648\u062A\u0633\u062A\u0642\u0628\u0644 \u0637\u0644\u0628\u0627\u062A \u0627\u0644\u0637\u0627\u0648\u0644\u0627\u062A." },
+    [
+      { en: "Everything in Starter, on up to five devices", de: "Alles aus Starter, auf bis zu f\xFCnf Ger\xE4ten", ar: "\u0643\u0644 \u0645\u0627 \u0641\u064A \u0627\u0644\u0645\u0628\u062A\u062F\u0626\u0629\u060C \u0639\u0644\u0649 \u062E\u0645\u0633\u0629 \u0623\u062C\u0647\u0632\u0629" },
+      { en: "Branded online storefront and table QR ordering", de: "Gebrandeter Onlineshop und Tisch-QR-Bestellung", ar: "\u0645\u062A\u062C\u0631 \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0628\u0647\u0648\u064A\u062A\u0643 \u0648\u0637\u0644\u0628 QR \u0644\u0644\u0637\u0627\u0648\u0644\u0627\u062A" },
+      { en: "Delivery zones, drivers and customer tracking links", de: "Lieferzonen, Fahrer und Tracking-Links f\xFCr Kunden", ar: "\u0645\u0646\u0627\u0637\u0642 \u062A\u0648\u0635\u064A\u0644 \u0648\u0633\u0627\u0626\u0642\u0648\u0646 \u0648\u0631\u0648\u0627\u0628\u0637 \u062A\u062A\u0628\u0651\u0639 \u0644\u0644\u0639\u0645\u0644\u0627\u0621" },
+      { en: "Loyalty tiers, wallet, promo codes and referrals", de: "Treuestufen, Guthaben, Gutscheincodes und Empfehlungen", ar: "\u0645\u0633\u062A\u0648\u064A\u0627\u062A \u0648\u0644\u0627\u0621 \u0648\u0645\u062D\u0641\u0638\u0629 \u0648\u0623\u0643\u0648\u0627\u062F \u062E\u0635\u0645 \u0648\u0625\u062D\u0627\u0644\u0627\u062A" },
+      { en: "WhatsApp and email order notifications", de: "Bestellbenachrichtigungen per WhatsApp und E-Mail", ar: "\u0625\u0634\u0639\u0627\u0631\u0627\u062A \u0637\u0644\u0628\u0627\u062A \u0639\u0628\u0631 \u0648\u0627\u062A\u0633\u0627\u0628 \u0648\u0627\u0644\u0628\u0631\u064A\u062F" },
+      { en: "Phone and chat support during business hours", de: "Telefon- und Chat-Support zu Gesch\xE4ftszeiten", ar: "\u062F\u0639\u0645 \u0647\u0627\u062A\u0641\u064A \u0648\u0645\u062D\u0627\u062F\u062B\u0629 \u062E\u0644\u0627\u0644 \u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0639\u0645\u0644" }
+    ],
+    true,
+    { en: "Most chosen", de: "Am h\xE4ufigsten", ar: "\u0627\u0644\u0623\u0643\u062B\u0631 \u0627\u062E\u062A\u064A\u0627\u0631\u064B\u0627" }
+  )}
+        ${plan(
+    ENTERPRISE,
+    { en: "Enterprise", de: "Enterprise", ar: "\u0627\u0644\u0645\u0624\u0633\u0633\u0627\u062A" },
+    { en: "Several branches under one roof, with the API and the reporting to match.", de: "Mehrere Filialen unter einem Dach, mit passender API und Auswertung.", ar: "\u0639\u062F\u0629 \u0641\u0631\u0648\u0639 \u062A\u062D\u062A \u0645\u0638\u0644\u0629 \u0648\u0627\u062D\u062F\u0629\u060C \u0645\u0639 \u0648\u0627\u062C\u0647\u0629 \u0628\u0631\u0645\u062C\u064A\u0629 \u0648\u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u0646\u0627\u0633\u0628\u0629." },
+    [
+      { en: "Everything in Professional, unlimited devices", de: "Alles aus Professional, unbegrenzte Ger\xE4te", ar: "\u0643\u0644 \u0645\u0627 \u0641\u064A \u0627\u0644\u0627\u062D\u062A\u0631\u0627\u0641\u064A\u0629\u060C \u0648\u0623\u062C\u0647\u0632\u0629 \u0628\u0644\u0627 \u062D\u062F" },
+      { en: "Multi-branch console with consolidated reporting", de: "Filialkonsole mit konsolidierter Auswertung", ar: "\u0644\u0648\u062D\u0629 \u0645\u062A\u0639\u062F\u062F\u0629 \u0627\u0644\u0641\u0631\u0648\u0639 \u0628\u062A\u0642\u0627\u0631\u064A\u0631 \u0645\u062C\u0645\u0651\u0639\u0629" },
+      { en: "REST API, webhooks and accounting export", de: "REST-API, Webhooks und Buchhaltungsexport", ar: "\u0648\u0627\u062C\u0647\u0629 REST \u0648Webhooks \u0648\u062A\u0635\u062F\u064A\u0631 \u0645\u062D\u0627\u0633\u0628\u064A" },
+      { en: "Caller ID integration and custom vertical modules", de: "Rufnummernerkennung und eigene Branchenmodule", ar: "\u062A\u0639\u0631\u064A\u0641 \u0627\u0644\u0645\u062A\u0635\u0644 \u0648\u0648\u062D\u062F\u0627\u062A \u0645\u062E\u0635\u064E\u0651\u0635\u0629 \u0644\u0645\u062C\u0627\u0644\u0643" },
+      { en: "Named contact, priority response and on-site onboarding", de: "Fester Ansprechpartner, priorisierte Reaktion und Onboarding vor Ort", ar: "\u0645\u0633\u0624\u0648\u0644 \u0645\u062E\u0635\u064E\u0651\u0635 \u0648\u0627\u0633\u062A\u062C\u0627\u0628\u0629 \u0630\u0627\u062A \u0623\u0648\u0644\u0648\u064A\u0629 \u0648\u062A\u0647\u064A\u0626\u0629 \u0641\u064A \u0627\u0644\u0645\u0648\u0642\u0639" }
+    ]
+  )}
+      </div>
+      <p class="form-note" style="text-align:center;margin-top:24px" ${tAttrs({
+    en: "Prices are per location in CHF, excluding VAT. Yearly billing is charged once for twelve months.",
+    de: "Preise je Standort in CHF, exkl. MwSt. Die Jahresabrechnung erfolgt einmalig f\xFCr zw\xF6lf Monate.",
+    ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0644\u0643\u0644 \u0641\u0631\u0639 \u0628\u0627\u0644\u0641\u0631\u0646\u0643 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A \u0648\u063A\u064A\u0631 \u0634\u0627\u0645\u0644\u0629 \u0627\u0644\u0636\u0631\u064A\u0628\u0629. \u062A\u064F\u062D\u0635\u064E\u0651\u0644 \u0627\u0644\u0641\u0648\u062A\u0631\u0629 \u0627\u0644\u0633\u0646\u0648\u064A\u0629 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629 \u0644\u0627\u062B\u0646\u064A \u0639\u0634\u0631 \u0634\u0647\u0631\u064B\u0627."
+  })}>Prices are per location in CHF, excluding VAT. Yearly billing is charged once for twelve months.</p>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="wrap">
+      ${head(
+    { en: "Included everywhere", de: "\xDCberall enthalten", ar: "\u0645\u0634\u0645\u0648\u0644 \u0641\u064A \u0643\u0644 \u0627\u0644\u0628\u0627\u0642\u0627\u062A" },
+    { en: "Things other vendors invoice separately", de: "Was andere Anbieter separat berechnen", ar: "\u0623\u0645\u0648\u0631 \u064A\u0641\u0648\u062A\u0631\u0647\u0627 \u0622\u062E\u0631\u0648\u0646 \u0645\u0646\u0641\u0635\u0644\u0629" },
+    void 0,
+    true
+  )}
+      <div class="grid grid-4">
+        ${card(icons.refresh, { en: "Updates", de: "Updates", ar: "\u0627\u0644\u062A\u062D\u062F\u064A\u062B\u0627\u062A" }, { en: "Every release, including new modules, at no extra cost.", de: "Jede Version, inklusive neuer Module, ohne Aufpreis.", ar: "\u0643\u0644 \u0625\u0635\u062F\u0627\u0631\u060C \u0628\u0645\u0627 \u0641\u064A\u0647 \u0627\u0644\u0648\u062D\u062F\u0627\u062A \u0627\u0644\u062C\u062F\u064A\u062F\u0629\u060C \u062F\u0648\u0646 \u062A\u0643\u0644\u0641\u0629 \u0625\u0636\u0627\u0641\u064A\u0629." })}
+        ${card(icons.cloud, { en: "Hosting and backups", de: "Hosting und Backups", ar: "\u0627\u0644\u0627\u0633\u062A\u0636\u0627\u0641\u0629 \u0648\u0627\u0644\u0646\u0633\u062E \u0627\u0644\u0627\u062D\u062A\u064A\u0627\u0637\u064A" }, { en: "European hosting with daily backups and point-in-time restore.", de: "Europ\xE4isches Hosting mit t\xE4glichen Backups und Point-in-Time-Restore.", ar: "\u0627\u0633\u062A\u0636\u0627\u0641\u0629 \u0623\u0648\u0631\u0648\u0628\u064A\u0629 \u0645\u0639 \u0646\u0633\u062E \u064A\u0648\u0645\u064A \u0648\u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0644\u0623\u064A \u0644\u062D\u0638\u0629." })}
+        ${card(icons.users, { en: "Onboarding", de: "Onboarding", ar: "\u0627\u0644\u062A\u0647\u064A\u0626\u0629" }, { en: "We import your menu and train your team before you go live.", de: "Wir importieren Ihre Karte und schulen Ihr Team vor dem Livegang.", ar: "\u0646\u0633\u062A\u0648\u0631\u062F \u0642\u0627\u0626\u0645\u062A\u0643 \u0648\u0646\u062F\u0631\u0651\u0628 \u0641\u0631\u064A\u0642\u0643 \u0642\u0628\u0644 \u0627\u0644\u062A\u0634\u063A\u064A\u0644." })}
+        ${card(icons.key, { en: "No commission", de: "Keine Provision", ar: "\u0628\u0644\u0627 \u0639\u0645\u0648\u0644\u0629" }, { en: "Orders through your own storefront cost you nothing per order.", de: "Bestellungen \xFCber Ihren eigenen Shop kosten pro Bestellung nichts.", ar: "\u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0639\u0628\u0631 \u0645\u062A\u062C\u0631\u0643 \u0644\u0627 \u062A\u0643\u0644\u0651\u0641\u0643 \u0634\u064A\u0626\u064B\u0627 \u0644\u0643\u0644 \u0637\u0644\u0628." })}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap" style="max-width:860px">
+      ${head({ en: "Billing", de: "Abrechnung", ar: "\u0627\u0644\u0641\u0648\u062A\u0631\u0629" }, { en: "Common questions", de: "H\xE4ufige Fragen", ar: "\u0623\u0633\u0626\u0644\u0629 \u0634\u0627\u0626\u0639\u0629" }, void 0, true)}
+      ${faq([
+    {
+      q: { en: "Is there a minimum contract?", de: "Gibt es eine Mindestlaufzeit?", ar: "\u0647\u0644 \u0647\u0646\u0627\u0643 \u062D\u062F \u0623\u062F\u0646\u0649 \u0644\u0644\u062A\u0639\u0627\u0642\u062F\u061F" },
+      a: { en: "Monthly plans run month to month and can be cancelled at the end of any period. Yearly plans run for twelve months and are billed once.", de: "Monatspl\xE4ne laufen monatlich und k\xF6nnen zum Periodenende gek\xFCndigt werden. Jahrespl\xE4ne laufen zw\xF6lf Monate und werden einmalig abgerechnet.", ar: "\u0627\u0644\u0628\u0627\u0642\u0627\u062A \u0627\u0644\u0634\u0647\u0631\u064A\u0629 \u062A\u064F\u062C\u062F\u064E\u0651\u062F \u0634\u0647\u0631\u064A\u064B\u0627 \u0648\u064A\u0645\u0643\u0646 \u0625\u0644\u063A\u0627\u0624\u0647\u0627 \u0646\u0647\u0627\u064A\u0629 \u0623\u064A \u0641\u062A\u0631\u0629. \u0627\u0644\u0628\u0627\u0642\u0627\u062A \u0627\u0644\u0633\u0646\u0648\u064A\u0629 \u0644\u0627\u062B\u0646\u064A \u0639\u0634\u0631 \u0634\u0647\u0631\u064B\u0627 \u0648\u062A\u064F\u062D\u0635\u064E\u0651\u0644 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629." }
+    },
+    {
+      q: { en: "What counts as a location?", de: "Was z\xE4hlt als Standort?", ar: "\u0645\u0627 \u0627\u0644\u0630\u064A \u064A\u064F\u062D\u062A\u0633\u0628 \u0641\u0631\u0639\u064B\u0627\u061F" },
+      a: { en: "One physical address. Devices inside that address are covered by the plan's device limit; a second shop needs a second location.", de: "Eine physische Adresse. Ger\xE4te an dieser Adresse fallen unter das Ger\xE4telimit des Plans; ein zweites Gesch\xE4ft ben\xF6tigt einen zweiten Standort.", ar: "\u0639\u0646\u0648\u0627\u0646 \u0641\u0639\u0644\u064A \u0648\u0627\u062D\u062F. \u0627\u0644\u0623\u062C\u0647\u0632\u0629 \u062F\u0627\u062E\u0644 \u0647\u0630\u0627 \u0627\u0644\u0639\u0646\u0648\u0627\u0646 \u062A\u062F\u062E\u0644 \u0636\u0645\u0646 \u062D\u062F \u0627\u0644\u0628\u0627\u0642\u0629\u061B \u0648\u0627\u0644\u0645\u062D\u0644 \u0627\u0644\u062B\u0627\u0646\u064A \u064A\u062D\u062A\u0627\u062C \u0641\u0631\u0639\u064B\u0627 \u062B\u0627\u0646\u064A\u064B\u0627." }
+    },
+    {
+      q: { en: "Do you take a cut of card or TWINT payments?", de: "Behalten Sie einen Anteil an Karten- oder TWINT-Zahlungen?", ar: "\u0647\u0644 \u062A\u0623\u062E\u0630\u0648\u0646 \u0646\u0633\u0628\u0629 \u0645\u0646 \u0645\u062F\u0641\u0648\u0639\u0627\u062A \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0623\u0648 TWINT\u061F" },
+      a: { en: "No. You keep your own acquirer contract and its rates. Kassenta records the payment and never sits between you and the money.", de: "Nein. Sie behalten Ihren eigenen Acquirer-Vertrag und dessen Konditionen. Kassenta erfasst die Zahlung und steht nie zwischen Ihnen und dem Geld.", ar: "\u0644\u0627. \u062A\u062D\u062A\u0641\u0638 \u0628\u0639\u0642\u062F \u0645\u0632\u0648\u0651\u062F \u0627\u0644\u062F\u0641\u0639 \u0627\u0644\u062E\u0627\u0635 \u0628\u0643 \u0648\u0623\u0633\u0639\u0627\u0631\u0647. \u064A\u0633\u062C\u0651\u0644 Kassenta \u0627\u0644\u062F\u0641\u0639\u0629 \u0648\u0644\u0627 \u064A\u0642\u0641 \u0623\u0628\u062F\u064B\u0627 \u0628\u064A\u0646\u0643 \u0648\u0628\u064A\u0646 \u0623\u0645\u0648\u0627\u0644\u0643." }
+    },
+    {
+      q: { en: "Can I change plan later?", de: "Kann ich den Plan sp\xE4ter wechseln?", ar: "\u0647\u0644 \u064A\u0645\u0643\u0646\u0646\u064A \u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u0628\u0627\u0642\u0629 \u0644\u0627\u062D\u0642\u064B\u0627\u061F" },
+      a: { en: "Yes, in both directions, effective from the next billing period. Your data and settings are untouched by a plan change.", de: "Ja, in beide Richtungen, wirksam ab der n\xE4chsten Abrechnungsperiode. Daten und Einstellungen bleiben unver\xE4ndert.", ar: "\u0646\u0639\u0645\u060C \u0641\u064A \u0627\u0644\u0627\u062A\u062C\u0627\u0647\u064A\u0646\u060C \u0627\u0639\u062A\u0628\u0627\u0631\u064B\u0627 \u0645\u0646 \u0641\u062A\u0631\u0629 \u0627\u0644\u0641\u0648\u062A\u0631\u0629 \u0627\u0644\u062A\u0627\u0644\u064A\u0629. \u0644\u0627 \u064A\u0645\u0633\u0651 \u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u0628\u0627\u0642\u0629 \u0628\u064A\u0627\u0646\u0627\u062A\u0643 \u0648\u0625\u0639\u062F\u0627\u062F\u0627\u062A\u0643." }
+    }
+  ])}
+    </div>
+  </section>
+
+  ${ctaBand(
+    { en: "Run the numbers with us", de: "Rechnen wir gemeinsam", ar: "\u0644\u0646\u062D\u0633\u0628 \u0627\u0644\u0623\u0631\u0642\u0627\u0645 \u0645\u0639\u064B\u0627" },
+    {
+      en: "Send your current monthly order volume and platform commission. We will show you the break-even point in writing before you commit to anything.",
+      de: "Senden Sie uns Ihr monatliches Bestellvolumen und die Plattformprovision. Wir zeigen Ihnen den Break-even schriftlich, bevor Sie sich festlegen.",
+      ar: "\u0623\u0631\u0633\u0644 \u062D\u062C\u0645 \u0637\u0644\u0628\u0627\u062A\u0643 \u0627\u0644\u0634\u0647\u0631\u064A \u0648\u0639\u0645\u0648\u0644\u0629 \u0627\u0644\u0645\u0646\u0635\u0629 \u0627\u0644\u062D\u0627\u0644\u064A\u0629. \u0633\u0646\u0639\u0631\u0636 \u0644\u0643 \u0646\u0642\u0637\u0629 \u0627\u0644\u062A\u0639\u0627\u062F\u0644 \u0643\u062A\u0627\u0628\u064A\u064B\u0627 \u0642\u0628\u0644 \u0623\u064A \u0627\u0644\u062A\u0632\u0627\u0645."
+    }
+  )}
+
+  <dialog class="buy" id="buyDialog" aria-labelledby="buy-title">
+    <button class="icon-btn buy-close" type="button" onclick="KassentaPricing.close()" aria-label="Close">${icons.close}</button>
+    <h3 id="buy-title" ${tAttrs({ en: "Start with Kassenta", de: "Mit Kassenta starten", ar: "\u0627\u0628\u062F\u0623 \u0645\u0639 Kassenta" })}>Start with Kassenta</h3>
+    <p class="buy-plan" id="buy-plan"></p>
+    <form id="buyForm" novalidate style="display:grid;gap:16px">
+      <div class="field">
+        <label for="buy-email" ${tAttrs({ en: "Work email", de: "Gesch\xE4ftliche E-Mail", ar: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0644\u0644\u0639\u0645\u0644" })}>Work email</label>
+        <input id="buy-email" name="email" type="email" required autocomplete="email" inputmode="email">
+        <p class="form-note" ${tAttrs({
+    en: "Your licence key and receipt go to this address.",
+    de: "Lizenzschl\xFCssel und Beleg gehen an diese Adresse.",
+    ar: "\u064A\u064F\u0631\u0633\u064E\u0644 \u0645\u0641\u062A\u0627\u062D \u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u0648\u0627\u0644\u0625\u064A\u0635\u0627\u0644 \u0625\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0639\u0646\u0648\u0627\u0646."
+  })}>Your licence key and receipt go to this address.</p>
+      </div>
+      <div class="form-status" id="buy-status" role="status" aria-live="polite"></div>
+      <button class="btn btn-primary" type="submit" id="buy-submit" ${tAttrs({
+    en: "Continue to secure checkout",
+    de: "Weiter zur sicheren Zahlung",
+    ar: "\u0627\u0644\u0645\u062A\u0627\u0628\u0639\u0629 \u0625\u0644\u0649 \u0627\u0644\u062F\u0641\u0639 \u0627\u0644\u0622\u0645\u0646"
+  })}>Continue to secure checkout</button>
+    </form>
+    <p class="form-note buy-legal" ${tAttrs({
+    en: "Payment is taken by Stripe on their own page, which is also where the available methods are shown. Your card details never reach us, and nothing is charged until you confirm there.",
+    de: "Die Zahlung l\xE4uft bei Stripe auf deren eigener Seite, dort werden auch die verf\xFCgbaren Zahlungsarten angezeigt. Ihre Kartendaten erreichen uns nie, und belastet wird erst, wenn Sie dort best\xE4tigen.",
+    ar: "\u064A\u062A\u0645 \u0627\u0644\u062F\u0641\u0639 \u0644\u062F\u0649 Stripe \u0639\u0644\u0649 \u0635\u0641\u062D\u062A\u0647 \u0627\u0644\u062E\u0627\u0635\u0629\u060C \u0648\u0647\u0646\u0627\u0643 \u0623\u064A\u0636\u064B\u0627 \u062A\u0638\u0647\u0631 \u0637\u0631\u0642 \u0627\u0644\u062F\u0641\u0639 \u0627\u0644\u0645\u062A\u0627\u062D\u0629. \u0644\u0627 \u062A\u0635\u0644\u0646\u0627 \u0628\u064A\u0627\u0646\u0627\u062A \u0628\u0637\u0627\u0642\u062A\u0643 \u0623\u0628\u062F\u064B\u0627\u060C \u0648\u0644\u0627 \u064A\u064F\u062E\u0635\u0645 \u0634\u064A\u0621 \u062D\u062A\u0649 \u062A\u0624\u0643\u0651\u062F \u0647\u0646\u0627\u0643."
+  })}>Payment is taken by Stripe on their own page, which is also where the available methods are shown. Your card details never reach us, and nothing is charged until you confirm there.</p>
+  </dialog>
+
+  <script>
+    /* The purchase path.
+       \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+       These pages are pre-rendered and sit behind a CDN, so no key and no plan
+       id can be baked into them. The catalogue is fetched at runtime from
+       /api/landing/plans, and the checkout is opened by asking the server for a
+       Stripe-hosted session: the browser never handles a publishable key, an
+       amount or a card. The amount is priced from the subscription_plans row on
+       the server side \u2014 sending one from here would not change what is charged. */
+    window.KassentaPricing = (function () {
+      var cycle = 'monthly';
+      var slug = null;
+      var catalogue = null;
+      var state = 'loading';           /* loading | ready | unavailable */
+      var dlg = document.getElementById('buyDialog');
+      var form = document.getElementById('buyForm');
+      var emailEl = document.getElementById('buy-email');
+      var statusEl = document.getElementById('buy-status');
+      var submitEl = document.getElementById('buy-submit');
+      var planEl = document.getElementById('buy-plan');
+
+      var MSG = {
+        loading: { en: 'Preparing the checkout\u2026', de: 'Zahlung wird vorbereitet\u2026', ar: '\u062C\u0627\u0631\u064D \u062A\u062C\u0647\u064A\u0632 \u0627\u0644\u062F\u0641\u0639\u2026' },
+        opening: { en: 'Opening the secure checkout\u2026', de: 'Sichere Zahlung wird ge\xF6ffnet\u2026', ar: '\u062C\u0627\u0631\u064D \u0641\u062A\u062D \u0635\u0641\u062D\u0629 \u0627\u0644\u062F\u0641\u0639 \u0627\u0644\u0622\u0645\u0646\u2026' },
+        invalid: { en: 'Please enter a valid email address.', de: 'Bitte geben Sie eine g\xFCltige E-Mail-Adresse ein.', ar: '\u064A\u0631\u062C\u0649 \u0625\u062F\u062E\u0627\u0644 \u0628\u0631\u064A\u062F \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0635\u062D\u064A\u062D.' },
+        down: { en: 'Online checkout is unavailable right now. Write to info@kassenta.com and we will set the plan up for you.', de: 'Die Online-Zahlung ist gerade nicht verf\xFCgbar. Schreiben Sie an info@kassenta.com, wir richten den Plan f\xFCr Sie ein.', ar: '\u0627\u0644\u062F\u0641\u0639 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u063A\u064A\u0631 \u0645\u062A\u0627\u062D \u062D\u0627\u0644\u064A\u064B\u0627. \u0631\u0627\u0633\u0644\u0646\u0627 \u0639\u0644\u0649 info@kassenta.com \u0648\u0633\u0646\u062C\u0647\u0651\u0632 \u0627\u0644\u0628\u0627\u0642\u0629 \u0644\u0643.' },
+        failed: { en: 'The checkout could not be opened. Nothing was charged. Please try again or write to info@kassenta.com.', de: 'Die Zahlung konnte nicht ge\xF6ffnet werden. Es wurde nichts belastet. Bitte erneut versuchen oder an info@kassenta.com schreiben.', ar: '\u062A\u0639\u0630\u0651\u0631 \u0641\u062A\u062D \u0635\u0641\u062D\u0629 \u0627\u0644\u062F\u0641\u0639 \u0648\u0644\u0645 \u064A\u064F\u062E\u0635\u0645 \u0623\u064A \u0645\u0628\u0644\u063A. \u062D\u0627\u0648\u0644 \u0645\u062C\u062F\u062F\u064B\u0627 \u0623\u0648 \u0631\u0627\u0633\u0644\u0646\u0627 \u0639\u0644\u0649 info@kassenta.com.' }
+      };
+      var PER = {
+        monthly: { en: 'per month, billed monthly', de: 'pro Monat, monatlich abgerechnet', ar: '\u0634\u0647\u0631\u064A\u064B\u0627\u060C \u0628\u0641\u0648\u062A\u0631\u0629 \u0634\u0647\u0631\u064A\u0629' },
+        yearly: { en: 'per month, billed once for twelve months', de: 'pro Monat, einmalig f\xFCr zw\xF6lf Monate abgerechnet', ar: '\u0634\u0647\u0631\u064A\u064B\u0627\u060C \u062A\u064F\u062D\u0635\u064E\u0651\u0644 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629 \u0644\u0627\u062B\u0646\u064A \u0639\u0634\u0631 \u0634\u0647\u0631\u064B\u0627' }
+      };
+      function lang() { return document.documentElement.lang || 'en'; }
+      function say(msg, cls) {
+        statusEl.textContent = msg[lang()] || msg.en;
+        statusEl.className = 'form-status ' + cls;
+      }
+
+      function set(next) {
+        cycle = next === 'yearly' ? 'yearly' : 'monthly';
+        document.querySelectorAll('.billing-toggle button').forEach(function (b) {
+          b.classList.toggle('active', b.dataset.cycle === cycle);
+        });
+        document.querySelectorAll('.price-value').forEach(function (el) {
+          el.textContent = el.getAttribute(cycle === 'yearly' ? 'data-yearly' : 'data-monthly');
+        });
+        if (dlg && dlg.open) describe();
+      }
+
+      /* The catalogue is the authority on both the price and the plan id. The
+         numbers in the HTML are only what the CDN had; these are the ones the
+         charge is built from. */
+      function apply(data) {
+        catalogue = {};
+        (data.plans || []).forEach(function (p) { catalogue[p.slug] = p; });
+        var cur = data.currency || 'CHF';
+        document.querySelectorAll('.price-currency').forEach(function (el) { el.textContent = cur; });
+        document.querySelectorAll('.price-card[data-plan]').forEach(function (card) {
+          var p = catalogue[card.getAttribute('data-plan')];
+          var el = card.querySelector('.price-value');
+          if (!p || !el) return;
+          if (p.monthly && typeof p.monthly.price === 'number') {
+            el.setAttribute('data-monthly', String(p.monthly.price));
+          }
+          if (p.yearly && typeof p.yearly.price === 'number') {
+            el.setAttribute('data-yearly', String(Math.round(p.yearly.price / 12)));
+          }
+        });
+        set(cycle);
+        state = data.checkout ? 'ready' : 'unavailable';
+        if (dlg && dlg.open) { describe(); gate(); }
+      }
+
+      function load() {
+        return fetch('/api/landing/plans', { headers: { Accept: 'application/json' } })
+          .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+          .then(apply)
+          .catch(function () {
+            state = 'unavailable';
+            if (dlg && dlg.open) { gate(); }
+          });
+      }
+
+      function entry() {
+        var p = catalogue && slug ? catalogue[slug] : null;
+        return p ? p[cycle] : null;
+      }
+
+      function describe() {
+        if (!planEl) return;
+        var p = catalogue && slug ? catalogue[slug] : null;
+        var card = document.querySelector('.price-card[data-plan="' + slug + '"] .price-value');
+        var name = (p && p.name) || (slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : '');
+        var shown = card ? card.textContent : '';
+        var cur = document.querySelector('.price-currency');
+        planEl.textContent = name + ' \u2014 ' + (cur ? cur.textContent : 'CHF') + ' ' + shown + ' ' +
+          (PER[cycle][lang()] || PER[cycle].en);
+      }
+
+      function gate() {
+        if (state === 'unavailable') {
+          submitEl.disabled = true;
+          say(MSG.down, 'err');
+        } else if (state === 'loading') {
+          submitEl.disabled = true;
+          say(MSG.loading, 'ok');
+        } else {
+          submitEl.disabled = false;
+          statusEl.textContent = '';
+          statusEl.className = 'form-status';
+        }
+      }
+
+      /* Returns true to let the anchor fall through to /contact/, which is what
+         happens when the catalogue never arrived or checkout is switched off. */
+      function buy(e, which) {
+        if (state === 'unavailable' || !dlg || !dlg.showModal) return true;
+        if (e) e.preventDefault();
+        slug = which;
+        describe();
+        gate();
+        dlg.showModal();
+        emailEl.focus();
+        return false;
+      }
+
+      function close() { if (dlg && dlg.open) dlg.close(); }
+
+      function checkout() {
+        var email = String(emailEl.value || '').trim();
+        if (!/^[^@s]+@[^@s]+.[^@s]{2,}$/.test(email)) return say(MSG.invalid, 'err');
+
+        var row = entry();
+        if (!row || !row.planId) { state = 'unavailable'; return gate(); }
+
+        submitEl.disabled = true;
+        say(MSG.opening, 'ok');
+
+        /* Stripe substitutes {CHECKOUT_SESSION_ID} on the way back, which is
+           the only handle the success page has to ask the server what happened.
+           Both URLs stay on this origin. */
+        fetch('/api/payments/checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            planId: row.planId,
+            email: email,
+            successUrl: location.origin + '/pay/success/?session_id={CHECKOUT_SESSION_ID}',
+            cancelUrl: location.origin + '/pay/cancelled/'
+          })
+        }).then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.json();
+        }).then(function (data) {
+          if (!data || !data.url) throw new Error('no url');
+          location.href = data.url;
+        }).catch(function () {
+          submitEl.disabled = false;
+          say(MSG.failed, 'err');
+        });
+      }
+
+      if (form) {
+        form.addEventListener('submit', function (e) { e.preventDefault(); checkout(); });
+      }
+      if (dlg) {
+        /* Clicking the backdrop lands on the <dialog> itself, never on a child. */
+        dlg.addEventListener('click', function (e) { if (e.target === dlg) close(); });
+      }
+      load();
+
+      return { set: set, buy: buy, close: close, checkout: checkout };
+    })();
+  </script>`
+};
+var compliance = {
+  meta: {
+    path: "/compliance",
+    title: { en: "Swiss VAT, GDPR and EU fiscalisation \u2014 Kassenta", de: "Schweizer MwSt., DSGVO und Fiskalisierung \u2014 Kassenta", ar: "\u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648GDPR \u0648\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0627\u0644\u0623\u0648\u0631\u0648\u0628\u064A \u2014 Kassenta" },
+    description: {
+      en: "Swiss VAT rates and cash rounding, GDPR and nDSG handling, audit trails, and our roadmap for German, Austrian, French and Italian fiscalisation.",
+      de: "Schweizer MwSt.-S\xE4tze und Rappenrundung, DSGVO- und nDSG-Umsetzung, Audit-Trails und unsere Roadmap zur Fiskalisierung in Deutschland, \xD6sterreich, Frankreich und Italien.",
+      ar: "\u0646\u0633\u0628 \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0627\u0644\u0633\u0648\u064A\u0633\u0631\u064A\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A\u060C \u0648\u0627\u0644\u062A\u0632\u0627\u0645 GDPR \u0648nDSG\u060C \u0648\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u062A\u062F\u0642\u064A\u0642\u060C \u0648\u062E\u0637\u062A\u0646\u0627 \u0644\u0644\u0623\u0646\u0638\u0645\u0629 \u0627\u0644\u0636\u0631\u064A\u0628\u064A\u0629 \u0641\u064A \u0623\u0644\u0645\u0627\u0646\u064A\u0627 \u0648\u0627\u0644\u0646\u0645\u0633\u0627 \u0648\u0641\u0631\u0646\u0633\u0627 \u0648\u0625\u064A\u0637\u0627\u0644\u064A\u0627."
+    }
+  },
+  body: `
+  ${pageHead(
+    { en: "What we handle, and what is still on the roadmap", de: "Was wir abdecken \u2014 und was noch aussteht", ar: "\u0645\u0627 \u0646\u063A\u0637\u0651\u064A\u0647 \u0648\u0645\u0627 \u0644\u0627 \u064A\u0632\u0627\u0644 \u0641\u064A \u0627\u0644\u062E\u0637\u0629" },
+    {
+      en: "Fiscal rules differ in every market and vendors are often vague about which ones they actually implement. This page states our position plainly so you can check it against your accountant's list.",
+      de: "Steuerliche Vorgaben unterscheiden sich je Markt, und Anbieter bleiben oft vage, was sie tats\xE4chlich umsetzen. Diese Seite nennt unsere Position klar, damit Sie sie mit der Liste Ihrer Treuhand abgleichen k\xF6nnen.",
+      ar: "\u062A\u062E\u062A\u0644\u0641 \u0627\u0644\u0642\u0648\u0627\u0639\u062F \u0627\u0644\u0636\u0631\u064A\u0628\u064A\u0629 \u0628\u064A\u0646 \u0627\u0644\u0623\u0633\u0648\u0627\u0642 \u0648\u0643\u062B\u064A\u0631\u064B\u0627 \u0645\u0627 \u064A\u0643\u0648\u0646 \u0627\u0644\u0645\u0648\u0631\u062F\u0648\u0646 \u063A\u0627\u0645\u0636\u064A\u0646 \u0628\u0634\u0623\u0646 \u0645\u0627 \u064A\u0646\u0641\u0651\u0630\u0648\u0646\u0647 \u0641\u0639\u0644\u064A\u064B\u0627. \u062A\u0639\u0631\u0636 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062D\u0629 \u0645\u0648\u0642\u0641\u0646\u0627 \u0628\u0648\u0636\u0648\u062D \u0644\u062A\u0642\u0627\u0631\u0646\u0647 \u0628\u0642\u0627\u0626\u0645\u0629 \u0645\u062D\u0627\u0633\u0628\u0643."
+    },
+    { en: "Compliance", de: "Compliance", ar: "\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644" }
+  )}
+
+  <section class="section">
+    <div class="wrap">
+      ${head(
+    { en: "Switzerland", de: "Schweiz", ar: "\u0633\u0648\u064A\u0633\u0631\u0627" },
+    { en: "The home market, implemented in full", de: "Der Heimatmarkt, vollst\xE4ndig umgesetzt", ar: "\u0627\u0644\u0633\u0648\u0642 \u0627\u0644\u0623\u0633\u0627\u0633\u064A\u060C \u0645\u0646\u0641\u064E\u0651\u0630 \u0628\u0627\u0644\u0643\u0627\u0645\u0644" }
+  )}
+      <div class="grid grid-2">
+        ${card(icons.scale, { en: "VAT rates", de: "MwSt.-S\xE4tze", ar: "\u0646\u0633\u0628 \u0627\u0644\u0636\u0631\u064A\u0628\u0629" }, {
+    en: "8.1% standard, 2.6% reduced and 3.8% accommodation, applied per product category. Dine-in and takeaway are treated separately on the same ticket.",
+    de: "8,1 % Normalsatz, 2,6 % reduziert und 3,8 % Beherbergung, je Artikelkategorie angewendet. Vor-Ort und Takeaway werden auf demselben Bon getrennt behandelt.",
+    ar: "8.1% \u0639\u0627\u062F\u064A\u0629 \u06482.6% \u0645\u062E\u0641\u064E\u0651\u0636\u0629 \u06483.8% \u0625\u0642\u0627\u0645\u0629\u060C \u062A\u064F\u0637\u0628\u064E\u0651\u0642 \u062D\u0633\u0628 \u0641\u0626\u0629 \u0627\u0644\u0645\u0646\u062A\u062C. \u0648\u064A\u064F\u0639\u0627\u0644\u064E\u062C \u0627\u0644\u062A\u0646\u0627\u0648\u0644 \u0628\u0627\u0644\u0645\u0643\u0627\u0646 \u0648\u0627\u0644\u062A\u064A\u0643 \u0623\u0648\u0627\u064A \u0628\u0634\u0643\u0644 \u0645\u0646\u0641\u0635\u0644 \u0641\u064A \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0646\u0641\u0633\u0647\u0627."
+  })}
+        ${card(icons.register, { en: "Cash rounding", de: "Rappenrundung", ar: "\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A" }, {
+    en: "Cash totals round to the nearest CHF 0.05 at the ticket level. Card, TWINT and invoice keep the exact amount, and the difference is posted as a rounding line.",
+    de: "Barbetr\xE4ge runden auf 5 Rappen je Bon. Karte, TWINT und Rechnung behalten den exakten Betrag; die Differenz wird als Rundungsposition gebucht.",
+    ar: "\u062A\u064F\u0642\u0631\u064E\u0651\u0628 \u0645\u0628\u0627\u0644\u063A \u0627\u0644\u0646\u0642\u062F \u0644\u0623\u0642\u0631\u0628 0.05 \u0641\u0631\u0646\u0643 \u0639\u0644\u0649 \u0645\u0633\u062A\u0648\u0649 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629. \u0648\u062A\u062D\u062A\u0641\u0638 \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0648TWINT \u0648\u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0628\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u062F\u0642\u064A\u0642\u060C \u0648\u064A\u064F\u0642\u064A\u064E\u0651\u062F \u0627\u0644\u0641\u0631\u0642 \u0643\u0633\u0637\u0631 \u062A\u0642\u0631\u064A\u0628."
+  })}
+        ${card(icons.lock, { en: "nDSG and GDPR", de: "nDSG und DSGVO", ar: "nDSG \u0648GDPR" }, {
+    en: "Data is hosted in Europe. Customers can request export or deletion, and both are executed from the console with a record of who approved them.",
+    de: "Daten werden in Europa gehostet. Kunden k\xF6nnen Export oder L\xF6schung verlangen; beides wird in der Konsole ausgef\xFChrt und protokolliert.",
+    ar: "\u062A\u064F\u0633\u062A\u0636\u0627\u0641 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0641\u064A \u0623\u0648\u0631\u0648\u0628\u0627. \u0648\u064A\u0645\u0643\u0646 \u0644\u0644\u0639\u0645\u0644\u0627\u0621 \u0637\u0644\u0628 \u0627\u0644\u062A\u0635\u062F\u064A\u0631 \u0623\u0648 \u0627\u0644\u062D\u0630\u0641\u060C \u0648\u064A\u064F\u0646\u0641\u064E\u0651\u0630\u0627\u0646 \u0645\u0646 \u0627\u0644\u0644\u0648\u062D\u0629 \u0645\u0639 \u062A\u0633\u062C\u064A\u0644 \u0645\u0646 \u0648\u0627\u0641\u0642 \u0639\u0644\u064A\u0647\u0645\u0627."
+  })}
+        ${card(icons.shield, { en: "Audit trail", de: "Audit-Trail", ar: "\u0633\u062C\u0644 \u0627\u0644\u062A\u062F\u0642\u064A\u0642" }, {
+    en: "Every sale, void, discount, price override and cash movement records the operator, the device and the timestamp. Records are append-only.",
+    de: "Jeder Verkauf, Storno, Rabatt, jede Preis\xE4nderung und Kassenbewegung erfasst Mitarbeiter, Ger\xE4t und Zeitstempel. Eintr\xE4ge sind nur anf\xFCgbar.",
+    ar: "\u0643\u0644 \u0628\u064A\u0639 \u0648\u0625\u0644\u063A\u0627\u0621 \u0648\u062E\u0635\u0645 \u0648\u062A\u0639\u062F\u064A\u0644 \u0633\u0639\u0631 \u0648\u062D\u0631\u0643\u0629 \u0646\u0642\u062F\u064A\u0629 \u064A\u0633\u062C\u0651\u0644 \u0627\u0644\u0645\u0648\u0638\u0641 \u0648\u0627\u0644\u062C\u0647\u0627\u0632 \u0648\u0627\u0644\u0648\u0642\u062A. \u0648\u0627\u0644\u0633\u062C\u0644\u0627\u062A \u0625\u0636\u0627\u0641\u064A\u0629 \u0641\u0642\u0637 \u0644\u0627 \u062A\u064F\u0639\u062F\u064E\u0651\u0644."
+  })}
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="wrap">
+      ${head(
+    { en: "European Union", de: "Europ\xE4ische Union", ar: "\u0627\u0644\u0627\u062A\u062D\u0627\u062F \u0627\u0644\u0623\u0648\u0631\u0648\u0628\u064A" },
+    { en: "Where each market stands today", de: "Wo jeder Markt heute steht", ar: "\u0648\u0636\u0639 \u0643\u0644 \u0633\u0648\u0642 \u0627\u0644\u064A\u0648\u0645" },
+    {
+      en: "Fiscalisation means certified hardware or software signatures in several EU countries. We list the exact requirement and our current status rather than a single claim of European compliance.",
+      de: "Fiskalisierung bedeutet in mehreren EU-L\xE4ndern zertifizierte Hardware oder Software-Signaturen. Wir nennen die konkrete Anforderung und unseren aktuellen Stand statt einer pauschalen Compliance-Aussage.",
+      ar: "\u062A\u0639\u0646\u064A \u0627\u0644\u0641\u0648\u062A\u0631\u0629 \u0627\u0644\u0636\u0631\u064A\u0628\u064A\u0629 \u0641\u064A \u0639\u062F\u0629 \u062F\u0648\u0644 \u0623\u0648\u0631\u0648\u0628\u064A\u0629 \u0623\u062C\u0647\u0632\u0629 \u0645\u0639\u062A\u0645\u062F\u0629 \u0623\u0648 \u062A\u0648\u0642\u064A\u0639\u0627\u062A \u0628\u0631\u0645\u062C\u064A\u0629. \u0646\u0639\u0631\u0636 \u0627\u0644\u0645\u062A\u0637\u0644\u064E\u0651\u0628 \u0628\u062F\u0642\u0629 \u0648\u0648\u0636\u0639\u0646\u0627 \u0627\u0644\u062D\u0627\u0644\u064A \u0628\u062F\u0644 \u0627\u062F\u0639\u0627\u0621 \u0627\u0645\u062A\u062B\u0627\u0644 \u0623\u0648\u0631\u0648\u0628\u064A \u0639\u0627\u0645."
+    }
+  )}
+      <div class="table-wrap reveal">
+        <table>
+          <thead>
+            <tr>
+              <th ${tAttrs({ en: "Market", de: "Markt", ar: "\u0627\u0644\u0633\u0648\u0642" })}>Market</th>
+              <th ${tAttrs({ en: "Requirement", de: "Anforderung", ar: "\u0627\u0644\u0645\u062A\u0637\u0644\u064E\u0651\u0628" })}>Requirement</th>
+              <th ${tAttrs({ en: "Status", de: "Status", ar: "\u0627\u0644\u062D\u0627\u0644\u0629" })}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Switzerland</strong></td>
+              <td ${tAttrs({ en: "VAT rates, cash rounding, retention of records", de: "MwSt.-S\xE4tze, Rappenrundung, Aufbewahrung", ar: "\u0646\u0633\u0628 \u0627\u0644\u0636\u0631\u064A\u0628\u0629 \u0648\u0627\u0644\u062A\u0642\u0631\u064A\u0628 \u0627\u0644\u0646\u0642\u062F\u064A \u0648\u062D\u0641\u0638 \u0627\u0644\u0633\u062C\u0644\u0627\u062A" })}>VAT rates, cash rounding, retention of records</td>
+              <td><span class="badge" ${tAttrs({ en: "Available", de: "Verf\xFCgbar", ar: "\u0645\u062A\u0627\u062D" })}>Available</span></td>
+            </tr>
+            <tr>
+              <td><strong>Germany</strong></td>
+              <td ${tAttrs({ en: "KassenSichV with a certified TSE, DSFinV-K export", de: "KassenSichV mit zertifizierter TSE, DSFinV-K-Export", ar: "KassenSichV \u0645\u0639 TSE \u0645\u0639\u062A\u0645\u062F \u0648\u062A\u0635\u062F\u064A\u0631 DSFinV-K" })}>KassenSichV with a certified TSE, DSFinV-K export</td>
+              <td><span class="badge badge--neutral" ${tAttrs({ en: "In progress", de: "In Arbeit", ar: "\u0642\u064A\u062F \u0627\u0644\u062A\u0646\u0641\u064A\u0630" })}>In progress</span></td>
+            </tr>
+            <tr>
+              <td><strong>Austria</strong></td>
+              <td ${tAttrs({ en: "RKSV signature device and receipt QR chain", de: "RKSV-Signatureinheit und Beleg-QR-Kette", ar: "\u062C\u0647\u0627\u0632 \u062A\u0648\u0642\u064A\u0639 RKSV \u0648\u0633\u0644\u0633\u0644\u0629 QR \u0644\u0644\u0625\u064A\u0635\u0627\u0644\u0627\u062A" })}>RKSV signature device and receipt QR chain</td>
+              <td><span class="badge badge--neutral" ${tAttrs({ en: "In progress", de: "In Arbeit", ar: "\u0642\u064A\u062F \u0627\u0644\u062A\u0646\u0641\u064A\u0630" })}>In progress</span></td>
+            </tr>
+            <tr>
+              <td><strong>France</strong></td>
+              <td ${tAttrs({ en: "NF525 certification for cash register software", de: "NF525-Zertifizierung f\xFCr Kassensoftware", ar: "\u0634\u0647\u0627\u062F\u0629 NF525 \u0644\u0628\u0631\u0627\u0645\u062C \u0627\u0644\u0643\u0627\u0634\u064A\u0631" })}>NF525 certification for cash register software</td>
+              <td><span class="badge badge--neutral" ${tAttrs({ en: "Planned", de: "Geplant", ar: "\u0645\u062E\u0637\u064E\u0651\u0637" })}>Planned</span></td>
+            </tr>
+            <tr>
+              <td><strong>Italy</strong></td>
+              <td ${tAttrs({ en: "Registratore Telematico daily transmission", de: "Registratore Telematico mit Tages\xFCbermittlung", ar: "Registratore Telematico \u0628\u0625\u0631\u0633\u0627\u0644 \u064A\u0648\u0645\u064A" })}>Registratore Telematico daily transmission</td>
+              <td><span class="badge badge--neutral" ${tAttrs({ en: "Planned", de: "Geplant", ar: "\u0645\u062E\u0637\u064E\u0651\u0637" })}>Planned</span></td>
+            </tr>
+            <tr>
+              <td><strong>EU-wide</strong></td>
+              <td ${tAttrs({ en: "GDPR: lawful basis, export, deletion, processor agreement", de: "DSGVO: Rechtsgrundlage, Export, L\xF6schung, AV-Vertrag", ar: "GDPR: \u0627\u0644\u0623\u0633\u0627\u0633 \u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A \u0648\u0627\u0644\u062A\u0635\u062F\u064A\u0631 \u0648\u0627\u0644\u062D\u0630\u0641 \u0648\u0627\u062A\u0641\u0627\u0642\u064A\u0629 \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629" })}>GDPR: lawful basis, export, deletion, processor agreement</td>
+              <td><span class="badge" ${tAttrs({ en: "Available", de: "Verf\xFCgbar", ar: "\u0645\u062A\u0627\u062D" })}>Available</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="form-note" style="margin-top:16px" ${tAttrs({
+    en: "If your market requires certification we have not completed, we will say so before you sign rather than after.",
+    de: "Wenn Ihr Markt eine Zertifizierung verlangt, die wir noch nicht abgeschlossen haben, sagen wir das vor Vertragsabschluss \u2014 nicht danach.",
+    ar: "\u0625\u0630\u0627 \u0643\u0627\u0646 \u0633\u0648\u0642\u0643 \u064A\u062A\u0637\u0644\u0628 \u0634\u0647\u0627\u062F\u0629 \u0644\u0645 \u0646\u0643\u0645\u0644\u0647\u0627 \u0628\u0639\u062F\u060C \u0641\u0633\u0646\u062E\u0628\u0631\u0643 \u0642\u0628\u0644 \u0627\u0644\u062A\u0648\u0642\u064A\u0639 \u0644\u0627 \u0628\u0639\u062F\u0647."
+  })}>If your market requires certification we have not completed, we will say so before you sign rather than after.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          ${head({ en: "Security", de: "Sicherheit", ar: "\u0627\u0644\u0623\u0645\u0627\u0646" }, { en: "How the system protects the data", de: "Wie das System die Daten sch\xFCtzt", ar: "\u0643\u064A\u0641 \u064A\u062D\u0645\u064A \u0627\u0644\u0646\u0638\u0627\u0645 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A" })}
+          ${ticks([
+    { en: "Traffic is encrypted in transit with TLS; passwords and staff PINs are stored as bcrypt hashes, never in plain text.", de: "Datenverkehr wird per TLS verschl\xFCsselt; Passw\xF6rter und Mitarbeiter-PINs werden als bcrypt-Hashes gespeichert, nie im Klartext.", ar: "\u062A\u064F\u0634\u0641\u064E\u0651\u0631 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u0646\u0642\u0644 \u0628\u0640TLS\u060C \u0648\u062A\u064F\u062E\u0632\u064E\u0651\u0646 \u0643\u0644\u0645\u0627\u062A \u0627\u0644\u0645\u0631\u0648\u0631 \u0648\u0623\u0631\u0642\u0627\u0645 \u0627\u0644\u0645\u0648\u0638\u0641\u064A\u0646 \u0643\u062A\u062C\u0632\u0626\u0627\u062A bcrypt \u0644\u0627 \u0643\u0646\u0635 \u0635\u0631\u064A\u062D." },
+    { en: "Each business is isolated by tenant, and every request is checked against both the licence and the employee's role.", de: "Jeder Betrieb ist mandantengetrennt; jede Anfrage wird gegen Lizenz und Mitarbeiterrolle gepr\xFCft.", ar: "\u0643\u0644 \u0646\u0634\u0627\u0637 \u0645\u0639\u0632\u0648\u0644 \u0643\u0645\u0633\u062A\u0623\u062C\u0631 \u0645\u0633\u062A\u0642\u0644\u060C \u0648\u0643\u0644 \u0637\u0644\u0628 \u064A\u064F\u0641\u062D\u0635 \u0645\u0642\u0627\u0628\u0644 \u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u0648\u062F\u0648\u0631 \u0627\u0644\u0645\u0648\u0638\u0641 \u0645\u0639\u064B\u0627." },
+    { en: "Sessions expire and can be revoked centrally when a device is lost or an employee leaves.", de: "Sitzungen laufen ab und k\xF6nnen zentral widerrufen werden, wenn ein Ger\xE4t verloren geht oder jemand ausscheidet.", ar: "\u062A\u0646\u062A\u0647\u064A \u0627\u0644\u062C\u0644\u0633\u0627\u062A \u0648\u064A\u0645\u0643\u0646 \u0625\u0628\u0637\u0627\u0644\u0647\u0627 \u0645\u0631\u0643\u0632\u064A\u064B\u0627 \u0639\u0646\u062F \u0641\u0642\u062F \u062C\u0647\u0627\u0632 \u0623\u0648 \u0645\u063A\u0627\u062F\u0631\u0629 \u0645\u0648\u0638\u0641." },
+    { en: "Daily encrypted backups with point-in-time restore, tested on a schedule rather than assumed to work.", de: "T\xE4glich verschl\xFCsselte Backups mit Point-in-Time-Restore, planm\xE4ssig getestet statt nur angenommen.", ar: "\u0646\u0633\u062E \u0627\u062D\u062A\u064A\u0627\u0637\u064A \u064A\u0648\u0645\u064A \u0645\u0634\u0641\u064E\u0651\u0631 \u0645\u0639 \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u0644\u0623\u064A \u0644\u062D\u0638\u0629\u060C \u062A\u064F\u062E\u062A\u0628\u0631 \u062F\u0648\u0631\u064A\u064B\u0627 \u0644\u0627 \u064A\u064F\u0641\u062A\u0631\u0636 \u0646\u062C\u0627\u062D\u0647\u0627." }
+  ])}
+        </div>
+        <div class="reveal">${shot({ id: "compliance-audit", ratio: "5 / 4", size: "1402 \xD7 1122", alt: { en: "Audit trail and permission settings in the Kassenta console", de: "Audit-Trail und Berechtigungen in der Kassenta-Konsole", ar: "\u0633\u062C\u0644 \u0627\u0644\u062A\u062F\u0642\u064A\u0642 \u0648\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0641\u064A \u0644\u0648\u062D\u0629 Kassenta" } })}</div>
+      </div>
+    </div>
+  </section>
+
+  ${ctaBand(
+    { en: "Send this page to your accountant", de: "Senden Sie diese Seite Ihrer Treuhand", ar: "\u0623\u0631\u0633\u0644 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062D\u0629 \u0625\u0644\u0649 \u0645\u062D\u0627\u0633\u0628\u0643" },
+    {
+      en: "We are happy to answer their questions directly, in writing, before you make a decision. Compliance is not a sales conversation.",
+      de: "Wir beantworten deren Fragen gerne direkt und schriftlich, bevor Sie entscheiden. Compliance ist kein Verkaufsgespr\xE4ch.",
+      ar: "\u064A\u0633\u0639\u062F\u0646\u0627 \u0627\u0644\u0625\u062C\u0627\u0628\u0629 \u0639\u0644\u0649 \u0623\u0633\u0626\u0644\u062A\u0647 \u0645\u0628\u0627\u0634\u0631\u0629 \u0648\u0643\u062A\u0627\u0628\u064A\u064B\u0627 \u0642\u0628\u0644 \u0623\u0646 \u062A\u0642\u0631\u0631. \u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644 \u0644\u064A\u0633 \u062D\u062F\u064A\u062B \u0645\u0628\u064A\u0639\u0627\u062A."
+    }
+  )}`
+};
+var about = {
+  meta: {
+    path: "/about",
+    title: { en: "About Kassenta \u2014 built behind the counter", de: "\xDCber Kassenta \u2014 hinter der Theke entstanden", ar: "\u0639\u0646 Kassenta \u2014 \u0648\u064F\u0644\u062F \u062E\u0644\u0641 \u0627\u0644\u0643\u0627\u0634\u064A\u0631" },
+    description: {
+      en: "Kassenta was built inside working restaurants rather than in a boardroom. Our approach to product, pricing and support, and how to reach us.",
+      de: "Kassenta entstand in laufenden Restaurants, nicht im Sitzungszimmer. Unser Ansatz zu Produkt, Preisen und Support \u2014 und wie Sie uns erreichen.",
+      ar: "\u0648\u064F\u0644\u062F Kassenta \u062F\u0627\u062E\u0644 \u0645\u0637\u0627\u0639\u0645 \u0639\u0627\u0645\u0644\u0629 \u0644\u0627 \u0641\u064A \u0642\u0627\u0639\u0629 \u0627\u062C\u062A\u0645\u0627\u0639\u0627\u062A. \u0646\u0647\u062C\u0646\u0627 \u0641\u064A \u0627\u0644\u0645\u0646\u062A\u062C \u0648\u0627\u0644\u062A\u0633\u0639\u064A\u0631 \u0648\u0627\u0644\u062F\u0639\u0645\u060C \u0648\u0643\u064A\u0641\u064A\u0629 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627."
+    }
+  },
+  body: `
+  ${pageHead(
+    { en: "Built behind the counter", de: "Hinter der Theke entstanden", ar: "\u0648\u064F\u0644\u062F \u062E\u0644\u0641 \u0627\u0644\u0643\u0627\u0634\u064A\u0631" },
+    {
+      en: "Kassenta started because a restaurant we worked with was paying three vendors for tools that refused to talk to each other, and a commission on top of that to a delivery platform.",
+      de: "Kassenta entstand, weil ein Restaurant, mit dem wir arbeiteten, drei Anbieter f\xFCr Werkzeuge bezahlte, die nicht miteinander sprachen \u2014 plus Provision an eine Lieferplattform.",
+      ar: "\u0628\u062F\u0623 Kassenta \u0644\u0623\u0646 \u0645\u0637\u0639\u0645\u064B\u0627 \u0639\u0645\u0644\u0646\u0627 \u0645\u0639\u0647 \u0643\u0627\u0646 \u064A\u062F\u0641\u0639 \u0644\u062B\u0644\u0627\u062B\u0629 \u0645\u0648\u0631\u062F\u064A\u0646 \u0644\u0623\u062F\u0648\u0627\u062A \u0644\u0627 \u062A\u062A\u062D\u062F\u062B \u0645\u0639 \u0628\u0639\u0636\u0647\u0627\u060C \u0648\u0639\u0645\u0648\u0644\u0629 \u0641\u0648\u0642 \u0630\u0644\u0643 \u0644\u0645\u0646\u0635\u0629 \u062A\u0648\u0635\u064A\u0644."
+    },
+    { en: "About", de: "\xDCber uns", ar: "\u0645\u0646 \u0646\u062D\u0646" }
+  )}
+
+  <section class="section">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          ${head({ en: "Our approach", de: "Unser Ansatz", ar: "\u0646\u0647\u062C\u0646\u0627" }, { en: "Three rules we hold to", de: "Drei Regeln, an die wir uns halten", ar: "\u062B\u0644\u0627\u062B \u0642\u0648\u0627\u0639\u062F \u0646\u0644\u062A\u0632\u0645 \u0628\u0647\u0627" })}
+          <div class="steps">
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "Ship what we can demonstrate", de: "Nur liefern, was wir zeigen k\xF6nnen", ar: "\u0646\u0637\u0631\u062D \u0645\u0627 \u0646\u0633\u062A\u0637\u064A\u0639 \u0639\u0631\u0636\u0647" })}>Ship what we can demonstrate</h3><p ${tAttrs({
+    en: "If a feature is on this site, you can see it working in a demo the same week. Anything still on the roadmap is labelled as such, including on the compliance page.",
+    de: "Steht eine Funktion auf dieser Seite, sehen Sie sie in derselben Woche in einer Demo. Was noch auf der Roadmap ist, kennzeichnen wir als solches \u2014 auch auf der Compliance-Seite.",
+    ar: "\u0625\u0646 \u0630\u064F\u0643\u0631\u062A \u0645\u064A\u0632\u0629 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0645\u0648\u0642\u0639 \u0641\u064A\u0645\u0643\u0646\u0643 \u0631\u0624\u064A\u062A\u0647\u0627 \u062A\u0639\u0645\u0644 \u0641\u064A \u0639\u0631\u0636 \u062E\u0644\u0627\u0644 \u0627\u0644\u0623\u0633\u0628\u0648\u0639 \u0646\u0641\u0633\u0647. \u0648\u0645\u0627 \u0632\u0627\u0644 \u0641\u064A \u0627\u0644\u062E\u0637\u0629 \u0646\u0636\u0639 \u0639\u0644\u064A\u0647 \u0639\u0644\u0627\u0645\u0629 \u0648\u0627\u0636\u062D\u0629\u060C \u0628\u0645\u0627 \u0641\u064A \u0630\u0644\u0643 \u0641\u064A \u0635\u0641\u062D\u0629 \u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644."
+  })}>If a feature is on this site, you can see it working in a demo the same week. Anything still on the roadmap is labelled as such, including on the compliance page.</p></div></div>
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "Never charge per order", de: "Niemals pro Bestellung abrechnen", ar: "\u0644\u0627 \u0646\u062D\u0627\u0633\u0628 \u0639\u0644\u0649 \u0643\u0644 \u0637\u0644\u0628" })}>Never charge per order</h3><p ${tAttrs({
+    en: "A percentage of revenue punishes you for growing. A flat fee per location means our incentive is to keep you running, not to take a slice of every ticket.",
+    de: "Ein Umsatzanteil bestraft Wachstum. Eine Pauschale je Standort bedeutet: Unser Anreiz ist, dass Sie laufen \u2014 nicht ein Anteil an jedem Bon.",
+    ar: "\u0627\u0644\u0646\u0633\u0628\u0629 \u0645\u0646 \u0627\u0644\u0625\u064A\u0631\u0627\u062F \u062A\u0639\u0627\u0642\u0628\u0643 \u0639\u0644\u0649 \u0627\u0644\u0646\u0645\u0648. \u0627\u0644\u0631\u0633\u0645 \u0627\u0644\u062B\u0627\u0628\u062A \u0644\u0643\u0644 \u0641\u0631\u0639 \u064A\u062C\u0639\u0644 \u0645\u0635\u0644\u062D\u062A\u0646\u0627 \u0623\u0646 \u062A\u0633\u062A\u0645\u0631 \u0628\u0646\u062C\u0627\u062D \u0644\u0627 \u0623\u0646 \u0646\u0642\u062A\u0637\u0639 \u0645\u0646 \u0643\u0644 \u0641\u0627\u062A\u0648\u0631\u0629."
+  })}>A percentage of revenue punishes you for growing. A flat fee per location means our incentive is to keep you running, not to take a slice of every ticket.</p></div></div>
+            <div class="step reveal"><div><h3 ${tAttrs({ en: "Your data stays yours", de: "Ihre Daten bleiben Ihre", ar: "\u0628\u064A\u0627\u0646\u0627\u062A\u0643 \u062A\u0628\u0642\u0649 \u0645\u0644\u0643\u0643" })}>Your data stays yours</h3><p ${tAttrs({
+    en: "Customers, recipes and sales history export to CSV whenever you want. We do not resell aggregated data, and we do not market to your customers.",
+    de: "Kunden, Rezepturen und Verkaufshistorie exportieren Sie jederzeit als CSV. Wir verkaufen keine aggregierten Daten weiter und bewerben Ihre Kunden nicht.",
+    ar: "\u064A\u0645\u0643\u0646\u0643 \u062A\u0635\u062F\u064A\u0631 \u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0648\u0627\u0644\u0648\u0635\u0641\u0627\u062A \u0648\u0633\u062C\u0644 \u0627\u0644\u0645\u0628\u064A\u0639\u0627\u062A \u0625\u0644\u0649 CSV \u0645\u062A\u0649 \u0634\u0626\u062A. \u0644\u0627 \u0646\u0628\u064A\u0639 \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u062C\u0645\u064E\u0651\u0639\u0629 \u0648\u0644\u0627 \u0646\u0633\u0648\u0651\u0642 \u0644\u0639\u0645\u0644\u0627\u0626\u0643."
+  })}>Customers, recipes and sales history export to CSV whenever you want. We do not resell aggregated data, and we do not market to your customers.</p></div></div>
+          </div>
+        </div>
+        <div class="reveal">${shot({ id: "about-team", ratio: "2 / 3", size: "1023 \xD7 1537", alt: { en: "The Kassenta team working alongside restaurant staff", de: "Das Kassenta-Team arbeitet mit Restaurantmitarbeitenden", ar: "\u0641\u0631\u064A\u0642 Kassenta \u064A\u0639\u0645\u0644 \u0645\u0639 \u0637\u0627\u0642\u0645 \u0627\u0644\u0645\u0637\u0639\u0645" } })}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--alt">
+    <div class="wrap">
+      ${head({ en: "Support", de: "Support", ar: "\u0627\u0644\u062F\u0639\u0645" }, { en: "What happens when something breaks at 19:00", de: "Was passiert, wenn um 19:00 etwas ausf\xE4llt", ar: "\u0645\u0627\u0630\u0627 \u064A\u062D\u062F\u062B \u0625\u0646 \u062A\u0639\u0637\u0651\u0644 \u0634\u064A\u0621 \u0627\u0644\u0633\u0627\u0639\u0629 19:00" }, void 0, true)}
+      <div class="grid grid-3">
+        ${card(icons.phone, { en: "Reach a person", de: "Erreichen Sie einen Menschen", ar: "\u062A\u0635\u0644 \u0625\u0644\u0649 \u0625\u0646\u0633\u0627\u0646" }, {
+    en: "Phone and WhatsApp during business hours on Professional and above, with a named contact on Enterprise.",
+    de: "Telefon und WhatsApp zu Gesch\xE4ftszeiten ab Professional, mit festem Ansprechpartner bei Enterprise.",
+    ar: "\u0647\u0627\u062A\u0641 \u0648\u0648\u0627\u062A\u0633\u0627\u0628 \u062E\u0644\u0627\u0644 \u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0639\u0645\u0644 \u0641\u064A \u0627\u0644\u0627\u062D\u062A\u0631\u0627\u0641\u064A\u0629 \u0641\u0645\u0627 \u0641\u0648\u0642\u060C \u0645\u0639 \u0645\u0633\u0624\u0648\u0644 \u0645\u062E\u0635\u064E\u0651\u0635 \u0641\u064A \u0628\u0627\u0642\u0629 \u0627\u0644\u0645\u0624\u0633\u0633\u0627\u062A."
+  })}
+        ${card(icons.wifiOff, { en: "Keep selling meanwhile", de: "Weiterverkaufen in der Zwischenzeit", ar: "\u0627\u0633\u062A\u0645\u0631 \u0641\u064A \u0627\u0644\u0628\u064A\u0639 \u0623\u062B\u0646\u0627\u0621 \u0630\u0644\u0643" }, {
+    en: "The POS holds orders locally when the connection drops, so a network problem is an inconvenience rather than a closed till.",
+    de: "Die Kasse h\xE4lt Bestellungen lokal, wenn die Verbindung abbricht \u2014 ein Netzproblem ist l\xE4stig, aber keine geschlossene Kasse.",
+    ar: "\u064A\u062D\u062A\u0641\u0638 \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0628\u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0645\u062D\u0644\u064A\u064B\u0627 \u0639\u0646\u062F \u0627\u0646\u0642\u0637\u0627\u0639 \u0627\u0644\u0627\u062A\u0635\u0627\u0644\u060C \u0641\u062A\u0635\u0628\u062D \u0645\u0634\u0643\u0644\u0629 \u0627\u0644\u0634\u0628\u0643\u0629 \u0625\u0632\u0639\u0627\u062C\u064B\u0627 \u0644\u0627 \u062A\u0648\u0642\u0641\u064B\u0627 \u0639\u0646 \u0627\u0644\u0628\u064A\u0639."
+  })}
+        ${card(icons.refresh, { en: "Fix, then explain", de: "Erst beheben, dann erkl\xE4ren", ar: "\u0646\u064F\u0635\u0644\u062D \u062B\u0645 \u0646\u0634\u0631\u062D" }, {
+    en: "We restore service first and send a written explanation afterwards, including what we changed so it does not recur.",
+    de: "Wir stellen zuerst den Betrieb wieder her und senden danach eine schriftliche Erkl\xE4rung inklusive der \xC4nderungen, damit es nicht wieder passiert.",
+    ar: "\u0646\u0639\u064A\u062F \u0627\u0644\u062E\u062F\u0645\u0629 \u0623\u0648\u0644\u064B\u0627 \u062B\u0645 \u0646\u0631\u0633\u0644 \u0634\u0631\u062D\u064B\u0627 \u0645\u0643\u062A\u0648\u0628\u064B\u0627 \u064A\u0634\u0645\u0644 \u0645\u0627 \u063A\u064A\u0651\u0631\u0646\u0627\u0647 \u0643\u064A \u0644\u0627 \u064A\u062A\u0643\u0631\u0631."
+  })}
+      </div>
+    </div>
+  </section>
+
+  ${ctaBand(
+    { en: "Come and take it apart", de: "Nehmen Sie es auseinander", ar: "\u062A\u0639\u0627\u0644 \u0648\u0627\u0641\u062D\u0635\u0647 \u0628\u0646\u0641\u0633\u0643" },
+    {
+      en: "The fastest way to judge a POS is to run a real service on it. Bring your busiest hour and we will set it up.",
+      de: "Am schnellsten beurteilen Sie eine Kasse, indem Sie einen echten Service darauf fahren. Bringen Sie Ihre Stosszeit mit \u2014 wir richten es ein.",
+      ar: "\u0623\u0633\u0631\u0639 \u0637\u0631\u064A\u0642\u0629 \u0644\u0644\u062D\u0643\u0645 \u0639\u0644\u0649 \u0646\u0638\u0627\u0645 \u0643\u0627\u0634\u064A\u0631 \u0647\u064A \u062A\u0634\u063A\u064A\u0644 \u062E\u062F\u0645\u0629 \u062D\u0642\u064A\u0642\u064A\u0629 \u0639\u0644\u064A\u0647. \u0623\u062D\u0636\u0631 \u0623\u0643\u062B\u0631 \u0633\u0627\u0639\u0627\u062A\u0643 \u0627\u0632\u062F\u062D\u0627\u0645\u064B\u0627 \u0648\u0633\u0646\u062C\u0647\u0651\u0632\u0647."
+    }
+  )}`
+};
+var contact = {
+  meta: {
+    path: "/contact",
+    title: { en: "Book a demo on your own menu \u2014 Kassenta POS", de: "Demo mit Ihrer eigenen Karte \u2014 Kassenta POS", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u0639\u0644\u0649 \u0642\u0627\u0626\u0645\u062A\u0643 \u2014 Kassenta POS" },
+    description: {
+      en: "Book a 30-minute demo on your own menu, or email info@kassenta.com. We answer every message from a real person, usually within one business day.",
+      de: "Buchen Sie eine 30-min\xFCtige Demo mit Ihrer eigenen Karte oder schreiben Sie an info@kassenta.com. Jede Nachricht wird von einem Menschen beantwortet, meist innerhalb eines Werktags.",
+      ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u0644\u0645\u062F\u0629 30 \u062F\u0642\u064A\u0642\u0629 \u0639\u0644\u0649 \u0642\u0627\u0626\u0645\u062A\u0643\u060C \u0623\u0648 \u0631\u0627\u0633\u0644\u0646\u0627 \u0639\u0644\u0649 info@kassenta.com. \u0646\u0631\u062F\u0651 \u0639\u0644\u0649 \u0643\u0644 \u0631\u0633\u0627\u0644\u0629 \u0628\u0634\u0643\u0644 \u0634\u062E\u0635\u064A\u060C \u063A\u0627\u0644\u0628\u064B\u0627 \u062E\u0644\u0627\u0644 \u064A\u0648\u0645 \u0639\u0645\u0644."
+    },
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "ContactPage",
+        name: "Contact Kassenta",
+        url: "https://kassenta.com/contact/",
+        mainEntity: {
+          "@type": "Organization",
+          name: "Kassenta",
+          email: "info@kassenta.com",
+          url: "https://kassenta.com",
+          contactPoint: {
+            "@type": "ContactPoint",
+            contactType: "sales",
+            email: "info@kassenta.com",
+            availableLanguage: ["English", "German", "Arabic"]
+          }
+        }
+      }
+    ]
+  },
+  body: `
+  ${pageHead(
+    { en: "Talk to us", de: "Sprechen Sie mit uns", ar: "\u062A\u062D\u062F\u0651\u062B \u0625\u0644\u064A\u0646\u0627" },
+    {
+      en: "Send your menu or product list with the form and we will load it into a demo account before the call, so you see your own business rather than a sample restaurant.",
+      de: "Senden Sie Ihre Karte oder Artikelliste \xFCber das Formular; wir laden sie vor dem Termin in ein Demo-Konto, damit Sie Ihren eigenen Betrieb sehen \u2014 kein Musterrestaurant.",
+      ar: "\u0623\u0631\u0633\u0644 \u0642\u0627\u0626\u0645\u062A\u0643 \u0623\u0648 \u0645\u0646\u062A\u062C\u0627\u062A\u0643 \u0639\u0628\u0631 \u0627\u0644\u0646\u0645\u0648\u0630\u062C \u0648\u0633\u0646\u062D\u0645\u0651\u0644\u0647\u0627 \u0641\u064A \u062D\u0633\u0627\u0628 \u062A\u062C\u0631\u064A\u0628\u064A \u0642\u0628\u0644 \u0627\u0644\u0645\u0643\u0627\u0644\u0645\u0629\u060C \u0644\u062A\u0631\u0649 \u0646\u0634\u0627\u0637\u0643 \u0623\u0646\u062A \u0644\u0627 \u0645\u0637\u0639\u0645\u064B\u0627 \u0646\u0645\u0648\u0630\u062C\u064A\u064B\u0627."
+    },
+    { en: "Contact", de: "Kontakt", ar: "\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627" }
+  )}
+
+  <section class="section">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          <form class="card" id="contactForm" novalidate style="display:grid;gap:18px">
+            <div class="grid grid-2" style="gap:16px">
+              <div class="field">
+                <label for="cf-name" ${tAttrs({ en: "Your name", de: "Ihr Name", ar: "\u0627\u0633\u0645\u0643" })}>Your name</label>
+                <input id="cf-name" name="name" type="text" required autocomplete="name">
+              </div>
+              <div class="field">
+                <label for="cf-business" ${tAttrs({ en: "Business name", de: "Betriebsname", ar: "\u0627\u0633\u0645 \u0627\u0644\u0646\u0634\u0627\u0637" })}>Business name</label>
+                <input id="cf-business" name="business" type="text" autocomplete="organization">
+              </div>
+            </div>
+            <div class="grid grid-2" style="gap:16px">
+              <div class="field">
+                <label for="cf-email" ${tAttrs({ en: "Email", de: "E-Mail", ar: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A" })}>Email</label>
+                <input id="cf-email" name="email" type="email" required autocomplete="email" inputmode="email">
+              </div>
+              <div class="field">
+                <label for="cf-phone" ${tAttrs({ en: "Phone or WhatsApp", de: "Telefon oder WhatsApp", ar: "\u0627\u0644\u0647\u0627\u062A\u0641 \u0623\u0648 \u0648\u0627\u062A\u0633\u0627\u0628" })}>Phone or WhatsApp</label>
+                <input id="cf-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel">
+              </div>
+            </div>
+            <div class="field">
+              <label for="cf-industry" ${tAttrs({ en: "Industry", de: "Branche", ar: "\u0627\u0644\u0645\u062C\u0627\u0644" })}>Industry</label>
+              <select id="cf-industry" name="industry">
+                <option value="restaurant" ${tAttrs({ en: "Restaurant", de: "Restaurant", ar: "\u0645\u0637\u0639\u0645" })}>Restaurant</option>
+                <option value="cafe" ${tAttrs({ en: "Caf\xE9 or bar", de: "Caf\xE9 oder Bar", ar: "\u0643\u0627\u0641\u064A\u0647 \u0623\u0648 \u0628\u0627\u0631" })}>Caf\xE9 or bar</option>
+                <option value="supermarket" ${tAttrs({ en: "Supermarket or grocer", de: "Supermarkt oder Lebensmittel", ar: "\u0633\u0648\u0628\u0631 \u0645\u0627\u0631\u0643\u062A \u0623\u0648 \u0628\u0642\u0627\u0644\u0629" })}>Supermarket or grocer</option>
+                <option value="pharmacy" ${tAttrs({ en: "Pharmacy", de: "Apotheke", ar: "\u0635\u064A\u062F\u0644\u064A\u0629" })}>Pharmacy</option>
+                <option value="bakery" ${tAttrs({ en: "Bakery", de: "B\xE4ckerei", ar: "\u0645\u062E\u0628\u0632" })}>Bakery</option>
+                <option value="retail" ${tAttrs({ en: "Retail", de: "Einzelhandel", ar: "\u062A\u062C\u0632\u0626\u0629" })}>Retail</option>
+                <option value="other" ${tAttrs({ en: "Something else", de: "Etwas anderes", ar: "\u0634\u064A\u0621 \u0622\u062E\u0631" })}>Something else</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="cf-message" ${tAttrs({ en: "What would you like to see?", de: "Was m\xF6chten Sie sehen?", ar: "\u0645\u0627 \u0627\u0644\u0630\u064A \u062A\u0648\u062F\u0651 \u0631\u0624\u064A\u062A\u0647\u061F" })}>What would you like to see?</label>
+              <textarea id="cf-message" name="message" placeholder="e.g. we run two branches, take phone orders and deliver in a 5 km radius"></textarea>
+            </div>
+            <div class="form-status" id="cf-status" role="status" aria-live="polite"></div>
+            <button class="btn btn-primary" type="submit" id="cf-submit" ${tAttrs({ en: "Request a demo", de: "Demo anfragen", ar: "\u0627\u0637\u0644\u0628 \u0639\u0631\u0636\u064B\u0627 \u062A\u0648\u0636\u064A\u062D\u064A\u064B\u0627" })}>Request a demo</button>
+            <p class="form-note" ${tAttrs({
+    en: "We use your details only to answer this enquiry. No newsletter, no third parties.",
+    de: "Wir verwenden Ihre Angaben nur zur Beantwortung dieser Anfrage. Kein Newsletter, keine Dritten.",
+    ar: "\u0646\u0633\u062A\u062E\u062F\u0645 \u0628\u064A\u0627\u0646\u0627\u062A\u0643 \u0644\u0644\u0631\u062F\u0651 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628 \u0641\u0642\u0637. \u0628\u0644\u0627 \u0646\u0634\u0631\u0627\u062A \u0628\u0631\u064A\u062F\u064A\u0629 \u0648\u0628\u0644\u0627 \u0623\u0637\u0631\u0627\u0641 \u062B\u0627\u0644\u062B\u0629."
+  })}>We use your details only to answer this enquiry. No newsletter, no third parties.</p>
+          </form>
+        </div>
+        <div>
+          ${head({ en: "Direct", de: "Direkt", ar: "\u0645\u0628\u0627\u0634\u0631\u0629" }, { en: "Or skip the form", de: "Oder ohne Formular", ar: "\u0623\u0648 \u062A\u062C\u0627\u0648\u0632 \u0627\u0644\u0646\u0645\u0648\u0630\u062C" })}
+          <div class="grid" style="gap:16px">
+            <article class="card">
+              <div class="card-icon">${icons.mail}</div>
+              <h3 ${tAttrs({ en: "Email", de: "E-Mail", ar: "\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A" })}>Email</h3>
+              <p><a href="mailto:info@kassenta.com" style="color:var(--accent);font-weight:700">info@kassenta.com</a></p>
+            </article>
+            <article class="card">
+              <div class="card-icon">${icons.building}</div>
+              <h3 ${tAttrs({ en: "Existing customer?", de: "Bestandskunde?", ar: "\u0639\u0645\u064A\u0644 \u062D\u0627\u0644\u064A\u061F" })}>Existing customer?</h3>
+              <p ${tAttrs({
+    en: "Open the POS and use the support entry in Settings so your licence and branch come through with the message.",
+    de: "\xD6ffnen Sie die Kasse und nutzen Sie den Support-Eintrag in den Einstellungen, damit Lizenz und Filiale mitgesendet werden.",
+    ar: "\u0627\u0641\u062A\u062D \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0627\u0633\u062A\u062E\u062F\u0645 \u0645\u062F\u062E\u0644 \u0627\u0644\u062F\u0639\u0645 \u0641\u064A \u0627\u0644\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0644\u064A\u0635\u0644\u0646\u0627 \u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u0648\u0627\u0644\u0641\u0631\u0639 \u0645\u0639 \u0627\u0644\u0631\u0633\u0627\u0644\u0629."
+  })}>Open the POS and use the support entry in Settings so your licence and branch come through with the message.</p>
+              <p style="margin-top:12px"><a class="btn-quiet" href="/app" ${tAttrs({ en: "Open the POS", de: "Kasse \xF6ffnen", ar: "\u0627\u0641\u062A\u062D \u0627\u0644\u0643\u0627\u0634\u064A\u0631" })}>Open the POS</a></p>
+            </article>
+            <article class="card">
+              <div class="card-icon">${icons.clock}</div>
+              <h3 ${tAttrs({ en: "Response time", de: "Antwortzeit", ar: "\u0632\u0645\u0646 \u0627\u0644\u0627\u0633\u062A\u062C\u0627\u0628\u0629" })}>Response time</h3>
+              <p ${tAttrs({
+    en: "Enquiries are answered within one business day. Support tickets from live customers are answered the same day during business hours.",
+    de: "Anfragen beantworten wir innerhalb eines Werktags. Support-Tickets aktiver Kunden am selben Tag zu Gesch\xE4ftszeiten.",
+    ar: "\u0646\u0631\u062F\u0651 \u0639\u0644\u0649 \u0627\u0644\u0627\u0633\u062A\u0641\u0633\u0627\u0631\u0627\u062A \u062E\u0644\u0627\u0644 \u064A\u0648\u0645 \u0639\u0645\u0644. \u0648\u062A\u064F\u062C\u0627\u0628 \u062A\u0630\u0627\u0643\u0631 \u062F\u0639\u0645 \u0627\u0644\u0639\u0645\u0644\u0627\u0621 \u0627\u0644\u0646\u0634\u0637\u064A\u0646 \u0641\u064A \u0627\u0644\u064A\u0648\u0645 \u0646\u0641\u0633\u0647 \u062E\u0644\u0627\u0644 \u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0639\u0645\u0644."
+  })}>Enquiries are answered within one business day. Support tickets from live customers are answered the same day during business hours.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      var form = document.getElementById('contactForm');
+      var status = document.getElementById('cf-status');
+      var btn = document.getElementById('cf-submit');
+      if (!form) return;
+      var MSG = {
+        sending: { en: 'Sending\u2026', de: 'Wird gesendet\u2026', ar: '\u062C\u0627\u0631\u064D \u0627\u0644\u0625\u0631\u0633\u0627\u0644\u2026' },
+        ok: { en: 'Thank you. We will reply within one business day.', de: 'Danke. Wir antworten innerhalb eines Werktags.', ar: '\u0634\u0643\u0631\u064B\u0627 \u0644\u0643. \u0633\u0646\u0631\u062F\u0651 \u062E\u0644\u0627\u0644 \u064A\u0648\u0645 \u0639\u0645\u0644.' },
+        err: { en: 'Could not send. Please email info@kassenta.com instead.', de: 'Senden fehlgeschlagen. Bitte schreiben Sie an info@kassenta.com.', ar: '\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u0625\u0631\u0633\u0627\u0644. \u064A\u0631\u062C\u0649 \u0627\u0644\u0645\u0631\u0627\u0633\u0644\u0629 \u0639\u0644\u0649 info@kassenta.com.' },
+        invalid: { en: 'Please fill in your name and a valid email address.', de: 'Bitte Name und eine g\xFCltige E-Mail-Adresse angeben.', ar: '\u064A\u0631\u062C\u0649 \u0625\u062F\u062E\u0627\u0644 \u0627\u0644\u0627\u0633\u0645 \u0648\u0628\u0631\u064A\u062F \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0635\u062D\u064A\u062D.' }
+      };
+      function say(kind, cls) {
+        var lang = document.documentElement.lang || 'en';
+        status.textContent = MSG[kind][lang] || MSG[kind].en;
+        status.className = 'form-status ' + cls;
+      }
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var data = Object.fromEntries(new FormData(form).entries());
+        if (!data.name || !/^[^@s]+@[^@s]+.[^@s]+$/.test(String(data.email || ''))) {
+          return say('invalid', 'err');
+        }
+        btn.disabled = true;
+        say('sending', 'ok');
+        fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        }).then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+          form.reset();
+          say('ok', 'ok');
+        }).catch(function () {
+          say('err', 'err');
+        }).finally(function () { btn.disabled = false; });
+      });
+    })();
+  </script>`
+};
+var PAGES = [home, features, solutions, pricing, compliance, about, contact];
+
+// server/site/pay.ts
+var crumbs = (label) => `
+      <div class="crumbs"><a href="/" ${tAttrs({ en: "Home", de: "Start", ar: "\u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629" })}>Home</a><span>/</span><a href="/pricing/" ${tAttrs({ en: "Pricing", de: "Preise", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631" })}>Pricing</a><span>/</span><span ${tAttrs(label)}>${esc(label.en)}</span></div>`;
+var step = (title, body) => `
+        <div class="step">
+          <div>
+            <h3 ${tAttrs(title)}>${esc(title.en)}</h3>
+            <p ${tAttrs(body)}>${esc(body.en)}</p>
+          </div>
+        </div>`;
+var paySuccess = {
+  meta: {
+    path: "/pay/success",
+    noindex: true,
+    title: { en: "Confirming your payment \u2014 Kassenta POS", de: "Zahlung wird best\xE4tigt \u2014 Kassenta POS", ar: "\u062C\u0627\u0631\u064D \u062A\u0623\u0643\u064A\u062F \u062F\u0641\u0639\u062A\u0643 \u2014 Kassenta POS" },
+    description: {
+      en: "We are confirming your Kassenta payment with Stripe. Once it settles we set your account up and send your licence key to the address you paid with.",
+      de: "Wir best\xE4tigen Ihre Kassenta-Zahlung bei Stripe. Sobald sie verbucht ist, richten wir Ihr Konto ein und senden den Lizenzschl\xFCssel an die Zahlungsadresse.",
+      ar: "\u0646\u0624\u0643\u0651\u062F \u062F\u0641\u0639\u062A\u0643 \u0644\u062F\u0649 Stripe \u0627\u0644\u0622\u0646. \u0648\u0628\u0645\u062C\u0631\u062F \u062A\u0633\u0648\u064A\u062A\u0647\u0627 \u0646\u062C\u0647\u0651\u0632 \u062D\u0633\u0627\u0628\u0643 \u0648\u0646\u0631\u0633\u0644 \u0645\u0641\u062A\u0627\u062D \u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u0625\u0644\u0649 \u0627\u0644\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0630\u064A \u062F\u0641\u0639\u062A \u0628\u0647."
+    }
+  },
+  body: `
+  <section class="page-head">
+    <div class="wrap">
+      ${crumbs({ en: "Payment", de: "Zahlung", ar: "\u0627\u0644\u062F\u0641\u0639" })}
+      <h1 id="pay-title" ${tAttrs({ en: "We are confirming your payment", de: "Wir best\xE4tigen Ihre Zahlung", ar: "\u0646\u0624\u0643\u0651\u062F \u062F\u0641\u0639\u062A\u0643 \u0627\u0644\u0622\u0646" })}>We are confirming your payment</h1>
+      <p class="lead" id="pay-lead" ${tAttrs({
+    en: "Stripe has sent you back to us. The confirmation comes from Stripe itself, not from this page, so give it a few seconds.",
+    de: "Stripe hat Sie zu uns zur\xFCckgeleitet. Die Best\xE4tigung kommt von Stripe selbst, nicht von dieser Seite \u2014 geben Sie ihr ein paar Sekunden.",
+    ar: "\u0623\u0639\u0627\u062F\u0643 Stripe \u0625\u0644\u064A\u0646\u0627. \u0627\u0644\u062A\u0623\u0643\u064A\u062F \u064A\u0623\u062A\u064A \u0645\u0646 Stripe \u0646\u0641\u0633\u0647 \u0644\u0627 \u0645\u0646 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062D\u0629\u060C \u0641\u0627\u0645\u0646\u062D\u0647 \u0628\u0636\u0639 \u062B\u0648\u0627\u0646\u064D."
+  })}>Stripe has sent you back to us. The confirmation comes from Stripe itself, not from this page, so give it a few seconds.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap" style="max-width:760px">
+      <article class="card" style="display:grid;gap:16px">
+        <div class="card-icon" id="pay-icon">${icons.clock}</div>
+        <h2 id="pay-headline" ${tAttrs({ en: "Checking with Stripe", de: "Abgleich mit Stripe", ar: "\u062C\u0627\u0631\u064D \u0627\u0644\u0645\u0631\u0627\u062C\u0639\u0629 \u0645\u0639 Stripe" })}>Checking with Stripe</h2>
+        <p id="pay-body" ${tAttrs({
+    en: "This page asks our server what Stripe recorded for your checkout. Nothing here decides whether you were charged.",
+    de: "Diese Seite fragt unseren Server, was Stripe zu Ihrem Checkout erfasst hat. Nichts auf dieser Seite entscheidet \xFCber die Belastung.",
+    ar: "\u062A\u0633\u0623\u0644 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062D\u0629 \u062E\u0627\u062F\u0645\u0646\u0627 \u0639\u0645\u0651\u0627 \u0633\u062C\u0651\u0644\u0647 Stripe \u0644\u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u062F\u0641\u0639. \u0644\u0627 \u0634\u064A\u0621 \u0647\u0646\u0627 \u064A\u0642\u0631\u0651\u0631 \u0645\u0627 \u0625\u0630\u0627 \u0643\u0646\u062A \u0642\u062F \u062F\u064F\u0641\u0639 \u0645\u0646\u0643."
+  })}>This page asks our server what Stripe recorded for your checkout. Nothing here decides whether you were charged.</p>
+        <div class="form-status wait" id="pay-status" role="status" aria-live="polite" ${tAttrs({
+    en: "Confirming\u2026",
+    de: "Wird best\xE4tigt\u2026",
+    ar: "\u062C\u0627\u0631\u064D \u0627\u0644\u062A\u0623\u0643\u064A\u062F\u2026"
+  })}>Confirming\u2026</div>
+        <p class="form-note" id="pay-detail"></p>
+      </article>
+
+      <div class="section-head" style="margin-top:48px;margin-bottom:24px">
+        <h2 ${tAttrs({ en: "What happens next", de: "Wie es weitergeht", ar: "\u0645\u0627 \u0627\u0644\u0630\u064A \u064A\u062D\u062F\u062B \u0628\u0639\u062F \u0630\u0644\u0643" })}>What happens next</h2>
+      </div>
+      <div class="steps">
+        ${step(
+    { en: "Stripe settles the payment", de: "Stripe verbucht die Zahlung", ar: "\u064A\u0633\u0648\u0651\u064A Stripe \u0627\u0644\u062F\u0641\u0639\u0629" },
+    {
+      en: "Card payments settle at once. TWINT and other redirect methods can take a minute, and you do not need to keep this page open.",
+      de: "Kartenzahlungen sind sofort verbucht. TWINT und andere Weiterleitungen k\xF6nnen eine Minute brauchen; diese Seite muss nicht offen bleiben.",
+      ar: "\u062A\u064F\u0633\u0648\u064E\u0651\u0649 \u0645\u062F\u0641\u0648\u0639\u0627\u062A \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0641\u0648\u0631\u064B\u0627. \u0623\u0645\u0627 TWINT \u0648\u0637\u0631\u0642 \u0627\u0644\u062A\u062D\u0648\u064A\u0644 \u0627\u0644\u0623\u062E\u0631\u0649 \u0641\u0642\u062F \u062A\u0633\u062A\u063A\u0631\u0642 \u062F\u0642\u064A\u0642\u0629\u060C \u0648\u0644\u0627 \u064A\u0644\u0632\u0645 \u0625\u0628\u0642\u0627\u0621 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062D\u0629 \u0645\u0641\u062A\u0648\u062D\u0629."
+    }
+  )}
+        ${step(
+    { en: "We set your account up", de: "Wir richten Ihr Konto ein", ar: "\u0646\u062C\u0647\u0651\u0632 \u062D\u0633\u0627\u0628\u0643" },
+    {
+      en: "Account creation is not automatic \u2014 a person at Kassenta opens it, which is also when we ask about your branches and your menu. Expect the licence key at the address you paid with within one business day.",
+      de: "Die Kontoer\xF6ffnung l\xE4uft nicht automatisch \u2014 ein Mensch bei Kassenta legt es an und fragt dabei nach Filialen und Karte. Der Lizenzschl\xFCssel kommt innerhalb eines Werktags an die Zahlungsadresse.",
+      ar: "\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u062D\u0633\u0627\u0628 \u0644\u064A\u0633 \u0622\u0644\u064A\u064B\u0627 \u2014 \u064A\u0641\u062A\u062D\u0647 \u0634\u062E\u0635 \u0644\u062F\u0649 Kassenta\u060C \u0648\u0639\u0646\u062F\u0647\u0627 \u0646\u0633\u0623\u0644 \u0639\u0646 \u0641\u0631\u0648\u0639\u0643 \u0648\u0642\u0627\u0626\u0645\u062A\u0643. \u062A\u0648\u0642\u0651\u0639 \u0645\u0641\u062A\u0627\u062D \u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u0639\u0644\u0649 \u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u062F\u0641\u0639 \u062E\u0644\u0627\u0644 \u064A\u0648\u0645 \u0639\u0645\u0644 \u0648\u0627\u062D\u062F."
+    }
+  )}
+        ${step(
+    { en: "Open the POS and activate", de: "Kasse \xF6ffnen und aktivieren", ar: "\u0627\u0641\u062A\u062D \u0627\u0644\u0643\u0627\u0634\u064A\u0631 \u0648\u0641\u0639\u0651\u0644" },
+    {
+      en: "Enter the licence key once on the device you will use at the counter. We import your menu and train your team before you go live.",
+      de: "Geben Sie den Lizenzschl\xFCssel einmalig auf dem Kassenger\xE4t ein. Wir importieren Ihre Karte und schulen Ihr Team vor dem Livegang.",
+      ar: "\u0623\u062F\u062E\u0644 \u0645\u0641\u062A\u0627\u062D \u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629 \u0639\u0644\u0649 \u0627\u0644\u062C\u0647\u0627\u0632 \u0627\u0644\u0630\u064A \u0633\u062A\u0633\u062A\u062E\u062F\u0645\u0647 \u0639\u0646\u062F \u0627\u0644\u0643\u0627\u0634\u064A\u0631. \u0646\u0633\u062A\u0648\u0631\u062F \u0642\u0627\u0626\u0645\u062A\u0643 \u0648\u0646\u062F\u0631\u0651\u0628 \u0641\u0631\u064A\u0642\u0643 \u0642\u0628\u0644 \u0627\u0644\u062A\u0634\u063A\u064A\u0644."
+    }
+  )}
+      </div>
+
+      <div class="btn-row" style="margin-top:32px">
+        <a class="btn btn-primary" href="/app" ${tAttrs({ en: "Open the POS", de: "Kasse \xF6ffnen", ar: "\u0627\u0641\u062A\u062D \u0627\u0644\u0643\u0627\u0634\u064A\u0631" })}>Open the POS</a>
+        <a class="btn btn-ghost" href="/contact/" ${tAttrs({ en: "Something looks wrong", de: "Etwas stimmt nicht", ar: "\u0647\u0646\u0627\u0643 \u0645\u0627 \u064A\u0628\u062F\u0648 \u062E\u0627\u0637\u0626\u064B\u0627" })}>Something looks wrong</a>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      var status = document.getElementById('pay-status');
+      var detail = document.getElementById('pay-detail');
+      var headline = document.getElementById('pay-headline');
+      var body = document.getElementById('pay-body');
+      var icon = document.getElementById('pay-icon');
+      if (!status) return;
+
+      /* Writes the three data-* attributes as well as the text, so the language
+         switcher keeps working on copy this script replaced. */
+      function say(el, msg) {
+        if (!el) return;
+        el.setAttribute('data-en', msg.en);
+        el.setAttribute('data-de', msg.de);
+        el.setAttribute('data-ar', msg.ar);
+        var lang = document.documentElement.lang || 'en';
+        el.textContent = msg[lang] || msg.en;
+      }
+
+      var MSG = {
+        waiting: {
+          en: 'Confirming with Stripe\u2026',
+          de: 'Best\xE4tigung bei Stripe\u2026',
+          ar: '\u062C\u0627\u0631\u064D \u0627\u0644\u062A\u0623\u0643\u064A\u062F \u0645\u0639 Stripe\u2026'
+        },
+        paid: {
+          en: 'Stripe has confirmed the payment.',
+          de: 'Stripe hat die Zahlung best\xE4tigt.',
+          ar: '\u0623\u0643\u0651\u062F Stripe \u0627\u0644\u062F\u0641\u0639\u0629.'
+        },
+        paidBody: {
+          en: 'Stripe has your money and we can see it. Your account is opened by a person, not by this page, so the licence key reaches the address you paid with within one business day.',
+          de: 'Stripe hat Ihre Zahlung und wir sehen sie. Ihr Konto wird von einem Menschen angelegt, nicht von dieser Seite \u2014 der Lizenzschl\xFCssel erreicht die Zahlungsadresse innerhalb eines Werktags.',
+          ar: '\u0627\u0633\u062A\u0644\u0645 Stripe \u0645\u0628\u0644\u063A\u0643 \u0648\u0646\u0631\u0627\u0647 \u0644\u062F\u064A\u0646\u0627. \u064A\u0641\u062A\u062D \u062D\u0633\u0627\u0628\u0643 \u0634\u062E\u0635 \u0644\u0627 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062D\u0629\u060C \u0641\u064A\u0635\u0644\u0643 \u0645\u0641\u062A\u0627\u062D \u0627\u0644\u062A\u0631\u062E\u064A\u0635 \u0639\u0644\u0649 \u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u062F\u0641\u0639 \u062E\u0644\u0627\u0644 \u064A\u0648\u0645 \u0639\u0645\u0644 \u0648\u0627\u062D\u062F.'
+        },
+        pending: {
+          en: 'Stripe has not settled this payment yet.',
+          de: 'Stripe hat diese Zahlung noch nicht verbucht.',
+          ar: '\u0644\u0645 \u064A\u0633\u0648\u0650\u0651 Stripe \u0647\u0630\u0647 \u0627\u0644\u062F\u0641\u0639\u0629 \u0628\u0639\u062F.'
+        },
+        pendingBody: {
+          en: 'TWINT and bank redirects can take a minute to settle. Nothing is lost if you close this page: whatever Stripe clears, we see, and we pick it up from there.',
+          de: 'TWINT und Bank-Weiterleitungen brauchen manchmal eine Minute. Es geht nichts verloren, wenn Sie diese Seite schliessen: Was Stripe verbucht, sehen wir \u2014 und machen von dort weiter.',
+          ar: '\u0642\u062F \u064A\u0633\u062A\u063A\u0631\u0642 TWINT \u0648\u0627\u0644\u062A\u062D\u0648\u064A\u0644\u0627\u062A \u0627\u0644\u0628\u0646\u0643\u064A\u0629 \u062F\u0642\u064A\u0642\u0629 \u062D\u062A\u0649 \u062A\u064F\u0633\u0648\u064E\u0651\u0649. \u0644\u0627 \u064A\u0636\u064A\u0639 \u0634\u064A\u0621 \u0625\u0646 \u0623\u063A\u0644\u0642\u062A \u0627\u0644\u0635\u0641\u062D\u0629: \u0645\u0627 \u064A\u0633\u0648\u0651\u064A\u0647 Stripe \u0646\u0631\u0627\u0647 \u0648\u0646\u0643\u0645\u0644 \u0645\u0646\u0647.'
+        },
+        unknown: {
+          en: 'We could not read this checkout from here.',
+          de: 'Wir konnten diesen Checkout hier nicht auslesen.',
+          ar: '\u062A\u0639\u0630\u0651\u0631 \u0639\u0644\u064A\u0646\u0627 \u0642\u0631\u0627\u0621\u0629 \u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u062F\u0641\u0639 \u0647\u0630\u0647 \u0645\u0646 \u0647\u0646\u0627.'
+        },
+        unknownBody: {
+          en: 'That does not mean the payment failed \u2014 only that this page cannot see it. Stripe emails you a receipt for anything it charged. If nothing arrives within ten minutes, contact us and we will look it up.',
+          de: 'Das heisst nicht, dass die Zahlung fehlgeschlagen ist \u2014 nur, dass diese Seite sie nicht sieht. Stripe sendet f\xFCr jede Belastung eine Quittung per E-Mail. Kommt binnen zehn Minuten nichts an, melden Sie sich; wir pr\xFCfen das.',
+          ar: '\u0647\u0630\u0627 \u0644\u0627 \u064A\u0639\u0646\u064A \u0641\u0634\u0644 \u0627\u0644\u062F\u0641\u0639\u060C \u0628\u0644 \u0623\u0646 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u062D\u0629 \u0644\u0627 \u062A\u0631\u0627\u0647 \u0641\u062D\u0633\u0628. \u064A\u0631\u0633\u0644 Stripe \u0625\u064A\u0635\u0627\u0644\u064B\u0627 \u0628\u0627\u0644\u0628\u0631\u064A\u062F \u0644\u0623\u064A \u0645\u0628\u0644\u063A \u062D\u0635\u0651\u0644\u0647. \u0625\u0646 \u0644\u0645 \u064A\u0635\u0644\u0643 \u0634\u064A\u0621 \u062E\u0644\u0627\u0644 \u0639\u0634\u0631 \u062F\u0642\u0627\u0626\u0642 \u0641\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627 \u0648\u0633\u0646\u062A\u062D\u0642\u0651\u0642.'
+        },
+        expired: {
+          en: 'This checkout expired before it was paid.',
+          de: 'Dieser Checkout ist abgelaufen, bevor er bezahlt wurde.',
+          ar: '\u0627\u0646\u062A\u0647\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u062F\u0641\u0639 \u0647\u0630\u0647 \u0642\u0628\u0644 \u0625\u062A\u0645\u0627\u0645\u0647\u0627.'
+        },
+        expiredBody: {
+          en: 'Nothing was charged. Pick your plan again from the pricing page and the checkout starts fresh.',
+          de: 'Es wurde nichts belastet. W\xE4hlen Sie Ihren Plan auf der Preisseite erneut, der Checkout startet neu.',
+          ar: '\u0644\u0645 \u064A\u064F\u062E\u0635\u0645 \u0623\u064A \u0645\u0628\u0644\u063A. \u0627\u062E\u062A\u0631 \u0628\u0627\u0642\u062A\u0643 \u0645\u0646 \u0635\u0641\u062D\u0629 \u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0645\u0646 \u062C\u062F\u064A\u062F \u0648\u0633\u062A\u0628\u062F\u0623 \u0639\u0645\u0644\u064A\u0629 \u062F\u0641\u0639 \u062C\u062F\u064A\u062F\u0629.'
+        }
+      };
+
+      var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
+
+      function amountLine(data) {
+        if (typeof data.amountTotal !== 'number' || !data.currency) return;
+        var major = (data.amountTotal / 100).toFixed(2);
+        var cur = String(data.currency).toUpperCase();
+        var name = data.planName ? ' \u2014 ' + data.planName : '';
+        detail.textContent = cur + ' ' + major + name;
+      }
+
+      var sid = new URLSearchParams(location.search).get('session_id');
+      if (!sid || !/^cs_[A-Za-z0-9_]+$/.test(sid)) {
+        say(headline, MSG.unknown);
+        say(body, MSG.unknownBody);
+        say(status, MSG.unknown);
+        status.className = 'form-status wait';
+        return;
+      }
+
+      say(status, MSG.waiting);
+
+      /* Polls for the settled state rather than trusting the redirect: the
+         webhook is the authority and a TWINT redirect returns before it fires. */
+      var deadline = Date.now() + 45000;
+
+      function poll() {
+        fetch('/api/landing/checkout-session/' + encodeURIComponent(sid), {
+          headers: { Accept: 'application/json' }
+        }).then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.json();
+        }).then(function (data) {
+          amountLine(data);
+
+          if (data.paymentStatus === 'paid') {
+            icon.innerHTML = CHECK;
+            say(headline, MSG.paid);
+            say(body, MSG.paidBody);
+            say(status, MSG.paid);
+            status.className = 'form-status ok';
+            return;
+          }
+          if (data.status === 'expired') {
+            say(headline, MSG.expired);
+            say(body, MSG.expiredBody);
+            say(status, MSG.expired);
+            status.className = 'form-status err';
+            return;
+          }
+          if (Date.now() < deadline) return setTimeout(poll, 2500);
+
+          say(headline, MSG.pending);
+          say(body, MSG.pendingBody);
+          say(status, MSG.pending);
+          status.className = 'form-status wait';
+        }).catch(function () {
+          if (Date.now() < deadline) return setTimeout(poll, 4000);
+          say(headline, MSG.unknown);
+          say(body, MSG.unknownBody);
+          say(status, MSG.unknown);
+          status.className = 'form-status wait';
+        });
+      }
+
+      poll();
+    })();
+  </script>`
+};
+var payCancelled = {
+  meta: {
+    path: "/pay/cancelled",
+    noindex: true,
+    title: { en: "Checkout cancelled \u2014 Kassenta POS", de: "Checkout abgebrochen \u2014 Kassenta POS", ar: "\u0623\u064F\u0644\u063A\u064A\u062A \u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u062F\u0641\u0639 \u2014 Kassenta POS" },
+    description: {
+      en: "You left the Kassenta checkout before paying. Nothing was charged and no account was created.",
+      de: "Sie haben den Kassenta-Checkout vor der Zahlung verlassen. Es wurde nichts belastet und kein Konto angelegt.",
+      ar: "\u063A\u0627\u062F\u0631\u062A \u0635\u0641\u062D\u0629 \u0627\u0644\u062F\u0641\u0639 \u0642\u0628\u0644 \u0625\u062A\u0645\u0627\u0645\u0647\u0627. \u0644\u0645 \u064A\u064F\u062E\u0635\u0645 \u0623\u064A \u0645\u0628\u0644\u063A \u0648\u0644\u0645 \u064A\u064F\u0646\u0634\u0623 \u0623\u064A \u062D\u0633\u0627\u0628."
+    }
+  },
+  body: `
+  <section class="page-head">
+    <div class="wrap">
+      ${crumbs({ en: "Cancelled", de: "Abgebrochen", ar: "\u0645\u0644\u063A\u0627\u0629" })}
+      <h1 ${tAttrs({ en: "Checkout cancelled", de: "Checkout abgebrochen", ar: "\u0623\u064F\u0644\u063A\u064A\u062A \u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u062F\u0641\u0639" })}>Checkout cancelled</h1>
+      <p class="lead" ${tAttrs({
+    en: "You left the payment page before it completed. Nothing was charged and no account was created.",
+    de: "Sie haben die Zahlungsseite vor dem Abschluss verlassen. Es wurde nichts belastet und kein Konto angelegt.",
+    ar: "\u063A\u0627\u062F\u0631\u062A \u0635\u0641\u062D\u0629 \u0627\u0644\u062F\u0641\u0639 \u0642\u0628\u0644 \u0625\u062A\u0645\u0627\u0645\u0647\u0627. \u0644\u0645 \u064A\u064F\u062E\u0635\u0645 \u0623\u064A \u0645\u0628\u0644\u063A \u0648\u0644\u0645 \u064A\u064F\u0646\u0634\u0623 \u0623\u064A \u062D\u0633\u0627\u0628."
+  })}>You left the payment page before it completed. Nothing was charged and no account was created.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap" style="max-width:760px">
+      <article class="card" style="display:grid;gap:14px">
+        <div class="card-icon">${icons.tag}</div>
+        <h2 ${tAttrs({ en: "Pick up where you left off", de: "Machen Sie dort weiter, wo Sie aufgeh\xF6rt haben", ar: "\u0623\u0643\u0645\u0644 \u0645\u0646 \u062D\u064A\u062B \u062A\u0648\u0642\u0651\u0641\u062A" })}>Pick up where you left off</h2>
+        <p ${tAttrs({
+    en: "The plan you chose is still on the pricing page, and starting the checkout again takes a few seconds. If something on the payment page stopped you, tell us what it was \u2014 that is worth knowing.",
+    de: "Ihr gew\xE4hlter Plan steht weiterhin auf der Preisseite, und ein neuer Checkout dauert wenige Sekunden. Falls Sie etwas auf der Zahlungsseite gestoppt hat, sagen Sie uns was \u2014 das ist wertvoll zu wissen.",
+    ar: "\u0628\u0627\u0642\u062A\u0643 \u0627\u0644\u0645\u062E\u062A\u0627\u0631\u0629 \u0645\u0627 \u0632\u0627\u0644\u062A \u0639\u0644\u0649 \u0635\u0641\u062D\u0629 \u0627\u0644\u0623\u0633\u0639\u0627\u0631\u060C \u0648\u0628\u062F\u0621 \u0627\u0644\u062F\u0641\u0639 \u0645\u0646 \u062C\u062F\u064A\u062F \u064A\u0633\u062A\u063A\u0631\u0642 \u062B\u0648\u0627\u0646\u064D. \u0648\u0625\u0646 \u0623\u0648\u0642\u0641\u0643 \u0634\u064A\u0621 \u0641\u064A \u0635\u0641\u062D\u0629 \u0627\u0644\u062F\u0641\u0639 \u0641\u0623\u062E\u0628\u0631\u0646\u0627 \u0628\u0647 \u2014 \u0641\u0630\u0644\u0643 \u064A\u0647\u0645\u0651\u0646\u0627."
+  })}>The plan you chose is still on the pricing page, and starting the checkout again takes a few seconds. If something on the payment page stopped you, tell us what it was \u2014 that is worth knowing.</p>
+        <div class="btn-row">
+          <a class="btn btn-primary" href="/pricing/" ${tAttrs({ en: "Back to pricing", de: "Zur\xFCck zu den Preisen", ar: "\u0627\u0644\u0639\u0648\u062F\u0629 \u0625\u0644\u0649 \u0627\u0644\u0623\u0633\u0639\u0627\u0631" })}>Back to pricing</a>
+          <a class="btn btn-ghost" href="/contact/" ${tAttrs({ en: "Talk to us instead", de: "Lieber sprechen", ar: "\u062A\u062D\u062F\u0651\u062B \u0625\u0644\u064A\u0646\u0627 \u0628\u062F\u0644\u064B\u0627 \u0645\u0646 \u0630\u0644\u0643" })}>Talk to us instead</a>
+        </div>
+      </article>
+
+      <p class="form-note" style="margin-top:24px" ${tAttrs({
+    en: "Prefer an invoice, a bank transfer or a demo before you commit? All three are fine \u2014 write to info@kassenta.com and we will set it up.",
+    de: "Lieber Rechnung, Bank\xFCberweisung oder erst eine Demo? Alles m\xF6glich \u2014 schreiben Sie an info@kassenta.com und wir richten es ein.",
+    ar: "\u062A\u0641\u0636\u0651\u0644 \u0641\u0627\u062A\u0648\u0631\u0629 \u0623\u0648 \u062A\u062D\u0648\u064A\u0644\u064B\u0627 \u0628\u0646\u0643\u064A\u064B\u0627 \u0623\u0648 \u0639\u0631\u0636\u064B\u0627 \u062A\u0648\u0636\u064A\u062D\u064A\u064B\u0627 \u0642\u0628\u0644 \u0627\u0644\u0627\u0644\u062A\u0632\u0627\u0645\u061F \u0643\u0644\u0647\u0627 \u0645\u062A\u0627\u062D\u0629 \u2014 \u0631\u0627\u0633\u0644\u0646\u0627 \u0639\u0644\u0649 info@kassenta.com \u0648\u0633\u0646\u0631\u062A\u0651\u0628 \u0630\u0644\u0643."
+  })}>Prefer an invoice, a bank transfer or a demo before you commit? All three are fine \u2014 write to info@kassenta.com and we will set it up.</p>
+    </div>
+  </section>`
+};
+var PAY_PAGES = [paySuccess, payCancelled];
+
+// server/site/index.ts
+var ALL_PAGES = [...PAGES, ...PAY_PAGES];
+var BY_PATH = new Map(ALL_PAGES.map((p) => [p.meta.path, p]));
+var SITE_PATHS = ALL_PAGES.map((p) => p.meta.path);
+var SITEMAP_PATHS = ALL_PAGES.filter((p) => !p.meta.noindex).map(
+  (p) => p.meta.path
+);
+function normaliseSitePath(pathname) {
+  if (pathname === "/" || pathname === "/index.html") return "/";
+  let p = pathname.replace(/\/index\.html$/i, "");
+  if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
+  return p.toLowerCase();
+}
+function isSitePath(pathname) {
+  return BY_PATH.has(normaliseSitePath(pathname));
+}
+function renderSitePage(pathname, baseUrl) {
+  const page = BY_PATH.get(normaliseSitePath(pathname));
+  if (!page) return null;
+  return renderPage(page.meta, page.body, baseUrl);
+}
+
 // server/index.ts
-init_site();
 var fs5 = __toESM(require("fs"));
 var path4 = __toESM(require("path"));
-var runMigrations = null;
 var usingMySql = Boolean(process.env.MYSQL_HOST || process.env.MYSQL_DATABASE);
 if (!usingMySql) {
   if (process.env.PGHOST && process.env.PGHOST.includes("neon.tech")) {
@@ -17840,7 +19885,7 @@ if (!usingMySql) {
     process.env.DATABASE_URL = neonUrl;
   }
 }
-var app = (0, import_express.default)();
+var app = (0, import_express2.default)();
 var log2 = console.log;
 app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
@@ -17848,7 +19893,10 @@ app.use((req, res, next) => {
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("Content-Security-Policy", "frame-ancestors 'self'");
-  res.setHeader("Permissions-Policy", "geolocation=(self), camera=(self), microphone=(), payment=(), interest-cohort=()");
+  res.setHeader(
+    "Permissions-Policy",
+    'geolocation=(self), camera=(self), microphone=(), payment=(self "https://js.stripe.com"), interest-cohort=()'
+  );
   if ((req.header("x-forwarded-proto") || req.protocol) === "https") {
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   }
@@ -17912,14 +19960,14 @@ function setupCors(app2) {
 }
 function setupBodyParsing(app2) {
   app2.use(
-    import_express.default.json({
+    import_express2.default.json({
       limit: "10mb",
       verify: (req, _res, buf) => {
         req.rawBody = buf;
       }
     })
   );
-  app2.use(import_express.default.urlencoded({ extended: false }));
+  app2.use(import_express2.default.urlencoded({ extended: false }));
 }
 function setupRequestLogging(app2) {
   app2.use((req, res, next) => {
@@ -18100,6 +20148,13 @@ function configureExpoAndLanding(app2) {
             res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
             return res.status(200).send(fs5.readFileSync(jsPath, "utf-8"));
           }
+          if (sub === "/pay.js") {
+            const payPath = path4.resolve(process.cwd(), "delivery-app", "js", "stripe-payments.js");
+            if (!fs5.existsSync(payPath)) return res.status(404).end();
+            res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+            res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+            return res.status(200).send(fs5.readFileSync(payPath, "utf-8"));
+          }
           if (sub === "/manifest.json") {
             res.setHeader("Content-Type", "application/manifest+json");
             return res.status(200).json({
@@ -18118,9 +20173,17 @@ function configureExpoAndLanding(app2) {
           }
           const shellPath = path4.resolve(process.cwd(), "delivery-app", "customer.html");
           if (!fs5.existsSync(shellPath)) return res.status(503).send("<h1>Customer app not deployed</h1>");
+          let shell = fs5.readFileSync(shellPath, "utf-8");
+          const customerConfig = JSON.stringify({
+            basePath: req.path.startsWith("/api/") ? "/api" : "",
+            currency: process.env.DEFAULT_CURRENCY || "CHF",
+            stripePublishableKey: await getBrowserSafeStripeKey(),
+            language: req.query.lang || "en"
+          });
+          shell = shell.replace("__KASSENTA_CONFIG__", customerConfig);
           res.setHeader("Content-Type", "text/html; charset=utf-8");
           res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-          return res.status(200).send(fs5.readFileSync(shellPath, "utf-8"));
+          return res.status(200).send(shell);
         } catch (err) {
           console.error("[/customer] Error:", err);
           return res.status(500).send("<h1>Server error</h1>");
@@ -18165,7 +20228,7 @@ function configureExpoAndLanding(app2) {
           storeName: "Kassenta Delivery",
           currency: process.env.DEFAULT_CURRENCY || "CHF",
           language: req.query.lang || "en",
-          stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
+          stripePublishableKey: await getBrowserSafeStripeKey(),
           primaryColor: "#FF5722",
           accentColor: "#2FD3C6",
           tenantId: null,
@@ -18217,7 +20280,7 @@ function configureExpoAndLanding(app2) {
           return res.status(503).send("<h1>Delivery app not yet deployed</h1>");
         }
         let html = fs5.readFileSync(deliveryIndexPath, "utf-8");
-        const stripeKey = process.env.STRIPE_PUBLISHABLE_KEY || "";
+        const stripeKey = await getBrowserSafeStripeKey();
         const configJson = JSON.stringify({
           slug,
           tenantId,
@@ -18276,7 +20339,7 @@ function configureExpoAndLanding(app2) {
           storeName: "Kassenta Delivery",
           currency: process.env.DEFAULT_CURRENCY || "CHF",
           language: req.query.lang || "en",
-          stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
+          stripePublishableKey: await getBrowserSafeStripeKey(),
           primaryColor: "#FF5722",
           accentColor: "#2FD3C6",
           tenantId: null,
@@ -18371,21 +20434,21 @@ function configureExpoAndLanding(app2) {
     }
     next();
   });
-  const deliveryAppStatic = import_express.default.static(path4.resolve(process.cwd(), "delivery-app"), {
+  const deliveryAppStatic = import_express2.default.static(path4.resolve(process.cwd(), "delivery-app"), {
     index: false
     // HTML is served dynamically above
   });
   app2.use("/delivery-app", deliveryAppStatic);
   app2.use("/api/delivery-app", deliveryAppStatic);
-  const uploadsStatic = import_express.default.static(path4.resolve(process.cwd(), "uploads"), { maxAge: "30d" });
-  const assetsStatic = import_express.default.static(path4.resolve(process.cwd(), "assets"), { maxAge: "30d" });
+  const uploadsStatic = import_express2.default.static(path4.resolve(process.cwd(), "uploads"), { maxAge: "30d" });
+  const assetsStatic = import_express2.default.static(path4.resolve(process.cwd(), "assets"), { maxAge: "30d" });
   app2.use("/assets", assetsStatic);
   app2.use("/api/assets", assetsStatic);
   app2.use("/uploads", uploadsStatic);
   app2.use("/api/uploads", uploadsStatic);
   app2.use("/objects", uploadsStatic);
   app2.use("/api/objects", uploadsStatic);
-  const brandStatic = import_express.default.static(path4.resolve(process.cwd(), "public", "brand"), {
+  const brandStatic = import_express2.default.static(path4.resolve(process.cwd(), "public", "brand"), {
     maxAge: "7d"
   });
   app2.use("/brand", brandStatic);
@@ -18448,6 +20511,79 @@ function configureExpoAndLanding(app2) {
       }
     }
   );
+  let planCache = null;
+  const PLAN_CACHE_MS = 5 * 60 * 1e3;
+  const sameText = (a, b) => String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
+  const pickRow = (rows, name, interval) => rows.filter((r) => sameText(r.name, name) && sameText(r.interval || "monthly", interval)).sort((a, b) => Number(a.id) - Number(b.id))[0];
+  async function loadPlanCatalogue() {
+    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const read2 = async () => {
+      const [rows2] = await pool2.query("SELECT * FROM subscription_plans WHERE is_active = 1");
+      return Array.isArray(rows2) ? rows2 : [];
+    };
+    let rows = await read2();
+    const missing = PLAN_ROWS.filter((p) => !pickRow(rows, p.name, p.interval));
+    if (missing.length) {
+      for (const p of missing) {
+        await pool2.query(
+          "INSERT INTO subscription_plans (name, description, price, `interval`, features, is_active) VALUES (?, ?, ?, ?, ?, 1)",
+          [p.name, p.description, p.price.toFixed(2), p.interval, JSON.stringify(p.features)]
+        );
+      }
+      log2(`[plans] seeded ${missing.length} subscription_plans row(s) from the site catalogue`);
+      rows = await read2();
+    }
+    const plans = PLANS.map((plan2) => {
+      const cell = (interval) => {
+        const row = pickRow(rows, plan2.name, interval);
+        return row ? { planId: Number(row.id), price: Number(row.price) } : null;
+      };
+      return { slug: plan2.slug, name: plan2.name, monthly: cell("monthly"), yearly: cell("yearly") };
+    });
+    return {
+      currency: CURRENCY,
+      // Only true when a checkout can actually be created end to end; the page
+      // falls back to /contact/ rather than to a button that goes nowhere.
+      checkout: await isStripeConfigured() && plans.every((p) => p.monthly && p.yearly),
+      plans
+    };
+  }
+  app2.get("/api/landing/plans", async (_req, res) => {
+    try {
+      if (!planCache || Date.now() - planCache.at > PLAN_CACHE_MS) {
+        planCache = { at: Date.now(), body: await loadPlanCatalogue() };
+      }
+      res.setHeader("Cache-Control", "public, max-age=60");
+      res.json(planCache.body);
+    } catch (e) {
+      log2(`[plans] catalogue read failed: ${e?.message}`);
+      res.json({ currency: CURRENCY, checkout: false, plans: [] });
+    }
+  });
+  app2.get(
+    "/api/landing/checkout-session/:id",
+    rateLimit({ name: "checkout-lookup", max: 60, windowMs: 10 * 60 * 1e3 }),
+    async (req, res) => {
+      const id = String(req.params.id || "");
+      if (id.length > 200 || !/^cs_[A-Za-z0-9_]+$/.test(id)) {
+        return res.status(400).json({ error: "Not a checkout session id" });
+      }
+      try {
+        const stripe = await requireStripeClient();
+        const session = await stripe.checkout.sessions.retrieve(id, { expand: ["line_items"] });
+        res.setHeader("Cache-Control", "no-store");
+        res.json({
+          status: session.status,
+          paymentStatus: session.payment_status,
+          amountTotal: session.amount_total,
+          currency: session.currency,
+          planName: session.line_items?.data?.[0]?.description ?? null
+        });
+      } catch (e) {
+        res.status(404).json({ error: "Unknown checkout session" });
+      }
+    }
+  );
   const SITE_URL = process.env.PUBLIC_BASE_URL || "https://kassenta.com";
   app2.get(["/robots.txt", "/api/robots.txt"], (_req, res) => {
     res.type("text/plain").send(
@@ -18460,6 +20596,7 @@ function configureExpoAndLanding(app2) {
         "Disallow: /dashboard",
         "Disallow: /license-gate",
         "Disallow: /login",
+        "Disallow: /pay/",
         "Disallow: /api/",
         "",
         "# Public ordering pages should stay crawlable",
@@ -18515,11 +20652,11 @@ function configureExpoAndLanding(app2) {
         "/compliance/": [img("compliance-audit", "Audit trail and permission settings in the Kassenta console")],
         "/about/": [img("about-team", "The Kassenta team working alongside restaurant staff")]
       };
-      const { SITE_PATHS: SITE_PATHS2 } = await Promise.resolve().then(() => (init_site(), site_exports));
       const entries = [
         { loc: "/", priority: "1.0", changefreq: "weekly", alternates: true },
-        // Every marketing page, derived from the site router so the two can't drift.
-        ...SITE_PATHS2.filter((p) => p !== "/").map((loc) => ({
+        // Every indexable marketing page, derived from the site router so the
+        // two can't drift. The Stripe return pages are excluded there.
+        ...SITEMAP_PATHS.filter((p) => p !== "/").map((loc) => ({
           loc: `${loc}/`,
           priority: loc === "/pricing" || loc === "/features" ? "0.9" : "0.8",
           changefreq: "monthly",
@@ -18587,11 +20724,11 @@ function configureExpoAndLanding(app2) {
       res.status(500).type("text/plain").send(`sitemap error: ${e.message}`);
     }
   });
-  app2.use("/sounds", import_express.default.static(path4.resolve(process.cwd(), "public", "sounds")));
-  app2.use("/api/sounds", import_express.default.static(path4.resolve(process.cwd(), "public", "sounds")));
-  app2.use("/app/assets/images", import_express.default.static(path4.resolve(process.cwd(), "assets", "images")));
+  app2.use("/sounds", import_express2.default.static(path4.resolve(process.cwd(), "public", "sounds")));
+  app2.use("/api/sounds", import_express2.default.static(path4.resolve(process.cwd(), "public", "sounds")));
+  app2.use("/app/assets/images", import_express2.default.static(path4.resolve(process.cwd(), "assets", "images")));
   const appDistDir = fs5.existsSync(path4.resolve(process.cwd(), "dist", "app")) ? path4.resolve(process.cwd(), "dist", "app") : path4.resolve(process.cwd(), "dist");
-  app2.use("/app", import_express.default.static(appDistDir, {
+  app2.use("/app", import_express2.default.static(appDistDir, {
     setHeaders(res, filePath) {
       if (filePath.endsWith(".webmanifest")) {
         res.setHeader("Content-Type", "application/manifest+json");
@@ -18601,7 +20738,7 @@ function configureExpoAndLanding(app2) {
       }
     }
   }));
-  app2.use(import_express.default.static(path4.resolve(process.cwd(), "static-build")));
+  app2.use(import_express2.default.static(path4.resolve(process.cwd(), "static-build")));
   const staticIndexPath = fs5.existsSync(path4.resolve(process.cwd(), "dist", "app", "index.html")) ? path4.resolve(process.cwd(), "dist", "app", "index.html") : path4.resolve(process.cwd(), "dist", "index.html");
   app2.get("/app/{*splat}", (req, res, next) => {
     if (req.path.includes(".")) {
@@ -18629,248 +20766,30 @@ function setupErrorHandler(app2) {
   });
 }
 async function initStripe() {
-  if (usingMySql) {
-    log2("MySQL mode detected, skipping Stripe schema sync");
-    return;
-  }
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    log2("DATABASE_URL not set, skipping Stripe init");
-    return;
-  }
-  try {
-    log2("Initializing Stripe schema...");
-    try {
-      const stripeSyncModule = await import("stripe-replit-sync");
-      runMigrations = stripeSyncModule.runMigrations;
-      await runMigrations({ databaseUrl });
-      log2("Stripe schema ready");
-    } catch (migErr) {
-      log2("Stripe migrations skipped (stripe-replit-sync not available):", migErr?.message);
-    }
-    let stripeSync2, secretKey;
-    try {
-      stripeSync2 = await getStripeSync();
-      secretKey = await getStripeSecretKey();
-    } catch (connErr) {
-      log2("Stripe connection not available, skipping:", connErr?.message || connErr);
-      return;
-    }
-    if (!secretKey || secretKey.includes("dummy")) {
-      log2("Stripe: Dummy or missing key detected. Skipping webhook setup and sync.");
-      return;
-    }
-    log2("Setting up managed webhook...");
-    const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
-    const webhookResult = await stripeSync2.findOrCreateManagedWebhook(
-      `${webhookBaseUrl}/api/stripe/webhook`
+  const configured = await isStripeConfigured();
+  if (!configured) {
+    log2(
+      "Stripe is not configured - set STRIPE_SECRET_KEY (and STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET) to enable card, TWINT and wallet payments."
     );
-    log2(`Webhook configured: ${webhookResult?.webhook?.url || "ready"}`);
-    log2("Syncing Stripe data...");
-    stripeSync2.syncBackfill().then(() => log2("Stripe data synced")).catch((err) => log2("Error syncing Stripe data:", err));
-  } catch (error) {
-    log2("Stripe init skipped:", error?.message || error);
+    return;
   }
-}
-function setupStripeWebhook(app2) {
-  app2.post(
-    "/api/stripe/webhook",
-    import_express.default.raw({ type: "application/json" }),
-    async (req, res) => {
-      const signature = req.headers["stripe-signature"];
-      if (!signature) {
-        return res.status(400).json({ error: "Missing stripe-signature" });
-      }
-      try {
-        const sig = Array.isArray(signature) ? signature[0] : signature;
-        if (!Buffer.isBuffer(req.body)) {
-          return res.status(500).json({ error: "Webhook processing error" });
-        }
-        await WebhookHandlers.processWebhook(req.body, sig);
-        res.status(200).json({ received: true });
-      } catch (error) {
-        log2("Webhook error:", error.message);
-        res.status(400).json({ error: "Webhook processing error" });
-      }
-    }
-  );
-}
-function setupStripeRoutes(app2) {
-  app2.get("/api/stripe/publishable-key", async (_req, res) => {
-    try {
-      const key = await getStripePublishableKey();
-      res.json({ publishableKey: key });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/stripe/create-payment-intent", async (req, res) => {
-    try {
-      const { amount, currency = "chf", metadata } = req.body;
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ error: "Valid amount is required" });
-      }
-      const stripe = await getUncachableStripeClient();
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount),
-        currency,
-        metadata: metadata || {},
-        automatic_payment_methods: { enabled: true }
-      });
-      res.json({
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/stripe/confirm-payment", async (req, res) => {
-    try {
-      const { paymentIntentId } = req.body;
-      if (!paymentIntentId) {
-        return res.status(400).json({ error: "paymentIntentId is required" });
-      }
-      const stripe = await getUncachableStripeClient();
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      res.json({
-        status: paymentIntent.status,
-        amount: paymentIntent.amount,
-        currency: paymentIntent.currency
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.get("/api/stripe/payment-methods", async (_req, res) => {
-    try {
-      res.json({
-        methods: ["card"],
-        supportedCards: ["visa", "mastercard", "amex"]
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/stripe/pos-charge", async (req, res) => {
-    try {
-      const { amount, currency = "chf", token, metadata } = req.body;
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ error: "Valid amount is required" });
-      }
-      if (!token) {
-        return res.status(400).json({ error: "Payment token is required" });
-      }
-      const stripe = await getUncachableStripeClient();
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount),
-        currency,
-        payment_method_data: {
-          type: "card",
-          card: { token }
-        },
-        confirm: true,
-        automatic_payment_methods: {
-          enabled: true,
-          allow_redirects: "never"
-        },
-        metadata: metadata || {}
-      });
-      res.json({
-        success: paymentIntent.status === "succeeded",
-        status: paymentIntent.status,
-        paymentIntentId: paymentIntent.id,
-        amount: paymentIntent.amount,
-        currency: paymentIntent.currency
-      });
-    } catch (e) {
-      const errorMsg = e.type === "StripeCardError" ? e.message : e.message || "Payment processing failed";
-      res.status(e.statusCode || 500).json({ error: errorMsg, code: e.code });
-    }
-  });
-}
-var paymentGatewayConfig = {
-  enabledMethods: ["cash", "card", "mobile", "nfc"],
-  stripe: {
-    enabled: true,
-    mode: "test",
-    currency: "chf",
-    autoCapture: true
-  },
-  nfc: {
-    enabled: true,
-    provider: "stripe_tap"
-  },
-  cash: {
-    enabled: true,
-    requireExactAmount: false
-  },
-  mobile: {
-    enabled: true,
-    providers: ["twint", "apple_pay", "google_pay"]
+  const mode = await getStripeMode();
+  if (!getStripeWebhookSecret()) {
+    log2("Stripe: STRIPE_WEBHOOK_SECRET is not set - payments cannot be confirmed.");
   }
-};
-function setupPaymentGatewayRoutes(app2) {
-  app2.get("/api/payment-gateway/config", async (_req, res) => {
-    try {
-      let stripeStatus = "disconnected";
-      let stripeMode = "test";
-      try {
-        const key = await getStripePublishableKey();
-        if (key) {
-          stripeStatus = "connected";
-          stripeMode = key.startsWith("pk_live") ? "live" : "test";
-        }
-      } catch {
-      }
-      res.json({
-        ...paymentGatewayConfig,
-        stripe: {
-          ...paymentGatewayConfig.stripe,
-          status: stripeStatus,
-          mode: stripeMode
-        }
-      });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.put("/api/payment-gateway/config", async (req, res) => {
-    try {
-      const updates = req.body;
-      paymentGatewayConfig = { ...paymentGatewayConfig, ...updates };
-      res.json(paymentGatewayConfig);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-  app2.post("/api/payment-gateway/test-stripe", async (_req, res) => {
-    try {
-      const stripe = await getUncachableStripeClient();
-      const balance = await stripe.balance.retrieve();
-      const key = await getStripePublishableKey();
-      res.json({
-        success: true,
-        mode: key.startsWith("pk_live") ? "live" : "test",
-        currency: balance.available?.[0]?.currency || "chf",
-        available: balance.available?.map((b) => ({ amount: b.amount, currency: b.currency }))
-      });
-    } catch (e) {
-      res.json({ success: false, error: e.message });
-    }
-  });
+  log2(`Stripe ready in ${mode} mode`);
 }
 (async () => {
   try {
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    const { sql: sql7 } = await import("drizzle-orm");
-    await db2.execute(sql7.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS language text DEFAULT 'en'`));
+    const { sql: sql8 } = await import("drizzle-orm");
+    await db2.execute(sql8.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS language text DEFAULT 'en'`));
   } catch (e) {
     console.log("[Migration] landing_page_config.language:", e.message);
   }
   try {
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    const { sql: sql7 } = await import("drizzle-orm");
+    const { sql: sql8 } = await import("drizzle-orm");
     for (const col of [
       "payment_instructions text",
       "bank_name text",
@@ -18878,21 +20797,21 @@ function setupPaymentGatewayRoutes(app2) {
       "bank_iban text",
       "twint_number text"
     ]) {
-      await db2.execute(sql7.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS ${col}`));
+      await db2.execute(sql8.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS ${col}`));
     }
   } catch (e) {
     console.log("[Migration] landing_page_config payment fields:", e.message);
   }
+  await runStripeMigrations();
   setupCors(app);
-  setupStripeWebhook(app);
+  registerStripeWebhook(app);
   setupBodyParsing(app);
   setupRequestLogging(app);
   app.use(tenantAuthMiddleware());
   app.use(attachEmployee());
   app.use(guardTenantRoutes());
-  setupStripeRoutes(app);
-  setupPaymentGatewayRoutes(app);
   configureExpoAndLanding(app);
+  registerPaymentRoutes(app);
   registerSuperAdminRoutes(app);
   registerBroadcastRoutes(app);
   registerCustomerExtraRoutes(app);
@@ -19161,8 +21080,8 @@ function setupPaymentGatewayRoutes(app2) {
   }
   try {
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    const { sql: sql7 } = await import("drizzle-orm");
-    const tenantsResult = await db2.execute(sql7`SELECT id FROM tenants LIMIT 1`);
+    const { sql: sql8 } = await import("drizzle-orm");
+    const tenantsResult = await db2.execute(sql8`SELECT id FROM tenants LIMIT 1`);
     const tenantRows = tenantsResult[0];
     if (tenantRows && tenantRows.length > 0) {
       const tid = tenantRows[0].id;
@@ -19200,7 +21119,7 @@ function setupPaymentGatewayRoutes(app2) {
       let totalFixed = 0;
       for (const table of tenantTables) {
         try {
-          const r = await db2.execute(sql7.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`));
+          const r = await db2.execute(sql8.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`));
           const affected = r[0]?.affectedRows ?? 0;
           if (affected > 0) {
             log2(`[migration] Fixed ${affected} rows in ${table}`);

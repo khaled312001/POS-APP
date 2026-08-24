@@ -770,12 +770,25 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CHECKOUT PAGE
+   Light-first: a mint-tinted page behind white cards, the two-layer elevation
+   from base.css, and the store's own accent for anything interactive. Brand
+   washes come from --delivery-primary-light so a store that picked its own
+   colour still reads as itself.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.checkout-page { background: var(--delivery-bg); padding-bottom: 100px; }
+/* A single soft bloom behind the first card lifts the page off flat grey.
+   Painted as a background layer rather than a positioned ::before, so it
+   cannot create a stacking context that breaks the sticky top bar. */
+.checkout-page {
+  min-height: 100vh;
+  padding-bottom: 100px;
+  background-color: var(--bg);
+  background-image: radial-gradient(120% 320px at 50% 0%, var(--delivery-primary-light) 0%, transparent 72%);
+  background-repeat: no-repeat;
+}
 
 .checkout-layout {
-  max-width: 860px;
+  max-width: 940px;
   margin: 0 auto;
   padding: var(--space-md);
 }
@@ -791,11 +804,12 @@
 }
 
 .checkout-step {
-  background: var(--delivery-surface);
-  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border-radius: var(--r-xl);
   overflow: hidden;
-  margin-bottom: var(--space-sm);
-  border: 1px solid var(--delivery-border);
+  margin-bottom: var(--space-md);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
 }
 
 .checkout-step__header {
@@ -803,13 +817,13 @@
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  border-bottom: 1px solid var(--delivery-border);
-  background: var(--delivery-bg);
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
 }
 
 .checkout-step__num {
-  width: 28px; height: 28px;
-  border-radius: 50%;
+  width: 32px; height: 32px;
+  border-radius: var(--r-pill);
   background: var(--delivery-primary);
   color: #fff;
   font-size: 0.875rem;
@@ -818,32 +832,44 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 0 0 4px var(--delivery-primary-light);
 }
 
-.checkout-step__title { font-weight: 700; }
+.checkout-step__title {
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.checkout-step__subtitle {
+  font-size: 0.8125rem;
+  color: var(--text-2);
+  margin-top: 2px;
+}
 .checkout-step__body { padding: var(--space-lg); }
 
 /* Map */
 #checkout-map {
   height: 200px;
-  border-radius: var(--radius-md);
+  border-radius: var(--r-lg);
   overflow: hidden;
   margin-bottom: var(--space-md);
-  border: 1px solid var(--delivery-border);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
 }
 
 /* Toggle switch */
 .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: var(--space-xs) 0; }
 .toggle-row__label { font-weight: 600; font-size: 0.9375rem; }
-.toggle-row__sub { font-size: 0.8125rem; color: var(--delivery-text-muted); }
+.toggle-row__sub { font-size: 0.8125rem; color: var(--text-2); }
 
 .toggle-switch { position: relative; width: 48px; height: 26px; flex-shrink: 0; }
 .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
 .toggle-switch__track {
   position: absolute;
   inset: 0;
-  background: var(--delivery-border);
-  border-radius: var(--radius-pill);
+  background: var(--border-2);
+  border-radius: var(--r-pill);
   cursor: pointer;
   transition: background var(--transition-fast);
 }
@@ -865,23 +891,108 @@
   position: fixed;
   bottom: 0; left: 0; right: 0;
   z-index: var(--z-sticky);
-  background: var(--delivery-surface);
-  border-top: 1px solid var(--delivery-border);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
   padding: var(--space-md);
   padding-bottom: calc(var(--space-md) + env(safe-area-inset-bottom, 0));
   max-width: 600px;
   margin: 0 auto;
+  box-shadow: var(--shadow-pop);
 }
 @media (min-width: 768px) { .checkout-cta { display: none; } }
 
-/* Stripe */
-#stripe-card-element {
-  padding: 14px var(--space-md);
-  border: 1.5px solid var(--delivery-border);
-  border-radius: var(--radius-md);
-  background: var(--delivery-surface);
-  transition: border-color var(--transition-fast);
+/* ── Payment step ──────────────────────────────────────────────────────────
+   The Stripe PaymentElement lives here, in a container that is genuinely on
+   screen — mounting it inside a display:none subtree is what made the old
+   card box render empty. */
+.pay-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
 }
+
+.pay-order-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-radius: var(--r-lg);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.pay-order-badge strong { display: block; font-size: 0.9375rem; }
+.pay-order-badge__icon {
+  width: 34px; height: 34px;
+  flex-shrink: 0;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--delivery-primary);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-xs);
+}
+
+.pay-amount-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.pay-amount-row span { font-size: 0.8125rem; color: var(--text-2); font-weight: 600; }
+.pay-amount-row strong { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
+
+/* The PaymentElement styles itself; this is only the frame around it. */
+.pay-element {
+  min-height: 140px;
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.pay-error {
+  padding: 12px var(--space-md);
+  border-radius: var(--r-md);
+  background: rgba(214, 69, 69, 0.10);
+  border: 1px solid rgba(214, 69, 69, 0.28);
+  color: var(--delivery-danger);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.pay-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.pay-note i { flex-shrink: 0; margin-top: 2px; }
+
+.pay-actions { display: flex; flex-direction: column; gap: var(--space-sm); }
+
+/* Waiting for the webhook after a TWINT / 3-D Secure redirect. */
+.pay-confirming {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-xl) var(--space-lg);
+  text-align: center;
+  color: var(--text);
+}
+.pay-confirming__title { font-size: 1.125rem; font-weight: 700; }
+.pay-confirming__text { font-size: 0.875rem; color: var(--text-2); max-width: 320px; line-height: 1.6; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ORDER TRACKING
@@ -2518,9 +2629,9 @@
 /* ── Checkout Page Extended ──*/
 
 .checkout-step-indicator-bar {
-  padding: var(--space-md);
-  background: var(--delivery-surface);
-  border-bottom: 1px solid var(--delivery-border);
+  padding: var(--space-sm) var(--space-md) 0;
+  background: transparent;
+  border-bottom: none;
 }
 
 .checkout-saved-addresses-wrap {
@@ -2551,14 +2662,24 @@
   margin-top: var(--space-lg);
 }
 
-.checkout-stripe-wrapper {
+/* Note under the payment options — the wallet split, or why paying online is
+   unavailable. Never used to claim a capability we do not have. */
+.checkout-pay-note {
   margin-top: var(--space-md);
+  padding: 12px var(--space-md);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--text-2);
 }
+.checkout-pay-note strong { color: var(--text); }
 
 /* Form validation */
 .form-input--error {
   border-color: var(--delivery-danger) !important;
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
+  box-shadow: 0 0 0 3px rgba(214, 69, 69, 0.14);
 }
 .form-error {
   font-size: 0.75rem; color: var(--delivery-danger);
@@ -2568,10 +2689,13 @@
 /* Checkout loading overlay */
 .checkout-loading-overlay {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,0.55);
+  background: var(--scrim);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: var(--space-md); z-index: var(--z-modal);
   color: #fff; font-size: 1rem; font-weight: 600;
+  text-align: center; padding: var(--space-lg);
 }
 
 .checkout-step-nav {
@@ -2585,9 +2709,9 @@
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  background: linear-gradient(135deg, #1E40AF15, #7C3AED15);
-  border: 2px solid #1E40AF33;
-  border-radius: var(--radius-xl);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
   padding: var(--space-md) var(--space-lg);
   margin-bottom: var(--space-md);
 }
@@ -2595,9 +2719,9 @@
   font-size: 2rem;
   width: 48px; height: 48px;
   display: flex; align-items: center; justify-content: center;
-  background: var(--delivery-surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xs);
 }
 .dine-in-banner__title {
   font-size: 0.875rem;
@@ -2607,26 +2731,26 @@
 .dine-in-banner__table {
   font-size: 1.25rem;
   font-weight: 900;
-  color: var(--delivery-text);
+  color: var(--text);
 }
 
 .dine-in-checkout-banner {
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  background: linear-gradient(135deg, #1E40AF22, #2FD3C622);
-  border: 2px solid #1E40AF44;
-  border-radius: var(--radius-xl);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
   padding: var(--space-md) var(--space-lg);
   margin: var(--space-md);
+  box-shadow: var(--shadow-card);
 }
 .dine-in-checkout-banner__icon {
   font-size: 2rem;
   width: 52px; height: 52px;
   display: flex; align-items: center; justify-content: center;
-  background: white;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  background: var(--accent-soft);
+  border-radius: var(--r-lg);
 }
 .dine-in-checkout-banner__title {
   font-size: 0.875rem;
@@ -2636,44 +2760,52 @@
 .dine-in-checkout-banner__table {
   font-size: 1.375rem;
   font-weight: 900;
-  color: var(--delivery-text);
+  color: var(--text);
 }
 
 .checkout-summary-header {
   padding: var(--space-md);
   font-weight: 700;
-  border-bottom: 1px solid var(--delivery-border);
+  border-bottom: 1px solid var(--border);
 }
 
 .checkout-review-heading {
   margin-bottom: var(--space-sm);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
 }
 
 .checkout-review-item {
   display: flex;
   justify-content: space-between;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--delivery-border);
+  gap: var(--space-md);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
 }
 
 .checkout-review-section {
-  margin-top: var(--space-md);
+  margin-top: var(--space-lg);
 }
 
 .checkout-review-address-text {
-  color: var(--delivery-text-secondary);
+  color: var(--text-2);
 }
 
 .checkout-summary-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--delivery-border);
+  gap: var(--space-sm);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
 }
 
 .checkout-summary-item-name {
   font-size: 0.875rem;
+  color: var(--text-2);
 }
 
 .checkout-summary-item-price {

@@ -504,7 +504,13 @@
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 
-.btn-primary { background: var(--delivery-primary); color: #fff; }
+/* The brand glow is derived from --delivery-primary-light, so a store with its
+   own colour gets its own halo rather than a hardcoded one. */
+.btn-primary {
+  background: var(--delivery-primary);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(11,31,38,0.08), 0 8px 20px var(--delivery-primary-light);
+}
 .btn-primary:hover { background: var(--delivery-primary-dark); transform: translateY(-1px); box-shadow: var(--shadow-md); }
 
 .btn-secondary { background: var(--nav-bg); color: #fff; }
@@ -517,8 +523,13 @@
 }
 .btn-outline:hover { background: var(--delivery-primary-light); }
 
-.btn-ghost { background: var(--delivery-border); color: var(--delivery-text); }
-.btn-ghost:hover { background: var(--delivery-border-dark); }
+/* inset ring instead of a real border: no 2px height jump next to .btn-primary */
+.btn-ghost {
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.btn-ghost:hover { background: var(--bg-2); box-shadow: inset 0 0 0 1px var(--border-2); }
 
 .btn-danger { background: var(--delivery-danger); color: #fff; }
 .btn-success { background: var(--delivery-success); color: #fff; }
@@ -752,7 +763,7 @@
 .product-card__image-placeholder {
   width: 100%;
   aspect-ratio: 4/3;
-  background: linear-gradient(145deg, #ff572220 0%, #ff572208 50%, #2FD3C610 100%);
+  background: linear-gradient(145deg, var(--accent-soft) 0%, var(--surface-2) 55%, rgba(0,193,176,0.10) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1814,24 +1825,27 @@
 /* Payment option */
 .payment-option {
   padding: var(--space-md);
-  border: 2px solid var(--delivery-border);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
   display: flex;
   align-items: center;
   gap: var(--space-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
 }
-.payment-option:hover { border-color: var(--delivery-primary); }
+.payment-option:hover { border-color: var(--border-2); box-shadow: var(--shadow-sm); }
 .payment-option.selected {
   border-color: var(--delivery-primary);
   background: var(--delivery-primary-light);
+  box-shadow: 0 0 0 3px var(--delivery-primary-light), var(--shadow-sm);
 }
 
 .payment-option__radio {
   width: 20px; height: 20px;
   border-radius: 50%;
-  border: 2px solid var(--delivery-border);
+  border: 2px solid var(--border-2);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -1848,31 +1862,43 @@
   background: var(--delivery-primary);
 }
 
-.payment-option__icon { font-size: 1.5rem; }
-.payment-option__label { font-weight: 600; font-size: 0.9375rem; }
-.payment-option__desc { font-size: 0.8125rem; color: var(--delivery-text-muted); }
+.payment-option__icon {
+  font-size: 1.5rem;
+  width: 40px; height: 40px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--delivery-primary);
+}
+.payment-option.selected .payment-option__icon { background: var(--surface); }
+.payment-option__label { font-weight: 600; font-size: 0.9375rem; color: var(--text); }
+.payment-option__desc { font-size: 0.8125rem; color: var(--text-2); }
 
 /* Address card */
 .address-card {
   padding: var(--space-md);
-  border: 2px solid var(--delivery-border);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
   display: flex;
   gap: var(--space-md);
   align-items: flex-start;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
 }
-.address-card:hover { border-color: var(--delivery-primary); }
+.address-card:hover { border-color: var(--border-2); box-shadow: var(--shadow-sm); }
 .address-card.selected {
   border-color: var(--delivery-primary);
   background: var(--delivery-primary-light);
+  box-shadow: 0 0 0 3px var(--delivery-primary-light), var(--shadow-sm);
 }
 
 .address-card__icon {
   width: 40px; height: 40px;
-  border-radius: 50%;
-  background: var(--delivery-primary-light);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
   color: var(--delivery-primary);
   display: flex;
   align-items: center;

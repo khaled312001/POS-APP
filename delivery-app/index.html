@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#FF5722" />
+  <meta name="theme-color" content="#F2F6F5" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#040E32" media="(prefers-color-scheme: dark)" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -13,9 +14,9 @@
   <title>Kassenta Delivery</title>
 
   <!-- CSS -->
-  <link rel="stylesheet" href="/api/delivery-app/css/base.css?v=20260412h" />
-  <link rel="stylesheet" href="/api/delivery-app/css/components.css?v=20260412h" />
-  <link rel="stylesheet" href="/api/delivery-app/css/pages.css?v=20260412h" />
+  <link rel="stylesheet" href="/api/delivery-app/css/base.css?v=20260824a" />
+  <link rel="stylesheet" href="/api/delivery-app/css/components.css?v=20260824a" />
+  <link rel="stylesheet" href="/api/delivery-app/css/pages.css?v=20260824a" />
 
   <!-- Leaflet maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -23,12 +24,34 @@
   <!-- Inline config injected by Express -->
   <script>window.DELIVERY_CONFIG = __DELIVERY_CONFIG__;</script>
 
+  <script>
+    // Runs before the stylesheets paint: stamps <html> so the right palette is
+    // live on the first frame. "kassenta_theme" is the shared key the customer
+    // app, the POS and the dashboards all read; the old "barmagly_theme" value
+    // is migrated once so nobody loses their choice.
+    (function () {
+      try {
+        var t = localStorage.getItem("kassenta_theme");
+        if (!t) {
+          var legacy = localStorage.getItem("barmagly_theme");
+          if (legacy) { t = legacy; localStorage.setItem("kassenta_theme", legacy); }
+        }
+        if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+
   <style>
-    /* Critical inline: prevent FOUC */
-    body { background: #F8F9FA; }
+    /* Critical inline: prevent FOUC. Light-first, with dark following the
+       stamped data-theme and then the OS. */
+    body { background: #F2F6F5; }
+    html[data-theme="dark"] body { background: #040E32; }
+    @media (prefers-color-scheme: dark) {
+      html:not([data-theme]) body { background: #040E32; }
+    }
     #splash {
       position: fixed; inset: 0;
-      background: #1A1A2E;
+      background: #040E32;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -41,12 +64,12 @@
     #splash-logo {
       width: 80px; height: 80px;
       border-radius: 20px;
-      background: #FF5722;
+      background: linear-gradient(135deg, #0A6E65, #00C1B0);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 2.5rem;
-      box-shadow: 0 8px 32px rgba(255,87,34,0.4);
+      box-shadow: 0 8px 32px rgba(0,193,176,0.32);
     }
     #splash-name {
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
@@ -66,7 +89,7 @@
       display: block;
       height: 100%;
       width: 40%;
-      background: #FF5722;
+      background: #00C1B0;
       border-radius: 2px;
       animation: splash-progress 1.2s ease infinite alternate;
     }
@@ -78,7 +101,7 @@
     /* ── Onboarding ────────────────────────────────────────────────────── */
     #onboarding {
       position: fixed; inset: 0;
-      background: #1A1A2E;
+      background: #040E32;
       z-index: 9998;
       display: none;
       flex-direction: column;
@@ -122,9 +145,9 @@
       border-radius: 40px;
       opacity: 0.15;
     }
-    .slide-bg-1 { background: linear-gradient(135deg, #FF5722, #FF8A65); }
+    .slide-bg-1 { background: linear-gradient(135deg, #0A6E65, #00C1B0); }
     .slide-bg-1::before { background: radial-gradient(circle at 30% 30%, #fff, transparent 60%); }
-    .slide-bg-2 { background: linear-gradient(135deg, #2FD3C6, #4DD0E1); }
+    .slide-bg-2 { background: linear-gradient(135deg, #00C1B0, #4DD0E1); }
     .slide-bg-2::before { background: radial-gradient(circle at 70% 30%, #fff, transparent 60%); }
     .slide-bg-3 { background: linear-gradient(135deg, #F59E0B, #FBBF24); }
     .slide-bg-3::before { background: radial-gradient(circle at 30% 70%, #fff, transparent 60%); }
@@ -163,7 +186,7 @@
       transition: all 0.3s ease;
     }
     .onboarding-dot.active {
-      background: #FF5722;
+      background: #00C1B0;
       width: 24px;
       border-radius: 4px;
     }
@@ -188,16 +211,16 @@
     }
     .onboarding-btn--skip:hover { background: rgba(255,255,255,0.12); }
     .onboarding-btn--next {
-      background: #FF5722;
+      background: #0A6E65;
       color: #fff;
       flex: 2;
     }
-    .onboarding-btn--next:hover { background: #E64A19; }
+    .onboarding-btn--next:hover { background: #0E9C8D; }
 
     /* ── Terms & Conditions ─────────────────────────────────────────── */
     #terms-screen {
       position: fixed; inset: 0;
-      background: #1A1A2E;
+      background: #040E32;
       z-index: 9997;
       display: none;
       flex-direction: column;
@@ -216,11 +239,11 @@
     .terms-header__icon {
       width: 44px; height: 44px;
       border-radius: 12px;
-      background: rgba(255,87,34,0.15);
+      background: rgba(0,193,176,0.16);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #FF5722;
+      color: #00C1B0;
     }
     .terms-header__title {
       font-size: 1.25rem;
@@ -235,7 +258,7 @@
     .terms-body h3 {
       font-size: 1rem;
       font-weight: 700;
-      color: #FF5722;
+      color: #00C1B0;
       margin: 20px 0 8px;
     }
     .terms-body h3:first-child { margin-top: 0; }
@@ -275,8 +298,8 @@
       margin-top: 2px;
     }
     .terms-checkbox.checked {
-      background: #FF5722;
-      border-color: #FF5722;
+      background: #0A6E65;
+      border-color: #0A6E65;
     }
     .terms-checkbox.checked::after {
       content: '';
@@ -295,7 +318,7 @@
       width: 100%;
       padding: 16px;
       border-radius: 14px;
-      background: rgba(255,87,34,0.3);
+      background: rgba(10,110,101,0.35);
       color: rgba(255,255,255,0.4);
       font-size: 1rem;
       font-weight: 700;
@@ -304,12 +327,12 @@
       transition: all 0.3s ease;
     }
     .terms-accept-btn.enabled {
-      background: #FF5722;
+      background: #0A6E65;
       color: #fff;
       cursor: pointer;
     }
     .terms-accept-btn.enabled:hover {
-      background: #E64A19;
+      background: #0E9C8D;
     }
   </style>
 </head>
@@ -655,44 +678,35 @@
   <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
-  <!-- Lazy Stripe loader -->
-  <script>
-    window.loadStripe = function() {
-      if (window.Stripe) return Promise.resolve(window.Stripe);
-      return new Promise(function(resolve, reject) {
-        var s = document.createElement("script");
-        s.src = "https://js.stripe.com/v3/";
-        s.onload = function() { resolve(window.Stripe); };
-        s.onerror = reject;
-        document.head.appendChild(s);
-      });
-    };
-  </script>
+  <!-- Shared payment helper (window.KassentaPay). Loads Stripe.js on demand,
+       mounts a PaymentElement so TWINT and the wallets are offered, and never
+       treats a redirect return as proof of payment. -->
+  <script src="/api/delivery-app/js/stripe-payments.js?v=20260824a"></script>
 
   <!-- Core modules (order matters) -->
-  <script src="/api/delivery-app/js/router.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/cart.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/auth.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/api.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/router.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/cart.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/auth.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/api.js?v=20260824a"></script>
 
   <!-- Page modules -->
-  <script src="/api/delivery-app/js/pages/home.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/menu.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/cart-page.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/checkout.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/tracking.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/account.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/offers.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/login.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/search.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/favorites.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/help.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/reviews.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/rewards.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/stamps.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/giftcards.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/courier.js?v=20260412h"></script>
-  <script src="/api/delivery-app/js/pages/partner.js?v=20260412h"></script>
+  <script src="/api/delivery-app/js/pages/home.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/menu.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/cart-page.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/checkout.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/tracking.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/account.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/offers.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/login.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/search.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/favorites.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/help.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/reviews.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/rewards.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/stamps.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/giftcards.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/courier.js?v=20260824a"></script>
+  <script src="/api/delivery-app/js/pages/partner.js?v=20260824a"></script>
 
   <!-- pages namespace -->
   <script>window.pages = window.pages || {};</script>
@@ -707,13 +721,23 @@
     var currency = cfg.currency || "CHF";
 
     // ── Apply brand colors ──────────────────────────────────────────────
-    if (cfg.primaryColor) {
-      document.documentElement.style.setProperty("--delivery-primary", cfg.primaryColor);
-      document.documentElement.style.setProperty("--delivery-primary-dark",  shadeColor(cfg.primaryColor, -15));
-      document.documentElement.style.setProperty("--delivery-primary-light", hexToRgba(cfg.primaryColor, 0.12));
+    // #FF5722 / #2FD3C6 are the retired defaults the server still emits for a
+    // store that never picked a colour. Treat them as "unset" so those stores
+    // fall through to the Kassenta palette in base.css instead of the old
+    // orange; a store that genuinely chose a colour still wins.
+    function brandOverride(value, retired) {
+      if (!value) return "";
+      return value.toLowerCase() === retired ? "" : value;
     }
-    if (cfg.accentColor) {
-      document.documentElement.style.setProperty("--delivery-accent", cfg.accentColor);
+    var primaryColor = brandOverride(cfg.primaryColor, "#ff5722");
+    var accentColor  = brandOverride(cfg.accentColor,  "#2fd3c6");
+    if (primaryColor) {
+      document.documentElement.style.setProperty("--delivery-primary", primaryColor);
+      document.documentElement.style.setProperty("--delivery-primary-dark",  shadeColor(primaryColor, -15));
+      document.documentElement.style.setProperty("--delivery-primary-light", hexToRgba(primaryColor, 0.12));
+    }
+    if (accentColor) {
+      document.documentElement.style.setProperty("--delivery-accent", accentColor);
     }
 
     // ── RTL ─────────────────────────────────────────────────────────────
@@ -1007,40 +1031,33 @@
 
   // ── Theme Toggle ──────────────────────────────────────────────────────────
   window.setAppTheme = function(theme) {
-    localStorage.setItem("barmagly_theme", theme);
+    localStorage.setItem("kassenta_theme", theme);
     applyTheme(theme);
-    // Update toggle buttons
+    setThemeControls(theme);
+  };
+  function applyTheme(theme) {
+    // "light" is stamped explicitly, not just left blank: the palette in
+    // base.css falls back to the OS whenever data-theme is absent, so an
+    // empty attribute would hand an OS-dark user a dark page they opted out of.
+    if (theme === "dark" || theme === "light") {
+      document.documentElement.setAttribute("data-theme", theme);
+    } else {
+      document.documentElement.removeAttribute("data-theme"); // follow the OS
+    }
+  }
+  // Apply saved theme on load
+  (function() {
+    var saved = localStorage.getItem("kassenta_theme") || "system";
+    applyTheme(saved);
+    setThemeControls(saved);
+  })();
+  function setThemeControls(theme) {
     document.querySelectorAll(".side-menu__theme-btn").forEach(function(btn) {
       btn.classList.toggle("active", btn.dataset.themeVal === theme);
     });
     var label = document.getElementById("side-menu-theme-label");
     if (label) label.textContent = theme === "light" ? "Light" : theme === "dark" ? "Dark" : "System";
-  };
-  function applyTheme(theme) {
-    if (theme === "dark") {
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else if (theme === "light") {
-      document.documentElement.removeAttribute("data-theme");
-    } else {
-      // System
-      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-        document.documentElement.setAttribute("data-theme", "dark");
-      } else {
-        document.documentElement.removeAttribute("data-theme");
-      }
-    }
   }
-  // Apply saved theme on load
-  (function() {
-    var saved = localStorage.getItem("barmagly_theme") || "system";
-    applyTheme(saved);
-    // Listen for system changes
-    if (window.matchMedia) {
-      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function() {
-        if ((localStorage.getItem("barmagly_theme") || "system") === "system") applyTheme("system");
-      });
-    }
-  })();
 
   // ── Onboarding slide navigation ──────────────────────────────────────────
 

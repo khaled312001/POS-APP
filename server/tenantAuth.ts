@@ -13,6 +13,8 @@ const PUBLIC_ROUTES = [
   "/api/license/validate",
   "/api/auth/google",
   "/api/landing/subscribe",
+  "/api/landing/plans",             // Public plan catalogue for the pricing page
+  "/api/landing/checkout-session",  // Read-only Checkout status for /pay/success
   "/api/landing-page-config",
   "/api/store/",
   "/api/store-public/",
@@ -20,6 +22,15 @@ const PUBLIC_ROUTES = [
   "/api/stripe/webhook",
   "/api/stripe/publishable-key",
   "/api/payment-gateway/config",
+  // ── Payments ──
+  // Only the routes a guest checkout genuinely needs. Everything else under
+  // /api/payments/ (sale intents, refunds, health) deliberately stays behind
+  // the licence/employee check, so this must NOT become a bare "/api/payments/".
+  "/api/payments/webhook",       // signature-verified, see stripeWebhook.ts
+  "/api/payments/config",        // publishable key + offered methods
+  "/api/payments/order/",        // guarded by the order's tracking token
+  "/api/payments/status/",       // PaymentIntent id is already a bearer secret
+  "/api/payments/checkout-session", // plan price comes from the DB, never the caller
   "/api/products/template",
   "/api/dashboard/subscriptions",
   "/api/caller-id/incoming",  // Local FRITZ!Card bridge (secured by CALLER_ID_BRIDGE_SECRET)

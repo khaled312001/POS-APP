@@ -14,6 +14,7 @@ import {
   requireRole, requireManager, requireAdmin,
 } from "./employeeAuth";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import { repriceOrder, PricingError } from "./orderPricing";
 import { sendLicenseKeyEmail } from "./emailService";
 import { whatsappService } from "./whatsappService";
 import {
@@ -3930,6 +3931,26 @@ async function test(){
         }
       }
 
+      // Re-price from the tenant's own product rows. The body's subtotal /
+      // deliveryFee / totalAmount are advisory only: this endpoint is public,
+      // and the stored total is what Stripe will charge.
+      let pricing;
+      try {
+        pricing = await repriceOrder({
+          tenantId: Number(tenantId),
+          items,
+          clientSubtotal: subtotal,
+          clientDeliveryFee: deliveryFee,
+          clientTotal: totalAmount,
+          discountAmount: finalDiscount,
+          walletUsed,
+          orderType: orderType || "delivery",
+        });
+      } catch (e: any) {
+        if (e instanceof PricingError) return res.status(400).json({ error: e.message });
+        throw e;
+      }
+
       const order = await storage.createOnlineOrder({
         tenantId: Number(tenantId),
         orderNumber,
@@ -3937,11 +3958,11 @@ async function test(){
         customerPhone,
         customerEmail: customerEmail ?? null,
         customerAddress: customerAddress ?? null,
-        items: items || [],
-        subtotal: Number(subtotal).toFixed(2),
+        items: pricing.items,
+        subtotal: pricing.subtotal.toFixed(2),
         taxAmount: "0",
-        deliveryFee: Number(deliveryFee ?? 0).toFixed(2),
-        totalAmount: Number(totalAmount).toFixed(2),
+        deliveryFee: pricing.deliveryFee.toFixed(2),
+        totalAmount: pricing.totalAmount.toFixed(2),
         paymentMethod: paymentMethod || "cash",
         paymentStatus: "pending",
         status: "pending",

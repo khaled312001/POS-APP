@@ -3,52 +3,86 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* ── CSS Variables ───────────────────────────────────────────────────────── */
+/* Light-first. The bare :root block is the light palette; dark is a swap of
+   the same names, applied either by the OS (until the customer states a
+   preference) or by <html data-theme="dark"> once they have. The preference
+   itself lives in localStorage under "kassenta_theme" — the same key the
+   customer app, the POS and the dashboards read. */
 :root {
-  /* ── Brand palette (Kassenta) ── */
-  --delivery-primary:       #FF5722;
-  --delivery-primary-light: rgba(255, 87, 34, 0.12);
-  --delivery-primary-dark:  #E64A19;
+  color-scheme: light;
 
-  --delivery-accent:        #2FD3C6;
-  --delivery-accent-light:  rgba(47, 211, 198, 0.12);
+  /* ── Kassenta design tokens ──
+     Brand is navy #040E32 + teal #00C1B0. --accent is the ink-bearing teal:
+     it ALWAYS takes white text, so never lighten it below this value. */
+  --bg:          #F2F6F5;
+  --bg-2:        #E9F0EF;
+  --surface:     #FFFFFF;
+  --surface-2:   #F7FAFA;
+  --border:      #E3EAE9;
+  --border-2:    #CEDBD9;
+  --text:        #0B1F26;
+  --text-2:      #4A6362;
+  --text-dim:    #7F9694;
+  --accent:      #0A6E65;
+  --accent-2:    #0E9C8D;
+  --accent-soft: #E1F1EF;
+  --accent-ring: rgba(10, 110, 101, 0.16);
+  --teal:        #00C1B0;
+  --navy:        #040E32;
+  --scrim:       rgba(6, 26, 24, 0.55);
 
-  --delivery-success:       #4CAF50;
-  --delivery-success-light: rgba(76, 175, 80, 0.12);
-  --delivery-warning:       #F59E0B;
-  --delivery-danger:        #EF4444;
-  --delivery-info:          #3B82F6;
+  /* Two-layer elevation: a tight contact shadow plus a wide soft one. */
+  --shadow-card: 0 1px 2px rgba(11,31,38,0.04), 0 10px 26px rgba(11,31,38,0.07);
+  --shadow-pop:  0 2px 6px rgba(11,31,38,0.06), 0 20px 48px rgba(11,31,38,0.13);
+
+  /* ── Brand palette (legacy --delivery-* names, new Kassenta values) ──
+     Per-store branding may still override --delivery-primary at runtime; the
+     bootstrap in index.html ignores the retired orange default so a store that
+     never picked a colour lands on the Kassenta accent instead. */
+  --delivery-primary:       #0A6E65;
+  --delivery-primary-light: rgba(10, 110, 101, 0.10);
+  --delivery-primary-dark:  #08574F;
+
+  --delivery-accent:        #00C1B0;
+  --delivery-accent-light:  rgba(0, 193, 176, 0.12);
+
+  --delivery-success:       #0F9D6E;
+  --delivery-success-light: rgba(15, 157, 110, 0.12);
+  --delivery-warning:       #C07A06;
+  --delivery-danger:        #D64545;
+  --delivery-info:          #3B6BF5;
 
   /* ── Surfaces ── */
-  --delivery-bg:            #F8F9FA;
+  --delivery-bg:            #F2F6F5;
   --delivery-surface:       #FFFFFF;
   --delivery-card:          #FFFFFF;
-  --delivery-border:        #E8ECF0;
-  --delivery-border-dark:   #D1D9E0;
+  --delivery-border:        #E3EAE9;
+  --delivery-border-dark:   #CEDBD9;
 
   /* ── Text ── */
-  --delivery-text:          #1A1A2E;
-  --delivery-text-secondary:#6B7280;
-  --delivery-text-muted:    #9CA3AF;
+  --delivery-text:          #0B1F26;
+  --delivery-text-secondary:#4A6362;
+  --delivery-text-muted:    #7F9694;
 
-  /* ── Nav (dark) ── */
-  --nav-bg:                 #1A1A2E;
+  /* ── Nav (navy) ── */
+  --nav-bg:                 #040E32;
   --nav-text:               #FFFFFF;
   --nav-text-muted:         rgba(255,255,255,0.65);
 
   /* ── Order status ── */
-  --status-pending:         #F59E0B;
-  --status-accepted:        #3B82F6;
-  --status-preparing:       #8B5CF6;
-  --status-ready:           #2FD3C6;
-  --status-on-way:          #FF5722;
-  --status-delivered:       #10B981;
-  --status-cancelled:       #EF4444;
+  --status-pending:         #C07A06;
+  --status-accepted:        #3B6BF5;
+  --status-preparing:       #7C6BF5;
+  --status-ready:           #00C1B0;
+  --status-on-way:          #0E9C8D;
+  --status-delivered:       #0F9D6E;
+  --status-cancelled:       #D64545;
 
   /* ── Loyalty tiers ── */
-  --tier-bronze:            #CD7F32;
-  --tier-silver:            #9CA3AF;
-  --tier-gold:              #F59E0B;
-  --tier-platinum:          #6366F1;
+  --tier-bronze:            #B4713C;
+  --tier-silver:            #8FA3A1;
+  --tier-gold:              #C07A06;
+  --tier-platinum:          #5B6BD6;
 
   /* ── Spacing scale ── */
   --space-xs:   4px;
@@ -60,19 +94,20 @@
   --space-3xl:  64px;
 
   /* ── Border radius ── */
-  --radius-xs:  4px;
-  --radius-sm:  8px;
-  --radius-md:  12px;
+  --radius-xs:  6px;
+  --radius-sm:  10px;
+  --radius-md:  14px;
   --radius-lg:  20px;
-  --radius-xl:  28px;
+  --radius-xl:  26px;
   --radius-pill:9999px;
+  --r-sm: 10px; --r-md: 14px; --r-lg: 20px; --r-xl: 26px; --r-pill: 999px;
 
   /* ── Shadows ── */
-  --shadow-xs:  0 1px 2px rgba(0,0,0,0.05);
-  --shadow-sm:  0 1px 4px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:  0 4px 16px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
-  --shadow-lg:  0 8px 32px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.08);
-  --shadow-xl:  0 20px 60px rgba(0,0,0,0.16);
+  --shadow-xs:  0 1px 2px rgba(11,31,38,0.05);
+  --shadow-sm:  0 1px 2px rgba(11,31,38,0.04), 0 4px 12px rgba(11,31,38,0.05);
+  --shadow-md:  0 1px 2px rgba(11,31,38,0.04), 0 10px 26px rgba(11,31,38,0.07);
+  --shadow-lg:  0 2px 6px rgba(11,31,38,0.06), 0 20px 48px rgba(11,31,38,0.13);
+  --shadow-xl:  0 4px 10px rgba(11,31,38,0.08), 0 32px 70px rgba(11,31,38,0.18);
 
   /* ── Transitions ── */
   --transition-fast:   150ms ease;
@@ -95,18 +130,113 @@
   --bottom-nav-height:62px;
 }
 
-/* ── Dark mode ───────────────────────────────────────────────────────────── */
+/* ── Dark mode ─────────────────────────────────────────────────────────────
+   Opt-in via <html data-theme="dark">, which wins over everything below. */
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg:          #040E32;
+  --bg-2:        #071544;
+  --surface:     #0D1A44;
+  --surface-2:   #132355;
+  --border:      #1F2F5D;
+  --border-2:    #2B3E73;
+  --text:        #F1F5FD;
+  --text-2:      #B5C0D8;
+  --text-dim:    #8492B4;
+  --accent:      #0E8A7E;
+  --accent-2:    #00C1B0;
+  --accent-soft: #0C2E36;
+  --accent-ring: rgba(0, 193, 176, 0.22);
+  --scrim:       rgba(0, 0, 0, 0.60);
+
+  --shadow-card: 0 2px 6px rgba(0,0,0,0.32), 0 16px 40px rgba(0,0,0,0.40);
+  --shadow-pop:  0 4px 12px rgba(0,0,0,0.40), 0 28px 60px rgba(0,0,0,0.52);
+
+  --delivery-primary:       #0E8A7E;
+  --delivery-primary-light: rgba(0, 193, 176, 0.14);
+  --delivery-primary-dark:  #0A6E65;
+  --delivery-accent:        #00C1B0;
+  --delivery-accent-light:  rgba(0, 193, 176, 0.16);
+
+  --delivery-success:       #10B981;
+  --delivery-success-light: rgba(16, 185, 129, 0.16);
+  --delivery-warning:       #F59E0B;
+  --delivery-danger:        #EF4444;
+  --delivery-info:          #5B84FF;
+
+  --delivery-bg:            #040E32;
+  --delivery-surface:       #0D1A44;
+  --delivery-card:          #132355;
+  --delivery-border:        #1F2F5D;
+  --delivery-border-dark:   #2B3E73;
+
+  --delivery-text:          #F1F5FD;
+  --delivery-text-secondary:#B5C0D8;
+  --delivery-text-muted:    #8492B4;
+
+  --nav-bg:                 #071544;
+
+  --shadow-xs:  0 1px 2px rgba(0,0,0,0.30);
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.30), 0 4px 12px rgba(0,0,0,0.34);
+  --shadow-md:  0 2px 6px rgba(0,0,0,0.32), 0 16px 40px rgba(0,0,0,0.40);
+  --shadow-lg:  0 4px 12px rgba(0,0,0,0.40), 0 28px 60px rgba(0,0,0,0.52);
+  --shadow-xl:  0 8px 20px rgba(0,0,0,0.46), 0 40px 84px rgba(0,0,0,0.60);
+}
+
+/* Follow the OS only until the customer states a preference — once they do,
+   data-theme sits on <html> and the block above wins. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --delivery-bg:      #0F1117;
-    --delivery-surface: #1C1F2B;
-    --delivery-card:    #242736;
-    --delivery-border:  #2D3144;
-    --delivery-border-dark: #3A3F5C;
-    --delivery-text:    #F0F2F8;
-    --delivery-text-secondary: #9CA3AF;
-    --delivery-text-muted: #6B7280;
-    --nav-bg:           #10111A;
+  html:not([data-theme]) {
+    color-scheme: dark;
+
+    --bg:          #040E32;
+    --bg-2:        #071544;
+    --surface:     #0D1A44;
+    --surface-2:   #132355;
+    --border:      #1F2F5D;
+    --border-2:    #2B3E73;
+    --text:        #F1F5FD;
+    --text-2:      #B5C0D8;
+    --text-dim:    #8492B4;
+    --accent:      #0E8A7E;
+    --accent-2:    #00C1B0;
+    --accent-soft: #0C2E36;
+    --accent-ring: rgba(0, 193, 176, 0.22);
+    --scrim:       rgba(0, 0, 0, 0.60);
+
+    --shadow-card: 0 2px 6px rgba(0,0,0,0.32), 0 16px 40px rgba(0,0,0,0.40);
+    --shadow-pop:  0 4px 12px rgba(0,0,0,0.40), 0 28px 60px rgba(0,0,0,0.52);
+
+    --delivery-primary:       #0E8A7E;
+    --delivery-primary-light: rgba(0, 193, 176, 0.14);
+    --delivery-primary-dark:  #0A6E65;
+    --delivery-accent:        #00C1B0;
+    --delivery-accent-light:  rgba(0, 193, 176, 0.16);
+
+    --delivery-success:       #10B981;
+    --delivery-success-light: rgba(16, 185, 129, 0.16);
+    --delivery-warning:       #F59E0B;
+    --delivery-danger:        #EF4444;
+    --delivery-info:          #5B84FF;
+
+    --delivery-bg:            #040E32;
+    --delivery-surface:       #0D1A44;
+    --delivery-card:          #132355;
+    --delivery-border:        #1F2F5D;
+    --delivery-border-dark:   #2B3E73;
+
+    --delivery-text:          #F1F5FD;
+    --delivery-text-secondary:#B5C0D8;
+    --delivery-text-muted:    #8492B4;
+
+    --nav-bg:                 #071544;
+
+    --shadow-xs:  0 1px 2px rgba(0,0,0,0.30);
+    --shadow-sm:  0 1px 3px rgba(0,0,0,0.30), 0 4px 12px rgba(0,0,0,0.34);
+    --shadow-md:  0 2px 6px rgba(0,0,0,0.32), 0 16px 40px rgba(0,0,0,0.40);
+    --shadow-lg:  0 4px 12px rgba(0,0,0,0.40), 0 28px 60px rgba(0,0,0,0.52);
+    --shadow-xl:  0 8px 20px rgba(0,0,0,0.46), 0 40px 84px rgba(0,0,0,0.60);
   }
 }
 

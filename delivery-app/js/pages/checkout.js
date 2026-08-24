@@ -1,5 +1,25 @@
 /**
- * checkout.js — Multi-step checkout: Address → Payment → Confirm
+ * checkout.js — Multi-step checkout: Address → Payment → Review → Pay
+ *
+ * Order-first by design. The order is created before a single franc moves, so
+ * the customer can never be charged for something we failed to record, and the
+ * PaymentIntent is priced by the server from that stored order — this page
+ * never sends an amount.
+ *
+ * Two rules the old version broke and this one keeps:
+ *
+ *   1. **Nothing here marks anything paid.** Only the signed Stripe webhook
+ *      does. Every path that involves money ends in waitForSettlement(), which
+ *      polls our own /api/payments/status until the webhook has landed.
+ *
+ *   2. **Fail closed.** If the customer chose to pay online and payment does
+ *      not go through, the order stays unpaid and they are told so plainly.
+ *      The old flow silently placed an unpaid order whenever Stripe failed to
+ *      load, while the customer believed they had paid.
+ *
+ * Payment itself goes through the shared window.KassentaPay helper, which
+ * mounts a Stripe PaymentElement — the only element that offers TWINT, the
+ * method that actually matters in Switzerland, plus Link and the wallets.
  */
 window.pages = window.pages || {};
 
@@ -11,13 +31,23 @@ pages.checkout = {
   _scheduledAt: null,
   _map: null,
   _marker: null,
-  _stripe: null,
-  _cardElement: null,
+  _payConfig: null,
+  _payReady: false,
+  _walletBalance: 0,
+  _order: null,
   _submitting: false,
+  _paying: false,
 
   async render(params, container) {
     const cfg = window.DELIVERY_CONFIG || {};
     const rtl = isRtl();
+
+    // A TWINT / PayPal / 3-D Secure redirect lands back on this URL. Handle it
+    // before any cart or login guard: the cart was emptied when the order was
+    // created, so the guards below would bounce the customer away from their
+    // own payment result.
+    if (await pages.checkout._resumeRedirect(container)) return;
+
     const state = cart.getState();
 
     // Require login for delivery/pickup, but allow guest for dine-in
@@ -36,6 +66,9 @@ pages.checkout = {
     const customer = auth.getCustomer();
     const isDineIn = state.orderType === "dine_in";
     pages.checkout._step = isDineIn ? 2 : 1; // Skip address for dine-in
+    pages.checkout._order = null;
+    pages.checkout._paymentMethod = "cod";
+    pages.checkout._walletBalance = 0;
 
     // Load saved addresses if logged in
     if (customer) {
@@ -48,39 +81,131 @@ pages.checkout = {
       } catch (_) {}
     }
 
+    // What the gateway will actually accept decides what we may offer. Fetched
+    // at render time so a rotated key needs no deploy; a failure leaves
+    // _payReady false and the checkout degrades to cash rather than showing a
+    // button that cannot work.
+    await pages.checkout._initPayments(cfg);
+
     container.innerHTML = pages.checkout._buildLayout(cfg, rtl, state);
 
     pages.checkout._initMap();
     pages.checkout._renderOrderSummary(cfg, rtl, state);
     pages.checkout._initFieldValidation();
+    pages.checkout._loadWalletBalance();
+  },
 
-    // Load Stripe
-    if (cfg.stripePublishableKey) {
-      loadStripe().then(Stripe => {
-        pages.checkout._stripe = Stripe(cfg.stripePublishableKey);
-        const elements = pages.checkout._stripe.elements();
-        const card = elements.create("card", {
-          style: {
-            base: { fontSize: "16px", color: getComputedStyle(document.documentElement).getPropertyValue("--delivery-text").trim() || "#1A1A2E" }
-          }
-        });
-        const cardEl = document.getElementById("stripe-card-element");
-        if (cardEl) {
-          card.mount(cardEl);
-          pages.checkout._cardElement = card;
-          card.on("focus", () => cardEl.style.borderColor = "var(--delivery-primary)");
-          card.on("blur", () => cardEl.style.borderColor = "var(--delivery-border)");
-        }
-      }).catch(() => {});
+  // ── Payment plumbing ──────────────────────────────────────────────────────
+
+  async _initPayments(cfg) {
+    pages.checkout._payConfig = null;
+    pages.checkout._payReady = false;
+    if (!window.KassentaPay) return;
+    // basePath stays empty on purpose: this app's API calls already carry the
+    // /api prefix in both the direct and the CDN-proxied deployment.
+    pages.checkout._payConfig = await KassentaPay.init({ basePath: "", tenantId: cfg.tenantId }).catch(() => null);
+    pages.checkout._payReady = KassentaPay.isAvailable();
+  },
+
+  /** The gateway's currency wins; the store config is only a fallback. */
+  _currency() {
+    const cfg = window.DELIVERY_CONFIG || {};
+    return (pages.checkout._payConfig && pages.checkout._payConfig.currency) || cfg.currency || "CHF";
+  },
+
+  /** Name the methods the account really offers, so the label cannot lie. */
+  _onlineMethodsLabel() {
+    const m = (window.KassentaPay && KassentaPay.methods()) || [];
+    const names = {
+      card: "Card", twint: "TWINT", apple_pay: "Apple Pay", google_pay: "Google Pay",
+      link: "Link", paypal: "PayPal", klarna: "Klarna", revolut_pay: "Revolut Pay",
+    };
+    const nice = Object.keys(names).filter(k => m.indexOf(k) >= 0).map(k => names[k]);
+    if (!nice.length) nice.push("Card");
+    return nice.slice(0, 4).join(" · ");
+  },
+
+  _isDark() {
+    const attr = document.documentElement.getAttribute("data-theme");
+    if (attr) return attr === "dark";
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  },
+
+  _brandColor() {
+    const c = getComputedStyle(document.documentElement).getPropertyValue("--delivery-primary").trim();
+    return c || "#0A6E65";
+  },
+
+  /**
+   * Resume a redirect payment. `redirect_status=succeeded` in the URL means
+   * only that the browser came back — the money is confirmed by the webhook,
+   * so we poll our own record before saying anything to the customer.
+   */
+  async _resumeRedirect(container) {
+    if (!window.KassentaPay) return false;
+    const ret = KassentaPay.pendingReturn();
+    if (!ret || !ret.paymentIntentId) return false;
+    const rtl = isRtl();
+    KassentaPay.clearReturn();
+
+    container.innerHTML = `
+<div class="checkout-page">
+  <div class="pay-confirming">
+    <div class="loading-spinner"></div>
+    <div class="pay-confirming__title">${rtl ? "جارٍ تأكيد الدفع..." : "Confirming your payment…"}</div>
+    <div class="pay-confirming__text">${rtl
+      ? "لا تغلق هذه الصفحة. ننتظر تأكيد البنك."
+      : "Please keep this page open while we wait for your bank to confirm."}</div>
+  </div>
+</div>`;
+
+    const res = await KassentaPay.waitForSettlement(ret.paymentIntentId, { timeoutMs: 40000 });
+    pages.checkout._finishPayment(res, ret.trackingToken);
+    return true;
+  },
+
+  /** One honest ending for every payment outcome. */
+  _finishPayment(res, trackingToken) {
+    const rtl = isRtl();
+    if (res.settled) {
+      showToast(rtl ? "تم استلام الدفع — شكراً لك!" : "Payment received — thank you!", "success", 5000);
+    } else if (res.status === "pending" || res.status === "processing" || res.status === "unknown") {
+      // A slow bank is a legitimate outcome, not a failure. The webhook will
+      // still settle it; the order is already recorded either way.
+      showToast(rtl
+        ? "الدفع قيد المعالجة. طلبك مسجّل وسنحدّث حالته فور تأكيد البنك."
+        : "Payment is still processing. Your order is placed — we'll update it as soon as the bank confirms.", "warning", 8000);
+    } else {
+      showToast(rtl
+        ? "لم يكتمل الدفع. طلبك مسجّل كغير مدفوع — يمكنك الدفع عند الاستلام أو المحاولة مرة أخرى."
+        : "Payment was not completed. Your order is placed as unpaid — pay on delivery, or try again from the tracking page.", "error", 9000);
     }
+    const token = trackingToken || (res.order && res.order.trackingToken);
+    if (token) router.navigate("tracking", { token });
+    else router.navigate("home");
+  },
+
+  // ── Totals ────────────────────────────────────────────────────────────────
+
+  /**
+   * One place for the arithmetic the three views used to duplicate.
+   * Advisory only — the server re-prices every order from its own product
+   * rows, and Stripe is charged from that stored total, never from here.
+   */
+  _totals(state) {
+    const isDineIn = state.orderType === "dine_in";
+    const deliveryFee = isDineIn ? 0 : (parseFloat(pages.menu?._storeConfig?.deliveryFee) || 0);
+    const discount = parseFloat(state.discountAmount || 0) || 0;
+    const subtotal = parseFloat(state.subtotal) || 0;
+    const gross = Math.max(0, subtotal - discount) + deliveryFee;
+    const balance = Math.max(0, parseFloat(pages.checkout._walletBalance) || 0);
+    const wallet = pages.checkout._paymentMethod === "wallet" ? Math.min(balance, gross) : 0;
+    return { isDineIn, subtotal, discount, deliveryFee, gross, wallet, total: Math.max(0, gross - wallet) };
   },
 
   _buildLayout(cfg, rtl, state) {
     const isDineIn = state.orderType === "dine_in";
-    const deliveryFee = isDineIn ? 0 : (parseFloat(pages.menu?._storeConfig?.deliveryFee) || 0);
-    const discount = parseFloat(state.discountAmount || 0);
-    const subtotal = state.subtotal;
-    const total = Math.max(0, subtotal - discount) + deliveryFee;
+    const payReady = pages.checkout._payReady;
 
     return `
 <div class="checkout-page">
@@ -209,6 +334,7 @@ pages.checkout = {
           <div class="checkout-step__num">${isDineIn ? "1" : "2"}</div>
           <div>
             <div class="checkout-step__title">${isDineIn ? (rtl ? "بيانات الطلب والدفع" : "Order Info & Payment") : (rtl ? "طريقة الدفع" : "Payment method")}</div>
+            <div class="checkout-step__subtitle">${rtl ? "لن يتم خصم أي مبلغ قبل تأكيدك" : "Nothing is charged until you confirm"}</div>
           </div>
         </div>
         <div class="checkout-step__body">
@@ -229,19 +355,22 @@ pages.checkout = {
               <div class="payment-option__radio"></div>
               <div class="payment-option__icon"><i data-lucide="banknote" class="icon-lg"></i></div>
               <div>
-                <div class="payment-option__label">${rtl ? "الدفع عند الاستلام" : "Cash on delivery"}</div>
-                <div class="payment-option__desc">${rtl ? "ادفع نقداً عند استلام طلبك" : "Pay when your order arrives"}</div>
+                <div class="payment-option__label">${isDineIn ? (rtl ? "الدفع عند الكاشير" : "Pay at the counter") : (rtl ? "الدفع عند الاستلام" : "Cash on delivery")}</div>
+                <div class="payment-option__desc">${isDineIn ? (rtl ? "ادفع للموظف بعد الطلب" : "Settle with staff after ordering") : (rtl ? "ادفع نقداً عند استلام طلبك" : "Pay when your order arrives")}</div>
               </div>
             </div>
 
+            ${payReady ? `
+            <!-- Offered only when Stripe is reachable and configured, so this
+                 option can never lead to a charge that silently does nothing. -->
             <div class="payment-option" data-method="card" onclick="pages.checkout._selectPayment('card', this)">
               <div class="payment-option__radio"></div>
               <div class="payment-option__icon"><i data-lucide="credit-card" class="icon-lg"></i></div>
               <div>
-                <div class="payment-option__label">${rtl ? "بطاقة ائتمانية / مدى" : "Credit / Debit card"}</div>
-                <div class="payment-option__desc">Visa · Mastercard · Meeza</div>
+                <div class="payment-option__label">${rtl ? "الدفع الآن" : "Pay now"}</div>
+                <div class="payment-option__desc">${pages.checkout._onlineMethodsLabel()}</div>
               </div>
-            </div>
+            </div>` : ""}
 
             ${auth.getCustomer() ? `
             <div class="payment-option" data-method="wallet" onclick="pages.checkout._selectPayment('wallet', this)">
@@ -254,11 +383,12 @@ pages.checkout = {
             </div>` : ""}
           </div>
 
-          <!-- Stripe card element -->
-          <div id="stripe-card-wrapper" class="hidden checkout-stripe-wrapper">
-            <div class="form-label checkout-label-mb">${rtl ? "بيانات البطاقة" : "Card details"}</div>
-            <div id="stripe-card-element"></div>
-          </div>
+          ${payReady ? "" : `
+          <div class="checkout-pay-note">${rtl
+            ? "الدفع الإلكتروني غير متاح حالياً. يمكنك إتمام الطلب والدفع عند الاستلام."
+            : "Online payment is unavailable right now. You can still place your order and pay on delivery."}</div>`}
+
+          <div id="pay-method-note" class="checkout-pay-note hidden"></div>
 
           <div class="checkout-step-nav">
             ${isDineIn ? `
@@ -280,7 +410,7 @@ pages.checkout = {
       <!-- Step 3: Review & Place -->
       <div id="step-3" class="checkout-step hidden">
         <div class="checkout-step__header">
-          <div class="checkout-step__num">3</div>
+          <div class="checkout-step__num">${isDineIn ? "2" : "3"}</div>
           <div>
             <div class="checkout-step__title">${rtl ? "مراجعة وتأكيد الطلب" : "Review & place order"}</div>
           </div>
@@ -294,6 +424,53 @@ pages.checkout = {
             <button class="btn btn-primary flex-1 btn-lg" id="place-order-btn" onclick="pages.checkout._placeOrder()">
               ${rtl ? "تأكيد الطلب" : "Place order"} <i data-lucide="check-circle" class="icon-sm"></i>
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Pay. Only reached once the order exists server-side, so the
+           amount below comes from the server, never from this page. There is
+           no way back to step 3 from here: the order is already placed. -->
+      <div id="step-4" class="checkout-step hidden">
+        <div class="checkout-step__header">
+          <div class="checkout-step__num"><i data-lucide="lock" class="icon-sm"></i></div>
+          <div>
+            <div class="checkout-step__title">${rtl ? "الدفع الآمن" : "Secure payment"}</div>
+            <div class="checkout-step__subtitle">${rtl ? "خطوة أخيرة لتأكيد طلبك" : "One last step to confirm your order"}</div>
+          </div>
+        </div>
+        <div class="checkout-step__body">
+          <div class="pay-panel">
+            <div class="pay-order-badge">
+              <div class="pay-order-badge__icon"><i data-lucide="receipt" class="icon-sm"></i></div>
+              <div>
+                <strong>${rtl ? "تم تسجيل طلبك" : "Your order is placed"} <span id="pay-order-number"></span></strong>
+                ${rtl ? "أكمل الدفع لتأكيده، أو ادفع لاحقاً عند الاستلام." : "Complete payment to confirm it — or pay later on delivery."}
+              </div>
+            </div>
+
+            <div class="pay-amount-row">
+              <span>${rtl ? "المبلغ المستحق" : "Amount due"}</span>
+              <strong id="pay-amount">—</strong>
+            </div>
+
+            <div id="pay-element" class="pay-element"></div>
+            <div id="pay-error" class="pay-error hidden"></div>
+
+            <div class="pay-actions">
+              <button class="btn btn-primary btn-full btn-lg" id="pay-submit" disabled
+                onclick="pages.checkout._confirmPayment()">${rtl ? "جارٍ التحميل..." : "Loading…"}</button>
+              <button class="btn btn-ghost btn-full" onclick="pages.checkout._payLater()">
+                ${rtl ? "سأدفع عند الاستلام" : "I'll pay on delivery instead"}
+              </button>
+            </div>
+
+            <div class="pay-note">
+              <i data-lucide="shield-check" class="icon-xs"></i>
+              <span>${rtl
+                ? "تتم معالجة الدفع بواسطة Stripe. لا نرى بيانات بطاقتك، ولا يُعتبر الطلب مدفوعاً إلا بعد تأكيد البنك."
+                : "Payments are handled by Stripe — we never see your card details. Your order is only marked paid once your bank confirms it."}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -417,8 +594,54 @@ pages.checkout = {
     document.querySelectorAll(".payment-option").forEach(o => {
       o.classList.toggle("selected", o.dataset.method === method);
     });
-    const cardWrapper = document.getElementById("stripe-card-wrapper");
-    if (cardWrapper) cardWrapper.classList.toggle("hidden", method !== "card");
+    pages.checkout._updatePayNote();
+  },
+
+  /** Say exactly what the chosen method will do. No claim the code cannot keep. */
+  _updatePayNote() {
+    const noteEl = document.getElementById("pay-method-note");
+    if (!noteEl) return;
+    const rtl = isRtl();
+    const cur = pages.checkout._currency();
+    const t = pages.checkout._totals(cart.getState());
+    const fc = (n) => `<strong>${formatCurrency(n, cur)}</strong>`;
+    let html = "";
+
+    if (pages.checkout._paymentMethod === "card") {
+      html = rtl
+        ? `سنسجّل طلبك أولاً، ثم تدفع ${fc(t.total)} بأمان عبر Stripe. لا يُخصم أي مبلغ قبل تأكيدك.`
+        : `We create your order first, then you pay ${fc(t.total)} securely through Stripe. Nothing is charged until you confirm.`;
+    } else if (pages.checkout._paymentMethod === "wallet") {
+      if (t.wallet <= 0) {
+        html = rtl
+          ? "رصيد محفظتك فارغ — سيُدفع كامل المبلغ عند الاستلام."
+          : "Your wallet is empty — the full amount will be due on delivery.";
+      } else if (t.wallet < t.gross) {
+        html = rtl
+          ? `سيُخصم ${fc(t.wallet)} من محفظتك، والباقي ${fc(t.gross - t.wallet)} يُدفع عند الاستلام.`
+          : `${fc(t.wallet)} comes off your wallet; the remaining ${fc(t.gross - t.wallet)} is due on delivery.`;
+      } else {
+        html = rtl ? "رصيد محفظتك يغطي الطلب بالكامل." : "Your wallet covers the whole order.";
+      }
+    }
+
+    noteEl.innerHTML = html;
+    noteEl.classList.toggle("hidden", !html);
+  },
+
+  /** Wallet balance drives both the label and the amount we actually deduct. */
+  _loadWalletBalance() {
+    const customer = auth.getCustomer();
+    if (!customer) return;
+    api.wallet.get(customer.id).then(w => {
+      pages.checkout._walletBalance = parseFloat(w.balance) || 0;
+      const lbl = document.getElementById("wallet-balance-label");
+      if (lbl) lbl.textContent = formatCurrency(pages.checkout._walletBalance, pages.checkout._currency());
+      pages.checkout._updatePayNote();
+    }).catch(() => {
+      const lbl = document.getElementById("wallet-balance-label");
+      if (lbl) lbl.textContent = isRtl() ? "تعذّر تحميل الرصيد" : "Balance unavailable";
+    });
   },
 
   _validateField(id, msg) {
@@ -490,14 +713,7 @@ pages.checkout = {
         if (d && t) pages.checkout._scheduledAt = new Date(d + "T" + t).toISOString();
       }
 
-      // Load wallet balance
-      const customer = auth.getCustomer();
-      if (customer) {
-        api.wallet.get(customer.id).then(w => {
-          const lbl = document.getElementById("wallet-balance-label");
-          if (lbl) lbl.textContent = formatCurrency(w.balance, (window.DELIVERY_CONFIG||{}).currency);
-        }).catch(() => {});
-      }
+      pages.checkout._updatePayNote();
     }
 
     if (step === 3) {
@@ -510,6 +726,7 @@ pages.checkout = {
     document.getElementById(`step-${step}`)?.classList.remove("hidden");
     pages.checkout._updateStepIndicator(step);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    if (window.lucide) window.lucide.createIcons();
   },
 
   _prevStep(step) {
@@ -530,14 +747,17 @@ pages.checkout = {
   },
 
   _buildReview() {
-    const cfg = window.DELIVERY_CONFIG || {};
     const rtl = isRtl();
+    const cur = pages.checkout._currency();
     const state = cart.getState();
-    const deliveryFee = parseFloat(pages.menu?._storeConfig?.deliveryFee) || 0;
-    const discount = parseFloat(state.discountAmount || 0);
-    const total = Math.max(0, state.subtotal - discount) + deliveryFee;
+    const t = pages.checkout._totals(state);
     const addr = pages.checkout._address;
-    const paymentLabels = { cod: rtl ? "الدفع عند الاستلام" : "Cash on delivery", card: rtl ? "بطاقة ائتمانية" : "Credit card", wallet: rtl ? "المحفظة" : "Wallet" };
+    const payOnline = pages.checkout._paymentMethod === "card";
+    const paymentLabels = {
+      cod: t.isDineIn ? (rtl ? "الدفع عند الكاشير" : "Pay at the counter") : (rtl ? "الدفع عند الاستلام" : "Cash on delivery"),
+      card: (rtl ? "الدفع الآن — " : "Pay now — ") + pages.checkout._onlineMethodsLabel(),
+      wallet: rtl ? "المحفظة" : "Wallet",
+    };
     const reviewEl = document.getElementById("review-content");
     if (!reviewEl) return;
     reviewEl.innerHTML = `
@@ -545,98 +765,114 @@ pages.checkout = {
       ${state.items.map(item => `
         <div class="checkout-review-item">
           <span>${item.qty}× ${item.name}</span>
-          <strong>${formatCurrency(item.price * item.qty, cfg.currency)}</strong>
+          <strong>${formatCurrency(item.price * item.qty, cur)}</strong>
         </div>`).join("")}
+      ${t.isDineIn ? "" : `
       <div class="checkout-review-section">
         <h4 class="checkout-review-heading">${rtl ? "التوصيل إلى" : "Delivering to"}</h4>
         <div class="checkout-review-address-text">${addr?.address || "—"}${addr?.floor ? ", " + addr.floor : ""}</div>
         ${pages.checkout._scheduledAt ? `<div class="badge badge-info mt-sm"><i data-lucide="calendar" class="icon-xs"></i> ${new Date(pages.checkout._scheduledAt).toLocaleString()}</div>` : ""}
-      </div>
+      </div>`}
       <div class="checkout-review-section">
         <h4 class="checkout-review-heading">${rtl ? "طريقة الدفع" : "Payment"}</h4>
         <div>${paymentLabels[pages.checkout._paymentMethod] || "—"}</div>
       </div>
       <div class="divider"></div>
-      <div class="summary-row"><span class="label">${rtl ? "المجموع" : "Subtotal"}</span><strong>${formatCurrency(state.subtotal, cfg.currency)}</strong></div>
-      ${deliveryFee > 0 ? `<div class="summary-row"><span class="label">${rtl ? "التوصيل" : "Delivery"}</span><strong>${formatCurrency(deliveryFee, cfg.currency)}</strong></div>` : ""}
-      ${discount > 0 ? `<div class="summary-row discount"><span class="label">${rtl ? "خصم" : "Discount"}</span><strong>−${formatCurrency(discount, cfg.currency)}</strong></div>` : ""}
-      <div class="summary-row total"><span>${rtl ? "الإجمالي" : "Total"}</span><strong>${formatCurrency(total, cfg.currency)}</strong></div>
+      <div class="summary-row"><span class="label">${rtl ? "المجموع" : "Subtotal"}</span><strong>${formatCurrency(t.subtotal, cur)}</strong></div>
+      ${t.deliveryFee > 0 ? `<div class="summary-row"><span class="label">${rtl ? "التوصيل" : "Delivery"}</span><strong>${formatCurrency(t.deliveryFee, cur)}</strong></div>` : ""}
+      ${t.discount > 0 ? `<div class="summary-row discount"><span class="label">${rtl ? "خصم" : "Discount"}</span><strong>−${formatCurrency(t.discount, cur)}</strong></div>` : ""}
+      ${t.wallet > 0 ? `<div class="summary-row discount"><span class="label">${rtl ? "من المحفظة" : "From wallet"}</span><strong>−${formatCurrency(t.wallet, cur)}</strong></div>` : ""}
+      <div class="summary-row total"><span>${rtl ? "الإجمالي" : "Total"}</span><strong>${formatCurrency(t.total, cur)}</strong></div>
+      ${payOnline ? `
+      <div class="checkout-pay-note">${rtl
+        ? "بعد التأكيد سنسجّل طلبك ثم ننقلك لشاشة الدفع الآمن."
+        : "After you confirm, we record your order and take you to the secure payment step."}</div>` : ""}
     `;
+
+    // Say what the button actually does next.
+    const btn = document.getElementById("place-order-btn");
+    if (btn) {
+      btn.innerHTML = payOnline
+        ? `${rtl ? "المتابعة إلى الدفع" : "Continue to payment"} <i data-lucide="arrow-right" class="icon-sm"></i>`
+        : `${rtl ? "تأكيد الطلب" : "Place order"} <i data-lucide="check-circle" class="icon-sm"></i>`;
+    }
   },
 
   _renderOrderSummary(cfg, rtl, state) {
     const summaryEl = document.getElementById("order-summary-aside");
     if (!summaryEl) return;
-    const deliveryFee = parseFloat(pages.menu?._storeConfig?.deliveryFee) || 0;
-    const discount = parseFloat(state.discountAmount || 0);
-    const total = Math.max(0, state.subtotal - discount) + deliveryFee;
+    const cur = pages.checkout._currency();
+    const t = pages.checkout._totals(state);
     summaryEl.innerHTML = `
       ${state.items.map(item => `
         <div class="checkout-summary-item">
           <span class="checkout-summary-item-name">${item.qty}× ${item.name}</span>
-          <span class="checkout-summary-item-price">${formatCurrency(item.price * item.qty, cfg.currency)}</span>
+          <span class="checkout-summary-item-price">${formatCurrency(item.price * item.qty, cur)}</span>
         </div>`).join("")}
       <div class="checkout-summary-totals">
-        <div class="summary-row"><span class="label">${rtl ? "المجموع" : "Subtotal"}</span><strong>${formatCurrency(state.subtotal, cfg.currency)}</strong></div>
-        ${deliveryFee > 0 ? `<div class="summary-row"><span class="label">${rtl ? "التوصيل" : "Delivery"}</span><strong>${formatCurrency(deliveryFee, cfg.currency)}</strong></div>` : `<div class="summary-row"><span class="label">${rtl ? "التوصيل" : "Delivery"}</span><strong class="checkout-free-delivery">${rtl ? "مجاني" : "Free"}</strong></div>`}
-        ${discount > 0 ? `<div class="summary-row discount"><span class="label">${rtl ? "خصم" : "Discount"}</span><strong>−${formatCurrency(discount, cfg.currency)}</strong></div>` : ""}
-        <div class="summary-row total"><span>${rtl ? "الإجمالي" : "Total"}</span><strong>${formatCurrency(total, cfg.currency)}</strong></div>
+        <div class="summary-row"><span class="label">${rtl ? "المجموع" : "Subtotal"}</span><strong>${formatCurrency(t.subtotal, cur)}</strong></div>
+        ${t.isDineIn ? "" : (t.deliveryFee > 0
+          ? `<div class="summary-row"><span class="label">${rtl ? "التوصيل" : "Delivery"}</span><strong>${formatCurrency(t.deliveryFee, cur)}</strong></div>`
+          : `<div class="summary-row"><span class="label">${rtl ? "التوصيل" : "Delivery"}</span><strong class="checkout-free-delivery">${rtl ? "مجاني" : "Free"}</strong></div>`)}
+        ${t.discount > 0 ? `<div class="summary-row discount"><span class="label">${rtl ? "خصم" : "Discount"}</span><strong>−${formatCurrency(t.discount, cur)}</strong></div>` : ""}
+        <div class="summary-row total"><span>${rtl ? "الإجمالي" : "Total"}</span><strong>${formatCurrency(t.gross, cur)}</strong></div>
       </div>
     `;
   },
 
+  // ── Placing the order ─────────────────────────────────────────────────────
+
+  /**
+   * Create the order, then — and only then — charge for it.
+   *
+   * The reverse of the old flow, which confirmed a browser-computed total with
+   * Stripe before the order existed. Nothing below sends an amount to the
+   * payment API: /api/payments/order/:id/intent prices the intent from the
+   * stored order, and the server re-prices that order from its own product
+   * rows regardless of what this payload claims.
+   */
   async _placeOrder() {
     if (pages.checkout._submitting) return;
+    // The order already exists — never create a second one for the same cart.
+    // Re-open the payment step instead.
+    if (pages.checkout._order) { await pages.checkout._openPayStep(); return; }
     const cfg = window.DELIVERY_CONFIG || {};
     const rtl = isRtl();
     const state = cart.getState();
     const btn = document.getElementById("place-order-btn");
     const addr = pages.checkout._address || {};
-    const isDineIn = state.orderType === "dine_in";
+    const t = pages.checkout._totals(state);
+    const isDineIn = t.isDineIn;
+    const payOnline = pages.checkout._paymentMethod === "card";
 
     if (!isDineIn && !addr?.address) { showToast(rtl ? "أدخل عنواناً" : "Please enter address", "warning"); pages.checkout._prevStep(1); return; }
+
+    // Fail closed. The old checkout guarded the card branch on Stripe having
+    // loaded, so a failed load quietly placed an unpaid order while the
+    // customer believed they had paid.
+    if (payOnline && !pages.checkout._payReady) {
+      showToast(rtl
+        ? "الدفع الإلكتروني غير متاح حالياً — اختر طريقة دفع أخرى."
+        : "Online payment is unavailable right now — please choose another method.", "error", 7000);
+      pages.checkout._prevStep(2);
+      return;
+    }
 
     pages.checkout._submitting = true;
     if (btn) { btn.disabled = true; btn.classList.add("loading"); }
     // Show loading overlay
     const overlay = document.createElement("div");
     overlay.className = "checkout-loading-overlay";
-    overlay.innerHTML = `<div class="loading-spinner"></div><p>${rtl ? "جاري تأكيد طلبك..." : "Placing your order..."}</p>`;
+    overlay.innerHTML = `<div class="loading-spinner"></div><p>${rtl ? "جاري تسجيل طلبك..." : "Placing your order…"}</p>`;
     document.querySelector(".checkout-page")?.appendChild(overlay);
 
     try {
-      let paymentIntentId = null;
-
-      // Stripe card payment
-      if (pages.checkout._paymentMethod === "card" && pages.checkout._stripe && pages.checkout._cardElement) {
-        const deliveryFee = parseFloat(pages.menu?._storeConfig?.deliveryFee) || 0;
-        const discount = parseFloat(state.discountAmount || 0);
-        const total = Math.max(0, state.subtotal - discount) + deliveryFee;
-        const amountCents = Math.round(total * 100);
-        // Create payment intent on backend
-        const piResp = await apiFetch("/api/stripe/create-payment-intent", {
-          method: "POST",
-          body: JSON.stringify({ amount: amountCents, currency: cfg.currency || "egp", tenantId: cfg.tenantId }),
-        }).catch(() => null);
-
-        if (piResp?.clientSecret) {
-          const { error, paymentIntent } = await pages.checkout._stripe.confirmCardPayment(piResp.clientSecret, {
-            payment_method: { card: pages.checkout._cardElement }
-          });
-          if (error) throw new Error(error.message);
-          paymentIntentId = paymentIntent.id;
-        }
-      }
-
       const customer = auth.getCustomer();
-      const deliveryFee2 = isDineIn ? 0 : (parseFloat(pages.menu?._storeConfig?.deliveryFee) || 0);
-      const discount2 = parseFloat(state.discountAmount || 0);
 
       // For dine-in, read name/phone from dine-in fields
       const dineInName = isDineIn ? (document.getElementById("dinein-name")?.value || "") : "";
       const dineInPhone = isDineIn ? (document.getElementById("dinein-phone")?.value || "") : "";
 
-      const total2 = Math.max(0, state.subtotal - discount2) + deliveryFee2;
       const orderPayload = {
         tenantId: cfg.tenantId,
         slug: cfg.slug,
@@ -653,42 +889,162 @@ pages.checkout = {
           total: ((parseFloat(i.price) || 0) + (parseFloat(i.modifierPrice) || 0)) * i.qty,
           modifiers: i.modifiers || [],
         })),
-        customerAddress: state.orderType === "dine_in" ? "" : (addr.address || addr.street || ""),
-        floor: state.orderType === "dine_in" ? "" : (addr.floor || ""),
-        buildingName: state.orderType === "dine_in" ? "" : (addr.buildingName || ""),
-        addressNotes: state.orderType === "dine_in" ? "" : (addr.notes || ""),
-        customerLat: state.orderType === "dine_in" ? null : (addr.lat || null),
-        customerLng: state.orderType === "dine_in" ? null : (addr.lng || null),
-        subtotal: state.subtotal,
-        deliveryFee: state.orderType === "dine_in" ? 0 : deliveryFee2,
-        totalAmount: state.orderType === "dine_in" ? Math.max(0, state.subtotal - discount2) : total2,
-        discountAmount: discount2,
+        customerAddress: isDineIn ? "" : (addr.address || addr.street || ""),
+        floor: isDineIn ? "" : (addr.floor || ""),
+        buildingName: isDineIn ? "" : (addr.buildingName || ""),
+        addressNotes: isDineIn ? "" : (addr.notes || ""),
+        customerLat: isDineIn ? null : (addr.lat || null),
+        customerLng: isDineIn ? null : (addr.lng || null),
+        subtotal: t.subtotal,
+        deliveryFee: t.deliveryFee,
+        totalAmount: t.total,
+        discountAmount: t.discount,
         promoCodeId: state.promoCodeId || null,
         paymentMethod: pages.checkout._paymentMethod,
-        paymentIntentId,
         scheduledAt: pages.checkout._scheduledAt,
         notes: state.notes || "",
-        sourceChannel: state.orderType === "dine_in" ? "dine_in_qr" : "web",
-        walletAmountUsed: 0,
+        sourceChannel: isDineIn ? "dine_in_qr" : "web",
+        // Actually deduct what the customer chose to spend, capped at their
+        // balance; the server verifies it against the wallet before charging.
+        walletAmountUsed: t.wallet,
         language: document.documentElement.lang || "en",
         tableQrToken: state.tableQrToken || null,
         tableNumber: state.tableName || null,
       };
 
       const result = await api.orders.create(orderPayload);
+      pages.checkout._order = {
+        orderId: result.orderId || result.id,
+        orderNumber: result.orderNumber || "",
+        trackingToken: result.trackingToken || "",
+      };
       cart.clear();
 
-      // Navigate to tracking
-      const trackToken = result.trackingToken || result.orderId || result.id;
-      router.navigate("tracking", { token: trackToken });
+      const ov = document.querySelector(".checkout-loading-overlay");
+      if (ov) ov.remove();
+
+      // Online payment: hand over to the PaymentElement. A zero balance due
+      // (wallet covered it) has nothing to charge, so skip straight to tracking.
+      if (payOnline && t.total > 0) {
+        await pages.checkout._openPayStep();
+        return;
+      }
+
+      const token = pages.checkout._order.trackingToken || pages.checkout._order.orderId;
+      router.navigate("tracking", { token });
 
     } catch (err) {
-      showToast(err.message || (rtl ? "فشل في إتمام الطلب" : "Failed to place order"), "error");
+      // Only a failure to *create* the order may read as "order failed". Once
+      // it exists, a later error belongs to the payment step, and saying the
+      // order failed would be a lie the customer acts on.
+      if (pages.checkout._order) {
+        pages.checkout._payError(err.message || (rtl ? "تعذّر بدء عملية الدفع" : "Could not start payment"));
+      } else {
+        showToast(err.message || (rtl ? "فشل في إتمام الطلب" : "Failed to place order"), "error");
+      }
     } finally {
       pages.checkout._submitting = false;
       if (btn) { btn.disabled = false; btn.classList.remove("loading"); }
       const ov = document.querySelector(".checkout-loading-overlay");
       if (ov) ov.remove();
     }
+  },
+
+  // ── Paying for it ─────────────────────────────────────────────────────────
+
+  /**
+   * Reveal the payment step and mount the PaymentElement into it.
+   * The step is un-hidden *before* mounting on purpose: Stripe cannot measure
+   * itself inside a display:none subtree, which is exactly how the old card
+   * box rendered as an empty rectangle.
+   */
+  async _openPayStep() {
+    const rtl = isRtl();
+    const order = pages.checkout._order || {};
+
+    document.getElementById(`step-${pages.checkout._step}`)?.classList.add("hidden");
+    pages.checkout._step = 4;
+    document.getElementById("step-4")?.classList.remove("hidden");
+    pages.checkout._updateStepIndicator(4);
+    const numEl = document.getElementById("pay-order-number");
+    if (numEl) numEl.textContent = order.orderNumber ? `#${order.orderNumber}` : "";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (window.lucide) window.lucide.createIcons();
+
+    const payBtn = document.getElementById("pay-submit");
+    const amountEl = document.getElementById("pay-amount");
+    const elEl = document.getElementById("pay-element");
+
+    try {
+      const intent = await KassentaPay.createOrderIntent(order.orderId, order.trackingToken);
+      // Minor units, priced server-side from the stored order.
+      if (amountEl) {
+        amountEl.textContent = formatCurrency((intent.amount || 0) / 100,
+          (intent.currency || pages.checkout._currency()).toUpperCase());
+      }
+      await KassentaPay.mount(elEl, intent.clientSecret, {
+        dark: pages.checkout._isDark(),
+        primaryColor: pages.checkout._brandColor(),
+        locale: document.documentElement.lang || "auto",
+      });
+      if (payBtn) {
+        payBtn.disabled = false;
+        payBtn.textContent = rtl ? "ادفع الآن" : "Pay now";
+      }
+    } catch (err) {
+      pages.checkout._payError(err.message || (rtl ? "تعذّر بدء عملية الدفع" : "Could not start payment"));
+      if (payBtn) payBtn.textContent = rtl ? "غير متاح" : "Unavailable";
+    }
+  },
+
+  async _confirmPayment() {
+    if (pages.checkout._paying) return;
+    const rtl = isRtl();
+    const order = pages.checkout._order || {};
+    const btn = document.getElementById("pay-submit");
+    pages.checkout._paying = true;
+    pages.checkout._payError("");
+    if (btn) { btn.disabled = true; btn.textContent = rtl ? "جارٍ المعالجة..." : "Processing…"; }
+
+    try {
+      // TWINT, PayPal, Klarna and any 3-D Secure card leave the page here and
+      // return to this URL; render() picks the result up on the way back.
+      const back = KassentaPay.returnUrl({
+        order_id: order.orderId,
+        tracking_token: order.trackingToken,
+      });
+      const intent = await KassentaPay.confirm(back);
+      if (!intent) return; // redirected away; resumed on return
+
+      if (btn) btn.textContent = rtl ? "جارٍ التأكيد..." : "Confirming…";
+      // Stripe saying "succeeded" is not our record saying "paid" — only the
+      // signed webhook writes that, so wait for it.
+      const res = await KassentaPay.waitForSettlement(intent.id, { timeoutMs: 40000 });
+      pages.checkout._finishPayment(res, order.trackingToken);
+    } catch (err) {
+      pages.checkout._payError(err.message || (rtl ? "فشل الدفع" : "Payment failed"));
+      if (btn) { btn.disabled = false; btn.textContent = rtl ? "حاول مرة أخرى" : "Try again"; }
+    } finally {
+      pages.checkout._paying = false;
+    }
+  },
+
+  /** Leaving without paying is allowed — as long as we say so plainly. */
+  _payLater() {
+    const rtl = isRtl();
+    const order = pages.checkout._order || {};
+    showToast(rtl
+      ? "طلبك مسجّل كغير مدفوع. يمكنك الدفع عند الاستلام أو من صفحة التتبع."
+      : "Your order is placed as unpaid. Pay on delivery, or pay later from the tracking page.", "warning", 8000);
+    const token = order.trackingToken || order.orderId;
+    if (token) router.navigate("tracking", { token });
+    else router.navigate("home");
+  },
+
+  _payError(msg) {
+    const el = document.getElementById("pay-error");
+    if (!el) return;
+    el.textContent = msg || "";
+    el.classList.toggle("hidden", !msg);
   },
 };

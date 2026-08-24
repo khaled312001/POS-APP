@@ -68,6 +68,16 @@ const poStatusColors: Record<string, string> = {
 
 const EMPTY_SHIFTS: any[] = [];
 
+/** Stripe's payment method ids, rendered the way a shop owner names them. */
+const pgMethodNames: Record<string, string> = {
+  card: "Card", twint: "TWINT", apple_pay: "Apple Pay", google_pay: "Google Pay",
+  link: "Link", klarna: "Klarna", paypal: "PayPal", sepa_debit: "SEPA Direct Debit",
+  bancontact: "Bancontact", eps: "EPS", ideal: "iDEAL", sofort: "Sofort",
+  revolut_pay: "Revolut Pay", cashapp: "Cash App Pay", alipay: "Alipay", wechat_pay: "WeChat Pay",
+};
+const pgMethodLabel = (id: string) =>
+  pgMethodNames[id] ?? id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -221,6 +231,11 @@ export default function SettingsScreen() {
   const { data: productsList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/products?tenantId=${tenant.id}` : "/api/products"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
   const { data: storeSettings } = useQuery<any>({ queryKey: [tenant?.id ? `/api/store-settings?tenantId=${tenant.id}` : "/api/store-settings"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
   const { data: pgConfig, refetch: refetchPgConfig } = useQuery<any>({ queryKey: ["/api/payment-gateway/config"], queryFn: getQueryFn({ on401: "throw" }), enabled: isAdmin });
+  // Live account health. It hits Stripe on the server, so it only runs while
+  // the Payment Gateways sheet is open. Answers 200 with { connected:false }
+  // when the keys are missing — a thrown error here means our own server is
+  // unreachable, not that Stripe is misconfigured.
+  const { data: pgHealth, refetch: refetchPgHealth } = useQuery<any>({ queryKey: ["/api/payments/health"], queryFn: getQueryFn({ on401: "returnNull" }), enabled: isAdmin && showPaymentGateway, staleTime: 30000, retry: false });
   const { data: vehiclesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/vehicles?tenantId=${tenant.id}` : "/api/vehicles"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
   const { data: printerConfigsList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/printer-configs?tenantId=${tenant.id}` : "/api/printer-configs"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
   const { data: dailyClosingsList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/daily-closings?tenantId=${tenant.id}` : "/api/daily-closings"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
@@ -658,6 +673,41 @@ export default function SettingsScreen() {
     return `${hours}h ${mins}m`;
   };
 
+  // ── Payment gateway: what the server actually reports ───────────────────
+  // /api/payments/health is the fuller picture (it retrieves the account), so
+  // it wins when it has answered; /api/payment-gateway/config is the fallback.
+  const stripeConnected = pgHealth ? pgHealth.connected === true : pgConfig?.stripe?.status === "connected";
+  const stripeMode: string | null = pgHealth?.mode || pgConfig?.stripe?.mode || null;
+  const hasPublishableKey = !!pgConfig?.stripe?.publishableKey;
+  // Never a hardcoded list: this is what the Stripe account itself offers.
+  const accountMethods: string[] = pgHealth?.methods ?? pgConfig?.stripe?.availableMethods ?? [];
+
+  const runStripeTest = async () => {
+    setPgTesting(true);
+    setPgTestResult(null);
+    try {
+      const res = await apiRequest("POST", "/api/payment-gateway/test-stripe");
+      const data = await res.json();
+      // data.error is Stripe's own text and can carry a request id or a key
+      // fragment, so it is classified here and then dropped - it never reaches
+      // the screen.
+      setPgTestResult({
+        success: !!data?.success,
+        mode: data?.mode ?? null,
+        country: data?.country ?? null,
+        defaultCurrency: data?.defaultCurrency ?? null,
+        chargesEnabled: data?.chargesEnabled ?? null,
+        payoutsEnabled: data?.payoutsEnabled ?? null,
+        reason: data?.success ? null : /not configured|STRIPE_SECRET_KEY/i.test(String(data?.error ?? "")) ? "missingKeys" : "unreachable",
+      });
+    } catch {
+      setPgTestResult({ success: false, reason: "unreachable" });
+    }
+    refetchPgHealth();
+    refetchPgConfig();
+    setPgTesting(false);
+  };
+
   const handleLogout = () => {
     const isWeb = Platform.OS === "web";
     const doLogout = () => {
@@ -768,7 +818,7 @@ export default function SettingsScreen() {
               setStoreLogo(storeSettings?.logo || null);
               setShowStoreSettings(true);
             }} color={Colors.accent} rtl={isRTL} />
-            <SettingRow icon="card" label={t("paymentGateways")} value={pgConfig?.stripe?.status === "connected" ? t("stripeConnected") : t("notConfigured")} onPress={() => { setPgTestResult(null); setShowPaymentGateway(true); }} color={Colors.hueIndigo} rtl={isRTL} />
+            <SettingRow icon="card" label={t("paymentGateways")} value={pgConfig?.stripe?.status === "connected" ? `${t("stripeConnected")} - ${pgConfig?.stripe?.mode === "live" ? t("liveMode") : t("testMode")}` : t("stripeNotConfigured")} onPress={() => { setPgTestResult(null); setShowPaymentGateway(true); }} color={Colors.hueIndigo} rtl={isRTL} />
             <SettingRow icon="cloud-upload" label={t("bulkImport")} value={t("importData")} onPress={() => { setImportResult(null); setShowBulkImport(true); }} color={Colors.hueAmber} rtl={isRTL} />
             <SettingRow icon="qr-code" label="QR Tables" value={t("manageTables" as any) || "Manage QR codes"} onPress={() => router.push("/table-qr")} color={Colors.hueTeal} rtl={isRTL} />
           </>
@@ -2361,6 +2411,7 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
+              {/* ── Stripe: the state the server reports, never a guess ───── */}
               <View style={pgStyles.section}>
                 <View style={[pgStyles.gatewayHeader, isRTL && { flexDirection: "row-reverse" }]}>
                   <View style={[pgStyles.gatewayIcon, { backgroundColor: "#635BFF20" }]}>
@@ -2369,27 +2420,31 @@ export default function SettingsScreen() {
                   <View style={[pgStyles.gatewayInfo, isRTL && { alignItems: "flex-end" }]}>
                     <Text style={pgStyles.gatewayName}>Stripe</Text>
                     <View style={[pgStyles.statusRow, isRTL && { flexDirection: "row-reverse" }]}>
-                      <View style={[pgStyles.statusDot, { backgroundColor: pgConfig?.stripe?.status === "connected" ? Colors.success : Colors.danger }]} />
-                      <Text style={[pgStyles.statusText, { color: pgConfig?.stripe?.status === "connected" ? Colors.success : Colors.danger }]}>
-                        {pgConfig?.stripe?.status === "connected" ? t("connected") : t("disconnected")}
+                      <View style={[pgStyles.statusDot, { backgroundColor: stripeConnected ? Colors.success : Colors.danger }]} />
+                      <Text style={[pgStyles.statusText, { color: stripeConnected ? Colors.success : Colors.danger }]}>
+                        {stripeConnected ? t("connected") : t("disconnected")}
                       </Text>
-                      {pgConfig?.stripe?.mode && (
-                        <View style={[pgStyles.modeBadge, pgConfig.stripe.mode === "live" && { backgroundColor: Colors.success + "20" }]}>
-                          <Text style={[pgStyles.modeText, pgConfig.stripe.mode === "live" && { color: Colors.success }]}>
-                            {pgConfig.stripe.mode === "live" ? t("liveMode") : t("testMode")}
+                      {stripeConnected && stripeMode && (
+                        <View style={[pgStyles.modeBadge, stripeMode === "live" && { backgroundColor: Colors.success + "20" }]}>
+                          <Text style={[pgStyles.modeText, stripeMode === "live" && { color: Colors.success }]}>
+                            {stripeMode === "live" ? t("liveMode") : t("testMode")}
                           </Text>
                         </View>
                       )}
                     </View>
                   </View>
+                  <Pressable onPress={() => { refetchPgHealth(); refetchPgConfig(); }} hitSlop={10}>
+                    <Ionicons name="refresh" size={18} color={Colors.textMuted} />
+                  </Pressable>
                 </View>
 
+                {/* Till-side settings, stored per tenant */}
                 <View style={pgStyles.configGrid}>
                   <View style={pgStyles.configItem}>
                     <Text style={[pgStyles.configLabel, isRTL && { textAlign: "right" }]}>{t("currency")}</Text>
                     <View style={[pgStyles.configValueRow, isRTL && { flexDirection: "row-reverse" }]}>
                       <Ionicons name="cash-outline" size={16} color={Colors.accent} />
-                      <Text style={pgStyles.configValue}>{(pgConfig?.stripe?.currency || "chf").toUpperCase()}</Text>
+                      <Text style={pgStyles.configValue}>{(pgConfig?.currency || pgConfig?.stripe?.currency || "chf").toUpperCase()}</Text>
                     </View>
                   </View>
                   <View style={pgStyles.configItem}>
@@ -2406,20 +2461,68 @@ export default function SettingsScreen() {
                   </View>
                 </View>
 
+                {/* Facts read off the connected Stripe account */}
+                {stripeConnected && pgHealth?.connected && (
+                  <View style={pgStyles.configGrid}>
+                    <View style={pgStyles.configItem}>
+                      <Text style={[pgStyles.configLabel, isRTL && { textAlign: "right" }]}>{t("accountCountry")}</Text>
+                      <Text style={pgStyles.configValue}>{String(pgHealth?.country || "-").toUpperCase()}</Text>
+                    </View>
+                    <View style={pgStyles.configItem}>
+                      <Text style={[pgStyles.configLabel, isRTL && { textAlign: "right" }]}>{t("accountDefaultCurrency")}</Text>
+                      <Text style={pgStyles.configValue}>{String(pgHealth?.defaultCurrency || "-").toUpperCase()}</Text>
+                    </View>
+                  </View>
+                )}
+                {stripeConnected && pgHealth?.connected && (
+                  <View style={pgStyles.configGrid}>
+                    <View style={pgStyles.configItem}>
+                      <Text style={[pgStyles.configLabel, isRTL && { textAlign: "right" }]}>{t("chargesEnabled")}</Text>
+                      <Text style={[pgStyles.configValue, { color: pgHealth?.chargesEnabled ? Colors.success : Colors.warning }]}>
+                        {pgHealth?.chargesEnabled ? t("enabledShort") : t("disabledShort")}
+                      </Text>
+                    </View>
+                    <View style={pgStyles.configItem}>
+                      <Text style={[pgStyles.configLabel, isRTL && { textAlign: "right" }]}>{t("payoutsEnabled")}</Text>
+                      <Text style={[pgStyles.configValue, { color: pgHealth?.payoutsEnabled ? Colors.success : Colors.warning }]}>
+                        {pgHealth?.payoutsEnabled ? t("enabledShort") : t("disabledShort")}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* What is missing, named exactly as the server environment variable */}
+                {!stripeConnected && (
+                  <View style={pgStyles.warnBox}>
+                    <View style={[pgStyles.warnHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                      <Ionicons name="alert-circle" size={18} color={Colors.warning} />
+                      <Text style={[pgStyles.warnTitle, isRTL && { textAlign: "right" }]}>{t("stripeNotConfigured")}</Text>
+                    </View>
+                    <Text style={[pgStyles.warnText, isRTL && { textAlign: "right" }]}>{t("stripeMissingKeysHelp")}</Text>
+                    {[
+                      { name: "STRIPE_SECRET_KEY", desc: t("envSecretKeyDesc") },
+                      { name: "STRIPE_PUBLISHABLE_KEY", desc: t("envPublishableKeyDesc") },
+                      { name: "STRIPE_WEBHOOK_SECRET", desc: t("envWebhookSecretDesc") },
+                    ].map((v) => (
+                      <View key={v.name} style={pgStyles.envRow}>
+                        <Text style={pgStyles.envName}>{v.name}</Text>
+                        <Text style={[pgStyles.envDesc, isRTL && { textAlign: "right" }]}>{v.desc}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                {stripeConnected && !hasPublishableKey && (
+                  <View style={pgStyles.warnBox}>
+                    <View style={[pgStyles.warnHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                      <Ionicons name="alert-circle" size={18} color={Colors.warning} />
+                      <Text style={[pgStyles.warnTitle, isRTL && { textAlign: "right" }]}>{t("stripeMissingPublishable")}</Text>
+                    </View>
+                  </View>
+                )}
+
                 <Pressable
                   style={[pgStyles.testBtn, pgTesting && { opacity: 0.6 }]}
-                  onPress={async () => {
-                    setPgTesting(true);
-                    setPgTestResult(null);
-                    try {
-                      const res = await apiRequest("POST", "/api/payment-gateway/test-stripe");
-                      const data = await res.json();
-                      setPgTestResult(data);
-                    } catch (e: any) {
-                      setPgTestResult({ success: false, error: e.message });
-                    }
-                    setPgTesting(false);
-                  }}
+                  onPress={runStripeTest}
                   disabled={pgTesting}
                 >
                   <Ionicons name={pgTesting ? "sync" : "flash"} size={18} color={Colors.white} />
@@ -2434,14 +2537,53 @@ export default function SettingsScreen() {
                         {pgTestResult.success ? t("connectionSuccess") : t("connectionFailed")}
                       </Text>
                     </View>
-                    {pgTestResult.success && pgTestResult.mode && (
-                      <Text style={pgStyles.testResultDetail}>
-                        {t("mode")}: {pgTestResult.mode === "live" ? t("liveMode") : t("testMode")} | {t("currency")}: {(pgTestResult.currency || "chf").toUpperCase()}
+                    {pgTestResult.success ? (
+                      <>
+                        <Text style={[pgStyles.testResultDetail, isRTL && { textAlign: "right" }]}>
+                          {t("mode")}: {pgTestResult.mode === "live" ? t("liveMode") : t("testMode")}
+                          {pgTestResult.country ? `  |  ${t("accountCountry")}: ${String(pgTestResult.country).toUpperCase()}` : ""}
+                          {pgTestResult.defaultCurrency ? `  |  ${t("accountDefaultCurrency")}: ${String(pgTestResult.defaultCurrency).toUpperCase()}` : ""}
+                        </Text>
+                        <Text style={[pgStyles.testResultDetail, isRTL && { textAlign: "right" }]}>
+                          {t("chargesEnabled")}: {pgTestResult.chargesEnabled ? t("enabledShort") : t("disabledShort")}
+                          {"  |  "}{t("payoutsEnabled")}: {pgTestResult.payoutsEnabled ? t("enabledShort") : t("disabledShort")}
+                        </Text>
+                      </>
+                    ) : (
+                      /* The Stripe error text is deliberately not rendered: it can
+                         carry a request id or a fragment of a key. */
+                      <Text style={[pgStyles.testResultDetail, { color: Colors.danger }, isRTL && { textAlign: "right" }]}>
+                        {pgTestResult.reason === "missingKeys" ? t("stripeMissingKeys") : t("stripeUnreachable")}
                       </Text>
                     )}
-                    {pgTestResult.error && <Text style={[pgStyles.testResultDetail, { color: Colors.danger }]}>{pgTestResult.error}</Text>}
                   </View>
                 )}
+
+                <Text style={[pgStyles.footNote, isRTL && { textAlign: "right" }]}>{t("stripeKeysServerOnly")}</Text>
+              </View>
+
+              <View style={pgStyles.divider} />
+
+              {/* ── What the Stripe account itself offers ─────────────────── */}
+              <View style={pgStyles.section}>
+                <Text style={[pgStyles.methodsTitle, isRTL && { textAlign: "right" }]}>{t("accountMethods")}</Text>
+                {!stripeConnected ? (
+                  <Text style={[pgStyles.mutedNote, isRTL && { textAlign: "right" }]}>{t("connectStripeFirst")}</Text>
+                ) : accountMethods.length === 0 ? (
+                  <Text style={[pgStyles.mutedNote, isRTL && { textAlign: "right" }]}>{t("noAccountMethods")}</Text>
+                ) : (
+                  <View style={[pgStyles.chipRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    {accountMethods.map((m: string) => (
+                      <View key={m} style={pgStyles.chip}>
+                        <Text style={pgStyles.chipText}>{pgMethodLabel(m)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                <View style={pgStyles.infoNote}>
+                  <Ionicons name="information-circle" size={16} color={Colors.info} />
+                  <Text style={[pgStyles.infoNoteText, isRTL && { textAlign: "right" }]}>{t("postFinanceNote")}</Text>
+                </View>
               </View>
 
               <View style={pgStyles.divider} />
@@ -2474,6 +2616,7 @@ export default function SettingsScreen() {
 
               <View style={pgStyles.divider} />
 
+              {/* ── NFC: a manual confirmation at the till, nothing more ──── */}
               <View style={pgStyles.section}>
                 <Text style={[pgStyles.methodsTitle, isRTL && { textAlign: "right" }]}>{t("nfcSettings")}</Text>
                 <View style={[pgStyles.infoRow, isRTL && { flexDirection: "row-reverse" }]}>
@@ -2482,7 +2625,7 @@ export default function SettingsScreen() {
                   </View>
                   <View style={[pgStyles.gatewayInfo, isRTL && { alignItems: "flex-end" }]}>
                     <Text style={pgStyles.configLabel}>{t("nfcProvider")}</Text>
-                    <Text style={pgStyles.configValue}>Stripe Tap to Pay</Text>
+                    <Text style={pgStyles.configValue}>{t("nfcProviderManual")}</Text>
                   </View>
                 </View>
                 <View style={pgStyles.infoNote}>
@@ -2493,31 +2636,39 @@ export default function SettingsScreen() {
 
               <View style={pgStyles.divider} />
 
+              {/* ── Mobile wallets: availability comes from the account ───── */}
               <View style={pgStyles.section}>
                 <Text style={[pgStyles.methodsTitle, isRTL && { textAlign: "right" }]}>{t("mobilePaySettings")}</Text>
                 {[
-                  { key: "twint", icon: "phone-portrait", label: "TWINT" },
                   { key: "apple_pay", icon: "logo-apple", label: "Apple Pay" },
                   { key: "google_pay", icon: "logo-google", label: "Google Pay" },
-                ].map((mp) => (
-                  <View key={mp.key} style={[pgStyles.methodRow, isRTL && { flexDirection: "row-reverse" }]}>
-                    <View style={[pgStyles.methodIconWrap, { backgroundColor: Colors.textMuted + "20" }]}>
-                      <Ionicons name={mp.icon as any} size={20} color={Colors.text} />
+                ].map((mp) => {
+                  const offered = accountMethods.includes(mp.key);
+                  return (
+                    <View key={mp.key} style={[pgStyles.methodRow, isRTL && { flexDirection: "row-reverse" }]}>
+                      <View style={[pgStyles.methodIconWrap, { backgroundColor: Colors.textMuted + "20" }]}>
+                        <Ionicons name={mp.icon as any} size={20} color={Colors.text} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[pgStyles.methodLabel, isRTL && { textAlign: "right" }]}>{mp.label}</Text>
+                        <Text style={[pgStyles.methodHint, offered && { color: Colors.success }, isRTL && { textAlign: "right" }]}>
+                          {!stripeConnected ? t("connectStripeFirst") : offered ? t("availableInStripe") : t("notEnabledInStripe")}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={pgConfig?.mobile?.providers?.includes(mp.key) !== false}
+                        onValueChange={async (val) => {
+                          const current = pgConfig?.mobile?.providers || ["apple_pay", "google_pay"];
+                          const updated = val ? [...current, mp.key] : current.filter((p: string) => p !== mp.key);
+                          await apiRequest("PUT", "/api/payment-gateway/config", { mobile: { ...pgConfig?.mobile, providers: updated } });
+                          refetchPgConfig();
+                        }}
+                        trackColor={{ false: Colors.inputBg, true: Colors.accent + "60" }}
+                        thumbColor={Colors.accent}
+                      />
                     </View>
-                    <Text style={[pgStyles.methodLabel, isRTL && { textAlign: "right" }]}>{mp.label}</Text>
-                    <Switch
-                      value={pgConfig?.mobile?.providers?.includes(mp.key) !== false}
-                      onValueChange={async (val) => {
-                        const current = pgConfig?.mobile?.providers || ["apple_pay", "google_pay"];
-                        const updated = val ? [...current, mp.key] : current.filter((p: string) => p !== mp.key);
-                        await apiRequest("PUT", "/api/payment-gateway/config", { mobile: { ...pgConfig?.mobile, providers: updated } });
-                        refetchPgConfig();
-                      }}
-                      trackColor={{ false: Colors.inputBg, true: Colors.accent + "60" }}
-                      thumbColor={Colors.accent}
-                    />
-                  </View>
-                ))}
+                  );
+                })}
               </View>
 
             </ScrollView>
@@ -3352,6 +3503,19 @@ const pgStyles = themedStyles((Colors) => ({
   infoRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10 },
   infoNote: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: Colors.info + "10", borderRadius: 10, padding: 10, marginTop: 4 },
   infoNoteText: { color: Colors.textSecondary, fontSize: 12, flex: 1 },
+  methodHint: { color: Colors.textMuted, fontSize: 11, marginTop: 2 },
+  warnBox: { backgroundColor: Colors.warning + "12", borderWidth: 1, borderColor: Colors.warning + "35", borderRadius: 12, padding: 12, marginBottom: 12 },
+  warnHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  warnTitle: { flex: 1, color: Colors.text, fontSize: 14, fontWeight: "700" },
+  warnText: { color: Colors.textSecondary, fontSize: 12, marginTop: 6 },
+  envRow: { marginTop: 8 },
+  envName: { color: Colors.text, fontSize: 12, fontWeight: "700", fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
+  envDesc: { color: Colors.textMuted, fontSize: 11, marginTop: 2 },
+  footNote: { color: Colors.textMuted, fontSize: 11, marginTop: 10, lineHeight: 16 },
+  mutedNote: { color: Colors.textMuted, fontSize: 12, marginBottom: 4 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 4 },
+  chip: { backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.cardBorder, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  chipText: { color: Colors.text, fontSize: 12, fontWeight: "600" },
 }));
 
 const styles = themedStyles((Colors) => ({

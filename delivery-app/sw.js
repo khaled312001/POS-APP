@@ -3,7 +3,7 @@
  * Caches static assets, serves offline fallback, and handles push notifications.
  */
 
-const CACHE_NAME = "kassenta-delivery-v5";
+const CACHE_NAME = "kassenta-delivery-v6";
 const STATIC_ASSETS = [
   "/api/delivery-app/css/base.css",
   "/api/delivery-app/css/components.css",
@@ -12,6 +12,7 @@ const STATIC_ASSETS = [
   "/api/delivery-app/js/cart.js",
   "/api/delivery-app/js/auth.js",
   "/api/delivery-app/js/api.js",
+  "/api/delivery-app/js/stripe-payments.js",
   "/api/delivery-app/js/pages/home.js",
   "/api/delivery-app/js/pages/menu.js",
   "/api/delivery-app/js/pages/cart-page.js",
@@ -156,7 +157,7 @@ self.addEventListener("fetch", (event) => {
             if (cached) return cached;
             // Offline fallback page
             return new Response(
-              '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#F8F9FA;color:#1A1A2E;text-align:center;padding:20px}h1{font-size:1.5rem;margin-bottom:8px}p{color:#6B7280}button{margin-top:16px;padding:12px 24px;background:#FF5722;color:#fff;border:none;border-radius:12px;font-size:1rem;cursor:pointer}</style></head><body><div><h1>You\'re offline</h1><p>Check your internet connection and try again</p><button onclick="location.reload()">Retry</button></div></body></html>',
+              '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#F2F6F5;color:#0B1F26;text-align:center;padding:20px}h1{font-size:1.5rem;margin-bottom:8px}p{color:#4A6362}button{margin-top:16px;padding:12px 24px;background:#0A6E65;color:#fff;border:none;border-radius:12px;font-size:1rem;cursor:pointer}</style></head><body><div><h1>You\'re offline</h1><p>Check your internet connection and try again</p><button onclick="location.reload()">Retry</button></div></body></html>',
               { headers: { "Content-Type": "text/html; charset=utf-8" } }
             );
           })

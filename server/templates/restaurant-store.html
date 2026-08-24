@@ -24,6 +24,10 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/css/intlTelInput.css">
   <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/js/intlTelInput.min.js"></script>
+  <!-- Shared Kassenta payment helper (PaymentElement, never CardElement).
+       Served from /api/* because only that prefix reaches Express behind the CDN.
+       If it fails to load the checkout silently falls back to the manual methods. -->
+  <script src="/api/delivery-app/js/stripe-payments.js"></script>
   <style>
     /* intl-tel-input adjustments */
     .iti {
@@ -31,9 +35,9 @@
     }
 
     .iti__country-list {
-      background-color: var(--s1);
-      color: var(--txt);
-      border: 1px solid var(--bd);
+      background-color: var(--k-surface);
+      color: var(--k-text);
+      border: 1px solid var(--k-border);
     }
 
     .iti__country {
@@ -41,11 +45,11 @@
     }
 
     .iti__country:hover {
-      background-color: var(--P-light);
+      background-color: var(--k-accent-soft);
     }
 
     .iti__selected-country {
-      background-color: var(--s2);
+      background-color: var(--k-surface-2);
     }
 
     .form-input#co-phone {
@@ -105,6 +109,51 @@
       --shadow-lg: 0 20px 60px rgba(0, 0, 0, .6);
       --glass: rgba(23, 23, 42, .92);
       --glass-border: rgba(255, 255, 255, .08);
+    }
+
+    /* ===== KASSENTA CHECKOUT TOKENS =====
+       --P / --A are the tenant's own brand colours and are set at runtime from
+       the storefront config, so they are anything at all. The checkout and the
+       payment area deliberately use Kassenta's palette instead: a card form has
+       to stay readable and trustworthy whatever the restaurant picked. Light is
+       the default; body.dark overrides below. */
+    :root {
+      --k-surface: #ffffff;
+      --k-surface-2: #f7fafa;
+      --k-border: #e3eae9;
+      --k-border-2: #cedbd9;
+      --k-text: #0b1f26;
+      --k-text-2: #4a6362;
+      --k-dim: #7f9694;
+      --k-accent: #0a6e65;
+      /* --k-accent always takes white ink — keep it that way */
+      --k-accent-2: #0e9c8d;
+      --k-accent-soft: #e1f1ef;
+      --k-scrim: rgba(4, 14, 50, .55);
+      --k-shadow-sm: 0 2px 10px rgba(11, 31, 38, .06);
+      --k-shadow: 0 10px 30px rgba(11, 31, 38, .1);
+      --k-glow: 0 8px 22px rgba(10, 110, 101, .28);
+      --k-r-sm: 10px;
+      --k-r-md: 14px;
+      --k-r-lg: 20px;
+      --k-r-xl: 26px;
+    }
+
+    body.dark {
+      --k-surface: #0d1a44;
+      --k-surface-2: #0b1638;
+      --k-border: #1f2f5d;
+      --k-border-2: #2a3d71;
+      --k-text: #f1f5fd;
+      --k-text-2: #b9c6e4;
+      --k-dim: #8493c0;
+      --k-accent: #0e8a7e;
+      --k-accent-2: #00c1b0;
+      --k-accent-soft: #0c2e36;
+      --k-scrim: rgba(2, 6, 22, .7);
+      --k-shadow-sm: 0 2px 10px rgba(0, 0, 0, .35);
+      --k-shadow: 0 12px 34px rgba(0, 0, 0, .5);
+      --k-glow: 0 8px 22px rgba(0, 193, 176, .22);
     }
 
     /* ===== RESET ===== */
@@ -1757,20 +1806,20 @@
     .btn-checkout {
       width: 100%;
       padding: 14px;
-      border-radius: var(--r);
-      background: linear-gradient(135deg, var(--P), var(--A));
+      border-radius: var(--k-r-md);
+      background: linear-gradient(135deg, var(--k-accent), var(--k-accent-2));
       color: #fff;
       font-size: 1rem;
       font-weight: 700;
       border: none;
       cursor: pointer;
-      box-shadow: 0 6px 20px var(--P-glow);
+      box-shadow: var(--k-glow);
       transition: transform .2s, box-shadow .2s;
     }
 
     .btn-checkout:hover {
       transform: translateY(-1px);
-      box-shadow: 0 8px 28px var(--P-glow)
+      box-shadow: 0 12px 28px rgba(10, 110, 101, .32)
     }
 
     /* ===== FLOATING CART ===== */
@@ -1860,8 +1909,8 @@
     .checkout-backdrop {
       position: absolute;
       inset: 0;
-      background: rgba(0, 0, 0, .6);
-      backdrop-filter: blur(4px);
+      background: var(--k-scrim);
+      backdrop-filter: blur(6px);
     }
 
     .checkout-sheet {
@@ -1870,8 +1919,10 @@
       width: 100%;
       max-width: 520px;
       max-height: 90vh;
-      background: var(--s1);
-      border-radius: var(--r-lg) var(--r-lg) 0 0;
+      background: var(--k-surface);
+      color: var(--k-text);
+      border-radius: var(--k-r-xl) var(--k-r-xl) 0 0;
+      box-shadow: var(--k-shadow);
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -1891,7 +1942,8 @@
       }
 
       .checkout-sheet {
-        border-radius: var(--r-lg);
+        border-radius: var(--k-r-xl);
+        border: 1px solid var(--k-border);
         max-height: 85vh
       }
     }
@@ -1900,7 +1952,7 @@
       width: 36px;
       height: 4px;
       border-radius: 2px;
-      background: var(--s4);
+      background: var(--k-border-2);
       margin: 12px auto 0;
       flex-shrink: 0;
     }
@@ -1916,14 +1968,14 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid var(--bd);
+      border-bottom: 1px solid var(--k-border);
       flex-shrink: 0;
     }
 
     .checkout-title {
       font-size: 1.15rem;
       font-weight: 800;
-      color: var(--txt)
+      color: var(--k-text)
     }
 
     .checkout-body {
@@ -1940,7 +1992,7 @@
       display: block;
       font-size: .8rem;
       font-weight: 600;
-      color: var(--txt2);
+      color: var(--k-text-2);
       margin-bottom: 6px;
       text-transform: uppercase;
       letter-spacing: .04em
@@ -1950,11 +2002,11 @@
     .form-select,
     .form-textarea {
       width: 100%;
-      padding: 11px 14px;
-      border-radius: var(--r-sm);
-      border: 1.5px solid var(--bd2);
-      background: var(--s2);
-      color: var(--txt);
+      padding: 12px 14px;
+      border-radius: var(--k-r-sm);
+      border: 1.5px solid var(--k-border);
+      background: var(--k-surface-2);
+      color: var(--k-text);
       font-size: .9rem;
       transition: border-color .2s, box-shadow .2s;
     }
@@ -1962,19 +2014,20 @@
     .form-input:focus,
     .form-select:focus,
     .form-textarea:focus {
-      border-color: var(--P);
-      box-shadow: 0 0 0 3px var(--P-light);
+      border-color: var(--k-accent-2);
+      box-shadow: 0 0 0 3px var(--k-accent-soft);
+      outline: none;
     }
 
     .form-input::placeholder,
     .form-textarea::placeholder {
-      color: var(--mu)
+      color: var(--k-dim)
     }
 
     .form-select {
       appearance: none;
       cursor: pointer;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b80' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237f9694' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 12px center
     }
@@ -1999,9 +2052,9 @@
     .form-error {
       background: rgba(220, 53, 69, .1);
       border: 1px solid rgba(220, 53, 69, .3);
-      color: #dc3545;
+      color: #c62b39;
       padding: 10px 14px;
-      border-radius: var(--r-sm);
+      border-radius: var(--k-r-sm);
       font-size: .85rem;
       margin-bottom: 12px;
       display: none
@@ -2019,52 +2072,173 @@
       width: 72px;
       height: 72px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #28a745, #20c997);
+      background: linear-gradient(135deg, var(--k-accent), var(--k-accent-2));
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 2rem;
       color: #fff;
       margin: 0 auto 16px;
-      box-shadow: 0 8px 24px rgba(40, 167, 69, .4);
+      box-shadow: var(--k-glow);
+    }
+
+    .checkout-success-icon.pending {
+      background: linear-gradient(135deg, #d98324, #f0b429);
+      box-shadow: 0 8px 22px rgba(217, 131, 36, .28);
     }
 
     .checkout-success-title {
       font-size: 1.3rem;
       font-weight: 800;
-      color: var(--txt);
+      color: var(--k-text);
       margin-bottom: 8px
     }
 
     .checkout-success-msg {
-      color: var(--mu);
+      color: var(--k-text-2);
       font-size: .9rem;
       line-height: 1.6
     }
 
     .checkout-footer {
       padding: 16px 20px;
-      border-top: 1px solid var(--bd);
+      border-top: 1px solid var(--k-border);
+      background: var(--k-surface);
       flex-shrink: 0;
     }
 
     .btn-submit {
       width: 100%;
       padding: 14px;
-      border-radius: var(--r);
-      background: linear-gradient(135deg, var(--P), var(--A));
+      border-radius: var(--k-r-md);
+      background: linear-gradient(135deg, var(--k-accent), var(--k-accent-2));
       color: #fff;
       font-size: 1rem;
       font-weight: 700;
       border: none;
       cursor: pointer;
-      box-shadow: 0 6px 20px var(--P-glow);
-      transition: opacity .2s;
+      box-shadow: var(--k-glow);
+      transition: opacity .2s, transform .2s;
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      transform: translateY(-1px)
     }
 
     .btn-submit:disabled {
       opacity: .6;
       cursor: not-allowed
+    }
+
+    /* Quiet secondary action — "pay on arrival instead". */
+    .btn-quiet {
+      width: 100%;
+      margin-top: 8px;
+      padding: 12px;
+      border-radius: var(--k-r-md);
+      background: transparent;
+      border: 1px solid var(--k-border);
+      color: var(--k-text-2);
+      font-size: .88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s, border-color .2s;
+    }
+
+    .btn-quiet:hover {
+      background: var(--k-surface-2);
+      border-color: var(--k-border-2)
+    }
+
+    /* ===== PAYMENT AREA =====
+       Two different things live here and must never be confused:
+       #checkout-pay  — the Stripe PaymentElement (card / TWINT / wallets). It
+                        settles automatically, and only the signed webhook may
+                        call it paid.
+       #co-payment-details — the shop's own TWINT number or IBAN, paid by hand
+                        on arrival. For those, placing the order IS the finish
+                        line for this page. */
+    .pay-panel {
+      margin-bottom: 16px;
+      padding: 14px 16px;
+      border-radius: var(--k-r-md);
+      border: 1px solid var(--k-border);
+      background: var(--k-surface-2);
+      color: var(--k-text-2);
+      font-size: .85rem;
+      line-height: 1.6;
+    }
+
+    .pay-panel strong {
+      color: var(--k-text)
+    }
+
+    .pay-panel.pay-manual {
+      border-left: 3px solid var(--k-accent-2)
+    }
+
+    .pay-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .95rem;
+      font-weight: 800;
+      color: var(--k-text);
+      margin-bottom: 4px;
+    }
+
+    .pay-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--k-accent-soft);
+      color: var(--k-accent);
+      font-size: .68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+
+    body.dark .pay-badge {
+      color: var(--k-accent-2)
+    }
+
+    .pay-amount {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--k-text);
+      margin: 10px 0 14px;
+    }
+
+    #co-pay-element {
+      min-height: 120px
+    }
+
+    .pay-secure {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 12px;
+      color: var(--k-dim);
+      font-size: .75rem;
+    }
+
+    .pay-methods {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .pay-chip {
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--k-border-2);
+      background: var(--k-surface);
+      color: var(--k-text-2);
+      font-size: .72rem;
+      font-weight: 700;
     }
 
     /* ===== PIZZA MODAL ===== */
@@ -2918,13 +3092,21 @@
             <div class="form-group">
               <label class="form-label" data-i18n="payment">Payment</label>
               <select class="form-select" id="co-payment">
-                <option value="cash" data-i18n-opt="cashOnDelivery">Cash on Delivery</option>
-                <option value="card" data-i18n-opt="cardOpt">Card</option>
+                <option value="cash" data-i18n-opt="cashOnDelivery">Cash on delivery</option>
               </select>
-              <!-- Bank / TWINT details from the store's storefront settings -->
-              <div id="co-payment-details" style="display:none;margin-top:10px;padding:12px 14px;border-radius:12px;background:rgba(47,211,198,0.08);border:1px solid rgba(47,211,198,0.25);font-size:0.85rem;line-height:1.6"></div>
             </div>
           </div>
+          <!-- Automatic payment. Only shown when Stripe is actually reachable,
+               so the picker degrades to the manual methods rather than offering
+               a button that cannot work. -->
+          <div class="pay-panel" id="co-pay-hint" style="display:none">
+            <div class="pay-title"><i class="fa-solid fa-bolt"></i><span data-i18n="payNowTitle">Pay now, securely</span></div>
+            <span data-i18n="payNowHint">You pay on the next step. The order counts as paid only once the payment clears.</span>
+            <div class="pay-methods" id="co-pay-methods"></div>
+          </div>
+          <!-- Manual instructions: the shop's own TWINT number or IBAN, from the
+               storefront settings. Nothing is collected automatically here. -->
+          <div class="pay-panel pay-manual" id="co-payment-details" style="display:none"></div>
           <div class="form-group" id="co-address-group">
             <label class="form-label" data-i18n="deliveryAddress">Delivery Address *</label>
             <input class="form-input" id="co-address" type="text" data-i18n-placeholder="addressPlaceholder" placeholder="Street, City, ZIP">
@@ -2934,9 +3116,25 @@
             <textarea class="form-textarea" id="co-notes" data-i18n-placeholder="notesPlaceholder" placeholder="Allergies, special requests..."></textarea>
           </div>
         </div>
+        <!-- STEP 2 — online payment. Reached only after the order exists
+             server-side; the amount shown is the one the server priced from its
+             own record, never a number this page made up. -->
+        <div id="checkout-pay" style="display:none">
+          <div class="pay-title" style="margin-bottom:2px">
+            <span data-i18n="payTitle">Pay for your order</span>
+            <span class="pay-badge" id="co-pay-order"></span>
+          </div>
+          <div class="pay-amount" id="co-pay-amount"></div>
+          <div id="co-pay-element"></div>
+          <div class="form-error" id="co-pay-error"></div>
+          <div class="pay-secure">
+            <i class="fa-solid fa-lock"></i>
+            <span data-i18n="paySecure">Secured by Stripe — card details never touch this shop.</span>
+          </div>
+        </div>
         <div class="checkout-success" id="checkout-success" style="flex-direction:column;align-items:center">
           <div class="checkout-success-icon"><i class="fa-solid fa-check"></i></div>
-          <div class="checkout-success-title" data-i18n="orderPlaced">🎉 Order Placed!</div>
+          <div class="checkout-success-title" id="success-title" data-i18n="orderPlaced">🎉 Order Placed!</div>
           <p class="checkout-success-msg" id="success-msg" data-i18n="orderReceived">Your order has been received.</p>
           <button class="btn-submit" style="margin-top:20px;max-width:220px" onclick="closeCheckout()">
             <i class="fa-solid fa-utensils" style="margin-right:8px"></i><span data-i18n="continueBrowsing">Continue Browsing</span>
@@ -2947,6 +3145,14 @@
         <button class="btn-submit" id="checkout-submit" onclick="submitOrder()">
           <i class="fa-solid fa-lock" style="margin-right:8px"></i><span data-i18n="placeOrder">Place Order</span>
         </button>
+        <!-- Swapped in for the payment step. "Pay on arrival instead" leaves the
+             order standing and unpaid, which is a legitimate outcome. -->
+        <div id="co-pay-actions" style="display:none">
+          <button class="btn-submit" id="co-pay-go" onclick="confirmOnlinePayment()">
+            <i class="fa-solid fa-lock" style="margin-right:8px"></i><span id="co-pay-go-label">Pay now</span>
+          </button>
+          <button class="btn-quiet" id="co-pay-later" onclick="skipOnlinePayment()" data-i18n="payLater">Pay on arrival instead</button>
+        </div>
       </div>
     </div>
   </div>
@@ -3036,7 +3242,22 @@
         fullName:'Full Name *', phoneLbl2:'Phone *', emailLblForm:'Email',
         orderType:'Order Type', payment:'Payment',
         deliveryOpt:'Delivery', pickupOpt:'Pickup',
-        cashOnDelivery:'Cash on Delivery', cardOpt:'Card',
+        cashOnDelivery:'Cash on delivery / pickup', cardOpt:'Card on arrival (manual)',
+        bankTransfer:'Bank transfer (manual)', twintManual:'TWINT (manual)', manualTag:'manual',
+        payNow:'Pay now', payNowTitle:'Pay now, securely',
+        payNowHint:'You pay on the next step. The order counts as paid only once the payment clears.',
+        payTitle:'Pay for your order', paySecure:'Secured by Stripe — card details never touch this shop.',
+        payLater:'Pay on arrival instead', payStarting:'Preparing payment...',
+        payProcessing:'Processing...', payConfirming:'Confirming payment...',
+        payTryAgain:'Try again', payFailed:'Payment failed',
+        paidTitle:'🎉 Payment received!', paidMsg:'Thank you — the shop is preparing your order.',
+        payPendingTitle:'Payment is processing',
+        payPendingMsg:'Your bank has not confirmed it yet — we will update your order as soon as it clears.',
+        orderUnpaidMsg:'Payment is still open. You can pay when the order arrives.',
+        twintManualNote:'Send the amount with the TWINT app to the number shown here when the order arrives. Nothing is charged automatically.',
+        bankManualNote:'Transfer the amount to the IBAN shown here. Nothing is charged automatically.',
+        cashNote:'Pay the driver in cash, or at the counter when you pick up.',
+        cardArrivalNote:'Pay by card on arrival — the shop brings the card terminal.',
         deliveryAddress:'Delivery Address *', specialInstructions:'Special Instructions',
         namePlaceholder:'Your name', emailPlaceholder:'your@email.com',
         addressPlaceholder:'Street, City, ZIP', notesPlaceholder:'Allergies, special requests...',
@@ -3076,7 +3297,22 @@
         fullName:'الاسم الكامل *', phoneLbl2:'الهاتف *', emailLblForm:'البريد الإلكتروني',
         orderType:'نوع الطلب', payment:'طريقة الدفع',
         deliveryOpt:'توصيل', pickupOpt:'استلام',
-        cashOnDelivery:'الدفع عند الاستلام', cardOpt:'بطاقة',
+        cashOnDelivery:'نقداً عند الاستلام', cardOpt:'بطاقة عند الاستلام (يدوي)',
+        bankTransfer:'تحويل بنكي (يدوي)', twintManual:'TWINT (يدوي)', manualTag:'يدوي',
+        payNow:'ادفع الآن', payNowTitle:'ادفع الآن بأمان',
+        payNowHint:'ستدفع في الخطوة التالية. لا يُعتبر الطلب مدفوعاً إلا بعد تأكيد عملية الدفع.',
+        payTitle:'ادفع قيمة طلبك', paySecure:'محمي بواسطة Stripe — بيانات بطاقتك لا تصل إلى المتجر.',
+        payLater:'سأدفع عند الاستلام', payStarting:'جارٍ تجهيز الدفع...',
+        payProcessing:'جارٍ المعالجة...', payConfirming:'جارٍ تأكيد الدفع...',
+        payTryAgain:'حاول مرة أخرى', payFailed:'فشل الدفع',
+        paidTitle:'🎉 تم استلام الدفع!', paidMsg:'شكراً لك — يجهّز المتجر طلبك الآن.',
+        payPendingTitle:'جارٍ معالجة الدفع',
+        payPendingMsg:'لم يؤكد البنك العملية بعد — سنحدّث حالة طلبك فور اكتمالها.',
+        orderUnpaidMsg:'الدفع ما زال مفتوحاً. يمكنك الدفع عند وصول الطلب.',
+        twintManualNote:'أرسل المبلغ عبر تطبيق TWINT إلى الرقم الظاهر هنا عند وصول الطلب. لا يتم الخصم تلقائياً.',
+        bankManualNote:'حوّل المبلغ إلى الـ IBAN الظاهر هنا. لا يتم الخصم تلقائياً.',
+        cashNote:'ادفع نقداً للسائق أو عند الاستلام من المتجر.',
+        cardArrivalNote:'ادفع بالبطاقة عند الاستلام — يحضر المتجر جهاز الدفع.',
         deliveryAddress:'عنوان التوصيل *', specialInstructions:'تعليمات خاصة',
         namePlaceholder:'اسمك', emailPlaceholder:'بريدك@الإلكتروني.com',
         addressPlaceholder:'الشارع، المدينة، الرمز البريدي', notesPlaceholder:'حساسية، طلبات خاصة...',
@@ -3116,7 +3352,22 @@
         fullName:'Vollständiger Name *', phoneLbl2:'Telefon *', emailLblForm:'E-Mail',
         orderType:'Bestellart', payment:'Zahlung',
         deliveryOpt:'Lieferung', pickupOpt:'Abholung',
-        cashOnDelivery:'Barzahlung bei Lieferung', cardOpt:'Karte',
+        cashOnDelivery:'Bar bei Lieferung / Abholung', cardOpt:'Karte bei Erhalt (manuell)',
+        bankTransfer:'Banküberweisung (manuell)', twintManual:'TWINT (manuell)', manualTag:'manuell',
+        payNow:'Jetzt bezahlen', payNowTitle:'Jetzt sicher bezahlen',
+        payNowHint:'Sie bezahlen im nächsten Schritt. Die Bestellung gilt erst als bezahlt, wenn die Zahlung bestätigt ist.',
+        payTitle:'Bestellung bezahlen', paySecure:'Gesichert durch Stripe — Kartendaten erreichen den Shop nie.',
+        payLater:'Lieber bei Erhalt bezahlen', payStarting:'Zahlung wird vorbereitet...',
+        payProcessing:'Wird verarbeitet...', payConfirming:'Zahlung wird bestätigt...',
+        payTryAgain:'Erneut versuchen', payFailed:'Zahlung fehlgeschlagen',
+        paidTitle:'🎉 Zahlung erhalten!', paidMsg:'Vielen Dank — der Shop bereitet Ihre Bestellung vor.',
+        payPendingTitle:'Zahlung wird verarbeitet',
+        payPendingMsg:'Ihre Bank hat die Zahlung noch nicht bestätigt — wir aktualisieren die Bestellung, sobald sie eingeht.',
+        orderUnpaidMsg:'Die Zahlung ist noch offen. Sie können bei Erhalt bezahlen.',
+        twintManualNote:'Senden Sie den Betrag bei Erhalt per TWINT-App an die hier angezeigte Nummer. Es wird nichts automatisch belastet.',
+        bankManualNote:'Überweisen Sie den Betrag auf die hier angezeigte IBAN. Es wird nichts automatisch belastet.',
+        cashNote:'Bar an den Fahrer, oder an der Theke bei der Abholung.',
+        cardArrivalNote:'Karte bei Erhalt — der Shop bringt das Kartenterminal mit.',
         deliveryAddress:'Lieferadresse *', specialInstructions:'Besondere Anweisungen',
         namePlaceholder:'Ihr Name', emailPlaceholder:'ihre@email.de',
         addressPlaceholder:'Straße, Stadt, PLZ', notesPlaceholder:'Allergien, besondere Wünsche...',
@@ -3162,6 +3413,12 @@
         const key = el.getAttribute('data-i18n-opt');
         if (l[key] !== undefined) el.textContent = l[key];
       });
+      // The payment picker is built at runtime, so it is retranslated here:
+      // the "pay now" label is generated from the live method list, and the
+      // manual instructions are re-rendered by the storefront's own renderer.
+      const onlineOpt = document.querySelector('#co-payment option[value="online"]');
+      if (onlineOpt && payReady) onlineOpt.textContent = payNowLabel();
+      if (payDetailsRenderer) { try { payDetailsRenderer(); } catch (e) { } }
       // Update language button label
       const langLabel = document.getElementById('lang-label');
       if (langLabel) langLabel.textContent = lang.toUpperCase();
@@ -3267,6 +3524,14 @@
     let searchQuery = '';
     let audioCtx = null;
     let isDark = localStorage.getItem('store_dark') === 'true';
+
+    // ===== ONLINE PAYMENT STATE =====
+    // Everything here goes through the shared helper (window.KassentaPay), which
+    // owns the PaymentElement and the webhook-authoritative settlement poll.
+    let payReady = false;   // Stripe reachable AND configured for this tenant
+    let payMethods = [];    // what the connected account actually offers
+    let payOrder = null;    // { id, orderNumber, trackingToken, summary } awaiting payment
+    let payDetailsRenderer = null;  // set by loadStore(), so a language switch can redraw
 
     // ===== APPLY INITIAL LANGUAGE =====
     applyLang(currentLang);
@@ -3535,6 +3800,195 @@
       <button class="btn-checkout" onclick="openCheckout()"><i class="fa-solid fa-lock" style="margin-right:8px"></i>${tr('checkout')} — ${fmt(t.total)}</button>`);
     }
 
+    // ===== ONLINE PAYMENT =====
+    // Order first, payment second. The amount is never sent from here: the
+    // server prices the PaymentIntent from the order it already stored.
+    const PAY_METHOD_LABELS = {
+      card: 'Card', twint: 'TWINT', apple_pay: 'Apple Pay', google_pay: 'Google Pay',
+      link: 'Link', paypal: 'PayPal', klarna: 'Klarna', revolut_pay: 'Revolut Pay',
+    };
+
+    function initPayments() {
+      if (!window.KassentaPay) return Promise.resolve(null);
+      return KassentaPay.init({ basePath: '', tenantId: TENANT_ID }).then(cfg => {
+        payReady = KassentaPay.isAvailable();
+        payMethods = KassentaPay.methods();
+        return cfg;
+      });
+    }
+
+    /** Only name methods the account really offers — no promises the code can't keep. */
+    function payMethodNames() {
+      const names = payMethods.map(m => PAY_METHOD_LABELS[m]).filter(Boolean);
+      return names.length ? names : ['Card'];
+    }
+    function payNowLabel() {
+      return `${tr('payNow')} — ${payMethodNames().slice(0, 3).join(' / ')}`;
+    }
+
+    function showPayError(msg) {
+      setTxt('co-pay-error', msg);
+      setDisp('co-pay-error', 'block');
+    }
+
+    /**
+     * The one place the checkout is allowed to celebrate. `celebrate` is true
+     * only for an order that is genuinely done: a manual/cash order that has
+     * been placed, or a payment our own server has confirmed.
+     */
+    function showCheckoutResult({ title, msg, celebrate }) {
+      addCls('checkout-modal', 'open');
+      setDisp('checkout-form', 'none');
+      setDisp('checkout-pay', 'none');
+      setDisp('checkout-footer', 'none');
+      setDisp('checkout-error', 'none');
+      setDisp('checkout-success', 'flex');
+      setTxt('success-title', title);
+      setTxt('success-msg', msg);
+      const icon = document.querySelector('.checkout-success-icon');
+      if (icon) {
+        icon.classList.toggle('pending', !celebrate);
+        icon.innerHTML = celebrate
+          ? '<i class="fa-solid fa-check"></i>'
+          : '<i class="fa-regular fa-clock"></i>';
+        icon.classList.remove('animate'); void icon.offsetWidth; icon.classList.add('animate');
+      }
+      if (celebrate) { playOrderSuccess(); setTimeout(launchConfetti, 200); }
+    }
+
+    /** Waiting on the webhook — a spinner, not a tick, and certainly no confetti. */
+    function showPayWaiting() {
+      addCls('checkout-modal', 'open');
+      setDisp('checkout-form', 'none');
+      setDisp('checkout-pay', 'none');
+      setDisp('checkout-footer', 'none');
+      setDisp('checkout-error', 'none');
+      setDisp('checkout-success', 'flex');
+      setTxt('success-title', tr('payConfirming'));
+      setTxt('success-msg', tr('payPendingMsg'));
+      const icon = document.querySelector('.checkout-success-icon');
+      if (icon) {
+        icon.classList.add('pending');
+        icon.classList.remove('animate');
+        icon.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+      }
+    }
+
+    /** Create the intent and mount the PaymentElement for the order just placed. */
+    async function startOnlinePayment() {
+      setDisp('checkout-form', 'none');
+      setDisp('checkout-pay', 'block');
+      setDisp('checkout-footer', '');
+      setDisp('checkout-submit', 'none');
+      setDisp('co-pay-actions', 'block');
+      setDisp('co-pay-error', 'none');
+      setTxt('co-pay-order', payOrder.orderNumber ? `#${payOrder.orderNumber}` : '');
+      setDisp('co-pay-order', payOrder.orderNumber ? 'inline-block' : 'none');
+      setHtml('co-pay-element', '');
+      const go = document.getElementById('co-pay-go');
+      if (go) go.disabled = true;
+      setTxt('co-pay-go-label', tr('payStarting'));
+      try {
+        const intent = await KassentaPay.createOrderIntent(payOrder.id, payOrder.trackingToken);
+        // Minor units, priced by the server. Displayed, never sent back.
+        setTxt('co-pay-amount', `${String(intent.currency || CURRENCY).toUpperCase()} ${(intent.amount / 100).toFixed(2)}`);
+        await KassentaPay.mount(document.getElementById('co-pay-element'), intent.clientSecret, {
+          dark: isDark,
+          primaryColor: '#0A6E65',
+          fontFamily: "'Inter', system-ui, sans-serif",
+          locale: currentLang || 'auto',
+        });
+        if (go) go.disabled = false;
+        setTxt('co-pay-go-label', tr('payNow'));
+      } catch (e) {
+        showPayError(e.message || tr('payFailed'));
+        setTxt('co-pay-go-label', tr('payFailed'));
+      }
+    }
+
+    async function confirmOnlinePayment() {
+      playClick();
+      const go = document.getElementById('co-pay-go');
+      if (go) go.disabled = true;
+      setTxt('co-pay-go-label', tr('payProcessing'));
+      setDisp('co-pay-error', 'none');
+      try {
+        // TWINT, PayPal and 3-D Secure all leave the page here. The order id
+        // rides along in the return URL so the trip back can be resumed.
+        const back = KassentaPay.returnUrl({
+          order_id: payOrder.id,
+          tracking_token: payOrder.trackingToken,
+        });
+        const billing = {};
+        const bName = getVal('co-name'); if (bName) billing.name = bName;
+        const bMail = getVal('co-email'); if (bMail) billing.email = bMail;
+        const bPhone = iti ? iti.getNumber() : getVal('co-phone'); if (bPhone) billing.phone = bPhone;
+        const intent = await KassentaPay.confirm(back, Object.keys(billing).length ? billing : null);
+        if (!intent) return; // redirected away; picked up again by resumePaymentReturn()
+        setTxt('co-pay-go-label', tr('payConfirming'));
+        await settlePayment(intent.id);
+      } catch (e) {
+        showPayError(e.message || tr('payFailed'));
+        if (go) go.disabled = false;
+        setTxt('co-pay-go-label', tr('payTryAgain'));
+      }
+    }
+
+    /**
+     * Ask our own server whether the money actually arrived. Nothing on this
+     * page — not a resolved confirm(), not redirect_status in the URL — is
+     * allowed to decide that; only the signed Stripe webhook is.
+     */
+    async function settlePayment(paymentIntentId) {
+      const r = await KassentaPay.waitForSettlement(paymentIntentId, { timeoutMs: 40000 });
+      const num = (r.order && r.order.orderNumber) || (payOrder && payOrder.orderNumber) || '';
+      const tail = payOrder && payOrder.summary ? ` ${payOrder.summary}` : '';
+      if (r.settled) {
+        showCheckoutResult({
+          title: tr('paidTitle'),
+          msg: `${num ? '#' + num + ' — ' : ''}${tr('paidMsg')}${tail}`,
+          celebrate: true,
+        });
+        return;
+      }
+      if (r.status === 'canceled' || r.status === 'failed') {
+        throw new Error(tr('payFailed'));
+      }
+      // Still processing is a legitimate outcome for a slow bank.
+      showCheckoutResult({
+        title: tr('payPendingTitle'),
+        msg: `${num ? '#' + num + ' — ' : ''}${tr('payPendingMsg')}`,
+        celebrate: false,
+      });
+    }
+
+    /** The customer walked away from the card form. The order still stands. */
+    function skipOnlinePayment() {
+      playClick();
+      const num = payOrder && payOrder.orderNumber ? `#${payOrder.orderNumber} — ` : '';
+      const tail = payOrder && payOrder.summary ? ` ${payOrder.summary}` : '';
+      showCheckoutResult({
+        title: tr('orderPlaced'),
+        msg: `${num}${tr('orderUnpaidMsg')}${tail}`,
+        celebrate: true,
+      });
+    }
+
+    /** Resume after TWINT / 3-D Secure sent the customer to their bank and back. */
+    function resumePaymentReturn() {
+      if (!window.KassentaPay) return;
+      const ret = KassentaPay.pendingReturn();
+      if (!ret || !ret.paymentIntentId) return;
+      KassentaPay.clearReturn();
+      if (ret.orderId) {
+        payOrder = { id: ret.orderId, orderNumber: '', trackingToken: ret.trackingToken || '', summary: '' };
+      }
+      showPayWaiting();
+      settlePayment(ret.paymentIntentId).catch(() => {
+        showCheckoutResult({ title: tr('payFailed'), msg: tr('orderUnpaidMsg'), celebrate: false });
+      });
+    }
+
     // ===== CHECKOUT =====
     function openCheckout() {
       if (!cart.length) { showToast(`<i class="fa-solid fa-circle-exclamation" style="margin-right:6px;color:#f59e0b"></i>${tr('cartIsEmpty')}`); return; }
@@ -3542,8 +3996,12 @@
       closeCart();
       addCls('checkout-modal', 'open');
       setDisp('checkout-form', '');
+      setDisp('checkout-pay', 'none');
       setDisp('checkout-success', 'none');
       setDisp('checkout-footer', '');
+      setDisp('checkout-submit', '');
+      setDisp('co-pay-actions', 'none');
+      setDisp('co-pay-error', 'none');
       setDisp('checkout-error', 'none');
     }
     function closeCheckout() { playClick(); remCls('checkout-modal', 'open'); }
@@ -3592,16 +4050,37 @@
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || 'Order failed');
-        setDisp('checkout-form', 'none');
-        setDisp('checkout-success', 'flex');
-        setDisp('checkout-footer', 'none');
-        setTxt('success-msg', `Order #${data.orderNumber} confirmed! ${type === 'delivery' ? '🚚 ' + tr('deliveryFeat') + ': ' + address : '🏪 ' + tr('pickupFeat')}. ${tr('totalLbl')}: ${fmt(t.total)}`);
+
+        // The order exists server-side now, so the cart has done its job either
+        // way. What has NOT happened yet is payment.
         cart = []; updateCartUI();
-        // Trigger success animations
-        const icon = document.querySelector('.checkout-success-icon');
-        if (icon) { icon.classList.remove('animate'); void icon.offsetWidth; icon.classList.add('animate'); }
-        playOrderSuccess();
-        setTimeout(launchConfetti, 200);
+        const summary = `${type === 'delivery' ? '🚚 ' + tr('deliveryFeat') + ': ' + address : '🏪 ' + tr('pickupFeat')}. ${tr('totalLbl')}: ${fmt(t.total)}`;
+
+        if (payment === 'online' && payReady && data.id) {
+          // Straight into the PaymentElement. No confetti until the webhook says so.
+          payOrder = {
+            id: data.id,
+            orderNumber: data.orderNumber || '',
+            trackingToken: data.trackingToken || '',
+            summary,
+          };
+          await startOnlinePayment();
+        } else if (payment === 'online') {
+          // The order stands, but this page could not open the card form for it.
+          showCheckoutResult({
+            title: tr('orderPlaced'),
+            msg: `Order #${data.orderNumber} — ${tr('orderUnpaidMsg')} ${summary}`,
+            celebrate: true,
+          });
+        } else {
+          // Cash, card-on-arrival, the shop's TWINT number, a bank transfer:
+          // placing the order is genuinely the finish line for those.
+          showCheckoutResult({
+            title: tr('orderPlaced'),
+            msg: `Order #${data.orderNumber} confirmed! ${summary}`,
+            celebrate: true,
+          });
+        }
       } catch (e) { setTxt('checkout-error', e.message); setDisp('checkout-error', 'block'); }
       if (btn) { btn.disabled = false; btn.innerHTML = `<i class="fa-solid fa-lock" style="margin-right:8px"></i>${tr('placeOrder')}`; }
     }
@@ -3840,37 +4319,63 @@
         if (c?.estimatedDeliveryTime) feats.push(`<div class="hero-feature"><i class="fa-regular fa-clock"></i> ${c.estimatedDeliveryTime} min</div>`);
         setHtml('hero-features', feats.join(''));
 
-        // ── Payment methods + bank/TWINT details (from storefront settings) ──
+        // ── Payment methods (storefront settings + the connected Stripe account) ──
+        // Two families sit in this one dropdown and are labelled so they cannot
+        // be mistaken for each other:
+        //   "online"        — charged automatically through Stripe (card, TWINT,
+        //                     wallets), confirmed only by the signed webhook.
+        //   cash/card/twint/bank — the shop's own manual arrangements, paid by
+        //                     hand on arrival. This page cannot collect those.
         try {
+          const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, m => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[m]));
           const paySel = document.getElementById('co-payment');
           const payDet = document.getElementById('co-payment-details');
+          const payHint = document.getElementById('co-pay-hint');
+          const manualTag = ' <span class="pay-badge">' + esc(tr('manualTag')) + '</span>';
           if (paySel) {
-            // Reflect the store's accepted methods in the dropdown
             const opts = [];
-            if (c?.acceptCash !== false) opts.push('<option value="cash">' + (tr('cashOnDelivery') || 'Cash on Delivery') + '</option>');
-            if (c?.acceptCard) opts.push('<option value="card">' + (tr('cardOpt') || 'Card') + '</option>');
-            if (c?.acceptMobile && c?.twintNumber) opts.push('<option value="twint">TWINT</option>');
-            if (c?.bankIban) opts.push('<option value="bank">' + (tr('bankTransfer') || 'Bank Transfer') + '</option>');
+            // Offered only when Stripe is actually reachable for this tenant, so
+            // the picker degrades to the manual methods instead of showing a
+            // button that cannot work.
+            if (payReady) opts.push('<option value="online">' + esc(payNowLabel()) + '</option>');
+            if (c?.acceptCash !== false) opts.push('<option value="cash" data-i18n-opt="cashOnDelivery">' + esc(tr('cashOnDelivery')) + '</option>');
+            if (c?.acceptCard) opts.push('<option value="card" data-i18n-opt="cardOpt">' + esc(tr('cardOpt')) + '</option>');
+            // TWINT removed as a payment option (manual shop-number TWINT included).
+            if (c?.bankIban) opts.push('<option value="bank" data-i18n-opt="bankTransfer">' + esc(tr('bankTransfer')) + '</option>');
             if (opts.length) paySel.innerHTML = opts.join('');
           }
-          const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, m => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[m]));
           const renderPayDetails = () => {
-            if (!payDet) return;
             const v = paySel ? paySel.value : '';
+            if (payHint) {
+              payHint.style.display = v === 'online' ? 'block' : 'none';
+              if (v === 'online') {
+                setHtml('co-pay-methods', payMethodNames().map(n => '<span class="pay-chip">' + esc(n) + '</span>').join(''));
+              }
+            }
+            if (!payDet) return;
             let html = '';
             if (v === 'bank' && (c?.bankIban || c?.bankName)) {
-              html = '<strong><i class="fa-solid fa-building-columns"></i> ' + (tr('bankTransfer') || 'Bank Transfer') + '</strong><br>'
+              html = '<div class="pay-title"><i class="fa-solid fa-building-columns"></i> ' + esc(tr('bankTransfer')) + manualTag + '</div>'
                    + (c.bankAccountHolder ? esc(c.bankAccountHolder) + '<br>' : '')
                    + (c.bankName ? esc(c.bankName) + '<br>' : '')
-                   + (c.bankIban ? 'IBAN: <b>' + esc(c.bankIban) + '</b>' : '');
+                   + (c.bankIban ? 'IBAN: <b>' + esc(c.bankIban) + '</b><br>' : '')
+                   + esc(tr('bankManualNote'));
             } else if (v === 'twint' && c?.twintNumber) {
-              html = '<strong><i class="fa-solid fa-mobile-screen"></i> TWINT</strong><br>' + esc(c.twintNumber);
+              html = '<div class="pay-title"><i class="fa-solid fa-mobile-screen"></i> TWINT' + manualTag + '</div>'
+                   + '<b>' + esc(c.twintNumber) + '</b><br>' + esc(tr('twintManualNote'));
+            } else if (v === 'cash') {
+              html = '<div class="pay-title"><i class="fa-solid fa-money-bill-wave"></i> ' + esc(tr('cashOnDelivery')) + '</div>'
+                   + esc(tr('cashNote'));
+            } else if (v === 'card') {
+              html = '<div class="pay-title"><i class="fa-solid fa-credit-card"></i> ' + esc(tr('cardOpt')) + manualTag + '</div>'
+                   + esc(tr('cardArrivalNote'));
             }
-            if (!html && c?.paymentInstructions) html = esc(c.paymentInstructions);
+            if (html && v !== 'online' && c?.paymentInstructions) html += '<br>' + esc(c.paymentInstructions);
             payDet.innerHTML = html;
             payDet.style.display = html ? 'block' : 'none';
           };
           if (paySel) paySel.addEventListener('change', renderPayDetails);
+          payDetailsRenderer = renderPayDetails;
           renderPayDetails();
         } catch (e) { /* non-fatal */ }
 
@@ -3962,7 +4467,14 @@
       });
     }
 
-    loadStore();
+    // Payment config first: the picker can only offer "pay now" once we know
+    // Stripe is genuinely reachable for this tenant. Then, if this page load is
+    // the trip back from TWINT or 3-D Secure, resume that payment.
+    initPayments()
+      .catch(() => null)
+      .then(loadStore)
+      .then(resumePaymentReturn)
+      .catch(e => console.error('[STORE] init failed:', e));
   </script>
 </body>
 
