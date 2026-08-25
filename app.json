@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "tech.barmagly.pos",
-      "versionCode": 14,
+      "versionCode": 15,
       "minSdkVersion": 26,
       "targetSdkVersion": 35,
       "permissions": [
