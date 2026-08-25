@@ -8,6 +8,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import BroadcastToaster from "@/components/BroadcastToaster";
 import GlobalNotificationCenter from "@/components/GlobalNotificationCenter";
+import AppDownloadBanner from "@/components/AppDownloadBanner";
 import { queryClient } from "@/lib/query-client";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider } from "@/lib/auth-context";
@@ -18,7 +19,7 @@ import { NotificationProvider } from "@/lib/notification-context";
 import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
-import { Platform } from "react-native";
+import { Platform, View } from "react-native";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -151,7 +152,12 @@ function ThemedShell() {
               <NotificationProvider>
                 <CartProvider>
                   <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
-                  <RootLayoutNav />
+                  <View style={{ flex: 1 }}>
+                    <AppDownloadBanner />
+                    <View style={{ flex: 1 }}>
+                      <RootLayoutNav />
+                    </View>
+                  </View>
                   <BroadcastToaster />
                   <GlobalNotificationCenter />
                 </CartProvider>

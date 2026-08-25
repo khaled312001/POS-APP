@@ -17054,16 +17054,72 @@ p { color: var(--text-2); }
 .cta-mobile { display: none; }
 @media (max-width: 1040px) {
   .nav-toggle { display: grid; }
+  /* nav-links becomes a fixed dropdown here, so it no longer spaces the row.
+     Push the actions cluster to the far edge (RTL-safe) so the icons sit at
+     the edge opposite the logo, not floating in the middle. */
+  .nav-actions { margin-inline-start: auto; }
+  /* Mobile nav is an off-canvas side drawer (not a dropdown). It slides in from
+     the inline-end edge; RTL flips the side. A scrim dims the page behind it. */
   .nav-links {
-    position: fixed; inset: var(--nav-h) 0 auto 0; flex-direction: column; align-items: stretch; gap: 2px;
-    background: var(--bg); border-bottom: 1px solid var(--border); padding: 14px 18px 20px;
-    box-shadow: var(--shadow-lg); display: none; margin: 0; max-height: calc(100dvh - var(--nav-h)); overflow-y: auto;
+    position: fixed; top: var(--nav-h); bottom: 0; inset-inline-end: 0; width: min(84vw, 328px);
+    flex-direction: column; align-items: stretch; gap: 0;
+    background: var(--surface); border-inline-start: 1px solid var(--border); border-top: 1px solid var(--border);
+    padding: 12px 22px 28px; box-shadow: var(--shadow-xl);
+    margin: 0; height: calc(100dvh - var(--nav-h)); overflow-y: auto; z-index: 950; display: flex;
+    transform: translateX(100%); transition: transform .28s var(--ease);
   }
-  .nav-links.open { display: flex; }
-  .nav-links a { padding: 12px 14px; font-size: .98rem; }
+  [dir="rtl"] .nav-links { transform: translateX(-100%); }
+  .nav-links.open { transform: translateX(0); }
+  /* Nav items become a clean full-width divider list, so text hugs the row
+     edge instead of floating in the drawer's middle. */
+  .nav-links a:not(.cta-mobile) {
+    padding: 15px 2px; font-size: 1.02rem; font-weight: 600; color: var(--text);
+    border-radius: 0; border-bottom: 1px solid var(--border); text-align: start;
+  }
+  .nav-links a:not(.cta-mobile):hover { background: transparent; color: var(--accent); }
+  .nav-links a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
   .nav .cta-desktop { display: none; }
-  .nav-links .cta-mobile { display: inline-flex; }
+  .nav-links .cta-mobile { display: inline-flex; justify-content: center; margin-top: 20px; }
+  .nav-scrim {
+    position: fixed; inset: 0; background: var(--scrim, rgba(4,14,50,.62));
+    opacity: 0; visibility: hidden; transition: opacity .28s var(--ease); z-index: 800;
+  }
+  .nav-scrim.open { opacity: 1; visibility: visible; }
+  .nav-lang { display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .nav-lang button {
+    flex: 1; padding: 11px 8px; border: 1px solid var(--border-2); border-radius: 10px;
+    background: var(--surface); color: var(--text-2); font-weight: 700; font-size: .9rem; cursor: pointer;
+    transition: border-color .16s var(--ease), color .16s var(--ease), background-color .16s var(--ease);
+  }
+  .nav-lang button.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 }
+.nav-scrim { display: none; }
+@media (max-width: 1040px) { .nav-scrim { display: block; } }
+.nav-lang { display: none; }
+@media (max-width: 1040px) { .nav-lang { display: flex; } }
+@media (max-width: 600px) {
+  /* On phones the drawer fills the width so no page peeks beside it. */
+  .nav-links { width: 100%; border-inline-start: 0; }
+}
+
+/* ── Google Play download badges ────────────────────────────────────────── */
+.app-downloads { margin-top: 26px; }
+.app-downloads__title { display: block; font-size: .72rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); margin-bottom: 11px; }
+.play-badges { display: flex; flex-wrap: wrap; gap: 12px; }
+.play-badge { display: inline-flex; align-items: center; gap: 11px; padding: 9px 17px 9px 13px; border-radius: 13px; background: #0f1216; color: #fff; border: 1px solid rgba(255,255,255,.14); transition: transform .16s var(--ease), box-shadow .16s var(--ease), border-color .16s var(--ease); }
+.play-badge:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: rgba(255,255,255,.28); }
+.play-badge__logo { flex: none; }
+.play-badge__txt { display: flex; flex-direction: column; line-height: 1.12; text-align: start; }
+.play-badge__txt small { font-size: .57rem; font-weight: 600; letter-spacing: .11em; opacity: .82; }
+.play-badge__txt b { font-size: .98rem; font-weight: 700; letter-spacing: -.01em; }
+.footer .app-downloads { margin-top: 20px; }
+@media (max-width: 460px) { .play-badges { flex-direction: column; align-items: stretch; } .play-badge { width: 100%; } }
+
+/* ── Header: web-only "open app" link + edge-to-edge mobile bar ──────────── */
+.app-link-web { display: inline-flex; align-items: center; height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); font-size: .84rem; font-weight: 700; color: var(--text-2); transition: border-color .16s var(--ease), color .16s var(--ease); }
+.app-link-web:hover { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 1040px) { .app-link-web { display: none; } }
+@media (max-width: 720px) { .nav > .wrap { padding-inline: 12px; } }
 
 /* ── Hero ───────────────────────────────────────────────────────────────── */
 .hero { position: relative; padding: 84px 0 72px; overflow: hidden; }
@@ -17462,7 +17518,7 @@ function renderPage(meta2, body, baseUrl) {
   const heroPreload = meta2.heroImage ? `
   <link rel="preload" as="image" href="/brand/site/${meta2.heroImage}.webp" fetchpriority="high" type="image/webp">` : "";
   return `<!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="en" dir="ltr" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -17536,8 +17592,14 @@ function renderPage(meta2, body, baseUrl) {
       <nav class="nav-links" id="navLinks" aria-label="Main">
         ${navHtml}
         <a class="btn btn-primary cta-mobile" href="/contact/" style="margin-top:10px" ${tAttrs({ en: "Book a demo", de: "Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627" })}>Book a demo</a>
+        <div class="nav-lang" role="group" aria-label="Language">
+          <button type="button" data-lang="en" onclick="Kassenta.setLang('en')">EN</button>
+          <button type="button" data-lang="de" onclick="Kassenta.setLang('de')">DE</button>
+          <button type="button" data-lang="ar" onclick="Kassenta.setLang('ar')">AR</button>
+        </div>
       </nav>
       <div class="nav-actions">
+        <a class="app-link-web" href="/app/" ${tAttrs({ en: "Open web app", de: "Web-App \xF6ffnen", ar: "\u0627\u0641\u062A\u062D \u062A\u0637\u0628\u064A\u0642 \u0627\u0644\u0648\u064A\u0628" })}>Open web app</a>
         <button class="icon-btn theme-btn" type="button" onclick="Kassenta.toggleTheme()" aria-label="Toggle colour theme">${icons.sun}${icons.moon}</button>
         <div class="lang" id="langWrap">
           <button class="lang-btn" type="button" onclick="Kassenta.toggleLangMenu(event)" aria-haspopup="true" aria-expanded="false">
@@ -17550,6 +17612,7 @@ function renderPage(meta2, body, baseUrl) {
       </div>
     </div>
   </header>
+  <div class="nav-scrim" id="navScrim" onclick="Kassenta.toggleNav()"></div>
 
   <main id="main">
 ${body}
@@ -17604,6 +17667,17 @@ function renderWhatsApp() {
     </a>
   </div>`;
 }
+function playBadges(variant = "hero") {
+  const glyph = `<svg class="play-badge__logo" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#00C3FF" d="M3.6 1.3C3.2 1.6 3 2.1 3 2.8v18.4c0 .7.2 1.2.6 1.5l10.4-10.4z"/><path fill="#00E676" d="M17.7 15.3l-3.5-3.4 3.5-3.4 4.2 2.4c1 .6 1 1.5 0 2.1z"/><path fill="#FF3D00" d="M17.9 8.5 14.2 12 3.6 1.3c.5-.4 1.2-.4 1.9 0z"/><path fill="#FFC107" d="M17.9 15.5 5.5 22.7c-.7.4-1.4.4-1.9 0L14.2 12z"/></svg>`;
+  const apps = [
+    { id: "tech.barmagly.pos", name: "Kassenta POS" },
+    { id: "com.barmagly.customer", name: "Kassenta Order" }
+  ];
+  const badges = apps.map(
+    (a) => `<a class="play-badge" href="https://play.google.com/store/apps/details?id=${a.id}" target="_blank" rel="noopener" aria-label="${esc(a.name)} \u2014 Google Play">${glyph}<span class="play-badge__txt"><small>GET IT ON GOOGLE PLAY</small><b>${esc(a.name)}</b></span></a>`
+  ).join("");
+  return `<div class="app-downloads app-downloads--${variant}"><span class="app-downloads__title" ${tAttrs({ en: "Get the Android apps", de: "Android-Apps holen", ar: "\u062D\u0645\u0651\u0644 \u062A\u0637\u0628\u064A\u0642\u0627\u062A \u0623\u0646\u062F\u0631\u0648\u064A\u062F" })}>Get the Android apps</span><div class="play-badges">${badges}</div></div>`;
+}
 function renderFooter() {
   const col = (title, links) => `
         <div class="footer-col">
@@ -17622,6 +17696,7 @@ function renderFooter() {
     de: "Kasse, Online-Bestellung und Lieferung in einem System. Entwickelt f\xFCr Gastronomie und Handel in der Schweiz und Europa.",
     ar: "\u0646\u0642\u0637\u0629 \u0628\u064A\u0639 \u0648\u0637\u0644\u0628 \u0623\u0648\u0646\u0644\u0627\u064A\u0646 \u0648\u062A\u0648\u0635\u064A\u0644 \u0641\u064A \u0646\u0638\u0627\u0645 \u0648\u0627\u062D\u062F. \u0645\u0635\u0645\u064E\u0651\u0645 \u0644\u0642\u0637\u0627\u0639 \u0627\u0644\u0636\u064A\u0627\u0641\u0629 \u0648\u0627\u0644\u062A\u062C\u0632\u0626\u0629 \u0641\u064A \u0633\u0648\u064A\u0633\u0631\u0627 \u0648\u0623\u0648\u0631\u0648\u0628\u0627."
   })}>Point of sale, online ordering and delivery in one system. Built for Swiss and European hospitality and retail.</p>
+          ${playBadges("footer")}
         </div>
         ${col({ en: "Product", de: "Produkt", ar: "\u0627\u0644\u0645\u0646\u062A\u062C" }, [
     { href: "/features/", label: { en: "Features", de: "Funktionen", ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A" } },
@@ -17702,14 +17777,14 @@ window.Kassenta = (function () {
     });
     var label = document.getElementById('langLabel');
     if (label) label.textContent = LANGS[l];
-    document.querySelectorAll('.lang-menu button').forEach(function (b) {
+    document.querySelectorAll('.lang-menu button, .nav-lang button').forEach(function (b) {
       var on = b.dataset.lang === l;
       b.classList.toggle('active', on);
       b.setAttribute('aria-checked', on ? 'true' : 'false');
     });
   }
 
-  function setLang(l) { store('kassenta_lang', l); applyLang(l); closeLangMenu(); }
+  function setLang(l) { store('kassenta_lang', l); applyLang(l); closeLangMenu(); closeNav(); }
 
   function applyTheme(mode) {
     document.documentElement.setAttribute('data-theme', mode);
@@ -17725,8 +17800,15 @@ window.Kassenta = (function () {
   function toggleNav() {
     var el = document.getElementById('navLinks');
     var btn = document.querySelector('.nav-toggle');
+    var scrim = document.getElementById('navScrim');
     var open = el.classList.toggle('open');
+    if (scrim) scrim.classList.toggle('open', open);
+    document.body.style.overflow = open ? 'hidden' : '';
     if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function closeNav() {
+    var el = document.getElementById('navLinks');
+    if (el && el.classList.contains('open')) toggleNav();
   }
   function toggleLangMenu(e) {
     if (e) e.stopPropagation();
@@ -18207,6 +18289,7 @@ var home = {
             <a class="btn btn-primary" href="/contact/">${icons.arrowRight}<span ${tAttrs({ en: "Book a live demo", de: "Live-Demo buchen", ar: "\u0627\u062D\u062C\u0632 \u0639\u0631\u0636\u064B\u0627 \u0645\u0628\u0627\u0634\u0631\u064B\u0627" })}>Book a live demo</span></a>
             <a class="btn btn-ghost" href="/features/" ${tAttrs({ en: "Explore the platform", de: "Plattform ansehen", ar: "\u0627\u0633\u062A\u0643\u0634\u0641 \u0627\u0644\u0645\u0646\u0635\u0629" })}>Explore the platform</a>
           </div>
+          ${playBadges("hero")}
           <div class="hero-meta">
             <div><b>3</b><span ${tAttrs({ en: "Languages: EN / DE / AR", de: "Sprachen: EN / DE / AR", ar: "\u0644\u063A\u0627\u062A: EN / DE / AR" })}>Languages: EN / DE / AR</span></div>
             <div><b>8.1%</b><span ${tAttrs({ en: "Swiss VAT handled", de: "Schweizer MwSt. ber\xFCcksichtigt", ar: "\u0636\u0631\u064A\u0628\u0629 \u0633\u0648\u064A\u0633\u0631\u0627 \u0645\u062F\u0639\u0648\u0645\u0629" })}>Swiss VAT handled</span></div>

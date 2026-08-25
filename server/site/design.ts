@@ -268,16 +268,72 @@ p { color: var(--text-2); }
 .cta-mobile { display: none; }
 @media (max-width: 1040px) {
   .nav-toggle { display: grid; }
+  /* nav-links becomes a fixed dropdown here, so it no longer spaces the row.
+     Push the actions cluster to the far edge (RTL-safe) so the icons sit at
+     the edge opposite the logo, not floating in the middle. */
+  .nav-actions { margin-inline-start: auto; }
+  /* Mobile nav is an off-canvas side drawer (not a dropdown). It slides in from
+     the inline-end edge; RTL flips the side. A scrim dims the page behind it. */
   .nav-links {
-    position: fixed; inset: var(--nav-h) 0 auto 0; flex-direction: column; align-items: stretch; gap: 2px;
-    background: var(--bg); border-bottom: 1px solid var(--border); padding: 14px 18px 20px;
-    box-shadow: var(--shadow-lg); display: none; margin: 0; max-height: calc(100dvh - var(--nav-h)); overflow-y: auto;
+    position: fixed; top: var(--nav-h); bottom: 0; inset-inline-end: 0; width: min(84vw, 328px);
+    flex-direction: column; align-items: stretch; gap: 0;
+    background: var(--surface); border-inline-start: 1px solid var(--border); border-top: 1px solid var(--border);
+    padding: 12px 22px 28px; box-shadow: var(--shadow-xl);
+    margin: 0; height: calc(100dvh - var(--nav-h)); overflow-y: auto; z-index: 950; display: flex;
+    transform: translateX(100%); transition: transform .28s var(--ease);
   }
-  .nav-links.open { display: flex; }
-  .nav-links a { padding: 12px 14px; font-size: .98rem; }
+  [dir="rtl"] .nav-links { transform: translateX(-100%); }
+  .nav-links.open { transform: translateX(0); }
+  /* Nav items become a clean full-width divider list, so text hugs the row
+     edge instead of floating in the drawer's middle. */
+  .nav-links a:not(.cta-mobile) {
+    padding: 15px 2px; font-size: 1.02rem; font-weight: 600; color: var(--text);
+    border-radius: 0; border-bottom: 1px solid var(--border); text-align: start;
+  }
+  .nav-links a:not(.cta-mobile):hover { background: transparent; color: var(--accent); }
+  .nav-links a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
   .nav .cta-desktop { display: none; }
-  .nav-links .cta-mobile { display: inline-flex; }
+  .nav-links .cta-mobile { display: inline-flex; justify-content: center; margin-top: 20px; }
+  .nav-scrim {
+    position: fixed; inset: 0; background: var(--scrim, rgba(4,14,50,.62));
+    opacity: 0; visibility: hidden; transition: opacity .28s var(--ease); z-index: 800;
+  }
+  .nav-scrim.open { opacity: 1; visibility: visible; }
+  .nav-lang { display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .nav-lang button {
+    flex: 1; padding: 11px 8px; border: 1px solid var(--border-2); border-radius: 10px;
+    background: var(--surface); color: var(--text-2); font-weight: 700; font-size: .9rem; cursor: pointer;
+    transition: border-color .16s var(--ease), color .16s var(--ease), background-color .16s var(--ease);
+  }
+  .nav-lang button.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 }
+.nav-scrim { display: none; }
+@media (max-width: 1040px) { .nav-scrim { display: block; } }
+.nav-lang { display: none; }
+@media (max-width: 1040px) { .nav-lang { display: flex; } }
+@media (max-width: 600px) {
+  /* On phones the drawer fills the width so no page peeks beside it. */
+  .nav-links { width: 100%; border-inline-start: 0; }
+}
+
+/* ── Google Play download badges ────────────────────────────────────────── */
+.app-downloads { margin-top: 26px; }
+.app-downloads__title { display: block; font-size: .72rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); margin-bottom: 11px; }
+.play-badges { display: flex; flex-wrap: wrap; gap: 12px; }
+.play-badge { display: inline-flex; align-items: center; gap: 11px; padding: 9px 17px 9px 13px; border-radius: 13px; background: #0f1216; color: #fff; border: 1px solid rgba(255,255,255,.14); transition: transform .16s var(--ease), box-shadow .16s var(--ease), border-color .16s var(--ease); }
+.play-badge:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: rgba(255,255,255,.28); }
+.play-badge__logo { flex: none; }
+.play-badge__txt { display: flex; flex-direction: column; line-height: 1.12; text-align: start; }
+.play-badge__txt small { font-size: .57rem; font-weight: 600; letter-spacing: .11em; opacity: .82; }
+.play-badge__txt b { font-size: .98rem; font-weight: 700; letter-spacing: -.01em; }
+.footer .app-downloads { margin-top: 20px; }
+@media (max-width: 460px) { .play-badges { flex-direction: column; align-items: stretch; } .play-badge { width: 100%; } }
+
+/* ── Header: web-only "open app" link + edge-to-edge mobile bar ──────────── */
+.app-link-web { display: inline-flex; align-items: center; height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); font-size: .84rem; font-weight: 700; color: var(--text-2); transition: border-color .16s var(--ease), color .16s var(--ease); }
+.app-link-web:hover { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 1040px) { .app-link-web { display: none; } }
+@media (max-width: 720px) { .nav > .wrap { padding-inline: 12px; } }
 
 /* ── Hero ───────────────────────────────────────────────────────────────── */
 .hero { position: relative; padding: 84px 0 72px; overflow: hidden; }

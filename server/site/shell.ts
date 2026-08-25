@@ -258,7 +258,7 @@ export function renderPage(meta: PageMeta, body: string, baseUrl: string): strin
     : "";
 
   return `<!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="en" dir="ltr" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -332,8 +332,14 @@ export function renderPage(meta: PageMeta, body: string, baseUrl: string): strin
       <nav class="nav-links" id="navLinks" aria-label="Main">
         ${navHtml}
         <a class="btn btn-primary cta-mobile" href="/contact/" style="margin-top:10px" ${tAttrs({ en: "Book a demo", de: "Demo buchen", ar: "احجز عرضًا" })}>Book a demo</a>
+        <div class="nav-lang" role="group" aria-label="Language">
+          <button type="button" data-lang="en" onclick="Kassenta.setLang('en')">EN</button>
+          <button type="button" data-lang="de" onclick="Kassenta.setLang('de')">DE</button>
+          <button type="button" data-lang="ar" onclick="Kassenta.setLang('ar')">AR</button>
+        </div>
       </nav>
       <div class="nav-actions">
+        <a class="app-link-web" href="/app/" ${tAttrs({ en: "Open web app", de: "Web-App öffnen", ar: "افتح تطبيق الويب" })}>Open web app</a>
         <button class="icon-btn theme-btn" type="button" onclick="Kassenta.toggleTheme()" aria-label="Toggle colour theme">${icons.sun}${icons.moon}</button>
         <div class="lang" id="langWrap">
           <button class="lang-btn" type="button" onclick="Kassenta.toggleLangMenu(event)" aria-haspopup="true" aria-expanded="false">
@@ -346,6 +352,7 @@ export function renderPage(meta: PageMeta, body: string, baseUrl: string): strin
       </div>
     </div>
   </header>
+  <div class="nav-scrim" id="navScrim" onclick="Kassenta.toggleNav()"></div>
 
   <main id="main">
 ${body}
@@ -416,6 +423,22 @@ function renderWhatsApp(): string {
   </div>`;
 }
 
+/** Google Play download badges for the two Android apps. */
+export function playBadges(variant: "hero" | "footer" = "hero"): string {
+  const glyph = `<svg class="play-badge__logo" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#00C3FF" d="M3.6 1.3C3.2 1.6 3 2.1 3 2.8v18.4c0 .7.2 1.2.6 1.5l10.4-10.4z"/><path fill="#00E676" d="M17.7 15.3l-3.5-3.4 3.5-3.4 4.2 2.4c1 .6 1 1.5 0 2.1z"/><path fill="#FF3D00" d="M17.9 8.5 14.2 12 3.6 1.3c.5-.4 1.2-.4 1.9 0z"/><path fill="#FFC107" d="M17.9 15.5 5.5 22.7c-.7.4-1.4.4-1.9 0L14.2 12z"/></svg>`;
+  const apps = [
+    { id: "tech.barmagly.pos", name: "Kassenta POS" },
+    { id: "com.barmagly.customer", name: "Kassenta Order" },
+  ];
+  const badges = apps
+    .map(
+      (a) =>
+        `<a class="play-badge" href="https://play.google.com/store/apps/details?id=${a.id}" target="_blank" rel="noopener" aria-label="${esc(a.name)} — Google Play">${glyph}<span class="play-badge__txt"><small>GET IT ON GOOGLE PLAY</small><b>${esc(a.name)}</b></span></a>`
+    )
+    .join("");
+  return `<div class="app-downloads app-downloads--${variant}"><span class="app-downloads__title" ${tAttrs({ en: "Get the Android apps", de: "Android-Apps holen", ar: "حمّل تطبيقات أندرويد" })}>Get the Android apps</span><div class="play-badges">${badges}</div></div>`;
+}
+
 function renderFooter(): string {
   const col = (title: T3, links: { href: string; label: T3; external?: boolean }[]) => `
         <div class="footer-col">
@@ -438,6 +461,7 @@ function renderFooter(): string {
             de: "Kasse, Online-Bestellung und Lieferung in einem System. Entwickelt für Gastronomie und Handel in der Schweiz und Europa.",
             ar: "نقطة بيع وطلب أونلاين وتوصيل في نظام واحد. مصمَّم لقطاع الضيافة والتجزئة في سويسرا وأوروبا.",
           })}>Point of sale, online ordering and delivery in one system. Built for Swiss and European hospitality and retail.</p>
+          ${playBadges("footer")}
         </div>
         ${col({ en: "Product", de: "Produkt", ar: "المنتج" }, [
           { href: "/features/", label: { en: "Features", de: "Funktionen", ar: "المميزات" } },
@@ -519,14 +543,14 @@ window.Kassenta = (function () {
     });
     var label = document.getElementById('langLabel');
     if (label) label.textContent = LANGS[l];
-    document.querySelectorAll('.lang-menu button').forEach(function (b) {
+    document.querySelectorAll('.lang-menu button, .nav-lang button').forEach(function (b) {
       var on = b.dataset.lang === l;
       b.classList.toggle('active', on);
       b.setAttribute('aria-checked', on ? 'true' : 'false');
     });
   }
 
-  function setLang(l) { store('kassenta_lang', l); applyLang(l); closeLangMenu(); }
+  function setLang(l) { store('kassenta_lang', l); applyLang(l); closeLangMenu(); closeNav(); }
 
   function applyTheme(mode) {
     document.documentElement.setAttribute('data-theme', mode);
@@ -542,8 +566,15 @@ window.Kassenta = (function () {
   function toggleNav() {
     var el = document.getElementById('navLinks');
     var btn = document.querySelector('.nav-toggle');
+    var scrim = document.getElementById('navScrim');
     var open = el.classList.toggle('open');
+    if (scrim) scrim.classList.toggle('open', open);
+    document.body.style.overflow = open ? 'hidden' : '';
     if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function closeNav() {
+    var el = document.getElementById('navLinks');
+    if (el && el.classList.contains('open')) toggleNav();
   }
   function toggleLangMenu(e) {
     if (e) e.stopPropagation();

@@ -608,9 +608,9 @@
       // The /menu endpoint returns { categories:[{...,items}], allProducts:[...] }.
       // Normalise to a flat products array and attach each product's category
       // NAME (the render/filter code below keys off p.category, not categoryId).
-      var catNameById = {};
+      var catNameById = {}, catRankById = {};
       if (menuResp && Array.isArray(menuResp.categories)) {
-        menuResp.categories.forEach(function (c) { catNameById[c.id] = c.name; });
+        menuResp.categories.forEach(function (c, i) { catNameById[c.id] = c.name; catRankById[c.id] = i; });
       }
       var menu = Array.isArray(menuResp) ? menuResp
                : (menuResp && Array.isArray(menuResp.allProducts)) ? menuResp.allProducts
@@ -618,6 +618,13 @@
                : [];
       menu = menu.map(function (p) {
         return p.category ? p : Object.assign({}, p, { category: catNameById[p.categoryId] || "" });
+      });
+      // Follow the shop's own category order so main dishes (Pizza, mains…) come
+      // first and the Extra/sauces category lands last; allProducts arrives
+      // unsorted with Extra on top.
+      menu.sort(function (a, b) {
+        var ra = catRankById[a.categoryId], rb = catRankById[b.categoryId];
+        return (ra == null ? 999 : ra) - (rb == null ? 999 : rb);
       });
       state.tenantMenu = { slug: slug, store: store, menu: menu };
       $("menu-title").textContent = store.storeName || store.name || "Menu";
@@ -1676,7 +1683,6 @@
     // checkout degrades to cash rather than showing a button that cannot work.
     if (payReady) payOptions.push({ value: "online", label: payNowLabel() });
     payOptions.push({ value: "cash", label: "Cash on delivery" });
-    payOptions.push({ value: "card", label: "Card on delivery" });
     fields.push({ key: "payment", label: "Payment method", type: "select",
                   options: payOptions, value: payReady ? "online" : "cash" });
 

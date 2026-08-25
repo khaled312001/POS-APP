@@ -1,4 +1,4 @@
-import { icons, shot, t, tAttrs, esc, type PageMeta, type T3 } from "./shell";
+import { icons, shot, t, tAttrs, esc, playBadges, type PageMeta, type T3 } from "./shell";
 import {
   PLANS, CURRENCY, STARTER, PROFESSIONAL, ENTERPRISE, yearlyMonthly, type SitePlan,
 } from "./plans";
@@ -209,6 +209,7 @@ export const home: { meta: PageMeta; body: string } = {
             <a class="btn btn-primary" href="/contact/">${icons.arrowRight}<span ${tAttrs({ en: "Book a live demo", de: "Live-Demo buchen", ar: "احجز عرضًا مباشرًا" })}>Book a live demo</span></a>
             <a class="btn btn-ghost" href="/features/" ${tAttrs({ en: "Explore the platform", de: "Plattform ansehen", ar: "استكشف المنصة" })}>Explore the platform</a>
           </div>
+          ${playBadges("hero")}
           <div class="hero-meta">
             <div><b>3</b><span ${tAttrs({ en: "Languages: EN / DE / AR", de: "Sprachen: EN / DE / AR", ar: "لغات: EN / DE / AR" })}>Languages: EN / DE / AR</span></div>
             <div><b>8.1%</b><span ${tAttrs({ en: "Swiss VAT handled", de: "Schweizer MwSt. berücksichtigt", ar: "ضريبة سويسرا مدعومة" })}>Swiss VAT handled</span></div>
