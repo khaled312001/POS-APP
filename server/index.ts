@@ -22,6 +22,7 @@ import { runStripeMigrations } from "./stripeMigrations";
 import { runShamCashMigrations } from "./shamcash";
 import { runWholesaleMigrations } from "./wholesale";
 import { registerWholesaleRoutes } from "./wholesaleRoutes";
+import { runLoyaltyMigrations } from "./deliveryService";
 import { DELETE_ACCOUNT_HTML, PRIVACY_POLICY_HTML } from "./legal-pages";
 import { TERMS_HTML, IMPRINT_HTML } from "./site/legal";
 import { isSitePath, renderSitePage, findSiteAsset, SITEMAP_PATHS } from "./site";
@@ -1206,6 +1207,7 @@ async function initStripe() {
   await runStripeMigrations();
   await runShamCashMigrations();
   await runWholesaleMigrations();
+  await runLoyaltyMigrations();
 
   setupCors(app);
 

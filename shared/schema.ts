@@ -785,8 +785,12 @@ export const landingPageConfig = mysqlTable("landing_page_config", {
   deliveryZonesJson: json("delivery_zones_json").$type<{ label: string; lat: number; lng: number; radiusKm: number; fee: number }[]>().default([]),
   minDeliveryTime: int("min_delivery_time").default(20),
   maxDeliveryTime: int("max_delivery_time").default(45),
-  loyaltyPointsPerUnit: decimal("loyalty_points_per_unit", { precision: 5, scale: 2 }).default("1.00"),
-  loyaltyRedemptionRate: decimal("loyalty_redemption_rate", { precision: 5, scale: 2 }).default("0.01"),
+  // Loyalty (POS + online store). Scales are wide enough for zero-decimal
+  // currencies: an SYP store earns e.g. 1 point per 1,000 SYP (0.001/unit)
+  // and a point can be worth 100 SYP. Widened on boot by runLoyaltyMigrations.
+  loyaltyPointsPerUnit: decimal("loyalty_points_per_unit", { precision: 14, scale: 6 }).default("1.000000"),
+  loyaltyRedemptionRate: decimal("loyalty_redemption_rate", { precision: 14, scale: 4 }).default("0.0100"),
+  loyaltyMinRedeemPoints: int("loyalty_min_redeem_points").default(0),
   enableLoyalty: boolean("enable_loyalty").default(true),
   enableScheduledOrders: boolean("enable_scheduled_orders").default(true),
   enablePromos: boolean("enable_promos").default(true),

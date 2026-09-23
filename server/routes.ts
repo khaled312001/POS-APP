@@ -26,7 +26,8 @@ import {
 } from "./customerAuthService";
 import {
   validatePromoCode, recordPromoUsage, awardLoyaltyPoints,
-  redeemLoyaltyPoints, assignDriverToOrder, releaseDriver,
+  redeemLoyaltyPoints, checkLoyaltyRedemption, settlePosSaleLoyalty,
+  assignDriverToOrder, releaseDriver,
   getDeliveryZoneForLocation, generateTrackingToken,
   creditWallet, deductWallet,
 } from "./deliveryService";
@@ -1447,9 +1448,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ ...sale, items });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
-  app.post("/api/sales", async (req, res) => {
+  app.post("/api/sales", async (req: any, res) => {
     try {
-      const { items, ...saleData } = sanitizeDates(req.body);
+      const { items, loyaltyPointsRedeemed, ...saleData } = sanitizeDates(req.body);
+      // Loyalty is settled against the licence's tenant, never a body field.
+      // A redemption is checked before anything is written, so a stale balance
+      // refuses the sale instead of granting a discount the points can't cover.
+      const loyaltyTenantId: number | undefined = req.tenantId
+        ?? (saleData.customerId ? (await storage.getCustomer(saleData.customerId))?.tenantId ?? undefined : undefined);
+      const redeemPoints = Math.max(0, Math.floor(Number(loyaltyPointsRedeemed) || 0));
+      if (redeemPoints > 0) {
+        const refusal = saleData.customerId && loyaltyTenantId
+          ? await checkLoyaltyRedemption(Number(saleData.customerId), loyaltyTenantId, redeemPoints)
+          : "A customer is required to redeem points";
+        if (refusal) return res.status(400).json({ error: refusal });
+      }
       const swissDateRcp = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replace(/-/g, "");
       const dailySeqRcp = await storage.getNextSequenceNumber(`branch-${saleData.branchId || 0}`);
       const receiptNumber = `${saleData.branchId || 0}-${swissDateRcp}-${dailySeqRcp}`;
@@ -1488,9 +1501,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       if (saleData.customerId) {
-        const points = Math.floor(Number(saleData.totalAmount) / 10);
-        await storage.addLoyaltyPoints(saleData.customerId, points);
+        // Points follow Settings -> Loyalty (on/off, earn rate, point value).
         const existingCustomer = await storage.getCustomer(saleData.customerId);
+        if (loyaltyTenantId && existingCustomer
+          && (existingCustomer.tenantId == null || existingCustomer.tenantId === loyaltyTenantId)) {
+          try {
+            await settlePosSaleLoyalty({
+              customerId: existingCustomer.id,
+              tenantId: loyaltyTenantId,
+              receiptNumber: sale.receiptNumber,
+              amountPaid: Number(saleData.totalAmount),
+              redeemPoints,
+            });
+          } catch (e: any) {
+            // The sale is already written; a loyalty hiccup must not fail it.
+            console.error("[loyalty] POS sale", sale.id, e?.message || e);
+          }
+        }
         if (existingCustomer) {
           await storage.updateCustomer(saleData.customerId, {
             visitCount: (existingCustomer.visitCount || 0) + 1,
@@ -2503,7 +2530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get store settings (main branch + tenant info)
   app.get("/api/store-settings", async (req: any, res) => {
     try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : undefined;
+      const tenantId = req.tenantId ?? (req.query.tenantId ? Number(req.query.tenantId) : undefined);
       let branches = [];
       if (tenantId) {
         branches = await storage.getBranchesByTenant(tenantId);
@@ -2531,8 +2558,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/store-settings", async (req: any, res) => {
     try {
       const { storeType, tenantId: bodyTenantId, ...branchData } = sanitizeDates(req.body);
-      // Use tenantId from query or body to find the right branch
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : (bodyTenantId ? Number(bodyTenantId) : undefined);
+      // The licence's tenant first: the settings screen sends no tenantId, and
+      // falling through to getBranches() would edit another store's branch.
+      const tenantId = req.tenantId ?? (req.query.tenantId ? Number(req.query.tenantId) : (bodyTenantId ? Number(bodyTenantId) : undefined));
 
       let branches = [];
       if (tenantId) {

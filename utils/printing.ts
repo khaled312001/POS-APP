@@ -1,7 +1,54 @@
 import { Platform } from "react-native";
 import * as Print from "expo-print";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl } from "@/lib/query-client";
 import { getDisplayNumber } from "@/lib/api-config";
+
+// ── Receipt printer preferences (Settings → Receipt Printer) ────────────────
+// Per device: each till has its own printer. Kept in a module cache so the
+// print templates (plain functions) can read it synchronously; loaded from
+// storage once at import, long before the first sale is printed.
+export type ReceiptPaperSize = "58mm" | "80mm";
+export interface ReceiptPrinterPrefs {
+  paperSize: ReceiptPaperSize;
+  /** Print the receipt copies automatically when a sale completes. */
+  autoPrint: boolean;
+}
+const PRINTER_PREFS_KEY = "kassenta_receipt_printer";
+let printerPrefs: ReceiptPrinterPrefs = { paperSize: "80mm", autoPrint: true };
+
+AsyncStorage.getItem(PRINTER_PREFS_KEY)
+  .then((raw) => {
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    printerPrefs = {
+      paperSize: saved?.paperSize === "58mm" ? "58mm" : "80mm",
+      autoPrint: saved?.autoPrint !== false,
+    };
+  })
+  .catch(() => { /* keep the defaults */ });
+
+export function getReceiptPrinterPrefs(): ReceiptPrinterPrefs {
+  return printerPrefs;
+}
+
+export function setReceiptPrinterPrefs(next: Partial<ReceiptPrinterPrefs>): ReceiptPrinterPrefs {
+  printerPrefs = { ...printerPrefs, ...next };
+  AsyncStorage.setItem(PRINTER_PREFS_KEY, JSON.stringify(printerPrefs)).catch(() => {});
+  return printerPrefs;
+}
+
+/**
+ * Every receipt template is laid out for 80mm rolls (@page 80mm, 72mm body).
+ * On a 58mm printer the same markup is narrowed here, in one place, rather
+ * than in each template.
+ */
+function fitPaper(html: string): string {
+  if (printerPrefs.paperSize !== "58mm") return html;
+  return html
+    .replace(/size:\s*80mm auto/g, "size: 58mm auto")
+    .replace(/width:\s*72mm/g, "width: 50mm");
+}
 
 // ── Native receipt printing via expo-print ──────────────────────────────────
 // On iOS/Android there is no window.print(); the old iframe path silently did
@@ -9,11 +56,11 @@ import { getDisplayNumber } from "@/lib/api-config";
 // lets the user pick a printer OR "Save as PDF" / "Share".
 async function printHtmlNative(html: string, onDone?: () => void) {
   try {
-    await Print.printAsync({ html });
+    await Print.printAsync({ html: fitPaper(html) });
   } catch (e) {
     // Fallback: generate a PDF file the user can open/share.
     try {
-      await Print.printToFileAsync({ html });
+      await Print.printToFileAsync({ html: fitPaper(html) });
     } catch (_) { /* ignore */ }
   } finally {
     onDone?.();
@@ -47,7 +94,7 @@ export function printHtmlViaIframe(html: string, onDone?: () => void) {
   };
 
   try {
-    const blob = new Blob([html], { type: "text/html" });
+    const blob = new Blob([fitPaper(html)], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     iframe.src = url;
     iframe.onload = () => {

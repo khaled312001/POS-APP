@@ -23,8 +23,9 @@ import { getChromeMetrics } from "@/lib/responsive";
 import TabPageHeader from "@/components/tab-page-header";
 import { FlagIcon } from "@/components/FlagIcon";
 // Platform-aware printer: native → expo-print (Save-as-PDF), web → hidden iframe.
-import { printHtmlViaIframe } from "@/utils/printing";
+import { printHtmlViaIframe, getReceiptPrinterPrefs, setReceiptPrinterPrefs, type ReceiptPrinterPrefs } from "@/utils/printing";
 import { formatMoney, currencyLabel } from "@/lib/currency";
+import Constants from "expo-constants";
 import ShamCashSettings from "@/components/ShamCashSettings";
 import WhatsAppVerify from "@/components/WhatsAppVerify";
 
@@ -87,6 +88,8 @@ export default function SettingsScreen() {
   const qc = useQueryClient();
   const { employee, logout, isAdmin, canManage, isCashier } = useAuth();
   const { t, isRTL, language, setLanguage } = useLanguage();
+  // Inline copy for strings that have no i18n key yet: (Arabic, German, English).
+  const tr3 = (ar: string, de: string, en: string) => (language === "ar" ? ar : language === "de" ? de : en);
   const { tenant } = useLicense();
   const { topPad, bottomPad } = getChromeMetrics(width);
   const tenantId = tenant?.id;
@@ -138,15 +141,15 @@ export default function SettingsScreen() {
   const [branchForm, setBranchForm] = useState({ name: "", address: "", phone: "", currency: "CHF", taxRate: "" });
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState({ name: "", address: "", type: "main" });
-  // Delivery Platform modals
-  const [showDeliveryZones, setShowDeliveryZones] = useState(false);
-  const [showPromoCodes, setShowPromoCodes] = useState(false);
-  const [showDriverManagement, setShowDriverManagement] = useState(false);
+  // Loyalty programme (stored on the tenant's landing_page_config, which the
+  // till and the online store both read)
   const [showLoyaltyConfig, setShowLoyaltyConfig] = useState(false);
+  const [loyaltyForm, setLoyaltyForm] = useState({ enabled: true, spendPerPoint: "", pointValue: "", minRedeem: "" });
 
+  // Receipt printer: per-device preferences, read by utils/printing
   const [showPrinterSettings, setShowPrinterSettings] = useState(false);
-  const [printerPaperSize, setPrinterPaperSize] = useState("80mm");
-  const [printerAutoPrint, setPrinterAutoPrint] = useState(false);
+  const [printerPrefs, setPrinterPrefsState] = useState<ReceiptPrinterPrefs>(getReceiptPrinterPrefs());
+  const updatePrinterPrefs = (next: Partial<ReceiptPrinterPrefs>) => setPrinterPrefsState(setReceiptPrinterPrefs(next));
   const [showStoreSettings, setShowStoreSettings] = useState(false);
   const [storeForm, setStoreForm] = useState({ name: "", address: "", phone: "", email: "", storeType: "supermarket", taxRate: "", deliveryFee: "", whatsappAdminPhone: "" });
   const [storeLogo, setStoreLogo] = useState<string | null>(null);
@@ -179,9 +182,6 @@ export default function SettingsScreen() {
   const [importType, setImportType] = useState<"products" | "customers">("products");
   const [importLoading, setImportLoading] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
-  const [showCallerIdTest, setShowCallerIdTest] = useState(false);
-  const [testPhoneNumber, setTestPhoneNumber] = useState("");
-  const [callerIdStatus, setCallerIdStatus] = useState<"idle" | "testing" | "done">("idle");
 
   // Vehicles
   const [showVehicles, setShowVehicles] = useState(false);
@@ -219,6 +219,22 @@ export default function SettingsScreen() {
       AsyncStorage.setItem("barmagly_left_hand_mode", val ? "true" : "false");
     });
   };
+  // Shift monitor's default shift length: remembered on this device.
+  useEffect(() => {
+    import("@react-native-async-storage/async-storage").then(({ default: AsyncStorage }) => {
+      AsyncStorage.getItem("kassenta_default_shift_hours").then((v) => {
+        if (v && Number(v) > 0) setDefaultShiftDuration(v);
+      });
+    });
+  }, []);
+  const changeDefaultShiftDuration = (val: string) => {
+    setDefaultShiftDuration(val);
+    if (Number(val) > 0) {
+      import("@react-native-async-storage/async-storage").then(({ default: AsyncStorage }) => {
+        AsyncStorage.setItem("kassenta_default_shift_hours", val);
+      });
+    }
+  };
 
   const { data: employees = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/employees?tenantId=${tenant.id}` : "/api/employees"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
   const { data: suppliers = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/suppliers?tenantId=${tenant.id}` : "/api/suppliers"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
@@ -233,7 +249,9 @@ export default function SettingsScreen() {
   const { data: batchesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/product-batches?tenantId=${tenant.id}` : "/api/product-batches"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
   const { data: productsList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/products?tenantId=${tenant.id}` : "/api/products"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
   const { data: storeSettings } = useQuery<any>({ queryKey: [tenant?.id ? `/api/store-settings?tenantId=${tenant.id}` : "/api/store-settings"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
-  const { data: pgConfig, refetch: refetchPgConfig } = useQuery<any>({ queryKey: ["/api/payment-gateway/config"], queryFn: getQueryFn({ on401: "throw" }), enabled: isAdmin });
+  // The route is public (checkout reads it), so the licence never scopes it:
+  // without ?tenantId the server answers with the platform default settings.
+  const { data: pgConfig, refetch: refetchPgConfig } = useQuery<any>({ queryKey: ["/api/payment-gateway/config", tenantId ? `?tenantId=${tenantId}` : ""], queryFn: getQueryFn({ on401: "throw" }), enabled: isAdmin && !!tenantId });
   // Live account health. It hits Stripe on the server, so it only runs while
   // the Payment Gateways sheet is open. Answers 200 with { connected:false }
   // when the keys are missing — a thrown error here means our own server is
@@ -269,7 +287,19 @@ export default function SettingsScreen() {
 
   const unreadCount = unreadCountData?.count || 0;
 
+  // "Sync status" row: a real round trip to the server (and its database).
+  const { data: healthData, isError: healthError } = useQuery<any>({
+    queryKey: ["/api/health"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    refetchInterval: 60000,
+    retry: false,
+  });
+  const serverReachable = !healthError && healthData?.ok !== false;
+
   const activeShift = shifts.find((s: any) => s.employeeId === employee?.id && s.startTime && !s.endTime && s.status === "open");
+  // The employee's own branch, else this store's main branch. Expenses, shifts
+  // and purchase orders used to be written to branch 1 — another store's.
+  const myBranchId: number | null = employee?.branchId || storeSettings?.id || branches[0]?.id || null;
 
   useEffect(() => {
     if (!activeShift) {
@@ -378,6 +408,51 @@ export default function SettingsScreen() {
     },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
+
+  // ── Loyalty programme ───────────────────────────────────────────────────
+  // Stored as landing_page_config.loyalty_* (the columns the online store and
+  // POST /api/sales read). The screen speaks "spend X for 1 point", which
+  // stays readable for SYP (1 point per 1,000) as well as CHF (1 per 10).
+  const lc: any = landingConfigData || {};
+  const loyaltyEnabled = lc.enableLoyalty !== false;
+  const loyaltyPointsPerUnit = Number(lc.loyaltyPointsPerUnit ?? 1) || 0;
+  const loyaltySpendPerPoint = loyaltyPointsPerUnit > 0 ? Number((1 / loyaltyPointsPerUnit).toFixed(2)) : 0;
+  const openLoyaltyConfig = () => {
+    setLoyaltyForm({
+      enabled: loyaltyEnabled,
+      spendPerPoint: loyaltySpendPerPoint > 0 ? String(loyaltySpendPerPoint) : "",
+      pointValue: String(Number(lc.loyaltyRedemptionRate ?? 0.01)),
+      minRedeem: String(Number(lc.loyaltyMinRedeemPoints) || 0),
+    });
+    setShowLoyaltyConfig(true);
+  };
+  const saveLoyaltyMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("PUT", "/api/tenant/landing-config", data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/landing-page-config", tenantId ? `?tenantId=${tenantId}` : ""] });
+      setShowLoyaltyConfig(false);
+      Alert.alert(t("success"), tr3("تم حفظ إعدادات الولاء", "Treueprogramm gespeichert", "Loyalty settings saved"));
+    },
+    onError: (e: any) => Alert.alert(t("error"), e.message),
+  });
+  const handleSaveLoyalty = () => {
+    const spend = parseFloat(loyaltyForm.spendPerPoint.replace(",", "."));
+    const value = parseFloat(loyaltyForm.pointValue.replace(",", "."));
+    const minRedeem = parseInt(loyaltyForm.minRedeem || "0", 10);
+    // decimal(14,6): below 1 point per 1,000,000 the rate would round to zero.
+    if (!(spend > 0) || spend > 1000000) {
+      return Alert.alert(t("error"), tr3("أدخل مبلغاً صحيحاً لكسب نقطة واحدة", "Bitte einen gültigen Betrag pro Punkt eingeben", "Enter a valid amount per point"));
+    }
+    if (!(value >= 0) || value > 1000000) {
+      return Alert.alert(t("error"), tr3("أدخل قيمة صحيحة للنقطة", "Bitte einen gültigen Punktwert eingeben", "Enter a valid point value"));
+    }
+    saveLoyaltyMutation.mutate({
+      enableLoyalty: loyaltyForm.enabled,
+      loyaltyPointsPerUnit: (1 / spend).toFixed(6),
+      loyaltyRedemptionRate: value.toFixed(4),
+      loyaltyMinRedeemPoints: Number.isFinite(minRedeem) && minRedeem > 0 ? minRedeem : 0,
+    });
+  };
 
   const shiftsQueryKey = tenant?.id ? `/api/shifts?tenantId=${tenant.id}` : "/api/shifts";
   const activeShiftsQueryKey = tenant?.id ? `/api/shifts/active?tenantId=${tenant.id}` : "/api/shifts/active";
@@ -581,6 +656,7 @@ export default function SettingsScreen() {
       logoPath = storeLogo;
     }
     updateStoreSettingsMutation.mutate({
+      tenantId: tenant?.id,
       name: storeForm.name || undefined,
       address: storeForm.address || undefined,
       phone: storeForm.phone || undefined,
@@ -828,7 +904,7 @@ export default function SettingsScreen() {
             }} color={Colors.accent} rtl={isRTL} />
             <SettingRow icon="card" label={t("paymentGateways")} value={pgConfig?.stripe?.status === "connected" ? `${t("stripeConnected")} - ${pgConfig?.stripe?.mode === "live" ? t("liveMode") : t("testMode")}` : t("stripeNotConfigured")} onPress={() => { setPgTestResult(null); setShowPaymentGateway(true); }} color={Colors.hueIndigo} rtl={isRTL} />
             <SettingRow icon="cloud-upload" label={t("bulkImport")} value={t("importData")} onPress={() => { setImportResult(null); setShowBulkImport(true); }} color={Colors.hueAmber} rtl={isRTL} />
-            <SettingRow icon="qr-code" label="QR Tables" value={t("manageTables" as any) || "Manage QR codes"} onPress={() => router.push("/table-qr")} color={Colors.hueTeal} rtl={isRTL} />
+            <SettingRow icon="qr-code" label={tr3("طاولات QR", "QR-Tische", "QR Tables")} value={t("manageTables")} onPress={() => router.push("/table-qr")} color={Colors.hueTeal} rtl={isRTL} />
           </>
         )}
 
@@ -868,7 +944,18 @@ export default function SettingsScreen() {
           <SettingRow icon="globe-outline" label={t("editStorefront") || "Edit Storefront"} value={t("storefrontDesc") || "Name, offers, delivery, payments"} onPress={() => setShowStorefront(true)} color={Colors.accent} rtl={isRTL} />
         )}
         <SettingRow icon="storefront" label={t("storefrontPreview")} value={slug || "—"} onPress={() => { if (slug) require("react-native").Linking.openURL(getApiUrl() + `/order/${slug}`); }} color={Colors.accent} rtl={isRTL} />
-        <SettingRow icon="star" label={t("loyaltyConfiguration")} value={t("loyaltyPoints")} onPress={() => setShowLoyaltyConfig(true)} color={Colors.loyaltyGold} rtl={isRTL} />
+        {isAdmin && (
+          <SettingRow
+            icon="star"
+            label={t("loyaltyConfiguration")}
+            value={loyaltyEnabled
+              ? `${tr3("مفعّل", "Aktiv", "On")} · ${tr3("نقطة لكل", "1 Punkt je", "1 pt per")} ${formatMoney(loyaltySpendPerPoint)}`
+              : tr3("متوقف", "Aus", "Off")}
+            onPress={openLoyaltyConfig}
+            color={Colors.loyaltyGold}
+            rtl={isRTL}
+          />
+        )}
 
         <Text style={styles.sectionTitle}>{t("system")}</Text>
         <View style={[rowStyles.row, isRTL && { flexDirection: "row-reverse" }]}>
@@ -900,10 +987,10 @@ export default function SettingsScreen() {
             thumbColor={leftHandMode ? Colors.secondary : Colors.textMuted}
           />
         </Pressable>
-        {canManage && <SettingRow icon="print" label={t("receiptPrinter")} value={t("notConfigured")} onPress={() => setShowPrinterSettings(true)} color={Colors.textMuted} rtl={isRTL} />}
+        {canManage && <SettingRow icon="print" label={t("receiptPrinter")} value={`${printerPrefs.paperSize} · ${printerPrefs.autoPrint ? t("autoPrintReceipts") : tr3("طباعة يدوية", "Manueller Druck", "Manual printing")}`} onPress={() => { setPrinterPrefsState(getReceiptPrinterPrefs()); setShowPrinterSettings(true); }} color={Colors.hueIndigo} rtl={isRTL} />}
         {canManage && <SettingRow icon="print-outline" label={t("printerConfig")} value={t("printerConfigDesc")} onPress={() => setShowPrinterConfig(true)} color={Colors.hueIndigo} rtl={isRTL} />}
-        <SettingRow icon="cloud-upload" label={t("syncStatus")} value={t("connected")} color={Colors.success} rtl={isRTL} />
-        <SettingRow icon="information-circle" label={t("appVersion")} value="1.0.0" color={Colors.info} rtl={isRTL} />
+        <SettingRow icon="cloud-upload" label={t("syncStatus")} value={serverReachable ? t("connected") : tr3("غير متصل بالخادم", "Keine Verbindung zum Server", "Server unreachable")} color={serverReachable ? Colors.success : Colors.danger} rtl={isRTL} />
+        <SettingRow icon="information-circle" label={t("appVersion")} value={Constants.expoConfig?.version || "1.0.0"} color={Colors.info} rtl={isRTL} />
 
         <Pressable style={styles.logoutBtn} onPress={handleLogout}>
           <Ionicons name="log-out" size={20} color={Colors.danger} />
@@ -989,15 +1076,17 @@ export default function SettingsScreen() {
               </View>
               <Text style={styles.label}>{t("email")}</Text>
               <TextInput style={styles.input} value={empForm.email} onChangeText={(v) => setEmpForm({ ...empForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" />
+              <Text style={styles.label}>{t("phone")}</Text>
+              <TextInput style={styles.input} value={empForm.phone} onChangeText={(v) => setEmpForm({ ...empForm, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+41 79 123 45 67" />
               <Pressable style={styles.saveBtn} onPress={() => {
                 if (!empForm.name || (!editEmployee && !empForm.pin)) return Alert.alert(t("error"), t("namePinRequired"));
                 if (editEmployee) {
                   // Only send pin when the admin typed a new one — blank keeps the existing PIN.
-                  const upd: any = { name: empForm.name, role: empForm.role, email: empForm.email || undefined, permissions: empForm.role === "admin" ? ["all"] : ["pos"] };
+                  const upd: any = { name: empForm.name, role: empForm.role, email: empForm.email || undefined, phone: empForm.phone || undefined, permissions: empForm.role === "admin" ? ["all"] : ["pos"] };
                   if (empForm.pin) upd.pin = empForm.pin;
                   updateEmpMutation.mutate({ id: editEmployee.id, data: upd });
                 } else {
-                  createEmpMutation.mutate({ name: empForm.name, pin: empForm.pin, role: empForm.role, email: empForm.email || undefined, tenantId: tenant?.id, branchId: branches[0]?.id ?? null, permissions: empForm.role === "admin" ? ["all"] : ["pos"] });
+                  createEmpMutation.mutate({ name: empForm.name, pin: empForm.pin, role: empForm.role, email: empForm.email || undefined, phone: empForm.phone || undefined, tenantId: tenant?.id, branchId: branches[0]?.id ?? null, permissions: empForm.role === "admin" ? ["all"] : ["pos"] });
                 }
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
@@ -1057,6 +1146,8 @@ export default function SettingsScreen() {
               <TextInput style={styles.input} value={supForm.phone} onChangeText={(v) => setSupForm({ ...supForm, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+1234567890" />
               <Text style={styles.label}>{t("email")}</Text>
               <TextInput style={styles.input} value={supForm.email} onChangeText={(v) => setSupForm({ ...supForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" />
+              <Text style={styles.label}>{tr3("شروط الدفع", "Zahlungsbedingungen", "Payment terms")}</Text>
+              <TextInput style={styles.input} value={supForm.paymentTerms} onChangeText={(v) => setSupForm({ ...supForm, paymentTerms: v })} placeholderTextColor={Colors.textMuted} placeholder={tr3("مثال: 30 يوماً", "z. B. 30 Tage netto", "e.g. Net 30")} />
               <Pressable style={styles.saveBtn} onPress={() => {
                 if (!supForm.name) return Alert.alert(t("error"), t("companyNameRequired"));
                 createSupMutation.mutate({ name: supForm.name, contactName: supForm.contactName || undefined, phone: supForm.phone || undefined, email: supForm.email || undefined, paymentTerms: supForm.paymentTerms || undefined });
@@ -1237,7 +1328,7 @@ export default function SettingsScreen() {
               <TextInput style={[styles.input, { minHeight: 60 }]} value={expenseForm.notes} onChangeText={(v) => setExpenseForm({ ...expenseForm, notes: v })} placeholderTextColor={Colors.textMuted} placeholder={t("optionalNotes")} multiline />
               <Pressable style={styles.saveBtn} onPress={() => {
                 if (!expenseForm.description || !expenseForm.amount) return Alert.alert(t("error"), t("descriptionAmountRequired"));
-                createExpenseMutation.mutate({ branchId: 1, categoryId: expenseForm.category, description: expenseForm.description, amount: parseFloat(expenseForm.amount), date: expenseForm.date, notes: expenseForm.notes || undefined });
+                createExpenseMutation.mutate({ branchId: myBranchId, categoryId: expenseForm.category, description: expenseForm.description, amount: parseFloat(expenseForm.amount), date: expenseForm.date, notes: expenseForm.notes || undefined });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
                   <Text style={styles.saveBtnText}>{t("addExpense")}</Text>
@@ -1274,7 +1365,7 @@ export default function SettingsScreen() {
                     <Text style={[styles.clockBtnText, { color: Colors.danger }]}>{t("clockOut")}</Text>
                   </Pressable>
                 ) : (
-                  <Pressable style={[styles.clockBtn, { backgroundColor: Colors.success + "20" }]} onPress={() => clockInMutation.mutate({ employeeId: employee.id, branchId: 1, startTime: new Date().toISOString(), status: "open" })}>
+                  <Pressable style={[styles.clockBtn, { backgroundColor: Colors.success + "20" }]} onPress={() => clockInMutation.mutate({ employeeId: employee.id, branchId: myBranchId, startTime: new Date().toISOString(), status: "open" })}>
                     <Ionicons name="play-circle" size={20} color={Colors.success} />
                     <Text style={[styles.clockBtnText, { color: Colors.success }]}>{t("clockIn")}</Text>
                   </Pressable>
@@ -1388,7 +1479,7 @@ export default function SettingsScreen() {
               <TextInput style={[styles.input, { minHeight: 60 }]} value={poForm.notes} onChangeText={(v) => setPOForm({ ...poForm, notes: v })} placeholderTextColor={Colors.textMuted} placeholder={t("optionalNotes")} multiline />
               <Pressable style={styles.saveBtn} onPress={() => {
                 if (!poForm.supplierId) return Alert.alert(t("error"), t("pleaseSelectSupplier"));
-                createPOMutation.mutate({ branchId: 1, supplierId: parseInt(poForm.supplierId), status: "draft", notes: poForm.notes || undefined });
+                createPOMutation.mutate({ branchId: myBranchId, supplierId: parseInt(poForm.supplierId), status: "draft", notes: poForm.notes || undefined });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
                   <Text style={styles.saveBtnText}>{t("createOrder")}</Text>
@@ -1856,30 +1947,40 @@ export default function SettingsScreen() {
               <Pressable onPress={() => setShowPrinterSettings(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
+              {/* The till prints through the system print dialog (browser or
+                  OS), so there is no connection state to report here; these
+                  choices are saved on this device only. */}
               <View style={[styles.empCard, { marginBottom: 16 }]}>
-                <View style={[styles.empAvatar, { backgroundColor: Colors.danger + "30" }]}>
-                  <Ionicons name="print" size={20} color={Colors.danger} />
+                <View style={[styles.empAvatar, { backgroundColor: Colors.info + "30" }]}>
+                  <Ionicons name="print" size={20} color={Colors.info} />
                 </View>
                 <View style={styles.empInfo}>
                   <Text style={styles.empName}>{t("printerStatus")}</Text>
-                  <Text style={[styles.empMeta, { color: Colors.danger }]}>{t("notConnected")}</Text>
+                  <Text style={styles.empMeta}>
+                    {tr3("الطباعة عبر نافذة الطباعة في النظام · محفوظ على هذا الجهاز", "Druck über den Systemdruckdialog · auf diesem Gerät gespeichert", "Prints via the system print dialog · saved on this device")}
+                  </Text>
                 </View>
               </View>
 
               <Text style={styles.label}>{t("paperSize")}</Text>
               <View style={styles.roleRow}>
-                {["58mm", "80mm"].map((s) => (
-                  <Pressable key={s} style={[styles.roleChip, printerPaperSize === s && { backgroundColor: Colors.accent }]} onPress={() => setPrinterPaperSize(s)}>
-                    <Text style={[styles.roleChipText, printerPaperSize === s && { color: Colors.textDark }]}>{s}</Text>
+                {(["58mm", "80mm"] as const).map((s) => (
+                  <Pressable key={s} style={[styles.roleChip, printerPrefs.paperSize === s && { backgroundColor: Colors.accent }]} onPress={() => updatePrinterPrefs({ paperSize: s })}>
+                    <Text style={[styles.roleChipText, printerPrefs.paperSize === s && { color: Colors.textDark }]}>{s}</Text>
                   </Pressable>
                 ))}
               </View>
 
               <Text style={styles.label}>{t("autoPrintReceipts")}</Text>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 4 }}>
-                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("printAfterEverySale")}</Text>
-                <Switch value={printerAutoPrint} onValueChange={setPrinterAutoPrint} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={printerAutoPrint ? Colors.accent : Colors.textMuted} />
+                <Text style={{ color: Colors.text, fontSize: 14, flex: 1 }}>{t("printAfterEverySale")}</Text>
+                <Switch value={printerPrefs.autoPrint} onValueChange={(v) => updatePrinterPrefs({ autoPrint: v })} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={printerPrefs.autoPrint ? Colors.accent : Colors.textMuted} />
               </View>
+              {!printerPrefs.autoPrint && (
+                <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 6 }}>
+                  {tr3("يمكن طباعة الإيصال لاحقاً من سجل الفواتير.", "Belege können später aus dem Rechnungsverlauf gedruckt werden.", "Receipts can still be printed later from the invoice history.")}
+                </Text>
+              )}
 
               <Pressable style={styles.saveBtn} onPress={() => {
                 const sampleReceipt = `================================\n        SAMPLE RECEIPT\n================================\nDate: ${new Date().toLocaleString()}\nReceipt #: TEST-001\n--------------------------------\nItem 1        x2  ${formatMoney(10)}\nItem 2        x1   ${formatMoney(5.5)}\n--------------------------------\nSubtotal:          ${formatMoney(15.5)}\nTax (10%):          ${formatMoney(1.55)}\n--------------------------------\nTOTAL:             ${formatMoney(17.05)}\n================================\n      Thank you!\n================================`;
@@ -2096,7 +2197,7 @@ export default function SettingsScreen() {
                   <TextInput
                     style={[styles.formInput, { flex: 1 }]}
                     value={defaultShiftDuration}
-                    onChangeText={setDefaultShiftDuration}
+                    onChangeText={changeDefaultShiftDuration}
                     keyboardType="decimal-pad"
                     placeholderTextColor={Colors.textMuted}
                     placeholder="8"
@@ -2234,7 +2335,7 @@ export default function SettingsScreen() {
                 ))}
               </View>
 
-              <Text style={[styles.label, rtlTextAlign]}>Tax Rate (%)</Text>
+              <Text style={[styles.label, rtlTextAlign]}>{t("taxRatePercent")}</Text>
               <TextInput
                 style={[styles.input, rtlTextAlign]}
                 value={storeForm.taxRate}
@@ -2244,7 +2345,7 @@ export default function SettingsScreen() {
                 keyboardType="decimal-pad"
               />
 
-              <Text style={[styles.label, rtlTextAlign]}>Delivery Fee ({currencyLabel()})</Text>
+              <Text style={[styles.label, rtlTextAlign]}>{tr3("رسوم التوصيل", "Liefergebühr", "Delivery Fee")} ({currencyLabel()})</Text>
               <TextInput
                 style={[styles.input, rtlTextAlign]}
                 value={storeForm.deliveryFee}
@@ -2442,7 +2543,9 @@ export default function SettingsScreen() {
                   </Pressable>
                 </View>
 
-                {/* Till-side settings, stored per tenant */}
+                {/* The currency Stripe charges in: the store's own (main branch).
+                    Payments are always captured at once, so there is no
+                    capture switch here. */}
                 <View style={pgStyles.configGrid}>
                   <View style={pgStyles.configItem}>
                     <Text style={[pgStyles.configLabel, isRTL && { textAlign: "right" }]}>{t("currency")}</Text>
@@ -2450,18 +2553,6 @@ export default function SettingsScreen() {
                       <Ionicons name="cash-outline" size={16} color={Colors.accent} />
                       <Text style={pgStyles.configValue}>{(pgConfig?.currency || pgConfig?.stripe?.currency || "chf").toUpperCase()}</Text>
                     </View>
-                  </View>
-                  <View style={pgStyles.configItem}>
-                    <Text style={[pgStyles.configLabel, isRTL && { textAlign: "right" }]}>{t("autoCapture")}</Text>
-                    <Switch
-                      value={pgConfig?.stripe?.autoCapture !== false}
-                      onValueChange={async (val) => {
-                        await apiRequest("PUT", "/api/payment-gateway/config", { stripe: { ...pgConfig?.stripe, autoCapture: val } });
-                        refetchPgConfig();
-                      }}
-                      trackColor={{ false: Colors.inputBg, true: Colors.accent + "60" }}
-                      thumbColor={pgConfig?.stripe?.autoCapture !== false ? Colors.accent : Colors.textMuted}
-                    />
                   </View>
                 </View>
 
@@ -2592,60 +2683,48 @@ export default function SettingsScreen() {
 
               <View style={pgStyles.divider} />
 
-              {/* Sham Cash: online payments for Syrian (SYP/USD) stores */}
-              <ShamCashSettings />
-
-              <View style={pgStyles.divider} />
-
+              {/* Which buttons the till offers at checkout. Sham Cash lives in
+                  Store Settings; cash is the till's default and the fallback
+                  for a failed card payment, so it cannot be switched off. */}
               <Text style={[pgStyles.methodsTitle, isRTL && { textAlign: "right" }]}>{t("enabledPaymentMethods")}</Text>
               {[
                 { key: "cash", icon: "cash", label: t("cash"), color: Colors.success },
                 { key: "card", icon: "card", label: t("card"), color: "#635BFF" },
-                { key: "nfc", icon: "wifi", label: t("nfcPay"), color: Colors.accent },
-                { key: "mobile", icon: "phone-portrait", label: t("mobile"), color: Colors.info },
-              ].map((method) => (
-                <View key={method.key} style={[pgStyles.methodRow, isRTL && { flexDirection: "row-reverse" }]}>
-                  <View style={[pgStyles.methodIconWrap, { backgroundColor: method.color + "20" }]}>
-                    <Ionicons name={method.icon as any} size={20} color={method.color} />
+                { key: "mobile", icon: "phone-portrait", label: t("walletPay"), color: Colors.info },
+              ].map((method) => {
+                const on = method.key === "cash" || pgConfig?.enabledMethods?.includes(method.key) !== false;
+                return (
+                  <View key={method.key} style={[pgStyles.methodRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[pgStyles.methodIconWrap, { backgroundColor: method.color + "20" }]}>
+                      <Ionicons name={method.icon as any} size={20} color={method.color} />
+                    </View>
+                    <Text style={[pgStyles.methodLabel, isRTL && { textAlign: "right" }]}>{method.label}</Text>
+                    <Switch
+                      value={on}
+                      disabled={method.key === "cash"}
+                      onValueChange={async (val) => {
+                        const current: string[] = pgConfig?.enabledMethods || ["cash", "card", "mobile"];
+                        const updated = val
+                          ? Array.from(new Set([...current, method.key]))
+                          : current.filter((m: string) => m !== method.key);
+                        try {
+                          await apiRequest("PUT", "/api/payment-gateway/config", { enabledMethods: updated });
+                        } catch (e: any) {
+                          Alert.alert(t("error"), e.message);
+                        }
+                        refetchPgConfig();
+                        qc.invalidateQueries({ queryKey: ["/api/payments/config"] });
+                      }}
+                      trackColor={{ false: Colors.inputBg, true: method.color + "60" }}
+                      thumbColor={on ? method.color : Colors.textMuted}
+                    />
                   </View>
-                  <Text style={[pgStyles.methodLabel, isRTL && { textAlign: "right" }]}>{method.label}</Text>
-                  <Switch
-                    value={pgConfig?.enabledMethods?.includes(method.key) !== false}
-                    onValueChange={async (val) => {
-                      const current = pgConfig?.enabledMethods || ["cash", "card", "mobile", "nfc"];
-                      const updated = val ? [...current, method.key] : current.filter((m: string) => m !== method.key);
-                      await apiRequest("PUT", "/api/payment-gateway/config", { enabledMethods: updated });
-                      refetchPgConfig();
-                    }}
-                    trackColor={{ false: Colors.inputBg, true: method.color + "60" }}
-                    thumbColor={pgConfig?.enabledMethods?.includes(method.key) !== false ? method.color : Colors.textMuted}
-                  />
-                </View>
-              ))}
+                );
+              })}
 
               <View style={pgStyles.divider} />
 
-              {/* ── NFC: a manual confirmation at the till, nothing more ──── */}
-              <View style={pgStyles.section}>
-                <Text style={[pgStyles.methodsTitle, isRTL && { textAlign: "right" }]}>{t("nfcSettings")}</Text>
-                <View style={[pgStyles.infoRow, isRTL && { flexDirection: "row-reverse" }]}>
-                  <View style={[pgStyles.gatewayIcon, { backgroundColor: Colors.accent + "20" }]}>
-                    <Ionicons name="wifi" size={20} color={Colors.accent} style={{ transform: [{ rotate: "90deg" }] }} />
-                  </View>
-                  <View style={[pgStyles.gatewayInfo, isRTL && { alignItems: "flex-end" }]}>
-                    <Text style={pgStyles.configLabel}>{t("nfcProvider")}</Text>
-                    <Text style={pgStyles.configValue}>{t("nfcProviderManual")}</Text>
-                  </View>
-                </View>
-                <View style={pgStyles.infoNote}>
-                  <Ionicons name="information-circle" size={16} color={Colors.info} />
-                  <Text style={[pgStyles.infoNoteText, isRTL && { textAlign: "right" }]}>{t("nfcInfo")}</Text>
-                </View>
-              </View>
-
-              <View style={pgStyles.divider} />
-
-              {/* ── Mobile wallets: availability comes from the account ───── */}
+              {/* ── Mobile wallets: availability comes from the Stripe account ── */}
               <View style={pgStyles.section}>
                 <Text style={[pgStyles.methodsTitle, isRTL && { textAlign: "right" }]}>{t("mobilePaySettings")}</Text>
                 {[
@@ -2664,17 +2743,7 @@ export default function SettingsScreen() {
                           {!stripeConnected ? t("connectStripeFirst") : offered ? t("availableInStripe") : t("notEnabledInStripe")}
                         </Text>
                       </View>
-                      <Switch
-                        value={pgConfig?.mobile?.providers?.includes(mp.key) !== false}
-                        onValueChange={async (val) => {
-                          const current = pgConfig?.mobile?.providers || ["apple_pay", "google_pay"];
-                          const updated = val ? [...current, mp.key] : current.filter((p: string) => p !== mp.key);
-                          await apiRequest("PUT", "/api/payment-gateway/config", { mobile: { ...pgConfig?.mobile, providers: updated } });
-                          refetchPgConfig();
-                        }}
-                        trackColor={{ false: Colors.inputBg, true: Colors.accent + "60" }}
-                        thumbColor={Colors.accent}
-                      />
+                      <Ionicons name={offered && stripeConnected ? "checkmark-circle" : "remove-circle-outline"} size={20} color={offered && stripeConnected ? Colors.success : Colors.textMuted} />
                     </View>
                   );
                 })}
@@ -2785,7 +2854,7 @@ export default function SettingsScreen() {
                             const base64 = (ev.target?.result as string).split(",")[1];
                             const endpoint = importType === "products" ? "/api/products/import" : "/api/customers/import";
                             const body: any = { fileBase64: base64, tenantId: tenant?.id || 1 };
-                            if (importType === "products") body.branchId = employee?.branchId || 1;
+                            if (importType === "products") body.branchId = myBranchId;
                             const res = await apiRequest("POST", endpoint, body);
                             const data = await res.json();
                             setImportResult(data);
@@ -2817,7 +2886,7 @@ export default function SettingsScreen() {
                             const base64 = (reader.result as string).split(",")[1];
                             const endpoint = importType === "products" ? "/api/products/import" : "/api/customers/import";
                             const body: any = { fileBase64: base64, tenantId: tenant?.id || 1 };
-                            if (importType === "products") body.branchId = employee?.branchId || 1;
+                            if (importType === "products") body.branchId = myBranchId;
                             const res = await apiRequest("POST", endpoint, body);
                             const data = await res.json();
                             setImportResult(data);
@@ -2870,115 +2939,6 @@ export default function SettingsScreen() {
                   </View>
                 </View>
               )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Caller ID Test Modal */}
-      <Modal visible={showCallerIdTest} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Text style={[styles.modalTitle, rtlTextAlign]}>{t("callerID")}</Text>
-              <Pressable onPress={() => setShowCallerIdTest(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Status Indicator */}
-              <View style={{ alignItems: "center", marginBottom: 24 }}>
-                <View style={{
-                  width: 80, height: 80, borderRadius: 40,
-                  backgroundColor: callerIdStatus === "done" ? Colors.success + "20" : "#EC4899" + "20",
-                  justifyContent: "center", alignItems: "center", marginBottom: 12
-                }}>
-                  <Ionicons
-                    name={callerIdStatus === "done" ? "checkmark-circle" : "call"}
-                    size={40}
-                    color={callerIdStatus === "done" ? Colors.success : "#EC4899"}
-                  />
-                </View>
-                <Text style={{ color: Colors.text, fontSize: 18, fontWeight: "700" }}>
-                  {callerIdStatus === "done" ? t("callSimulated") : t("simulateCall")}
-                </Text>
-                <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 4, textAlign: "center" }}>
-                  {t("callerIdDescription")}
-                </Text>
-              </View>
-
-              {/* Phone Number Input */}
-              <Text style={[styles.label, rtlTextAlign]}>{t("phoneNumber")}</Text>
-              <TextInput
-                style={[styles.input, { fontSize: 18, textAlign: "center", fontWeight: "700" }]}
-                value={testPhoneNumber}
-                onChangeText={setTestPhoneNumber}
-                placeholder="0551234567"
-                placeholderTextColor={Colors.textMuted}
-                keyboardType="phone-pad"
-              />
-
-
-              {/* Simulate Button */}
-              <Pressable
-                style={{ borderRadius: 14, overflow: "hidden", marginTop: 24, marginBottom: 8 }}
-                onPress={async () => {
-                  try {
-                    setCallerIdStatus("testing");
-                    await apiRequest("POST", "/api/caller-id/simulate", {
-                      phoneNumber: testPhoneNumber,
-                      slot: 1,
-                      tenantId: tenant?.id
-                    });
-                    setCallerIdStatus("done");
-                    setTimeout(() => setCallerIdStatus("idle"), 3000);
-                  } catch (err: any) {
-                    Alert.alert(t("error"), err.message);
-                    setCallerIdStatus("idle");
-                  }
-                }}
-                disabled={callerIdStatus === "testing"}
-              >
-                <LinearGradient colors={["#EC4899", "#9333EA"]} style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", paddingVertical: 16, gap: 10 }}>
-                  <Ionicons name={callerIdStatus === "testing" ? "hourglass" : "call"} size={22} color={Colors.white} />
-                  <Text style={{ color: Colors.white, fontSize: 16, fontWeight: "700" }}>
-                    {callerIdStatus === "testing" ? t("simulating") : t("simulateIncomingCall")}
-                  </Text>
-                </LinearGradient>
-              </Pressable>
-
-              {/* Multi-call test: simulate all 4 slots */}
-              <Pressable
-                style={{ borderRadius: 14, overflow: "hidden", marginBottom: 16 }}
-                onPress={async () => {
-                  const testNumbers = ["0551234567", "0509876543", "0521112233", "+41791234567"];
-                  for (let i = 0; i < 4; i++) {
-                    try {
-                      await apiRequest("POST", "/api/caller-id/simulate", {
-                        phoneNumber: testNumbers[i],
-                        slot: i + 1,
-                        tenantId: tenant?.id
-                      });
-                      await new Promise((r) => setTimeout(r, 300));
-                    } catch { }
-                  }
-                  setCallerIdStatus("done");
-                  setTimeout(() => setCallerIdStatus("idle"), 3000);
-                }}
-              >
-                <LinearGradient colors={["#6366F1", "#8B5CF6"]} style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", paddingVertical: 12, gap: 8 }}>
-                  <Ionicons name="call-outline" size={18} color={Colors.white} />
-                  <Text style={{ color: Colors.white, fontSize: 14, fontWeight: "700" }}>
-                    {t("multipleIncomingCalls" as any)} (4 {t("callSlot" as any)}s)
-                  </Text>
-                </LinearGradient>
-              </Pressable>
-
-              {/* Info Note */}
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", backgroundColor: Colors.info + "10", borderRadius: 12, padding: 12, gap: 8, alignItems: "flex-start" }}>
-                <Ionicons name="information-circle" size={18} color={Colors.info} />
-                <Text style={{ color: Colors.textSecondary, fontSize: 12, flex: 1 }}>
-                  {t("callerIdNote")}
-                </Text>
-              </View>
             </ScrollView>
           </View>
         </View>
@@ -3418,62 +3378,63 @@ export default function SettingsScreen() {
         </View>
       </Modal>
 
-      {/* ── Delivery Zones Modal ────────────────────────────────────────────── */}
-      <Modal visible={showDeliveryZones} animationType="slide" transparent onRequestClose={() => setShowDeliveryZones(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t("deliveryZones")}</Text>
-              <Pressable onPress={() => setShowDeliveryZones(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
-            </View>
-            <Text style={{ color: Colors.textMuted, padding: 16, textAlign: "center" }}>
-              {t("addDeliveryZone")} — Coming Soon
-            </Text>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── Promo Codes Modal ───────────────────────────────────────────────── */}
-      <Modal visible={showPromoCodes} animationType="slide" transparent onRequestClose={() => setShowPromoCodes(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t("promoCodes")}</Text>
-              <Pressable onPress={() => setShowPromoCodes(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
-            </View>
-            <Text style={{ color: Colors.textMuted, padding: 16, textAlign: "center" }}>
-              {t("addPromoCode")} — Coming Soon
-            </Text>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── Driver Management Modal ─────────────────────────────────────────── */}
-      <Modal visible={showDriverManagement} animationType="slide" transparent onRequestClose={() => setShowDriverManagement(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t("driverManagement")}</Text>
-              <Pressable onPress={() => setShowDriverManagement(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
-            </View>
-            <Text style={{ color: Colors.textMuted, padding: 16, textAlign: "center" }}>
-              {t("activeDrivers")} — Coming Soon
-            </Text>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── Loyalty Configuration Modal ─────────────────────────────────────── */}
+      {/* ── Loyalty programme ─────────────────────────────────────────────────
+           One setting for the till and the online store. The server awards the
+           points on every sale to a known customer; the till offers redemption. */}
       <Modal visible={showLoyaltyConfig} animationType="slide" transparent onRequestClose={() => setShowLoyaltyConfig(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t("loyaltyConfiguration")}</Text>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={[styles.modalTitle, rtlTextAlign]}>{t("loyaltyConfiguration")}</Text>
               <Pressable onPress={() => setShowLoyaltyConfig(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
-            <Text style={{ color: Colors.textMuted, padding: 16, textAlign: "center" }}>
-              {t("loyaltyPoints")} — Coming Soon
-            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={[{ color: Colors.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 8 }, rtlTextAlign]}>
+                {tr3(
+                  "العميل المسجَّل في البيع يكسب نقاطاً على كل عملية شراء في الكاشير والمتجر الإلكتروني، ويمكنه استبدالها كخصم عند الدفع.",
+                  "Ein beim Verkauf ausgewählter Kunde sammelt bei jedem Einkauf an der Kasse und im Online-Shop Punkte und kann sie an der Kasse als Rabatt einlösen.",
+                  "A customer picked on the sale earns points on every purchase at the till and in the online store, and can redeem them as a discount at checkout.",
+                )}
+              </Text>
+
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                <Text style={{ color: Colors.text, fontSize: 14, fontWeight: "600" }}>{tr3("تفعيل برنامج الولاء", "Treueprogramm aktiv", "Loyalty programme on")}</Text>
+                <Switch value={loyaltyForm.enabled} onValueChange={(v) => setLoyaltyForm({ ...loyaltyForm, enabled: v })} trackColor={{ false: Colors.inputBorder, true: Colors.loyaltyGold + "60" }} thumbColor={loyaltyForm.enabled ? Colors.loyaltyGold : Colors.textMuted} />
+              </View>
+
+              <Text style={[styles.label, rtlTextAlign]}>{tr3("المبلغ المطلوب لكسب نقطة واحدة", "Umsatz für 1 Punkt", "Spend to earn 1 point")} ({currencyLabel()})</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={loyaltyForm.spendPerPoint} onChangeText={(v) => setLoyaltyForm({ ...loyaltyForm, spendPerPoint: v })} placeholderTextColor={Colors.textMuted} placeholder={tr3("مثال: 1000", "z. B. 10", "e.g. 10")} keyboardType="decimal-pad" />
+
+              <Text style={[styles.label, rtlTextAlign]}>{tr3("قيمة النقطة عند الاستبدال", "Wert von 1 Punkt beim Einlösen", "Value of 1 point when redeemed")} ({currencyLabel()})</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={loyaltyForm.pointValue} onChangeText={(v) => setLoyaltyForm({ ...loyaltyForm, pointValue: v })} placeholderTextColor={Colors.textMuted} placeholder={tr3("مثال: 10", "z. B. 0.10", "e.g. 0.10")} keyboardType="decimal-pad" />
+
+              <Text style={[styles.label, rtlTextAlign]}>{tr3("الحد الأدنى من النقاط للاستبدال", "Mindestpunkte zum Einlösen", "Minimum points to redeem")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={loyaltyForm.minRedeem} onChangeText={(v) => setLoyaltyForm({ ...loyaltyForm, minRedeem: v.replace(/[^0-9]/g, "") })} placeholderTextColor={Colors.textMuted} placeholder="0" keyboardType="number-pad" />
+
+              {(() => {
+                const spend = parseFloat(loyaltyForm.spendPerPoint.replace(",", "."));
+                const value = parseFloat(loyaltyForm.pointValue.replace(",", "."));
+                if (!(spend > 0) || !(value >= 0)) return null;
+                const back = (value / spend) * 100;
+                return (
+                  <View style={{ backgroundColor: Colors.loyaltyGold + "15", borderRadius: 12, padding: 12, marginTop: 14, borderWidth: 1, borderColor: Colors.loyaltyGold + "40" }}>
+                    <Text style={[{ color: Colors.text, fontSize: 13, lineHeight: 19 }, rtlTextAlign]}>
+                      {tr3(
+                        `مثال: عملية شراء بقيمة ${formatMoney(spend * 10)} تكسب 10 نقاط، و10 نقاط = خصم ${formatMoney(value * 10)} (${back.toFixed(1)}٪ من قيمة الشراء).`,
+                        `Beispiel: Ein Einkauf von ${formatMoney(spend * 10)} bringt 10 Punkte; 10 Punkte = ${formatMoney(value * 10)} Rabatt (${back.toFixed(1)} % zurück).`,
+                        `Example: a ${formatMoney(spend * 10)} purchase earns 10 points; 10 points = ${formatMoney(value * 10)} off (${back.toFixed(1)}% back).`,
+                      )}
+                    </Text>
+                  </View>
+                );
+              })()}
+
+              <Pressable style={styles.saveBtn} disabled={saveLoyaltyMutation.isPending} onPress={handleSaveLoyalty}>
+                <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
+                  <Text style={styles.saveBtnText}>{saveLoyaltyMutation.isPending ? "…" : t("save")}</Text>
+                </LinearGradient>
+              </Pressable>
+            </ScrollView>
           </View>
         </View>
       </Modal>

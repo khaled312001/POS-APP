@@ -80,7 +80,7 @@ const DEFAULT_GATEWAY = {
 async function loadGatewaySettings(tenantId: number): Promise<any> {
   try {
     const rows = await q(
-      `SELECT config_json FROM payment_gateway_settings
+      `SELECT tenant_id, config_json FROM payment_gateway_settings
         WHERE tenant_id IN (?, 0) ORDER BY tenant_id DESC LIMIT 1`,
       [tenantId || 0],
     );
@@ -89,6 +89,10 @@ async function loadGatewaySettings(tenantId: number): Promise<any> {
         typeof rows[0].config_json === "string"
           ? JSON.parse(rows[0].config_json)
           : rows[0].config_json;
+      // Which buttons a till offers is a per-store choice. The tenant-0 row
+      // was written by stores' own settings screens before that write was
+      // scoped to the store, so it must not switch methods off for everyone.
+      if (tenantId && Number(rows[0].tenant_id) === 0) delete parsed.enabledMethods;
       return { ...DEFAULT_GATEWAY, ...parsed };
     }
   } catch (e: any) {
@@ -196,7 +200,11 @@ export function registerPaymentRoutes(app: Express): void {
   // it, which means the guard has to live on the handler itself.
   app.put("/api/payment-gateway/config", requireAdmin, async (req: EmployeeRequest, res) => {
     try {
-      const tenantId = Number((req as any).tenantId ?? 0) || 0;
+      // The path is public, so the licence middleware never set req.tenantId;
+      // without the employee's own tenant every store would write tenant 0,
+      // the platform-wide default that all stores read.
+      const tenantId = Number((req as any).tenantId ?? req.employee?.tenantId ?? 0) || 0;
+      if (!tenantId) return res.status(401).json({ error: "Store authentication required" });
       const current = await loadGatewaySettings(tenantId);
       const merged = { ...current, ...req.body };
       // Sham Cash has its own endpoint (it holds a key); never overwrite it here.
