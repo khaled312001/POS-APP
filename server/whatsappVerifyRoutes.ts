@@ -1,5 +1,6 @@
 /**
- * Store WhatsApp number, verified by code.
+ * Store WhatsApp number, verified by code. Mounted under /api/whatsapp/store
+ * (not /api/store/, which is the public storefront prefix with no tenant).
  *
  * A store's order notifications go to its own WhatsApp number (sent from the
  * platform's WhatsApp session). A number only takes effect once the owner has
@@ -51,7 +52,7 @@ export function verifiedStorePhone(metadata: any): string {
 }
 
 export function registerWhatsAppVerifyRoutes(app: Express): void {
-  app.get("/api/store/whatsapp", requireAdmin, async (req: EmployeeRequest, res) => {
+  app.get("/api/whatsapp/store", requireAdmin, async (req: EmployeeRequest, res) => {
     try {
       const tenantId = tenantOf(req, res);
       if (tenantId == null) return;
@@ -70,7 +71,7 @@ export function registerWhatsAppVerifyRoutes(app: Express): void {
   });
 
   app.post(
-    "/api/store/whatsapp/verify/start",
+    "/api/whatsapp/store/verify/start",
     requireAdmin,
     rateLimit({
       name: "wa-verify-start",
@@ -109,7 +110,7 @@ export function registerWhatsAppVerifyRoutes(app: Express): void {
     },
   );
 
-  app.post("/api/store/whatsapp/verify/confirm", requireAdmin, async (req: EmployeeRequest, res) => {
+  app.post("/api/whatsapp/store/verify/confirm", requireAdmin, async (req: EmployeeRequest, res) => {
     try {
       const tenantId = tenantOf(req, res);
       if (tenantId == null) return;
@@ -141,7 +142,7 @@ export function registerWhatsAppVerifyRoutes(app: Express): void {
   });
 
   /** Unlink: notifications stop until a number is verified again. */
-  app.delete("/api/store/whatsapp", requireAdmin, async (req: EmployeeRequest, res) => {
+  app.delete("/api/whatsapp/store", requireAdmin, async (req: EmployeeRequest, res) => {
     try {
       const tenantId = tenantOf(req, res);
       if (tenantId == null) return;

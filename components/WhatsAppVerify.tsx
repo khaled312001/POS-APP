@@ -66,7 +66,7 @@ export default function WhatsAppVerify() {
   const row = isRTL ? ("row-reverse" as const) : ("row" as const);
 
   const { data, refetch } = useQuery<any>({
-    queryKey: ["/api/store/whatsapp"],
+    queryKey: ["/api/whatsapp/store"],
     queryFn: getQueryFn({ on401: "throw" }),
   });
 
@@ -87,14 +87,14 @@ export default function WhatsAppVerify() {
   };
 
   const sendCode = () => run(async () => {
-    const res = await apiRequest("POST", "/api/store/whatsapp/verify/start", { phone });
+    const res = await apiRequest("POST", "/api/whatsapp/store/verify/start", { phone });
     const out = await res.json();
     setSentTo(out.phone);
     setCode("");
   });
 
   const confirm = () => run(async () => {
-    await apiRequest("POST", "/api/store/whatsapp/verify/confirm", { code });
+    await apiRequest("POST", "/api/whatsapp/store/verify/confirm", { code });
     setSentTo(null);
     setEditing(false);
     setPhone("");
@@ -104,7 +104,7 @@ export default function WhatsAppVerify() {
   });
 
   const unlink = () => run(async () => {
-    await apiRequest("DELETE", "/api/store/whatsapp");
+    await apiRequest("DELETE", "/api/whatsapp/store");
     setEditing(false);
     await refetch();
   });

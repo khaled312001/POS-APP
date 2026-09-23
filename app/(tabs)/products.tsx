@@ -80,7 +80,6 @@ export default function ProductsScreen() {
   const [initialStock, setInitialStock] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
   // Wholesale price / minimum quantity (تجار الجملة) — kept apart from `form`.
-  const { language } = useLanguage();
   const [wholesaleForm, setWholesaleForm] = useState({ price: "", minQty: "" });
   useEffect(() => {
     if (!showForm) return;

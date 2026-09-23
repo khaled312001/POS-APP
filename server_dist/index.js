@@ -160,9 +160,10 @@ __export(schema_exports, {
   vehicles: () => vehicles,
   walletTransactions: () => walletTransactions,
   warehouseTransfers: () => warehouseTransfers,
-  warehouses: () => warehouses
+  warehouses: () => warehouses,
+  wholesalePayments: () => wholesalePayments
 });
-var import_mysql_core, import_drizzle_zod, branches, employees, categories, products, inventory, customers, sales, saleItems, calls, suppliers, purchaseOrders, purchaseOrderItems, shifts, notifications, expenses, tables, tableQrCodes, kitchenOrders, subscriptionPlans, subscriptions, activityLog, returns, returnItems, syncQueue, cashDrawerOperations, warehouses, warehouseTransfers, productBatches, inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications, platformSettings, platformCommissions, onlineOrders, chatRooms, chatMessages, broadcastOrders, broadcastOrderRecipients, landingPageConfig, vehicles, printerConfigs, dailyClosings, monthlyClosings, dailySequences, customerAddresses, promoCodes, promoCodeUsages, driverLocations, loyaltyTransactions, walletTransactions, orderRatings, customerSessions, otpVerifications, deliveryZones, customerFavorites, productDietaryTags, helpTickets, faqEntries, restaurantAggregateRatings, insertBranchSchema, insertEmployeeSchema, insertCategorySchema, insertProductSchema, insertInventorySchema, insertCustomerSchema, insertSaleSchema, insertSaleItemSchema, insertSupplierSchema, insertPurchaseOrderSchema, insertPurchaseOrderItemSchema, insertShiftSchema, insertNotificationSchema, insertExpenseSchema, insertCallSchema, insertTableSchema, insertTableQrCodeSchema, insertKitchenOrderSchema, insertSubscriptionPlanSchema, insertSubscriptionSchema, insertActivityLogSchema, insertReturnSchema, insertReturnItemSchema, insertCashDrawerOperationSchema, insertWarehouseSchema, insertWarehouseTransferSchema, insertProductBatchSchema, insertInventoryMovementSchema, insertStockCountSchema, insertStockCountItemSchema, insertSupplierContractSchema, insertEmployeeCommissionSchema, insertSuperAdminSchema, insertTenantSchema, insertTenantSubscriptionSchema, insertLicenseKeySchema, insertTenantNotificationSchema, insertOnlineOrderSchema, insertLandingPageConfigSchema, insertPlatformSettingSchema, insertPlatformCommissionSchema, insertVehicleSchema, insertPrinterConfigSchema, insertDailyClosingSchema, insertMonthlyClosingSchema, insertCustomerAddressSchema, insertPromoCodeSchema, insertPromoCodeUsageSchema, insertDriverLocationSchema, insertLoyaltyTransactionSchema, insertWalletTransactionSchema, insertOrderRatingSchema, insertCustomerSessionSchema, insertOtpVerificationSchema, insertDeliveryZoneSchema, insertCustomerFavoriteSchema, insertProductDietaryTagSchema, insertHelpTicketSchema, insertFaqEntrySchema, insertChatRoomSchema, insertChatMessageSchema, insertBroadcastOrderSchema, insertBroadcastOrderRecipientSchema;
+var import_mysql_core, import_drizzle_zod, branches, employees, categories, products, inventory, customers, sales, saleItems, calls, suppliers, purchaseOrders, purchaseOrderItems, shifts, notifications, expenses, tables, tableQrCodes, kitchenOrders, subscriptionPlans, subscriptions, activityLog, returns, returnItems, syncQueue, cashDrawerOperations, warehouses, warehouseTransfers, productBatches, inventoryMovements, stockCounts, stockCountItems, supplierContracts, employeeCommissions, superAdmins, tenants, tenantSubscriptions, licenseKeys, tenantNotifications, platformSettings, platformCommissions, onlineOrders, chatRooms, chatMessages, broadcastOrders, broadcastOrderRecipients, landingPageConfig, vehicles, printerConfigs, dailyClosings, monthlyClosings, dailySequences, customerAddresses, promoCodes, promoCodeUsages, driverLocations, loyaltyTransactions, wholesalePayments, walletTransactions, orderRatings, customerSessions, otpVerifications, deliveryZones, customerFavorites, productDietaryTags, helpTickets, faqEntries, restaurantAggregateRatings, insertBranchSchema, insertEmployeeSchema, insertCategorySchema, insertProductSchema, insertInventorySchema, insertCustomerSchema, insertSaleSchema, insertSaleItemSchema, insertSupplierSchema, insertPurchaseOrderSchema, insertPurchaseOrderItemSchema, insertShiftSchema, insertNotificationSchema, insertExpenseSchema, insertCallSchema, insertTableSchema, insertTableQrCodeSchema, insertKitchenOrderSchema, insertSubscriptionPlanSchema, insertSubscriptionSchema, insertActivityLogSchema, insertReturnSchema, insertReturnItemSchema, insertCashDrawerOperationSchema, insertWarehouseSchema, insertWarehouseTransferSchema, insertProductBatchSchema, insertInventoryMovementSchema, insertStockCountSchema, insertStockCountItemSchema, insertSupplierContractSchema, insertEmployeeCommissionSchema, insertSuperAdminSchema, insertTenantSchema, insertTenantSubscriptionSchema, insertLicenseKeySchema, insertTenantNotificationSchema, insertOnlineOrderSchema, insertLandingPageConfigSchema, insertPlatformSettingSchema, insertPlatformCommissionSchema, insertVehicleSchema, insertPrinterConfigSchema, insertDailyClosingSchema, insertMonthlyClosingSchema, insertCustomerAddressSchema, insertPromoCodeSchema, insertPromoCodeUsageSchema, insertDriverLocationSchema, insertLoyaltyTransactionSchema, insertWalletTransactionSchema, insertOrderRatingSchema, insertCustomerSessionSchema, insertOtpVerificationSchema, insertDeliveryZoneSchema, insertCustomerFavoriteSchema, insertProductDietaryTagSchema, insertHelpTicketSchema, insertFaqEntrySchema, insertChatRoomSchema, insertChatMessageSchema, insertBroadcastOrderSchema, insertBroadcastOrderRecipientSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -237,6 +238,10 @@ var init_schema = __esm({
       modifiers: (0, import_mysql_core.json)("modifiers").$type().default([]),
       variants: (0, import_mysql_core.json)("variants").$type().default([]),
       isAddon: (0, import_mysql_core.boolean)("is_addon").default(false),
+      // Wholesale (server/wholesale.ts): price for wholesale traders, applied from
+      // wholesaleMinQty units upwards when set.
+      wholesalePrice: (0, import_mysql_core.decimal)("wholesale_price", { precision: 12, scale: 2 }),
+      wholesaleMinQty: (0, import_mysql_core.int)("wholesale_min_qty"),
       createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
       updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
@@ -315,6 +320,14 @@ var init_schema = __esm({
       referredByCode: (0, import_mysql_core.varchar)("referred_by_code", { length: 16 }),
       fcmToken: (0, import_mysql_core.text)("fcm_token"),
       loyaltyTier: (0, import_mysql_core.text)("loyalty_tier").default("bronze"),
+      // ── Wholesale traders (server/wholesale.ts) ──
+      // creditLimit / wholesaleBalance / customerType are written only by the
+      // wholesale module; the generic customer routes strip them.
+      customerType: (0, import_mysql_core.varchar)("customer_type", { length: 20 }).default("retail"),
+      shopName: (0, import_mysql_core.varchar)("shop_name", { length: 160 }),
+      taxNumber: (0, import_mysql_core.varchar)("tax_number", { length: 64 }),
+      creditLimit: (0, import_mysql_core.decimal)("credit_limit", { precision: 14, scale: 2 }),
+      wholesaleBalance: (0, import_mysql_core.decimal)("wholesale_balance", { precision: 14, scale: 2 }).default("0"),
       createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow(),
       updatedAt: (0, import_mysql_core.timestamp)("updated_at").defaultNow()
     });
@@ -905,8 +918,12 @@ var init_schema = __esm({
       deliveryZonesJson: (0, import_mysql_core.json)("delivery_zones_json").$type().default([]),
       minDeliveryTime: (0, import_mysql_core.int)("min_delivery_time").default(20),
       maxDeliveryTime: (0, import_mysql_core.int)("max_delivery_time").default(45),
-      loyaltyPointsPerUnit: (0, import_mysql_core.decimal)("loyalty_points_per_unit", { precision: 5, scale: 2 }).default("1.00"),
-      loyaltyRedemptionRate: (0, import_mysql_core.decimal)("loyalty_redemption_rate", { precision: 5, scale: 2 }).default("0.01"),
+      // Loyalty (POS + online store). Scales are wide enough for zero-decimal
+      // currencies: an SYP store earns e.g. 1 point per 1,000 SYP (0.001/unit)
+      // and a point can be worth 100 SYP. Widened on boot by runLoyaltyMigrations.
+      loyaltyPointsPerUnit: (0, import_mysql_core.decimal)("loyalty_points_per_unit", { precision: 14, scale: 6 }).default("1.000000"),
+      loyaltyRedemptionRate: (0, import_mysql_core.decimal)("loyalty_redemption_rate", { precision: 14, scale: 4 }).default("0.0100"),
+      loyaltyMinRedeemPoints: (0, import_mysql_core.int)("loyalty_min_redeem_points").default(0),
       enableLoyalty: (0, import_mysql_core.boolean)("enable_loyalty").default(true),
       enableScheduledOrders: (0, import_mysql_core.boolean)("enable_scheduled_orders").default(true),
       enablePromos: (0, import_mysql_core.boolean)("enable_promos").default(true),
@@ -1085,6 +1102,20 @@ var init_schema = __esm({
       balanceBefore: (0, import_mysql_core.int)("balance_before").notNull(),
       balanceAfter: (0, import_mysql_core.int)("balance_after").notNull(),
       description: (0, import_mysql_core.text)("description"),
+      createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
+    });
+    wholesalePayments = (0, import_mysql_core.mysqlTable)("wholesale_payments", {
+      id: (0, import_mysql_core.serial)("id").primaryKey(),
+      tenantId: (0, import_mysql_core.int)("tenant_id").notNull(),
+      customerId: (0, import_mysql_core.int)("customer_id").notNull(),
+      kind: (0, import_mysql_core.varchar)("kind", { length: 20 }).notNull().default("payment"),
+      amount: (0, import_mysql_core.decimal)("amount", { precision: 14, scale: 2 }).notNull(),
+      method: (0, import_mysql_core.varchar)("method", { length: 30 }),
+      note: (0, import_mysql_core.varchar)("note", { length: 500 }),
+      saleId: (0, import_mysql_core.int)("sale_id"),
+      returnId: (0, import_mysql_core.int)("return_id"),
+      employeeId: (0, import_mysql_core.int)("employee_id"),
+      balanceAfter: (0, import_mysql_core.decimal)("balance_after", { precision: 14, scale: 2 }),
       createdAt: (0, import_mysql_core.timestamp)("created_at").defaultNow()
     });
     walletTransactions = (0, import_mysql_core.mysqlTable)("wallet_transactions", {
@@ -1342,11 +1373,11 @@ function digitsOnly(phone) {
 function lastNDigits(phone, n = 8) {
   return digitsOnly(phone).slice(-n);
 }
-function isSwissSubscriberOnly(digits) {
-  return /^\d{7}$/.test(digits) && !digits.startsWith("0");
+function isSwissSubscriberOnly(digits2) {
+  return /^\d{7}$/.test(digits2) && !digits2.startsWith("0");
 }
-function isSwissLandlineWithAreaCode(digits) {
-  return /^0[^7]\d{8}$/.test(digits);
+function isSwissLandlineWithAreaCode(digits2) {
+  return /^0[^7]\d{8}$/.test(digits2);
 }
 function getPhoneSearchVariants(search) {
   const cleaned = search.replace(/[\s\-\(\)\.\/]/g, "");
@@ -1430,13 +1461,13 @@ function getPhoneSearchConditions(column, variants) {
   for (const variant of variants) {
     if (!variant) continue;
     conditions.push((0, import_drizzle_orm.like)(column, `%${variant}%`));
-    const digits = variant.replace(/\D/g, "");
-    if (digits.length >= 6) {
-      digitVariants.add(digits);
+    const digits2 = variant.replace(/\D/g, "");
+    if (digits2.length >= 6) {
+      digitVariants.add(digits2);
     }
   }
-  for (const digits of digitVariants) {
-    conditions.push(import_drizzle_orm.sql`${strippedColumn} like ${"%" + digits + "%"}`);
+  for (const digits2 of digitVariants) {
+    conditions.push(import_drizzle_orm.sql`${strippedColumn} like ${"%" + digits2 + "%"}`);
   }
   return conditions;
 }
@@ -1565,16 +1596,16 @@ var init_storage = __esm({
       // Products
       async getProducts(search) {
         if (search) {
-          const q6 = `%${search.toLowerCase()}%`;
+          const q7 = `%${search.toLowerCase()}%`;
           return db.select().from(products).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q6}`,
-                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q6}`,
-                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q6}`,
-                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q6}`,
-                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q6}`
+                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q7}`,
+                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q7}`,
+                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q7}`,
+                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q7}`,
+                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q7}`
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -1583,17 +1614,17 @@ var init_storage = __esm({
       },
       async getProductsByTenant(tenantId, search) {
         if (search) {
-          const q6 = `%${search.toLowerCase()}%`;
+          const q7 = `%${search.toLowerCase()}%`;
           return db.select().from(products).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(products.tenantId, tenantId),
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q6}`,
-                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q6}`,
-                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q6}`,
-                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q6}`,
-                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q6}`
+                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q7}`,
+                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q7}`,
+                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q7}`,
+                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q7}`,
+                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q7}`
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -1604,8 +1635,8 @@ var init_storage = __esm({
         const [prod] = await db.select().from(products).where((0, import_drizzle_orm.eq)(products.id, id));
         return prod;
       },
-      async getProductByBarcode(barcode) {
-        const [prod] = await db.select().from(products).where((0, import_drizzle_orm.eq)(products.barcode, barcode));
+      async getProductByBarcode(barcode, tenantId) {
+        const [prod] = await db.select().from(products).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(products.barcode, barcode), (0, import_drizzle_orm.eq)(products.tenantId, tenantId)));
         return prod;
       },
       async createProduct(data) {
@@ -3451,14 +3482,14 @@ var init_storage = __esm({
       },
       // ── Delivery Management ─────────────────────────────────────────────────────
       async getDeliveryOrders(tenantId, filters) {
-        let q6 = db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId));
+        let q7 = db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId));
         if (filters?.status) {
-          q6 = q6.where((0, import_drizzle_orm.eq)(onlineOrders.status, filters.status));
+          q7 = q7.where((0, import_drizzle_orm.eq)(onlineOrders.status, filters.status));
         }
         if (filters?.orderType) {
-          q6 = q6.where((0, import_drizzle_orm.eq)(onlineOrders.orderType, filters.orderType));
+          q7 = q7.where((0, import_drizzle_orm.eq)(onlineOrders.orderType, filters.orderType));
         }
-        return q6.orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
+        return q7.orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
       },
       async assignDriverToOrder(orderId, vehicleId) {
         await db.update(onlineOrders).set({ driverId: vehicleId }).where((0, import_drizzle_orm.eq)(onlineOrders.id, orderId));
@@ -4159,11 +4190,11 @@ async function seedPizzaLemon() {
   if (pizzaLemonTenants.length > 0) {
     tenant = pizzaLemonTenants[0];
     console.log(`[PIZZA LEMON] Found existing store (ID ${tenant.id}). Upgrading credentials and data...`);
-    const hash3 = await import_bcrypt3.default.hash(STORE_PASSWORD, 10);
+    const hash4 = await import_bcrypt3.default.hash(STORE_PASSWORD, 10);
     await db.update(tenants).set({
       businessName: BUSINESS_NAME,
       ownerEmail: STORE_EMAIL,
-      passwordHash: hash3,
+      passwordHash: hash4,
       status: "active",
       storeType: "restaurant",
       maxBranches: 3,
@@ -4171,14 +4202,14 @@ async function seedPizzaLemon() {
     }).where((0, import_drizzle_orm4.eq)(tenants.id, 24));
   } else {
     console.log("[PIZZA LEMON] No Tenant ID 24 found. Creating new store with ID 24...");
-    const hash3 = await import_bcrypt3.default.hash(STORE_PASSWORD, 10);
+    const hash4 = await import_bcrypt3.default.hash(STORE_PASSWORD, 10);
     const [newTenant] = await db.insert(tenants).values({
       id: 24,
       businessName: BUSINESS_NAME,
       ownerName: "Pizza Lemon Owner",
       ownerEmail: STORE_EMAIL,
       ownerPhone: "+41443103814",
-      passwordHash: hash3,
+      passwordHash: hash4,
       status: "active",
       maxBranches: 3,
       maxEmployees: 20,
@@ -5839,17 +5870,17 @@ function pick(arr) {
   return arr[rand(0, arr.length - 1)];
 }
 function uuid() {
-  return crypto4.randomUUID().split("-")[0].toUpperCase();
+  return crypto5.randomUUID().split("-")[0].toUpperCase();
 }
 async function seedAllDemoData() {
   console.log("[SEED] Starting comprehensive demo data seeding...");
   const [saCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(superAdmins);
   if (Number(saCount.count) === 0) {
-    const hash3 = await import_bcrypt5.default.hash(process.env.SUPER_ADMIN_PASSWORD || require("crypto").randomBytes(18).toString("base64url"), 10);
+    const hash4 = await import_bcrypt5.default.hash(process.env.SUPER_ADMIN_PASSWORD || require("crypto").randomBytes(18).toString("base64url"), 10);
     await db.insert(superAdmins).values({
       name: "System Admin",
       email: process.env.SUPER_ADMIN_EMAIL || "admin@kassenta.com",
-      passwordHash: hash3,
+      passwordHash: hash4,
       role: "super_admin",
       isActive: true
     });
@@ -5858,13 +5889,13 @@ async function seedAllDemoData() {
   const [tenantCount] = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(tenants);
   if (Number(tenantCount.count) < 3) {
     for (const store of DEMO_STORES) {
-      const hash3 = await import_bcrypt5.default.hash("store123", 10);
+      const hash4 = await import_bcrypt5.default.hash("store123", 10);
       const [tenant] = await db.insert(tenants).values({
         businessName: store.biz,
         ownerName: store.owner,
         ownerEmail: store.email,
         ownerPhone: store.phone,
-        passwordHash: hash3,
+        passwordHash: hash4,
         status: "active",
         maxBranches: 5,
         maxEmployees: 20
@@ -6217,14 +6248,14 @@ async function seedAllDemoData() {
   }
   console.log("[SEED] \u2705 All demo data seeded successfully!");
 }
-var import_drizzle_orm6, crypto4, import_bcrypt5, import_date_fns3, DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
+var import_drizzle_orm6, crypto5, import_bcrypt5, import_date_fns3, DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
 var init_seedAllDemoData = __esm({
   "server/seedAllDemoData.ts"() {
     "use strict";
     init_db();
     import_drizzle_orm6 = require("drizzle-orm");
     init_schema();
-    crypto4 = __toESM(require("crypto"));
+    crypto5 = __toESM(require("crypto"));
     import_bcrypt5 = __toESM(require("bcrypt"));
     import_date_fns3 = require("date-fns");
     DEMO_STORES = [
@@ -7026,15 +7057,15 @@ function log(event) {
   console.log(`[WhatsApp] ${event}`);
 }
 function toChatId(phone) {
-  let digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("410") && digits.length === 12) {
-    digits = "41" + digits.slice(3);
-  } else if (digits.startsWith("0") && digits.length === 10) {
-    digits = "41" + digits.slice(1);
-  } else if (digits.length === 9 && !digits.startsWith("0")) {
-    digits = "41" + digits;
+  let digits2 = phone.replace(/\D/g, "");
+  if (digits2.startsWith("410") && digits2.length === 12) {
+    digits2 = "41" + digits2.slice(3);
+  } else if (digits2.startsWith("0") && digits2.length === 10) {
+    digits2 = "41" + digits2.slice(1);
+  } else if (digits2.length === 9 && !digits2.startsWith("0")) {
+    digits2 = "41" + digits2;
   }
-  return `${digits}@c.us`;
+  return `${digits2}@c.us`;
 }
 async function cleanupProcesses() {
   try {
@@ -7045,18 +7076,18 @@ async function cleanupProcesses() {
       execSync(`wmic process where "name='chromium.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: "ignore" });
     } else {
       execSync(
-        `pkill -9 -f 'chromium' 2>/dev/null; pkill -9 -f 'wppconnect' 2>/dev/null; true`,
+        `pkill -9 -f '${CHROME_DATA_DIR}' 2>/dev/null; true`,
         { timeout: 4e3 }
       );
     }
     await new Promise((r) => setTimeout(r, 800));
   } catch {
   }
-  try {
-    if (import_fs.default.existsSync(CHROME_DATA_DIR)) {
-      import_fs.default.rmSync(CHROME_DATA_DIR, { recursive: true, force: true });
+  for (const lock of ["SingletonLock", "SingletonSocket", "SingletonCookie"]) {
+    try {
+      import_fs.default.rmSync(import_path.default.join(CHROME_DATA_DIR, lock), { force: true });
+    } catch {
     }
-  } catch {
   }
   import_fs.default.mkdirSync(CHROME_DATA_DIR, { recursive: true });
   if (!import_fs.default.existsSync(TOKEN_DIR)) import_fs.default.mkdirSync(TOKEN_DIR, { recursive: true });
@@ -7207,6 +7238,13 @@ async function _connectBackground(wpp) {
     log(`Using browser: ${browserPath}`);
     fsMod.mkdirSync(CHROME_DATA_DIR, { recursive: true });
     fsMod.mkdirSync(TOKEN_DIR, { recursive: true });
+    const libDir = import_path.default.join(STORAGE_DIR, "lib");
+    if (!isWindows && fsMod.existsSync(libDir)) {
+      const cur = process.env.LD_LIBRARY_PATH || "";
+      if (!cur.split(":").includes(libDir)) {
+        process.env.LD_LIBRARY_PATH = cur ? `${libDir}:${cur}` : libDir;
+      }
+    }
     const browserArgs = [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -7224,7 +7262,11 @@ async function _connectBackground(wpp) {
       "--metrics-recording-only",
       "--mute-audio",
       "--safebrowsing-disable-auto-update",
-      "--window-size=1280,800"
+      "--window-size=1280,800",
+      // The hosting account caps threads/processes per user; keep
+      // Chrome to as few processes as it will run with.
+      "--renderer-process-limit=1",
+      "--disable-breakpad"
     ];
     connectionPhase = "awaiting_qr";
     let sessionConfirmedByEvent = false;
@@ -7605,8 +7647,176 @@ ${text2}`;
   }
 };
 
-// server/customerAuthService.ts
+// server/whatsappVerifyRoutes.ts
 var import_crypto3 = __toESM(require("crypto"));
+init_storage();
+
+// server/rateLimit.ts
+var buckets = /* @__PURE__ */ new Map();
+var lastSweep = Date.now();
+function sweep(now) {
+  if (now - lastSweep < 6e4) return;
+  lastSweep = now;
+  for (const [key, b] of buckets) {
+    if (b.resetAt <= now) buckets.delete(key);
+  }
+}
+function clientKey(req) {
+  const forwarded = req.header("x-forwarded-for");
+  const ip = forwarded ? forwarded.split(",")[0].trim() : req.ip || req.socket.remoteAddress || "unknown";
+  return ip;
+}
+function rateLimit(opts) {
+  const { max, windowMs, name, keyFn, message } = opts;
+  return (req, res, next) => {
+    const now = Date.now();
+    sweep(now);
+    const key = `${name}:${keyFn ? keyFn(req) : clientKey(req)}`;
+    let bucket = buckets.get(key);
+    if (!bucket || bucket.resetAt <= now) {
+      bucket = { count: 0, resetAt: now + windowMs };
+      buckets.set(key, bucket);
+    }
+    bucket.count += 1;
+    const remaining = Math.max(0, max - bucket.count);
+    res.setHeader("RateLimit-Limit", String(max));
+    res.setHeader("RateLimit-Remaining", String(remaining));
+    res.setHeader("RateLimit-Reset", String(Math.ceil((bucket.resetAt - now) / 1e3)));
+    if (bucket.count > max) {
+      res.setHeader("Retry-After", String(Math.ceil((bucket.resetAt - now) / 1e3)));
+      return res.status(429).json({ error: message || "Too many requests. Please try again shortly." });
+    }
+    next();
+  };
+}
+
+// server/whatsappVerifyRoutes.ts
+var CODE_TTL_MS = 10 * 60 * 1e3;
+var MAX_ATTEMPTS = 5;
+var pending = /* @__PURE__ */ new Map();
+var hash = (code) => import_crypto3.default.createHash("sha256").update(code).digest("hex");
+var digits = (v) => String(v ?? "").replace(/\D/g, "");
+function tenantOf(req, res) {
+  const tenantId = Number(req.tenantId ?? 0) || 0;
+  if (!tenantId) {
+    res.status(400).json({ error: "tenant required" });
+    return null;
+  }
+  return tenantId;
+}
+async function readMeta(tenantId) {
+  const tenant = await storage.getTenant(tenantId);
+  return { ...tenant?.metadata || {} };
+}
+function verifiedStorePhone(metadata) {
+  const m = metadata || {};
+  return m.whatsappVerifiedAt && m.whatsappAdminPhone ? String(m.whatsappAdminPhone) : "";
+}
+function registerWhatsAppVerifyRoutes(app2) {
+  app2.get("/api/whatsapp/store", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf(req, res);
+      if (tenantId == null) return;
+      const meta2 = await readMeta(tenantId);
+      const p = pending.get(tenantId);
+      res.json({
+        phone: meta2.whatsappAdminPhone || "",
+        verified: !!verifiedStorePhone(meta2),
+        verifiedAt: meta2.whatsappVerifiedAt || null,
+        pendingPhone: p && p.expiresAt > Date.now() ? p.phone : null,
+        platformConnected: whatsappService.getStatus().status === "connected"
+      });
+    } catch (e) {
+      res.status(500).json({ error: e?.message || "Error" });
+    }
+  });
+  app2.post(
+    "/api/whatsapp/store/verify/start",
+    requireAdmin,
+    rateLimit({
+      name: "wa-verify-start",
+      max: 5,
+      windowMs: 15 * 60 * 1e3,
+      keyFn: (req) => String(req.tenantId ?? "unknown"),
+      message: "\u0645\u062D\u0627\u0648\u0644\u0627\u062A \u0643\u062B\u064A\u0631\u0629. \u0627\u0646\u062A\u0638\u0631 \u0642\u0644\u064A\u0644\u0627\u064B \u062B\u0645 \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629."
+    }),
+    async (req, res) => {
+      try {
+        const tenantId = tenantOf(req, res);
+        if (tenantId == null) return;
+        const phone = digits(req.body?.phone);
+        if (phone.length < 8 || phone.length > 15) {
+          return res.status(400).json({ error: "\u0631\u0642\u0645 \u0648\u0627\u062A\u0633\u0627\u0628 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D. \u0627\u0643\u062A\u0628\u0647 \u0645\u0639 \u0631\u0645\u0632 \u0627\u0644\u062F\u0648\u0644\u0629\u060C \u0645\u062B\u0627\u0644: 963944123456" });
+        }
+        if (whatsappService.getStatus().status !== "connected") {
+          return res.status(503).json({ error: "\u062E\u062F\u0645\u0629 \u0648\u0627\u062A\u0633\u0627\u0628 \u063A\u064A\u0631 \u0645\u062A\u0635\u0644\u0629 \u062D\u0627\u0644\u064A\u0627\u064B. \u062D\u0627\u0648\u0644 \u0644\u0627\u062D\u0642\u0627\u064B \u0623\u0648 \u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062F\u0639\u0645." });
+        }
+        const code = String(import_crypto3.default.randomInt(1e5, 1e6));
+        const tenant = await storage.getTenant(tenantId);
+        const sent = await whatsappService.sendText(
+          phone,
+          `\u0631\u0645\u0632 \u062A\u0623\u0643\u064A\u062F \u0631\u0642\u0645 \u0648\u0627\u062A\u0633\u0627\u0628 \u0644\u0645\u062A\u062C\u0631 ${tenant?.businessName || "Kassenta"}: *${code}*
+Kassenta WhatsApp verification code: *${code}*
+\u064A\u0646\u062A\u0647\u064A \u062E\u0644\u0627\u0644 10 \u062F\u0642\u0627\u0626\u0642. \u0644\u0627 \u062A\u0634\u0627\u0631\u0643\u0647 \u0645\u0639 \u0623\u062D\u062F.`
+        );
+        if (!sent) {
+          return res.status(502).json({ error: "\u062A\u0639\u0630\u0651\u0631 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0631\u0645\u0632. \u062A\u0623\u0643\u062F \u0623\u0646 \u0627\u0644\u0631\u0642\u0645 \u0645\u0633\u062C\u0651\u0644 \u0639\u0644\u0649 \u0648\u0627\u062A\u0633\u0627\u0628 \u0648\u0645\u0643\u062A\u0648\u0628 \u0645\u0639 \u0631\u0645\u0632 \u0627\u0644\u062F\u0648\u0644\u0629." });
+        }
+        pending.set(tenantId, { phone, codeHash: hash(code), expiresAt: Date.now() + CODE_TTL_MS, attempts: 0 });
+        res.json({ ok: true, phone, expiresInSeconds: CODE_TTL_MS / 1e3 });
+      } catch (e) {
+        res.status(500).json({ error: e?.message || "Error" });
+      }
+    }
+  );
+  app2.post("/api/whatsapp/store/verify/confirm", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf(req, res);
+      if (tenantId == null) return;
+      const p = pending.get(tenantId);
+      if (!p || p.expiresAt < Date.now()) {
+        pending.delete(tenantId);
+        return res.status(400).json({ error: "\u0627\u0646\u062A\u0647\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0627\u0644\u0631\u0645\u0632. \u0627\u0637\u0644\u0628 \u0631\u0645\u0632\u0627\u064B \u062C\u062F\u064A\u062F\u0627\u064B." });
+      }
+      p.attempts += 1;
+      if (p.attempts > MAX_ATTEMPTS) {
+        pending.delete(tenantId);
+        return res.status(429).json({ error: "\u0645\u062D\u0627\u0648\u0644\u0627\u062A \u062E\u0627\u0637\u0626\u0629 \u0643\u062B\u064A\u0631\u0629. \u0627\u0637\u0644\u0628 \u0631\u0645\u0632\u0627\u064B \u062C\u062F\u064A\u062F\u0627\u064B." });
+      }
+      const code = digits(req.body?.code);
+      const a = Buffer.from(hash(code));
+      const b = Buffer.from(p.codeHash);
+      if (a.length !== b.length || !import_crypto3.default.timingSafeEqual(a, b)) {
+        return res.status(400).json({ error: "\u0627\u0644\u0631\u0645\u0632 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D." });
+      }
+      pending.delete(tenantId);
+      const meta2 = await readMeta(tenantId);
+      meta2.whatsappAdminPhone = p.phone;
+      meta2.whatsappVerifiedAt = (/* @__PURE__ */ new Date()).toISOString();
+      await storage.updateTenant(tenantId, { metadata: meta2 });
+      res.json({ ok: true, phone: p.phone, verified: true });
+    } catch (e) {
+      res.status(500).json({ error: e?.message || "Error" });
+    }
+  });
+  app2.delete("/api/whatsapp/store", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf(req, res);
+      if (tenantId == null) return;
+      pending.delete(tenantId);
+      const meta2 = await readMeta(tenantId);
+      meta2.whatsappAdminPhone = "";
+      meta2.whatsappVerifiedAt = null;
+      await storage.updateTenant(tenantId, { metadata: meta2 });
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: e?.message || "Error" });
+    }
+  });
+}
+
+// server/customerAuthService.ts
+var import_crypto4 = __toESM(require("crypto"));
 var import_bcrypt2 = __toESM(require("bcrypt"));
 init_db();
 init_schema();
@@ -7615,7 +7825,7 @@ var SESSION_TTL_DAYS = 30;
 var OTP_TTL_MINUTES = 10;
 var OTP_MAX_ATTEMPTS = 5;
 function generateToken2(bytes = 32) {
-  return import_crypto3.default.randomBytes(bytes).toString("hex");
+  return import_crypto4.default.randomBytes(bytes).toString("hex");
 }
 function generateOtp() {
   return Math.floor(1e5 + Math.random() * 9e5).toString();
@@ -7690,8 +7900,8 @@ async function verifyCustomerPassword(customer, password) {
   return import_bcrypt2.default.compare(password, customer.passwordHash);
 }
 async function setCustomerPassword(customerId, password) {
-  const hash3 = await import_bcrypt2.default.hash(password, 10);
-  await db.update(customers).set({ passwordHash: hash3, hasAccount: true }).where((0, import_drizzle_orm2.eq)(customers.id, customerId));
+  const hash4 = await import_bcrypt2.default.hash(password, 10);
+  await db.update(customers).set({ passwordHash: hash4, hasAccount: true }).where((0, import_drizzle_orm2.eq)(customers.id, customerId));
 }
 async function createCustomerSession(customerId, tenantId, deviceInfo) {
   const token = generateToken2(48);
@@ -7722,12 +7932,12 @@ async function getAuthenticatedCustomer(authHeader) {
 }
 
 // server/deliveryService.ts
-var import_crypto4 = __toESM(require("crypto"));
+var import_crypto5 = __toESM(require("crypto"));
 init_db();
 init_schema();
 var import_drizzle_orm3 = require("drizzle-orm");
 function generateTrackingToken() {
-  return import_crypto4.default.randomBytes(20).toString("hex");
+  return import_crypto5.default.randomBytes(20).toString("hex");
 }
 async function validatePromoCode(tenantId, code, orderTotal, orderType, customerId) {
   const now = /* @__PURE__ */ new Date();
@@ -7794,13 +8004,58 @@ async function recordPromoUsage(promoCodeId, customerId, orderId, discountApplie
 }
 async function getLoyaltyConfig(tenantId) {
   const [config] = await db.select({
+    enableLoyalty: landingPageConfig.enableLoyalty,
     loyaltyPointsPerUnit: landingPageConfig.loyaltyPointsPerUnit,
-    loyaltyRedemptionRate: landingPageConfig.loyaltyRedemptionRate
+    loyaltyRedemptionRate: landingPageConfig.loyaltyRedemptionRate,
+    loyaltyMinRedeemPoints: landingPageConfig.loyaltyMinRedeemPoints
   }).from(landingPageConfig).where((0, import_drizzle_orm3.eq)(landingPageConfig.tenantId, tenantId)).limit(1);
-  return {
-    pointsPerUnit: parseFloat(config?.loyaltyPointsPerUnit ?? "1"),
-    redemptionRate: parseFloat(config?.loyaltyRedemptionRate ?? "0.01")
+  const num3 = (v, fallback) => {
+    const n = parseFloat(String(v ?? ""));
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
   };
+  return {
+    enabled: config?.enableLoyalty !== false,
+    pointsPerUnit: num3(config?.loyaltyPointsPerUnit, 1),
+    redemptionRate: num3(config?.loyaltyRedemptionRate, 0.01),
+    minRedeemPoints: Math.floor(num3(config?.loyaltyMinRedeemPoints, 0))
+  };
+}
+async function runLoyaltyMigrations() {
+  const run2 = async (label, statement) => {
+    try {
+      await db.execute(import_drizzle_orm3.sql.raw(statement));
+    } catch (e) {
+      const msg = String(e?.message || e);
+      if (!/duplicate|already exists/i.test(msg)) console.log(`[loyalty-migration] ${label}: ${msg}`);
+    }
+  };
+  await run2(
+    "loyalty_min_redeem_points",
+    "ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS loyalty_min_redeem_points int DEFAULT 0"
+  );
+  try {
+    const [result] = await pool.query(
+      `SELECT COLUMN_NAME AS name, NUMERIC_SCALE AS scale FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'landing_page_config'
+          AND COLUMN_NAME IN ('loyalty_points_per_unit', 'loyalty_redemption_rate')`
+    );
+    const rows = Array.isArray(result) ? result : [];
+    const scaleOf = (name) => Number(rows.find((r) => r.name === name)?.scale ?? 99);
+    if (scaleOf("loyalty_points_per_unit") < 6) {
+      await run2(
+        "loyalty_points_per_unit",
+        "ALTER TABLE landing_page_config MODIFY COLUMN loyalty_points_per_unit decimal(14,6) DEFAULT 1.000000"
+      );
+    }
+    if (scaleOf("loyalty_redemption_rate") < 4) {
+      await run2(
+        "loyalty_redemption_rate",
+        "ALTER TABLE landing_page_config MODIFY COLUMN loyalty_redemption_rate decimal(14,4) DEFAULT 0.0100"
+      );
+    }
+  } catch (e) {
+    console.log("[loyalty-migration] column check:", e?.message || e);
+  }
 }
 function calculateLoyaltyTier(points) {
   if (points >= 5e3) return "platinum";
@@ -7808,47 +8063,87 @@ function calculateLoyaltyTier(points) {
   if (points >= 500) return "silver";
   return "bronze";
 }
-async function awardLoyaltyPoints(customerId, tenantId, orderId, orderTotal) {
-  const config = await getLoyaltyConfig(tenantId);
-  const pointsToAdd = Math.floor(orderTotal * config.pointsPerUnit);
-  if (pointsToAdd <= 0) return 0;
+async function moveLoyaltyPoints(customerId, tenantId, delta, type, description, orderId = null) {
   const [customer] = await db.select({ loyaltyPoints: customers.loyaltyPoints }).from(customers).where((0, import_drizzle_orm3.eq)(customers.id, customerId)).limit(1);
   const before = customer?.loyaltyPoints ?? 0;
-  const after = before + pointsToAdd;
+  const after = Math.max(0, before + delta);
   const newTier = calculateLoyaltyTier(after);
   await db.update(customers).set({ loyaltyPoints: after, loyaltyTier: newTier }).where((0, import_drizzle_orm3.eq)(customers.id, customerId));
   await db.insert(loyaltyTransactions).values({
     customerId,
     tenantId,
     orderId,
-    type: "earn",
-    points: pointsToAdd,
+    type,
+    points: after - before,
     balanceBefore: before,
     balanceAfter: after,
-    description: `Earned from order #${orderId}`
+    description
   });
+  return { before, after };
+}
+function pointsEarnedFor(amount, config) {
+  const raw = Math.max(0, Number(amount) || 0) * config.pointsPerUnit;
+  return Math.floor(raw + 1e-6);
+}
+async function awardLoyaltyPoints(customerId, tenantId, orderId, orderTotal) {
+  const config = await getLoyaltyConfig(tenantId);
+  if (!config.enabled) return 0;
+  const pointsToAdd = pointsEarnedFor(orderTotal, config);
+  if (pointsToAdd <= 0) return 0;
+  await moveLoyaltyPoints(customerId, tenantId, pointsToAdd, "earn", `Earned from order #${orderId}`, orderId);
   return pointsToAdd;
+}
+async function checkLoyaltyRedemption(customerId, tenantId, pointsToRedeem, config) {
+  const cfg = config ?? await getLoyaltyConfig(tenantId);
+  if (!cfg.enabled) return "Loyalty programme is disabled";
+  if (!Number.isInteger(pointsToRedeem) || pointsToRedeem <= 0) return "Invalid number of points";
+  if (cfg.minRedeemPoints > 0 && pointsToRedeem < cfg.minRedeemPoints)
+    return `At least ${cfg.minRedeemPoints} points are needed to redeem`;
+  const [customer] = await db.select({ loyaltyPoints: customers.loyaltyPoints, tenantId: customers.tenantId }).from(customers).where((0, import_drizzle_orm3.eq)(customers.id, customerId)).limit(1);
+  if (!customer || customer.tenantId != null && customer.tenantId !== tenantId) return "Customer not found";
+  if (pointsToRedeem > (customer.loyaltyPoints ?? 0)) return "Insufficient loyalty points";
+  return null;
 }
 async function redeemLoyaltyPoints(customerId, tenantId, pointsToRedeem) {
   const config = await getLoyaltyConfig(tenantId);
-  const [customer] = await db.select({ loyaltyPoints: customers.loyaltyPoints }).from(customers).where((0, import_drizzle_orm3.eq)(customers.id, customerId)).limit(1);
-  const available = customer?.loyaltyPoints ?? 0;
-  if (pointsToRedeem > available)
-    return { success: false, discountAmount: 0, error: "Insufficient loyalty points" };
+  const refusal = await checkLoyaltyRedemption(customerId, tenantId, pointsToRedeem, config);
+  if (refusal) return { success: false, discountAmount: 0, error: refusal };
   const discountAmount = Math.round(pointsToRedeem * config.redemptionRate * 100) / 100;
-  const after = available - pointsToRedeem;
-  const newTier = calculateLoyaltyTier(after);
-  await db.update(customers).set({ loyaltyPoints: after, loyaltyTier: newTier }).where((0, import_drizzle_orm3.eq)(customers.id, customerId));
-  await db.insert(loyaltyTransactions).values({
+  await moveLoyaltyPoints(
     customerId,
     tenantId,
-    type: "redeem",
-    points: -pointsToRedeem,
-    balanceBefore: available,
-    balanceAfter: after,
-    description: `Redeemed ${pointsToRedeem} points for ${discountAmount} discount`
-  });
+    -pointsToRedeem,
+    "redeem",
+    `Redeemed ${pointsToRedeem} points for ${discountAmount} discount`
+  );
   return { success: true, discountAmount };
+}
+async function settlePosSaleLoyalty(opts) {
+  const config = await getLoyaltyConfig(opts.tenantId);
+  if (!config.enabled) return { earned: 0, redeemed: 0 };
+  let redeemed = 0;
+  if (opts.redeemPoints > 0) {
+    const value = Math.round(opts.redeemPoints * config.redemptionRate * 100) / 100;
+    await moveLoyaltyPoints(
+      opts.customerId,
+      opts.tenantId,
+      -opts.redeemPoints,
+      "redeem",
+      `Redeemed ${opts.redeemPoints} points for ${value} discount on sale ${opts.receiptNumber}`
+    );
+    redeemed = opts.redeemPoints;
+  }
+  const earned = pointsEarnedFor(opts.amountPaid, config);
+  if (earned > 0) {
+    await moveLoyaltyPoints(
+      opts.customerId,
+      opts.tenantId,
+      earned,
+      "earn",
+      `Earned from sale ${opts.receiptNumber}`
+    );
+  }
+  return { earned, redeemed };
 }
 async function assignDriverToOrder(orderId, vehicleId) {
   await db.update(onlineOrders).set({ driverId: vehicleId }).where((0, import_drizzle_orm3.eq)(onlineOrders.id, orderId));
@@ -7877,52 +8172,662 @@ async function deductWallet(customerId, tenantId, amount, orderId) {
   return { success: true };
 }
 
-// server/routes.ts
-var bcrypt6 = __toESM(require("bcrypt"));
-var crypto5 = __toESM(require("crypto"));
-var import_date_fns4 = require("date-fns");
-var import_google_auth_library = require("google-auth-library");
-
-// server/rateLimit.ts
-var buckets = /* @__PURE__ */ new Map();
-var lastSweep = Date.now();
-function sweep(now) {
-  if (now - lastSweep < 6e4) return;
-  lastSweep = now;
-  for (const [key, b] of buckets) {
-    if (b.resetAt <= now) buckets.delete(key);
+// server/wholesale.ts
+init_db();
+async function q(sqlText, params = []) {
+  const [rows] = await pool.query(sqlText, params);
+  return Array.isArray(rows) ? rows : [];
+}
+var WholesaleError = class extends Error {
+  statusCode;
+  code;
+  details;
+  constructor(message, statusCode = 400, code, details) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
+  }
+};
+var COLUMNS = [
+  ["products", "wholesale_price", "decimal(12,2) NULL DEFAULT NULL"],
+  ["products", "wholesale_min_qty", "int NULL DEFAULT NULL"],
+  ["customers", "customer_type", "varchar(20) NOT NULL DEFAULT 'retail'"],
+  ["customers", "shop_name", "varchar(160) NULL DEFAULT NULL"],
+  ["customers", "tax_number", "varchar(64) NULL DEFAULT NULL"],
+  ["customers", "credit_limit", "decimal(14,2) NULL DEFAULT NULL"],
+  ["customers", "wholesale_balance", "decimal(14,2) NOT NULL DEFAULT 0"]
+];
+var PAYMENTS_TABLE = `
+  CREATE TABLE IF NOT EXISTS wholesale_payments (
+    id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    tenant_id int NOT NULL,
+    customer_id int NOT NULL,
+    kind varchar(20) NOT NULL DEFAULT 'payment',
+    amount decimal(14,2) NOT NULL,
+    method varchar(30) NULL DEFAULT NULL,
+    note varchar(500) NULL DEFAULT NULL,
+    sale_id int NULL DEFAULT NULL,
+    return_id int NULL DEFAULT NULL,
+    employee_id int NULL DEFAULT NULL,
+    balance_after decimal(14,2) NULL DEFAULT NULL,
+    created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY ix_wp_tenant (tenant_id, created_at),
+    KEY ix_wp_customer (customer_id, created_at),
+    KEY ix_wp_sale (sale_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`;
+async function columnExists(table, column) {
+  const rows = await q(
+    `SELECT 1 FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+    [table, column]
+  );
+  return rows.length > 0;
+}
+async function indexExists(table, index) {
+  const rows = await q(
+    `SELECT 1 FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1`,
+    [table, index]
+  );
+  return rows.length > 0;
+}
+async function runWholesaleMigrations() {
+  let added = 0;
+  for (const [table, column, def] of COLUMNS) {
+    try {
+      if (await columnExists(table, column)) continue;
+      await q(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${def}`);
+      added++;
+    } catch (e) {
+      const msg = String(e?.message || e);
+      if (!/duplicate column/i.test(msg)) console.error(`[wholesale] ${table}.${column}: ${msg}`);
+    }
+  }
+  try {
+    await q(PAYMENTS_TABLE);
+  } catch (e) {
+    console.error("[wholesale] wholesale_payments:", e?.message || e);
+  }
+  try {
+    if (!await indexExists("customers", "ix_customers_tenant_type")) {
+      await q(`ALTER TABLE customers ADD INDEX ix_customers_tenant_type (tenant_id, customer_type)`);
+    }
+  } catch (e) {
+    const msg = String(e?.message || e);
+    if (!/duplicate key name/i.test(msg)) console.error("[wholesale] customers index:", msg);
+  }
+  console.log(added > 0 ? `[wholesale] added ${added} column(s)` : "[wholesale] schema up to date");
+}
+var MAX_AMOUNT_CENTS = 1e13;
+function toCents(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+var fromCents = (c) => (c / 100).toFixed(2);
+var num2 = (v) => v == null ? 0 : Number(v) || 0;
+var numOrNull = (v) => v == null || v === "" ? null : Number(v);
+function parsePositiveAmount(v, field = "amount") {
+  const raw = typeof v === "string" ? v.trim().replace(",", ".") : v;
+  const n = Number(raw);
+  if (raw === "" || raw == null || !Number.isFinite(n)) {
+    throw new WholesaleError(`${field} must be a number`, 400, "INVALID_AMOUNT");
+  }
+  const cents = Math.round(n * 100);
+  if (cents <= 0) throw new WholesaleError(`${field} must be greater than zero`, 400, "INVALID_AMOUNT");
+  if (cents > MAX_AMOUNT_CENTS) throw new WholesaleError(`${field} is too large`, 400, "INVALID_AMOUNT");
+  return cents;
+}
+function parseOptionalMoney(v, field) {
+  if (v === void 0 || v === null) return null;
+  const raw = typeof v === "string" ? v.trim().replace(",", ".") : v;
+  if (raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) throw new WholesaleError(`${field} must be zero or more`, 400, "INVALID_AMOUNT");
+  const cents = Math.round(n * 100);
+  if (cents > MAX_AMOUNT_CENTS) throw new WholesaleError(`${field} is too large`, 400, "INVALID_AMOUNT");
+  return cents;
+}
+var clip = (v, n) => {
+  const t2 = String(v ?? "").trim();
+  return t2 ? t2.slice(0, n) : null;
+};
+function normalizeWholesaleProductFields(body) {
+  if (!body || typeof body !== "object") return body;
+  const b = body;
+  if ("wholesalePrice" in b) {
+    const cents = parseOptionalMoney(b.wholesalePrice, "wholesalePrice");
+    b.wholesalePrice = cents == null ? null : fromCents(cents);
+  }
+  if ("wholesaleMinQty" in b) {
+    const raw = b.wholesaleMinQty;
+    if (raw === "" || raw == null) {
+      b.wholesaleMinQty = null;
+    } else {
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 1 || n > 1e6) {
+        throw new WholesaleError("wholesaleMinQty must be a whole number of at least 1", 400, "INVALID_QTY");
+      }
+      b.wholesaleMinQty = n;
+    }
+  }
+  return body;
+}
+function stripProtectedCustomerFields(body) {
+  if (!body || typeof body !== "object") return body;
+  const b = { ...body };
+  delete b.wholesaleBalance;
+  delete b.wholesale_balance;
+  delete b.creditLimit;
+  delete b.credit_limit;
+  delete b.customerType;
+  delete b.customer_type;
+  return b;
+}
+function mapTrader(r) {
+  const balance = num2(r.wholesale_balance);
+  const creditLimit = numOrNull(r.credit_limit);
+  return {
+    id: Number(r.id),
+    name: r.name,
+    shopName: r.shop_name ?? null,
+    phone: r.phone ?? null,
+    email: r.email ?? null,
+    address: r.address ?? null,
+    taxNumber: r.tax_number ?? null,
+    notes: r.notes ?? null,
+    creditLimit,
+    balance,
+    availableCredit: creditLimit == null ? null : Math.max(0, (toCents(creditLimit) - toCents(balance)) / 100),
+    overLimit: creditLimit != null && toCents(balance) > toCents(creditLimit),
+    isActive: r.is_active == null ? true : !!Number(r.is_active),
+    createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+    lastPaymentAt: r.last_payment_at ? new Date(r.last_payment_at).toISOString() : null,
+    lastCreditSaleAt: r.last_credit_sale_at ? new Date(r.last_credit_sale_at).toISOString() : null
+  };
+}
+var TRADER_COLUMNS = `c.id, c.name, c.shop_name, c.phone, c.email, c.address, c.tax_number, c.notes,
+  c.credit_limit, c.wholesale_balance, c.is_active, c.created_at`;
+async function listTraders(tenantId, opts = {}) {
+  const where = ["c.tenant_id = ?", "c.customer_type = 'wholesale'"];
+  const params = [tenantId];
+  if (!opts.includeInactive) where.push("(c.is_active = 1 OR c.is_active IS NULL)");
+  const s = String(opts.search ?? "").trim();
+  if (s) {
+    const like2 = `%${s.slice(0, 80)}%`;
+    where.push("(c.name LIKE ? OR c.shop_name LIKE ? OR c.phone LIKE ? OR c.tax_number LIKE ?)");
+    params.push(like2, like2, like2, like2);
+  }
+  const rows = await q(
+    `SELECT ${TRADER_COLUMNS},
+       (SELECT MAX(p.created_at) FROM wholesale_payments p
+         WHERE p.customer_id = c.id AND p.kind = 'payment') AS last_payment_at,
+       (SELECT MAX(s.created_at) FROM sales s
+         WHERE s.customer_id = c.id AND s.payment_method = 'credit') AS last_credit_sale_at
+     FROM customers c
+     WHERE ${where.join(" AND ")}
+     ORDER BY c.wholesale_balance DESC, c.name ASC
+     LIMIT 1000`,
+    params
+  );
+  return rows.map(mapTrader);
+}
+async function getTrader(tenantId, id) {
+  const rows = await q(
+    `SELECT ${TRADER_COLUMNS} FROM customers c
+      WHERE c.id = ? AND c.tenant_id = ? AND c.customer_type = 'wholesale' LIMIT 1`,
+    [id, tenantId]
+  );
+  if (!rows[0]) throw new WholesaleError("Trader not found", 404, "NOT_FOUND");
+  return mapTrader(rows[0]);
+}
+async function withTx(fn) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const out = await fn(conn);
+    await conn.commit();
+    return out;
+  } catch (e) {
+    try {
+      await conn.rollback();
+    } catch {
+    }
+    throw e;
+  } finally {
+    conn.release();
   }
 }
-function clientKey(req) {
-  const forwarded = req.header("x-forwarded-for");
-  const ip = forwarded ? forwarded.split(",")[0].trim() : req.ip || req.socket.remoteAddress || "unknown";
-  return ip;
+async function cq(conn, sqlText, params = []) {
+  const [rows] = await conn.query(sqlText, params);
+  return rows;
 }
-function rateLimit(opts) {
-  const { max, windowMs, name, keyFn, message } = opts;
-  return (req, res, next) => {
-    const now = Date.now();
-    sweep(now);
-    const key = `${name}:${keyFn ? keyFn(req) : clientKey(req)}`;
-    let bucket = buckets.get(key);
-    if (!bucket || bucket.resetAt <= now) {
-      bucket = { count: 0, resetAt: now + windowMs };
-      buckets.set(key, bucket);
+async function lockTrader(conn, tenantId, customerId, requireWholesale = true) {
+  const rows = await cq(
+    conn,
+    `SELECT id, name, customer_type, is_active, credit_limit, wholesale_balance
+       FROM customers WHERE id = ? AND tenant_id = ? FOR UPDATE`,
+    [customerId, tenantId]
+  );
+  const row = rows?.[0];
+  if (!row) throw new WholesaleError("Trader not found", 404, "NOT_FOUND");
+  if (requireWholesale && row.customer_type !== "wholesale") {
+    throw new WholesaleError("This customer is not a wholesale trader", 409, "NOT_WHOLESALE");
+  }
+  return row;
+}
+async function createTrader(tenantId, input, employeeId) {
+  const name = clip(input.name, 160);
+  const limitCents = parseOptionalMoney(input.creditLimit, "creditLimit");
+  const openingCents = parseOptionalMoney(input.openingBalance, "openingBalance") ?? 0;
+  const existingId = input.customerId != null && input.customerId !== "" ? Number(input.customerId) : null;
+  if (existingId != null && !Number.isInteger(existingId)) throw new WholesaleError("Invalid customerId", 400);
+  if (!name && existingId == null) throw new WholesaleError("Name is required", 400, "NAME_REQUIRED");
+  const id = await withTx(async (conn) => {
+    let customerId;
+    if (existingId != null) {
+      const row = await lockTrader(conn, tenantId, existingId, false);
+      if (row.customer_type === "wholesale") {
+        throw new WholesaleError("This customer is already a wholesale trader", 409, "ALREADY_WHOLESALE");
+      }
+      await cq(
+        conn,
+        `UPDATE customers SET customer_type = 'wholesale',
+            name = COALESCE(?, name), shop_name = ?, tax_number = ?, credit_limit = ?,
+            phone = COALESCE(?, phone), email = COALESCE(?, email), address = COALESCE(?, address),
+            notes = COALESCE(?, notes), is_active = 1, wholesale_balance = 0
+          WHERE id = ? AND tenant_id = ?`,
+        [
+          name,
+          clip(input.shopName, 160),
+          clip(input.taxNumber, 64),
+          limitCents == null ? null : fromCents(limitCents),
+          clip(input.phone, 40),
+          clip(input.email, 160),
+          clip(input.address, 500),
+          clip(input.notes, 1e3),
+          existingId,
+          tenantId
+        ]
+      );
+      customerId = existingId;
+    } else {
+      const res = await cq(
+        conn,
+        `INSERT INTO customers
+           (tenant_id, name, phone, email, address, notes, customer_type, shop_name, tax_number,
+            credit_limit, wholesale_balance, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, 'wholesale', ?, ?, ?, 0, 1)`,
+        [
+          tenantId,
+          name,
+          clip(input.phone, 40),
+          clip(input.email, 160),
+          clip(input.address, 500),
+          clip(input.notes, 1e3),
+          clip(input.shopName, 160),
+          clip(input.taxNumber, 64),
+          limitCents == null ? null : fromCents(limitCents)
+        ]
+      );
+      customerId = Number(res.insertId);
     }
-    bucket.count += 1;
-    const remaining = Math.max(0, max - bucket.count);
-    res.setHeader("RateLimit-Limit", String(max));
-    res.setHeader("RateLimit-Remaining", String(remaining));
-    res.setHeader("RateLimit-Reset", String(Math.ceil((bucket.resetAt - now) / 1e3)));
-    if (bucket.count > max) {
-      res.setHeader("Retry-After", String(Math.ceil((bucket.resetAt - now) / 1e3)));
-      return res.status(429).json({ error: message || "Too many requests. Please try again shortly." });
+    if (openingCents > 0) {
+      await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(openingCents), customerId]);
+      await cq(
+        conn,
+        `INSERT INTO wholesale_payments
+           (tenant_id, customer_id, kind, amount, method, note, employee_id, balance_after)
+         VALUES (?, ?, 'charge', ?, 'opening', ?, ?, ?)`,
+        [tenantId, customerId, fromCents(openingCents), "Opening balance", employeeId, fromCents(openingCents)]
+      );
     }
-    next();
+    return customerId;
+  });
+  return getTrader(tenantId, id);
+}
+async function updateTrader(tenantId, id, input) {
+  await getTrader(tenantId, id);
+  const sets = [];
+  const params = [];
+  const text2 = (key, col2, max) => {
+    if (input[key] !== void 0) {
+      sets.push(`${col2} = ?`);
+      params.push(clip(input[key], max));
+    }
+  };
+  if (input.name !== void 0) {
+    const name = clip(input.name, 160);
+    if (!name) throw new WholesaleError("Name is required", 400, "NAME_REQUIRED");
+    sets.push("name = ?");
+    params.push(name);
+  }
+  text2("shopName", "shop_name", 160);
+  text2("phone", "phone", 40);
+  text2("email", "email", 160);
+  text2("address", "address", 500);
+  text2("taxNumber", "tax_number", 64);
+  text2("notes", "notes", 1e3);
+  if (input.creditLimit !== void 0) {
+    const cents = parseOptionalMoney(input.creditLimit, "creditLimit");
+    sets.push("credit_limit = ?");
+    params.push(cents == null ? null : fromCents(cents));
+  }
+  if (input.isActive !== void 0) {
+    sets.push("is_active = ?");
+    params.push(input.isActive ? 1 : 0);
+  }
+  if (sets.length > 0) {
+    params.push(id, tenantId);
+    await q(`UPDATE customers SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ? AND customer_type = 'wholesale'`, params);
+  }
+  return getTrader(tenantId, id);
+}
+async function deactivateTrader(tenantId, id) {
+  return updateTrader(tenantId, id, { isActive: false });
+}
+var PAYMENT_METHODS = ["cash", "card", "transfer", "shamcash", "cheque", "other"];
+async function recordPayment(tenantId, customerId, body, employeeId) {
+  const cents = parsePositiveAmount(body.amount);
+  const method = String(body.method || "cash").toLowerCase();
+  if (!PAYMENT_METHODS.includes(method)) {
+    throw new WholesaleError("Unknown payment method", 400, "INVALID_METHOD");
+  }
+  return withTx(async (conn) => {
+    const row = await lockTrader(conn, tenantId, customerId);
+    const balance = toCents(row.wholesale_balance);
+    if (cents > balance) {
+      throw new WholesaleError("Amount exceeds the outstanding balance", 409, "OVERPAYMENT", {
+        balance: balance / 100
+      });
+    }
+    const next = balance - cents;
+    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), customerId]);
+    const res = await cq(
+      conn,
+      `INSERT INTO wholesale_payments
+         (tenant_id, customer_id, kind, amount, method, note, employee_id, balance_after)
+       VALUES (?, ?, 'payment', ?, ?, ?, ?, ?)`,
+      [tenantId, customerId, fromCents(cents), method, clip(body.note, 500), employeeId, fromCents(next)]
+    );
+    return { id: Number(res.insertId), amount: cents / 100, method, balance: next / 100 };
+  });
+}
+async function recordCharge(tenantId, customerId, body, employeeId) {
+  const cents = parsePositiveAmount(body.amount);
+  return withTx(async (conn) => {
+    const row = await lockTrader(conn, tenantId, customerId);
+    const next = toCents(row.wholesale_balance) + cents;
+    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), customerId]);
+    const res = await cq(
+      conn,
+      `INSERT INTO wholesale_payments
+         (tenant_id, customer_id, kind, amount, method, note, employee_id, balance_after)
+       VALUES (?, ?, 'charge', ?, 'manual', ?, ?, ?)`,
+      [tenantId, customerId, fromCents(cents), clip(body.note, 500), employeeId, fromCents(next)]
+    );
+    return { id: Number(res.insertId), amount: cents / 100, balance: next / 100 };
+  });
+}
+async function voidLedgerEntry(tenantId, entryId) {
+  const rows = await q(
+    `SELECT id, customer_id, kind, amount FROM wholesale_payments WHERE id = ? AND tenant_id = ? LIMIT 1`,
+    [entryId, tenantId]
+  );
+  const entry = rows[0];
+  if (!entry) throw new WholesaleError("Entry not found", 404, "NOT_FOUND");
+  if (entry.kind === "return") {
+    throw new WholesaleError("Returns are reversed from the returns screen", 409, "NOT_VOIDABLE");
+  }
+  return withTx(async (conn) => {
+    const row = await lockTrader(conn, tenantId, Number(entry.customer_id));
+    const amount = toCents(entry.amount);
+    const next = toCents(row.wholesale_balance) + (entry.kind === "charge" ? -amount : amount);
+    const del = await cq(conn, `DELETE FROM wholesale_payments WHERE id = ? AND tenant_id = ?`, [entryId, tenantId]);
+    if (!del?.affectedRows) throw new WholesaleError("Entry not found", 404, "NOT_FOUND");
+    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), row.id]);
+    return { balance: next / 100 };
+  });
+}
+async function holdCreditForSale(tenantId, customerId, totalAmount) {
+  if (!tenantId) throw new WholesaleError("Store not identified", 401, "NO_TENANT");
+  const cid = Number(customerId);
+  if (!customerId || !Number.isInteger(cid) || cid <= 0) {
+    throw new WholesaleError("A credit sale needs a wholesale trader as the customer", 400, "CUSTOMER_REQUIRED");
+  }
+  const cents = parsePositiveAmount(totalAmount, "totalAmount");
+  await withTx(async (conn) => {
+    const row = await lockTrader(conn, tenantId, cid);
+    if (row.is_active != null && !Number(row.is_active)) {
+      throw new WholesaleError("This trader account is deactivated", 409, "TRADER_INACTIVE");
+    }
+    const balance = toCents(row.wholesale_balance);
+    const next = balance + cents;
+    if (row.credit_limit != null) {
+      const limit = toCents(row.credit_limit);
+      if (next > limit) {
+        throw new WholesaleError("Credit limit exceeded", 409, "CREDIT_LIMIT", {
+          balance: balance / 100,
+          creditLimit: limit / 100,
+          available: Math.max(0, limit - balance) / 100
+        });
+      }
+    }
+    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), cid]);
+  });
+  return { tenantId, customerId: cid, cents };
+}
+async function releaseCreditHold(hold) {
+  try {
+    await q(
+      `UPDATE customers SET wholesale_balance = wholesale_balance - ? WHERE id = ? AND tenant_id = ?`,
+      [fromCents(hold.cents), hold.customerId, hold.tenantId]
+    );
+  } catch (e) {
+    console.error("[wholesale] could not release credit hold", hold, e?.message || e);
+  }
+}
+async function creditSaleOfTenant(tenantId, saleId) {
+  const rows = await q(
+    `SELECT s.id, s.customer_id, s.total_amount, s.receipt_number
+       FROM sales s JOIN customers c ON c.id = s.customer_id
+      WHERE s.id = ? AND s.payment_method = 'credit' AND c.tenant_id = ? LIMIT 1`,
+    [saleId, tenantId]
+  );
+  return rows[0] ?? null;
+}
+async function reverseCreditSale(tenantId, saleId) {
+  if (!tenantId || !Number.isInteger(saleId)) return;
+  const sale = await creditSaleOfTenant(tenantId, saleId);
+  if (!sale) return;
+  await withTx(async (conn) => {
+    const row = await lockTrader(conn, tenantId, Number(sale.customer_id), false);
+    const ret = await cq(
+      conn,
+      `SELECT COALESCE(SUM(amount), 0) AS returned FROM wholesale_payments
+        WHERE sale_id = ? AND kind = 'return' AND tenant_id = ?`,
+      [saleId, tenantId]
+    );
+    const outstanding = Math.max(0, toCents(sale.total_amount) - toCents(ret?.[0]?.returned));
+    await cq(conn, `DELETE FROM wholesale_payments WHERE sale_id = ? AND kind = 'return' AND tenant_id = ?`, [saleId, tenantId]);
+    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [
+      fromCents(toCents(row.wholesale_balance) - outstanding),
+      row.id
+    ]);
+  });
+}
+async function creditReturnForSale(tenantId, saleId, returnId, returnTotal, employeeId) {
+  const sid = Number(saleId);
+  if (!tenantId || !Number.isInteger(sid) || sid <= 0) return;
+  const requested = Math.abs(toCents(returnTotal));
+  if (requested <= 0) return;
+  const sale = await creditSaleOfTenant(tenantId, sid);
+  if (!sale) return;
+  await withTx(async (conn) => {
+    const row = await lockTrader(conn, tenantId, Number(sale.customer_id), false);
+    const ret = await cq(
+      conn,
+      `SELECT COALESCE(SUM(amount), 0) AS returned FROM wholesale_payments
+        WHERE sale_id = ? AND kind = 'return' AND tenant_id = ?`,
+      [sid, tenantId]
+    );
+    const left = Math.max(0, toCents(sale.total_amount) - toCents(ret?.[0]?.returned));
+    const cents = Math.min(requested, left);
+    if (cents <= 0) return;
+    const next = toCents(row.wholesale_balance) - cents;
+    await cq(conn, `UPDATE customers SET wholesale_balance = ? WHERE id = ?`, [fromCents(next), row.id]);
+    await cq(
+      conn,
+      `INSERT INTO wholesale_payments
+         (tenant_id, customer_id, kind, amount, method, note, sale_id, return_id, employee_id, balance_after)
+       VALUES (?, ?, 'return', ?, 'return', ?, ?, ?, ?, ?)`,
+      [
+        tenantId,
+        row.id,
+        fromCents(cents),
+        `Return on ${sale.receipt_number || `#${sid}`}`,
+        sid,
+        returnId,
+        employeeId,
+        fromCents(next)
+      ]
+    );
+  });
+}
+function parseDate(v, endOfDay = false) {
+  const s = String(v ?? "").trim();
+  if (!s) return null;
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? /* @__PURE__ */ new Date(`${s}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`) : new Date(s);
+  if (Number.isNaN(d.getTime())) throw new WholesaleError("Invalid date", 400, "INVALID_DATE");
+  return d;
+}
+async function getStatement(tenantId, customerId, fromRaw, toRaw) {
+  const trader = await getTrader(tenantId, customerId);
+  const from = parseDate(fromRaw);
+  const to = parseDate(toRaw, true);
+  const saleRows = await q(
+    `SELECT id, receipt_number, total_amount, created_at FROM sales
+      WHERE customer_id = ? AND payment_method = 'credit' ${from ? "AND created_at >= ?" : ""}
+      ORDER BY created_at ASC, id ASC`,
+    from ? [customerId, from] : [customerId]
+  );
+  const ledgerRows = await q(
+    `SELECT id, kind, amount, method, note, sale_id, created_at FROM wholesale_payments
+      WHERE customer_id = ? AND tenant_id = ? ${from ? "AND created_at >= ?" : ""}
+      ORDER BY created_at ASC, id ASC`,
+    from ? [customerId, tenantId, from] : [customerId, tenantId]
+  );
+  const all = [
+    ...saleRows.map((s) => {
+      const cents = toCents(s.total_amount);
+      return {
+        id: `s${s.id}`,
+        at: new Date(s.created_at).getTime(),
+        date: new Date(s.created_at).toISOString(),
+        type: "sale",
+        reference: s.receipt_number ?? null,
+        method: "credit",
+        note: null,
+        debit: cents / 100,
+        credit: 0,
+        cents,
+        saleId: Number(s.id),
+        entryId: null
+      };
+    }),
+    ...ledgerRows.map((p) => {
+      const cents = toCents(p.amount);
+      const isDebit = p.kind === "charge";
+      return {
+        id: `p${p.id}`,
+        at: new Date(p.created_at).getTime(),
+        date: new Date(p.created_at).toISOString(),
+        type: ["payment", "charge", "return"].includes(p.kind) ? p.kind : "payment",
+        reference: null,
+        method: p.method ?? null,
+        note: p.note ?? null,
+        debit: isDebit ? cents / 100 : 0,
+        credit: isDebit ? 0 : cents / 100,
+        cents: isDebit ? cents : -cents,
+        saleId: p.sale_id != null ? Number(p.sale_id) : null,
+        entryId: Number(p.id)
+      };
+    })
+  ].sort((a, b) => a.at - b.at);
+  const sinceFromNet = all.reduce((s, e) => s + e.cents, 0);
+  const openingCents = toCents(trader.balance) - sinceFromNet;
+  let running = openingCents;
+  let debitCents = 0;
+  let creditCents = 0;
+  const entries = [];
+  for (const e of all) {
+    if (to && e.at > to.getTime()) break;
+    running += e.cents;
+    if (e.cents > 0) debitCents += e.cents;
+    else creditCents -= e.cents;
+    const { at: _at, cents: _c, ...rest } = e;
+    entries.push({ ...rest, balance: running / 100 });
+  }
+  return {
+    trader,
+    from: from ? from.toISOString() : null,
+    to: to ? to.toISOString() : null,
+    openingBalance: openingCents / 100,
+    totalDebit: debitCents / 100,
+    totalCredit: creditCents / 100,
+    closingBalance: running / 100,
+    entries
+  };
+}
+async function getSummary(tenantId) {
+  const [totals] = await q(
+    `SELECT COUNT(*) AS traders,
+            COALESCE(SUM(CASE WHEN is_active = 1 OR is_active IS NULL THEN 1 ELSE 0 END), 0) AS active,
+            COALESCE(SUM(CASE WHEN wholesale_balance > 0 THEN wholesale_balance ELSE 0 END), 0) AS receivables,
+            COALESCE(SUM(CASE WHEN wholesale_balance > 0 THEN 1 ELSE 0 END), 0) AS debtors,
+            COALESCE(SUM(CASE WHEN credit_limit IS NOT NULL AND wholesale_balance > credit_limit THEN 1 ELSE 0 END), 0) AS over_limit
+       FROM customers WHERE tenant_id = ? AND customer_type = 'wholesale'`,
+    [tenantId]
+  );
+  const monthStart = /* @__PURE__ */ new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const [collected] = await q(
+    `SELECT COALESCE(SUM(amount), 0) AS total FROM wholesale_payments
+      WHERE tenant_id = ? AND kind = 'payment' AND created_at >= ?`,
+    [tenantId, monthStart]
+  );
+  const [creditSales] = await q(
+    `SELECT COALESCE(SUM(s.total_amount), 0) AS total, COUNT(*) AS count
+       FROM sales s JOIN customers c ON c.id = s.customer_id
+      WHERE c.tenant_id = ? AND s.payment_method = 'credit' AND s.created_at >= ?`,
+    [tenantId, monthStart]
+  );
+  const top = await q(
+    `SELECT ${TRADER_COLUMNS} FROM customers c
+      WHERE c.tenant_id = ? AND c.customer_type = 'wholesale' AND c.wholesale_balance > 0
+      ORDER BY c.wholesale_balance DESC LIMIT 5`,
+    [tenantId]
+  );
+  return {
+    traders: num2(totals?.traders),
+    activeTraders: num2(totals?.active),
+    totalReceivables: num2(totals?.receivables),
+    debtors: num2(totals?.debtors),
+    overLimit: num2(totals?.over_limit),
+    collectedThisMonth: num2(collected?.total),
+    creditSalesThisMonth: num2(creditSales?.total),
+    creditSalesCountThisMonth: num2(creditSales?.count),
+    monthStart: monthStart.toISOString(),
+    topDebtors: top.map(mapTrader)
   };
 }
 
 // server/routes.ts
+var bcrypt6 = __toESM(require("bcrypt"));
+var crypto6 = __toESM(require("crypto"));
+var import_date_fns4 = require("date-fns");
+var import_google_auth_library = require("google-auth-library");
 var TIMESTAMP_FIELDS = [
   "createdAt",
   "updatedAt",
@@ -8143,7 +9048,7 @@ async function registerRoutes(app2) {
       });
       const randomSegments = Array.from(
         { length: 4 },
-        () => crypto5.randomBytes(2).toString("hex").toUpperCase()
+        () => crypto6.randomBytes(2).toString("hex").toUpperCase()
       );
       const licenseKey = `KASSENTA-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
@@ -8232,7 +9137,7 @@ async function registerRoutes(app2) {
         autoRenew: true,
         paymentMethod: "stripe"
       });
-      const randomSegments = Array.from({ length: 4 }, () => crypto5.randomBytes(2).toString("hex").toUpperCase());
+      const randomSegments = Array.from({ length: 4 }, () => crypto6.randomBytes(2).toString("hex").toUpperCase());
       const licenseKey = `KASSENTA-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
         licenseKey,
@@ -8267,7 +9172,7 @@ async function registerRoutes(app2) {
       let isNew = false;
       if (!tenant) {
         isNew = true;
-        const tempPassword = "GAuth-" + crypto5.randomBytes(4).toString("hex");
+        const tempPassword = "GAuth-" + crypto6.randomBytes(4).toString("hex");
         const passwordHash = await bcrypt6.hash(tempPassword, 10);
         tenant = await storage.createTenant({
           businessName: payload.name ? `${payload.name}'s Store` : "My New Store",
@@ -8293,7 +9198,7 @@ async function registerRoutes(app2) {
         });
         const randomSegments = Array.from(
           { length: 4 },
-          () => crypto5.randomBytes(2).toString("hex").toUpperCase()
+          () => crypto6.randomBytes(2).toString("hex").toUpperCase()
         );
         const licenseKey = `TRIAL-${randomSegments.join("-")}`;
         await storage.createLicenseKey({
@@ -8870,7 +9775,9 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/products/barcode/:barcode", async (req, res) => {
     try {
-      const prod = await storage.getProductByBarcode(req.params.barcode);
+      const tenantId = Number(req.tenantId) || 0;
+      if (!tenantId) return res.status(401).json({ error: "Store not identified" });
+      const prod = await storage.getProductByBarcode(String(req.params.barcode), tenantId);
       if (!prod) return res.status(404).json({ error: "Product not found" });
       res.json(prod);
     } catch (e) {
@@ -8879,7 +9786,7 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/products", async (req, res) => {
     try {
-      const body = sanitizeDates(req.body);
+      const body = normalizeWholesaleProductFields(sanitizeDates(req.body));
       if (body.isAddon) body.price = "0";
       const p = await storage.createProduct(body);
       callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
@@ -8890,7 +9797,7 @@ async function registerRoutes(app2) {
   });
   app2.put("/api/products/:id", async (req, res) => {
     try {
-      const body = sanitizeDates(req.body);
+      const body = normalizeWholesaleProductFields(sanitizeDates(req.body));
       if (body.isAddon) body.price = "0";
       const p = await storage.updateProduct(Number(req.params.id), body);
       callerIdService.broadcast({ type: "menu_updated" }, req.tenantId);
@@ -9207,14 +10114,14 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/customers", async (req, res) => {
     try {
-      res.json(await storage.createCustomer(sanitizeDates(req.body)));
+      res.json(await storage.createCustomer(stripProtectedCustomerFields(sanitizeDates(req.body))));
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
   });
   app2.put("/api/customers/:id", async (req, res) => {
     try {
-      res.json(await storage.updateCustomer(Number(req.params.id), sanitizeDates(req.body)));
+      res.json(await storage.updateCustomer(Number(req.params.id), stripProtectedCustomerFields(sanitizeDates(req.body))));
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -9273,11 +10180,31 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/sales", async (req, res) => {
     try {
-      const { items, ...saleData } = sanitizeDates(req.body);
+      const { items, loyaltyPointsRedeemed, ...saleData } = sanitizeDates(req.body);
+      const loyaltyTenantId = req.tenantId ?? (saleData.customerId ? (await storage.getCustomer(saleData.customerId))?.tenantId ?? void 0 : void 0);
+      const redeemPoints = Math.max(0, Math.floor(Number(loyaltyPointsRedeemed) || 0));
+      if (redeemPoints > 0) {
+        const refusal = saleData.customerId && loyaltyTenantId ? await checkLoyaltyRedemption(Number(saleData.customerId), loyaltyTenantId, redeemPoints) : "A customer is required to redeem points";
+        if (refusal) return res.status(400).json({ error: refusal });
+      }
       const swissDateRcp = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit" }).format(/* @__PURE__ */ new Date()).replace(/-/g, "");
       const dailySeqRcp = await storage.getNextSequenceNumber(`branch-${saleData.branchId || 0}`);
       const receiptNumber = `${saleData.branchId || 0}-${swissDateRcp}-${dailySeqRcp}`;
-      const sale = await storage.createSale({ ...saleData, receiptNumber });
+      let creditHold = null;
+      if (saleData.paymentMethod === "credit") {
+        try {
+          creditHold = await holdCreditForSale(req.tenantId, saleData.customerId, saleData.totalAmount);
+        } catch (err) {
+          return res.status(err?.statusCode || 400).json({ error: err?.message, code: err?.code, ...err?.details || {} });
+        }
+        saleData.customerId = creditHold.customerId;
+        saleData.totalAmount = (creditHold.cents / 100).toFixed(2);
+        saleData.paymentStatus = "pending";
+      }
+      const sale = await storage.createSale({ ...saleData, receiptNumber }).catch(async (err) => {
+        if (creditHold) await releaseCreditHold(creditHold);
+        throw err;
+      });
       if (items && items.length > 0) {
         for (const item of items) {
           await storage.createSaleItem({ ...item, saleId: sale.id });
@@ -9296,9 +10223,20 @@ async function registerRoutes(app2) {
         }
       }
       if (saleData.customerId) {
-        const points = Math.floor(Number(saleData.totalAmount) / 10);
-        await storage.addLoyaltyPoints(saleData.customerId, points);
         const existingCustomer = await storage.getCustomer(saleData.customerId);
+        if (loyaltyTenantId && existingCustomer && (existingCustomer.tenantId == null || existingCustomer.tenantId === loyaltyTenantId)) {
+          try {
+            await settlePosSaleLoyalty({
+              customerId: existingCustomer.id,
+              tenantId: loyaltyTenantId,
+              receiptNumber: sale.receiptNumber,
+              amountPaid: Number(saleData.totalAmount),
+              redeemPoints
+            });
+          } catch (e) {
+            console.error("[loyalty] POS sale", sale.id, e?.message || e);
+          }
+        }
         if (existingCustomer) {
           await storage.updateCustomer(saleData.customerId, {
             visitCount: (existingCustomer.visitCount || 0) + 1,
@@ -9436,6 +10374,7 @@ async function registerRoutes(app2) {
   });
   app2.delete("/api/sales/:id", async (req, res) => {
     try {
+      await reverseCreditSale(req.tenantId, Number(req.params.id));
       await storage.deleteSale(Number(req.params.id));
       res.json({ success: true });
     } catch (e) {
@@ -9664,7 +10603,7 @@ async function registerRoutes(app2) {
     try {
       const { tenantId, tableId, branchId, tableName } = req.body;
       if (!tenantId || !tableId || !tableName) return res.status(400).json({ error: "tenantId, tableId, tableName required" });
-      const qrToken = `TBL-${crypto5.randomBytes(16).toString("hex")}`;
+      const qrToken = `TBL-${crypto6.randomBytes(16).toString("hex")}`;
       const qr = await storage.createTableQrCode({
         tenantId: Number(tenantId),
         tableId: Number(tableId),
@@ -9684,11 +10623,11 @@ async function registerRoutes(app2) {
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
       const allTables = await storage.getTables(branchId ? Number(branchId) : void 0);
       const existing = await storage.getTableQrCodes(Number(tenantId));
-      const existingTableIds = new Set(existing.map((q6) => q6.tableId));
+      const existingTableIds = new Set(existing.map((q7) => q7.tableId));
       const created = [];
       for (const table of allTables) {
         if (existingTableIds.has(table.id)) continue;
-        const qrToken = `TBL-${crypto5.randomBytes(16).toString("hex")}`;
+        const qrToken = `TBL-${crypto6.randomBytes(16).toString("hex")}`;
         const qr = await storage.createTableQrCode({
           tenantId: Number(tenantId),
           tableId: table.id,
@@ -9943,6 +10882,11 @@ async function registerRoutes(app2) {
       }
       if (returnData.originalSaleId) {
         await storage.updateSale(returnData.originalSaleId, { status: "refunded" });
+        try {
+          await creditReturnForSale(req.tenantId, returnData.originalSaleId, ret.id, returnData.totalAmount, returnData.employeeId ?? null);
+        } catch (err) {
+          console.error("[/api/returns] wholesale balance not reduced:", err?.message || err);
+        }
       }
       await storage.createActivityLog({
         employeeId: returnData.employeeId,
@@ -10406,7 +11350,7 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/products-with-stock", async (req, res) => {
     try {
-      const { initialStock, branchId, ...productData } = sanitizeDates(req.body);
+      const { initialStock, branchId, ...productData } = normalizeWholesaleProductFields(sanitizeDates(req.body));
       const product = await storage.createProduct(productData);
       if (initialStock && initialStock > 0 && branchId) {
         await storage.upsertInventory({ productId: product.id, branchId: Number(branchId), quantity: Number(initialStock) });
@@ -10436,7 +11380,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/store-settings", async (req, res) => {
     try {
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
+      const tenantId = req.tenantId ?? (req.query.tenantId ? Number(req.query.tenantId) : void 0);
       let branches2 = [];
       if (tenantId) {
         branches2 = await storage.getBranchesByTenant(tenantId);
@@ -10452,6 +11396,7 @@ async function registerRoutes(app2) {
         commissionRate: 0,
         // commission is baked into product prices via applyMarkup
         whatsappAdminPhone: tenant?.metadata?.whatsappAdminPhone || "",
+        whatsappVerified: !!verifiedStorePhone(tenant?.metadata),
         // BIZ-01: opt-in minimum-order top-up, delivery only. 0 = disabled.
         minOrderAmount: Number(tenant?.metadata?.minOrderAmount) || 0
       });
@@ -10462,7 +11407,7 @@ async function registerRoutes(app2) {
   app2.put("/api/store-settings", async (req, res) => {
     try {
       const { storeType, tenantId: bodyTenantId, ...branchData } = sanitizeDates(req.body);
-      const tenantId = req.query.tenantId ? Number(req.query.tenantId) : bodyTenantId ? Number(bodyTenantId) : void 0;
+      const tenantId = req.tenantId ?? (req.query.tenantId ? Number(req.query.tenantId) : bodyTenantId ? Number(bodyTenantId) : void 0);
       let branches2 = [];
       if (tenantId) {
         branches2 = await storage.getBranchesByTenant(tenantId);
@@ -10479,7 +11424,10 @@ async function registerRoutes(app2) {
         if (whatsappAdminPhone !== void 0 || minOrderAmount !== void 0) {
           const existingTenant = await storage.getTenant(mainBranch.tenantId);
           const metadata = { ...existingTenant?.metadata || {} };
-          if (whatsappAdminPhone !== void 0) metadata.whatsappAdminPhone = whatsappAdminPhone.replace(/\D/g, "");
+          if (whatsappAdminPhone !== void 0 && !String(whatsappAdminPhone).replace(/\D/g, "")) {
+            metadata.whatsappAdminPhone = "";
+            metadata.whatsappVerifiedAt = null;
+          }
           if (minOrderAmount !== void 0) metadata.minOrderAmount = Math.max(0, Number(minOrderAmount) || 0);
           tenantUpdates.metadata = metadata;
         }
@@ -10490,7 +11438,7 @@ async function registerRoutes(app2) {
       res.json({
         ...updatedBranch,
         storeType,
-        whatsappAdminPhone: whatsappAdminPhone?.replace(/\D/g, "") || "",
+        whatsappAdminPhone: mainBranch.tenantId ? verifiedStorePhone((await storage.getTenant(mainBranch.tenantId))?.metadata) : "",
         minOrderAmount: Math.max(0, Number(minOrderAmount) || 0)
       });
     } catch (e) {
@@ -10776,7 +11724,7 @@ async function test(){
       try {
         const tenant = await storage.getTenant(resolvedTenantId);
         const storeName = tenant?.businessName || "Online Store";
-        const storeAdminPhone = tenant?.metadata?.whatsappAdminPhone;
+        const storeAdminPhone = verifiedStorePhone(tenant?.metadata) || void 0;
         const globalAdminPhone = await storage.getPlatformSetting("whatsapp_admin_phone");
         const adminPhone = storeAdminPhone || globalAdminPhone || void 0;
         await whatsappService.sendOrderNotification({
@@ -10936,7 +11884,11 @@ async function test(){
       const tenant = await storage.getTenant(Number(req.params.tenantId));
       if (!tenant) return res.status(404).json({ error: "Tenant not found" });
       const phone = (req.body?.phone || "").replace(/\D/g, "");
-      const metadata = { ...tenant.metadata || {}, whatsappAdminPhone: phone };
+      const metadata = {
+        ...tenant.metadata || {},
+        whatsappAdminPhone: phone,
+        whatsappVerifiedAt: phone ? (/* @__PURE__ */ new Date()).toISOString() : null
+      };
       await storage.updateTenant(Number(req.params.tenantId), { metadata });
       res.json({ success: true, phone });
     } catch (e) {
@@ -12582,14 +13534,14 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
   });
   app2.get("/api/delivery/search", async (req, res) => {
     try {
-      const q6 = (req.query.q || "").trim();
+      const q7 = (req.query.q || "").trim();
       const tenantId = Number(req.query.tenantId);
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
-      if (!q6) return res.json([]);
+      if (!q7) return res.json([]);
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { products: products2, categories: categories2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
       const { eq: eq10, and: and7, or: or5, like: like2, sql: sql8 } = await import("drizzle-orm");
-      const pattern = `%${q6}%`;
+      const pattern = `%${q7}%`;
       const results = await db2.select({
         id: products2.id,
         name: products2.name,
@@ -12821,7 +13773,7 @@ Sitemap: https://kassenta.com/api/delivery/sitemap.xml
 
 // server/superAdminRoutes.ts
 var bcrypt7 = __toESM(require("bcrypt"));
-var crypto6 = __toESM(require("crypto"));
+var crypto7 = __toESM(require("crypto"));
 var fs4 = __toESM(require("fs"));
 var path3 = __toESM(require("path"));
 init_storage();
@@ -12841,7 +13793,7 @@ var MK = {
   tenantId: "kassenta_tenant_id",
   customerId: "kassenta_customer_id"
 };
-async function q(sqlText, params = []) {
+async function q2(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -12879,7 +13831,7 @@ async function markOnlineOrderFailed(pi) {
   const orderId = metaInt(pi, MK.orderId);
   if (!orderId) return "no order id in metadata";
   const reason = pi.last_payment_error?.message ?? pi.last_payment_error?.code ?? "payment failed";
-  await q(
+  await q2(
     `UPDATE online_orders
         SET payment_status = 'failed',
             stripe_payment_intent_id = ?,
@@ -12893,7 +13845,7 @@ async function markSalePaid(pi) {
   const saleId = metaInt(pi, MK.saleId);
   if (!saleId) return "no sale id in metadata";
   const chargeId = typeof pi.latest_charge === "string" ? pi.latest_charge : pi.latest_charge?.id ?? null;
-  await q(
+  await q2(
     `UPDATE sales
         SET payment_status = 'paid',
             stripe_payment_intent_id = ?,
@@ -12908,7 +13860,7 @@ async function creditWallet2(pi) {
   const customerId = metaInt(pi, MK.customerId);
   const tenantId = metaInt(pi, MK.tenantId);
   if (!customerId || !tenantId) return "missing customer/tenant in metadata";
-  const existing = await q(
+  const existing = await q2(
     `SELECT id FROM wallet_transactions WHERE stripe_payment_intent_id = ? LIMIT 1`,
     [pi.id]
   );
@@ -12958,7 +13910,7 @@ async function creditWallet2(pi) {
 async function activateSubscription(pi) {
   const tenantId = metaInt(pi, MK.tenantId);
   if (!tenantId) return "no tenant id in metadata";
-  await q(
+  await q2(
     `UPDATE tenant_subscriptions
         SET status = 'active',
             last_payment_date = NOW(),
@@ -12966,7 +13918,7 @@ async function activateSubscription(pi) {
       WHERE tenant_id = ?`,
     [tenantId]
   );
-  await q(`UPDATE tenants SET status = 'active' WHERE id = ?`, [tenantId]);
+  await q2(`UPDATE tenants SET status = 'active' WHERE id = ?`, [tenantId]);
   return `tenant ${tenantId} subscription -> active`;
 }
 async function applyRefund(charge) {
@@ -12984,7 +13936,7 @@ async function applyRefund(charge) {
       WHERE stripe_payment_intent_id = ?`,
     [fully ? "refunded" : "partially_refunded", refunded, refundId, piId]
   );
-  await q(
+  await q2(
     `UPDATE sales
         SET payment_status = ?,
             stripe_refund_id = COALESCE(?, stripe_refund_id)
@@ -13007,7 +13959,7 @@ async function onPaymentIntentSucceeded(pi) {
       return activateSubscription(pi);
     default:
       if (metaInt(pi, MK.orderId)) return markOnlineOrderPaid(pi);
-      await q(
+      await q2(
         `UPDATE online_orders SET payment_status = 'paid', paid_at = COALESCE(paid_at, NOW())
           WHERE stripe_payment_intent_id = ? AND payment_status <> 'paid'`,
         [pi.id]
@@ -13021,7 +13973,7 @@ async function onCheckoutCompleted(session) {
   if (kind === "tenant_subscription" && tenantId) {
     const subId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null;
     const custId = typeof session.customer === "string" ? session.customer : session.customer?.id ?? null;
-    await q(
+    await q2(
       `UPDATE tenant_subscriptions
           SET status = 'active',
               stripe_subscription_id = COALESCE(?, stripe_subscription_id),
@@ -13031,7 +13983,7 @@ async function onCheckoutCompleted(session) {
       [subId, custId, tenantId]
     );
     if (custId) {
-      await q(`UPDATE tenants SET stripe_customer_id = ?, status = 'active' WHERE id = ?`, [
+      await q2(`UPDATE tenants SET stripe_customer_id = ?, status = 'active' WHERE id = ?`, [
         custId,
         tenantId
       ]);
@@ -13041,7 +13993,7 @@ async function onCheckoutCompleted(session) {
   const orderId = metaInt(session, MK.orderId);
   if (orderId && session.payment_status === "paid") {
     const piId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null;
-    await q(
+    await q2(
       `UPDATE online_orders
           SET payment_status = 'paid',
               stripe_payment_intent_id = COALESCE(?, stripe_payment_intent_id),
@@ -13057,7 +14009,7 @@ async function onInvoice(invoice, paid) {
   const custId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id ?? null;
   if (!custId) return "invoice has no customer";
   if (paid) {
-    await q(
+    await q2(
       `UPDATE tenant_subscriptions
           SET status = 'active',
               last_payment_date = NOW(),
@@ -13068,7 +14020,7 @@ async function onInvoice(invoice, paid) {
     );
     return `invoice ${invoice.id} paid for customer ${custId}`;
   }
-  await q(
+  await q2(
     `UPDATE tenant_subscriptions
         SET status = 'past_due',
             last_invoice_id = ?,
@@ -13082,7 +14034,7 @@ async function onSubscriptionChanged(sub) {
   const custId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
   if (!custId) return "subscription has no customer";
   const status2 = sub.status === "active" || sub.status === "trialing" ? "active" : sub.status === "past_due" || sub.status === "unpaid" ? "past_due" : "cancelled";
-  await q(
+  await q2(
     `UPDATE tenant_subscriptions
         SET status = ?,
             stripe_subscription_id = ?,
@@ -13092,7 +14044,7 @@ async function onSubscriptionChanged(sub) {
     [status2, sub.id, sub.cancel_at_period_end ? 0 : 1, status2, custId]
   );
   if (status2 === "cancelled") {
-    await q(`UPDATE tenants SET status = 'suspended' WHERE stripe_customer_id = ?`, [custId]);
+    await q2(`UPDATE tenants SET status = 'suspended' WHERE stripe_customer_id = ?`, [custId]);
   }
   return `subscription ${sub.id} -> ${status2}`;
 }
@@ -13138,7 +14090,7 @@ async function processStripeWebhook(rawBody, signature) {
   const stripe = await requireStripeClient();
   const event = stripe.webhooks.constructEvent(rawBody, signature, secret);
   try {
-    await q(
+    await q2(
       `INSERT INTO stripe_webhook_events (id, type, api_version, livemode, status, payload)
        VALUES (?, ?, ?, ?, 'received', ?)`,
       [
@@ -13157,7 +14109,7 @@ async function processStripeWebhook(rawBody, signature) {
   }
   try {
     const outcome = await dispatchStripeEvent(event);
-    await q(
+    await q2(
       `UPDATE stripe_webhook_events SET status='processed', processed_at=NOW(), error=? WHERE id=?`,
       [outcome.slice(0, 500), event.id]
     ).catch(() => {
@@ -13166,7 +14118,7 @@ async function processStripeWebhook(rawBody, signature) {
     return { received: true, eventId: event.id, outcome };
   } catch (e) {
     const msg = String(e?.message || e);
-    await q(
+    await q2(
       `UPDATE stripe_webhook_events SET status='failed', error=? WHERE id=?`,
       [msg.slice(0, 500), event.id]
     ).catch(() => {
@@ -13180,7 +14132,7 @@ async function processStripeWebhook(rawBody, signature) {
 var DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || "CHF").toLowerCase();
 var MIN_MAJOR = 0.5;
 var MAX_MAJOR = 2e4;
-async function q2(sqlText, params = []) {
+async function q3(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -13199,7 +14151,7 @@ function toMinor(major, label) {
 async function currencyFor(tenantId) {
   if (!tenantId) return DEFAULT_CURRENCY;
   try {
-    const rows = await q2(
+    const rows = await q3(
       `SELECT currency FROM payment_gateway_settings WHERE tenant_id IN (?, 0)
         ORDER BY tenant_id DESC LIMIT 1`,
       [tenantId]
@@ -13242,7 +14194,7 @@ async function buildIntent(opts) {
   };
 }
 async function createOrderPaymentIntent(orderId) {
-  const rows = await q2(
+  const rows = await q3(
     `SELECT id, tenant_id, order_number, total_amount, payment_status,
             customer_email, stripe_payment_intent_id
        FROM online_orders WHERE id = ? LIMIT 1`,
@@ -13282,14 +14234,14 @@ async function createOrderPaymentIntent(orderId) {
     receiptEmail: order.customer_email || null,
     idempotencyKey: `order-${order.id}-${amountMinor}`
   });
-  await q2(`UPDATE online_orders SET stripe_payment_intent_id = ? WHERE id = ?`, [
+  await q3(`UPDATE online_orders SET stripe_payment_intent_id = ? WHERE id = ?`, [
     result.paymentIntentId,
     orderId
   ]);
   return result;
 }
 async function createSalePaymentIntent(saleId) {
-  const rows = await q2(
+  const rows = await q3(
     `SELECT s.id, s.receipt_number, s.total_amount, s.payment_status, b.tenant_id
        FROM sales s LEFT JOIN branches b ON b.id = s.branch_id
       WHERE s.id = ? LIMIT 1`,
@@ -13309,14 +14261,14 @@ async function createSalePaymentIntent(saleId) {
     description: `Receipt ${sale.receipt_number}`,
     idempotencyKey: `sale-${sale.id}-${amountMinor}`
   });
-  await q2(`UPDATE sales SET stripe_payment_intent_id = ? WHERE id = ?`, [
+  await q3(`UPDATE sales SET stripe_payment_intent_id = ? WHERE id = ?`, [
     result.paymentIntentId,
     saleId
   ]);
   return result;
 }
 async function createWalletTopupIntent(opts) {
-  const rows = await q2(`SELECT id, email, tenant_id FROM customers WHERE id = ? LIMIT 1`, [
+  const rows = await q3(`SELECT id, email, tenant_id FROM customers WHERE id = ? LIMIT 1`, [
     opts.customerId
   ]);
   const customer = rows[0];
@@ -13339,7 +14291,7 @@ async function createWalletTopupIntent(opts) {
 async function createSubscriptionIntent(opts) {
   let amount = opts.amount ?? null;
   if (opts.planId) {
-    const rows = await q2(`SELECT id, name, price FROM subscription_plans WHERE id = ? LIMIT 1`, [
+    const rows = await q3(`SELECT id, name, price FROM subscription_plans WHERE id = ? LIMIT 1`, [
       opts.planId
     ]);
     if (!rows.length) throw badRequest(`Plan ${opts.planId} not found`, 404);
@@ -13404,14 +14356,14 @@ async function createCheckoutSession(opts) {
   let amount = opts.amount ?? null;
   let label = opts.description ?? "Kassenta";
   if (opts.planId) {
-    const rows = await q2(`SELECT id, name, price FROM subscription_plans WHERE id = ? LIMIT 1`, [
+    const rows = await q3(`SELECT id, name, price FROM subscription_plans WHERE id = ? LIMIT 1`, [
       opts.planId
     ]);
     if (!rows.length) throw badRequest(`Plan ${opts.planId} not found`, 404);
     amount = Number(rows[0].price);
     label = `Kassenta ${rows[0].name}`;
   } else if (opts.orderId) {
-    const rows = await q2(
+    const rows = await q3(
       `SELECT order_number, total_amount, tenant_id FROM online_orders WHERE id = ? LIMIT 1`,
       [opts.orderId]
     );
@@ -13419,7 +14371,7 @@ async function createCheckoutSession(opts) {
     amount = Number(rows[0].total_amount);
     label = `Order ${rows[0].order_number}`;
   } else if (opts.saleId) {
-    const rows = await q2(
+    const rows = await q3(
       `SELECT s.receipt_number, s.total_amount, b.tenant_id
          FROM sales s LEFT JOIN branches b ON b.id = s.branch_id
         WHERE s.id = ? LIMIT 1`,
@@ -13461,7 +14413,7 @@ async function createCheckoutSession(opts) {
 }
 
 // server/superAdminRoutes.ts
-async function q3(text2, params = []) {
+async function q4(text2, params = []) {
   const [rows] = await pool.query(text2, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -13822,7 +14774,7 @@ function registerSuperAdminRoutes(app2) {
       });
       const randomSegments = Array.from(
         { length: 4 },
-        () => crypto6.randomBytes(2).toString("hex").toUpperCase()
+        () => crypto7.randomBytes(2).toString("hex").toUpperCase()
       );
       const licenseKey = `TRIAL-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
@@ -13876,7 +14828,7 @@ function registerSuperAdminRoutes(app2) {
       const tenantMap = Object.fromEntries(tenantList.map((t2) => [t2.id, t2]));
       const billingMap = {};
       try {
-        const rows = await q3(
+        const rows = await q4(
           `SELECT id, stripe_customer_id, stripe_subscription_id, stripe_price_id,
                   last_invoice_id, last_payment_error
              FROM tenant_subscriptions`
@@ -13996,7 +14948,7 @@ function registerSuperAdminRoutes(app2) {
   app2.post("/api/super-admin/licenses/generate", requireSuperAdmin, async (req, res) => {
     try {
       const { tenantId, subscriptionId, maxActivations, expiresAt, notes, customKey } = req.body;
-      const segments = Array.from({ length: 4 }, () => crypto6.randomBytes(2).toString("hex").toUpperCase());
+      const segments = Array.from({ length: 4 }, () => crypto7.randomBytes(2).toString("hex").toUpperCase());
       const licenseKey = customKey || `KASSENTA-${segments.join("-")}`;
       const key = await storage.createLicenseKey({
         licenseKey,
@@ -14104,13 +15056,13 @@ function registerSuperAdminRoutes(app2) {
       let rows = [];
       let totals = {};
       try {
-        rows = await q3(
+        rows = await q4(
           `SELECT * FROM ( ${union.sql} ) p
             ORDER BY COALESCE(p.paidAt, p.createdAt) DESC
             LIMIT ?`,
           [...union.params, limit]
         );
-        const agg = await q3(
+        const agg = await q4(
           `SELECT COUNT(*) AS n,
                   SUM(CASE WHEN p.status IN ('paid','completed') THEN p.amount ELSE 0 END) AS collected,
                   SUM(COALESCE(p.refunded, 0)) AS refunded,
@@ -14181,7 +15133,7 @@ function registerSuperAdminRoutes(app2) {
   app2.get("/api/super-admin/payments/events", requireSuperAdmin, async (req, res) => {
     const limit = Math.min(Math.max(Number(req.query.limit) || 40, 1), 200);
     try {
-      const rows = await q3(
+      const rows = await q4(
         `SELECT id, type, status, livemode, error, received_at, processed_at
            FROM stripe_webhook_events
           ORDER BY received_at DESC
@@ -14209,7 +15161,7 @@ function registerSuperAdminRoutes(app2) {
       if (!/^pi_[A-Za-z0-9_]+$/.test(paymentIntentId)) {
         return res.status(400).json({ error: "A Stripe PaymentIntent id (pi_...) is required" });
       }
-      const known = await q3(
+      const known = await q4(
         `SELECT total_amount AS amount, COALESCE(amount_refunded, 0) AS refunded
            FROM online_orders WHERE stripe_payment_intent_id = ?
           UNION ALL
@@ -14865,7 +15817,7 @@ function registerSuperAdminRoutes(app2) {
 }
 
 // server/broadcastRoutes.ts
-var import_crypto5 = require("crypto");
+var import_crypto6 = require("crypto");
 init_db();
 init_schema();
 var import_drizzle_orm8 = require("drizzle-orm");
@@ -14922,7 +15874,7 @@ async function ensureBroadcastTables() {
 }
 var BROADCAST_TTL_MINUTES = 5;
 function generateBroadcastToken() {
-  return (0, import_crypto5.randomBytes)(20).toString("hex");
+  return (0, import_crypto6.randomBytes)(20).toString("hex");
 }
 function normalizeItems(items) {
   if (Array.isArray(items)) return items;
@@ -14942,7 +15894,7 @@ function normalizeBroadcastRow(row) {
 }
 function generateOrderNumber(tenantId) {
   const stamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10).replace(/-/g, "");
-  const suffix = (0, import_crypto5.randomBytes)(3).toString("hex").toUpperCase();
+  const suffix = (0, import_crypto6.randomBytes)(3).toString("hex").toUpperCase();
   return `BC-${tenantId}-${stamp}-${suffix}`;
 }
 function registerBroadcastRoutes(app2) {
@@ -15177,16 +16129,16 @@ function registerBroadcastRoutes(app2) {
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
       const now = /* @__PURE__ */ new Date();
       await db.update(broadcastOrders).set({ status: "expired", updatedAt: now }).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(broadcastOrders.status, "pending"), import_drizzle_orm8.sql`${broadcastOrders.expiresAt} <= ${now}`));
-      const pending = await db.select().from(broadcastOrders).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(broadcastOrders.status, "pending"), (0, import_drizzle_orm8.gt)(broadcastOrders.expiresAt, now))).orderBy((0, import_drizzle_orm8.desc)(broadcastOrders.createdAt)).limit(50);
-      if (pending.length === 0) return res.json([]);
-      const ids = pending.map((p) => p.id);
+      const pending2 = await db.select().from(broadcastOrders).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(broadcastOrders.status, "pending"), (0, import_drizzle_orm8.gt)(broadcastOrders.expiresAt, now))).orderBy((0, import_drizzle_orm8.desc)(broadcastOrders.createdAt)).limit(50);
+      if (pending2.length === 0) return res.json([]);
+      const ids = pending2.map((p) => p.id);
       const rejected = await db.select({ broadcastOrderId: broadcastOrderRecipients.broadcastOrderId }).from(broadcastOrderRecipients).where((0, import_drizzle_orm8.and)(
         (0, import_drizzle_orm8.eq)(broadcastOrderRecipients.tenantId, tenantId),
         (0, import_drizzle_orm8.eq)(broadcastOrderRecipients.response, "rejected"),
         (0, import_drizzle_orm8.inArray)(broadcastOrderRecipients.broadcastOrderId, ids)
       ));
       const rejectedSet = new Set(rejected.map((r) => r.broadcastOrderId));
-      const visible = pending.filter((p) => !rejectedSet.has(p.id)).map(normalizeBroadcastRow);
+      const visible = pending2.filter((p) => !rejectedSet.has(p.id)).map(normalizeBroadcastRow);
       res.json(visible);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -15230,7 +16182,7 @@ function registerBroadcastRoutes(app2) {
       const [bc] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm8.eq)(broadcastOrders.id, id)).limit(1);
       if (!bc) return res.status(500).json({ error: "Post-claim read failed" });
       const orderNumber = generateOrderNumber(tenantId);
-      const trackingToken = (0, import_crypto5.randomBytes)(32).toString("hex");
+      const trackingToken = (0, import_crypto6.randomBytes)(32).toString("hex");
       const bcItems = normalizeItems(bc.items);
       const posItems = bcItems.map((it, idx) => ({
         productId: it.productId || 0,
@@ -15841,12 +16793,12 @@ var import_express = __toESM(require("express"));
 init_db();
 
 // server/shamcash.ts
-var import_crypto6 = __toESM(require("crypto"));
+var import_crypto7 = __toESM(require("crypto"));
 init_db();
 var BASE = (process.env.SHAMCASH_API_URL || "https://api-shamcash.com/api").replace(/\/$/, "");
 var SHAMCASH_CURRENCIES = ["SYP", "USD"];
 var INVOICE_MINUTES = 60;
-async function q4(sqlText, params = []) {
+async function q5(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -15873,7 +16825,7 @@ var PAYER_MESSAGES = {
 };
 async function runShamCashMigrations() {
   try {
-    await q4(`
+    await q5(`
       CREATE TABLE IF NOT EXISTS shamcash_invoices (
         id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
         tenant_id int NOT NULL,
@@ -15898,7 +16850,7 @@ async function runShamCashMigrations() {
   }
 }
 async function readConfigJson(tenantId) {
-  const rows = await q4(
+  const rows = await q5(
     `SELECT config_json FROM payment_gateway_settings WHERE tenant_id = ? LIMIT 1`,
     [tenantId]
   );
@@ -15930,7 +16882,7 @@ function cleanImagePath(v) {
   }
   return p;
 }
-var clip = (v, n) => {
+var clip2 = (v, n) => {
   const t2 = String(v ?? "").trim();
   return t2 ? t2.slice(0, n) : null;
 };
@@ -15944,10 +16896,10 @@ async function saveShamCashSettings(tenantId, patch) {
     next.apiKey = patch.apiKey ? String(patch.apiKey).trim() : null;
   }
   if (patch.qrImage !== void 0) next.qrImage = cleanImagePath(patch.qrImage);
-  if (patch.phone !== void 0) next.phone = clip(patch.phone, 40);
-  if (patch.holderName !== void 0) next.holderName = clip(patch.holderName, 80);
+  if (patch.phone !== void 0) next.phone = clip2(patch.phone, 40);
+  if (patch.holderName !== void 0) next.holderName = clip2(patch.holderName, 80);
   cfg.shamcash = next;
-  await q4(
+  await q5(
     `INSERT INTO payment_gateway_settings (tenant_id, config_json)
      VALUES (?, ?)
      ON DUPLICATE KEY UPDATE config_json = VALUES(config_json)`,
@@ -15959,7 +16911,7 @@ function keyFor(s) {
   return s.apiKey || process.env.SHAMCASH_API_KEY || null;
 }
 async function shamCashCurrencyFor(tenantId) {
-  const rows = await q4(
+  const rows = await q5(
     `SELECT currency FROM branches WHERE tenant_id = ? ORDER BY is_main DESC, id ASC LIMIT 1`,
     [tenantId]
   );
@@ -15995,7 +16947,7 @@ async function publicShamCashStatus(tenantId) {
 async function recordOrderReference(orderId, reference) {
   const ref = String(reference || "").replace(/[^\w\- ]/g, "").trim().slice(0, 40);
   if (!ref) throw new ShamCashError(PAYER_MESSAGES.MISSING_TRAN_ID, 400);
-  await q4(
+  await q5(
     `UPDATE online_orders
         SET payment_method = 'shamcash',
             notes = TRIM(CONCAT(COALESCE(notes, ''), CASE WHEN COALESCE(notes, '') = '' THEN '' ELSE ' | ' END, ?))
@@ -16058,7 +17010,7 @@ function matchWallet(wallets, id) {
 }
 async function loadTarget(t2) {
   if (t2.kind === "order") {
-    const rows2 = await q4(
+    const rows2 = await q5(
       `SELECT tenant_id, total_amount, payment_status, order_number FROM online_orders WHERE id = ? LIMIT 1`,
       [t2.id]
     );
@@ -16071,7 +17023,7 @@ async function loadTarget(t2) {
       label: `Order ${r2.order_number}`
     };
   }
-  const rows = await q4(
+  const rows = await q5(
     `SELECT b.tenant_id, s.total_amount, s.payment_status, s.receipt_number
        FROM sales s JOIN branches b ON b.id = s.branch_id WHERE s.id = ? LIMIT 1`,
     [t2.id]
@@ -16130,7 +17082,7 @@ async function createInvoiceFor(t2, publicBaseUrl) {
     throw new ShamCashError("\u0634\u0627\u0645 \u0643\u0627\u0634 \u064A\u062F\u0639\u0645 \u0627\u0644\u0644\u064A\u0631\u0629 \u0627\u0644\u0633\u0648\u0631\u064A\u0629 \u0648\u0627\u0644\u062F\u0648\u0644\u0627\u0631 \u0641\u0642\u0637", 400, "UNSUPPORTED_CURRENCY");
   }
   if (!(target.amount > 0)) throw new ShamCashError("\u0642\u064A\u0645\u0629 \u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D\u0629", 400);
-  const open = await q4(
+  const open = await q5(
     `SELECT * FROM shamcash_invoices
       WHERE ${col(t2)} = ? AND status = 'pending' AND expires_at > NOW() + INTERVAL 2 MINUTE
       ORDER BY id DESC LIMIT 1`,
@@ -16155,23 +17107,23 @@ async function createInvoiceFor(t2, publicBaseUrl) {
     throw new ShamCashError("\u062A\u0639\u0630\u0651\u0631 \u0625\u0646\u0634\u0627\u0621 \u0641\u0627\u062A\u0648\u0631\u0629 \u0634\u0627\u0645 \u0643\u0627\u0634", 502);
   }
   const expiresAt = inv?.expiresAt ? new Date(inv.expiresAt) : new Date(Date.now() + INVOICE_MINUTES * 6e4);
-  await q4(
+  await q5(
     `INSERT INTO shamcash_invoices (tenant_id, ${col(t2)}, invoice_number, amount, currency, wallet, status, expires_at)
      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
     [target.tenantId, t2.id, invoiceNumber, target.amount.toFixed(2), currency, walletRef, expiresAt]
   );
-  const [row] = await q4(`SELECT * FROM shamcash_invoices WHERE invoice_number = ?`, [invoiceNumber]);
+  const [row] = await q5(`SELECT * FROM shamcash_invoices WHERE invoice_number = ?`, [invoiceNumber]);
   return publicInvoice(row, await payToDetails(apiKey, walletRef));
 }
 async function markSettled(row, tranId) {
-  await q4(
+  await q5(
     `UPDATE shamcash_invoices
         SET status = 'paid', tran_id = COALESCE(?, tran_id), paid_at = COALESCE(paid_at, NOW())
       WHERE id = ?`,
     [tranId, row.id]
   );
   if (row.online_order_id) {
-    await q4(
+    await q5(
       `UPDATE online_orders
           SET payment_status = 'paid', payment_method = 'shamcash',
               paid_at = COALESCE(paid_at, NOW()), payment_error = NULL
@@ -16180,7 +17132,7 @@ async function markSettled(row, tranId) {
     );
   }
   if (row.sale_id) {
-    await q4(
+    await q5(
       `UPDATE sales
           SET payment_status = 'paid', payment_method = 'shamcash', paid_at = COALESCE(paid_at, NOW())
         WHERE id = ? AND (payment_status IS NULL OR payment_status <> 'paid')`,
@@ -16194,7 +17146,7 @@ async function apiKeyForRow(row) {
   return key;
 }
 async function refreshInvoice(invoiceNumber) {
-  const [row] = await q4(`SELECT * FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
+  const [row] = await q5(`SELECT * FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
   if (!row) throw new ShamCashError("\u0641\u0627\u062A\u0648\u0631\u0629 \u063A\u064A\u0631 \u0645\u0639\u0631\u0648\u0641\u0629", 404);
   if (row.status !== "paid") {
     const remote = await call(await apiKeyForRow(row), "GET", `/v1/invoices/${encodeURIComponent(invoiceNumber)}`);
@@ -16203,16 +17155,16 @@ async function refreshInvoice(invoiceNumber) {
     if (status2 === "paid") {
       await markSettled(row, inv?.transactionRef ?? inv?.tranId ?? inv?.tran_id ?? null);
     } else if (status2 === "expired" || status2 === "cancelled") {
-      await q4(`UPDATE shamcash_invoices SET status = ? WHERE id = ?`, [status2, row.id]);
+      await q5(`UPDATE shamcash_invoices SET status = ? WHERE id = ?`, [status2, row.id]);
     }
   }
-  const [fresh] = await q4(`SELECT * FROM shamcash_invoices WHERE id = ?`, [row.id]);
+  const [fresh] = await q5(`SELECT * FROM shamcash_invoices WHERE id = ?`, [row.id]);
   return fresh;
 }
 async function verifyInvoice(t2, tranId) {
   const clean2 = String(tranId ?? "").trim();
   if (!clean2) throw new ShamCashError(PAYER_MESSAGES.MISSING_TRAN_ID, 400, "MISSING_TRAN_ID");
-  const [row] = await q4(
+  const [row] = await q5(
     `SELECT * FROM shamcash_invoices WHERE ${col(t2)} = ? ORDER BY id DESC LIMIT 1`,
     [t2.id]
   );
@@ -16227,12 +17179,12 @@ async function verifyInvoice(t2, tranId) {
   }
   const fresh = await refreshInvoice(row.invoice_number);
   if (fresh.status === "paid" && !fresh.tran_id) {
-    await q4(`UPDATE shamcash_invoices SET tran_id = ? WHERE id = ?`, [clean2, fresh.id]);
+    await q5(`UPDATE shamcash_invoices SET tran_id = ? WHERE id = ?`, [clean2, fresh.id]);
   }
   return { status: fresh.status, invoiceNumber: fresh.invoice_number };
 }
 async function invoiceStatus(t2) {
-  const [row] = await q4(
+  const [row] = await q5(
     `SELECT * FROM shamcash_invoices WHERE ${col(t2)} = ? ORDER BY id DESC LIMIT 1`,
     [t2.id]
   );
@@ -16243,11 +17195,11 @@ async function invoiceStatus(t2) {
 async function handleWebhook(rawBody, signatureHeader) {
   const secret = process.env.SHAMCASH_WEBHOOK_SECRET;
   if (secret) {
-    const expected = import_crypto6.default.createHmac("sha256", secret).update(rawBody).digest("hex");
+    const expected = import_crypto7.default.createHmac("sha256", secret).update(rawBody).digest("hex");
     const got = String(signatureHeader ?? "").replace(/^sha256=/, "");
     const a = Buffer.from(expected, "hex");
     const b = Buffer.from(got, "hex");
-    if (a.length !== b.length || !import_crypto6.default.timingSafeEqual(a, b)) {
+    if (a.length !== b.length || !import_crypto7.default.timingSafeEqual(a, b)) {
       throw new ShamCashError("bad signature", 401);
     }
   }
@@ -16259,7 +17211,7 @@ async function handleWebhook(rawBody, signatureHeader) {
   }
   const invoiceNumber = body?.invoiceNumber;
   if (!invoiceNumber) return { ignored: true };
-  const [row] = await q4(`SELECT id FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
+  const [row] = await q5(`SELECT id FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
   if (!row) return { ignored: true };
   const fresh = await refreshInvoice(String(invoiceNumber));
   return { invoiceNumber, status: fresh.status };
@@ -16279,7 +17231,7 @@ async function adminShamCashView(tenantId) {
 
 // server/paymentRoutes.ts
 var PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://kassenta.com";
-async function q5(sqlText, params = []) {
+async function q6(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -16298,13 +17250,14 @@ var DEFAULT_GATEWAY = {
 };
 async function loadGatewaySettings(tenantId) {
   try {
-    const rows = await q5(
-      `SELECT config_json FROM payment_gateway_settings
+    const rows = await q6(
+      `SELECT tenant_id, config_json FROM payment_gateway_settings
         WHERE tenant_id IN (?, 0) ORDER BY tenant_id DESC LIMIT 1`,
       [tenantId || 0]
     );
     if (rows[0]?.config_json) {
       const parsed = typeof rows[0].config_json === "string" ? JSON.parse(rows[0].config_json) : rows[0].config_json;
+      if (tenantId && Number(rows[0].tenant_id) === 0) delete parsed.enabledMethods;
       return { ...DEFAULT_GATEWAY, ...parsed };
     }
   } catch (e) {
@@ -16314,7 +17267,7 @@ async function loadGatewaySettings(tenantId) {
 }
 async function saveGatewaySettings(tenantId, config) {
   const currency = config?.stripe?.currency || "CHF";
-  await q5(
+  await q6(
     `INSERT INTO payment_gateway_settings (tenant_id, config_json, currency, enabled_methods)
      VALUES (?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE config_json = VALUES(config_json),
@@ -16387,7 +17340,8 @@ function registerPaymentRoutes(app2) {
   app2.get("/api/payment-gateway/config", config);
   app2.put("/api/payment-gateway/config", requireAdmin, async (req, res) => {
     try {
-      const tenantId = Number(req.tenantId ?? 0) || 0;
+      const tenantId = Number(req.tenantId ?? req.employee?.tenantId ?? 0) || 0;
+      if (!tenantId) return res.status(401).json({ error: "Store authentication required" });
       const current = await loadGatewaySettings(tenantId);
       const merged = { ...current, ...req.body };
       merged.shamcash = current.shamcash;
@@ -16409,7 +17363,7 @@ function registerPaymentRoutes(app2) {
       const orderId = Number.parseInt(String(req.params.orderId), 10);
       if (!Number.isFinite(orderId)) return res.status(400).json({ error: "Invalid order id" });
       const token = String(req.body?.trackingToken ?? req.query.trackingToken ?? "");
-      const rows = await q5(
+      const rows = await q6(
         `SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`,
         [orderId]
       );
@@ -16427,7 +17381,7 @@ function registerPaymentRoutes(app2) {
     try {
       const stripe = await requireStripeClient();
       const pi = await stripe.paymentIntents.retrieve(String(req.params.paymentIntentId));
-      const orderRows = await q5(
+      const orderRows = await q6(
         `SELECT id, order_number, payment_status, tracking_token
            FROM online_orders WHERE stripe_payment_intent_id = ? LIMIT 1`,
         [pi.id]
@@ -16547,7 +17501,7 @@ function registerPaymentRoutes(app2) {
       return null;
     }
     const token = String(req.body?.trackingToken ?? req.query.trackingToken ?? "");
-    const rows = await q5(`SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [orderId]);
+    const rows = await q6(`SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [orderId]);
     if (!rows.length) {
       res.status(404).json({ error: "Order not found" });
       return null;
@@ -16601,7 +17555,7 @@ function registerPaymentRoutes(app2) {
       res.status(400).json({ error: "Invalid sale id" });
       return null;
     }
-    const rows = await q5(
+    const rows = await q6(
       `SELECT b.tenant_id FROM sales s JOIN branches b ON b.id = s.branch_id WHERE s.id = ? LIMIT 1`,
       [saleId]
     );
@@ -16713,7 +17667,7 @@ function registerPaymentRoutes(app2) {
 // server/stripeMigrations.ts
 var import_drizzle_orm10 = require("drizzle-orm");
 init_db();
-var COLUMNS = {
+var COLUMNS2 = {
   // Which Stripe objects paid for an online order, and when.
   online_orders: [
     "stripe_charge_id varchar(255)",
@@ -16816,7 +17770,7 @@ async function run(label, statement) {
 }
 async function runStripeMigrations() {
   let added = 0;
-  for (const [table, cols] of Object.entries(COLUMNS)) {
+  for (const [table, cols] of Object.entries(COLUMNS2)) {
     for (const col2 of cols) {
       const name = col2.split(/\s+/)[0];
       const ok = await run(
@@ -16838,6 +17792,84 @@ async function runStripeMigrations() {
   console.log(
     added > 0 ? `[stripe-migration] added ${added} column(s); tables and indexes ensured` : "[stripe-migration] schema already up to date"
   );
+}
+
+// server/wholesaleRoutes.ts
+function tenantOf2(req) {
+  const t2 = req.tenantId;
+  if (!t2 || !Number.isInteger(t2)) throw new WholesaleError("Store not identified", 401, "NO_TENANT");
+  return t2;
+}
+function idParam(v) {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n <= 0) throw new WholesaleError("Invalid id", 400, "INVALID_ID");
+  return n;
+}
+function employeeOf(req) {
+  const fromToken = req.employee?.employeeId;
+  if (fromToken && Number.isInteger(Number(fromToken))) return Number(fromToken);
+  const fromBody = Number(req.body?.employeeId);
+  return Number.isInteger(fromBody) && fromBody > 0 ? fromBody : null;
+}
+function fail2(res, e) {
+  if (e instanceof WholesaleError) {
+    return res.status(e.statusCode).json({ error: e.message, code: e.code, ...e.details || {} });
+  }
+  console.error("[wholesale]", e?.message || e);
+  return res.status(500).json({ error: "Wholesale request failed" });
+}
+var wrap = (fn) => async (req, res) => {
+  try {
+    await fn(req, res);
+  } catch (e) {
+    fail2(res, e);
+  }
+};
+function registerWholesaleRoutes(app2) {
+  app2.get("/api/wholesale/summary", wrap(async (req, res) => {
+    res.json(await getSummary(tenantOf2(req)));
+  }));
+  app2.get("/api/wholesale/traders", wrap(async (req, res) => {
+    res.json(await listTraders(tenantOf2(req), {
+      search: typeof req.query.search === "string" ? req.query.search : void 0,
+      includeInactive: req.query.includeInactive === "1" || req.query.includeInactive === "true"
+    }));
+  }));
+  app2.get("/api/wholesale/traders/:id", wrap(async (req, res) => {
+    res.json(await getTrader(tenantOf2(req), idParam(req.params.id)));
+  }));
+  app2.get("/api/wholesale/traders/:id/statement", wrap(async (req, res) => {
+    res.json(await getStatement(tenantOf2(req), idParam(req.params.id), req.query.from, req.query.to));
+  }));
+  app2.post("/api/wholesale/traders", requireManager, wrap(async (req, res) => {
+    res.status(201).json(await createTrader(tenantOf2(req), req.body || {}, employeeOf(req)));
+  }));
+  app2.put("/api/wholesale/traders/:id", requireManager, wrap(async (req, res) => {
+    const b = req.body || {};
+    res.json(await updateTrader(tenantOf2(req), idParam(req.params.id), {
+      name: b.name,
+      shopName: b.shopName,
+      phone: b.phone,
+      email: b.email,
+      address: b.address,
+      taxNumber: b.taxNumber,
+      notes: b.notes,
+      creditLimit: b.creditLimit,
+      isActive: b.isActive
+    }));
+  }));
+  app2.delete("/api/wholesale/traders/:id", requireManager, wrap(async (req, res) => {
+    res.json(await deactivateTrader(tenantOf2(req), idParam(req.params.id)));
+  }));
+  app2.post("/api/wholesale/traders/:id/payments", requireStaff, wrap(async (req, res) => {
+    res.status(201).json(await recordPayment(tenantOf2(req), idParam(req.params.id), req.body || {}, employeeOf(req)));
+  }));
+  app2.post("/api/wholesale/traders/:id/charges", requireManager, wrap(async (req, res) => {
+    res.status(201).json(await recordCharge(tenantOf2(req), idParam(req.params.id), req.body || {}, employeeOf(req)));
+  }));
+  app2.delete("/api/wholesale/entries/:id", requireManager, wrap(async (req, res) => {
+    res.json(await voidLedgerEntry(tenantOf2(req), idParam(req.params.id)));
+  }));
 }
 
 // server/legal-pages.ts
@@ -17392,7 +18424,7 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 </html>`;
 
 // server/site/shell.ts
-var import_crypto7 = require("crypto");
+var import_crypto8 = require("crypto");
 
 // server/site/design.ts
 var SITE_CSS = String.raw`
@@ -18011,7 +19043,7 @@ body:has(.nav-links.open) .wa { opacity: 0; pointer-events: none; }
 function href(routePath) {
   return routePath === "/" ? "/" : `${routePath}/`;
 }
-var hash8 = (s) => (0, import_crypto7.createHash)("sha256").update(s).digest("hex").slice(0, 8);
+var hash8 = (s) => (0, import_crypto8.createHash)("sha256").update(s).digest("hex").slice(0, 8);
 var assetCache = null;
 function siteAssets() {
   if (!assetCache) {
@@ -21491,6 +22523,8 @@ async function initStripe() {
   }
   await runStripeMigrations();
   await runShamCashMigrations();
+  await runWholesaleMigrations();
+  await runLoyaltyMigrations();
   setupCors(app);
   registerStripeWebhook(app);
   setupBodyParsing(app);
@@ -21500,9 +22534,11 @@ async function initStripe() {
   app.use(guardTenantRoutes());
   configureExpoAndLanding(app);
   registerPaymentRoutes(app);
+  registerWhatsAppVerifyRoutes(app);
   registerSuperAdminRoutes(app);
   registerBroadcastRoutes(app);
   registerCustomerExtraRoutes(app);
+  registerWholesaleRoutes(app);
   const server = await registerRoutes(app);
   setupErrorHandler(app);
   const isProduction = process.env.NODE_ENV === "production";

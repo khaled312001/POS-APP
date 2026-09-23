@@ -227,8 +227,9 @@ export const storage = {
     const [prod] = await db.select().from(products).where(eq(products.id, id));
     return prod;
   },
-  async getProductByBarcode(barcode: string) {
-    const [prod] = await db.select().from(products).where(eq(products.barcode, barcode));
+  async getProductByBarcode(barcode: string, tenantId: number) {
+    const [prod] = await db.select().from(products)
+      .where(and(eq(products.barcode, barcode), eq(products.tenantId, tenantId)));
     return prod;
   },
   async createProduct(data: InsertProduct) {

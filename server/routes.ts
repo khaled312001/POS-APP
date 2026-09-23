@@ -1068,9 +1068,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(prod);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
-  app.get("/api/products/barcode/:barcode", async (req, res) => {
+  app.get("/api/products/barcode/:barcode", async (req: any, res) => {
     try {
-      const prod = await storage.getProductByBarcode(req.params.barcode);
+      // Scoped to the store the licence key identified — never another store's catalogue.
+      const tenantId = Number(req.tenantId) || 0;
+      if (!tenantId) return res.status(401).json({ error: "Store not identified" });
+      const prod = await storage.getProductByBarcode(String(req.params.barcode), tenantId);
       if (!prod) return res.status(404).json({ error: "Product not found" });
       res.json(prod);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -2581,7 +2584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const existingTenant = await storage.getTenant(mainBranch.tenantId as number);
           const metadata: any = { ...(existingTenant?.metadata as any || {}) };
           // A new number only takes effect through the WhatsApp code check
-          // (/api/store/whatsapp/verify/*); this form may only clear it.
+          // (/api/whatsapp/store/verify/*); this form may only clear it.
           if (whatsappAdminPhone !== undefined && !String(whatsappAdminPhone).replace(/\D/g, "")) {
             metadata.whatsappAdminPhone = "";
             metadata.whatsappVerifiedAt = null;
