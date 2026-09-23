@@ -97,22 +97,22 @@ async function cleanupProcesses() {
             execSync(`wmic process where "name='chrome.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: 'ignore' });
             execSync(`wmic process where "name='chromium.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: 'ignore' });
         } else {
+            // Only our own browser (its profile dir is on the command line):
+            // the hosting account runs other apps that may use Chrome too.
             execSync(
-                `pkill -9 -f 'chromium' 2>/dev/null; pkill -9 -f 'wppconnect' 2>/dev/null; true`,
+                `pkill -9 -f '${CHROME_DATA_DIR}' 2>/dev/null; true`,
                 { timeout: 4000 }
             );
         }
         await new Promise(r => setTimeout(r, 800));
     } catch { }
 
-    // Wipe the entire chrome-data directory to guarantee no stale lock files.
-    // SingletonLock on Linux is a symlink — individual unlink can be unreliable.
-    // WhatsApp session tokens are in TOKEN_DIR (separate folder) and are preserved.
-    try {
-        if (fs.existsSync(CHROME_DATA_DIR)) {
-            fs.rmSync(CHROME_DATA_DIR, { recursive: true, force: true });
-        }
-    } catch { }
+    // Drop only the profile's lock files. The profile itself holds the linked
+    // WhatsApp session, so wiping it would force a new QR scan after every
+    // restart. SingletonLock is a symlink, hence rmSync with force.
+    for (const lock of ["SingletonLock", "SingletonSocket", "SingletonCookie"]) {
+        try { fs.rmSync(path.join(CHROME_DATA_DIR, lock), { force: true }); } catch { }
+    }
 
     fs.mkdirSync(CHROME_DATA_DIR, { recursive: true });
     if (!fs.existsSync(TOKEN_DIR)) fs.mkdirSync(TOKEN_DIR, { recursive: true });
@@ -267,6 +267,17 @@ async function _connectBackground(wpp: any): Promise<void> {
         fsMod.mkdirSync(CHROME_DATA_DIR, { recursive: true });
         fsMod.mkdirSync(TOKEN_DIR, { recursive: true });
 
+        // Shared hosting lacks a couple of Chrome's system libraries
+        // (libatk-bridge, libatspi); copies placed in .wppconnect/lib are put
+        // on the loader path of the browser we spawn.
+        const libDir = path.join(STORAGE_DIR, "lib");
+        if (!isWindows && fsMod.existsSync(libDir)) {
+            const cur = process.env.LD_LIBRARY_PATH || "";
+            if (!cur.split(":").includes(libDir)) {
+                process.env.LD_LIBRARY_PATH = cur ? `${libDir}:${cur}` : libDir;
+            }
+        }
+
         const browserArgs = [
             "--no-sandbox",
             "--disable-setuid-sandbox",
@@ -285,6 +296,10 @@ async function _connectBackground(wpp: any): Promise<void> {
             "--mute-audio",
             "--safebrowsing-disable-auto-update",
             "--window-size=1280,800",
+            // The hosting account caps threads/processes per user; keep
+            // Chrome to as few processes as it will run with.
+            "--renderer-process-limit=1",
+            "--disable-breakpad",
         ];
 
         connectionPhase = "awaiting_qr";
