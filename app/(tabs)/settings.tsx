@@ -912,6 +912,7 @@ export default function SettingsScreen() {
           <>
             <Text style={styles.sectionTitle}>{t("management")}</Text>
             <SettingRow icon="cube" label={t("suppliers")} value={`${suppliers.length} ${t("suppliers")}`} onPress={() => setShowSuppliers(true)} color={Colors.success} rtl={isRTL} />
+            <SettingRow icon="storefront" label={language === "ar" ? "تجار الجملة" : language === "de" ? "Großhändler" : "Wholesale traders"} value={language === "ar" ? "الذمم والكشوفات والتحصيل" : language === "de" ? "Forderungen, Auszüge, Zahlungen" : "Receivables, statements, payments"} onPress={() => router.push("/wholesale" as any)} color={Colors.hueIndigo} rtl={isRTL} />
             <SettingRow icon="wallet" label={t("expenses")} value={`${expenses.length} ${t("expenses")}`} onPress={() => setShowExpenses(true)} color={Colors.warning} rtl={isRTL} />
             <SettingRow icon="time" label={t("attendance")} value={`${shifts.length} ${t("attendance")}`} onPress={() => setShowAttendance(true)} color={Colors.warning} rtl={isRTL} />
             {isAdmin && <SettingRow icon="pulse" label={t("shiftMonitor")} value={`${allActiveShifts.length} ${t("activeShiftsCount")}`} onPress={() => { setShiftMonitorTab("active"); setShowShiftMonitor(true); }} color={Colors.hueTeal} rtl={isRTL} />}
