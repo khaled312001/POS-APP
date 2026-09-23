@@ -63,6 +63,18 @@ async function getAuthHeaders(extraHeaders?: Record<string, string>): Promise<Re
   return headers;
 }
 
+/** The readable part of an apiRequest error ("503: {\"error\":\"…\"}" → "…"). */
+export function apiErrorMessage(e: unknown, fallback = "Error"): string {
+  const raw = String((e as any)?.message ?? "");
+  const body = raw.replace(/^\d{3}:\s*/, "");
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed.error === "string") return parsed.error;
+    if (parsed && typeof parsed.message === "string") return parsed.message;
+  } catch { /* not JSON */ }
+  return body || fallback;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;

@@ -17,6 +17,7 @@ import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClie
 import { repriceOrder, PricingError } from "./orderPricing";
 import { sendLicenseKeyEmail } from "./emailService";
 import { whatsappService } from "./whatsappService";
+import { verifiedStorePhone } from "./whatsappVerifyRoutes";
 import {
   createOtp, verifyOtp, findOrCreateCustomerByPhone,
   findCustomerByEmail, verifyCustomerPassword, setCustomerPassword,
@@ -2491,6 +2492,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storeType: tenant?.storeType || "supermarket",
         commissionRate: 0, // commission is baked into product prices via applyMarkup
         whatsappAdminPhone: (tenant?.metadata as any)?.whatsappAdminPhone || "",
+        whatsappVerified: !!verifiedStorePhone(tenant?.metadata),
         // BIZ-01: opt-in minimum-order top-up, delivery only. 0 = disabled.
         minOrderAmount: Number((tenant?.metadata as any)?.minOrderAmount) || 0,
       });
@@ -2522,7 +2524,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (whatsappAdminPhone !== undefined || minOrderAmount !== undefined) {
           const existingTenant = await storage.getTenant(mainBranch.tenantId as number);
           const metadata: any = { ...(existingTenant?.metadata as any || {}) };
-          if (whatsappAdminPhone !== undefined) metadata.whatsappAdminPhone = whatsappAdminPhone.replace(/\D/g, "");
+          // A new number only takes effect through the WhatsApp code check
+          // (/api/store/whatsapp/verify/*); this form may only clear it.
+          if (whatsappAdminPhone !== undefined && !String(whatsappAdminPhone).replace(/\D/g, "")) {
+            metadata.whatsappAdminPhone = "";
+            metadata.whatsappVerifiedAt = null;
+          }
           if (minOrderAmount !== undefined) metadata.minOrderAmount = Math.max(0, Number(minOrderAmount) || 0);
           tenantUpdates.metadata = metadata;
         }
@@ -2534,7 +2541,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         ...updatedBranch,
         storeType,
-        whatsappAdminPhone: whatsappAdminPhone?.replace(/\D/g, "") || "",
+        whatsappAdminPhone: mainBranch.tenantId
+          ? verifiedStorePhone((await storage.getTenant(mainBranch.tenantId as number))?.metadata)
+          : "",
         minOrderAmount: Math.max(0, Number(minOrderAmount) || 0),
       });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -2874,7 +2883,7 @@ async function test(){
         const tenant = await storage.getTenant(resolvedTenantId);
         const storeName = tenant?.businessName || "Online Store";
         // Get store-specific admin phone from metadata, fallback to global platform setting
-        const storeAdminPhone = (tenant?.metadata as any)?.whatsappAdminPhone as string | undefined;
+        const storeAdminPhone = verifiedStorePhone(tenant?.metadata) || undefined;
         const globalAdminPhone = await storage.getPlatformSetting("whatsapp_admin_phone");
         const adminPhone = storeAdminPhone || globalAdminPhone || undefined;
         // Notify admin
@@ -3044,7 +3053,11 @@ async function test(){
       const tenant = await storage.getTenant(Number(req.params.tenantId));
       if (!tenant) return res.status(404).json({ error: "Tenant not found" });
       const phone = (req.body?.phone || "").replace(/\D/g, "");
-      const metadata = { ...(tenant.metadata as any || {}), whatsappAdminPhone: phone };
+      const metadata = {
+        ...(tenant.metadata as any || {}),
+        whatsappAdminPhone: phone,
+        whatsappVerifiedAt: phone ? new Date().toISOString() : null,
+      };
       await storage.updateTenant(Number(req.params.tenantId), { metadata });
       res.json({ success: true, phone });
     } catch (e: any) { res.status(500).json({ error: e.message }); }

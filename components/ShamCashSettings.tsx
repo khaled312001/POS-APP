@@ -5,7 +5,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@/lib/theme-context";
 import { useLanguage } from "@/lib/language-context";
-import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
+import { apiRequest, apiErrorMessage, getQueryFn, getApiUrl } from "@/lib/query-client";
 
 /**
  * Sham Cash (شام كاش) for a store: its own QR code and Sham Cash number,
@@ -125,7 +125,7 @@ export default function ShamCashSettings() {
       await refetch();
       setMsg(c.saved);
     } catch (e: any) {
-      setMsg(e?.message || "Error");
+      setMsg(apiErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -150,7 +150,7 @@ export default function ShamCashSettings() {
       setQrImage(objectPath);
       await save({ qrImage: objectPath });
     } catch (e: any) {
-      setMsg(e?.message || c.uploadFailed);
+      setMsg(apiErrorMessage(e, c.uploadFailed));
     } finally {
       setUploading(false);
     }

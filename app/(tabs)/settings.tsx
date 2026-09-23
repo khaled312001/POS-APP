@@ -26,6 +26,7 @@ import { FlagIcon } from "@/components/FlagIcon";
 import { printHtmlViaIframe } from "@/utils/printing";
 import { formatMoney, currencyLabel } from "@/lib/currency";
 import ShamCashSettings from "@/components/ShamCashSettings";
+import WhatsAppVerify from "@/components/WhatsAppVerify";
 
 function SettingRow({ icon, label, value, onPress, color, rtl }: { icon: string; label: string; value?: string; onPress?: () => void; color?: string; rtl?: boolean }) {
   return (
@@ -588,7 +589,6 @@ export default function SettingsScreen() {
       storeType: storeForm.storeType || "supermarket",
       taxRate: storeForm.taxRate !== "" ? storeForm.taxRate : undefined,
       deliveryFee: storeForm.deliveryFee !== "" ? storeForm.deliveryFee : undefined,
-      whatsappAdminPhone: storeForm.whatsappAdminPhone || "",
     });
   };
 
@@ -2254,17 +2254,8 @@ export default function SettingsScreen() {
                 keyboardType="decimal-pad"
               />
 
-              <Text style={[styles.label, rtlTextAlign]}>
-                {isRTL ? "رقم واتساب الأدمن (للإشعارات)" : "WhatsApp Admin Phone (Notifications)"}
-              </Text>
-              <TextInput
-                style={[styles.input, rtlTextAlign]}
-                value={storeForm.whatsappAdminPhone}
-                onChangeText={(v) => setStoreForm({ ...storeForm, whatsappAdminPhone: v })}
-                placeholderTextColor={Colors.textMuted}
-                placeholder={isRTL ? "مثال: 201234567890" : "e.g. 201234567890"}
-                keyboardType="phone-pad"
-              />
+              {/* WhatsApp number: only takes effect once verified by a code sent over WhatsApp. */}
+              <WhatsAppVerify />
 
               {/* Sham Cash: the store's own QR code and number (saves on its own). */}
               <View style={{ height: 1, backgroundColor: Colors.cardBorder, marginVertical: 16 }} />

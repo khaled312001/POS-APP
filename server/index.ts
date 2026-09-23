@@ -17,6 +17,7 @@ import {
   requireStripeClient,
 } from "./stripeClient";
 import { registerPaymentRoutes, registerStripeWebhook } from "./paymentRoutes";
+import { registerWhatsAppVerifyRoutes } from "./whatsappVerifyRoutes";
 import { runStripeMigrations } from "./stripeMigrations";
 import { runShamCashMigrations } from "./shamcash";
 import { DELETE_ACCOUNT_HTML, PRIVACY_POLICY_HTML } from "./legal-pages";
@@ -1223,6 +1224,7 @@ async function initStripe() {
   configureExpoAndLanding(app);
 
   registerPaymentRoutes(app);
+  registerWhatsAppVerifyRoutes(app);
   registerSuperAdminRoutes(app);
   registerBroadcastRoutes(app);
   registerCustomerExtraRoutes(app);
