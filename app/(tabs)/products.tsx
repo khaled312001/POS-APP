@@ -13,7 +13,9 @@ import { Colors } from "@/constants/colors";
 import { themedStyles } from "@/lib/themed-styles";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { playClickSound } from "@/lib/sound";
-import BarcodeScanner from "@/components/BarcodeScanner";
+import BarcodeScannerModal from "@/components/BarcodeScannerModal";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { normalizeBarcode } from "@/lib/barcode";
 import { useAuth } from "@/lib/auth-context";
 import { useLicense } from "@/lib/license-context";
 import { useLanguage } from "@/lib/language-context";
@@ -51,7 +53,7 @@ export default function ProductsScreen() {
   const qc = useQueryClient();
   const { canManage } = useAuth();
   const { tenant } = useLicense();
-  const { t, isRTL, rtlTextAlign, rtlText } = useLanguage();
+  const { t, isRTL, rtlTextAlign, rtlText, language } = useLanguage();
   const tenantId = tenant?.id;
   const [screenDims, setScreenDims] = useState(Dimensions.get("window"));
   useEffect(() => {
@@ -135,6 +137,17 @@ export default function ProductsScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/categories"] }),
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
+
+  const { newBarcode } = useLocalSearchParams<{ newBarcode?: string }>();
+  const router = useRouter();
+  useEffect(() => {
+    const code = normalizeBarcode(String(newBarcode || ""));
+    if (!code) return;
+    resetForm(); setEditProduct(null);
+    setForm((f) => ({ ...f, barcode: code }));
+    setShowForm(true);
+    router.setParams({ newBarcode: "" });
+  }, [newBarcode]);
 
   const resetForm = () => { setForm({ name: "", price: "", sku: "", barcode: "", categoryId: "", costPrice: "", unit: "piece", expiryDate: "", isAddon: false }); setProductImage(null); setInitialStock(""); };
 
@@ -693,9 +706,19 @@ export default function ProductsScreen() {
         </View>
       </Modal>
 
-      <BarcodeScanner
+      <BarcodeScannerModal
         visible={showBarcodeScanner}
-        onScanned={(barcode) => { setForm({ ...form, barcode }); setShowBarcodeScanner(false); }}
+        title={t("barcode")}
+        onScanned={(barcode) => {
+          const applyCode = () => { setForm((f) => ({ ...f, barcode })); setShowBarcodeScanner(false); };
+          const taken = (products as any[]).find((p: any) => p.barcode === barcode && p.id !== editProduct?.id);
+          if (!taken) { applyCode(); return; }
+          return {
+            ok: false,
+            message: language === "ar" ? `هذا الباركود مستخدم للمنتج: ${taken.name}` : language === "de" ? `Barcode wird bereits verwendet von: ${taken.name}` : `Barcode already used by: ${taken.name}`,
+            action: { label: language === "ar" ? "استخدمه رغم ذلك" : language === "de" ? "Trotzdem verwenden" : "Use anyway", onPress: applyCode },
+          };
+        }}
         onClose={() => setShowBarcodeScanner(false)}
       />
 
