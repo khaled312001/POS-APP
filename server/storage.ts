@@ -1870,13 +1870,20 @@ export const storage = {
   },
 
   async upsertLandingPageConfig(tenantId: number, data: Partial<InsertLandingPageConfig>) {
+    const existing = await this.getLandingPageConfig(tenantId);
+    // A save without a slug (loyalty settings, storefront editor, …) must keep
+    // the store's existing link. Only a store that has none gets one derived
+    // from its name — and a non-Latin name (e.g. Arabic) strips to nothing, so
+    // fall back to "store-<id>" rather than an empty, unreachable slug.
     if (!data.slug) {
-      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId));
-      if (tenant) {
-        data.slug = tenant.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      if (existing?.slug) {
+        delete data.slug;
+      } else {
+        const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId));
+        const derived = (tenant?.businessName || "").toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        data.slug = derived || `store-${tenantId}`;
       }
     }
-    const existing = await this.getLandingPageConfig(tenantId);
     if (existing) {
       const [updated] = await db.update(landingPageConfig)
         .set({ ...data, tenantId, updatedAt: new Date() })

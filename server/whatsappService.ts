@@ -448,6 +448,14 @@ export const whatsappService = {
     },
 
     async connect(): Promise<{ status: WhatsAppStatus; qrCode?: string }> {
+        // Kill switch: the headless browser needs dozens of threads, and on
+        // shared hosting that budget is shared with every other site on the
+        // account. WHATSAPP_BROWSER_DISABLED=1 keeps it from starting at all.
+        if (process.env.WHATSAPP_BROWSER_DISABLED === "1") {
+            lastError = "WhatsApp browser disabled on this server (WHATSAPP_BROWSER_DISABLED=1)";
+            status = "disconnected";
+            return { status };
+        }
         if (clientReady && status === "connected" && client) {
             const alive = await isClientAlive();
             if (alive) return { status: "connected" };
