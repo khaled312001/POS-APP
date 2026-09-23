@@ -2266,6 +2266,11 @@ export default function SettingsScreen() {
                 keyboardType="phone-pad"
               />
 
+              {/* Sham Cash: the store's own QR code and number (saves on its own). */}
+              <View style={{ height: 1, backgroundColor: Colors.cardBorder, marginVertical: 16 }} />
+              <ShamCashSettings />
+              <View style={{ height: 1, backgroundColor: Colors.cardBorder, marginVertical: 8 }} />
+
               <Pressable style={{ marginTop: 16 }} onPress={handleSaveStoreSettings}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ paddingVertical: 14, borderRadius: 12, alignItems: "center" }}>
                   <Text style={{ color: Colors.white, fontSize: 16, fontWeight: "700" }}>{storeLogoUploading ? t("imageUploading") : t("save")}</Text>

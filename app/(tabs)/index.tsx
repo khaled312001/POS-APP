@@ -464,11 +464,11 @@ export default function POSScreen() {
     queryFn: getQueryFn({ on401: "throw" }),
     staleTime: 5 * 60 * 1000,
   });
-  // A Syrian-pound store cannot be charged through Stripe; it takes Sham Cash
-  // instead. `enabled` is only true once an active wallet is linked.
-  const syrianStore = paymentsConfig?.shamcash?.currency === "SYP";
+  // Sham Cash sits next to the Stripe methods for any store that set up its
+  // own QR code / number, and for SYP/USD stores (greyed out until set up).
   const shamCashReady = !!paymentsConfig?.shamcash?.enabled;
-  const stripeReady = paymentsConfig?.stripe?.status === "connected" && !syrianStore;
+  const shamCashStore = shamCashReady || !!paymentsConfig?.shamcash?.currency;
+  const stripeReady = paymentsConfig?.stripe?.status === "connected";
   // Raw Stripe method ids ("apple_pay") read badly in a label.
   const stripeMethods: string[] = (paymentsConfig?.stripe?.availableMethods || [])
     .map((m: string) => m.replace(/_/g, " "));
@@ -1053,7 +1053,7 @@ export default function POSScreen() {
    * written "pending" and stays that way until the Stripe webhook says
    * otherwise — the till must never call a sale paid on its own.
    */
-  const createSale = async (pm: string, stripePaymentId: string | null, paymentStatus: string = "completed") => {
+  const createSale = async (pm: string, stripePaymentId: string | null, paymentStatus: string = "completed", extraNote?: string) => {
     const saleItems = cart.items.map((i) => ({
       productId: i.productId,
       productName: i.name,
@@ -1086,6 +1086,7 @@ export default function POSScreen() {
     const notesParts = [];
     if (orderNotes.trim()) notesParts.push(orderNotes.trim());
     if (stripePaymentId) notesParts.push(`Stripe: ${stripePaymentId}`);
+    if (extraNote) notesParts.push(extraNote);
     if (notesParts.length > 0) data.notes = notesParts.join(" | ");
 
     // ── Auto-save new customer if phone was entered but no customer linked ──
@@ -1347,35 +1348,24 @@ export default function POSScreen() {
     else closeStripeCapture();
   }, [stripeCapture, parkStripeSale, closeStripeCapture]);
 
-  // ── Sham Cash (Syrian stores) ─────────────────────────────────────────────
-  // Same shape as the Stripe flow: the sale is written unpaid, then the modal
-  // opens an invoice for it and waits for the server to confirm payment.
-  const [shamCashSale, setShamCashSale] = useState<any>(null);
+  // ── Sham Cash ─────────────────────────────────────────────────────────────
+  // Each store shows its own Sham Cash QR code and number. The cashier waits
+  // for the transfer in the store's Sham Cash app, then confirms; only then is
+  // the sale written, as paid.
+  const [showShamCash, setShamCashOpen] = useState(false);
 
   const shamCashMutation = useMutation({
-    mutationFn: async () => {
-      const sale = await createSale("shamcash", null, "pending");
-      if (!sale?.id) throw new Error(t("saleNotFound"));
-      return sale;
+    mutationFn: async (reference: string) =>
+      createSale("shamcash", null, "completed", reference ? `شام كاش - رقم العملية: ${reference}` : "شام كاش"),
+    onSuccess: (sale: any) => {
+      setShamCashOpen(false);
+      completeSaleAfterPayment(sale, "shamcash");
     },
-    onSuccess: (sale) => setShamCashSale(sale),
     onError: (e: any) => Alert.alert(t("error"), e?.message || "Failed to complete sale"),
   });
 
-  const shamCashToCash = async () => {
-    if (!shamCashSale) return;
-    try {
-      await apiRequest("PUT", `/api/sales/${shamCashSale.id}`, { paymentMethod: "cash", paymentStatus: "completed" });
-      const sale = { ...shamCashSale, paymentMethod: "cash", paymentStatus: "completed" };
-      setShamCashSale(null);
-      completeSaleAfterPayment(sale, "cash");
-    } catch (e: any) {
-      Alert.alert(t("error"), e?.message || "Error");
-    }
-  };
-
   const checkoutBusy = saleMutation.isPending || stripeCaptureMutation.isPending || stripeStage !== "idle"
-    || shamCashMutation.isPending || shamCashSale != null;
+    || shamCashMutation.isPending || showShamCash;
 
   const openCheckoutLink = useCallback(() => {
     if (!stripeCapture) return;
@@ -2676,17 +2666,14 @@ export default function POSScreen() {
 
               <Text style={[styles.sectionLabel, rtlTextAlign]}>{t("paymentMethod")}</Text>
               <View style={[styles.paymentMethods, isRTL && { flexDirection: "row-reverse" }]}>
-                {(syrianStore
-                  ? [
-                      { key: "cash", icon: "cash" as const, label: t("cash") },
-                      { key: "shamcash", icon: "wallet" as const, label: language === "ar" ? "شام كاش" : "Sham Cash" },
-                    ]
-                  : [
-                      { key: "cash", icon: "cash" as const, label: t("cash") },
-                      { key: "card", icon: "card" as const, label: t("card") },
-                      { key: "wallet", icon: "wallet-outline" as const, label: t("walletPay") },
-                    ]
-                ).map((m) => {
+                {[
+                  { key: "cash", icon: "cash" as const, label: t("cash") },
+                  { key: "card", icon: "card" as const, label: t("card") },
+                  { key: "wallet", icon: "wallet-outline" as const, label: t("walletPay") },
+                  ...(shamCashStore
+                    ? [{ key: "shamcash", icon: "wallet" as const, label: language === "ar" ? "شام كاش" : "Sham Cash" }]
+                    : []),
+                ].map((m) => {
                   // Nothing here talks to a card reader, so the non-cash buttons
                   // are only offered when Stripe (or Sham Cash) is actually live.
                   const blocked = (isStripeMethod(m.key) && !stripeReady) || (m.key === "shamcash" && !shamCashReady);
@@ -2703,16 +2690,16 @@ export default function POSScreen() {
                   );
                 })}
               </View>
-              {paymentsConfig !== undefined && !syrianStore && !stripeReady && (
+              {paymentsConfig !== undefined && !stripeReady && (
                 <Text style={[styles.payHint, rtlTextAlign]}>{t("stripeNotConnected")}</Text>
               )}
-              {syrianStore && !shamCashReady && (
+              {shamCashStore && !shamCashReady && (
                 <Text style={[styles.payHint, rtlTextAlign]}>
                   {language === "ar"
-                    ? "شام كاش غير مفعّل بعد: أكمل ربط محفظة من لوحة شام كاش، ثم فعّله من الإعدادات ← بوابة الدفع."
+                    ? "شام كاش غير مفعّل بعد: ارفع رمز QR أو رقم شام كاش الخاص بالمتجر من الإعدادات ← بوابة الدفع ← شام كاش."
                     : language === "de"
-                      ? "Sham Cash ist noch nicht aktiv: Wallet im Sham-Cash-Dashboard verknüpfen, dann unter Einstellungen → Zahlungs-Gateway einschalten."
-                      : "Sham Cash is not live yet: finish linking a wallet in the Sham Cash dashboard, then switch it on in Settings → Payment gateway."}
+                      ? "Sham Cash ist noch nicht aktiv: QR-Code oder Sham-Cash-Nummer unter Einstellungen → Zahlungs-Gateway → Sham Cash hinterlegen."
+                      : "Sham Cash is not live yet: add the store's QR code or Sham Cash number in Settings → Payment gateway → Sham Cash."}
                 </Text>
               )}
 
@@ -2848,7 +2835,7 @@ export default function POSScreen() {
                   }
                   if (checkoutBusy) return;
                   if (paymentMethod === "shamcash") {
-                    shamCashMutation.mutate();
+                    setShamCashOpen(true);
                   } else if (isStripeMethod(paymentMethod)) {
                     setStripeError("");
                     setStripeStage("creating");
@@ -2971,14 +2958,12 @@ export default function POSScreen() {
       </Modal>
 
       <ShamCashTillModal
-        saleId={shamCashSale?.id ?? null}
-        onPaid={() => {
-          const sale = { ...shamCashSale, paymentMethod: "shamcash", paymentStatus: "paid" };
-          setShamCashSale(null);
-          completeSaleAfterPayment(sale, "shamcash");
-        }}
-        onTakeCash={shamCashToCash}
-        onLeavePending={() => { setShamCashSale(null); parkStripeSale(); }}
+        visible={showShamCash}
+        amount={cart.total + manualAdjustment}
+        info={paymentsConfig?.shamcash}
+        busy={shamCashMutation.isPending}
+        onConfirm={(reference) => shamCashMutation.mutate(reference)}
+        onCancel={() => setShamCashOpen(false)}
       />
 
       <Modal visible={showReceipt} animationType="fade" transparent>

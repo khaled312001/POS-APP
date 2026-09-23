@@ -44,6 +44,7 @@ import {
   handleWebhook as handleShamCashWebhook,
   adminShamCashView,
   saveShamCashSettings,
+  recordOrderReference,
 } from "./shamcash";
 
 /** Where Sham Cash should deliver invoice webhooks. */
@@ -431,6 +432,18 @@ export function registerPaymentRoutes(app: Express): void {
     }
   });
 
+  // Manual mode: the customer leaves the transaction number for the store.
+  app.post("/api/payments/order/:orderId/shamcash/reference", async (req: Request, res: Response) => {
+    try {
+      const id = await orderFromToken(req, res);
+      if (id == null) return;
+      await recordOrderReference(id, String(req.body?.reference ?? ""));
+      res.json({ ok: true });
+    } catch (e: any) {
+      scFail(res, e);
+    }
+  });
+
   app.get("/api/payments/order/:orderId/shamcash/status", async (req: Request, res: Response) => {
     try {
       const id = await orderFromToken(req, res);
@@ -508,8 +521,8 @@ export function registerPaymentRoutes(app: Express): void {
     try {
       const tenantId = Number((req as any).tenantId ?? 0) || 0;
       if (!tenantId) return res.status(400).json({ error: "tenant required" });
-      const { enabled, walletId, apiKey } = req.body ?? {};
-      await saveShamCashSettings(tenantId, { enabled, walletId, apiKey });
+      const { enabled, qrImage, phone, holderName } = req.body ?? {};
+      await saveShamCashSettings(tenantId, { enabled, qrImage, phone, holderName });
       res.json(await adminShamCashView(tenantId));
     } catch (e: any) {
       scFail(res, e);

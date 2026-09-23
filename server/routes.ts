@@ -4024,7 +4024,7 @@ async function test(){
         }, Number(tenantId));
       } catch (_) {}
 
-      res.status(201).json({ success: true, orderId: order.id, orderNumber, trackingToken });
+      res.status(201).json({ success: true, orderId: order.id, orderNumber, trackingToken, totalAmount: Number(order.totalAmount) });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 

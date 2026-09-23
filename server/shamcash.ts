@@ -90,6 +90,11 @@ export interface ShamCashSettings {
   enabled: boolean;
   walletId: string | null; // UUID, 32-hex address or account number
   apiKey: string | null; // tenant's own key; null = use the platform key
+  // Manual mode (what stores use): the store's own Sham Cash QR code and
+  // number, shown to the customer at checkout. No gateway call involved.
+  qrImage: string | null; // uploaded image path, e.g. /objects/<uuid>.png
+  phone: string | null; // Sham Cash number / account the money goes to
+  holderName: string | null;
 }
 
 async function readConfigJson(tenantId: number): Promise<any> {
@@ -112,12 +117,38 @@ export async function loadShamCashSettings(tenantId: number): Promise<ShamCashSe
     enabled: !!cfg.enabled,
     walletId: cfg.walletId ? String(cfg.walletId) : null,
     apiKey: cfg.apiKey ? String(cfg.apiKey) : null,
+    qrImage: cfg.qrImage ? String(cfg.qrImage) : null,
+    phone: cfg.phone ? String(cfg.phone) : null,
+    holderName: cfg.holderName ? String(cfg.holderName) : null,
   };
 }
 
+/**
+ * Only accept our own upload paths for the QR image. JSON responses rewrite
+ * /objects/ to /api/objects/, so a value echoed back from the form is folded
+ * back to the stored form.
+ */
+function cleanImagePath(v: unknown): string | null {
+  const raw = String(v ?? "").trim();
+  if (!raw) return null;
+  const p = raw.replace(/^\/api\//, "/");
+  if (!/^\/(objects|uploads)\/[\w./-]{1,200}$/.test(p) || p.includes("..")) {
+    throw new ShamCashError("Invalid QR image", 400);
+  }
+  return p;
+}
+
+const clip = (v: unknown, n: number) => {
+  const t = String(v ?? "").trim();
+  return t ? t.slice(0, n) : null;
+};
+
 export async function saveShamCashSettings(
   tenantId: number,
-  patch: { enabled?: boolean; walletId?: string | null; apiKey?: string | null },
+  patch: {
+    enabled?: boolean; walletId?: string | null; apiKey?: string | null;
+    qrImage?: string | null; phone?: string | null; holderName?: string | null;
+  },
 ): Promise<ShamCashSettings> {
   const cfg = await readConfigJson(tenantId);
   const cur = cfg.shamcash ?? {};
@@ -129,6 +160,9 @@ export async function saveShamCashSettings(
   if (patch.apiKey !== undefined && !String(patch.apiKey ?? "").includes("•")) {
     next.apiKey = patch.apiKey ? String(patch.apiKey).trim() : null;
   }
+  if (patch.qrImage !== undefined) next.qrImage = cleanImagePath(patch.qrImage);
+  if (patch.phone !== undefined) next.phone = clip(patch.phone, 40);
+  if (patch.holderName !== undefined) next.holderName = clip(patch.holderName, 80);
   cfg.shamcash = next;
   await q(
     `INSERT INTO payment_gateway_settings (tenant_id, config_json)
@@ -169,14 +203,41 @@ async function resolveWallet(s: ShamCashSettings): Promise<any | null> {
   }
 }
 
-/** What a checkout needs to know; safe to publish. */
+/**
+ * What a checkout needs to know; safe to publish. Each store shows its own
+ * QR code and number — both are meant to be seen by the paying customer.
+ */
 export async function publicShamCashStatus(tenantId: number) {
   if (!tenantId) return { enabled: false };
   const s = await loadShamCashSettings(tenantId);
   const currency = await shamCashCurrencyFor(tenantId);
-  if (!s.enabled || !currency) return { enabled: false, currency: currency ?? null };
-  const wallet = await resolveWallet(s);
-  return { enabled: !!wallet, currency };
+  const ready = s.enabled && !!(s.qrImage || s.phone);
+  if (!ready) return { enabled: false, mode: "manual", currency };
+  return {
+    enabled: true,
+    mode: "manual",
+    currency,
+    qrImage: s.qrImage,
+    phone: s.phone,
+    holderName: s.holderName,
+  };
+}
+
+/**
+ * Manual mode: the customer says which Sham Cash transfer paid the order. It
+ * is only a note for the store to match against its Sham Cash app — the order
+ * stays unpaid until the store confirms it.
+ */
+export async function recordOrderReference(orderId: number, reference: string): Promise<void> {
+  const ref = String(reference || "").replace(/[^\w\- ]/g, "").trim().slice(0, 40);
+  if (!ref) throw new ShamCashError(PAYER_MESSAGES.MISSING_TRAN_ID, 400);
+  await q(
+    `UPDATE online_orders
+        SET payment_method = 'shamcash',
+            notes = TRIM(CONCAT(COALESCE(notes, ''), CASE WHEN COALESCE(notes, '') = '' THEN '' ELSE ' | ' END, ?))
+      WHERE id = ?`,
+    [`شام كاش - رقم العملية: ${ref}`, orderId],
+  );
 }
 
 // ── HTTP client ─────────────────────────────────────────────────────────────
@@ -483,8 +544,22 @@ export async function handleWebhook(rawBody: Buffer, signatureHeader: string | u
   return { invoiceNumber, status: fresh.status };
 }
 
-/** Admin view: settings plus the wallets the key can see. */
+/** Admin view of the store's own (manual) Sham Cash details. */
 export async function adminShamCashView(tenantId: number) {
+  const s = await loadShamCashSettings(tenantId);
+  return {
+    enabled: s.enabled,
+    mode: "manual",
+    qrImage: s.qrImage,
+    phone: s.phone,
+    holderName: s.holderName,
+    currency: await shamCashCurrencyFor(tenantId),
+    live: s.enabled && !!(s.qrImage || s.phone),
+  };
+}
+
+/** Gateway view (API key + wallets). Not used by the settings screen today. */
+export async function adminShamCashGatewayView(tenantId: number) {
   const s = await loadShamCashSettings(tenantId);
   const key = keyFor(s);
   let wallets: any[] = [];

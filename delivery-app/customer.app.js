@@ -1696,10 +1696,10 @@
     });
   }
 
-  // --- Sham Cash (Syrian stores, SYP/USD) ------------------------------
-  // Invoice based: the server opens an invoice for the stored order total, the
-  // customer transfers it in the Sham Cash app, then either Sham Cash notifies
-  // our server or the customer types the transaction number here.
+  // --- Sham Cash (store's own QR code / number) ------------------------------
+  // Each store shows its own Sham Cash QR code and number. The customer pays
+  // from their Sham Cash app and may leave the transaction number; the store
+  // confirms the payment on its side.
   var shamCashByTenant = {};
 
   function loadShamCash(tenantId) {
@@ -1717,7 +1717,13 @@
 
   function scT(ar, en) { return state.lang === "ar" ? ar : en; }
 
-  function openShamCashSheet(order) {
+  function shamCashImg(path) {
+    if (!path) return "";
+    if (/^(https?:|data:)/.test(path)) return path;
+    return path.indexOf("/api/") === 0 ? path : "/api" + path;
+  }
+
+  function openShamCashSheet(order, sc) {
     return new Promise(function (resolve) {
       var rtl = state.lang === "ar";
       var wrap = document.createElement("div");
@@ -1725,94 +1731,64 @@
       wrap.setAttribute("style",
         "position:fixed;inset:0;z-index:9999;background:rgba(4,6,14,.86);" +
         "display:flex;align-items:flex-end;justify-content:center");
+      function row(label, value) {
+        if (!value) return "";
+        return "<div style=\"display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)\">" +
+          "<span style=\"opacity:.65\">" + label + "</span>" +
+          "<span style=\"display:flex;gap:8px;align-items:center;font-weight:700;direction:ltr\">" + escHtml(value) +
+          "<button data-copy=\"" + escHtml(value) + "\" style=\"background:rgba(255,255,255,.1);border:0;color:#fff;border-radius:8px;padding:4px 8px;font-size:12px;cursor:pointer\">" + scT("نسخ", "Copy") + "</button>" +
+          "</span></div>";
+      }
+      var amount = order.totalAmount != null ? order.totalAmount : null;
       wrap.innerHTML =
-        "<div style=\"background:#12151F;color:#fff;width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:20px 18px 26px;max-height:92vh;overflow:auto\">" +
+        "<div style=\"background:#12151F;color:#fff;width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:20px 18px 26px;max-height:94vh;overflow:auto\">" +
           "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:6px\">" +
             "<strong style=\"font-size:17px\">" + scT("الدفع عبر شام كاش", "Pay with Sham Cash") + "</strong>" +
             "<button id=\"sc-x\" style=\"background:none;border:0;color:inherit;font-size:26px;line-height:1;cursor:pointer\">&times;</button>" +
           "</div>" +
-          "<div id=\"sc-body\" style=\"font-size:14px;opacity:.8\">" + scT("جارٍ إنشاء الفاتورة…", "Creating your invoice…") + "</div>" +
-          "<div id=\"sc-error\" style=\"color:#ff5a5a;font-size:13px;margin-top:10px;display:none\"></div>" +
+          (amount != null ? "<div style=\"font-size:28px;font-weight:800;margin:6px 0 2px\">" + escHtml(money(amount, order.currency)) + "</div>" : "") +
+          "<div style=\"opacity:.65;margin-bottom:10px\">" + scT("الطلب", "Order") + " " + escHtml(order.orderNumber || "") + "</div>" +
+          "<div style=\"opacity:.9;line-height:1.7\">" + scT("امسح الرمز من تطبيق شام كاش وحوّل المبلغ بالضبط، أو حوّل إلى الرقم التالي:", "Scan the code in the Sham Cash app and send exactly this amount, or send it to:") + "</div>" +
+          (sc.qrImage ? "<div style=\"background:#fff;border-radius:14px;padding:10px;margin:12px auto;max-width:280px\"><img src=\"" + escHtml(shamCashImg(sc.qrImage)) + "\" alt=\"Sham Cash QR\" style=\"width:100%;display:block\"></div>" : "") +
+          row(scT("رقم شام كاش", "Sham Cash number"), sc.phone) +
+          (sc.holderName ? "<div style=\"display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)\"><span style=\"opacity:.65\">" + scT("اسم الحساب", "Account name") + "</span><strong>" + escHtml(sc.holderName) + "</strong></div>" : "") +
+          "<input id=\"sc-ref\" inputmode=\"numeric\" placeholder=\"" + scT("رقم العملية من شام كاش (اختياري)", "Sham Cash transaction number (optional)") + "\" " +
+            "style=\"width:100%;box-sizing:border-box;margin-top:14px;padding:13px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:#0B0E16;color:#fff;font-size:16px\">" +
+          "<div id=\"sc-error\" style=\"color:#ff5a5a;font-size:13px;margin-top:8px;display:none\"></div>" +
+          "<button id=\"sc-done\" style=\"width:100%;margin-top:10px;padding:14px;border:0;border-radius:12px;background:#0E9F6E;color:#fff;font-size:16px;font-weight:700;cursor:pointer\">" + scT("تم التحويل", "I have paid") + "</button>" +
+          "<div style=\"opacity:.55;font-size:12px;margin-top:8px\">" + scT("سيؤكد المتجر استلام الدفع ويبدأ بتجهيز طلبك.", "The store confirms the payment and starts preparing your order.") + "</div>" +
           "<button id=\"sc-later\" style=\"width:100%;margin-top:10px;padding:12px;border:0;border-radius:12px;background:transparent;color:inherit;opacity:.65;font-size:14px;cursor:pointer\">" + scT("الدفع عند الاستلام بدلاً من ذلك", "Pay on delivery instead") + "</button>" +
         "</div>";
       document.body.appendChild(wrap);
 
-      var body = wrap.querySelector("#sc-body");
       var errEl = wrap.querySelector("#sc-error");
-      var done = false, poll = null;
-      var q = "?trackingToken=" + encodeURIComponent(order.trackingToken || "");
-      var base = "/api/payments/order/" + order.orderId + "/shamcash";
-
+      var done = false;
       function finish(result) {
         if (done) return;
         done = true;
-        if (poll) clearInterval(poll);
         wrap.remove();
         resolve(result);
       }
-      function showErr(msg) { errEl.textContent = msg; errEl.style.display = "block"; }
-      function row(label, value, copy) {
-        return "<div style=\"display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.08)\">" +
-          "<span style=\"opacity:.65\">" + label + "</span>" +
-          "<span style=\"display:flex;gap:8px;align-items:center;font-weight:600;direction:ltr\">" + escHtml(value) +
-          (copy ? "<button data-copy=\"" + escHtml(value) + "\" style=\"background:rgba(255,255,255,.1);border:0;color:#fff;border-radius:8px;padding:4px 8px;font-size:12px;cursor:pointer\">" + scT("نسخ", "Copy") + "</button>" : "") +
-          "</span></div>";
-      }
-
-      wrap.querySelector("#sc-x").onclick = function () { finish({ paid: false, reason: "closed" }); };
-      wrap.querySelector("#sc-later").onclick = function () { finish({ paid: false, reason: "later" }); };
-
-      api("POST", base, { trackingToken: order.trackingToken })
-        .then(function (inv) {
-          var to = inv.payTo || {};
-          var html =
-            "<div style=\"font-size:28px;font-weight:800;margin:6px 0 2px\">" + escHtml(money(inv.amount, inv.currency)) + "</div>" +
-            "<div style=\"opacity:.65;margin-bottom:10px\">" + scT("الطلب", "Order") + " " + escHtml(order.orderNumber || "") + "</div>" +
-            "<ol style=\"padding-inline-start:18px;margin:8px 0 12px;line-height:1.7;opacity:.9\">" +
-              "<li>" + scT("افتح تطبيق شام كاش وحوّل المبلغ بالضبط إلى الحساب التالي.", "Open the Sham Cash app and send exactly this amount to the account below.") + "</li>" +
-              "<li>" + scT("انسخ رقم العملية من التطبيق وألصقه هنا.", "Copy the transaction number from the app and paste it here.") + "</li>" +
-            "</ol>" +
-            (to.accountNumber ? row(scT("رقم الحساب", "Account number"), to.accountNumber, true) : "") +
-            (to.walletAddress ? row(scT("عنوان المحفظة", "Wallet address"), to.walletAddress, true) : "") +
-            (to.label ? row(scT("اسم المستفيد", "Beneficiary"), to.label, false) : "") +
-            row(scT("رقم الفاتورة", "Invoice"), inv.invoiceNumber, true) +
-            "<input id=\"sc-tran\" inputmode=\"numeric\" placeholder=\"" + scT("رقم العملية من شام كاش", "Sham Cash transaction number") + "\" " +
-              "style=\"width:100%;box-sizing:border-box;margin-top:14px;padding:13px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:#0B0E16;color:#fff;font-size:16px\">" +
-            "<button id=\"sc-go\" style=\"width:100%;margin-top:10px;padding:14px;border:0;border-radius:12px;background:#FF5722;color:#fff;font-size:16px;font-weight:600;cursor:pointer\">" + scT("تأكيد الدفع", "Confirm payment") + "</button>" +
-            "<div style=\"opacity:.55;font-size:12px;margin-top:8px\">" + scT("بعد الدفع يتأكد الطلب تلقائياً أيضاً خلال لحظات.", "Once you have paid, the order is also confirmed automatically within moments.") + "</div>";
-          body.innerHTML = html;
-          body.style.opacity = "1";
-          Array.prototype.forEach.call(body.querySelectorAll("[data-copy]"), function (b) {
-            b.onclick = function () {
-              try { navigator.clipboard.writeText(b.getAttribute("data-copy")); b.textContent = scT("تم", "Copied"); } catch (e) {}
-            };
+      Array.prototype.forEach.call(wrap.querySelectorAll("[data-copy]"), function (b) {
+        b.onclick = function () {
+          try { navigator.clipboard.writeText(b.getAttribute("data-copy")); b.textContent = scT("تم", "Copied"); } catch (e) {}
+        };
+      });
+      wrap.querySelector("#sc-x").onclick = function () { finish({ sent: false }); };
+      wrap.querySelector("#sc-later").onclick = function () { finish({ sent: false }); };
+      wrap.querySelector("#sc-done").onclick = function () {
+        var btn = this;
+        var ref = (wrap.querySelector("#sc-ref").value || "").trim();
+        if (!ref) { finish({ sent: true }); return; }
+        btn.disabled = true;
+        api("POST", "/api/payments/order/" + order.orderId + "/shamcash/reference", { trackingToken: order.trackingToken, reference: ref })
+          .then(function () { finish({ sent: true }); })
+          .catch(function (e) {
+            btn.disabled = false;
+            errEl.textContent = (e && e.message) || "Error";
+            errEl.style.display = "block";
           });
-          var go = body.querySelector("#sc-go");
-          var resetGo = function () { go.disabled = false; go.textContent = scT("تأكيد الدفع", "Confirm payment"); };
-          go.onclick = function () {
-            var tran = (body.querySelector("#sc-tran").value || "").trim();
-            if (!tran) { showErr(scT("أدخل رقم العملية", "Enter the transaction number")); return; }
-            errEl.style.display = "none";
-            go.disabled = true; go.textContent = scT("جارٍ التحقق…", "Checking…");
-            api("POST", base + "/verify", { trackingToken: order.trackingToken, tranId: tran })
-              .then(function (r) {
-                if (r && r.status === "paid") finish({ paid: true });
-                else { resetGo(); showErr(scT("لم يكتمل الدفع بعد", "Payment not completed yet")); }
-              })
-              .catch(function (e) { resetGo(); showErr(e.message || "Error"); });
-          };
-          // The webhook may settle it first; poll gently in the background.
-          poll = setInterval(function () {
-            api("GET", base + "/status" + q).then(function (r) {
-              if (r && r.status === "paid") finish({ paid: true });
-              else if (r && r.status === "expired") showErr(scT("انتهت صلاحية الفاتورة، أغلق وأعد المحاولة", "Invoice expired, close and try again"));
-            }).catch(function () {});
-          }, 8000);
-        })
-        .catch(function (e) {
-          body.textContent = "";
-          showErr(e.message || scT("تعذّر بدء الدفع", "Could not start payment"));
-        });
+      };
     });
   }
 
@@ -1856,12 +1832,9 @@
     var payOptions = [];
     // Only offered when Stripe is actually reachable and configured, so the
     // checkout degrades to cash rather than showing a button that cannot work.
-    // Stripe cannot charge Syrian pounds, so a Syrian store offers Sham Cash
-    // in its place.
-    var syrian = !!(sc && (sc.currency === "SYP" || sc.enabled));
-    var stripeOk = payReady && !syrian;
-    if (sc && sc.enabled) payOptions.push({ value: "shamcash", label: state.lang === "ar" ? "شام كاش - دفع إلكتروني" : "Sham Cash (pay online)" });
-    if (stripeOk) payOptions.push({ value: "online", label: payNowLabel() });
+    // A store that uploaded its Sham Cash QR code / number also offers that.
+    if (sc && sc.enabled) payOptions.push({ value: "shamcash", label: state.lang === "ar" ? "شام كاش" : "Sham Cash" });
+    if (payReady) payOptions.push({ value: "online", label: payNowLabel() });
     payOptions.push({ value: "cash", label: state.lang === "ar" ? "الدفع عند الاستلام" : "Cash on delivery" });
     fields.push({ key: "payment", label: "Payment method", type: "select",
                   options: payOptions, value: payOptions[0].value });
@@ -1922,9 +1895,11 @@
             return openShamCashSheet({
               orderId: resp.orderId,
               orderNumber: resp.orderNumber,
-              trackingToken: resp.trackingToken
-            }).then(function (r) {
-              if (r && r.paid) toast(state.lang === "ar" ? "تم الدفع - شكراً لك!" : "Paid - thank you!", "success");
+              trackingToken: resp.trackingToken,
+              totalAmount: resp.totalAmount != null ? resp.totalAmount : total,
+              currency: curFor(tid)
+            }, sc).then(function (r) {
+              if (r && r.sent) toast(state.lang === "ar" ? "شكراً! سيؤكد المتجر استلام الدفع." : "Thank you! The store will confirm your payment.", "success");
               else toast(state.lang === "ar" ? "تم إرسال الطلب. يمكنك الدفع عند الاستلام." : "Order placed. You can pay on delivery.");
               if (resp.trackingToken) navigate("track", [resp.trackingToken]);
               else navigate("orders");

@@ -11932,7 +11932,7 @@ Address: ${customerAddress || "Pickup"}`
         }, Number(tenantId));
       } catch (_) {
       }
-      res.status(201).json({ success: true, orderId: order.id, orderNumber, trackingToken });
+      res.status(201).json({ success: true, orderId: order.id, orderNumber, trackingToken, totalAmount: Number(order.totalAmount) });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -15915,9 +15915,25 @@ async function loadShamCashSettings(tenantId) {
   return {
     enabled: !!cfg.enabled,
     walletId: cfg.walletId ? String(cfg.walletId) : null,
-    apiKey: cfg.apiKey ? String(cfg.apiKey) : null
+    apiKey: cfg.apiKey ? String(cfg.apiKey) : null,
+    qrImage: cfg.qrImage ? String(cfg.qrImage) : null,
+    phone: cfg.phone ? String(cfg.phone) : null,
+    holderName: cfg.holderName ? String(cfg.holderName) : null
   };
 }
+function cleanImagePath(v) {
+  const raw = String(v ?? "").trim();
+  if (!raw) return null;
+  const p = raw.replace(/^\/api\//, "/");
+  if (!/^\/(objects|uploads)\/[\w./-]{1,200}$/.test(p) || p.includes("..")) {
+    throw new ShamCashError("Invalid QR image", 400);
+  }
+  return p;
+}
+var clip = (v, n) => {
+  const t2 = String(v ?? "").trim();
+  return t2 ? t2.slice(0, n) : null;
+};
 async function saveShamCashSettings(tenantId, patch) {
   const cfg = await readConfigJson(tenantId);
   const cur = cfg.shamcash ?? {};
@@ -15927,6 +15943,9 @@ async function saveShamCashSettings(tenantId, patch) {
   if (patch.apiKey !== void 0 && !String(patch.apiKey ?? "").includes("\u2022")) {
     next.apiKey = patch.apiKey ? String(patch.apiKey).trim() : null;
   }
+  if (patch.qrImage !== void 0) next.qrImage = cleanImagePath(patch.qrImage);
+  if (patch.phone !== void 0) next.phone = clip(patch.phone, 40);
+  if (patch.holderName !== void 0) next.holderName = clip(patch.holderName, 80);
   cfg.shamcash = next;
   await q4(
     `INSERT INTO payment_gateway_settings (tenant_id, config_json)
@@ -15962,9 +15981,27 @@ async function publicShamCashStatus(tenantId) {
   if (!tenantId) return { enabled: false };
   const s = await loadShamCashSettings(tenantId);
   const currency = await shamCashCurrencyFor(tenantId);
-  if (!s.enabled || !currency) return { enabled: false, currency: currency ?? null };
-  const wallet = await resolveWallet(s);
-  return { enabled: !!wallet, currency };
+  const ready = s.enabled && !!(s.qrImage || s.phone);
+  if (!ready) return { enabled: false, mode: "manual", currency };
+  return {
+    enabled: true,
+    mode: "manual",
+    currency,
+    qrImage: s.qrImage,
+    phone: s.phone,
+    holderName: s.holderName
+  };
+}
+async function recordOrderReference(orderId, reference) {
+  const ref = String(reference || "").replace(/[^\w\- ]/g, "").trim().slice(0, 40);
+  if (!ref) throw new ShamCashError(PAYER_MESSAGES.MISSING_TRAN_ID, 400);
+  await q4(
+    `UPDATE online_orders
+        SET payment_method = 'shamcash',
+            notes = TRIM(CONCAT(COALESCE(notes, ''), CASE WHEN COALESCE(notes, '') = '' THEN '' ELSE ' | ' END, ?))
+      WHERE id = ?`,
+    [`\u0634\u0627\u0645 \u0643\u0627\u0634 - \u0631\u0642\u0645 \u0627\u0644\u0639\u0645\u0644\u064A\u0629: ${ref}`, orderId]
+  );
 }
 async function call(apiKey, method, path5, body) {
   const ctrl = new AbortController();
@@ -16229,33 +16266,14 @@ async function handleWebhook(rawBody, signatureHeader) {
 }
 async function adminShamCashView(tenantId) {
   const s = await loadShamCashSettings(tenantId);
-  const key = keyFor(s);
-  let wallets = [];
-  let apiError = null;
-  if (key) {
-    try {
-      wallets = (await listWallets(key, true)).map((w) => ({
-        id: w.id,
-        label: w.label ?? null,
-        status: w.status ?? null,
-        walletAddress: w.walletAddress ?? null,
-        accountNumber: w.accountNumber ?? null
-      }));
-    } catch (e) {
-      apiError = e?.message || "Sham Cash API error";
-    }
-  }
-  const selected = matchWallet(wallets, s.walletId);
   return {
     enabled: s.enabled,
-    walletId: s.walletId,
-    walletStatus: selected?.status ?? null,
-    ownApiKey: s.apiKey ? "\u2022\u2022\u2022\u2022" + s.apiKey.slice(-4) : null,
-    platformKeyConfigured: !!process.env.SHAMCASH_API_KEY,
+    mode: "manual",
+    qrImage: s.qrImage,
+    phone: s.phone,
+    holderName: s.holderName,
     currency: await shamCashCurrencyFor(tenantId),
-    supportedCurrencies: SHAMCASH_CURRENCIES,
-    wallets,
-    apiError
+    live: s.enabled && !!(s.qrImage || s.phone)
   };
 }
 
@@ -16558,6 +16576,16 @@ function registerPaymentRoutes(app2) {
       scFail(res, e);
     }
   });
+  app2.post("/api/payments/order/:orderId/shamcash/reference", async (req, res) => {
+    try {
+      const id = await orderFromToken(req, res);
+      if (id == null) return;
+      await recordOrderReference(id, String(req.body?.reference ?? ""));
+      res.json({ ok: true });
+    } catch (e) {
+      scFail(res, e);
+    }
+  });
   app2.get("/api/payments/order/:orderId/shamcash/status", async (req, res) => {
     try {
       const id = await orderFromToken(req, res);
@@ -16627,8 +16655,8 @@ function registerPaymentRoutes(app2) {
     try {
       const tenantId = Number(req.tenantId ?? 0) || 0;
       if (!tenantId) return res.status(400).json({ error: "tenant required" });
-      const { enabled, walletId, apiKey } = req.body ?? {};
-      await saveShamCashSettings(tenantId, { enabled, walletId, apiKey });
+      const { enabled, qrImage, phone, holderName } = req.body ?? {};
+      await saveShamCashSettings(tenantId, { enabled, qrImage, phone, holderName });
       res.json(await adminShamCashView(tenantId));
     } catch (e) {
       scFail(res, e);

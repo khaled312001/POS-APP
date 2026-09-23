@@ -1,66 +1,91 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, Pressable, Switch, TextInput, ActivityIndicator, StyleSheet } from "react-native";
+import { View, Text, Pressable, Switch, TextInput, ActivityIndicator, Image, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@/lib/theme-context";
 import { useLanguage } from "@/lib/language-context";
-import { apiRequest, getQueryFn } from "@/lib/query-client";
+import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 
 /**
- * Sham Cash (شام كاش) settings for Syrian stores: switch it on, pick the wallet
- * that receives the money, optionally use the store's own API key instead of
- * the platform one. The key is write-only; the server only ever returns a mask.
+ * Sham Cash (شام كاش) for a store: its own QR code and Sham Cash number,
+ * shown to the customer at checkout on the till and on the online store. The
+ * money goes straight to the store's own Sham Cash account; no gateway.
  */
 const COPY = {
   en: {
     title: "Sham Cash",
-    sub: "Online payments in Syrian pounds",
+    sub: "Customers pay to your own Sham Cash account",
+    live: "Shown at checkout (till and online store)",
     enabled: "Accept Sham Cash",
-    wallet: "Receiving wallet",
-    noWallets: "No wallets found for this API key.",
-    pending: "pending — finish linking it in the Sham Cash dashboard",
-    active: "active",
-    ownKey: "Store API key (optional)",
-    ownKeyHint: "Leave empty to use the Kassenta platform key.",
+    qr: "Your Sham Cash QR code",
+    qrHint: "Open the Sham Cash app → Receive → save the QR image, then upload it here.",
+    upload: "Upload QR code",
+    change: "Change",
+    remove: "Remove",
+    phone: "Sham Cash number",
+    phonePh: "e.g. 0944 123 456",
+    holder: "Account holder name",
+    holderPh: "Name shown in Sham Cash",
     save: "Save",
     saved: "Saved",
-    currencyWarn: "Sham Cash only works for stores whose currency is SYP or USD. Change the branch currency first.",
-    notReady: "Not live yet: pick an active wallet.",
-    live: "Live on the online store",
+    needOne: "Add a QR code or a Sham Cash number so customers know where to pay.",
+    uploadFailed: "Upload failed",
   },
   de: {
     title: "Sham Cash",
-    sub: "Online-Zahlungen in Syrischen Pfund",
+    sub: "Kunden zahlen direkt auf Ihr Sham-Cash-Konto",
+    live: "Wird an der Kasse und im Online-Shop angezeigt",
     enabled: "Sham Cash akzeptieren",
-    wallet: "Empfangs-Wallet",
-    noWallets: "Für diesen API-Schlüssel wurden keine Wallets gefunden.",
-    pending: "ausstehend — im Sham-Cash-Dashboard fertig verknüpfen",
-    active: "aktiv",
-    ownKey: "Eigener API-Schlüssel (optional)",
-    ownKeyHint: "Leer lassen, um den Kassenta-Plattformschlüssel zu nutzen.",
+    qr: "Ihr Sham-Cash-QR-Code",
+    qrHint: "In der Sham-Cash-App → Empfangen → QR-Bild speichern und hier hochladen.",
+    upload: "QR-Code hochladen",
+    change: "Ändern",
+    remove: "Entfernen",
+    phone: "Sham-Cash-Nummer",
+    phonePh: "z. B. 0944 123 456",
+    holder: "Kontoinhaber",
+    holderPh: "Name in Sham Cash",
     save: "Speichern",
     saved: "Gespeichert",
-    currencyWarn: "Sham Cash funktioniert nur für Filialen mit Währung SYP oder USD. Bitte zuerst die Währung ändern.",
-    notReady: "Noch nicht aktiv: bitte ein aktives Wallet wählen.",
-    live: "Aktiv im Online-Shop",
+    needOne: "QR-Code oder Sham-Cash-Nummer angeben, damit Kunden wissen, wohin sie zahlen.",
+    uploadFailed: "Upload fehlgeschlagen",
   },
   ar: {
     title: "شام كاش",
-    sub: "دفع إلكتروني بالليرة السورية",
+    sub: "الزبون يدفع مباشرة إلى حساب شام كاش الخاص بمتجرك",
+    live: "يظهر عند الدفع في الكاشير والمتجر الإلكتروني",
     enabled: "تفعيل الدفع عبر شام كاش",
-    wallet: "المحفظة المستلِمة",
-    noWallets: "لا توجد محافظ مرتبطة بهذا المفتاح.",
-    pending: "قيد الانتظار — أكمل ربطها من لوحة شام كاش",
-    active: "نشطة",
-    ownKey: "مفتاح API خاص بالمتجر (اختياري)",
-    ownKeyHint: "اتركه فارغاً لاستخدام مفتاح منصة Kassenta.",
+    qr: "رمز QR الخاص بشام كاش",
+    qrHint: "من تطبيق شام كاش ← استلام ← احفظ صورة رمز QR ثم ارفعها هنا.",
+    upload: "رفع رمز QR",
+    change: "تغيير",
+    remove: "حذف",
+    phone: "رقم شام كاش",
+    phonePh: "مثال: 0944 123 456",
+    holder: "اسم صاحب الحساب",
+    holderPh: "الاسم كما يظهر في شام كاش",
     save: "حفظ",
     saved: "تم الحفظ",
-    currencyWarn: "شام كاش يعمل فقط للمتاجر التي عملتها الليرة السورية أو الدولار. غيّر عملة الفرع أولاً.",
-    notReady: "غير مفعّل بعد: اختر محفظة نشطة.",
-    live: "مفعّل في المتجر الإلكتروني",
+    needOne: "أضف رمز QR أو رقم شام كاش حتى يعرف الزبون أين يدفع.",
+    uploadFailed: "فشل رفع الصورة",
   },
 };
+
+export function shamCashImageUri(path?: string | null): string | null {
+  if (!path) return null;
+  if (/^(https?:|data:|file:|blob:)/.test(path)) return path;
+  const p = path.startsWith("/api/") ? path : `/api${path}`;
+  return `${getApiUrl().replace(/\/$/, "")}${p}`;
+}
+
+const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result).split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 
 export default function ShamCashSettings() {
   const { colors } = useTheme();
@@ -72,26 +97,30 @@ export default function ShamCashSettings() {
   });
 
   const [enabled, setEnabled] = useState(false);
-  const [walletId, setWalletId] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState("");
+  const [qrImage, setQrImage] = useState<string | null>(null);
+  const [phone, setPhone] = useState("");
+  const [holderName, setHolderName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!data) return;
     setEnabled(!!data.enabled);
-    setWalletId(data.walletId ?? null);
-    setApiKey(data.ownApiKey ?? "");
+    setQrImage(data.qrImage ?? null);
+    setPhone(data.phone ?? "");
+    setHolderName(data.holderName ?? "");
   }, [data]);
 
-  const save = async (patch?: { enabled?: boolean }) => {
+  const save = async (patch?: { enabled?: boolean; qrImage?: string | null }) => {
     setBusy(true);
     setMsg(null);
     try {
       await apiRequest("PUT", "/api/payment-gateway/shamcash", {
         enabled: patch?.enabled ?? enabled,
-        walletId,
-        apiKey,
+        qrImage: patch && "qrImage" in patch ? patch.qrImage : qrImage,
+        phone,
+        holderName,
       });
       await refetch();
       setMsg(c.saved);
@@ -102,14 +131,36 @@ export default function ShamCashSettings() {
     }
   };
 
-  const wallets: any[] = data?.wallets ?? [];
-  // No explicit pick means "first active wallet" (the server does the same).
-  const selected = walletId
-    ? wallets.find((w) => w.id === walletId || w.walletAddress === walletId || w.accountNumber === walletId)
-    : wallets.find((w) => w.status === "active");
-  const live = !!data?.enabled && selected?.status === "active" && !!data?.currency;
+  const pickQr = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: "images" as ImagePicker.MediaType,
+      quality: 0.9,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    setUploading(true);
+    setMsg(null);
+    try {
+      const blob = await (await fetch(result.assets[0].uri)).blob();
+      const res = await apiRequest("POST", "/api/objects/upload", {
+        imageData: await blobToBase64(blob),
+        contentType: blob.type || "image/png",
+      });
+      const { objectPath } = await res.json();
+      if (!objectPath) throw new Error(c.uploadFailed);
+      setQrImage(objectPath);
+      await save({ qrImage: objectPath });
+    } catch (e: any) {
+      setMsg(e?.message || c.uploadFailed);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const live = !!data?.live;
   const row = isRTL ? ("row-reverse" as const) : ("row" as const);
   const align = isRTL ? ("right" as const) : ("left" as const);
+  const qrUri = shamCashImageUri(qrImage);
+  const inputStyle = [s.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card, textAlign: align }];
 
   return (
     <View style={{ marginBottom: 8 }}>
@@ -132,54 +183,57 @@ export default function ShamCashSettings() {
         )}
       </View>
 
-      {!!data && !data.currency && (
-        <Text style={[s.note, { color: colors.warning, textAlign: align }]}>{c.currencyWarn}</Text>
-      )}
-      {!!data?.apiError && (
-        <Text style={[s.note, { color: colors.danger, textAlign: align }]}>{data.apiError}</Text>
-      )}
-
-      <Text style={[s.label, { color: colors.textMuted, textAlign: align }]}>{c.wallet}</Text>
-      {wallets.length === 0 ? (
-        <Text style={[s.note, { color: colors.textMuted, textAlign: align }]}>{c.noWallets}</Text>
-      ) : (
-        wallets.map((w) => {
-          const on = walletId === w.id;
-          return (
-            <Pressable
-              key={w.id}
-              onPress={() => setWalletId(w.id)}
-              style={[s.wallet, { flexDirection: row, borderColor: on ? "#0E9F6E" : colors.border, backgroundColor: colors.card }]}
-            >
-              <Ionicons name={on ? "radio-button-on" : "radio-button-off"} size={18} color={on ? "#0E9F6E" : colors.textMuted} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.text, fontWeight: "700", textAlign: align }}>
-                  {w.label || w.accountNumber || w.id}
-                </Text>
-                <Text style={{ color: w.status === "active" ? colors.success : colors.warning, fontSize: 12, textAlign: align }}>
-                  {w.status === "active" ? c.active : c.pending}
-                  {w.accountNumber ? ` · ${w.accountNumber}` : ""}
-                </Text>
-              </View>
+      <Text style={[s.label, { color: colors.textMuted, textAlign: align }]}>{c.qr}</Text>
+      <View style={[s.qrRow, { flexDirection: row, borderColor: colors.border, backgroundColor: colors.card }]}>
+        {qrUri ? (
+          <Image source={{ uri: qrUri }} style={s.qr} resizeMode="contain" />
+        ) : (
+          <View style={[s.qr, s.qrEmpty, { borderColor: colors.border }]}>
+            <Ionicons name="qr-code-outline" size={40} color={colors.textMuted} />
+          </View>
+        )}
+        <View style={{ flex: 1, gap: 8 }}>
+          <Text style={{ color: colors.textMuted, fontSize: 12, textAlign: align }}>{c.qrHint}</Text>
+          <View style={{ flexDirection: row, gap: 8, flexWrap: "wrap" }}>
+            <Pressable onPress={pickQr} disabled={uploading} style={[s.smallBtn, { backgroundColor: "#0E9F6E" }]}>
+              {uploading ? <ActivityIndicator color="#fff" size="small" /> : (
+                <Text style={s.smallBtnText}>{qrUri ? c.change : c.upload}</Text>
+              )}
             </Pressable>
-          );
-        })
-      )}
+            {!!qrUri && (
+              <Pressable
+                onPress={() => { setQrImage(null); save({ qrImage: null }); }}
+                style={[s.smallBtn, { borderWidth: 1, borderColor: colors.danger }]}
+              >
+                <Text style={[s.smallBtnText, { color: colors.danger }]}>{c.remove}</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      </View>
 
-      <Text style={[s.label, { color: colors.textMuted, textAlign: align }]}>{c.ownKey}</Text>
+      <Text style={[s.label, { color: colors.textMuted, textAlign: align }]}>{c.phone}</Text>
       <TextInput
-        value={apiKey}
-        onChangeText={setApiKey}
-        placeholder="sk_…"
+        value={phone}
+        onChangeText={setPhone}
+        placeholder={c.phonePh}
         placeholderTextColor={colors.textMuted}
-        autoCapitalize="none"
-        autoCorrect={false}
-        secureTextEntry={!apiKey.includes("•")}
-        style={[s.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card, textAlign: align }]}
+        keyboardType="phone-pad"
+        style={inputStyle}
       />
-      <Text style={[s.hint, { color: colors.textMuted, textAlign: align }]}>{c.ownKeyHint}</Text>
 
-      {enabled && !live && <Text style={[s.note, { color: colors.warning, textAlign: align }]}>{c.notReady}</Text>}
+      <Text style={[s.label, { color: colors.textMuted, textAlign: align }]}>{c.holder}</Text>
+      <TextInput
+        value={holderName}
+        onChangeText={setHolderName}
+        placeholder={c.holderPh}
+        placeholderTextColor={colors.textMuted}
+        style={inputStyle}
+      />
+
+      {enabled && !qrImage && !phone.trim() && (
+        <Text style={[s.note, { color: colors.warning, textAlign: align }]}>{c.needOne}</Text>
+      )}
 
       <Pressable onPress={() => save()} disabled={busy} style={[s.btn, busy && { opacity: 0.6 }]}>
         {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>{c.save}</Text>}
@@ -194,10 +248,14 @@ const s = StyleSheet.create({
   icon: { width: 48, height: 48, borderRadius: 14, justifyContent: "center", alignItems: "center" },
   name: { fontSize: 18, fontWeight: "700" },
   label: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 12, marginBottom: 6 },
-  wallet: { alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 8 },
+  qrRow: { alignItems: "center", gap: 12, borderWidth: 1, borderRadius: 12, padding: 10 },
+  qr: { width: 110, height: 110, borderRadius: 8, backgroundColor: "#fff" },
+  qrEmpty: { borderWidth: 1, borderStyle: "dashed", justifyContent: "center", alignItems: "center", backgroundColor: "transparent" },
+  smallBtn: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, minWidth: 80, alignItems: "center" },
+  smallBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
   hint: { fontSize: 11, marginTop: 6 },
-  note: { fontSize: 12, marginTop: 6 },
+  note: { fontSize: 12, marginTop: 8 },
   btn: { marginTop: 14, backgroundColor: "#0E9F6E", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
   btnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 });
