@@ -9,7 +9,7 @@
  */
 
 import crypto from "crypto";
-import { db } from "./db";
+import { db, pool } from "./db";
 import {
   deliveryZones,
   promoCodes,
@@ -232,22 +232,82 @@ export async function recordPromoUsage(
 
 // ── Loyalty points ────────────────────────────────────────────────────────────
 
-export async function getLoyaltyConfig(
-  tenantId: number
-): Promise<{ pointsPerUnit: number; redemptionRate: number }> {
+/**
+ * The store's loyalty programme, edited in POS Settings → Loyalty. One setting
+ * drives both the till (POST /api/sales) and the online store.
+ */
+export interface LoyaltyConfig {
+  enabled: boolean;
+  pointsPerUnit: number; // points earned per 1 unit of the store currency
+  redemptionRate: number; // currency value of 1 point when redeemed
+  minRedeemPoints: number; // smallest balance that may be redeemed
+}
+
+export async function getLoyaltyConfig(tenantId: number): Promise<LoyaltyConfig> {
   const [config] = await db
     .select({
+      enableLoyalty: landingPageConfig.enableLoyalty,
       loyaltyPointsPerUnit: landingPageConfig.loyaltyPointsPerUnit,
       loyaltyRedemptionRate: landingPageConfig.loyaltyRedemptionRate,
+      loyaltyMinRedeemPoints: landingPageConfig.loyaltyMinRedeemPoints,
     })
     .from(landingPageConfig)
     .where(eq(landingPageConfig.tenantId, tenantId))
     .limit(1);
 
-  return {
-    pointsPerUnit: parseFloat((config?.loyaltyPointsPerUnit as string) ?? "1"),
-    redemptionRate: parseFloat((config?.loyaltyRedemptionRate as string) ?? "0.01"),
+  const num = (v: unknown, fallback: number) => {
+    const n = parseFloat(String(v ?? ""));
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
   };
+  return {
+    enabled: config?.enableLoyalty !== false,
+    pointsPerUnit: num(config?.loyaltyPointsPerUnit, 1),
+    redemptionRate: num(config?.loyaltyRedemptionRate, 0.01),
+    minRedeemPoints: Math.floor(num(config?.loyaltyMinRedeemPoints, 0)),
+  };
+}
+
+/**
+ * Widens the loyalty columns (the original decimal(5,2) could not hold
+ * "1 point per 1,000 SYP") and adds the minimum-redeem column. Idempotent;
+ * runs on boot and never aborts startup.
+ */
+export async function runLoyaltyMigrations(): Promise<void> {
+  const run = async (label: string, statement: string) => {
+    try {
+      await db.execute(sql.raw(statement));
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      if (!/duplicate|already exists/i.test(msg)) console.log(`[loyalty-migration] ${label}: ${msg}`);
+    }
+  };
+  await run(
+    "loyalty_min_redeem_points",
+    "ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS loyalty_min_redeem_points int DEFAULT 0",
+  );
+  try {
+    const [result] = await pool.query(
+      `SELECT COLUMN_NAME AS name, NUMERIC_SCALE AS scale FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'landing_page_config'
+          AND COLUMN_NAME IN ('loyalty_points_per_unit', 'loyalty_redemption_rate')`,
+    );
+    const rows: any[] = Array.isArray(result) ? (result as any[]) : [];
+    const scaleOf = (name: string) => Number(rows.find((r) => r.name === name)?.scale ?? 99);
+    if (scaleOf("loyalty_points_per_unit") < 6) {
+      await run(
+        "loyalty_points_per_unit",
+        "ALTER TABLE landing_page_config MODIFY COLUMN loyalty_points_per_unit decimal(14,6) DEFAULT 1.000000",
+      );
+    }
+    if (scaleOf("loyalty_redemption_rate") < 4) {
+      await run(
+        "loyalty_redemption_rate",
+        "ALTER TABLE landing_page_config MODIFY COLUMN loyalty_redemption_rate decimal(14,4) DEFAULT 0.0100",
+      );
+    }
+  } catch (e: any) {
+    console.log("[loyalty-migration] column check:", e?.message || e);
+  }
 }
 
 export function calculateLoyaltyTier(points: number): string {
@@ -257,17 +317,19 @@ export function calculateLoyaltyTier(points: number): string {
   return "bronze";
 }
 
-export async function awardLoyaltyPoints(
+/**
+ * Adds (or, with a negative delta, removes) points and writes the ledger row.
+ * orderId is an online_orders id; till sales leave it null and name the
+ * receipt in the description instead.
+ */
+async function moveLoyaltyPoints(
   customerId: number,
   tenantId: number,
-  orderId: number,
-  orderTotal: number
-): Promise<number> {
-  const config = await getLoyaltyConfig(tenantId);
-  const pointsToAdd = Math.floor(orderTotal * config.pointsPerUnit);
-
-  if (pointsToAdd <= 0) return 0;
-
+  delta: number,
+  type: "earn" | "redeem",
+  description: string,
+  orderId: number | null = null
+): Promise<{ before: number; after: number }> {
   const [customer] = await db
     .select({ loyaltyPoints: customers.loyaltyPoints })
     .from(customers)
@@ -275,7 +337,7 @@ export async function awardLoyaltyPoints(
     .limit(1);
 
   const before = customer?.loyaltyPoints ?? 0;
-  const after = before + pointsToAdd;
+  const after = Math.max(0, before + delta);
   const newTier = calculateLoyaltyTier(after);
 
   await db
@@ -287,14 +349,59 @@ export async function awardLoyaltyPoints(
     customerId,
     tenantId,
     orderId,
-    type: "earn",
-    points: pointsToAdd,
+    type,
+    points: after - before,
     balanceBefore: before,
     balanceAfter: after,
-    description: `Earned from order #${orderId}`,
+    description,
   });
 
+  return { before, after };
+}
+
+/** Whole points earned on an amount; the epsilon absorbs float error (0.29 × 100 = 28.999…). */
+export function pointsEarnedFor(amount: number, config: LoyaltyConfig): number {
+  const raw = Math.max(0, Number(amount) || 0) * config.pointsPerUnit;
+  return Math.floor(raw + 1e-6);
+}
+
+export async function awardLoyaltyPoints(
+  customerId: number,
+  tenantId: number,
+  orderId: number,
+  orderTotal: number
+): Promise<number> {
+  const config = await getLoyaltyConfig(tenantId);
+  if (!config.enabled) return 0;
+  const pointsToAdd = pointsEarnedFor(orderTotal, config);
+
+  if (pointsToAdd <= 0) return 0;
+
+  await moveLoyaltyPoints(customerId, tenantId, pointsToAdd, "earn", `Earned from order #${orderId}`, orderId);
   return pointsToAdd;
+}
+
+/** Why a redemption would be refused, or null when it may go ahead. */
+export async function checkLoyaltyRedemption(
+  customerId: number,
+  tenantId: number,
+  pointsToRedeem: number,
+  config?: LoyaltyConfig
+): Promise<string | null> {
+  const cfg = config ?? (await getLoyaltyConfig(tenantId));
+  if (!cfg.enabled) return "Loyalty programme is disabled";
+  if (!Number.isInteger(pointsToRedeem) || pointsToRedeem <= 0) return "Invalid number of points";
+  if (cfg.minRedeemPoints > 0 && pointsToRedeem < cfg.minRedeemPoints)
+    return `At least ${cfg.minRedeemPoints} points are needed to redeem`;
+
+  const [customer] = await db
+    .select({ loyaltyPoints: customers.loyaltyPoints, tenantId: customers.tenantId })
+    .from(customers)
+    .where(eq(customers.id, customerId))
+    .limit(1);
+  if (!customer || (customer.tenantId != null && customer.tenantId !== tenantId)) return "Customer not found";
+  if (pointsToRedeem > (customer.loyaltyPoints ?? 0)) return "Insufficient loyalty points";
+  return null;
 }
 
 export async function redeemLoyaltyPoints(
@@ -303,37 +410,51 @@ export async function redeemLoyaltyPoints(
   pointsToRedeem: number
 ): Promise<{ success: boolean; discountAmount: number; error?: string }> {
   const config = await getLoyaltyConfig(tenantId);
-
-  const [customer] = await db
-    .select({ loyaltyPoints: customers.loyaltyPoints })
-    .from(customers)
-    .where(eq(customers.id, customerId))
-    .limit(1);
-
-  const available = customer?.loyaltyPoints ?? 0;
-  if (pointsToRedeem > available)
-    return { success: false, discountAmount: 0, error: "Insufficient loyalty points" };
+  const refusal = await checkLoyaltyRedemption(customerId, tenantId, pointsToRedeem, config);
+  if (refusal) return { success: false, discountAmount: 0, error: refusal };
 
   const discountAmount = Math.round(pointsToRedeem * config.redemptionRate * 100) / 100;
-  const after = available - pointsToRedeem;
-  const newTier = calculateLoyaltyTier(after);
-
-  await db
-    .update(customers)
-    .set({ loyaltyPoints: after, loyaltyTier: newTier })
-    .where(eq(customers.id, customerId));
-
-  await db.insert(loyaltyTransactions).values({
-    customerId,
-    tenantId,
-    type: "redeem",
-    points: -pointsToRedeem,
-    balanceBefore: available,
-    balanceAfter: after,
-    description: `Redeemed ${pointsToRedeem} points for ${discountAmount} discount`,
-  });
-
+  await moveLoyaltyPoints(
+    customerId, tenantId, -pointsToRedeem, "redeem",
+    `Redeemed ${pointsToRedeem} points for ${discountAmount} discount`,
+  );
   return { success: true, discountAmount };
+}
+
+/**
+ * Loyalty for a till sale, applied after the sale row exists: first the points
+ * the cashier redeemed at checkout (already validated with
+ * checkLoyaltyRedemption and already taken off the total as a discount), then
+ * the points earned on what the customer actually paid.
+ */
+export async function settlePosSaleLoyalty(opts: {
+  customerId: number;
+  tenantId: number;
+  receiptNumber: string;
+  amountPaid: number;
+  redeemPoints: number;
+}): Promise<{ earned: number; redeemed: number }> {
+  const config = await getLoyaltyConfig(opts.tenantId);
+  if (!config.enabled) return { earned: 0, redeemed: 0 };
+
+  let redeemed = 0;
+  if (opts.redeemPoints > 0) {
+    const value = Math.round(opts.redeemPoints * config.redemptionRate * 100) / 100;
+    await moveLoyaltyPoints(
+      opts.customerId, opts.tenantId, -opts.redeemPoints, "redeem",
+      `Redeemed ${opts.redeemPoints} points for ${value} discount on sale ${opts.receiptNumber}`,
+    );
+    redeemed = opts.redeemPoints;
+  }
+
+  const earned = pointsEarnedFor(opts.amountPaid, config);
+  if (earned > 0) {
+    await moveLoyaltyPoints(
+      opts.customerId, opts.tenantId, earned, "earn",
+      `Earned from sale ${opts.receiptNumber}`,
+    );
+  }
+  return { earned, redeemed };
 }
 
 // ── Driver helpers ────────────────────────────────────────────────────────────

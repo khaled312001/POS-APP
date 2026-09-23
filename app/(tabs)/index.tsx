@@ -23,7 +23,7 @@ import RealTimeClock from "@/components/RealTimeClock";
 import { useLanguage } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
 import { useNotifications } from "@/lib/notification-context";
-import { printHtmlViaIframe, autoPrint3Copies } from "@/utils/printing";
+import { printHtmlViaIframe, autoPrint3Copies, getReceiptPrinterPrefs } from "@/utils/printing";
 import { getChromeMetrics } from "@/lib/responsive";
 import { getWebStaticFallbackChain } from "@/lib/web-static";
 import {
@@ -472,6 +472,69 @@ export default function POSScreen() {
   // Raw Stripe method ids ("apple_pay") read badly in a label.
   const stripeMethods: string[] = (paymentsConfig?.stripe?.availableMethods || [])
     .map((m: string) => m.replace(/_/g, " "));
+  // Settings → Payment gateways → "Enabled payment methods" (the till's
+  // "wallet" button is the gateway's "mobile" entry). Cash is the default and
+  // the fallback for a failed card payment, so it always stays.
+  const tillMethodEnabled = (key: string) => {
+    const enabled: string[] | undefined = paymentsConfig?.enabledMethods;
+    if (!Array.isArray(enabled) || key === "cash" || key === "shamcash") return true;
+    return enabled.includes(key === "wallet" ? "mobile" : key);
+  };
+
+  // ── Loyalty (Settings → Loyalty) ──────────────────────────────────────────
+  // Same query key as the settings screen, so a saved change shows up here.
+  // The server awards the points on POST /api/sales; the till only offers the
+  // redemption, which it applies as a discount and reports with the sale.
+  const { data: loyaltyConfigRaw } = useQuery<any>({
+    queryKey: ["/api/landing-page-config", tenantId ? `?tenantId=${tenantId}` : ""],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!tenantId,
+  });
+  const loyalty = {
+    enabled: loyaltyConfigRaw?.enableLoyalty !== false,
+    pointsPerUnit: Number(loyaltyConfigRaw?.loyaltyPointsPerUnit ?? 1) || 0,
+    pointValue: Number(loyaltyConfigRaw?.loyaltyRedemptionRate ?? 0.01) || 0,
+    minRedeem: Math.max(1, Number(loyaltyConfigRaw?.loyaltyMinRedeemPoints) || 0),
+  };
+  const [loyaltyRedeem, setLoyaltyRedeem] = useState<{
+    customerId: number; points: number; value: number; rate: number; prevRate: number; subtotal: number;
+  } | null>(null);
+  // A redemption is a discount rate fixed for one customer and one cart. If
+  // the cart moves on under it, undo it rather than bill a stale discount.
+  useEffect(() => {
+    if (!loyaltyRedeem) return;
+    const ownRate = Math.abs(cart.discountRate - loyaltyRedeem.rate) < 1e-9;
+    const sameCart = loyaltyRedeem.customerId === cart.customerId
+      && Math.abs(loyaltyRedeem.subtotal - cart.subtotal) < 0.005;
+    if (ownRate && sameCart) return;
+    // Still our discount on a changed cart: restore the discount from before.
+    // Someone else replaced the rate (manual discount, cleared cart): just forget it.
+    if (ownRate && cart.items.length > 0) cart.setDiscount(loyaltyRedeem.prevRate);
+    setLoyaltyRedeem(null);
+  }, [loyaltyRedeem, cart.discountRate, cart.customerId, cart.subtotal, cart.items.length]);
+  /** How many of the selected customer's points this cart can absorb, and their value. */
+  const loyaltyRedeemable = () => {
+    if (!cart.customerId || !loyalty.enabled || loyalty.pointValue <= 0 || cart.subtotal <= 0) return null;
+    const balance = Number(selectedCustomer?.loyaltyPoints) || 0;
+    // Never discount more than what is left after any existing discount.
+    const room = Math.max(0, cart.subtotal - cart.discount);
+    const points = Math.min(balance, Math.floor(room / loyalty.pointValue + 1e-9));
+    if (points < loyalty.minRedeem) return null;
+    return { points, value: Math.round(points * loyalty.pointValue * 100) / 100 };
+  };
+  const toggleLoyaltyRedeem = () => {
+    if (loyaltyRedeem) {
+      cart.setDiscount(loyaltyRedeem.prevRate);
+      setLoyaltyRedeem(null);
+      return;
+    }
+    const redeemable = loyaltyRedeemable();
+    if (!redeemable || !cart.customerId) return;
+    const { points, value } = redeemable;
+    const rate = ((cart.discount + value) / cart.subtotal) * 100;
+    cart.setDiscount(rate);
+    setLoyaltyRedeem({ customerId: cart.customerId, points, value, rate, prevRate: cart.discountRate, subtotal: cart.subtotal });
+  };
 
   const generateThermalReceiptHTML = (saleData: any, qrUrl: string | null = null, options: { isKitchen?: boolean, isPartial?: boolean, title?: string } = {}) => {
     const { isKitchen = false, isPartial = false, title = isKitchen ? "KÜCHENBON" : (t("viewReceipt" as any) || "RECHNUNG") } = options;
@@ -997,9 +1060,9 @@ export default function POSScreen() {
     const custName = selectedCustomer?.name || t("walkIn");
     const empName = employee?.name || "Staff";
     const cashAmt = Number(cashReceived) || 0;
-    // Auto-print 3 copies on web
+    // Auto-print 3 copies on web (unless turned off in Settings → Receipt Printer)
     const vehicleObj = cart.vehicleId ? (vehicles as any[]).find((v: any) => v.id === cart.vehicleId) : undefined;
-    autoPrint3Copies(
+    if (getReceiptPrinterPrefs().autoPrint) autoPrint3Copies(
       saleData, cart.items, cart.subtotal, cart.tax, cart.discount, cart.serviceFee, cart.total + manualAdjustment, cart.deliveryFee,
       pm, cashAmt, custName, empName, selectedCustomer, vehicleObj, cart.minimumOrderSurcharge,
       storeSettings, tenant, categories as any[]
@@ -1082,6 +1145,8 @@ export default function POSScreen() {
         ? (Number(cashReceived) - (cart.total + manualAdjustment)).toFixed(2) : "0",
       items: saleItems,
       callId: activeCallId,
+      // Already inside discountAmount; the server takes the points off the balance.
+      loyaltyPointsRedeemed: loyaltyRedeem && loyaltyRedeem.customerId === cart.customerId ? loyaltyRedeem.points : 0,
     };
     const notesParts = [];
     if (orderNotes.trim()) notesParts.push(orderNotes.trim());
@@ -2663,6 +2728,42 @@ export default function POSScreen() {
                   </View>
                 </View>
               )}
+              {selectedCustomer && loyalty.enabled && (() => {
+                // Points to earn are what the server will award on the amount paid.
+                const earn = Math.floor(Math.max(0, cart.total + manualAdjustment) * loyalty.pointsPerUnit + 1e-6);
+                const redeemable = loyaltyRedeem ? null : loyaltyRedeemable();
+                if (earn <= 0 && !loyaltyRedeem && !redeemable) return null;
+                return (
+                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, marginTop: -8, marginBottom: 16 }}>
+                    <Text style={[{ flex: 1, color: Colors.textMuted, fontSize: 12 }, rtlTextAlign]}>
+                      {earn > 0
+                        ? (language === "ar" ? `+${earn} نقطة على هذا الطلب` : language === "de" ? `+${earn} Punkte für diesen Einkauf` : `+${earn} pts on this sale`)
+                        : ""}
+                    </Text>
+                    {(loyaltyRedeem || redeemable) && (
+                      <Pressable
+                        onPress={toggleLoyaltyRedeem}
+                        style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.warning + "60", backgroundColor: loyaltyRedeem ? Colors.warning + "25" : Colors.warning + "10" }}
+                      >
+                        <Ionicons name={loyaltyRedeem ? "close-circle" : "gift-outline"} size={16} color={Colors.warning} />
+                        <Text style={{ color: Colors.warning, fontSize: 12, fontWeight: "700" }}>
+                          {loyaltyRedeem
+                            ? (language === "ar"
+                              ? `إلغاء الاستبدال (${loyaltyRedeem.points} نقطة = −${formatMoney(loyaltyRedeem.value)})`
+                              : language === "de"
+                                ? `Einlösung aufheben (${loyaltyRedeem.points} Pkt. = −${formatMoney(loyaltyRedeem.value)})`
+                                : `Undo redeem (${loyaltyRedeem.points} pts = −${formatMoney(loyaltyRedeem.value)})`)
+                            : (language === "ar"
+                              ? `استبدال ${redeemable!.points} نقطة (−${formatMoney(redeemable!.value)})`
+                              : language === "de"
+                                ? `${redeemable!.points} Punkte einlösen (−${formatMoney(redeemable!.value)})`
+                                : `Redeem ${redeemable!.points} pts (−${formatMoney(redeemable!.value)})`)}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })()}
 
               <Text style={[styles.sectionLabel, rtlTextAlign]}>{t("paymentMethod")}</Text>
               <View style={[styles.paymentMethods, isRTL && { flexDirection: "row-reverse" }]}>
@@ -2673,7 +2774,7 @@ export default function POSScreen() {
                   ...(shamCashStore
                     ? [{ key: "shamcash", icon: "wallet" as const, label: language === "ar" ? "شام كاش" : "Sham Cash" }]
                     : []),
-                ].map((m) => {
+                ].filter((m) => tillMethodEnabled(m.key)).map((m) => {
                   // Nothing here talks to a card reader, so the non-cash buttons
                   // are only offered when Stripe (or Sham Cash) is actually live.
                   const blocked = (isStripeMethod(m.key) && !stripeReady) || (m.key === "shamcash" && !shamCashReady);
@@ -2696,10 +2797,10 @@ export default function POSScreen() {
               {shamCashStore && !shamCashReady && (
                 <Text style={[styles.payHint, rtlTextAlign]}>
                   {language === "ar"
-                    ? "شام كاش غير مفعّل بعد: ارفع رمز QR أو رقم شام كاش الخاص بالمتجر من الإعدادات ← بوابة الدفع ← شام كاش."
+                    ? "شام كاش غير مفعّل بعد: ارفع رمز QR أو رقم شام كاش الخاص بالمتجر من الإعدادات ← إعدادات المتجر ← شام كاش."
                     : language === "de"
-                      ? "Sham Cash ist noch nicht aktiv: QR-Code oder Sham-Cash-Nummer unter Einstellungen → Zahlungs-Gateway → Sham Cash hinterlegen."
-                      : "Sham Cash is not live yet: add the store's QR code or Sham Cash number in Settings → Payment gateway → Sham Cash."}
+                      ? "Sham Cash ist noch nicht aktiv: QR-Code oder Sham-Cash-Nummer unter Einstellungen → Filialeinstellungen → Sham Cash hinterlegen."
+                      : "Sham Cash is not live yet: add the store's QR code or Sham Cash number in Settings → Store Settings → Sham Cash."}
                 </Text>
               )}
 
