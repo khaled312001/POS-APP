@@ -19,6 +19,8 @@ import {
 import { registerPaymentRoutes, registerStripeWebhook } from "./paymentRoutes";
 import { runStripeMigrations } from "./stripeMigrations";
 import { runShamCashMigrations } from "./shamcash";
+import { runWholesaleMigrations } from "./wholesale";
+import { registerWholesaleRoutes } from "./wholesaleRoutes";
 import { DELETE_ACCOUNT_HTML, PRIVACY_POLICY_HTML } from "./legal-pages";
 import { TERMS_HTML, IMPRINT_HTML } from "./site/legal";
 import { isSitePath, renderSitePage, findSiteAsset, SITEMAP_PATHS } from "./site";
@@ -1202,6 +1204,7 @@ async function initStripe() {
   // before any route is registered, so the first request already finds them.
   await runStripeMigrations();
   await runShamCashMigrations();
+  await runWholesaleMigrations();
 
   setupCors(app);
 
@@ -1226,6 +1229,7 @@ async function initStripe() {
   registerSuperAdminRoutes(app);
   registerBroadcastRoutes(app);
   registerCustomerExtraRoutes(app);
+  registerWholesaleRoutes(app);
   const server = await registerRoutes(app);
 
   setupErrorHandler(app);

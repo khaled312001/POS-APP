@@ -18,6 +18,7 @@ import { getChromeMetrics } from "@/lib/responsive";
 import TabPageHeader, { HeaderIconButton } from "@/components/tab-page-header";
 import LoyaltyBadge from "@/components/LoyaltyBadge";
 import { formatMoney } from "@/lib/currency";
+import { router } from "expo-router";
 
 const PAGE_SIZE = 200;
 
@@ -331,6 +332,8 @@ export default function CustomersScreen() {
         isRTL={isRTL}
         rightActions={
           <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8 }}>
+            {/* Wholesale traders (تجار الجملة) — app/wholesale.tsx */}
+            <HeaderIconButton icon="storefront-outline" onPress={() => { playClickSound("medium"); router.push("/wholesale"); }} />
             <HeaderIconButton icon="cloud-upload" onPress={() => { playClickSound("medium"); handleImportCSV(); }} />
             <HeaderIconButton icon="add" onPress={() => { playClickSound("medium"); setEditCustomer(null); resetForm(); setShowForm(true); }} />
           </View>

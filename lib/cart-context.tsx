@@ -10,6 +10,25 @@ export interface CartItem {
   quantity: number;
   modifiers?: { name: string; option: string; price: number }[];
   notes?: string;
+  /** Set while wholesale pricing replaced `price`: the till price it replaced. */
+  retailPrice?: number;
+  /** True when `price` is the product's wholesale price (see setWholesalePricing). */
+  wholesale?: boolean;
+}
+
+/**
+ * Wholesale prices by product id, for a wholesale trader's cart. `retail` is
+ * the till price the product is added at: only a plain line still at that
+ * price is repriced, so variants, extras and hand-edited prices are left alone.
+ */
+export type WholesalePricing = Record<number, { price: number; minQty: number; retail: number }>;
+
+function applyWholesale(item: CartItem, pricing: WholesalePricing | null): CartItem {
+  if (!pricing || item.variantName || (item.modifiers && item.modifiers.length > 0)) return item;
+  const wp = pricing[item.productId];
+  if (!wp || Math.abs(item.price - wp.retail) > 0.004) return item;
+  if (item.quantity < Math.max(1, wp.minQty || 1)) return item;
+  return { ...item, price: wp.price, retailPrice: item.price, wholesale: true };
 }
 
 // BUG-01: Date.now() collides when two items land in the same millisecond
@@ -75,12 +94,22 @@ interface CartContextValue {
   setOrderType: (t: string) => void;
   vehicleId: number | null;
   setVehicleId: (id: number | null) => void;
+  /** Non-null while the selected customer is a wholesale trader. */
+  wholesalePricing: WholesalePricing | null;
+  setWholesalePricing: (p: WholesalePricing | null) => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
+  // Lines as added; `items` below is what the till sees and bills, with
+  // wholesale prices applied for a trader.
+  const [rawItems, setItems] = useState<CartItem[]>([]);
+  const [wholesalePricing, setWholesalePricing] = useState<WholesalePricing | null>(null);
+  const items = useMemo(
+    () => (wholesalePricing ? rawItems.map((i) => applyWholesale(i, wholesalePricing)) : rawItems),
+    [rawItems, wholesalePricing]
+  );
   const [discountRate, setDiscountRate] = useState(0); // stored as percentage 0-100
   // Swiss standard VAT is 8.1% since 1 Jan 2024 (was 7.7%). Overridden per
   // branch from store settings; this is only the pre-load fallback.
@@ -177,8 +206,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       tax, deliveryFee, setDeliveryFee, serviceFeeRate, setServiceFeeRate, serviceFee,
       minOrderAmount, setMinOrderAmount, minimumOrderSurcharge, total,
       customerId, setCustomerId, tableNumber, setTableNumber, orderType, setOrderType, vehicleId, setVehicleId,
+      wholesalePricing, setWholesalePricing,
     }),
-    [items, addItem, removeItem, updateQuantity, updateItem, clearCart, subtotal, itemCount, discount, discountRate, taxRate, tax, deliveryFee, serviceFeeRate, serviceFee, minOrderAmount, minimumOrderSurcharge, total, customerId, tableNumber, orderType, vehicleId]
+    [items, addItem, removeItem, updateQuantity, updateItem, clearCart, subtotal, itemCount, discount, discountRate, taxRate, tax, deliveryFee, serviceFeeRate, serviceFee, minOrderAmount, minimumOrderSurcharge, total, customerId, tableNumber, orderType, vehicleId, wholesalePricing]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

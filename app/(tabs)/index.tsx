@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
 import { themedStyles } from "@/lib/themed-styles";
 import { useCart } from "@/lib/cart-context";
+import type { WholesalePricing } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
@@ -890,6 +891,63 @@ export default function POSScreen() {
           .filter(Boolean).join(" "))
     : "";
 
+  // ── Wholesale traders (تجار الجملة) — app/wholesale.tsx, server/wholesale.ts ──
+  // A trader is a customer with customerType "wholesale": their cart is billed
+  // at wholesale prices and may be paid "credit" (آجل) up to their limit.
+  const { data: wholesaleTraders = [] } = useQuery<any[]>({
+    queryKey: [`/api/wholesale/traders?tenantId=${tenantId || ""}`],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
+    staleTime: 30 * 1000,
+  });
+  const selectedTrader: any = cart.customerId
+    ? (wholesaleTraders as any[]).find((tr: any) => tr.id === cart.customerId) || null
+    : null;
+  // Same key as the product grid without a search, so normally already cached.
+  const { data: wholesaleCatalog } = useQuery<any[]>({
+    queryKey: ["/api/products", `?tenantId=${tenantId || ""}&applyMarkup=true`],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId && !!selectedTrader,
+  });
+  useEffect(() => {
+    if (!selectedTrader || !wholesaleCatalog) {
+      cart.setWholesalePricing(null);
+      return;
+    }
+    const pricing: WholesalePricing = {};
+    for (const p of wholesaleCatalog) {
+      if (p?.wholesalePrice == null || p.wholesalePrice === "") continue;
+      pricing[p.id] = { price: Number(p.wholesalePrice), minQty: Number(p.wholesaleMinQty) || 1, retail: Number(p.price) };
+    }
+    cart.setWholesalePricing(pricing);
+  }, [selectedTrader?.id, wholesaleCatalog]);
+  useEffect(() => {
+    if (!selectedTrader && paymentMethod === "credit") setPaymentMethod("cash");
+  }, [selectedTrader, paymentMethod]);
+  const wholesaleLineCount = cart.items.filter((i) => i.wholesale).length;
+  const creditBalanceAfterSale = selectedTrader ? Number(selectedTrader.balance || 0) + cart.total + manualAdjustment : 0;
+  const creditLimitExceeded = !!selectedTrader && selectedTrader.creditLimit != null
+    && creditBalanceAfterSale > Number(selectedTrader.creditLimit) + 0.004;
+  const wholesaleBanner = selectedTrader ? (
+    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, marginHorizontal: 10, marginBottom: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: Colors.info + "18", borderWidth: 1, borderColor: Colors.info + "55" }}>
+      <View style={{ backgroundColor: Colors.info, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+        <Text style={{ color: Colors.white, fontSize: 11, fontWeight: "800" }}>
+          {language === "ar" ? "جملة" : language === "de" ? "Großhandel" : "Wholesale"}
+        </Text>
+      </View>
+      <Text style={{ flex: 1, color: Colors.text, fontSize: 11, fontWeight: "600", textAlign: isRTL ? "right" : "left" }} numberOfLines={1}>
+        {(selectedTrader.shopName || selectedTrader.name) + " · "}
+        {language === "ar" ? "الرصيد" : language === "de" ? "Saldo" : "Balance"}: {formatMoney(selectedTrader.balance)}
+        {selectedTrader.creditLimit != null ? ` / ${formatMoney(selectedTrader.creditLimit)}` : ""}
+      </Text>
+      {wholesaleLineCount > 0 && (
+        <Text style={{ color: Colors.info, fontSize: 11, fontWeight: "700" }}>
+          {wholesaleLineCount} {language === "ar" ? "بسعر الجملة" : language === "de" ? "zum Großhandelspreis" : "at wholesale"}
+        </Text>
+      )}
+    </View>
+  ) : null;
+
   const handlePhoneSearch = useCallback(async (phone: string) => {
     const trimmed = phone.trim();
     if (!trimmed) {
@@ -1046,6 +1104,7 @@ export default function POSScreen() {
     qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
     qc.invalidateQueries({ queryKey: ["/api/inventory"] });
     qc.invalidateQueries({ queryKey: ["/api/customers"] });
+    qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/wholesale") });
   };
 
   /**
@@ -2091,6 +2150,7 @@ export default function POSScreen() {
               <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color={Colors.primary} />
             </Pressable>
           )}
+          {wholesaleBanner}
 
           {/* Show order notes badge if set */}
           {orderNotes.trim() !== "" && (
@@ -2302,6 +2362,7 @@ export default function POSScreen() {
                     </View>
                   </View>
                 ) : null}
+                {wholesaleBanner}
 
                 <FlatList
                   data={cart.items}
@@ -2673,6 +2734,9 @@ export default function POSScreen() {
                   ...(shamCashStore
                     ? [{ key: "shamcash", icon: "wallet" as const, label: language === "ar" ? "شام كاش" : "Sham Cash" }]
                     : []),
+                  ...(selectedTrader
+                    ? [{ key: "credit", icon: "document-text-outline" as const, label: language === "ar" ? "آجل" : language === "de" ? "Auf Rechnung" : "On credit" }]
+                    : []),
                 ].map((m) => {
                   // Nothing here talks to a card reader, so the non-cash buttons
                   // are only offered when Stripe (or Sham Cash) is actually live.
@@ -2716,6 +2780,30 @@ export default function POSScreen() {
                   />
                   {cashReceived && Number(cashReceived) >= cart.total && (
                     <Text style={styles.changeText}>{t("change")}: {formatMoney(Number(cashReceived) - (cart.total + manualAdjustment))}</Text>
+                  )}
+                </View>
+              )}
+
+              {paymentMethod === "credit" && selectedTrader && (
+                <View style={[styles.payNotice, creditLimitExceeded && { borderColor: Colors.danger }]}>
+                  <View style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8 }]}>
+                    <Ionicons name="document-text-outline" size={18} color={creditLimitExceeded ? Colors.danger : Colors.accent} />
+                    <Text style={[styles.payNoticeTitle, rtlTextAlign]}>
+                      {language === "ar" ? "بيع آجل على حساب التاجر" : language === "de" ? "Verkauf auf Rechnung des Händlers" : "Sale on the trader's account"}
+                    </Text>
+                  </View>
+                  <Text style={[styles.payNoticeText, rtlTextAlign]}>
+                    {language === "ar" ? "الرصيد الحالي" : language === "de" ? "Aktueller Saldo" : "Current balance"}: {formatMoney(selectedTrader.balance)}
+                    {"\n"}
+                    {language === "ar" ? "الرصيد بعد البيع" : language === "de" ? "Saldo nach Verkauf" : "Balance after sale"}: {formatMoney(creditBalanceAfterSale)}
+                    {selectedTrader.creditLimit != null
+                      ? `\n${language === "ar" ? "سقف الدين" : language === "de" ? "Kreditlimit" : "Credit limit"}: ${formatMoney(selectedTrader.creditLimit)}`
+                      : ""}
+                  </Text>
+                  {creditLimitExceeded && (
+                    <Text style={[styles.payNoticeText, { color: Colors.danger, fontWeight: "700" }, rtlTextAlign]}>
+                      {language === "ar" ? "هذا البيع يتجاوز سقف الدين المسموح لهذا التاجر." : language === "de" ? "Dieser Verkauf überschreitet das Kreditlimit des Händlers." : "This sale exceeds the trader's credit limit."}
+                    </Text>
                   )}
                 </View>
               )}
@@ -2834,6 +2922,10 @@ export default function POSScreen() {
                     return;
                   }
                   if (checkoutBusy) return;
+                  if (paymentMethod === "credit" && creditLimitExceeded) {
+                    Alert.alert(t("error"), language === "ar" ? "هذا البيع يتجاوز سقف الدين المسموح لهذا التاجر." : language === "de" ? "Dieser Verkauf überschreitet das Kreditlimit des Händlers." : "This sale exceeds the trader's credit limit.");
+                    return;
+                  }
                   if (paymentMethod === "shamcash") {
                     setShamCashOpen(true);
                   } else if (isStripeMethod(paymentMethod)) {
