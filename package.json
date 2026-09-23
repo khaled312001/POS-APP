@@ -30,6 +30,8 @@
     "@types/nodemailer": "^7.0.11",
     "@ungap/structured-clone": "^1.3.0",
     "@wppconnect-team/wppconnect": "^1.41.0",
+    "@zxing/browser": "^0.1.5",
+    "@zxing/library": "^0.21.3",
     "bcrypt": "^6.0.0",
     "cheerio": "^1.2.0",
     "date-fns": "^4.1.0",

@@ -18,7 +18,8 @@ import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { getDisplayNumber } from "@/lib/api-config";
 import { normalizeOrderItems } from "@/lib/order-items";
-import BarcodeScanner from "@/components/BarcodeScanner";
+import BarcodeScannerModal, { type ScanFeedback } from "@/components/BarcodeScannerModal";
+import { findProductByCode, looksLikeBarcode, normalizeBarcode, useHardwareBarcodeScanner } from "@/lib/barcode";
 import { playClickSound, playAddSound } from "@/lib/sound";
 import RealTimeClock from "@/components/RealTimeClock";
 import { useLanguage } from "@/lib/language-context";
@@ -1551,20 +1552,77 @@ export default function POSScreen() {
     handleAddToCart(product);
   }, [getProductVariantOptions, handleAddToCart, prefersInlineSizePicker]);
 
-  const handleBarcodeScan = useCallback(async (barcode: string) => {
-    try {
-      const res = await apiRequest("GET", `/api/products/barcode/${encodeURIComponent(barcode)}`);
-      const product = await res.json();
-      if (product && product.id) {
-        cart.addItem({ id: product.id, name: product.name, price: Number(product.price) });
-        playAddSound();
-        setShowScanner(false);
-        Alert.alert(t("success"), `${product.name} - ${t("itemAdded")}`);
-      }
-    } catch {
-      Alert.alert(t("error"), t("noProductsFound"));
+  // ── Barcode scanning: camera (scanner modal), USB/Bluetooth scanner, typed code ──
+  const { canManageProducts } = useAuth();
+  const [scanToast, setScanToast] = useState<ScanFeedback | null>(null);
+  useEffect(() => {
+    if (!scanToast) return;
+    const timer = setTimeout(() => setScanToast(null), 2600);
+    return () => clearTimeout(timer);
+  }, [scanToast]);
+
+  /** Find a product of this store by barcode (or exact SKU), with the till's marked-up price. */
+  const lookupProductByCode = useCallback(async (code: string): Promise<any | undefined> => {
+    const inView = findProductByCode(products as any[], code);
+    if (inView) return inView;
+    // The visible list may be narrowed by a search — try every till list already cached for this store.
+    for (const [key, data] of qc.getQueriesData<any[]>({ queryKey: ["/api/products"] })) {
+      const params = String((key as any[])[1] ?? "");
+      if (!Array.isArray(data) || !params.startsWith(`?tenantId=${tenantId}&`) || !params.includes("applyMarkup=true")) continue;
+      const hit = findProductByCode(data, code);
+      if (hit) return hit;
     }
-  }, [cart]);
+    try {
+      const res = await apiRequest("GET", `/api/products?tenantId=${tenantId}&search=${encodeURIComponent(code)}&applyMarkup=true`);
+      return findProductByCode(await res.json(), code);
+    } catch {
+      return undefined;
+    }
+  }, [products, qc, tenantId]);
+
+  const handleBarcodeScan = useCallback(async (rawCode: string): Promise<ScanFeedback> => {
+    const L = (ar: string, de: string, en: string) => (language === "ar" ? ar : language === "de" ? de : en);
+    const code = normalizeBarcode(rawCode);
+    const product = code ? await lookupProductByCode(code) : undefined;
+    if (!product) {
+      playClickSound("heavy");
+      return {
+        ok: false,
+        message: L(`لا يوجد منتج بهذا الباركود: ${code}`, `Kein Produkt mit Barcode ${code} gefunden`, `No product found for barcode ${code}`),
+        action: canManageProducts ? {
+          label: L("إضافة كمنتج جديد", "Als neues Produkt anlegen", "Add as new product"),
+          onPress: () => {
+            setShowScanner(false);
+            router.push({ pathname: "/products", params: { newBarcode: code } } as any);
+          },
+        } : undefined,
+      };
+    }
+    const name = (language === "ar" && product.nameAr) || product.name;
+    const needsOptions = getProductVariantOptions(product).length > 0 || isPizzaProduct(product) || isFingerfoodProduct(product);
+    if (needsOptions) {
+      // Sizes / extras: close the scanner so the options sheet opens on top, exactly like a tap on the card.
+      setShowScanner(false);
+      setTimeout(() => handleAddToCart(product), Platform.OS === "web" ? 50 : 400);
+      return { ok: true, message: L(`${name}: اختر الخيارات`, `${name}: Optionen wählen`, `${name}: choose options`) };
+    }
+    handleAddToCart(product);
+    return { ok: true, message: L(`تمت إضافة ${name}`, `${name} hinzugefügt`, `${name} added`) };
+  }, [language, canManageProducts, router, lookupProductByCode, getProductVariantOptions, isPizzaProduct, isFingerfoodProduct, handleAddToCart]);
+
+  /** Codes that arrive as keystrokes (scanner gun in the search box, or with nothing focused). */
+  const handleKeyboardScan = useCallback(async (code: string) => {
+    const res = await handleBarcodeScan(code);
+    setScanToast({ ok: res.ok, message: res.message });
+    return res.ok;
+  }, [handleBarcodeScan]);
+  useHardwareBarcodeScanner(!showScanner && !showCheckout, handleKeyboardScan);
+
+  const handleSearchSubmit = useCallback(async () => {
+    const code = normalizeBarcode(search);
+    if (!code || (!looksLikeBarcode(code) && !findProductByCode(products as any[], code))) return;
+    if (await handleKeyboardScan(code)) setSearch("");
+  }, [search, products, handleKeyboardScan]);
 
   const maxCashierDiscountPct = 10;
   const applyDiscount = () => {
@@ -1992,6 +2050,9 @@ export default function POSScreen() {
                 placeholderTextColor={Colors.textMuted}
                 value={search}
                 onChangeText={setSearch}
+                onSubmitEditing={handleSearchSubmit}
+                blurOnSubmit={false}
+                returnKeyType="search"
               />
               {search ? (
                 <Pressable onPress={() => setSearch("")}>
@@ -4121,11 +4182,20 @@ export default function POSScreen() {
         </View>
       </Modal>
 
-      <BarcodeScanner
+      <BarcodeScannerModal
         visible={showScanner}
         onScanned={handleBarcodeScan}
         onClose={() => setShowScanner(false)}
+        continuous
       />
+      {scanToast ? (
+        <View pointerEvents="none" style={{ position: "absolute", top: insets.top + topPad + 60, left: 16, right: 16, alignItems: "center", zIndex: 999 }}>
+          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, maxWidth: 520, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, backgroundColor: scanToast.ok ? "#047857" : "#B91C1C" }}>
+            <Ionicons name={scanToast.ok ? "checkmark-circle" : "alert-circle"} size={20} color="#FFFFFF" />
+            <Text style={{ color: "#FFFFFF", fontSize: 15, fontWeight: "600", flexShrink: 1 }}>{scanToast.message}</Text>
+          </View>
+        </View>
+      ) : null}
 
       {/* ── Shift Prompt after Account Switch ── */}
       <Modal visible={showSwitchShiftPrompt} animationType="fade" transparent onRequestClose={() => { }}>
