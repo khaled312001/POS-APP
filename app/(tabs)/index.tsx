@@ -30,6 +30,8 @@ import {
   PIZZA_TOPPINGS, TOPPING_PRICE, TOPPING_GRID, SAUCE_ROW, SAUCE_NAMES,
   calcToppingsPrice, getToppingDisplayName, getToppingEmoji, getToppingInfo,
 } from "@/utils/toppingUtils";
+import { formatMoney, currencyLabel, setCurrency } from "@/lib/currency";
+import ShamCashTillModal from "@/components/ShamCashTillModal";
 
 type ProductVariantOption = {
   name: string;
@@ -462,7 +464,11 @@ export default function POSScreen() {
     queryFn: getQueryFn({ on401: "throw" }),
     staleTime: 5 * 60 * 1000,
   });
-  const stripeReady = paymentsConfig?.stripe?.status === "connected";
+  // A Syrian-pound store cannot be charged through Stripe; it takes Sham Cash
+  // instead. `enabled` is only true once an active wallet is linked.
+  const syrianStore = paymentsConfig?.shamcash?.currency === "SYP";
+  const shamCashReady = !!paymentsConfig?.shamcash?.enabled;
+  const stripeReady = paymentsConfig?.stripe?.status === "connected" && !syrianStore;
   // Raw Stripe method ids ("apple_pay") read badly in a label.
   const stripeMethods: string[] = (paymentsConfig?.stripe?.availableMethods || [])
     .map((m: string) => m.replace(/_/g, " "));
@@ -488,7 +494,7 @@ export default function POSScreen() {
       <div style="display:flex;justify-content:space-between;padding:3px 0;${isKitchen ? 'font-size:14px;font-weight:bold;' : ''}">
         <span style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.productName || item.name}</span>
         <span style="width:40px;text-align:center;">x${item.quantity}</span>
-        ${!isKitchen ? `<span style="width:75px;text-align:right;">CHF ${Number(item.total || (item.unitPrice * item.quantity)).toFixed(2)}</span>` : ""}
+        ${!isKitchen ? `<span style="width:75px;text-align:right;">${formatMoney(item.total || (item.unitPrice * item.quantity))}</span>` : ""}
       </div>
     `).join("");
 
@@ -530,34 +536,34 @@ export default function POSScreen() {
   
   <div class="flex-between">
     <span>${t("subtotal")}:</span>
-    <span>CHF ${Number(saleData.subtotal || saleData.totalAmount).toFixed(2)}</span>
+    <span>${formatMoney(saleData.subtotal || saleData.totalAmount)}</span>
   </div>
   ${Number(saleData.discount) > 0 ? `
     <div class="flex-between">
       <span>${t("discount")}:</span>
-      <span>-CHF ${Number(saleData.discount).toFixed(2)}</span>
+      <span>-${formatMoney(saleData.discount)}</span>
     </div>
   ` : ""}
   ${Number(saleData.minimumOrderSurcharge) > 0 ? `
     <div class="flex-between">
       <span>Mindestbestellwert:</span>
-      <span>+CHF ${Number(saleData.minimumOrderSurcharge).toFixed(2)}</span>
+      <span>+${formatMoney(saleData.minimumOrderSurcharge)}</span>
     </div>
   ` : ""}
   ${Number(saleData.serviceFee || saleData.serviceFeeAmount) > 0 ? `
     <div class="flex-between">
       <span>${t("serviceTax") || "Service Tax"}:</span>
-      <span>CHF ${Number(saleData.serviceFee || saleData.serviceFeeAmount).toFixed(2)}</span>
+      <span>${formatMoney(saleData.serviceFee || saleData.serviceFeeAmount)}</span>
     </div>
   ` : ""}
   <div class="flex-between">
     <span>${t("tax")}:</span>
-    <span>CHF ${Number(saleData.tax).toFixed(2)}</span>
+    <span>${formatMoney(saleData.tax)}</span>
   </div>
   ${Number(saleData.deliveryFee) > 0 ? `
     <div class="flex-between">
       <span>Delivery Fee:</span>
-      <span>CHF ${Number(saleData.deliveryFee).toFixed(2)}</span>
+      <span>${formatMoney(saleData.deliveryFee)}</span>
     </div>
   ` : ""}
   ${vehicleObj ? `
@@ -571,7 +577,7 @@ export default function POSScreen() {
   
   <div class="flex-between bold" style="font-size:15px;">
     <span>TOTAL:</span>
-    <span>CHF ${Number(saleData.total || saleData.totalAmount).toFixed(2)}</span>
+    <span>${formatMoney(saleData.total || saleData.totalAmount)}</span>
   </div>
   
   <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
@@ -583,11 +589,11 @@ export default function POSScreen() {
   ${saleData.paymentMethod === "cash" ? `
     <div class="flex-between">
       <span>${t("cash")}:</span>
-      <span>CHF ${Number(saleData.cashReceived || 0).toFixed(2)}</span>
+      <span>${formatMoney(saleData.cashReceived || 0)}</span>
     </div>
     <div class="flex-between">
       <span>${t("change")}:</span>
-      <span>CHF ${Number(saleData.change || 0).toFixed(2)}</span>
+      <span>${formatMoney(saleData.change || 0)}</span>
     </div>
   ` : ""}
   
@@ -645,9 +651,9 @@ export default function POSScreen() {
     if (Platform.OS !== "web") {
       const inv = selectedInvoice;
       const itemsText = (inv.items || []).map((item: any) =>
-        `${item.productName || item.name}  x${item.quantity}  CHF ${Number(item.total || (item.unitPrice * item.quantity)).toFixed(2)}`
+        `${item.productName || item.name}  x${item.quantity}  ${formatMoney(item.total || (item.unitPrice * item.quantity))}`
       ).join("\n");
-      const receiptText = `${storeSettings?.name || tenant?.name || "POS System"}\n${storeSettings?.address || ""}\n${"─".repeat(30)}\n${t("receiptNumber")}: ${getDisplayNumber(inv.receiptNumber) || "#" + inv.id}\n${t("receiptDate")}: ${new Date(inv.createdAt || inv.date).toLocaleString()}\n${"─".repeat(30)}\n${itemsText}\n${"─".repeat(30)}\nTOTAL: CHF ${Number(inv.totalAmount).toFixed(2)}\n${t("paymentMethod")}: ${(inv.paymentMethod || "cash").toUpperCase()}\n${"═".repeat(30)}\n${t("thankYou")}`;
+      const receiptText = `${storeSettings?.name || tenant?.name || "POS System"}\n${storeSettings?.address || ""}\n${"─".repeat(30)}\n${t("receiptNumber")}: ${getDisplayNumber(inv.receiptNumber) || "#" + inv.id}\n${t("receiptDate")}: ${new Date(inv.createdAt || inv.date).toLocaleString()}\n${"─".repeat(30)}\n${itemsText}\n${"─".repeat(30)}\nTOTAL: ${formatMoney(inv.totalAmount)}\n${t("paymentMethod")}: ${(inv.paymentMethod || "cash").toUpperCase()}\n${"═".repeat(30)}\n${t("thankYou")}`;
       Alert.alert(t("printInvoice"), receiptText);
       return;
     }
@@ -823,6 +829,12 @@ export default function POSScreen() {
     // BIZ-01: minimum-order top-up is opt-in per store and delivery-only.
     cart.setMinOrderAmount(Number(storeSettings?.minOrderAmount) || 0);
   }, [storeSettings?.taxRate, storeSettings?.commissionRate, storeSettings?.minOrderAmount]);
+
+  // Store currency = main branch's `currency`. The license context already set
+  // it at login; this keeps it in sync when store settings are refetched.
+  useEffect(() => {
+    if (storeSettings?.currency) setCurrency(storeSettings.currency);
+  }, [storeSettings?.currency]);
 
   useEffect(() => {
     if (cart.orderType === "delivery" && storeSettings?.deliveryFee) {
@@ -1335,7 +1347,35 @@ export default function POSScreen() {
     else closeStripeCapture();
   }, [stripeCapture, parkStripeSale, closeStripeCapture]);
 
-  const checkoutBusy = saleMutation.isPending || stripeCaptureMutation.isPending || stripeStage !== "idle";
+  // ── Sham Cash (Syrian stores) ─────────────────────────────────────────────
+  // Same shape as the Stripe flow: the sale is written unpaid, then the modal
+  // opens an invoice for it and waits for the server to confirm payment.
+  const [shamCashSale, setShamCashSale] = useState<any>(null);
+
+  const shamCashMutation = useMutation({
+    mutationFn: async () => {
+      const sale = await createSale("shamcash", null, "pending");
+      if (!sale?.id) throw new Error(t("saleNotFound"));
+      return sale;
+    },
+    onSuccess: (sale) => setShamCashSale(sale),
+    onError: (e: any) => Alert.alert(t("error"), e?.message || "Failed to complete sale"),
+  });
+
+  const shamCashToCash = async () => {
+    if (!shamCashSale) return;
+    try {
+      await apiRequest("PUT", `/api/sales/${shamCashSale.id}`, { paymentMethod: "cash", paymentStatus: "completed" });
+      const sale = { ...shamCashSale, paymentMethod: "cash", paymentStatus: "completed" };
+      setShamCashSale(null);
+      completeSaleAfterPayment(sale, "cash");
+    } catch (e: any) {
+      Alert.alert(t("error"), e?.message || "Error");
+    }
+  };
+
+  const checkoutBusy = saleMutation.isPending || stripeCaptureMutation.isPending || stripeStage !== "idle"
+    || shamCashMutation.isPending || shamCashSale != null;
 
   const openCheckoutLink = useCallback(() => {
     if (!stripeCapture) return;
@@ -1755,7 +1795,7 @@ export default function POSScreen() {
                     {call.customer.visitCount ? (
                       <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, marginTop: 1 }}>
                         {language === "ar" ? `${call.customer.visitCount} زيارة` : language === "de" ? `${call.customer.visitCount} Besuche` : `${call.customer.visitCount} visits`}
-                        {call.customer.totalSpent ? ` · CHF ${Number(call.customer.totalSpent).toFixed(0)}` : ""}
+                        {call.customer.totalSpent ? ` · ${formatMoney(call.customer.totalSpent, 0)}` : ""}
                       </Text>
                     ) : null}
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
@@ -1925,7 +1965,7 @@ export default function POSScreen() {
                     )}
                   </View>
                   <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-                  <Text style={[styles.productPrice, { color: catColor }]}>CHF {Number(item.price).toFixed(2)}</Text>
+                  <Text style={[styles.productPrice, { color: catColor }]}>{formatMoney(item.price)}</Text>
                   {hasInlineSizeOptions && (
                     <View style={styles.productSizeWrap}>
                       <Pressable
@@ -1959,7 +1999,7 @@ export default function POSScreen() {
                             >
                               <Text style={styles.productSizeOptionName}>{getShortVariantLabel(variant.name)}</Text>
                               <Text style={[styles.productSizeOptionPrice, { color: catColor }]}>
-                                CHF {Number(variant.price).toFixed(2)}
+                                {formatMoney(variant.price)}
                               </Text>
                             </Pressable>
                           ))}
@@ -2111,7 +2151,7 @@ export default function POSScreen() {
                       );
                     })()}
                   </View>
-                  <Text style={[styles.cartItemUnit, rtlTextAlign]}>CHF {Number(item.price).toFixed(2)} × {item.quantity}</Text>
+                  <Text style={[styles.cartItemUnit, rtlTextAlign]}>{formatMoney(item.price)} × {item.quantity}</Text>
                 </View>
                 <View style={[styles.cartItemActions, isRTL && { flexDirection: "row-reverse" }]}>
                   <Pressable
@@ -2129,7 +2169,7 @@ export default function POSScreen() {
                   >
                     <Ionicons name="add" size={14} color={Colors.accent} />
                   </Pressable>
-                  <Text style={styles.cartItemTotal}>CHF {(item.price * item.quantity).toFixed(2)}</Text>
+                  <Text style={styles.cartItemTotal}>{formatMoney(item.price * item.quantity)}</Text>
                 </View>
               </View>
             )}
@@ -2145,29 +2185,29 @@ export default function POSScreen() {
           <View style={styles.cartSummary}>
             <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("subtotal")}</Text>
-              <Text style={[styles.summaryValue, rtlTextAlign]}>CHF {cart.subtotal.toFixed(2)}</Text>
+              <Text style={[styles.summaryValue, rtlTextAlign]}>{formatMoney(cart.subtotal)}</Text>
             </View>
             {cart.discount > 0 && (
               <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
                 <Text style={[styles.summaryLabel, { color: Colors.success }, rtlTextAlign]}>{t("discount")}</Text>
-                <Text style={[styles.summaryValue, { color: Colors.success }, rtlTextAlign]}>-CHF {cart.discount.toFixed(2)}</Text>
+                <Text style={[styles.summaryValue, { color: Colors.success }, rtlTextAlign]}>-{formatMoney(cart.discount)}</Text>
               </View>
             )}
             {cart.minimumOrderSurcharge > 0 && (
               <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
-                <Text style={[styles.summaryLabel, { color: Colors.warning ?? "#F59E0B" }, rtlTextAlign]}>Mindestbestellwert (min. CHF 20)</Text>
-                <Text style={[styles.summaryValue, { color: Colors.warning ?? "#F59E0B" }, rtlTextAlign]}>+CHF {cart.minimumOrderSurcharge.toFixed(2)}</Text>
+                <Text style={[styles.summaryLabel, { color: Colors.warning ?? "#F59E0B" }, rtlTextAlign]}>Mindestbestellwert (min. {formatMoney(cart.minOrderAmount, 0)})</Text>
+                <Text style={[styles.summaryValue, { color: Colors.warning ?? "#F59E0B" }, rtlTextAlign]}>+{formatMoney(cart.minimumOrderSurcharge)}</Text>
               </View>
             )}
             {cart.serviceFee > 0 && (
               <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
                 <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("serviceTax" as any) || "Service Tax"} ({cart.serviceFeeRate}%)</Text>
-                <Text style={[styles.summaryValue, rtlTextAlign]}>CHF {cart.serviceFee.toFixed(2)}</Text>
+                <Text style={[styles.summaryValue, rtlTextAlign]}>{formatMoney(cart.serviceFee)}</Text>
               </View>
             )}
             <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("tax")} ({cart.taxRate}%)</Text>
-              <Text style={[styles.summaryValue, rtlTextAlign]}>CHF {cart.tax.toFixed(2)}</Text>
+              <Text style={[styles.summaryValue, rtlTextAlign]}>{formatMoney(cart.tax)}</Text>
             </View>
             <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }, { alignItems: "center" }]}>
               <Text style={[styles.summaryLabel, rtlTextAlign]}>Anpassung</Text>
@@ -2192,7 +2232,7 @@ export default function POSScreen() {
             </View>
             <View style={[styles.summaryRow, styles.totalRow, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.totalLabel, rtlTextAlign]}>{t("total")}</Text>
-              <Text style={[styles.totalValue, rtlTextAlign]}>CHF {(cart.total + manualAdjustment).toFixed(2)}</Text>
+              <Text style={[styles.totalValue, rtlTextAlign]}>{formatMoney(cart.total + manualAdjustment)}</Text>
             </View>
           </View>
 
@@ -2213,7 +2253,7 @@ export default function POSScreen() {
                     <Text style={styles.checkoutBtnText}>{t("checkout")}</Text>
                   </View>
                   <View style={styles.checkoutBtnPrice}>
-                    <Text style={styles.checkoutBtnPriceText}>CHF {(cart.total + manualAdjustment).toFixed(2)}</Text>
+                    <Text style={styles.checkoutBtnPriceText}>{formatMoney(cart.total + manualAdjustment)}</Text>
                     {cart.items.length > 0 && (
                       <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 10, textAlign: "center" }}>{cart.itemCount} items</Text>
                     )}
@@ -2236,7 +2276,7 @@ export default function POSScreen() {
               </Text>
             </View>
             <View style={styles.mobileCartBarPrice}>
-              <Text style={styles.mobileCartBarPriceText}>CHF {(cart.total + manualAdjustment).toFixed(2)}</Text>
+              <Text style={styles.mobileCartBarPriceText}>{formatMoney(cart.total + manualAdjustment)}</Text>
             </View>
           </Pressable>
 
@@ -2282,7 +2322,7 @@ export default function POSScreen() {
                     <View style={[styles.cartItem, isRTL && { flexDirection: "row-reverse" }]}>
                       <View style={styles.cartItemInfo}>
                         <Text style={[styles.cartItemName, rtlTextAlign]} numberOfLines={2}>{item.name}</Text>
-                        <Text style={[styles.cartItemUnit, rtlTextAlign]}>CHF {Number(item.price).toFixed(2)} × {item.quantity}</Text>
+                        <Text style={[styles.cartItemUnit, rtlTextAlign]}>{formatMoney(item.price)} × {item.quantity}</Text>
                       </View>
                       <View style={[styles.cartItemActions, isRTL && { flexDirection: "row-reverse" }]}>
                         <Pressable
@@ -2315,11 +2355,11 @@ export default function POSScreen() {
                 <View style={styles.cartSummary}>
                   <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
                     <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("subtotal")}</Text>
-                    <Text style={[styles.summaryValue, rtlTextAlign]}>CHF {cart.subtotal.toFixed(2)}</Text>
+                    <Text style={[styles.summaryValue, rtlTextAlign]}>{formatMoney(cart.subtotal)}</Text>
                   </View>
                   <View style={[styles.summaryRow, styles.totalRow, isRTL && { flexDirection: "row-reverse" }]}>
                     <Text style={[styles.totalLabel, rtlTextAlign]}>{t("total")}</Text>
-                    <Text style={[styles.totalValue, rtlTextAlign]}>CHF {(cart.total + manualAdjustment).toFixed(2)}</Text>
+                    <Text style={[styles.totalValue, rtlTextAlign]}>{formatMoney(cart.total + manualAdjustment)}</Text>
                   </View>
                 </View>
 
@@ -2346,7 +2386,7 @@ export default function POSScreen() {
                         <Text style={styles.checkoutBtnText}>{t("checkout")}</Text>
                       </View>
                       <View style={styles.checkoutBtnPrice}>
-                        <Text style={styles.checkoutBtnPriceText}>CHF {(cart.total + manualAdjustment).toFixed(2)}</Text>
+                        <Text style={styles.checkoutBtnPriceText}>{formatMoney(cart.total + manualAdjustment)}</Text>
                       </View>
                     </View>
                   </LinearGradient>
@@ -2401,7 +2441,7 @@ export default function POSScreen() {
                       }}
                     >
                       <Text style={[styles.sizeCardName, selectedVariant?.name === v.name && { color: Colors.accent }]}>{getShortVariantLabel(v.name)}</Text>
-                      <Text style={[styles.sizeCardPrice, selectedVariant?.name === v.name && { color: Colors.accent }]}>CHF {Number(v.price).toFixed(2)}</Text>
+                      <Text style={[styles.sizeCardPrice, selectedVariant?.name === v.name && { color: Colors.accent }]}>{formatMoney(v.price)}</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -2414,7 +2454,7 @@ export default function POSScreen() {
                   <View style={[styles.selectedSizeBadge, { paddingVertical: 8, paddingHorizontal: 14, backgroundColor: Colors.accent + "18", marginBottom: 8 }]}>
                     <Ionicons name="pizza" size={15} color={Colors.accent} />
                     <Text style={[styles.selectedSizeBadgeText, { fontSize: 14, fontWeight: "700" }]}>
-                      {getShortVariantLabel(selectedVariant.name)} — CHF {(Number(selectedVariant.price) + calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)}
+                      {getShortVariantLabel(selectedVariant.name)} — {formatMoney(Number(selectedVariant.price) + calcToppingsPrice(selectedToppings, selectedVariant?.name))}
                     </Text>
                     {selectedToppings.length > 0 && (
                       <View style={{ marginLeft: "auto", backgroundColor: Colors.accent, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 }}>
@@ -2429,10 +2469,10 @@ export default function POSScreen() {
                   <Ionicons name="pricetag" size={12} color={Colors.accent} />
                   <Text style={{ color: Colors.accent, fontSize: 11, fontWeight: "700" }}>
                     {language === "ar"
-                      ? "كل إضافة +CHF 2.00، وكِسراند 33cm = CHF 3 / 45cm = CHF 6"
+                      ? `كل إضافة +${formatMoney(2)}، وكِسراند 33cm = ${formatMoney(3, 0)} / 45cm = ${formatMoney(6, 0)}`
                       : language === "de"
-                        ? "Jedes Extra +CHF 2.00, Käserand 33cm = CHF 3 / 45cm = CHF 6"
-                        : "Each extra +CHF 2.00, cheese crust 33cm = CHF 3 / 45cm = CHF 6"}
+                        ? `Jedes Extra +${formatMoney(2)}, Käserand 33cm = ${formatMoney(3, 0)} / 45cm = ${formatMoney(6, 0)}`
+                        : `Each extra +${formatMoney(2)}, cheese crust 33cm = ${formatMoney(3, 0)} / 45cm = ${formatMoney(6, 0)}`}
                   </Text>
                 </View>
 
@@ -2520,10 +2560,10 @@ export default function POSScreen() {
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                       <Text style={{ color: Colors.accent, fontSize: 11, fontWeight: "700" }}>
                         {language === "ar"
-                          ? `الإضافات المختارة (${selectedToppings.length}) — +CHF ${(calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)}`
+                          ? `الإضافات المختارة (${selectedToppings.length}) — +${formatMoney(calcToppingsPrice(selectedToppings, selectedVariant?.name))}`
                           : language === "de"
-                          ? `Ausgewählte Extras (${selectedToppings.length}) — +CHF ${(calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)}`
-                          : `Selected Extras (${selectedToppings.length}) — +CHF ${(calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)}`}
+                          ? `Ausgewählte Extras (${selectedToppings.length}) — +${formatMoney(calcToppingsPrice(selectedToppings, selectedVariant?.name))}`
+                          : `Selected Extras (${selectedToppings.length}) — +${formatMoney(calcToppingsPrice(selectedToppings, selectedVariant?.name))}`}
                       </Text>
                       <Pressable onPress={() => setSelectedToppings([])}>
                         <Text style={{ color: Colors.danger, fontSize: 11, fontWeight: "600" }}>
@@ -2579,10 +2619,10 @@ export default function POSScreen() {
                         {editingCartItemId !== null
                           ? (language === "ar" ? "تحديث الإضافات" : language === "de" ? "Extras aktualisieren" : "Update Extras")
                           : language === "ar"
-                          ? `إضافة للسلة${selectedToppings.length > 0 ? ` (+CHF ${(calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)})` : ""}`
+                          ? `إضافة للسلة${selectedToppings.length > 0 ? ` (+${formatMoney(calcToppingsPrice(selectedToppings, selectedVariant?.name))})` : ""}`
                           : language === "de"
-                          ? `In den Warenkorb${selectedToppings.length > 0 ? ` (+CHF ${(calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)})` : ""}`
-                          : `Add to Cart${selectedToppings.length > 0 ? ` (+CHF ${(calcToppingsPrice(selectedToppings, selectedVariant?.name)).toFixed(2)})` : ""}`}
+                          ? `In den Warenkorb${selectedToppings.length > 0 ? ` (+${formatMoney(calcToppingsPrice(selectedToppings, selectedVariant?.name))})` : ""}`
+                          : `Add to Cart${selectedToppings.length > 0 ? ` (+${formatMoney(calcToppingsPrice(selectedToppings, selectedVariant?.name))})` : ""}`}
                       </Text>
                     </LinearGradient>
                   </Pressable>
@@ -2621,7 +2661,7 @@ export default function POSScreen() {
                 </Pressable>
               </View>
 
-              <Text style={styles.modalTotal}>CHF {(cart.total + manualAdjustment).toFixed(2)}</Text>
+              <Text style={styles.modalTotal}>{formatMoney(cart.total + manualAdjustment)}</Text>
 
               {selectedCustomer && (
                 <View style={[styles.customerInfo, isRTL && { flexDirection: "row-reverse" }]}>
@@ -2636,14 +2676,20 @@ export default function POSScreen() {
 
               <Text style={[styles.sectionLabel, rtlTextAlign]}>{t("paymentMethod")}</Text>
               <View style={[styles.paymentMethods, isRTL && { flexDirection: "row-reverse" }]}>
-                {[
-                  { key: "cash", icon: "cash" as const, label: t("cash") },
-                  { key: "card", icon: "card" as const, label: t("card") },
-                  { key: "wallet", icon: "wallet-outline" as const, label: t("walletPay") },
-                ].map((m) => {
+                {(syrianStore
+                  ? [
+                      { key: "cash", icon: "cash" as const, label: t("cash") },
+                      { key: "shamcash", icon: "wallet" as const, label: language === "ar" ? "شام كاش" : "Sham Cash" },
+                    ]
+                  : [
+                      { key: "cash", icon: "cash" as const, label: t("cash") },
+                      { key: "card", icon: "card" as const, label: t("card") },
+                      { key: "wallet", icon: "wallet-outline" as const, label: t("walletPay") },
+                    ]
+                ).map((m) => {
                   // Nothing here talks to a card reader, so the non-cash buttons
-                  // are only offered when Stripe is actually connected.
-                  const blocked = isStripeMethod(m.key) && !stripeReady;
+                  // are only offered when Stripe (or Sham Cash) is actually live.
+                  const blocked = (isStripeMethod(m.key) && !stripeReady) || (m.key === "shamcash" && !shamCashReady);
                   return (
                     <Pressable
                       key={m.key}
@@ -2657,8 +2703,17 @@ export default function POSScreen() {
                   );
                 })}
               </View>
-              {paymentsConfig !== undefined && !stripeReady && (
+              {paymentsConfig !== undefined && !syrianStore && !stripeReady && (
                 <Text style={[styles.payHint, rtlTextAlign]}>{t("stripeNotConnected")}</Text>
+              )}
+              {syrianStore && !shamCashReady && (
+                <Text style={[styles.payHint, rtlTextAlign]}>
+                  {language === "ar"
+                    ? "شام كاش غير مفعّل بعد: أكمل ربط محفظة من لوحة شام كاش، ثم فعّله من الإعدادات ← بوابة الدفع."
+                    : language === "de"
+                      ? "Sham Cash ist noch nicht aktiv: Wallet im Sham-Cash-Dashboard verknüpfen, dann unter Einstellungen → Zahlungs-Gateway einschalten."
+                      : "Sham Cash is not live yet: finish linking a wallet in the Sham Cash dashboard, then switch it on in Settings → Payment gateway."}
+                </Text>
               )}
 
               {paymentMethod === "cash" && (
@@ -2673,7 +2728,7 @@ export default function POSScreen() {
                     keyboardType="decimal-pad"
                   />
                   {cashReceived && Number(cashReceived) >= cart.total && (
-                    <Text style={styles.changeText}>{t("change")}: CHF {(Number(cashReceived) - (cart.total + manualAdjustment)).toFixed(2)}</Text>
+                    <Text style={styles.changeText}>{t("change")}: {formatMoney(Number(cashReceived) - (cart.total + manualAdjustment))}</Text>
                   )}
                 </View>
               )}
@@ -2695,7 +2750,7 @@ export default function POSScreen() {
               {cart.items.map((item) => (
                 <View key={String(item.id)} style={[styles.checkoutItem, isRTL && { flexDirection: "row-reverse" }]}>
                   <Text style={[styles.checkoutItemName, rtlTextAlign]}>{item.name} x{item.quantity}</Text>
-                  <Text style={[styles.checkoutItemTotal, rtlTextAlign]}>CHF {(item.price * item.quantity).toFixed(2)}</Text>
+                  <Text style={[styles.checkoutItemTotal, rtlTextAlign]}>{formatMoney(item.price * item.quantity)}</Text>
                 </View>
               ))}
               {/* Vehicle Picker — always shown (optional) */}
@@ -2756,7 +2811,7 @@ export default function POSScreen() {
                 </View>
               )}
 
-              {/* Delivery Fee Stepper — editable in 0.50 CHF increments */}
+              {/* Delivery Fee Stepper — editable in 0.50 increments of the store currency */}
               <View style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder }]}>
                 <View style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6 }]}>
                   <Ionicons name="bicycle-outline" size={16} color={Colors.info} />
@@ -2772,7 +2827,7 @@ export default function POSScreen() {
                     <Ionicons name="remove" size={16} color={Colors.danger} />
                   </Pressable>
                   <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: "700", minWidth: 60, textAlign: "center" }}>
-                    CHF {cart.deliveryFee.toFixed(2)}
+                    {formatMoney(cart.deliveryFee)}
                   </Text>
                   <Pressable
                     onPress={() => cart.setDeliveryFee(Math.round((cart.deliveryFee + 0.5) * 100) / 100)}
@@ -2792,7 +2847,9 @@ export default function POSScreen() {
                     return;
                   }
                   if (checkoutBusy) return;
-                  if (isStripeMethod(paymentMethod)) {
+                  if (paymentMethod === "shamcash") {
+                    shamCashMutation.mutate();
+                  } else if (isStripeMethod(paymentMethod)) {
                     setStripeError("");
                     setStripeStage("creating");
                     stripeCaptureMutation.mutate();
@@ -2803,11 +2860,11 @@ export default function POSScreen() {
                 disabled={checkoutBusy}
               >
                 <LinearGradient colors={[Colors.success, "#059669"]} style={[styles.completeBtnGradient, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Ionicons name={isStripeMethod(paymentMethod) ? "qr-code-outline" : "checkmark-circle"} size={22} color={Colors.white} />
+                  <Ionicons name={isStripeMethod(paymentMethod) || paymentMethod === "shamcash" ? "qr-code-outline" : "checkmark-circle"} size={22} color={Colors.white} />
                   <Text style={styles.completeBtnText}>
                     {checkoutBusy
                       ? t("processing")
-                      : isStripeMethod(paymentMethod) ? t("requestPayment") : t("completeSale")}
+                      : isStripeMethod(paymentMethod) || paymentMethod === "shamcash" ? t("requestPayment") : t("completeSale")}
                   </Text>
                 </LinearGradient>
               </Pressable>
@@ -2913,6 +2970,17 @@ export default function POSScreen() {
         </View>
       </Modal>
 
+      <ShamCashTillModal
+        saleId={shamCashSale?.id ?? null}
+        onPaid={() => {
+          const sale = { ...shamCashSale, paymentMethod: "shamcash", paymentStatus: "paid" };
+          setShamCashSale(null);
+          completeSaleAfterPayment(sale, "shamcash");
+        }}
+        onTakeCash={shamCashToCash}
+        onLeavePending={() => { setShamCashSale(null); parkStripeSale(); }}
+      />
+
       <Modal visible={showReceipt} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={{ backgroundColor: Colors.surface, borderRadius: 16, width: "94%", maxWidth: 380, maxHeight: "90%", overflow: "hidden" }}>
@@ -2955,7 +3023,7 @@ export default function POSScreen() {
                     <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, flex: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }} numberOfLines={1}>{item.productName || item.name}</Text>
                       <Text style={{ color: "#000", fontSize: 11, width: 40, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>x{item.quantity}</Text>
-                      <Text style={{ color: "#000", fontSize: 11, width: 75, textAlign: "right", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(item.total || (item.unitPrice * item.quantity)).toFixed(2)}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, width: 75, textAlign: "right", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(item.total || (item.unitPrice * item.quantity))}</Text>
                     </View>
                   ))}
                 </View>
@@ -2965,28 +3033,28 @@ export default function POSScreen() {
                 <View style={{ marginVertical: 4 }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                     <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("subtotal")}:</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(lastSale?.subtotal || lastSale?.totalAmount).toFixed(2)}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.subtotal || lastSale?.totalAmount)}</Text>
                   </View>
                   {(lastSale?.discount || 0) > 0 && (
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("discount")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>-CHF {Number(lastSale?.discount).toFixed(2)}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>-{formatMoney(lastSale?.discount)}</Text>
                     </View>
                   )}
                   {(lastSale?.serviceFee || lastSale?.serviceFeeAmount || 0) > 0 && (
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("serviceTax")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(lastSale?.serviceFee || lastSale?.serviceFeeAmount).toFixed(2)}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.serviceFee || lastSale?.serviceFeeAmount)}</Text>
                     </View>
                   )}
                   <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                     <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("tax")}:</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {lastSale?.tax?.toFixed(2)}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.tax)}</Text>
                   </View>
                   {(lastSale?.deliveryFee || 0) > 0 && (
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Delivery Fee:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(lastSale?.deliveryFee).toFixed(2)}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.deliveryFee)}</Text>
                     </View>
                   )}
                   {lastSale?.vehicleId && (() => {
@@ -3002,7 +3070,7 @@ export default function POSScreen() {
 
                   <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
                     <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>TOTAL:</Text>
-                    <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {lastSale?.total?.toFixed(2)}</Text>
+                    <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.total)}</Text>
                   </View>
 
                   <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
@@ -3014,13 +3082,13 @@ export default function POSScreen() {
                   {lastSale?.paymentMethod === "cash" && (
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("cash")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {lastSale?.cashReceived?.toFixed(2)}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.cashReceived)}</Text>
                     </View>
                   )}
                   {(lastSale?.change || 0) > 0 && (
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("change")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {lastSale?.change?.toFixed(2)}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.change)}</Text>
                     </View>
                   )}
                 </View>
@@ -3375,7 +3443,7 @@ export default function POSScreen() {
             </View>
             <View style={[styles.discountTypeRow, isRTL && { flexDirection: "row-reverse" }]}>
               <Pressable style={[styles.discountTypeBtn, discountType === "fixed" && styles.discountTypeBtnActive]} onPress={() => setDiscountType("fixed")}>
-                <Text style={[styles.discountTypeBtnText, discountType === "fixed" && { color: Colors.textDark }]}>{t("fixedAmount")} (CHF)</Text>
+                <Text style={[styles.discountTypeBtnText, discountType === "fixed" && { color: Colors.textDark }]}>{t("fixedAmount")} ({currencyLabel()})</Text>
               </Pressable>
               <Pressable style={[styles.discountTypeBtn, discountType === "percent" && styles.discountTypeBtnActive]} onPress={() => setDiscountType("percent")}>
                 <Text style={[styles.discountTypeBtnText, discountType === "percent" && { color: Colors.textDark }]}>{t("percentage")} (%)</Text>
@@ -3517,7 +3585,7 @@ export default function POSScreen() {
                     </View>
                     <View style={{ alignItems: isRTL ? "flex-start" : "flex-end" }}>
                       <Text style={{ color: Colors.accent, fontSize: 16, fontWeight: "800" }}>
-                        CHF {Number(item.totalAmount).toFixed(2)}
+                        {formatMoney(item.totalAmount)}
                       </Text>
                       <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4, marginTop: 4 }}>
                         <Ionicons name="eye-outline" size={14} color={Colors.info} />
@@ -3583,7 +3651,7 @@ export default function POSScreen() {
                       <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                         <Text style={{ color: "#000", fontSize: 11, flex: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }} numberOfLines={1}>{item.productName || item.name}</Text>
                         <Text style={{ color: "#000", fontSize: 11, width: 40, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>x{item.quantity}</Text>
-                        <Text style={{ color: "#000", fontSize: 11, width: 75, textAlign: "right", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(item.total || (item.unitPrice * item.quantity)).toFixed(2)}</Text>
+                        <Text style={{ color: "#000", fontSize: 11, width: 75, textAlign: "right", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(item.total || (item.unitPrice * item.quantity))}</Text>
                       </View>
                     ))}
                   </View>
@@ -3593,28 +3661,28 @@ export default function POSScreen() {
                   <View style={{ marginVertical: 4 }}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("subtotal")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(selectedInvoice.subtotal || selectedInvoice.totalAmount).toFixed(2)}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(selectedInvoice.subtotal || selectedInvoice.totalAmount)}</Text>
                     </View>
                     {Number(selectedInvoice.discount) > 0 && (
                       <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                         <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("discount")}:</Text>
-                        <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>-CHF {Number(selectedInvoice.discount).toFixed(2)}</Text>
+                        <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>-{formatMoney(selectedInvoice.discount)}</Text>
                       </View>
                     )}
                     {(selectedInvoice.serviceFee || selectedInvoice.serviceFeeAmount || 0) > 0 && (
                       <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                         <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("serviceTax")}:</Text>
-                        <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(selectedInvoice.serviceFee || selectedInvoice.serviceFeeAmount).toFixed(2)}</Text>
+                        <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(selectedInvoice.serviceFee || selectedInvoice.serviceFeeAmount)}</Text>
                       </View>
                     )}
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("tax")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(selectedInvoice.tax || 0).toFixed(2)}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(selectedInvoice.tax || 0)}</Text>
                     </View>
                     {(selectedInvoice.deliveryFee || 0) > 0 && (
                       <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                         <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Delivery Fee:</Text>
-                        <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(selectedInvoice.deliveryFee).toFixed(2)}</Text>
+                        <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(selectedInvoice.deliveryFee)}</Text>
                       </View>
                     )}
                     {selectedInvoice?.vehicleId && (() => {
@@ -3630,7 +3698,7 @@ export default function POSScreen() {
 
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
                       <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>TOTAL:</Text>
-                      <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>CHF {Number(selectedInvoice.totalAmount).toFixed(2)}</Text>
+                      <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(selectedInvoice.totalAmount)}</Text>
                     </View>
 
                     <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
@@ -3992,7 +4060,7 @@ export default function POSScreen() {
                         <View style={{ backgroundColor: statusColor[item.status] || Colors.textMuted, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999 }}>
                           <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700", textTransform: "capitalize" }}>{item.status}</Text>
                         </View>
-                        <Text style={{ color: Colors.accent, fontWeight: "800" }}>CHF {Number(item.totalAmount).toFixed(2)}</Text>
+                        <Text style={{ color: Colors.accent, fontWeight: "800" }}>{formatMoney(item.totalAmount)}</Text>
                       </View>
                     </View>
                     <Text style={{ color: Colors.textSecondary, fontSize: 12, marginBottom: 2 }}>{item.customerName} · {item.customerPhone}
@@ -4006,7 +4074,7 @@ export default function POSScreen() {
                     {/* Items */}
                     {orderItems.map((it: any, idx: number) => (
                       <Text key={idx} style={{ color: Colors.textMuted, fontSize: 11 }}>
-                        • {it.name} x{it.quantity} — CHF {Number(it.total).toFixed(2)}
+                        • {it.name} x{it.quantity} — {formatMoney(it.total)}
                       </Text>
                     ))}
                     {item.notes && <Text style={{ color: Colors.warning, fontSize: 11, marginTop: 4 }}>{item.notes}</Text>}
@@ -4448,7 +4516,7 @@ export default function POSScreen() {
                       <Text style={{ color: Colors.textSecondary, fontSize: 12, fontWeight: "600" }}>
                         {language === "ar" ? "إجمالي المبيعات" : language === "de" ? "Umsatz Total" : "Total Sales"}
                       </Text>
-                      <Text style={{ color: Colors.text, fontSize: 12, fontWeight: "700" }}>CHF {grandTotal.toFixed(2)}</Text>
+                      <Text style={{ color: Colors.text, fontSize: 12, fontWeight: "700" }}>{formatMoney(grandTotal)}</Text>
                     </View>
                     <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
                       <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>
@@ -4460,7 +4528,7 @@ export default function POSScreen() {
                       <Text style={{ color: Colors.text, fontSize: 13, fontWeight: "800" }}>
                         {zeroOutSalesData.length} {language === "ar" ? "فاتورة · الإجمالي" : language === "de" ? "TOTAL Kassierer" : "TOTAL Cashier"}
                       </Text>
-                      <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: "800" }}>CHF {grandTotal.toFixed(2)}</Text>
+                      <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: "800" }}>{formatMoney(grandTotal)}</Text>
                     </View>
                   </View>
                 );

@@ -12,6 +12,7 @@ import { themedStyles } from "@/lib/themed-styles";
 import { useLicense } from "@/lib/license-context";
 import { getQueryFn, getApiUrl } from "@/lib/query-client";
 import { useLanguage } from "@/lib/language-context";
+import { formatMoney } from "@/lib/currency";
 
 interface Driver {
   id: number;
@@ -216,7 +217,7 @@ export default function DriverManagementScreen() {
                   {[
                     { label: lbl("Total Deliveries", "إجمالي التوصيلات"), value: deliveryStats?.todayDeliveries ?? 0, color: Colors.deliveryPrimary },
                     { label: lbl("Avg. Delivery Time", "متوسط وقت التوصيل"), value: `${deliveryStats?.avgDeliveryMinutes ?? 0} min`, color: Colors.info },
-                    { label: lbl("Delivery Revenue", "إيرادات التوصيل"), value: `CHF ${Number(deliveryStats?.deliveryRevenue ?? 0).toFixed(2)}`, color: Colors.success },
+                    { label: lbl("Delivery Revenue", "إيرادات التوصيل"), value: `${formatMoney(deliveryStats?.deliveryRevenue ?? 0)}`, color: Colors.success },
                     { label: lbl("Active Drivers", "السائقون النشطون"), value: onlineDrivers.length, color: Colors.driverOnline },
                   ].map((item, i) => (
                     <View key={i} style={[styles.statRow, isRTL && { flexDirection: "row-reverse" }]}>

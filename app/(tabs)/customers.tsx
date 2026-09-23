@@ -17,6 +17,7 @@ import { useLicense } from "@/lib/license-context";
 import { getChromeMetrics } from "@/lib/responsive";
 import TabPageHeader, { HeaderIconButton } from "@/components/tab-page-header";
 import LoyaltyBadge from "@/components/LoyaltyBadge";
+import { formatMoney } from "@/lib/currency";
 
 const PAGE_SIZE = 200;
 
@@ -391,7 +392,7 @@ export default function CustomersScreen() {
                     </View>
                   )}
                   {(Number(item.totalSpent || 0) > 0 || Number(item.legacyTotalSpent || 0) > 0) && (
-                    <Text style={styles.totalSpent}>CHF {Number(item.totalSpent || item.legacyTotalSpent || 0).toFixed(0)}</Text>
+                    <Text style={styles.totalSpent}>{formatMoney(item.totalSpent || item.legacyTotalSpent || 0, 0)}</Text>
                   )}
                   {item.loyaltyPoints > 0 && (
                     <View style={[styles.loyaltyBadge, isRTL && { flexDirection: "row-reverse" }]}>
@@ -632,7 +633,7 @@ export default function CustomersScreen() {
                 {/* Stats Row */}
                 <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 6, marginBottom: 14 }}>
                   <View style={styles.statBox}>
-                    <Text style={[styles.statValue, { color: Colors.accent }]}>CHF {Number(selectedCustomer.totalSpent || selectedCustomer.legacyTotalSpent || 0).toFixed(0)}</Text>
+                    <Text style={[styles.statValue, { color: Colors.accent }]}>{formatMoney(selectedCustomer.totalSpent || selectedCustomer.legacyTotalSpent || 0, 0)}</Text>
                     <Text style={styles.statLabel}>{t("totalSpent")}</Text>
                   </View>
                   <View style={styles.statBox}>
@@ -641,7 +642,7 @@ export default function CustomersScreen() {
                   </View>
                   {Number(selectedCustomer.averageOrderValue || 0) > 0 && (
                     <View style={styles.statBox}>
-                      <Text style={[styles.statValue, { color: Colors.warning }]}>CHF {Number(selectedCustomer.averageOrderValue).toFixed(0)}</Text>
+                      <Text style={[styles.statValue, { color: Colors.warning }]}>{formatMoney(selectedCustomer.averageOrderValue, 0)}</Text>
                       <Text style={styles.statLabel}>⌀ {language === "ar" ? "متوسط" : "Avg"}</Text>
                     </View>
                   )}
@@ -786,7 +787,7 @@ export default function CustomersScreen() {
                     <View key={sale.id} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8 }}>
                       <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center" }}>
                         <Text style={[{ color: Colors.text, fontSize: 14, fontWeight: "600" }, rtlTextAlign]}>Sale #{sale.id}</Text>
-                        <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: "700" }}>CHF {Number(sale.totalAmount || 0).toFixed(2)}</Text>
+                        <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: "700" }}>{formatMoney(sale.totalAmount || 0)}</Text>
                       </View>
                       <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginTop: 4 }}>
                         <Text style={{ color: Colors.textMuted, fontSize: 12 }}>

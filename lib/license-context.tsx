@@ -3,7 +3,8 @@ import React from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { getApiUrl } from "./api-config";
-import { setCachedLicenseKey, clearCachedLicenseKey } from "./query-client";
+import { setCachedLicenseKey, clearCachedLicenseKey, apiRequest } from "./query-client";
+import { setCurrency } from "./currency";
 import * as Application from "expo-application";
 
 interface SubscriptionStatus {
@@ -34,6 +35,32 @@ interface LicenseContextType {
 }
 
 const LicenseContext = createContext<LicenseContextType | null>(null);
+
+const CURRENCY_CACHE_KEY = "kassenta_store_currency";
+
+/**
+ * Applies the store currency (main branch's `branches.currency`, served by
+ * /api/store-settings). The last known value is restored from storage first so
+ * the POS grid never flashes the wrong currency on a warm start; the fresh value
+ * then arrives in the background and re-renders every screen via useCurrency().
+ */
+async function syncStoreCurrency(tenantId: number | string | undefined | null) {
+    if (!tenantId) return;
+    const cacheKey = `${CURRENCY_CACHE_KEY}_${tenantId}`;
+    try {
+        const cached = await AsyncStorage.getItem(cacheKey);
+        if (cached) setCurrency(cached);
+    } catch { /* ignore */ }
+    apiRequest("GET", `/api/store-settings?tenantId=${tenantId}`)
+        .then((res) => res.json())
+        .then((settings: any) => {
+            if (settings?.currency) {
+                setCurrency(settings.currency);
+                AsyncStorage.setItem(cacheKey, String(settings.currency)).catch(() => {});
+            }
+        })
+        .catch(() => { /* offline: keep cached/default currency */ });
+}
 
 async function parseJsonResponse(response: Response, context: string) {
     const contentType = response.headers.get("content-type") || "";
@@ -139,6 +166,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                     }));
                 } catch { /* ignore */ }
 
+                await syncStoreCurrency(data.tenant?.id);
                 setIsValid(true);
                 setTenant(data.tenant);
                 setSubscription(data.subscription);
@@ -165,6 +193,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                     const cached = JSON.parse(cachedRaw);
                     if (cached?.at && (Date.now() - cached.at) < GRACE_MS && cached.tenant) {
                         console.warn("[License] Offline grace active — using last successful validation.");
+                        await syncStoreCurrency(cached.tenant?.id);
                         setIsValid(true);
                         setTenant(cached.tenant);
                         setSubscription(cached.subscription ?? null);
@@ -219,6 +248,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.removeItem("barmagly_license_key");
         await AsyncStorage.removeItem("barmagly_tenant_id");
         clearCachedLicenseKey();
+        setCurrency(null);
         setIsValid(false);
         setTenant(null);
         setSubscription(null);

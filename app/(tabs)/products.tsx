@@ -20,6 +20,7 @@ import { useLanguage } from "@/lib/language-context";
 import { getChromeMetrics } from "@/lib/responsive";
 import { getWebStaticFallbackChain } from "@/lib/web-static";
 import TabPageHeader, { HeaderIconButton } from "@/components/tab-page-header";
+import { formatMoney } from "@/lib/currency";
 
 const AnimatedProductImage = ({ uri }: { uri: string }) => {
   const fallbacks = getWebStaticFallbackChain(uri);
@@ -438,7 +439,7 @@ export default function ProductsScreen() {
                 {item.isAddon ? (
                   <Text style={[styles.productPrice, { color: Colors.success }]}>{isRTL ? "مجاني" : "Free"}</Text>
                 ) : (
-                  <Text style={styles.productPrice}>CHF {Number(item.price).toFixed(2)}</Text>
+                  <Text style={styles.productPrice}>{formatMoney(item.price)}</Text>
                 )}
                 {item.isAddon && (
                   <View style={{ backgroundColor: Colors.success + "22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginTop: 3 }}>

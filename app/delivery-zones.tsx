@@ -12,6 +12,7 @@ import { themedStyles } from "@/lib/themed-styles";
 import { useLicense } from "@/lib/license-context";
 import { getQueryFn, apiRequest, getApiUrl } from "@/lib/query-client";
 import { useLanguage } from "@/lib/language-context";
+import { formatMoney, currencyLabel } from "@/lib/currency";
 
 interface DeliveryZone {
   id: number;
@@ -161,11 +162,11 @@ export default function DeliveryZonesScreen() {
                   <Text style={[styles.zoneName, isRTL && { textAlign: "right" }]}>{isRTL && zone.nameAr ? zone.nameAr : zone.name}</Text>
                   <Text style={[styles.zoneMeta, isRTL && { textAlign: "right" }]}>
                     {language === "ar"
-                      ? `رسوم التوصيل: CHF ${Number(zone.deliveryFee).toFixed(2)} · ${zone.estimatedMinutes} دقيقة · ${zone.radiusKm} كم`
-                      : `Fee: CHF ${Number(zone.deliveryFee).toFixed(2)} · ${zone.estimatedMinutes} min · ${zone.radiusKm} km`}
+                      ? `رسوم التوصيل: ${formatMoney(zone.deliveryFee)} · ${zone.estimatedMinutes} دقيقة · ${zone.radiusKm} كم`
+                      : `Fee: ${formatMoney(zone.deliveryFee)} · ${zone.estimatedMinutes} min · ${zone.radiusKm} km`}
                   </Text>
                   <Text style={[styles.zoneMin, isRTL && { textAlign: "right" }]}>
-                    {language === "ar" ? `حد أدنى: CHF ${Number(zone.minOrderAmount).toFixed(2)}` : `Min order: CHF ${Number(zone.minOrderAmount).toFixed(2)}`}
+                    {language === "ar" ? `حد أدنى: ${formatMoney(zone.minOrderAmount)}` : `Min order: ${formatMoney(zone.minOrderAmount)}`}
                   </Text>
                 </View>
               </View>
@@ -221,7 +222,7 @@ export default function DeliveryZonesScreen() {
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.fieldLabel, isRTL && { textAlign: "right" }]}>
-                    {language === "ar" ? "رسوم التوصيل (CHF)" : "Delivery Fee (CHF)"}
+                    {language === "ar" ? `رسوم التوصيل (${currencyLabel()})` : `Delivery Fee (${currencyLabel()})`}
                   </Text>
                   <TextInput
                     style={[styles.input, isRTL && { textAlign: "right" }]}
@@ -234,7 +235,7 @@ export default function DeliveryZonesScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.fieldLabel, isRTL && { textAlign: "right" }]}>
-                    {language === "ar" ? "الحد الأدنى للطلب" : "Min Order (CHF)"}
+                    {language === "ar" ? "الحد الأدنى للطلب" : `Min Order (${currencyLabel()})`}
                   </Text>
                   <TextInput
                     style={[styles.input, isRTL && { textAlign: "right" }]}

@@ -3757,6 +3757,17 @@ async function test(){
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // Store currency lives on the tenant's main branch (branches.currency), e.g.
+  // "CHF" or "SYP". Landing-page config has no currency column of its own.
+  async function mainBranchCurrency(tenantId: number | null | undefined): Promise<string | null> {
+    if (!tenantId) return null;
+    try {
+      const brs = await storage.getBranchesByTenant(Number(tenantId));
+      const main: any = brs.find((b: any) => b.isMain) || brs[0];
+      return main?.currency || null;
+    } catch { return null; }
+  }
+
   // ── Slug resolver helper — maps "barmagly" and demo slugs to real config ──
   async function resolveSlugConfig(slug: string) {
     // "barmagly" brand alias → primary tenant
@@ -3788,7 +3799,7 @@ async function test(){
       const config = await resolveSlugConfig(req.params.slug);
       if (!config) return res.status(404).json({ error: "Store not found" });
       const tenant = await storage.getTenant(config.tenantId).catch(() => null);
-      const currency = (config as any).currency || tenant?.currency || process.env.DEFAULT_CURRENCY || "CHF";
+      const currency = (await mainBranchCurrency(config.tenantId)) || (config as any).currency || tenant?.currency || process.env.DEFAULT_CURRENCY || "CHF";
       res.setHeader("Cache-Control", "public, max-age=300");
       res.json({
         slug: config.slug,
@@ -4041,7 +4052,7 @@ async function test(){
             store = {
               name: (cfg as any).storeName || (cfg as any).name,
               primaryColor: (cfg as any).primaryColor || "#FF5722",
-              currency: (cfg as any).currency || process.env.DEFAULT_CURRENCY || "CHF",
+              currency: (await mainBranchCurrency(Number(order.tenantId))) || (cfg as any).currency || process.env.DEFAULT_CURRENCY || "CHF",
               logo: (cfg as any).logo,
               supportPhone: (cfg as any).supportPhone,
               slug: cfg.slug,

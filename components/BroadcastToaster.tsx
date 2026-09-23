@@ -13,6 +13,7 @@ import { Platform, Pressable, StyleSheet, Text, View, Animated } from "react-nat
 import { useRouter } from "expo-router";
 import { useLicense } from "@/lib/license-context";
 import { getApiUrl } from "@/lib/query-client";
+import { formatMoney } from "@/lib/currency";
 
 type Broadcast = {
   id: number;
@@ -133,7 +134,7 @@ export default function BroadcastToaster() {
             <Text style={styles.line} numberOfLines={1}>{itemLine || "tap to view"}</Text>
             <Text style={styles.sub}>
               ⏱ {Math.floor(secsLeft / 60)}:{String(secsLeft % 60).padStart(2, "0")}
-              {current.estimatedTotal ? `  ·  CHF ${Number(current.estimatedTotal).toFixed(2)}` : ""}
+              {current.estimatedTotal ? `  ·  ${formatMoney(current.estimatedTotal)}` : ""}
             </Text>
           </View>
           <Pressable onPress={hide} style={styles.close} hitSlop={8}>

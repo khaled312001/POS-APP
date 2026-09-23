@@ -9,7 +9,7 @@
 import type { Express, Request, Response } from "express";
 import { randomBytes } from "crypto";
 import { db, pool } from "./db";
-import { broadcastOrders, broadcastOrderRecipients, onlineOrders, tenants, products, categories, landingPageConfig } from "@shared/schema";
+import { broadcastOrders, broadcastOrderRecipients, onlineOrders, tenants, products, categories, landingPageConfig, branches } from "@shared/schema";
 import { eq, and, gt, sql, desc, inArray, or, isNull } from "drizzle-orm";
 import { callerIdService } from "./callerIdService";
 import { pushService } from "./pushService";
@@ -157,6 +157,23 @@ export function registerBroadcastRoutes(app: Express) {
       const catMap = new Map(cats.map((c) => [`${c.tenantId}:${c.id}`, c.name]));
       const tMap = new Map(activeTenants.map((t) => [t.id, t]));
 
+      // Each store prices in its main branch's currency (CHF, SYP, ...).
+      const branchRows = await db.select({
+        tenantId: branches.tenantId,
+        currency: branches.currency,
+        isMain: branches.isMain,
+      })
+      .from(branches)
+      .where(inArray(branches.tenantId, tenantIds));
+      const currencyByTenant = new Map<number, string>();
+      for (const b of branchRows) {
+        if (b.tenantId == null || !b.currency) continue;
+        if (b.isMain || !currencyByTenant.has(b.tenantId)) currencyByTenant.set(b.tenantId, b.currency);
+      }
+      const defaultCurrency = process.env.DEFAULT_CURRENCY || "CHF";
+      const currencyOf = (tenantId: number | null) =>
+        (tenantId != null && currencyByTenant.get(tenantId)) || defaultCurrency;
+
       // modifiers/variants are stored as JSON; mysql2 already parses them,
       // but stringly-typed rows can sneak in from older inserts — coerce.
       const parseJson = (v: any) => {
@@ -173,6 +190,7 @@ export function registerBroadcastRoutes(app: Express) {
           tenantLogo: (t as any)?.logo || null,
           tenantSlug: t?.slug || "",
           tenantColor: t?.primaryColor || "#FF5722",
+          currency: currencyOf(p.tenantId),
           name: p.name,
           nameAr: p.nameAr,
           description: p.description,
@@ -191,7 +209,7 @@ export function registerBroadcastRoutes(app: Express) {
       // diners can stack them like in-restaurant ordering.
       const addons = validProducts.filter((p: any) => p.isAddon).map(decorate);
       res.json({
-        restaurants: activeTenants,
+        restaurants: activeTenants.map((t) => ({ ...t, currency: currencyOf(t.id) })),
         products: main,
         addons,
         categories: Array.from(new Set(main.map((p) => p.category))).filter(Boolean).sort(),

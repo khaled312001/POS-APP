@@ -18,6 +18,7 @@ import {
 } from "./stripeClient";
 import { registerPaymentRoutes, registerStripeWebhook } from "./paymentRoutes";
 import { runStripeMigrations } from "./stripeMigrations";
+import { runShamCashMigrations } from "./shamcash";
 import { DELETE_ACCOUNT_HTML, PRIVACY_POLICY_HTML } from "./legal-pages";
 import { TERMS_HTML, IMPRINT_HTML } from "./site/legal";
 import { isSitePath, renderSitePage, findSiteAsset, SITEMAP_PATHS } from "./site";
@@ -1200,6 +1201,7 @@ async function initStripe() {
   // Payment columns and the webhook-event / gateway-settings tables. Runs
   // before any route is registered, so the first request already finds them.
   await runStripeMigrations();
+  await runShamCashMigrations();
 
   setupCors(app);
 

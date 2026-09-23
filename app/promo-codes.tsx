@@ -12,6 +12,7 @@ import { themedStyles } from "@/lib/themed-styles";
 import { useLicense } from "@/lib/license-context";
 import { getQueryFn, getApiUrl } from "@/lib/query-client";
 import { useLanguage } from "@/lib/language-context";
+import { formatMoney, currencyLabel } from "@/lib/currency";
 
 interface PromoCode {
   id: number;
@@ -30,7 +31,7 @@ interface PromoCode {
 
 const DISCOUNT_TYPES = [
   { key: "percent", label: "Percent (%)", labelAr: "نسبة مئوية (%)" },
-  { key: "fixed", label: "Fixed (CHF)", labelAr: "مبلغ ثابت (CHF)" },
+  { key: "fixed", label: "Fixed ({currency})", labelAr: "مبلغ ثابت ({currency})" },
   { key: "free_delivery", label: "Free Delivery", labelAr: "توصيل مجاني" },
 ];
 
@@ -138,7 +139,7 @@ export default function PromoCodesScreen() {
 
   const discountLabel = (p: PromoCode) => {
     if (p.discountType === "percent") return `${p.discountValue}% off`;
-    if (p.discountType === "fixed") return `CHF ${Number(p.discountValue).toFixed(2)} off`;
+    if (p.discountType === "fixed") return `${formatMoney(p.discountValue)} off`;
     return "Free delivery";
   };
 
@@ -246,7 +247,7 @@ export default function PromoCodesScreen() {
                     onPress={() => setForm(f => ({ ...f, discountType: dt.key as any }))}
                   >
                     <Text style={[styles.typeBtnText, form.discountType === dt.key && styles.typeBtnTextActive]}>
-                      {isRTL ? dt.labelAr : dt.label}
+                      {(isRTL ? dt.labelAr : dt.label).replace("{currency}", currencyLabel())}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -255,7 +256,7 @@ export default function PromoCodesScreen() {
               {form.discountType !== "free_delivery" && (
                 <>
                   <Text style={[styles.fieldLabel, isRTL && { textAlign: "right" }]}>
-                    {form.discountType === "percent" ? (language === "ar" ? "النسبة (%)" : "Percent (%)") : (language === "ar" ? "المبلغ (CHF)" : "Amount (CHF)")}
+                    {form.discountType === "percent" ? (language === "ar" ? "النسبة (%)" : "Percent (%)") : (language === "ar" ? `المبلغ (${currencyLabel()})` : `Amount (${currencyLabel()})`)}
                   </Text>
                   <TextInput
                     style={[styles.input, isRTL && { textAlign: "right" }]}

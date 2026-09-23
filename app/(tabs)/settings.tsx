@@ -24,6 +24,8 @@ import TabPageHeader from "@/components/tab-page-header";
 import { FlagIcon } from "@/components/FlagIcon";
 // Platform-aware printer: native → expo-print (Save-as-PDF), web → hidden iframe.
 import { printHtmlViaIframe } from "@/utils/printing";
+import { formatMoney, currencyLabel } from "@/lib/currency";
+import ShamCashSettings from "@/components/ShamCashSettings";
 
 function SettingRow({ icon, label, value, onPress, color, rtl }: { icon: string; label: string; value?: string; onPress?: () => void; color?: string; rtl?: boolean }) {
   return (
@@ -501,7 +503,13 @@ export default function SettingsScreen() {
       if (editBranch) return apiRequest("PUT", `/api/branches/${editBranch.id}`, payload);
       return apiRequest("POST", "/api/branches", payload);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/branches?tenantId=${tenant.id}` : "/api/branches"] }); setShowBranchForm(false); setEditBranch(null); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/branches?tenantId=${tenant.id}` : "/api/branches"] });
+      // The branch currency drives every price display; refetching store
+      // settings pushes a changed main-branch currency into lib/currency.
+      qc.invalidateQueries({ queryKey: ["/api/store-settings"] });
+      setShowBranchForm(false); setEditBranch(null);
+    },
     onError: (e: any) => Alert.alert(t("error"), e.message),
   });
 
@@ -1136,7 +1144,7 @@ export default function SettingsScreen() {
               <TextInput style={styles.input} value={branchForm.phone} onChangeText={(v) => setBranchForm({ ...branchForm, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+1234567890" />
               <Text style={styles.label}>{t("currency")}</Text>
               <View style={styles.roleRow}>
-                {["CHF", "USD", "EGP", "EUR", "GBP", "SAR"].map((c) => (
+                {["CHF", "USD", "EGP", "EUR", "GBP", "SAR", "SYP"].map((c) => (
                   <Pressable key={c} style={[styles.roleChip, branchForm.currency === c && { backgroundColor: Colors.accent }]} onPress={() => setBranchForm({ ...branchForm, currency: c })}>
                     <Text style={[styles.roleChipText, branchForm.currency === c && { color: Colors.textDark }]}>{c}</Text>
                   </Pressable>
@@ -1181,7 +1189,7 @@ export default function SettingsScreen() {
                   </View>
                   <View style={styles.empInfo}>
                     <Text style={styles.empName}>{item.description}</Text>
-                    <Text style={styles.empMeta}>CHF {parseFloat(item.amount).toFixed(2)} | {new Date(item.date).toLocaleDateString()}</Text>
+                    <Text style={styles.empMeta}>{formatMoney(parseFloat(item.amount))} | {new Date(item.date).toLocaleDateString()}</Text>
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <View style={[styles.roleBadge, { backgroundColor: (expenseCategoryColors[item.categoryId] || expenseCategoryColors.other) + "20" }]}>
@@ -1452,7 +1460,7 @@ export default function SettingsScreen() {
                   </View>
                   <View style={styles.empInfo}>
                     <Text style={styles.empName}>Return #{item.id} - Sale #{item.originalSaleId}</Text>
-                    <Text style={styles.empMeta}>CHF {Number(item.totalAmount).toFixed(2)} | {item.reason || t("noReason")} | {new Date(item.createdAt).toLocaleDateString()}</Text>
+                    <Text style={styles.empMeta}>{formatMoney(item.totalAmount)} | {item.reason || t("noReason")} | {new Date(item.createdAt).toLocaleDateString()}</Text>
                   </View>
                   <View style={[styles.roleBadge, { backgroundColor: (item.status === "completed" ? Colors.success : Colors.warning) + "20" }]}>
                     <Text style={[styles.roleText, { color: item.status === "completed" ? Colors.success : Colors.warning }]}>{item.status || "completed"}</Text>
@@ -1484,7 +1492,7 @@ export default function SettingsScreen() {
                   >
                     <View style={styles.empInfo}>
                       <Text style={styles.empName}>{getDisplayNumber(item.receiptNumber)}</Text>
-                      <Text style={styles.empMeta}>CHF {Number(item.totalAmount).toFixed(2)} | {new Date(item.createdAt).toLocaleDateString()} | {item.paymentMethod}</Text>
+                      <Text style={styles.empMeta}>{formatMoney(item.totalAmount)} | {new Date(item.createdAt).toLocaleDateString()} | {item.paymentMethod}</Text>
                     </View>
                     {returnForm.originalSaleId === String(item.id) && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
                   </Pressable>
@@ -1528,7 +1536,7 @@ export default function SettingsScreen() {
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.success }} />
                     <Text style={{ color: Colors.success, fontSize: 14, fontWeight: "700" }}>{t("activeShift")}</Text>
                   </View>
-                  <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{t("openingCash")}: CHF {Number(activeShift.openingCash || 0).toFixed(2)}</Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{t("openingCash")}: {formatMoney(activeShift.openingCash || 0)}</Text>
                   <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>{t("durationLabel")}: {activeShiftElapsed || "0:00"}</Text>
                 </View>
               ) : (
@@ -1874,7 +1882,7 @@ export default function SettingsScreen() {
               </View>
 
               <Pressable style={styles.saveBtn} onPress={() => {
-                const sampleReceipt = `================================\n        SAMPLE RECEIPT\n================================\nDate: ${new Date().toLocaleString()}\nReceipt #: TEST-001\n--------------------------------\nItem 1        x2  CHF 10.00\nItem 2        x1   CHF 5.50\n--------------------------------\nSubtotal:          CHF 15.50\nTax (10%):          CHF 1.55\n--------------------------------\nTOTAL:             CHF 17.05\n================================\n      Thank you!\n================================`;
+                const sampleReceipt = `================================\n        SAMPLE RECEIPT\n================================\nDate: ${new Date().toLocaleString()}\nReceipt #: TEST-001\n--------------------------------\nItem 1        x2  ${formatMoney(10)}\nItem 2        x1   ${formatMoney(5.5)}\n--------------------------------\nSubtotal:          ${formatMoney(15.5)}\nTax (10%):          ${formatMoney(1.55)}\n--------------------------------\nTOTAL:             ${formatMoney(17.05)}\n================================\n      Thank you!\n================================`;
                 // Both web and native go through the shared printer so the
                 // test print produces a real print / Save-as-PDF sheet in the app.
                 printHtmlViaIframe(`<pre style="font-family:monospace;font-size:12px;">${sampleReceipt}</pre>`);
@@ -2062,7 +2070,7 @@ export default function SettingsScreen() {
                         </View>
                         <View style={smStyles.statChip}>
                           <Ionicons name="cart-outline" size={12} color={Colors.accent} />
-                          <Text style={smStyles.statChipText}>CHF {Number(item.totalSales || 0).toFixed(2)}</Text>
+                          <Text style={smStyles.statChipText}>{formatMoney(item.totalSales || 0)}</Text>
                         </View>
                         <View style={smStyles.statChip}>
                           <Ionicons name="receipt-outline" size={12} color={Colors.warning} />
@@ -2071,7 +2079,7 @@ export default function SettingsScreen() {
                         {item.openingCash != null && (
                           <View style={smStyles.statChip}>
                             <Ionicons name="cash-outline" size={12} color={Colors.success} />
-                            <Text style={smStyles.statChipText}>CHF {Number(item.openingCash || 0).toFixed(2)} → CHF {Number(item.closingCash || 0).toFixed(2)}</Text>
+                            <Text style={smStyles.statChipText}>{formatMoney(item.openingCash || 0)} → {formatMoney(item.closingCash || 0)}</Text>
                           </View>
                         )}
                       </View>
@@ -2236,7 +2244,7 @@ export default function SettingsScreen() {
                 keyboardType="decimal-pad"
               />
 
-              <Text style={[styles.label, rtlTextAlign]}>Delivery Fee (CHF)</Text>
+              <Text style={[styles.label, rtlTextAlign]}>Delivery Fee ({currencyLabel()})</Text>
               <TextInput
                 style={[styles.input, rtlTextAlign]}
                 value={storeForm.deliveryFee}
@@ -2585,6 +2593,11 @@ export default function SettingsScreen() {
                   <Text style={[pgStyles.infoNoteText, isRTL && { textAlign: "right" }]}>{t("postFinanceNote")}</Text>
                 </View>
               </View>
+
+              <View style={pgStyles.divider} />
+
+              {/* Sham Cash: online payments for Syrian (SYP/USD) stores */}
+              <ShamCashSettings />
 
               <View style={pgStyles.divider} />
 
@@ -3294,7 +3307,7 @@ export default function SettingsScreen() {
                   <View key={dc.id} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder }}>
                     <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
                       <Text style={{ color: Colors.text, fontWeight: "700" }}>{dc.closingDate}</Text>
-                      <Text style={{ color: Colors.success, fontWeight: "700" }}>CHF {Number(dc.totalSales || 0).toFixed(2)}</Text>
+                      <Text style={{ color: Colors.success, fontWeight: "700" }}>{formatMoney(dc.totalSales || 0)}</Text>
                     </View>
                     <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{dc.totalTransactions} {t("transactions")} · {t("cashDrawer")}: {Number(dc.closingCash || 0).toFixed(2)}</Text>
                   </View>
@@ -3352,10 +3365,10 @@ export default function SettingsScreen() {
                   <View key={mc.id} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder }}>
                     <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
                       <Text style={{ color: Colors.text, fontWeight: "700" }}>{mc.closingMonth}</Text>
-                      <Text style={{ color: Colors.success, fontWeight: "700" }}>CHF {Number(mc.totalSales || 0).toFixed(2)}</Text>
+                      <Text style={{ color: Colors.success, fontWeight: "700" }}>{formatMoney(mc.totalSales || 0)}</Text>
                     </View>
-                    <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{mc.totalTransactions} {t("transactions")} · {t("netRevenue")}: CHF {Number(mc.netRevenue || 0).toFixed(2)}</Text>
-                    <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{t("totalExpenses")}: CHF {Number(mc.totalExpenses || 0).toFixed(2)}</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{mc.totalTransactions} {t("transactions")} · {t("netRevenue")}: {formatMoney(mc.netRevenue || 0)}</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{t("totalExpenses")}: {formatMoney(mc.totalExpenses || 0)}</Text>
                   </View>
                 ))
               )}
@@ -3380,7 +3393,7 @@ export default function SettingsScreen() {
                   <>
                     <View style={{ backgroundColor: Colors.hueRose + "15", borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.hueRose + "40" }}>
                       <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{t("totalOutstanding")}</Text>
-                      <Text style={{ color: Colors.hueRose, fontSize: 28, fontWeight: "800" }}>CHF {total.toFixed(2)}</Text>
+                      <Text style={{ color: Colors.hueRose, fontSize: 28, fontWeight: "800" }}>{formatMoney(total)}</Text>
                       <Text style={{ color: Colors.textMuted, fontSize: 13 }}>{debtors.length} {t("customersWithCredit")}</Text>
                     </View>
                     {debtors.length === 0 ? (
@@ -3394,7 +3407,7 @@ export default function SettingsScreen() {
                               <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{c.phone || t("noPhone")}</Text>
                             </View>
                             <View style={{ alignItems: "flex-end" }}>
-                              <Text style={{ color: Colors.hueRose, fontWeight: "800", fontSize: 16 }}>CHF {Number(c.creditBalance).toFixed(2)}</Text>
+                              <Text style={{ color: Colors.hueRose, fontWeight: "800", fontSize: 16 }}>{formatMoney(c.creditBalance)}</Text>
                               <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{t("creditBalance")}</Text>
                             </View>
                           </View>

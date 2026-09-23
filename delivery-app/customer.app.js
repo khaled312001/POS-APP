@@ -32,6 +32,47 @@
   function $(id) { return document.getElementById(id); }
   function $$(sel) { return document.querySelectorAll(sel); }
 
+  // ─── Money ────────────────────────────────────────────────────────
+  // Each store prices in its own currency (main branch's branches.currency),
+  // e.g. CHF for Swiss shops and SYP for Syrian ones. The server sends it on
+  // /api/delivery/store/:slug and per product/restaurant on the broadcast menu;
+  // we remember it per tenant (persisted so a restored cart still renders right).
+  var DEFAULT_CURRENCY = String((window.KASSENTA_CONFIG || {}).currency || "CHF").toUpperCase();
+  var ZERO_DECIMAL_CURRENCIES = { SYP: 1 };
+  var ARABIC_CURRENCY_SUFFIX = { SYP: "ل.س" };
+  var tenantCurrency = (function () {
+    try { return JSON.parse(localStorage.getItem("bc_currencies") || "{}") || {}; } catch (e) { return {}; }
+  })();
+  function rememberCurrency(tenantId, code) {
+    if (tenantId == null || !code) return;
+    code = String(code).toUpperCase();
+    if (tenantCurrency[String(tenantId)] === code) return;
+    tenantCurrency[String(tenantId)] = code;
+    try { localStorage.setItem("bc_currencies", JSON.stringify(tenantCurrency)); } catch (e) { /* ignore */ }
+  }
+  function rememberCurrencies(data) {
+    ((data && data.restaurants) || []).forEach(function (r) { rememberCurrency(r.id, r.currency); });
+    ((data && data.products) || []).forEach(function (p) { rememberCurrency(p.tenantId, p.currency); });
+  }
+  function curFor(tenantId) {
+    return (tenantId != null && tenantCurrency[String(tenantId)]) || DEFAULT_CURRENCY;
+  }
+  // "CHF 12.50"; SYP has no minor units and is grouped: "SYP 12,500", or
+  // "12,500 ل.س" when the storefront is in Arabic.
+  function money(value, code) {
+    code = String(code || DEFAULT_CURRENCY).toUpperCase();
+    var n = Number(value);
+    if (!isFinite(n)) n = 0;
+    var txt;
+    if (ZERO_DECIMAL_CURRENCIES[code]) {
+      txt = Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    } else {
+      txt = n.toFixed(2);
+    }
+    var suffix = state.lang === "ar" ? ARABIC_CURRENCY_SUFFIX[code] : null;
+    return suffix ? txt + " " + suffix : code + " " + txt;
+  }
+
   // ─── SVG Icon library ─────────────────────────────────────────────
   // All visual glyphs in the customer SPA come from here so we can swap
   // the entire iconography in one place. Each entry is the inner markup
@@ -405,6 +446,7 @@
     // so we get a real, populated home page even before /api/delivery/restaurants.
     if (state.products.length === 0) {
       api("GET", "/api/delivery/broadcast/menu").then(function (data) {
+        rememberCurrencies(data);
         state.products = data.products || [];
         if (!state.bc) state.bc = { activeCat: "all", sort: "popular", restaurants: [], categories: [], addons: [] };
         state.bc.restaurants = data.restaurants || [];
@@ -532,7 +574,7 @@
            + '  </div>'
            + '  <div class="home-pop__body">'
            + '    <div class="home-pop__name">' + escHtml(p.name) + '</div>'
-           + '    <div class="home-pop__price">CHF ' + Number(p.price).toFixed(2) + '</div>'
+           + '    <div class="home-pop__price">' + money(p.price, p.currency || curFor(p.tenantId)) + '</div>'
            + '  </div>'
            + '</div>';
     }).join("");
@@ -626,6 +668,7 @@
         var ra = catRankById[a.categoryId], rb = catRankById[b.categoryId];
         return (ra == null ? 999 : ra) - (rb == null ? 999 : rb);
       });
+      rememberCurrency(store.tenantId, store.currency);
       state.tenantMenu = { slug: slug, store: store, menu: menu };
       $("menu-title").textContent = store.storeName || store.name || "Menu";
       $("menu-sub").textContent = (store.cuisine || "") + " · " + (menu.length || 0) + " items";
@@ -670,7 +713,7 @@
          + '    <div class="card__title">' + escHtml(p.name) + '</div>'
          + (p.description ? '<div class="card__sub">' + escHtml(p.description.slice(0, 60)) + '</div>' : "")
          + '    <div class="card__foot">'
-         + '      <span class="card__price">CHF ' + Number(p.price).toFixed(2) + '</span>'
+         + '      <span class="card__price">' + money(p.price, curFor(tenantId)) + '</span>'
          + (qty > 0
               ? '<div class="qty"><button class="qty__btn" data-act="dec" data-id="' + p.id + '" data-tenant="' + tenantId + '" data-tname="' + escHtml(tenantName || "") + '">−</button><span class="qty__num">' + qty + '</span><button class="qty__btn" data-act="inc" data-id="' + p.id + '" data-tenant="' + tenantId + '" data-tname="' + escHtml(tenantName || "") + '">+</button></div>'
               : '<button class="card__add" data-act="add" data-id="' + p.id + '" data-tenant="' + tenantId + '" data-tname="' + escHtml(tenantName || "") + '" data-name="' + escHtml(p.name) + '" data-price="' + p.price + '" data-img="' + escHtml(p.imageUrl || "") + '">+ Add</button>')
@@ -755,7 +798,7 @@
     if (n > 0) {
       fab.classList.remove("hidden");
       $("cart-fab-count").textContent = n;
-      $("cart-fab-total").textContent = "CHF " + total.toFixed(2);
+      $("cart-fab-total").textContent = money(total, cartCurrency());
     } else fab.classList.add("hidden");
     // Drawer body
     var body = $("cart-body");
@@ -766,10 +809,10 @@
         return '<div class="list-item">'
              + '  <div class="list-item__body">'
              + '    <div class="list-item__title">' + escHtml(it.name) + '</div>'
-             + '    <div class="list-item__sub"><i class="fa-solid fa-store"></i> ' + escHtml(it.tenantName || "") + ' · CHF ' + Number(it.estimatedPrice).toFixed(2) + '</div>'
+             + '    <div class="list-item__sub"><i class="fa-solid fa-store"></i> ' + escHtml(it.tenantName || "") + ' · ' + money(it.estimatedPrice, curFor(it.tenantId)) + '</div>'
              + '  </div>'
              + '  <div style="display:flex;flex-direction:column;align-items:end;gap:4px;">'
-             + '    <span class="list-item__price">CHF ' + (it.quantity * Number(it.estimatedPrice)).toFixed(2) + '</span>'
+             + '    <span class="list-item__price">' + money(it.quantity * Number(it.estimatedPrice), curFor(it.tenantId)) + '</span>'
              + '    <div class="qty"><button class="qty__btn" data-cart-act="dec" data-id="' + it.productId + '" data-tenant="' + it.tenantId + '">−</button><span class="qty__num">' + it.quantity + '</span><button class="qty__btn" data-cart-act="inc" data-id="' + it.productId + '" data-tenant="' + it.tenantId + '">+</button></div>'
              + '  </div>'
              + '</div>';
@@ -784,8 +827,13 @@
         });
       });
     }
-    $("cart-total").textContent = "CHF " + total.toFixed(2);
+    $("cart-total").textContent = money(total, cartCurrency());
     $("btn-checkout").disabled = state.cart.length === 0;
+  }
+
+  // Cart totals use the currency of the store the cart belongs to.
+  function cartCurrency() {
+    return curFor(state.cart.length ? state.cart[0].tenantId : null);
   }
 
   function openCart() { $("cart-drawer").classList.add("open"); $("cart-overlay").classList.add("open"); }
@@ -799,6 +847,7 @@
   function renderBroadcast() {
     if (state.products.length === 0 || !state.bc.restaurants.length) {
       api("GET", "/api/delivery/broadcast/menu").then(function (data) {
+        rememberCurrencies(data);
         state.products = data.products || [];
         state.bc.addons = data.addons || [];
         state.bc.restaurants = data.restaurants || [];
@@ -949,7 +998,7 @@
          + '    <div class="card__title">' + escHtml(p.name) + '</div>'
          + (p.description ? '<div class="card__sub">' + escHtml(String(p.description).slice(0, 70)) + '</div>' : '')
          + '    <div class="card__foot">'
-         + '      <span class="card__price">CHF ' + Number(p.price).toFixed(2) + '</span>'
+         + '      <span class="card__price">' + money(p.price, p.currency || curFor(p.tenantId)) + '</span>'
          + (qty > 0
               ? '<button class="card__add" data-bc-pid="' + p.id + '" data-incart="1">' + icon("check") + ' ' + qty + ' added</button>'
               : '<button class="card__add" data-bc-pid="' + p.id + '">' + icon("plus") + ' Add</button>')
@@ -1062,7 +1111,7 @@
         html += '<div class="cust-opt' + sel + '" data-kind="single" data-vidx="' + i + '">'
              +    '<div class="cust-opt__check"></div>'
              +    '<div class="cust-opt__label">' + escHtml(v.name || ("Option " + (i + 1))) + '</div>'
-             +    '<div class="cust-opt__price">CHF ' + Number(v.price || p.price).toFixed(2) + '</div>'
+             +    '<div class="cust-opt__price">' + money(v.price || p.price, p.currency || curFor(p.tenantId)) + '</div>'
              + '</div>';
       });
       html += '  </div></div>';
@@ -1080,7 +1129,7 @@
         html += '<div class="cust-opt' + sel + '" data-kind="' + (isSingle ? "single" : "multi") + '" data-gi="' + gi + '" data-oi="' + oi + '">'
              +    '<div class="cust-opt__check"></div>'
              +    '<div class="cust-opt__label">' + escHtml(op.label || op.name || "Option") + '</div>'
-             +    (Number(op.price) > 0 ? '<div class="cust-opt__price">+CHF ' + Number(op.price).toFixed(2) + '</div>' : '<div class="cust-opt__price" style="color:var(--text-dim);">Free</div>')
+             +    (Number(op.price) > 0 ? '<div class="cust-opt__price">+' + money(op.price, p.currency || curFor(p.tenantId)) + '</div>' : '<div class="cust-opt__price" style="color:var(--text-dim);">Free</div>')
              + '</div>';
       });
       html += '  </div></div>';
@@ -1101,7 +1150,7 @@
              +    '<div class="cust-addon__img">' + imgHtml + '</div>'
              +    '<div class="cust-addon__body">'
              +      '<div class="cust-addon__name">' + escHtml(a.name) + '</div>'
-             +      '<div class="cust-addon__price">' + (Number(a.price) > 0 ? "CHF " + Number(a.price).toFixed(2) : "Free") + '</div>'
+             +      '<div class="cust-addon__price">' + (Number(a.price) > 0 ? money(a.price, p.currency || curFor(p.tenantId)) : "Free") + '</div>'
              +    '</div>'
              +    (q > 0
                     ? '<div class="cust-addon__qty">'
@@ -1202,7 +1251,7 @@
   function updateCustomizeTotal() {
     if (!custState) return;
     var grand = (customizeUnitPrice() * custState.qty) + customizeAddonsTotal();
-    $("cust-total").textContent = "CHF " + grand.toFixed(2);
+    $("cust-total").textContent = money(grand, custState.product.currency || curFor(custState.product.tenantId));
   }
 
   function commitCustomize() {
@@ -1287,7 +1336,7 @@
     return '<div class="list-item" data-token="' + escHtml(o.trackingToken || "") + '" data-id="' + o.id + '">'
          + '  <div class="list-item__body">'
          + '    <div class="list-item__title">Order #' + escHtml(o.orderNumber || o.id) + '</div>'
-         + '    <div class="list-item__sub">CHF ' + Number(o.totalAmount || 0).toFixed(2) + ' · ' + new Date(o.createdAt).toLocaleString() + '</div>'
+         + '    <div class="list-item__sub">' + money(o.totalAmount || 0, curFor(o.tenantId)) + ' · ' + new Date(o.createdAt).toLocaleString() + '</div>'
          + '  </div>'
          + '  <span class="status-pill" data-s="' + s + '">' + s.replace(/_/g, " ") + '</span>'
          + '</div>';
@@ -1320,6 +1369,7 @@
     $("track-content").innerHTML = '<div class="skeleton" style="height:280px;margin-bottom:14px;"></div>';
     api("GET", "/api/delivery/orders/track/" + encodeURIComponent(token)).then(function (data) {
       var order = data.order, store = data.store;
+      if (store) rememberCurrency(order.tenantId, store.currency);
       state.activeOrder = order;
       $("track-title").textContent = "Order #" + escHtml(order.orderNumber || order.id);
       $("track-sub").textContent = (store ? store.name : "") + " · " + new Date(order.createdAt).toLocaleString();
@@ -1375,7 +1425,7 @@
     var items = o.items || [];
     if (typeof items === "string") { try { items = JSON.parse(items); } catch (e) { items = []; } }
     var itemsHtml = items.map(function (it) {
-      return '<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.875rem;color:var(--text-2);"><span>' + (it.quantity || 1) + '× ' + escHtml(it.name || "") + '</span><span>CHF ' + Number((it.unitPrice || 0) * (it.quantity || 1)).toFixed(2) + '</span></div>';
+      return '<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.875rem;color:var(--text-2);"><span>' + (it.quantity || 1) + '× ' + escHtml(it.name || "") + '</span><span>' + money((it.unitPrice || 0) * (it.quantity || 1), (store && store.currency) || curFor(o.tenantId)) + '</span></div>';
     }).join("");
     return ''
       + '<div id="track-map" style="height:240px;background:var(--bg-2);margin-bottom:14px;"></div>'
@@ -1386,7 +1436,7 @@
       + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;">'
       + '  <strong style="display:block;margin-bottom:10px;">Order details</strong>'
       + itemsHtml
-      + '  <div style="display:flex;justify-content:space-between;padding-top:10px;border-top:1px solid var(--border);margin-top:8px;font-weight:800;"><span>Total</span><span style="color:var(--accent-2);">CHF ' + Number(o.totalAmount || 0).toFixed(2) + '</span></div>'
+      + '  <div style="display:flex;justify-content:space-between;padding-top:10px;border-top:1px solid var(--border);margin-top:8px;font-weight:800;"><span>Total</span><span style="color:var(--accent-2);">' + money(o.totalAmount || 0, (store && store.currency) || curFor(o.tenantId)) + '</span></div>'
       + '</div>';
   }
 
@@ -1450,7 +1500,7 @@
       + '</div>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
       + '  <div style="background:var(--surface-2);padding:12px;border-radius:var(--r-md);text-align:center;"><div style="font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;">Loyalty</div><div style="font-weight:800;font-size:1.05rem;">' + (c.loyaltyPoints || 0) + ' pts</div></div>'
-      + '  <div style="background:var(--surface-2);padding:12px;border-radius:var(--r-md);text-align:center;"><div style="font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;">Wallet</div><div style="font-weight:800;font-size:1.05rem;">CHF ' + Number(c.walletBalance || 0).toFixed(2) + '</div></div>'
+      + '  <div style="background:var(--surface-2);padding:12px;border-radius:var(--r-md);text-align:center;"><div style="font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;">Wallet</div><div style="font-weight:800;font-size:1.05rem;">' + money(c.walletBalance || 0, curFor(c.tenantId)) + '</div></div>'
       + '</div>';
   }
 
@@ -1646,6 +1696,126 @@
     });
   }
 
+  // --- Sham Cash (Syrian stores, SYP/USD) ------------------------------
+  // Invoice based: the server opens an invoice for the stored order total, the
+  // customer transfers it in the Sham Cash app, then either Sham Cash notifies
+  // our server or the customer types the transaction number here.
+  var shamCashByTenant = {};
+
+  function loadShamCash(tenantId) {
+    if (!tenantId) return Promise.resolve({ enabled: false });
+    if (shamCashByTenant[tenantId]) return Promise.resolve(shamCashByTenant[tenantId]);
+    var timeout = new Promise(function (r) { setTimeout(function () { r(null); }, 4000); });
+    return Promise.race([api("GET", "/api/payments/config?tenantId=" + tenantId), timeout])
+      .then(function (cfg) {
+        var sc = (cfg && cfg.shamcash) || { enabled: false };
+        shamCashByTenant[tenantId] = sc;
+        return sc;
+      })
+      .catch(function () { return { enabled: false }; });
+  }
+
+  function scT(ar, en) { return state.lang === "ar" ? ar : en; }
+
+  function openShamCashSheet(order) {
+    return new Promise(function (resolve) {
+      var rtl = state.lang === "ar";
+      var wrap = document.createElement("div");
+      wrap.setAttribute("dir", rtl ? "rtl" : "ltr");
+      wrap.setAttribute("style",
+        "position:fixed;inset:0;z-index:9999;background:rgba(4,6,14,.86);" +
+        "display:flex;align-items:flex-end;justify-content:center");
+      wrap.innerHTML =
+        "<div style=\"background:#12151F;color:#fff;width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:20px 18px 26px;max-height:92vh;overflow:auto\">" +
+          "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:6px\">" +
+            "<strong style=\"font-size:17px\">" + scT("الدفع عبر شام كاش", "Pay with Sham Cash") + "</strong>" +
+            "<button id=\"sc-x\" style=\"background:none;border:0;color:inherit;font-size:26px;line-height:1;cursor:pointer\">&times;</button>" +
+          "</div>" +
+          "<div id=\"sc-body\" style=\"font-size:14px;opacity:.8\">" + scT("جارٍ إنشاء الفاتورة…", "Creating your invoice…") + "</div>" +
+          "<div id=\"sc-error\" style=\"color:#ff5a5a;font-size:13px;margin-top:10px;display:none\"></div>" +
+          "<button id=\"sc-later\" style=\"width:100%;margin-top:10px;padding:12px;border:0;border-radius:12px;background:transparent;color:inherit;opacity:.65;font-size:14px;cursor:pointer\">" + scT("الدفع عند الاستلام بدلاً من ذلك", "Pay on delivery instead") + "</button>" +
+        "</div>";
+      document.body.appendChild(wrap);
+
+      var body = wrap.querySelector("#sc-body");
+      var errEl = wrap.querySelector("#sc-error");
+      var done = false, poll = null;
+      var q = "?trackingToken=" + encodeURIComponent(order.trackingToken || "");
+      var base = "/api/payments/order/" + order.orderId + "/shamcash";
+
+      function finish(result) {
+        if (done) return;
+        done = true;
+        if (poll) clearInterval(poll);
+        wrap.remove();
+        resolve(result);
+      }
+      function showErr(msg) { errEl.textContent = msg; errEl.style.display = "block"; }
+      function row(label, value, copy) {
+        return "<div style=\"display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.08)\">" +
+          "<span style=\"opacity:.65\">" + label + "</span>" +
+          "<span style=\"display:flex;gap:8px;align-items:center;font-weight:600;direction:ltr\">" + escHtml(value) +
+          (copy ? "<button data-copy=\"" + escHtml(value) + "\" style=\"background:rgba(255,255,255,.1);border:0;color:#fff;border-radius:8px;padding:4px 8px;font-size:12px;cursor:pointer\">" + scT("نسخ", "Copy") + "</button>" : "") +
+          "</span></div>";
+      }
+
+      wrap.querySelector("#sc-x").onclick = function () { finish({ paid: false, reason: "closed" }); };
+      wrap.querySelector("#sc-later").onclick = function () { finish({ paid: false, reason: "later" }); };
+
+      api("POST", base, { trackingToken: order.trackingToken })
+        .then(function (inv) {
+          var to = inv.payTo || {};
+          var html =
+            "<div style=\"font-size:28px;font-weight:800;margin:6px 0 2px\">" + escHtml(money(inv.amount, inv.currency)) + "</div>" +
+            "<div style=\"opacity:.65;margin-bottom:10px\">" + scT("الطلب", "Order") + " " + escHtml(order.orderNumber || "") + "</div>" +
+            "<ol style=\"padding-inline-start:18px;margin:8px 0 12px;line-height:1.7;opacity:.9\">" +
+              "<li>" + scT("افتح تطبيق شام كاش وحوّل المبلغ بالضبط إلى الحساب التالي.", "Open the Sham Cash app and send exactly this amount to the account below.") + "</li>" +
+              "<li>" + scT("انسخ رقم العملية من التطبيق وألصقه هنا.", "Copy the transaction number from the app and paste it here.") + "</li>" +
+            "</ol>" +
+            (to.accountNumber ? row(scT("رقم الحساب", "Account number"), to.accountNumber, true) : "") +
+            (to.walletAddress ? row(scT("عنوان المحفظة", "Wallet address"), to.walletAddress, true) : "") +
+            (to.label ? row(scT("اسم المستفيد", "Beneficiary"), to.label, false) : "") +
+            row(scT("رقم الفاتورة", "Invoice"), inv.invoiceNumber, true) +
+            "<input id=\"sc-tran\" inputmode=\"numeric\" placeholder=\"" + scT("رقم العملية من شام كاش", "Sham Cash transaction number") + "\" " +
+              "style=\"width:100%;box-sizing:border-box;margin-top:14px;padding:13px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:#0B0E16;color:#fff;font-size:16px\">" +
+            "<button id=\"sc-go\" style=\"width:100%;margin-top:10px;padding:14px;border:0;border-radius:12px;background:#FF5722;color:#fff;font-size:16px;font-weight:600;cursor:pointer\">" + scT("تأكيد الدفع", "Confirm payment") + "</button>" +
+            "<div style=\"opacity:.55;font-size:12px;margin-top:8px\">" + scT("بعد الدفع يتأكد الطلب تلقائياً أيضاً خلال لحظات.", "Once you have paid, the order is also confirmed automatically within moments.") + "</div>";
+          body.innerHTML = html;
+          body.style.opacity = "1";
+          Array.prototype.forEach.call(body.querySelectorAll("[data-copy]"), function (b) {
+            b.onclick = function () {
+              try { navigator.clipboard.writeText(b.getAttribute("data-copy")); b.textContent = scT("تم", "Copied"); } catch (e) {}
+            };
+          });
+          var go = body.querySelector("#sc-go");
+          var resetGo = function () { go.disabled = false; go.textContent = scT("تأكيد الدفع", "Confirm payment"); };
+          go.onclick = function () {
+            var tran = (body.querySelector("#sc-tran").value || "").trim();
+            if (!tran) { showErr(scT("أدخل رقم العملية", "Enter the transaction number")); return; }
+            errEl.style.display = "none";
+            go.disabled = true; go.textContent = scT("جارٍ التحقق…", "Checking…");
+            api("POST", base + "/verify", { trackingToken: order.trackingToken, tranId: tran })
+              .then(function (r) {
+                if (r && r.status === "paid") finish({ paid: true });
+                else { resetGo(); showErr(scT("لم يكتمل الدفع بعد", "Payment not completed yet")); }
+              })
+              .catch(function (e) { resetGo(); showErr(e.message || "Error"); });
+          };
+          // The webhook may settle it first; poll gently in the background.
+          poll = setInterval(function () {
+            api("GET", base + "/status" + q).then(function (r) {
+              if (r && r.status === "paid") finish({ paid: true });
+              else if (r && r.status === "expired") showErr(scT("انتهت صلاحية الفاتورة، أغلق وأعد المحاولة", "Invoice expired, close and try again"));
+            }).catch(function () {});
+          }, 8000);
+        })
+        .catch(function (e) {
+          body.textContent = "";
+          showErr(e.message || scT("تعذّر بدء الدفع", "Could not start payment"));
+        });
+    });
+  }
+
   /** Resume after a TWINT / 3-D Secure redirect brought the customer back. */
   function resumePaymentReturn() {
     if (!window.KassentaPay) return;
@@ -1671,6 +1841,11 @@
   // ─── Checkout ──────────────────────────────────────────────────────
   function startCheckout() {
     if (state.cart.length === 0) return;
+    var tenantForPay = state.cartMode && state.cartMode.indexOf("tenant:") === 0 ? Number(state.cartMode.split(":")[1]) : null;
+    loadShamCash(tenantForPay).then(function (sc) { showCheckout(sc || { enabled: false }); });
+  }
+
+  function showCheckout(sc) {
     var c = (state.auth && state.auth.customer) || {};
     var fields = [];
     fields.push({ key: "name", label: "Full name", placeholder: "John Smith", required: true, value: c.name || "" });
@@ -1681,10 +1856,15 @@
     var payOptions = [];
     // Only offered when Stripe is actually reachable and configured, so the
     // checkout degrades to cash rather than showing a button that cannot work.
-    if (payReady) payOptions.push({ value: "online", label: payNowLabel() });
-    payOptions.push({ value: "cash", label: "Cash on delivery" });
+    // Stripe cannot charge Syrian pounds, so a Syrian store offers Sham Cash
+    // in its place.
+    var syrian = !!(sc && (sc.currency === "SYP" || sc.enabled));
+    var stripeOk = payReady && !syrian;
+    if (sc && sc.enabled) payOptions.push({ value: "shamcash", label: state.lang === "ar" ? "شام كاش - دفع إلكتروني" : "Sham Cash (pay online)" });
+    if (stripeOk) payOptions.push({ value: "online", label: payNowLabel() });
+    payOptions.push({ value: "cash", label: state.lang === "ar" ? "الدفع عند الاستلام" : "Cash on delivery" });
     fields.push({ key: "payment", label: "Payment method", type: "select",
-                  options: payOptions, value: payReady ? "online" : "cash" });
+                  options: payOptions, value: payOptions[0].value });
 
     dialog.form("Checkout", fields, {
       icon: '<i class="fa-solid fa-box"></i>', iconKind: "", okLabel: "Place order →", cancelLabel: "Cancel",
@@ -1738,6 +1918,19 @@
           // Order first, payment second. The server prices the order from its
           // own product table and the PaymentIntent is built from that stored
           // total, so nothing the browser sent can change what is charged.
+          if (payment === "shamcash" && resp && resp.orderId) {
+            return openShamCashSheet({
+              orderId: resp.orderId,
+              orderNumber: resp.orderNumber,
+              trackingToken: resp.trackingToken
+            }).then(function (r) {
+              if (r && r.paid) toast(state.lang === "ar" ? "تم الدفع - شكراً لك!" : "Paid - thank you!", "success");
+              else toast(state.lang === "ar" ? "تم إرسال الطلب. يمكنك الدفع عند الاستلام." : "Order placed. You can pay on delivery.");
+              if (resp.trackingToken) navigate("track", [resp.trackingToken]);
+              else navigate("orders");
+            });
+          }
+
           if (payment === "online" && resp && resp.orderId && payReady) {
             return openPaymentSheet({
               orderId: resp.orderId,

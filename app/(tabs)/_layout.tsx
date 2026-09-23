@@ -15,6 +15,7 @@ import { usePathname, useRouter } from "expo-router";
 import { getQueryFn, getApiUrl } from "@/lib/query-client";
 import { getChromeMetrics, WEB_TOOLBAR_DESKTOP_H, WEB_TOOLBAR_MOBILE_H } from "@/lib/responsive";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { formatMoney } from "@/lib/currency";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -401,7 +402,7 @@ export default function TabLayout() {
                 #{onlineOrderNotification.orderNumber} · {onlineOrderNotification.customerName}
               </Text>
               <Text style={{ color: "#bbf7d0", fontSize: 13, fontWeight: "800", marginTop: 1 }}>
-                CHF {Number(onlineOrderNotification.totalAmount || 0).toFixed(2)}
+                {formatMoney(onlineOrderNotification.totalAmount || 0)}
               </Text>
               <Text style={{ color: "rgba(187,247,208,0.7)", fontSize: 11, marginTop: 3 }}>
                 {t("tapToViewDetails" as any) || "Tap to view details →"}

@@ -35,6 +35,19 @@ import {
   createCheckoutSession,
 } from "./paymentService";
 import { processStripeWebhook } from "./stripeWebhook";
+import {
+  ShamCashError,
+  publicShamCashStatus,
+  createInvoiceFor,
+  verifyInvoice,
+  invoiceStatus,
+  handleWebhook as handleShamCashWebhook,
+  adminShamCashView,
+  saveShamCashSettings,
+} from "./shamcash";
+
+/** Where Sham Cash should deliver invoice webhooks. */
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://kassenta.com";
 
 interface TenantRequest extends Request {
   tenantId?: number;
@@ -124,6 +137,21 @@ export function registerStripeWebhook(app: Express): void {
   const rawJson = express.raw({ type: "application/json" });
   app.post("/api/stripe/webhook", rawJson, webhook);
   app.post("/api/payments/webhook", rawJson, webhook);
+
+  // Sham Cash invoice webhook. Always answers 2xx quickly for anything that is
+  // not a bad signature: Sham Cash does not retry invoice webhooks, and the
+  // status endpoint re-reads the invoice anyway.
+  app.post("/api/payments/webhook/shamcash", rawJson, async (req: Request, res: Response) => {
+    try {
+      const sig = req.headers["x-webhook-signature"];
+      const result = await handleShamCashWebhook(req.body as Buffer, Array.isArray(sig) ? sig[0] : sig);
+      res.status(200).json(result);
+    } catch (e: any) {
+      if (e?.statusCode === 401) return res.status(401).json({ error: "bad signature" });
+      console.error("[shamcash] webhook:", e?.message || e);
+      res.status(200).json({ received: true });
+    }
+  });
 }
 
 /**
@@ -141,8 +169,10 @@ export function registerPaymentRoutes(app: Express): void {
       const publishableKey = await getStripePublishableKey();
       const methods = configured ? (await listAvailablePaymentMethods()).methods : [];
 
+      const { shamcash: _storedShamCash, ...publicSettings } = settings;
       res.json({
-        ...settings,
+        ...publicSettings,
+        shamcash: await publicShamCashStatus(tenantId),
         currency: (await currencyFor(tenantId)).toUpperCase(),
         stripe: {
           ...settings.stripe,
@@ -168,6 +198,8 @@ export function registerPaymentRoutes(app: Express): void {
       const tenantId = Number((req as any).tenantId ?? 0) || 0;
       const current = await loadGatewaySettings(tenantId);
       const merged = { ...current, ...req.body };
+      // Sham Cash has its own endpoint (it holds a key); never overwrite it here.
+      merged.shamcash = current.shamcash;
       // Keys are never accepted over HTTP; they live in the environment.
       delete (merged as any).secretKey;
       delete (merged as any).publishableKey;
@@ -176,7 +208,8 @@ export function registerPaymentRoutes(app: Express): void {
         delete merged.stripe.publishableKey;
       }
       await saveGatewaySettings(tenantId, merged);
-      res.json(merged);
+      const { shamcash: _sc, ...safe } = merged;
+      res.json(safe);
     } catch (e: any) {
       fail(res, e);
     }
@@ -352,6 +385,137 @@ export function registerPaymentRoutes(app: Express): void {
   const health = async (_req: Request, res: Response) => {
     res.json(await stripeAccountStatus());
   };
+  // ── Sham Cash (invoice based, SYP/USD stores) ─────────────────────────────
+  const scFail = (res: Response, e: any) => {
+    if (e instanceof ShamCashError) return res.status(e.statusCode).json({ error: e.message, code: e.code });
+    fail(res, e);
+  };
+
+  /** Same proof of possession as the Stripe order intent: the tracking token. */
+  async function orderFromToken(req: Request, res: Response): Promise<number | null> {
+    const orderId = Number.parseInt(String(req.params.orderId), 10);
+    if (!Number.isFinite(orderId)) {
+      res.status(400).json({ error: "Invalid order id" });
+      return null;
+    }
+    const token = String(req.body?.trackingToken ?? req.query.trackingToken ?? "");
+    const rows = await q(`SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [orderId]);
+    if (!rows.length) {
+      res.status(404).json({ error: "Order not found" });
+      return null;
+    }
+    if (rows[0].tracking_token && token !== rows[0].tracking_token) {
+      res.status(403).json({ error: "Invalid tracking token for this order" });
+      return null;
+    }
+    return orderId;
+  }
+
+  app.post("/api/payments/order/:orderId/shamcash", async (req: Request, res: Response) => {
+    try {
+      const id = await orderFromToken(req, res);
+      if (id == null) return;
+      res.json(await createInvoiceFor({ kind: "order", id }, PUBLIC_BASE_URL));
+    } catch (e: any) {
+      scFail(res, e);
+    }
+  });
+
+  app.post("/api/payments/order/:orderId/shamcash/verify", async (req: Request, res: Response) => {
+    try {
+      const id = await orderFromToken(req, res);
+      if (id == null) return;
+      res.json(await verifyInvoice({ kind: "order", id }, String(req.body?.tranId ?? "")));
+    } catch (e: any) {
+      scFail(res, e);
+    }
+  });
+
+  app.get("/api/payments/order/:orderId/shamcash/status", async (req: Request, res: Response) => {
+    try {
+      const id = await orderFromToken(req, res);
+      if (id == null) return;
+      res.json(await invoiceStatus({ kind: "order", id }));
+    } catch (e: any) {
+      scFail(res, e);
+    }
+  });
+
+  /** Till: the cashier issues an invoice for a sale and verifies it. */
+  async function saleOfTenant(req: TenantRequest, res: Response): Promise<number | null> {
+    const saleId = Number.parseInt(String(req.params.saleId), 10);
+    if (!Number.isFinite(saleId)) {
+      res.status(400).json({ error: "Invalid sale id" });
+      return null;
+    }
+    const rows = await q(
+      `SELECT b.tenant_id FROM sales s JOIN branches b ON b.id = s.branch_id WHERE s.id = ? LIMIT 1`,
+      [saleId],
+    );
+    if (!rows.length) {
+      res.status(404).json({ error: "Sale not found" });
+      return null;
+    }
+    if (req.tenantId && Number(rows[0].tenant_id) !== Number(req.tenantId)) {
+      res.status(403).json({ error: "Sale belongs to another store" });
+      return null;
+    }
+    return saleId;
+  }
+
+  app.post("/api/payments/sale/:saleId/shamcash", async (req: TenantRequest, res: Response) => {
+    try {
+      const id = await saleOfTenant(req, res);
+      if (id == null) return;
+      res.json(await createInvoiceFor({ kind: "sale", id }, PUBLIC_BASE_URL));
+    } catch (e: any) {
+      scFail(res, e);
+    }
+  });
+
+  app.post("/api/payments/sale/:saleId/shamcash/verify", async (req: TenantRequest, res: Response) => {
+    try {
+      const id = await saleOfTenant(req, res);
+      if (id == null) return;
+      res.json(await verifyInvoice({ kind: "sale", id }, String(req.body?.tranId ?? "")));
+    } catch (e: any) {
+      scFail(res, e);
+    }
+  });
+
+  app.get("/api/payments/sale/:saleId/shamcash/status", async (req: TenantRequest, res: Response) => {
+    try {
+      const id = await saleOfTenant(req, res);
+      if (id == null) return;
+      res.json(await invoiceStatus({ kind: "sale", id }));
+    } catch (e: any) {
+      scFail(res, e);
+    }
+  });
+
+  /** Store settings: admin/owner only. */
+  app.get("/api/payment-gateway/shamcash", requireAdmin, async (req: EmployeeRequest, res) => {
+    try {
+      const tenantId = Number((req as any).tenantId ?? 0) || 0;
+      if (!tenantId) return res.status(400).json({ error: "tenant required" });
+      res.json(await adminShamCashView(tenantId));
+    } catch (e: any) {
+      scFail(res, e);
+    }
+  });
+
+  app.put("/api/payment-gateway/shamcash", requireAdmin, async (req: EmployeeRequest, res) => {
+    try {
+      const tenantId = Number((req as any).tenantId ?? 0) || 0;
+      if (!tenantId) return res.status(400).json({ error: "tenant required" });
+      const { enabled, walletId, apiKey } = req.body ?? {};
+      await saveShamCashSettings(tenantId, { enabled, walletId, apiKey });
+      res.json(await adminShamCashView(tenantId));
+    } catch (e: any) {
+      scFail(res, e);
+    }
+  });
+
   app.get("/api/payments/health", health);
   app.post("/api/payment-gateway/test-stripe", async (_req, res) => {
     const status = await stripeAccountStatus();

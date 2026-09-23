@@ -28,6 +28,7 @@ import DriverAssignModal from "@/components/DriverAssignModal";
 import TrackingLinkButton from "@/components/TrackingLinkButton";
 import ScheduledOrderBadge from "@/components/ScheduledOrderBadge";
 import DeliveryStatusPipeline from "@/components/DeliveryStatusPipeline";
+import { formatMoney } from "@/lib/currency";
 
 const STATUS_FLOW = ["pending", "accepted", "preparing", "ready", "delivered"];
 
@@ -689,7 +690,7 @@ export default function OrdersScreen() {
               </Text>
             </View>
           </View>
-          <Text style={styles.orderAmount}>CHF {Number(item.totalAmount).toFixed(2)}</Text>
+          <Text style={styles.orderAmount}>{formatMoney(item.totalAmount)}</Text>
         </View>
 
         {/* Customer info */}
@@ -744,7 +745,7 @@ export default function OrdersScreen() {
                 <View style={[styles.itemRow, isRTL && { flexDirection: "row-reverse" }]}>
                   <Text style={styles.itemQty}>{it.quantity}×</Text>
                   <Text style={[styles.itemName, { flex: 1 }, isRTL && { textAlign: "right" }]}>{it.name || it.productName}</Text>
-                  <Text style={styles.itemPrice}>CHF {(Number(it.total) || (Number(it.unitPrice) * Number(it.quantity)) || 0).toFixed(2)}</Text>
+                  <Text style={styles.itemPrice}>{formatMoney(Number(it.total) || (Number(it.unitPrice) * Number(it.quantity)) || 0)}</Text>
                 </View>
                 {it.notes ? <Text style={[styles.itemAddons, isRTL && { textAlign: "right" }]}>↳ {it.notes}</Text> : null}
               </View>
@@ -789,7 +790,7 @@ export default function OrdersScreen() {
             {orderDate.toLocaleDateString()} · {orderDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           </Text>
           {item.deliveryFee && Number(item.deliveryFee) > 0 ? (
-            <Text style={styles.feeText}>+CHF {Number(item.deliveryFee).toFixed(2)} {lbl("delivery", "توصيل", "Lieferung")}</Text>
+            <Text style={styles.feeText}>+{formatMoney(item.deliveryFee)} {lbl("delivery", "توصيل", "Lieferung")}</Text>
           ) : null}
         </View>
 
@@ -1030,7 +1031,7 @@ export default function OrdersScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.editItemName, isRTL && { textAlign: "right" }]}>{it.name}</Text>
                       <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
-                        <Text style={styles.editItemPrice}>CHF {Number(it.unitPrice).toFixed(2)}</Text>
+                        <Text style={styles.editItemPrice}>{formatMoney(it.unitPrice)}</Text>
                         <Pressable onPress={() => editItemAddons(idx)} style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.accent + "15", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
                           <Ionicons name="options-outline" size={12} color={Colors.accent} />
                           <Text style={{ fontSize: 10, color: Colors.accent, fontWeight: "700" }}>{lbl("Edit Addons", "تعديل الإضافات", "Extras bearbeiten")}</Text>
@@ -1057,17 +1058,17 @@ export default function OrdersScreen() {
               <View style={[styles.editDivider, { marginVertical: 15 }]} />
               <View style={[styles.modalTotalRow, isRTL && { flexDirection: "row-reverse" }]}>
                 <Text style={styles.modalTotalLabel}>{lbl("Subtotal", "المجموع الفرعي", "Zwischensumme")}</Text>
-                <Text style={styles.modalTotalVal}>CHF {editForm.subtotal.toFixed(2)}</Text>
+                <Text style={styles.modalTotalVal}>{formatMoney(editForm.subtotal)}</Text>
               </View>
               {editForm.deliveryFee > 0 && (
                 <View style={[styles.modalTotalRow, isRTL && { flexDirection: "row-reverse" }]}>
                   <Text style={styles.modalTotalLabel}>{lbl("Delivery Fee", "رسوم التوصيل", "Liefergebühr")}</Text>
-                  <Text style={styles.modalTotalVal}>CHF {editForm.deliveryFee.toFixed(2)}</Text>
+                  <Text style={styles.modalTotalVal}>{formatMoney(editForm.deliveryFee)}</Text>
                 </View>
               )}
               <View style={[styles.modalTotalRow, isRTL && { flexDirection: "row-reverse" }, { marginTop: 4 }]}>
                 <Text style={[styles.modalTotalLabel, { color: Colors.text, fontWeight: "700" }]}>{lbl("Total", "الإجمالي", "Gesamt")}</Text>
-                <Text style={[styles.modalTotalVal, { color: Colors.accent, fontSize: 18, fontWeight: "800" }]}>CHF {editForm.totalAmount.toFixed(2)}</Text>
+                <Text style={[styles.modalTotalVal, { color: Colors.accent, fontSize: 18, fontWeight: "800" }]}>{formatMoney(editForm.totalAmount)}</Text>
               </View>
               <View style={{ height: 40 }} />
             </ScrollView>
@@ -1133,7 +1134,7 @@ export default function OrdersScreen() {
                       }}
                     >
                       <Text style={[styles.statusTabText, selectedVariant?.name === v.name && styles.statusTabTextActive]}>{v.name}</Text>
-                      <Text style={[styles.statusTabText, { opacity: 0.8, fontSize: 13 }, selectedVariant?.name === v.name && styles.statusTabTextActive]}>CHF {Number(v.price).toFixed(2)}</Text>
+                      <Text style={[styles.statusTabText, { opacity: 0.8, fontSize: 13 }, selectedVariant?.name === v.name && styles.statusTabTextActive]}>{formatMoney(v.price)}</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -1143,7 +1144,7 @@ export default function OrdersScreen() {
                 <View style={{ backgroundColor: Colors.accent + "15", padding: 12, borderRadius: 10, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <Ionicons name="pizza" size={20} color={Colors.accent} />
                   <Text style={{ color: Colors.accent, fontWeight: "700", fontSize: 15 }}>
-                    {selectedVariant?.name || configuringProduct?.name} — CHF {Number(selectedVariant?.price || configuringProduct?.price).toFixed(2)}
+                    {selectedVariant?.name || configuringProduct?.name} — {formatMoney(selectedVariant?.price || configuringProduct?.price)}
                   </Text>
                 </View>
                 {/* Color-coded POS topping grid */}
@@ -1410,7 +1411,7 @@ export default function OrdersScreen() {
                           <View style={styles.productCardBody}>
                             <Text style={styles.productCardName} numberOfLines={2}>{p.name}</Text>
                             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
-                              <Text style={[styles.productCardPrice, { color: catColor }]}>CHF {Number(p.price).toFixed(2)}</Text>
+                              <Text style={[styles.productCardPrice, { color: catColor }]}>{formatMoney(p.price)}</Text>
                               {(p.modifiers?.length > 0 || p.variants?.length > 0 || isPizzaProduct(p)) && (
                                 <View style={{ backgroundColor: catColor + "20", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
                                   <Text style={{ fontSize: 8, color: catColor, fontWeight: "700" }}>+</Text>
@@ -1554,7 +1555,7 @@ export default function OrdersScreen() {
                       {bc.notes ? <Text style={styles.bcNotes}>{bc.notes}</Text> : null}
                       <View style={styles.bcTotalRow}>
                         <Text style={styles.bcTotalLbl}>{lbl("Est. Total", "الإجمالي المقدر", "Geschätzt")}</Text>
-                        <Text style={styles.bcTotalVal}>CHF {Number(bc.estimatedTotal || 0).toFixed(2)}</Text>
+                        <Text style={styles.bcTotalVal}>{formatMoney(bc.estimatedTotal || 0)}</Text>
                       </View>
                       <View style={styles.bcActions}>
                         <Pressable style={[styles.bcBtn, styles.bcBtnReject]} onPress={() => rejectBroadcast(bc)} disabled={bcBusyId === bc.id}>

@@ -3,6 +3,7 @@ import { I18nManager, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Language, t, TranslationKey, isRTL } from "./i18n";
 import { useTheme } from "./theme-context";
+import { setMoneyLanguage, useCurrency } from "./currency";
 
 interface LanguageContextType {
   language: Language;
@@ -16,6 +17,8 @@ interface LanguageContextType {
   rtlText: any;
   /** Current palette id — exposed so consumers can key memoised render output. */
   themeMode: "light" | "dark";
+  /** Store currency code (branches.currency), e.g. "CHF" or "SYP". */
+  currency: string;
 }
 
 const LanguageContext = createContext<LanguageContextType | null>(null);
@@ -32,6 +35,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   // provider rebuilds its context value on each render, so subscribing here
   // propagates the switch to the whole app in one hop.
   const { mode: themeMode } = useTheme();
+  // Same fan-out for the store currency (branches.currency): when it becomes
+  // known after login every screen re-renders its prices.
+  const currency = useCurrency();
 
   useEffect(() => {
     AsyncStorage.getItem(LANG_KEY).then((val) => {
@@ -61,6 +67,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const translate = useCallback((key: TranslationKey) => t(language, key), [language]);
 
   const rtl = isRTL(language);
+  // formatMoney() is used outside React too (receipt templates), so it reads
+  // the language from module state. Set it before the children render.
+  setMoneyLanguage(language);
 
   const rtlRow = { flexDirection: rtl ? "row-reverse" as const : "row" as const };
   const rtlRowReverse = { flexDirection: rtl ? "row" as const : "row-reverse" as const };
@@ -79,7 +88,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <LanguageContext.Provider
-      value={{ language, setLanguage, t: translate, isRTL: rtl, rtlStyle, rtlRow, rtlRowReverse, rtlTextAlign, rtlText, themeMode }}
+      value={{ language, setLanguage, t: translate, isRTL: rtl, rtlStyle, rtlRow, rtlRowReverse, rtlTextAlign, rtlText, themeMode, currency }}
     >
       {children}
     </LanguageContext.Provider>

@@ -25,6 +25,7 @@ import { useLicense } from "@/lib/license-context";
 import { getApiUrl } from "@/lib/query-client";
 import { Colors } from "@/constants/colors";
 import { themedStyles } from "@/lib/themed-styles";
+import { formatMoney } from "@/lib/currency";
 
 type NotifKind =
   | "order"
@@ -267,7 +268,7 @@ export default function GlobalNotificationCenter() {
             body: typeof m.items === "string"
               ? "Tap to view items"
               : Array.isArray(m.items) ? m.items.slice(0, 2).map((it: any) => `${it.quantity || 1}× ${it.name}`).join(" · ") : "Tap to view",
-            meta: m.estimatedTotal ? `CHF ${Number(m.estimatedTotal).toFixed(2)} · first to accept wins` : "first to accept wins",
+            meta: m.estimatedTotal ? `${formatMoney(m.estimatedTotal)} · first to accept wins` : "first to accept wins",
             href: "/(tabs)/online-orders",
             expiresAt, dedupeKey,
           });

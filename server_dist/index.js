@@ -1565,16 +1565,16 @@ var init_storage = __esm({
       // Products
       async getProducts(search) {
         if (search) {
-          const q5 = `%${search.toLowerCase()}%`;
+          const q6 = `%${search.toLowerCase()}%`;
           return db.select().from(products).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q5}`,
-                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q5}`,
-                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q5}`,
-                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q5}`,
-                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q5}`
+                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q6}`,
+                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q6}`,
+                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q6}`,
+                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q6}`,
+                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q6}`
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -1583,17 +1583,17 @@ var init_storage = __esm({
       },
       async getProductsByTenant(tenantId, search) {
         if (search) {
-          const q5 = `%${search.toLowerCase()}%`;
+          const q6 = `%${search.toLowerCase()}%`;
           return db.select().from(products).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(products.tenantId, tenantId),
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q5}`,
-                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q5}`,
-                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q5}`,
-                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q5}`,
-                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q5}`
+                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q6}`,
+                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q6}`,
+                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q6}`,
+                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q6}`,
+                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q6}`
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -2103,12 +2103,12 @@ var init_storage = __esm({
       },
       async createCall(data) {
         const _ins_call = await db.insert(calls).values(data).$returningId();
-        const [call] = await db.select().from(calls).where((0, import_drizzle_orm.eq)(calls.id, _ins_call[0]?.id ?? 0));
-        return call;
+        const [call2] = await db.select().from(calls).where((0, import_drizzle_orm.eq)(calls.id, _ins_call[0]?.id ?? 0));
+        return call2;
       },
       async updateCall(id, data) {
-        const [call] = await db.update(calls).set(data).where((0, import_drizzle_orm.eq)(calls.id, id));
-        return call;
+        const [call2] = await db.update(calls).set(data).where((0, import_drizzle_orm.eq)(calls.id, id));
+        return call2;
       },
       // Returns
       async getReturns(tenantId) {
@@ -3451,14 +3451,14 @@ var init_storage = __esm({
       },
       // ── Delivery Management ─────────────────────────────────────────────────────
       async getDeliveryOrders(tenantId, filters) {
-        let q5 = db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId));
+        let q6 = db.select().from(onlineOrders).where((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId));
         if (filters?.status) {
-          q5 = q5.where((0, import_drizzle_orm.eq)(onlineOrders.status, filters.status));
+          q6 = q6.where((0, import_drizzle_orm.eq)(onlineOrders.status, filters.status));
         }
         if (filters?.orderType) {
-          q5 = q5.where((0, import_drizzle_orm.eq)(onlineOrders.orderType, filters.orderType));
+          q6 = q6.where((0, import_drizzle_orm.eq)(onlineOrders.orderType, filters.orderType));
         }
-        return q5.orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
+        return q6.orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
       },
       async assignDriverToOrder(orderId, vehicleId) {
         await db.update(onlineOrders).set({ driverId: vehicleId }).where((0, import_drizzle_orm.eq)(onlineOrders.id, orderId));
@@ -3596,10 +3596,10 @@ var init_callerIdService = __esm({
                 const tenantId = ws.tenantId;
                 if (slot && tenantId) {
                   const key = `${tenantId}-${slot}`;
-                  const call = this.activeCallSlots.get(key);
-                  if (call?.dbCallId) {
+                  const call2 = this.activeCallSlots.get(key);
+                  if (call2?.dbCallId) {
                     Promise.resolve().then(() => (init_storage(), storage_exports)).then(({ storage: storage2 }) => {
-                      storage2.updateCall(call.dbCallId, { status: "answered" }).catch(() => {
+                      storage2.updateCall(call2.dbCallId, { status: "answered" }).catch(() => {
                       });
                     });
                   }
@@ -9684,7 +9684,7 @@ async function registerRoutes(app2) {
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
       const allTables = await storage.getTables(branchId ? Number(branchId) : void 0);
       const existing = await storage.getTableQrCodes(Number(tenantId));
-      const existingTableIds = new Set(existing.map((q5) => q5.tableId));
+      const existingTableIds = new Set(existing.map((q6) => q6.tableId));
       const created = [];
       for (const table of allTables) {
         if (existingTableIds.has(table.id)) continue;
@@ -11669,6 +11669,16 @@ Valid for 10 minutes.`);
       res.status(500).json({ error: e.message });
     }
   });
+  async function mainBranchCurrency(tenantId) {
+    if (!tenantId) return null;
+    try {
+      const brs = await storage.getBranchesByTenant(Number(tenantId));
+      const main = brs.find((b) => b.isMain) || brs[0];
+      return main?.currency || null;
+    } catch {
+      return null;
+    }
+  }
   async function resolveSlugConfig(slug) {
     if (slug === "barmagly") {
       const config2 = await storage.getLandingPageConfigBySlug("pizza-lemon");
@@ -11693,7 +11703,7 @@ Valid for 10 minutes.`);
       const config = await resolveSlugConfig(req.params.slug);
       if (!config) return res.status(404).json({ error: "Store not found" });
       const tenant = await storage.getTenant(config.tenantId).catch(() => null);
-      const currency = config.currency || tenant?.currency || process.env.DEFAULT_CURRENCY || "CHF";
+      const currency = await mainBranchCurrency(config.tenantId) || config.currency || tenant?.currency || process.env.DEFAULT_CURRENCY || "CHF";
       res.setHeader("Cache-Control", "public, max-age=300");
       res.json({
         slug: config.slug,
@@ -11951,7 +11961,7 @@ Address: ${customerAddress || "Pickup"}`
             store = {
               name: cfg.storeName || cfg.name,
               primaryColor: cfg.primaryColor || "#FF5722",
-              currency: cfg.currency || process.env.DEFAULT_CURRENCY || "CHF",
+              currency: await mainBranchCurrency(Number(order.tenantId)) || cfg.currency || process.env.DEFAULT_CURRENCY || "CHF",
               logo: cfg.logo,
               supportPhone: cfg.supportPhone,
               slug: cfg.slug
@@ -12572,14 +12582,14 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
   });
   app2.get("/api/delivery/search", async (req, res) => {
     try {
-      const q5 = (req.query.q || "").trim();
+      const q6 = (req.query.q || "").trim();
       const tenantId = Number(req.query.tenantId);
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
-      if (!q5) return res.json([]);
+      if (!q6) return res.json([]);
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { products: products2, categories: categories2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
       const { eq: eq10, and: and7, or: or5, like: like2, sql: sql8 } = await import("drizzle-orm");
-      const pattern = `%${q5}%`;
+      const pattern = `%${q6}%`;
       const results = await db2.select({
         id: products2.id,
         name: products2.name,
@@ -14976,6 +14986,18 @@ function registerBroadcastRoutes(app2) {
       }).from(categories).where((0, import_drizzle_orm8.inArray)(categories.tenantId, tenantIds));
       const catMap = new Map(cats.map((c) => [`${c.tenantId}:${c.id}`, c.name]));
       const tMap = new Map(activeTenants.map((t2) => [t2.id, t2]));
+      const branchRows = await db.select({
+        tenantId: branches.tenantId,
+        currency: branches.currency,
+        isMain: branches.isMain
+      }).from(branches).where((0, import_drizzle_orm8.inArray)(branches.tenantId, tenantIds));
+      const currencyByTenant = /* @__PURE__ */ new Map();
+      for (const b of branchRows) {
+        if (b.tenantId == null || !b.currency) continue;
+        if (b.isMain || !currencyByTenant.has(b.tenantId)) currencyByTenant.set(b.tenantId, b.currency);
+      }
+      const defaultCurrency = process.env.DEFAULT_CURRENCY || "CHF";
+      const currencyOf = (tenantId) => tenantId != null && currencyByTenant.get(tenantId) || defaultCurrency;
       const parseJson2 = (v) => {
         if (Array.isArray(v) || v && typeof v === "object") return v;
         if (typeof v === "string" && v.trim()) {
@@ -14996,6 +15018,7 @@ function registerBroadcastRoutes(app2) {
           tenantLogo: t2?.logo || null,
           tenantSlug: t2?.slug || "",
           tenantColor: t2?.primaryColor || "#FF5722",
+          currency: currencyOf(p.tenantId),
           name: p.name,
           nameAr: p.nameAr,
           description: p.description,
@@ -15011,7 +15034,7 @@ function registerBroadcastRoutes(app2) {
       const main = validProducts.filter((p) => !p.isAddon).map(decorate);
       const addons = validProducts.filter((p) => p.isAddon).map(decorate);
       res.json({
-        restaurants: activeTenants,
+        restaurants: activeTenants.map((t2) => ({ ...t2, currency: currencyOf(t2.id) })),
         products: main,
         addons,
         categories: Array.from(new Set(main.map((p) => p.category))).filter(Boolean).sort()
@@ -15816,7 +15839,429 @@ init_callerIdService();
 // server/paymentRoutes.ts
 var import_express = __toESM(require("express"));
 init_db();
+
+// server/shamcash.ts
+var import_crypto6 = __toESM(require("crypto"));
+init_db();
+var BASE = (process.env.SHAMCASH_API_URL || "https://api-shamcash.com/api").replace(/\/$/, "");
+var SHAMCASH_CURRENCIES = ["SYP", "USD"];
+var INVOICE_MINUTES = 60;
 async function q4(sqlText, params = []) {
+  const [rows] = await pool.query(sqlText, params);
+  return Array.isArray(rows) ? rows : [];
+}
+var ShamCashError = class extends Error {
+  statusCode;
+  code;
+  constructor(message, statusCode = 400, code) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+  }
+};
+var PAYER_MESSAGES = {
+  MISSING_TRAN_ID: "\u0623\u062F\u062E\u0644 \u0631\u0642\u0645 \u0627\u0644\u0639\u0645\u0644\u064A\u0629 \u0645\u0646 \u062A\u0637\u0628\u064A\u0642 \u0634\u0627\u0645 \u0643\u0627\u0634",
+  TRANSACTION_NOT_FOUND: "\u0644\u0645 \u0646\u062C\u062F \u0647\u0630\u0647 \u0627\u0644\u0639\u0645\u0644\u064A\u0629 \u0628\u0639\u062F \u0641\u064A \u0634\u0627\u0645 \u0643\u0627\u0634. \u0627\u0646\u062A\u0638\u0631 \u062F\u0642\u064A\u0642\u0629 \u062B\u0645 \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629",
+  ALREADY_PAID: "\u0647\u0630\u0647 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0645\u062F\u0641\u0648\u0639\u0629 \u0645\u0633\u0628\u0642\u0627\u064B",
+  TRAN_ID_USED: "\u0631\u0642\u0645 \u0627\u0644\u0639\u0645\u0644\u064A\u0629 \u0647\u0630\u0627 \u0645\u0633\u062A\u062E\u062F\u0645 \u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0623\u062E\u0631\u0649",
+  EXPIRED: "\u0627\u0646\u062A\u0647\u062A \u0635\u0644\u0627\u062D\u064A\u0629 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629\u060C \u0623\u0646\u0634\u0626 \u0641\u0627\u062A\u0648\u0631\u0629 \u062C\u062F\u064A\u062F\u0629",
+  AMOUNT_MISMATCH: "\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u062D\u0648\u064E\u0651\u0644 \u0644\u0627 \u064A\u0637\u0627\u0628\u0642 \u0642\u064A\u0645\u0629 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629",
+  INVALID_STATUS: "\u0644\u0627 \u064A\u0645\u0643\u0646 \u0627\u0644\u062A\u062D\u0642\u0642 \u0645\u0646 \u0647\u0630\u0647 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629",
+  RATE_LIMIT: "\u0645\u062D\u0627\u0648\u0644\u0627\u062A \u0643\u062B\u064A\u0631\u0629\u060C \u0627\u0646\u062A\u0638\u0631 \u0642\u0644\u064A\u0644\u0627\u064B \u062B\u0645 \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629",
+  WALLET_INACTIVE: "\u0645\u062D\u0641\u0638\u0629 \u0634\u0627\u0645 \u0643\u0627\u0634 \u0627\u0644\u062E\u0627\u0635\u0629 \u0628\u0627\u0644\u0645\u062A\u062C\u0631 \u063A\u064A\u0631 \u0645\u0641\u0639\u0651\u0644\u0629",
+  SUBSCRIPTION_EXPIRED: "\u0627\u0634\u062A\u0631\u0627\u0643 \u0628\u0648\u0627\u0628\u0629 \u0634\u0627\u0645 \u0643\u0627\u0634 \u0645\u0646\u062A\u0647\u064D"
+};
+async function runShamCashMigrations() {
+  try {
+    await q4(`
+      CREATE TABLE IF NOT EXISTS shamcash_invoices (
+        id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        tenant_id int NOT NULL,
+        online_order_id int NULL DEFAULT NULL,
+        sale_id int NULL DEFAULT NULL,
+        invoice_number varchar(64) NOT NULL,
+        amount decimal(14,2) NOT NULL,
+        currency varchar(8) NOT NULL,
+        wallet varchar(128) NULL DEFAULT NULL,
+        status varchar(20) NOT NULL DEFAULT 'pending',
+        tran_id varchar(64) NULL DEFAULT NULL,
+        expires_at timestamp NULL DEFAULT NULL,
+        paid_at timestamp NULL DEFAULT NULL,
+        created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_shamcash_invoice (invoice_number),
+        KEY ix_shamcash_order (online_order_id),
+        KEY ix_shamcash_sale (sale_id)
+      )`);
+  } catch (e) {
+    console.error("[shamcash] migration failed:", e?.message || e);
+  }
+}
+async function readConfigJson(tenantId) {
+  const rows = await q4(
+    `SELECT config_json FROM payment_gateway_settings WHERE tenant_id = ? LIMIT 1`,
+    [tenantId]
+  );
+  const raw = rows[0]?.config_json;
+  if (!raw) return {};
+  try {
+    return typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return {};
+  }
+}
+async function loadShamCashSettings(tenantId) {
+  const cfg = (await readConfigJson(tenantId))?.shamcash ?? {};
+  return {
+    enabled: !!cfg.enabled,
+    walletId: cfg.walletId ? String(cfg.walletId) : null,
+    apiKey: cfg.apiKey ? String(cfg.apiKey) : null
+  };
+}
+async function saveShamCashSettings(tenantId, patch) {
+  const cfg = await readConfigJson(tenantId);
+  const cur = cfg.shamcash ?? {};
+  const next = { ...cur };
+  if (patch.enabled !== void 0) next.enabled = !!patch.enabled;
+  if (patch.walletId !== void 0) next.walletId = patch.walletId ? String(patch.walletId).trim() : null;
+  if (patch.apiKey !== void 0 && !String(patch.apiKey ?? "").includes("\u2022")) {
+    next.apiKey = patch.apiKey ? String(patch.apiKey).trim() : null;
+  }
+  cfg.shamcash = next;
+  await q4(
+    `INSERT INTO payment_gateway_settings (tenant_id, config_json)
+     VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE config_json = VALUES(config_json)`,
+    [tenantId, JSON.stringify(cfg)]
+  );
+  return loadShamCashSettings(tenantId);
+}
+function keyFor(s) {
+  return s.apiKey || process.env.SHAMCASH_API_KEY || null;
+}
+async function shamCashCurrencyFor(tenantId) {
+  const rows = await q4(
+    `SELECT currency FROM branches WHERE tenant_id = ? ORDER BY is_main DESC, id ASC LIMIT 1`,
+    [tenantId]
+  );
+  const c = String(rows[0]?.currency || "").toUpperCase();
+  return SHAMCASH_CURRENCIES.includes(c) ? c : null;
+}
+async function resolveWallet(s) {
+  const key = keyFor(s);
+  if (!key) return null;
+  try {
+    const wallets = await listWallets(key);
+    const w = s.walletId ? matchWallet(wallets, s.walletId) : wallets.find((x) => x.status === "active");
+    return w && w.status === "active" ? w : null;
+  } catch {
+    return null;
+  }
+}
+async function publicShamCashStatus(tenantId) {
+  if (!tenantId) return { enabled: false };
+  const s = await loadShamCashSettings(tenantId);
+  const currency = await shamCashCurrencyFor(tenantId);
+  if (!s.enabled || !currency) return { enabled: false, currency: currency ?? null };
+  const wallet = await resolveWallet(s);
+  return { enabled: !!wallet, currency };
+}
+async function call(apiKey, method, path5, body) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 35e3);
+  let res;
+  try {
+    res = await fetch(BASE + path5, {
+      method,
+      headers: {
+        "X-Api-Key": apiKey,
+        Accept: "application/json",
+        ...body !== void 0 ? { "Content-Type": "application/json" } : {}
+      },
+      body: body !== void 0 ? JSON.stringify(body) : void 0,
+      signal: ctrl.signal
+    });
+  } catch (e) {
+    throw new ShamCashError("\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0628\u0634\u0627\u0645 \u0643\u0627\u0634\u060C \u062D\u0627\u0648\u0644 \u0645\u062C\u062F\u062F\u0627\u064B", 502, "UPSTREAM_UNREACHABLE");
+  } finally {
+    clearTimeout(timer);
+  }
+  const text2 = await res.text();
+  let data = null;
+  try {
+    data = text2 ? JSON.parse(text2) : null;
+  } catch {
+    data = { message: text2.slice(0, 300) };
+  }
+  if (!res.ok) {
+    const code = data?.error || data?.code || `HTTP_${res.status}`;
+    const msg = PAYER_MESSAGES[code] || data?.message || "\u062E\u0637\u0623 \u0645\u0646 \u0628\u0648\u0627\u0628\u0629 \u0634\u0627\u0645 \u0643\u0627\u0634";
+    if (res.status >= 500 || res.status === 401 || res.status === 403) {
+      console.error(`[shamcash] ${method} ${path5} -> ${res.status} ${code}: ${data?.message ?? ""}`);
+    }
+    const status2 = res.status === 401 || res.status === 403 ? 503 : res.status;
+    throw new ShamCashError(msg, status2, code);
+  }
+  return data;
+}
+var walletCache = /* @__PURE__ */ new Map();
+async function listWallets(apiKey, fresh = false) {
+  const hit = walletCache.get(apiKey);
+  if (!fresh && hit && Date.now() - hit.at < 5 * 6e4) return hit.wallets;
+  const data = await call(apiKey, "GET", "/v1/wallets");
+  const wallets = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+  walletCache.set(apiKey, { at: Date.now(), wallets });
+  return wallets;
+}
+function matchWallet(wallets, id) {
+  if (!id) return null;
+  return wallets.find(
+    (w) => w.id === id || w.walletAddress === id || String(w.accountNumber ?? "") === id
+  ) ?? null;
+}
+async function loadTarget(t2) {
+  if (t2.kind === "order") {
+    const rows2 = await q4(
+      `SELECT tenant_id, total_amount, payment_status, order_number FROM online_orders WHERE id = ? LIMIT 1`,
+      [t2.id]
+    );
+    if (!rows2.length) throw new ShamCashError("\u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F", 404);
+    const r2 = rows2[0];
+    return {
+      tenantId: Number(r2.tenant_id),
+      amount: Number(r2.total_amount),
+      paid: r2.payment_status === "paid",
+      label: `Order ${r2.order_number}`
+    };
+  }
+  const rows = await q4(
+    `SELECT b.tenant_id, s.total_amount, s.payment_status, s.receipt_number
+       FROM sales s JOIN branches b ON b.id = s.branch_id WHERE s.id = ? LIMIT 1`,
+    [t2.id]
+  );
+  if (!rows.length) throw new ShamCashError("\u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629", 404);
+  const r = rows[0];
+  return {
+    tenantId: Number(r.tenant_id),
+    amount: Number(r.total_amount),
+    paid: r.payment_status === "paid",
+    label: `Sale ${r.receipt_number}`
+  };
+}
+function col(t2) {
+  return t2.kind === "order" ? "online_order_id" : "sale_id";
+}
+async function payToDetails(apiKey, walletId) {
+  try {
+    const w = matchWallet(await listWallets(apiKey), walletId);
+    if (!w) return null;
+    return {
+      label: w.label ?? null,
+      walletAddress: w.walletAddress ?? null,
+      accountNumber: w.accountNumber ?? null
+    };
+  } catch {
+    return null;
+  }
+}
+function publicInvoice(row, payTo) {
+  return {
+    invoiceNumber: row.invoice_number,
+    amount: Number(row.amount),
+    currency: row.currency,
+    status: row.status,
+    expiresAt: row.expires_at,
+    paidAt: row.paid_at,
+    payTo
+  };
+}
+async function createInvoiceFor(t2, publicBaseUrl) {
+  const target = await loadTarget(t2);
+  if (target.paid) throw new ShamCashError("\u062A\u0645 \u062F\u0641\u0639 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628 \u0645\u0633\u0628\u0642\u0627\u064B", 409, "ALREADY_PAID");
+  const s = await loadShamCashSettings(target.tenantId);
+  const apiKey = keyFor(s);
+  const currency = await shamCashCurrencyFor(target.tenantId);
+  if (!s.enabled || !apiKey) {
+    throw new ShamCashError("\u0627\u0644\u062F\u0641\u0639 \u0639\u0628\u0631 \u0634\u0627\u0645 \u0643\u0627\u0634 \u063A\u064A\u0631 \u0645\u0641\u0639\u0651\u0644 \u0644\u0647\u0630\u0627 \u0627\u0644\u0645\u062A\u062C\u0631", 503, "NOT_CONFIGURED");
+  }
+  const wallet = await resolveWallet(s);
+  if (!wallet) {
+    throw new ShamCashError("\u0645\u062D\u0641\u0638\u0629 \u0634\u0627\u0645 \u0643\u0627\u0634 \u0627\u0644\u062E\u0627\u0635\u0629 \u0628\u0627\u0644\u0645\u062A\u062C\u0631 \u063A\u064A\u0631 \u0645\u0641\u0639\u0651\u0644\u0629 \u0628\u0639\u062F", 503, "WALLET_INACTIVE");
+  }
+  const walletRef = wallet.id;
+  if (!currency) {
+    throw new ShamCashError("\u0634\u0627\u0645 \u0643\u0627\u0634 \u064A\u062F\u0639\u0645 \u0627\u0644\u0644\u064A\u0631\u0629 \u0627\u0644\u0633\u0648\u0631\u064A\u0629 \u0648\u0627\u0644\u062F\u0648\u0644\u0627\u0631 \u0641\u0642\u0637", 400, "UNSUPPORTED_CURRENCY");
+  }
+  if (!(target.amount > 0)) throw new ShamCashError("\u0642\u064A\u0645\u0629 \u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D\u0629", 400);
+  const open = await q4(
+    `SELECT * FROM shamcash_invoices
+      WHERE ${col(t2)} = ? AND status = 'pending' AND expires_at > NOW() + INTERVAL 2 MINUTE
+      ORDER BY id DESC LIMIT 1`,
+    [t2.id]
+  );
+  if (open.length && Number(open[0].amount) === Number(target.amount.toFixed(2)) && open[0].currency === currency) {
+    return publicInvoice(open[0], await payToDetails(apiKey, open[0].wallet));
+  }
+  const created = await call(apiKey, "POST", "/v1/invoices", {
+    amount: target.amount.toFixed(2).replace(/\.00$/, ""),
+    currency,
+    walletAddress: walletRef,
+    webhookUrl: `${publicBaseUrl.replace(/\/$/, "")}/api/payments/webhook/shamcash`,
+    expiresInMinutes: INVOICE_MINUTES,
+    note: `Kassenta ${target.label}`.slice(0, 500),
+    metadata: { kind: t2.kind, id: String(t2.id), tenantId: String(target.tenantId) }
+  });
+  const inv = created?.data ?? created;
+  const invoiceNumber = inv?.invoiceNumber ?? inv?.invoice_number;
+  if (!invoiceNumber) {
+    console.error("[shamcash] unexpected create response:", JSON.stringify(created).slice(0, 400));
+    throw new ShamCashError("\u062A\u0639\u0630\u0651\u0631 \u0625\u0646\u0634\u0627\u0621 \u0641\u0627\u062A\u0648\u0631\u0629 \u0634\u0627\u0645 \u0643\u0627\u0634", 502);
+  }
+  const expiresAt = inv?.expiresAt ? new Date(inv.expiresAt) : new Date(Date.now() + INVOICE_MINUTES * 6e4);
+  await q4(
+    `INSERT INTO shamcash_invoices (tenant_id, ${col(t2)}, invoice_number, amount, currency, wallet, status, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
+    [target.tenantId, t2.id, invoiceNumber, target.amount.toFixed(2), currency, walletRef, expiresAt]
+  );
+  const [row] = await q4(`SELECT * FROM shamcash_invoices WHERE invoice_number = ?`, [invoiceNumber]);
+  return publicInvoice(row, await payToDetails(apiKey, walletRef));
+}
+async function markSettled(row, tranId) {
+  await q4(
+    `UPDATE shamcash_invoices
+        SET status = 'paid', tran_id = COALESCE(?, tran_id), paid_at = COALESCE(paid_at, NOW())
+      WHERE id = ?`,
+    [tranId, row.id]
+  );
+  if (row.online_order_id) {
+    await q4(
+      `UPDATE online_orders
+          SET payment_status = 'paid', payment_method = 'shamcash',
+              paid_at = COALESCE(paid_at, NOW()), payment_error = NULL
+        WHERE id = ? AND payment_status <> 'paid'`,
+      [row.online_order_id]
+    );
+  }
+  if (row.sale_id) {
+    await q4(
+      `UPDATE sales
+          SET payment_status = 'paid', payment_method = 'shamcash', paid_at = COALESCE(paid_at, NOW())
+        WHERE id = ? AND (payment_status IS NULL OR payment_status <> 'paid')`,
+      [row.sale_id]
+    );
+  }
+}
+async function apiKeyForRow(row) {
+  const key = keyFor(await loadShamCashSettings(Number(row.tenant_id)));
+  if (!key) throw new ShamCashError("\u0627\u0644\u062F\u0641\u0639 \u0639\u0628\u0631 \u0634\u0627\u0645 \u0643\u0627\u0634 \u063A\u064A\u0631 \u0645\u0641\u0639\u0651\u0644 \u0644\u0647\u0630\u0627 \u0627\u0644\u0645\u062A\u062C\u0631", 503, "NOT_CONFIGURED");
+  return key;
+}
+async function refreshInvoice(invoiceNumber) {
+  const [row] = await q4(`SELECT * FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
+  if (!row) throw new ShamCashError("\u0641\u0627\u062A\u0648\u0631\u0629 \u063A\u064A\u0631 \u0645\u0639\u0631\u0648\u0641\u0629", 404);
+  if (row.status !== "paid") {
+    const remote = await call(await apiKeyForRow(row), "GET", `/v1/invoices/${encodeURIComponent(invoiceNumber)}`);
+    const inv = remote?.data ?? remote;
+    const status2 = String(inv?.status ?? "").toLowerCase();
+    if (status2 === "paid") {
+      await markSettled(row, inv?.transactionRef ?? inv?.tranId ?? inv?.tran_id ?? null);
+    } else if (status2 === "expired" || status2 === "cancelled") {
+      await q4(`UPDATE shamcash_invoices SET status = ? WHERE id = ?`, [status2, row.id]);
+    }
+  }
+  const [fresh] = await q4(`SELECT * FROM shamcash_invoices WHERE id = ?`, [row.id]);
+  return fresh;
+}
+async function verifyInvoice(t2, tranId) {
+  const clean2 = String(tranId ?? "").trim();
+  if (!clean2) throw new ShamCashError(PAYER_MESSAGES.MISSING_TRAN_ID, 400, "MISSING_TRAN_ID");
+  const [row] = await q4(
+    `SELECT * FROM shamcash_invoices WHERE ${col(t2)} = ? ORDER BY id DESC LIMIT 1`,
+    [t2.id]
+  );
+  if (!row) throw new ShamCashError("\u0644\u0627 \u062A\u0648\u062C\u062F \u0641\u0627\u062A\u0648\u0631\u0629 \u0634\u0627\u0645 \u0643\u0627\u0634 \u0644\u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628", 404);
+  if (row.status === "paid") return { status: "paid", invoiceNumber: row.invoice_number };
+  try {
+    await call(await apiKeyForRow(row), "POST", `/v1/invoices/${encodeURIComponent(row.invoice_number)}/verify`, {
+      tran_id: clean2
+    });
+  } catch (e) {
+    if (e?.code !== "ALREADY_PAID") throw e;
+  }
+  const fresh = await refreshInvoice(row.invoice_number);
+  if (fresh.status === "paid" && !fresh.tran_id) {
+    await q4(`UPDATE shamcash_invoices SET tran_id = ? WHERE id = ?`, [clean2, fresh.id]);
+  }
+  return { status: fresh.status, invoiceNumber: fresh.invoice_number };
+}
+async function invoiceStatus(t2) {
+  const [row] = await q4(
+    `SELECT * FROM shamcash_invoices WHERE ${col(t2)} = ? ORDER BY id DESC LIMIT 1`,
+    [t2.id]
+  );
+  if (!row) return { status: "none" };
+  const fresh = row.status === "pending" ? await refreshInvoice(row.invoice_number) : row;
+  return { status: fresh.status, invoiceNumber: fresh.invoice_number, paidAt: fresh.paid_at };
+}
+async function handleWebhook(rawBody, signatureHeader) {
+  const secret = process.env.SHAMCASH_WEBHOOK_SECRET;
+  if (secret) {
+    const expected = import_crypto6.default.createHmac("sha256", secret).update(rawBody).digest("hex");
+    const got = String(signatureHeader ?? "").replace(/^sha256=/, "");
+    const a = Buffer.from(expected, "hex");
+    const b = Buffer.from(got, "hex");
+    if (a.length !== b.length || !import_crypto6.default.timingSafeEqual(a, b)) {
+      throw new ShamCashError("bad signature", 401);
+    }
+  }
+  let body;
+  try {
+    body = JSON.parse(rawBody.toString("utf8"));
+  } catch {
+    throw new ShamCashError("bad json", 400);
+  }
+  const invoiceNumber = body?.invoiceNumber;
+  if (!invoiceNumber) return { ignored: true };
+  const [row] = await q4(`SELECT id FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
+  if (!row) return { ignored: true };
+  const fresh = await refreshInvoice(String(invoiceNumber));
+  return { invoiceNumber, status: fresh.status };
+}
+async function adminShamCashView(tenantId) {
+  const s = await loadShamCashSettings(tenantId);
+  const key = keyFor(s);
+  let wallets = [];
+  let apiError = null;
+  if (key) {
+    try {
+      wallets = (await listWallets(key, true)).map((w) => ({
+        id: w.id,
+        label: w.label ?? null,
+        status: w.status ?? null,
+        walletAddress: w.walletAddress ?? null,
+        accountNumber: w.accountNumber ?? null
+      }));
+    } catch (e) {
+      apiError = e?.message || "Sham Cash API error";
+    }
+  }
+  const selected = matchWallet(wallets, s.walletId);
+  return {
+    enabled: s.enabled,
+    walletId: s.walletId,
+    walletStatus: selected?.status ?? null,
+    ownApiKey: s.apiKey ? "\u2022\u2022\u2022\u2022" + s.apiKey.slice(-4) : null,
+    platformKeyConfigured: !!process.env.SHAMCASH_API_KEY,
+    currency: await shamCashCurrencyFor(tenantId),
+    supportedCurrencies: SHAMCASH_CURRENCIES,
+    wallets,
+    apiError
+  };
+}
+
+// server/paymentRoutes.ts
+var PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://kassenta.com";
+async function q5(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -15835,7 +16280,7 @@ var DEFAULT_GATEWAY = {
 };
 async function loadGatewaySettings(tenantId) {
   try {
-    const rows = await q4(
+    const rows = await q5(
       `SELECT config_json FROM payment_gateway_settings
         WHERE tenant_id IN (?, 0) ORDER BY tenant_id DESC LIMIT 1`,
       [tenantId || 0]
@@ -15851,7 +16296,7 @@ async function loadGatewaySettings(tenantId) {
 }
 async function saveGatewaySettings(tenantId, config) {
   const currency = config?.stripe?.currency || "CHF";
-  await q4(
+  await q5(
     `INSERT INTO payment_gateway_settings (tenant_id, config_json, currency, enabled_methods)
      VALUES (?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE config_json = VALUES(config_json),
@@ -15881,6 +16326,17 @@ function registerStripeWebhook(app2) {
   const rawJson = import_express.default.raw({ type: "application/json" });
   app2.post("/api/stripe/webhook", rawJson, webhook);
   app2.post("/api/payments/webhook", rawJson, webhook);
+  app2.post("/api/payments/webhook/shamcash", rawJson, async (req, res) => {
+    try {
+      const sig = req.headers["x-webhook-signature"];
+      const result = await handleWebhook(req.body, Array.isArray(sig) ? sig[0] : sig);
+      res.status(200).json(result);
+    } catch (e) {
+      if (e?.statusCode === 401) return res.status(401).json({ error: "bad signature" });
+      console.error("[shamcash] webhook:", e?.message || e);
+      res.status(200).json({ received: true });
+    }
+  });
 }
 function registerPaymentRoutes(app2) {
   const config = async (req, res) => {
@@ -15891,8 +16347,10 @@ function registerPaymentRoutes(app2) {
       const mode = await getStripeMode();
       const publishableKey = await getStripePublishableKey();
       const methods = configured ? (await listAvailablePaymentMethods()).methods : [];
+      const { shamcash: _storedShamCash, ...publicSettings } = settings;
       res.json({
-        ...settings,
+        ...publicSettings,
+        shamcash: await publicShamCashStatus(tenantId),
         currency: (await currencyFor(tenantId)).toUpperCase(),
         stripe: {
           ...settings.stripe,
@@ -15914,6 +16372,7 @@ function registerPaymentRoutes(app2) {
       const tenantId = Number(req.tenantId ?? 0) || 0;
       const current = await loadGatewaySettings(tenantId);
       const merged = { ...current, ...req.body };
+      merged.shamcash = current.shamcash;
       delete merged.secretKey;
       delete merged.publishableKey;
       if (merged.stripe) {
@@ -15921,7 +16380,8 @@ function registerPaymentRoutes(app2) {
         delete merged.stripe.publishableKey;
       }
       await saveGatewaySettings(tenantId, merged);
-      res.json(merged);
+      const { shamcash: _sc, ...safe } = merged;
+      res.json(safe);
     } catch (e) {
       fail(res, e);
     }
@@ -15931,7 +16391,7 @@ function registerPaymentRoutes(app2) {
       const orderId = Number.parseInt(String(req.params.orderId), 10);
       if (!Number.isFinite(orderId)) return res.status(400).json({ error: "Invalid order id" });
       const token = String(req.body?.trackingToken ?? req.query.trackingToken ?? "");
-      const rows = await q4(
+      const rows = await q5(
         `SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`,
         [orderId]
       );
@@ -15949,7 +16409,7 @@ function registerPaymentRoutes(app2) {
     try {
       const stripe = await requireStripeClient();
       const pi = await stripe.paymentIntents.retrieve(String(req.params.paymentIntentId));
-      const orderRows = await q4(
+      const orderRows = await q5(
         `SELECT id, order_number, payment_status, tracking_token
            FROM online_orders WHERE stripe_payment_intent_id = ? LIMIT 1`,
         [pi.id]
@@ -16058,6 +16518,122 @@ function registerPaymentRoutes(app2) {
   const health = async (_req, res) => {
     res.json(await stripeAccountStatus());
   };
+  const scFail = (res, e) => {
+    if (e instanceof ShamCashError) return res.status(e.statusCode).json({ error: e.message, code: e.code });
+    fail(res, e);
+  };
+  async function orderFromToken(req, res) {
+    const orderId = Number.parseInt(String(req.params.orderId), 10);
+    if (!Number.isFinite(orderId)) {
+      res.status(400).json({ error: "Invalid order id" });
+      return null;
+    }
+    const token = String(req.body?.trackingToken ?? req.query.trackingToken ?? "");
+    const rows = await q5(`SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [orderId]);
+    if (!rows.length) {
+      res.status(404).json({ error: "Order not found" });
+      return null;
+    }
+    if (rows[0].tracking_token && token !== rows[0].tracking_token) {
+      res.status(403).json({ error: "Invalid tracking token for this order" });
+      return null;
+    }
+    return orderId;
+  }
+  app2.post("/api/payments/order/:orderId/shamcash", async (req, res) => {
+    try {
+      const id = await orderFromToken(req, res);
+      if (id == null) return;
+      res.json(await createInvoiceFor({ kind: "order", id }, PUBLIC_BASE_URL));
+    } catch (e) {
+      scFail(res, e);
+    }
+  });
+  app2.post("/api/payments/order/:orderId/shamcash/verify", async (req, res) => {
+    try {
+      const id = await orderFromToken(req, res);
+      if (id == null) return;
+      res.json(await verifyInvoice({ kind: "order", id }, String(req.body?.tranId ?? "")));
+    } catch (e) {
+      scFail(res, e);
+    }
+  });
+  app2.get("/api/payments/order/:orderId/shamcash/status", async (req, res) => {
+    try {
+      const id = await orderFromToken(req, res);
+      if (id == null) return;
+      res.json(await invoiceStatus({ kind: "order", id }));
+    } catch (e) {
+      scFail(res, e);
+    }
+  });
+  async function saleOfTenant(req, res) {
+    const saleId = Number.parseInt(String(req.params.saleId), 10);
+    if (!Number.isFinite(saleId)) {
+      res.status(400).json({ error: "Invalid sale id" });
+      return null;
+    }
+    const rows = await q5(
+      `SELECT b.tenant_id FROM sales s JOIN branches b ON b.id = s.branch_id WHERE s.id = ? LIMIT 1`,
+      [saleId]
+    );
+    if (!rows.length) {
+      res.status(404).json({ error: "Sale not found" });
+      return null;
+    }
+    if (req.tenantId && Number(rows[0].tenant_id) !== Number(req.tenantId)) {
+      res.status(403).json({ error: "Sale belongs to another store" });
+      return null;
+    }
+    return saleId;
+  }
+  app2.post("/api/payments/sale/:saleId/shamcash", async (req, res) => {
+    try {
+      const id = await saleOfTenant(req, res);
+      if (id == null) return;
+      res.json(await createInvoiceFor({ kind: "sale", id }, PUBLIC_BASE_URL));
+    } catch (e) {
+      scFail(res, e);
+    }
+  });
+  app2.post("/api/payments/sale/:saleId/shamcash/verify", async (req, res) => {
+    try {
+      const id = await saleOfTenant(req, res);
+      if (id == null) return;
+      res.json(await verifyInvoice({ kind: "sale", id }, String(req.body?.tranId ?? "")));
+    } catch (e) {
+      scFail(res, e);
+    }
+  });
+  app2.get("/api/payments/sale/:saleId/shamcash/status", async (req, res) => {
+    try {
+      const id = await saleOfTenant(req, res);
+      if (id == null) return;
+      res.json(await invoiceStatus({ kind: "sale", id }));
+    } catch (e) {
+      scFail(res, e);
+    }
+  });
+  app2.get("/api/payment-gateway/shamcash", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = Number(req.tenantId ?? 0) || 0;
+      if (!tenantId) return res.status(400).json({ error: "tenant required" });
+      res.json(await adminShamCashView(tenantId));
+    } catch (e) {
+      scFail(res, e);
+    }
+  });
+  app2.put("/api/payment-gateway/shamcash", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = Number(req.tenantId ?? 0) || 0;
+      if (!tenantId) return res.status(400).json({ error: "tenant required" });
+      const { enabled, walletId, apiKey } = req.body ?? {};
+      await saveShamCashSettings(tenantId, { enabled, walletId, apiKey });
+      res.json(await adminShamCashView(tenantId));
+    } catch (e) {
+      scFail(res, e);
+    }
+  });
   app2.get("/api/payments/health", health);
   app2.post("/api/payment-gateway/test-stripe", async (_req, res) => {
     const status2 = await stripeAccountStatus();
@@ -16213,11 +16789,11 @@ async function run(label, statement) {
 async function runStripeMigrations() {
   let added = 0;
   for (const [table, cols] of Object.entries(COLUMNS)) {
-    for (const col of cols) {
-      const name = col.split(/\s+/)[0];
+    for (const col2 of cols) {
+      const name = col2.split(/\s+/)[0];
       const ok = await run(
         `${table}.${name}`,
-        `ALTER TABLE \`${table}\` ADD COLUMN IF NOT EXISTS ${col}`
+        `ALTER TABLE \`${table}\` ADD COLUMN IF NOT EXISTS ${col2}`
       );
       if (ok) added++;
     }
@@ -16788,7 +17364,7 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 </html>`;
 
 // server/site/shell.ts
-var import_crypto6 = require("crypto");
+var import_crypto7 = require("crypto");
 
 // server/site/design.ts
 var SITE_CSS = String.raw`
@@ -17407,7 +17983,7 @@ body:has(.nav-links.open) .wa { opacity: 0; pointer-events: none; }
 function href(routePath) {
   return routePath === "/" ? "/" : `${routePath}/`;
 }
-var hash8 = (s) => (0, import_crypto6.createHash)("sha256").update(s).digest("hex").slice(0, 8);
+var hash8 = (s) => (0, import_crypto7.createHash)("sha256").update(s).digest("hex").slice(0, 8);
 var assetCache = null;
 function siteAssets() {
   if (!assetCache) {
@@ -17679,7 +18255,7 @@ function playBadges(variant = "hero") {
   return `<div class="app-downloads app-downloads--${variant}"><span class="app-downloads__title" ${tAttrs({ en: "Get the Android apps", de: "Android-Apps holen", ar: "\u062D\u0645\u0651\u0644 \u062A\u0637\u0628\u064A\u0642\u0627\u062A \u0623\u0646\u062F\u0631\u0648\u064A\u062F" })}>Get the Android apps</span><div class="play-badges">${badges}</div></div>`;
 }
 function renderFooter() {
-  const col = (title, links) => `
+  const col2 = (title, links) => `
         <div class="footer-col">
           <h4 ${tAttrs(title)}>${esc(title.en)}</h4>
           ${links.map(
@@ -17698,18 +18274,18 @@ function renderFooter() {
   })}>Point of sale, online ordering and delivery in one system. Built for Swiss and European hospitality and retail.</p>
           ${playBadges("footer")}
         </div>
-        ${col({ en: "Product", de: "Produkt", ar: "\u0627\u0644\u0645\u0646\u062A\u062C" }, [
+        ${col2({ en: "Product", de: "Produkt", ar: "\u0627\u0644\u0645\u0646\u062A\u062C" }, [
     { href: "/features/", label: { en: "Features", de: "Funktionen", ar: "\u0627\u0644\u0645\u0645\u064A\u0632\u0627\u062A" } },
     { href: "/solutions/", label: { en: "Industries", de: "Branchen", ar: "\u0627\u0644\u0645\u062C\u0627\u0644\u0627\u062A" } },
     { href: "/pricing/", label: { en: "Pricing", de: "Preise", ar: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631" } },
     { href: "/compliance/", label: { en: "Compliance", de: "Compliance", ar: "\u0627\u0644\u0627\u0645\u062A\u062B\u0627\u0644" } }
   ])}
-        ${col({ en: "Company", de: "Unternehmen", ar: "\u0627\u0644\u0634\u0631\u0643\u0629" }, [
+        ${col2({ en: "Company", de: "Unternehmen", ar: "\u0627\u0644\u0634\u0631\u0643\u0629" }, [
     { href: "/about/", label: { en: "About", de: "\xDCber uns", ar: "\u0645\u0646 \u0646\u062D\u0646" } },
     { href: "/contact/", label: { en: "Contact", de: "Kontakt", ar: "\u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627" } },
     { href: "mailto:info@kassenta.com", label: { en: "info@kassenta.com", de: "info@kassenta.com", ar: "info@kassenta.com" } }
   ])}
-        ${col({ en: "Access", de: "Zugang", ar: "\u0627\u0644\u062F\u062E\u0648\u0644" }, [
+        ${col2({ en: "Access", de: "Zugang", ar: "\u0627\u0644\u062F\u062E\u0648\u0644" }, [
     { href: "/app", label: { en: "Open the POS", de: "Kasse \xF6ffnen", ar: "\u0627\u0641\u062A\u062D \u0646\u0642\u0637\u0629 \u0627\u0644\u0628\u064A\u0639" } },
     { href: "/restaurants", label: { en: "Order online", de: "Online bestellen", ar: "\u0627\u0637\u0644\u0628 \u0623\u0648\u0646\u0644\u0627\u064A\u0646" } },
     { href: "/super_admin/login", label: { en: "Admin login", de: "Admin-Login", ar: "\u062F\u062E\u0648\u0644 \u0627\u0644\u0645\u0634\u0631\u0641" } }
@@ -20873,19 +21449,20 @@ async function initStripe() {
   try {
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sql: sql8 } = await import("drizzle-orm");
-    for (const col of [
+    for (const col2 of [
       "payment_instructions text",
       "bank_name text",
       "bank_account_holder text",
       "bank_iban text",
       "twint_number text"
     ]) {
-      await db2.execute(sql8.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS ${col}`));
+      await db2.execute(sql8.raw(`ALTER TABLE landing_page_config ADD COLUMN IF NOT EXISTS ${col2}`));
     }
   } catch (e) {
     console.log("[Migration] landing_page_config payment fields:", e.message);
   }
   await runStripeMigrations();
+  await runShamCashMigrations();
   setupCors(app);
   registerStripeWebhook(app);
   setupBodyParsing(app);
