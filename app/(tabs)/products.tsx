@@ -77,6 +77,16 @@ export default function ProductsScreen() {
   const [categoryImage, setCategoryImage] = useState<string | null>(null);
   const [initialStock, setInitialStock] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
+  // Wholesale price / minimum quantity (تجار الجملة) — kept apart from `form`.
+  const { language } = useLanguage();
+  const [wholesaleForm, setWholesaleForm] = useState({ price: "", minQty: "" });
+  useEffect(() => {
+    if (!showForm) return;
+    setWholesaleForm({
+      price: editProduct?.wholesalePrice != null ? String(editProduct.wholesalePrice) : "",
+      minQty: editProduct?.wholesaleMinQty != null ? String(editProduct.wholesaleMinQty) : "",
+    });
+  }, [showForm, editProduct]);
 
   const { data: products = [] } = useQuery<any[]>({
     queryKey: ["/api/products", `?tenantId=${tenantId}${search ? `&search=${search}` : ""}`],
@@ -207,6 +217,13 @@ export default function ProductsScreen() {
       categoryId: form.categoryId ? Number(form.categoryId) : undefined, unit: form.unit, expiryDate: form.expiryDate || undefined,
       image: imagePath || undefined, isAddon: form.isAddon,
     };
+    const wsPrice = wholesaleForm.price.trim().replace(",", ".");
+    const wsMinQty = wholesaleForm.minQty.trim();
+    if ((wsPrice && !(Number(wsPrice) >= 0)) || (wsMinQty && !(Number.isInteger(Number(wsMinQty)) && Number(wsMinQty) >= 1))) {
+      return Alert.alert(t("error"), language === "ar" ? "سعر الجملة أو الحد الأدنى للكمية غير صالح" : language === "de" ? "Großhandelspreis oder Mindestmenge ungültig" : "Invalid wholesale price or minimum quantity");
+    }
+    productData.wholesalePrice = form.isAddon || !wsPrice ? null : wsPrice;
+    productData.wholesaleMinQty = form.isAddon || !wsPrice || !wsMinQty ? null : Number(wsMinQty);
     if (!editProduct && initialStock && Number(initialStock) > 0) {
       apiRequest("POST", "/api/products-with-stock", { ...productData, initialStock: Number(initialStock), branchId: 1 })
         .then(() => {
@@ -568,6 +585,18 @@ export default function ProductsScreen() {
                   <TextInput style={[styles.input, rtlTextAlign]} value={form.costPrice} onChangeText={(v) => setForm({ ...form, costPrice: v })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" />
                 </View>
               </View>
+              {!form.isAddon && (
+                <View style={[styles.row, isRTL && { flexDirection: "row-reverse" }]}>
+                  <View style={styles.half}>
+                    <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "سعر الجملة" : language === "de" ? "Großhandelspreis" : "Wholesale price"}</Text>
+                    <TextInput style={[styles.input, rtlTextAlign]} value={wholesaleForm.price} onChangeText={(v) => setWholesaleForm((w) => ({ ...w, price: v }))} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder={language === "ar" ? "اختياري" : language === "de" ? "optional" : "optional"} />
+                  </View>
+                  <View style={styles.half}>
+                    <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "أقل كمية للجملة" : language === "de" ? "Mindestmenge Großhandel" : "Min. wholesale qty"}</Text>
+                    <TextInput style={[styles.input, rtlTextAlign]} value={wholesaleForm.minQty} onChangeText={(v) => setWholesaleForm((w) => ({ ...w, minQty: v.replace(/[^0-9]/g, "") }))} keyboardType="number-pad" placeholderTextColor={Colors.textMuted} placeholder="1" editable={!!wholesaleForm.price.trim()} />
+                  </View>
+                </View>
+              )}
               <Text style={[styles.label, rtlTextAlign]}>SKU</Text>
               <TextInput style={[styles.input, rtlTextAlign]} value={form.sku} onChangeText={(v) => setForm({ ...form, sku: v })} placeholderTextColor={Colors.textMuted} placeholder="SKU-001" />
 

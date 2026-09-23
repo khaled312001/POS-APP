@@ -73,6 +73,10 @@ export const products = mysqlTable("products", {
   modifiers: json("modifiers").$type<{ name: string; options: { label: string; price: number }[] }[]>().default([]),
   variants: json("variants").$type<{ name: string; sku: string; price: number; stock: number }[]>().default([]),
   isAddon: boolean("is_addon").default(false),
+  // Wholesale (server/wholesale.ts): price for wholesale traders, applied from
+  // wholesaleMinQty units upwards when set.
+  wholesalePrice: decimal("wholesale_price", { precision: 12, scale: 2 }),
+  wholesaleMinQty: int("wholesale_min_qty"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -152,6 +156,14 @@ export const customers = mysqlTable("customers", {
   referredByCode: varchar("referred_by_code", { length: 16 }),
   fcmToken: text("fcm_token"),
   loyaltyTier: text("loyalty_tier").default("bronze"),
+  // ── Wholesale traders (server/wholesale.ts) ──
+  // creditLimit / wholesaleBalance / customerType are written only by the
+  // wholesale module; the generic customer routes strip them.
+  customerType: varchar("customer_type", { length: 20 }).default("retail"),
+  shopName: varchar("shop_name", { length: 160 }),
+  taxNumber: varchar("tax_number", { length: 64 }),
+  creditLimit: decimal("credit_limit", { precision: 14, scale: 2 }),
+  wholesaleBalance: decimal("wholesale_balance", { precision: 14, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -964,6 +976,25 @@ export const loyaltyTransactions = mysqlTable("loyalty_transactions", {
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Wholesale trader ledger: collections (payment), manual debits (charge) and
+// returns against credit sales (return). Credit sales themselves are the
+// sales rows with payment_method = 'credit'. Created by runWholesaleMigrations.
+export const wholesalePayments = mysqlTable("wholesale_payments", {
+  id: serial("id").primaryKey(),
+  tenantId: int("tenant_id").notNull(),
+  customerId: int("customer_id").notNull(),
+  kind: varchar("kind", { length: 20 }).notNull().default("payment"),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  method: varchar("method", { length: 30 }),
+  note: varchar("note", { length: 500 }),
+  saleId: int("sale_id"),
+  returnId: int("return_id"),
+  employeeId: int("employee_id"),
+  balanceAfter: decimal("balance_after", { precision: 14, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export type WholesalePayment = typeof wholesalePayments.$inferSelect;
 
 export const walletTransactions = mysqlTable("wallet_transactions", {
   id: serial("id").primaryKey(),

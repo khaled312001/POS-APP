@@ -30,6 +30,11 @@ import {
   getDeliveryZoneForLocation, generateTrackingToken,
   creditWallet, deductWallet,
 } from "./deliveryService";
+import {
+  normalizeWholesaleProductFields, stripProtectedCustomerFields,
+  holdCreditForSale, releaseCreditHold, reverseCreditSale, creditReturnForSale,
+  type CreditHold,
+} from "./wholesale";
 
 const TIMESTAMP_FIELDS = [
   "createdAt", "updatedAt", "expiryDate", "expectedDate", "receivedDate",
@@ -1071,7 +1076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/products", async (req, res) => {
     try {
-      const body = sanitizeDates(req.body);
+      const body = normalizeWholesaleProductFields(sanitizeDates(req.body));
       // Addons are always free
       if (body.isAddon) body.price = "0";
       const p = await storage.createProduct(body);
@@ -1081,7 +1086,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.put("/api/products/:id", async (req, res) => {
     try {
-      const body = sanitizeDates(req.body);
+      const body = normalizeWholesaleProductFields(sanitizeDates(req.body));
       // Addons are always free
       if (body.isAddon) body.price = "0";
       const p = await storage.updateProduct(Number(req.params.id), body);
@@ -1400,10 +1405,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.post("/api/customers", async (req, res) => {
-    try { res.json(await storage.createCustomer(sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.createCustomer(stripProtectedCustomerFields(sanitizeDates(req.body)))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.put("/api/customers/:id", async (req, res) => {
-    try { res.json(await storage.updateCustomer(Number(req.params.id), sanitizeDates(req.body))); } catch (e: any) { res.status(500).json({ error: e.message }); }
+    try { res.json(await storage.updateCustomer(Number(req.params.id), stripProtectedCustomerFields(sanitizeDates(req.body)))); } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   app.delete("/api/customers/:id", async (req, res) => {
     try { await storage.deleteCustomer(Number(req.params.id)); res.json({ success: true }); } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -1448,7 +1453,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const swissDateRcp = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replace(/-/g, "");
       const dailySeqRcp = await storage.getNextSequenceNumber(`branch-${saleData.branchId || 0}`);
       const receiptNumber = `${saleData.branchId || 0}-${swissDateRcp}-${dailySeqRcp}`;
-      const sale = await storage.createSale({ ...saleData, receiptNumber });
+      // Wholesale credit (آجل): the amount goes on the trader's account under a
+      // row lock and is refused over the credit limit — see server/wholesale.ts.
+      let creditHold: CreditHold | null = null;
+      if (saleData.paymentMethod === "credit") {
+        try {
+          creditHold = await holdCreditForSale((req as any).tenantId, saleData.customerId, saleData.totalAmount);
+        } catch (err: any) {
+          return res.status(err?.statusCode || 400).json({ error: err?.message, code: err?.code, ...(err?.details || {}) });
+        }
+        saleData.customerId = creditHold.customerId;
+        saleData.totalAmount = (creditHold.cents / 100).toFixed(2);
+        saleData.paymentStatus = "pending";
+      }
+      const sale = await storage.createSale({ ...saleData, receiptNumber }).catch(async (err: any) => {
+        if (creditHold) await releaseCreditHold(creditHold);
+        throw err;
+      });
       if (items && items.length > 0) {
         for (const item of items) {
           await storage.createSaleItem({ ...item, saleId: sale.id });
@@ -1626,6 +1647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/sales/:id", async (req, res) => {
     try {
+      await reverseCreditSale((req as any).tenantId, Number(req.params.id));
       await storage.deleteSale(Number(req.params.id));
       res.json({ success: true });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -2029,6 +2051,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Mark original sale as refunded
       if (returnData.originalSaleId) {
         await storage.updateSale(returnData.originalSaleId, { status: "refunded" });
+        // Goods back from a wholesale credit sale: the trader owes less.
+        try {
+          await creditReturnForSale((req as any).tenantId, returnData.originalSaleId, ret.id, returnData.totalAmount, returnData.employeeId ?? null);
+        } catch (err: any) {
+          console.error("[/api/returns] wholesale balance not reduced:", err?.message || err);
+        }
       }
       // Log activity
       await storage.createActivityLog({
@@ -2448,7 +2476,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create product with initial stock
   app.post("/api/products-with-stock", async (req, res) => {
     try {
-      const { initialStock, branchId, ...productData } = sanitizeDates(req.body);
+      const { initialStock, branchId, ...productData } = normalizeWholesaleProductFields(sanitizeDates(req.body));
       const product = await storage.createProduct(productData);
       if (initialStock && initialStock > 0 && branchId) {
         await storage.upsertInventory({ productId: product.id, branchId: Number(branchId), quantity: Number(initialStock) });
