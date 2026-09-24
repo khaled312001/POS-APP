@@ -1,225 +1,240 @@
 /**
- * cart.js — Cart state management with localStorage persistence
- * Supports product items, modifiers, quantity management, and totals.
+ * cart.js — cart state, persisted per store.
+ *
+ * A line is { _key, productId, name, image, price, variant, mods, notes, qty }
+ *   price   unit price before modifiers (the variant's price when one is chosen)
+ *   mods    [{ group, label, price }] — group/label exactly as in products.modifiers,
+ *           because the server re-prices every line by matching those names.
+ *
+ * The server is the authority on money: it re-prices each order from its own
+ * product rows. The numbers here only drive the UI, but they use the same
+ * rules so the customer sees what they will actually be charged.
  */
+(function () {
+  "use strict";
 
-const CART_KEY = "barmagly_cart";
+  var s = window.safeStorage;
+  var VERSION = 2;
 
-const cart = {
-  _items: [],   // [{ productId, name, price, image, qty, modifiers, modifierPrice }]
-  _tenantId: null,
-  _slug: null,
-  _orderType: "delivery",  // "delivery" | "pickup" | "dine_in"
-  _promo: null,            // { code, discountType, discountValue, promoCodeId }
-  _discountAmount: 0,
-  _notes: "",
-  _tableQrToken: null,     // QR token for dine-in orders
-  _tableName: null,        // Table name for dine-in orders
+  var cart = {
+    _items: [],
+    _tenantId: null,
+    _orderType: "delivery",
+    _promo: null,          // { code, promoCodeId, discountType, discountValue, maxDiscountCap, minOrderAmount }
+    _notes: "",
+    _tableQrToken: null,
+    _tableName: null,
+    _listeners: [],
 
-  // ── Init ────────────────────────────────────────────────────────────────────
-  init(tenantId, slug) {
-    this._tenantId = tenantId;
-    this._slug = slug;
-    this._load();
-    // Clear cart if it's for a different tenant
-    if (this._items.length > 0 && this._items[0]._tenantId !== tenantId) {
-      this._items = [];
-      this._save();
-    }
-  },
+    _key: function () { return "kassenta_cart_v2_" + (cart._tenantId || "x"); },
 
-  // ── Persistence ─────────────────────────────────────────────────────────────
-  _load() {
-    try {
-      const raw = localStorage.getItem(CART_KEY);
-      const data = raw ? JSON.parse(raw) : null;
-      if (data && data.tenantId === this._tenantId) {
-        this._items = data.items || [];
-        this._orderType = data.orderType || "delivery";
-        this._promo = data.promo || null;
-        this._discountAmount = data.discountAmount || 0;
-        this._notes = data.notes || "";
-        this._tableQrToken = data.tableQrToken || null;
-        this._tableName = data.tableName || null;
-      } else {
-        this._items = [];
+    init: function (tenantId) {
+      cart._tenantId = tenantId;
+      var d = s.json(cart._key(), null);
+      if (d && d.v === VERSION && Array.isArray(d.items)) {
+        cart._items = d.items.filter(function (i) { return i && i.productId && i.qty > 0; });
+        cart._orderType = d.orderType || "delivery";
+        cart._promo = d.promo || null;
+        cart._notes = d.notes || "";
+        cart._tableQrToken = d.tableQrToken || null;
+        cart._tableName = d.tableName || null;
       }
-    } catch {
-      this._items = [];
-    }
-  },
+      // Retire the old shared cart (different line format, other stores mixed in).
+      s.del("barmagly_cart");
+    },
 
-  _save() {
-    localStorage.setItem(CART_KEY, JSON.stringify({
-      tenantId: this._tenantId,
-      slug: this._slug,
-      items: this._items,
-      orderType: this._orderType,
-      promo: this._promo,
-      discountAmount: this._discountAmount,
-      notes: this._notes,
-      tableQrToken: this._tableQrToken,
-      tableName: this._tableName,
-    }));
-    this._emit();
-  },
+    _save: function (silent) {
+      s.set(cart._key(), JSON.stringify({
+        v: VERSION,
+        items: cart._items,
+        orderType: cart._orderType,
+        promo: cart._promo,
+        notes: cart._notes,
+        tableQrToken: cart._tableQrToken,
+        tableName: cart._tableName,
+      }));
+      if (!silent) cart._emit();
+    },
 
-  // ── Events ──────────────────────────────────────────────────────────────────
-  _listeners: [],
+    onChange: function (fn) {
+      cart._listeners.push(fn);
+      return function () { cart._listeners = cart._listeners.filter(function (l) { return l !== fn; }); };
+    },
+    _emit: function () {
+      var st = cart.getState();
+      cart._listeners.slice().forEach(function (fn) { try { fn(st); } catch (e) { console.error(e); } });
+    },
 
-  onChange(fn) {
-    this._listeners.push(fn);
-    return () => {
-      this._listeners = this._listeners.filter(l => l !== fn);
-    };
-  },
+    unitPrice: function (i) {
+      return (Number(i.price) || 0) + (i.mods || []).reduce(function (a, m) { return a + (Number(m.price) || 0); }, 0);
+    },
+    lineTotal: function (i) { return kx.roundMoney(cart.unitPrice(i) * i.qty); },
 
-  _emit() {
-    this._listeners.forEach(fn => fn(this.getState()));
-  },
+    count: function () { return cart._items.reduce(function (a, i) { return a + i.qty; }, 0); },
+    subtotal: function () { return kx.roundMoney(cart._items.reduce(function (a, i) { return a + cart.lineTotal(i); }, 0)); },
+    isEmpty: function () { return cart._items.length === 0; },
 
-  // ── State ───────────────────────────────────────────────────────────────────
-  getState() {
-    return {
-      items: this._items,
-      count: this.count(),
-      subtotal: this.subtotal(),
-      orderType: this._orderType,
-      promo: this._promo,
-      discountAmount: this._discountAmount,
-      promoCodeId: this._promo?.promoCodeId || null,
-      notes: this._notes,
-      tableQrToken: this._tableQrToken,
-      tableName: this._tableName,
-    };
-  },
+    /** Discount the applied promo is worth on the current basket (0 when it no longer qualifies). */
+    discount: function () {
+      var p = cart._promo;
+      if (!p) return 0;
+      var sub = cart.subtotal();
+      if (p.minOrderAmount && sub < Number(p.minOrderAmount)) return 0;
+      var v = Number(p.discountValue) || 0;
+      var d = 0;
+      if (p.discountType === "percent") {
+        d = sub * v / 100;
+        if (p.maxDiscountCap) d = Math.min(d, Number(p.maxDiscountCap));
+      } else if (p.discountType === "fixed") {
+        d = Math.min(v, sub);
+      }
+      return kx.roundMoney(Math.max(0, Math.min(d, sub)));
+    },
 
-  count() {
-    return this._items.reduce((sum, i) => sum + i.qty, 0);
-  },
+    getState: function () {
+      return {
+        items: cart._items,
+        count: cart.count(),
+        subtotal: cart.subtotal(),
+        discountAmount: cart.discount(),
+        orderType: cart._orderType,
+        promo: cart._promo,
+        promoCodeId: cart._promo ? cart._promo.promoCodeId : null,
+        notes: cart._notes,
+        tableQrToken: cart._tableQrToken,
+        tableName: cart._tableName,
+      };
+    },
 
-  subtotal() {
-    return this._items.reduce((sum, i) => sum + (i.price + (i.modifierPrice || 0)) * i.qty, 0);
-  },
+    setOrderType: function (type) {
+      if (cart._orderType === "dine_in" && cart._tableQrToken && type !== "dine_in") {
+        cart._tableQrToken = null;
+        cart._tableName = null;
+      }
+      cart._orderType = (type === "pickup" || type === "dine_in") ? type : "delivery";
+      cart._save();
+    },
+    setDineIn: function (token, tableName) {
+      cart._orderType = "dine_in";
+      cart._tableQrToken = token;
+      cart._tableName = tableName || null;
+      cart._save();
+    },
+    setPromo: function (promo) { cart._promo = promo || null; cart._save(); },
+    clearPromo: function () { cart._promo = null; cart._save(); },
+    setNotes: function (n) { cart._notes = String(n || "").slice(0, 300); cart._save(true); },
 
-  isEmpty() {
-    return this._items.length === 0;
-  },
+    _lineKey: function (productId, variant, mods, notes) {
+      var m = (mods || []).map(function (x) { return x.group + ":" + x.label; }).sort().join(",");
+      return [productId, variant || "", m, (notes || "").trim()].join("|");
+    },
 
-  // ── Order metadata ──────────────────────────────────────────────────────────
-  setOrderType(type) {
-    this._orderType = (type === "pickup" || type === "dine_in") ? type : "delivery";
-    this._save();
-  },
+    /**
+     * Add a product. `opts` = { qty, variant: {name, price}|null, mods: [{group,label,price}], notes }
+     */
+    add: function (product, opts) {
+      opts = opts || {};
+      var qty = Math.max(1, Math.min(99, Number(opts.qty) || 1));
+      var variant = opts.variant || null;
+      var mods = (opts.mods || []).map(function (m) { return { group: m.group, label: m.label, price: Number(m.price) || 0 }; });
+      var notes = (opts.notes || "").trim().slice(0, 200);
+      var key = cart._lineKey(product.id, variant && variant.name, mods, notes);
+      var existing = cart._items.find(function (i) { return i._key === key; });
+      if (existing) {
+        existing.qty = Math.min(99, existing.qty + qty);
+      } else {
+        cart._items.push({
+          _key: key,
+          productId: product.id,
+          name: product.name || "",
+          nameAr: product.nameAr || "",
+          image: shop.productImage(product) || null,
+          price: variant ? Number(variant.price) || 0 : Number(product.price) || 0,
+          variant: variant ? variant.name : null,
+          mods: mods,
+          notes: notes,
+          qty: qty,
+        });
+      }
+      cart._save();
+    },
 
-  setDineIn(tableQrToken, tableName) {
-    this._orderType = "dine_in";
-    this._tableQrToken = tableQrToken;
-    this._tableName = tableName;
-    this._save();
-  },
+    setQty: function (key, qty) {
+      var item = cart._items.find(function (i) { return i._key === key; });
+      if (!item) return;
+      if (qty <= 0) cart._items = cart._items.filter(function (i) { return i._key !== key; });
+      else item.qty = Math.min(99, qty);
+      cart._save();
+    },
+    removeItem: function (key) { cart.setQty(key, 0); },
 
-  setPromo(promo, discountAmount) {
-    this._promo = promo || null;
-    this._discountAmount = discountAmount || 0;
-    this._save();
-  },
+    clear: function () {
+      cart._items = [];
+      cart._promo = null;
+      cart._notes = "";
+      cart._save();
+    },
 
-  clearPromo() {
-    this._promo = null;
-    this._discountAmount = 0;
-    this._save();
-  },
-
-  setNotes(notes) {
-    this._notes = notes || "";
-    this._save();
-  },
-
-  // ── Mutations ───────────────────────────────────────────────────────────────
-  addItem(product, qty = 1, modifiers = [], modifierPrice = 0) {
-    const key = this._itemKey(product.id, modifiers);
-    const existing = this._items.find(i => i._key === key);
-    if (existing) {
-      existing.qty += qty;
-    } else {
-      this._items.push({
-        _key: key,
-        productId: product.id,
-        name: product.name,
-        price: parseFloat(product.price) || 0,
-        image: product.imageUrl || null,
-        qty,
-        modifiers,
-        modifierPrice,
+    /** Summary strings, one per group, in the exact form the server prices. */
+    modLines: function (item) {
+      var groups = [];
+      var byGroup = {};
+      (item.mods || []).forEach(function (m) {
+        if (!byGroup[m.group]) { byGroup[m.group] = []; groups.push(m.group); }
+        byGroup[m.group].push(m.label);
       });
-    }
-    this._save();
-  },
+      return groups.map(function (g) { return g ? g + ": " + byGroup[g].join(", ") : byGroup[g].join(", "); });
+    },
 
-  setQty(key, qty) {
-    const item = this._items.find(i => i._key === key);
-    if (!item) return;
-    if (qty <= 0) {
-      this._items = this._items.filter(i => i._key !== key);
-    } else {
-      item.qty = qty;
-    }
-    this._save();
-  },
+    /** Options as the customer reads them under the item name. */
+    describe: function (item) {
+      var parts = [];
+      if (item.variant) parts.push(item.variant);
+      (item.mods || []).forEach(function (m) { parts.push(m.label); });
+      return parts.join(" · ");
+    },
 
-  /** Alias: accepts _key OR productId (string or number) for convenience */
-  updateQty(keyOrProductId, qty) {
-    const item = this._items.find(i =>
-      i._key === keyOrProductId ||
-      String(i.productId) === String(keyOrProductId)
-    );
-    if (item) this.setQty(item._key, qty);
-  },
+    payloadItems: function () {
+      return cart._items.map(function (i) {
+        return {
+          productId: i.productId,
+          productName: i.name,
+          quantity: i.qty,
+          unitPrice: cart.unitPrice(i),
+          variant: i.variant || null,
+          modifiers: cart.modLines(i),
+          notes: i.notes || null,
+        };
+      });
+    },
 
-  removeItem(keyOrProductId) {
-    const item = this._items.find(i =>
-      i._key === keyOrProductId ||
-      String(i.productId) === String(keyOrProductId)
-    );
-    if (item) {
-      this._items = this._items.filter(i => i._key !== item._key);
-      this._save();
-    }
-  },
+    /** Drop lines whose product disappeared from the menu (or changed price). */
+    reconcile: function (menu) {
+      if (!menu || !menu.byId) return [];
+      var removed = [];
+      cart._items = cart._items.filter(function (i) {
+        var p = menu.byId[i.productId];
+        if (!p) { removed.push(i.name); return false; }
+        if (!i.variant) i.price = Number(p.price) || 0;
+        else {
+          var v = shop.variants(p).find(function (x) { return x.name === i.variant; });
+          if (!v) { removed.push(i.name); return false; }
+          i.price = v.price;
+        }
+        var groups = shop.modGroups(p);
+        i.mods = (i.mods || []).filter(function (m) {
+          var g = groups.find(function (x) { return x.name === m.group; });
+          var o = g && g.options.find(function (x) { return x.label === m.label; });
+          if (o) m.price = o.price;
+          return !!o;
+        });
+        i.image = shop.productImage(p) || i.image;
+        return true;
+      });
+      cart._save();
+      return removed;
+    },
+  };
 
-  clear() {
-    this._items = [];
-    this._save();
-  },
-
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-  _itemKey(productId, modifiers) {
-    const modStr = modifiers.map(m => `${m.groupId}:${m.optionId}`).sort().join(",");
-    return `${productId}|${modStr}`;
-  },
-
-  /** Build the payload for POST /api/delivery/orders */
-  buildOrderPayload(opts = {}) {
-    return {
-      tenantId: this._tenantId,
-      items: this._items.map(i => ({
-        productId: i.productId,
-        productName: i.name,
-        quantity: i.qty,
-        unitPrice: i.price,
-        modifiers: i.modifiers,
-      })),
-      subtotal: this.subtotal().toFixed(2),
-      orderType: this._orderType,
-      promoCodeId: this._promo?.promoCodeId || null,
-      discountAmount: this._discountAmount.toFixed(2),
-      notes: this._notes,
-      tableQrToken: this._tableQrToken || null,
-      tableNumber: this._tableName || null,
-      ...opts,
-    };
-  },
-};
-
-window.cart = cart;
+  window.cart = cart;
+})();

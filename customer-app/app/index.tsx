@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { WebView, WebViewNavigation } from "react-native-webview";
 import { signInWithGoogleNative, GoogleSignInCancelled } from "@/lib/google-signin";
 
@@ -67,9 +68,20 @@ function isAppScheme(url: string): boolean {
  */
 const NATIVE_FLAG = "window.__KASSENTA_NATIVE__ = true; true;";
 
+/** Light theme is the page default; the page reports theme switches (see onMessage). */
+const LIGHT_BG = "#F2F6F5";
+const DARK_BG = "#040E32";
+const ACCENT = "#0A6E65";
+
+function isHexColor(v: unknown): v is string {
+  return typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
+}
+
 export default function CustomerWebView() {
   const webRef = useRef<WebView>(null);
   const [canGoBack, setCanGoBack] = useState(false);
+  // Status bar + surrounding chrome follow the page's light/dark theme.
+  const [chrome, setChrome] = useState<{ dark: boolean; bg: string }>({ dark: false, bg: LIGHT_BG });
 
   /** Hands an ID token — or a failure — back to the page that asked for it. */
   const replyToPage = (payload: Record<string, unknown>) => {
@@ -80,11 +92,16 @@ export default function CustomerWebView() {
   };
 
   const onMessage = async (event: { nativeEvent: { data: string } }) => {
-    let msg: { type?: string };
+    let msg: { type?: string; mode?: string; color?: string };
     try {
       msg = JSON.parse(event.nativeEvent.data);
     } catch {
       return; // not ours
+    }
+    if (msg.type === "theme") {
+      const dark = msg.mode === "dark";
+      setChrome({ dark, bg: isHexColor(msg.color) ? msg.color : dark ? DARK_BG : LIGHT_BG });
+      return;
     }
     if (msg.type !== "google-signin") return;
 
@@ -113,11 +130,12 @@ export default function CustomerWebView() {
   }, [canGoBack]);
 
   return (
-    <SafeAreaView style={styles.root} edges={["top", "bottom", "left", "right"]}>
+    <SafeAreaView style={[styles.root, { backgroundColor: chrome.bg }]} edges={["top", "bottom", "left", "right"]}>
+      <StatusBar style={chrome.dark ? "light" : "dark"} backgroundColor={chrome.bg} />
       <WebView
         ref={webRef}
         source={{ uri: CUSTOMER_URL }}
-        style={styles.web}
+        style={[styles.web, { backgroundColor: chrome.bg }]}
         originWhitelist={[ALLOWED_ORIGIN, ...PAYMENT_HOSTS.map((h) => `https://*.${h}`)]}
         onShouldStartLoadWithRequest={(req) => {
           if (isInAppUrl(req.url)) return true;
@@ -144,8 +162,8 @@ export default function CustomerWebView() {
         pullToRefreshEnabled
         startInLoadingState
         renderLoading={() => (
-          <View style={styles.loader}>
-            <ActivityIndicator size="large" color="#FF5722" />
+          <View style={[styles.loader, { backgroundColor: chrome.bg }]}>
+            <ActivityIndicator size="large" color={ACCENT} />
           </View>
         )}
         onNavigationStateChange={(nav: WebViewNavigation) =>
@@ -157,8 +175,8 @@ export default function CustomerWebView() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#070A12" },
-  web: { flex: 1, backgroundColor: "#070A12" },
+  root: { flex: 1, backgroundColor: LIGHT_BG },
+  web: { flex: 1, backgroundColor: LIGHT_BG },
   loader: {
     position: "absolute",
     top: 0,
@@ -167,6 +185,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#070A12",
+    backgroundColor: LIGHT_BG,
   },
 });

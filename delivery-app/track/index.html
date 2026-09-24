@@ -1,536 +1,583 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr" id="html-root">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" id="theme-meta" content="#FF5722" />
-  <title id="page-title">Track Your Order</title>
-
-  <link rel="stylesheet" href="/api/delivery-app/css/base.css" />
-  <link rel="stylesheet" href="/api/delivery-app/css/components.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
-  <link rel="stylesheet" href="/api/delivery-app/track/track.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#F2F6F5" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#040E32" media="(prefers-color-scheme: dark)" />
+  <meta name="robots" content="noindex" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>Order tracking</title>
+  <script>
+    // Language and theme before first paint: ?lang=, then the saved theme.
+    (function () {
+      try {
+        var q = new URLSearchParams(location.search).get("lang");
+        if (q === "ar") { document.documentElement.lang = "ar"; document.documentElement.dir = "rtl"; }
+        var t = localStorage.getItem("kassenta_theme");
+        if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    html, body { margin: 0; background: #F2F6F5; }
+    html[data-theme="dark"], html[data-theme="dark"] body { background: #040E32; }
+    @media (prefers-color-scheme: dark) { html:not([data-theme]), html:not([data-theme]) body { background: #040E32; } }
+  </style>
+  <link rel="stylesheet" href="/api/delivery-app/css/base.css?v=20260925a" />
+  <style>
+    :root { --safe-b: env(safe-area-inset-bottom, 0px); --good: var(--delivery-success); --bad: var(--delivery-danger); --warn: var(--delivery-warning); --brand: var(--delivery-primary); --brand-ink: var(--brand); }
+    html[data-theme="dark"] { --brand-ink: color-mix(in srgb, var(--brand) 45%, #fff); }
+    @media (prefers-color-scheme: dark) { html:not([data-theme]) { --brand-ink: color-mix(in srgb, var(--brand) 45%, #fff); } }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Arabic", Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); padding-bottom: calc(24px + var(--safe-b)); }
+    p { color: inherit; margin: 0; }
+    .muted { color: var(--text-2); }
+    .small { font-size: .85rem; }
+    .wrap { max-width: 640px; margin: 0 auto; padding: 0 16px; display: grid; gap: 14px; }
+    .top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px; height: 60px; padding: 0 12px; padding-top: env(safe-area-inset-top, 0px); background: color-mix(in srgb, var(--surface) 92%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+    .top__brand { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 800; }
+    .top__brand img, .top__brand .ph { width: 36px; height: 36px; border-radius: 10px; object-fit: cover; flex: none; background: var(--accent-soft); color: var(--brand-ink); display: grid; place-items: center; }
+    .top__brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .icon-btn { width: 44px; height: 44px; border-radius: 50%; display: inline-grid; place-items: center; color: var(--text); flex: none; }
+    .icon-btn:hover { background: var(--surface-2); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; box-shadow: var(--shadow-xs); display: grid; gap: 12px; min-width: 0; }
+    .card h2 { font-size: 1rem; font-weight: 800; margin: 0; display: flex; align-items: center; gap: 8px; }
+    .card h2 svg { color: var(--brand-ink); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: .95rem; border: 1px solid transparent; cursor: pointer; text-decoration: none; position: relative; }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-soft { background: var(--accent-soft); color: var(--brand-ink); }
+    .btn-ghost { background: transparent; color: var(--text); }
+    .btn-block { width: 100%; }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-row .btn { flex: 1 1 140px; }
+    .btn.is-loading { color: transparent !important; pointer-events: none; }
+    .btn.is-loading > * { visibility: hidden; }
+    .btn.is-loading::after { content: ""; position: absolute; inset: 0; margin: auto; width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid rgba(255,255,255,.45); border-top-color: #fff; animation: spin .7s linear infinite; }
+    .btn-soft.is-loading::after { border-color: var(--border-2); border-top-color: var(--brand); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--brand); animation: spin .8s linear infinite; }
+    .state { display: grid; justify-items: center; text-align: center; gap: 12px; padding: 72px 24px; }
+    .state h1 { font-size: 1.25rem; margin: 0; }
+    .banner { display: flex; gap: 10px; align-items: flex-start; padding: 14px 16px; border-radius: 16px; font-weight: 700; }
+    .banner--good { background: var(--delivery-success-light); color: var(--good); }
+    .banner--warn { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+    .banner--bad { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+    .banner p { font-weight: 500; margin-top: 2px; }
+    .hero { text-align: center; justify-items: center; padding: 22px 16px; }
+    .hero__icon { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--brand-ink); position: relative; }
+    .hero__icon.live::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--brand); opacity: .5; animation: pulse 1.8s ease-out infinite; }
+    .hero__icon--done { background: var(--good); color: #fff; }
+    .hero__icon--bad { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+    @keyframes pulse { from { transform: scale(.9); opacity: .6; } to { transform: scale(1.25); opacity: 0; } }
+    .hero__status { font-size: 1.4rem; font-weight: 800; margin: 4px 0 0; }
+    .hero__num { font-weight: 700; }
+    .hero__meta { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; font-size: .8rem; }
+    .hero__meta button { color: var(--brand-ink); font-weight: 700; min-height: 32px; padding: 0 6px; }
+    .steps { display: grid; gap: 0; }
+    .step { display: grid; grid-template-columns: 30px 1fr; gap: 12px; position: relative; padding-bottom: 16px; }
+    .step:last-child { padding-bottom: 0; }
+    .step::before { content: ""; position: absolute; top: 30px; bottom: 0; inset-inline-start: 14px; width: 2px; background: var(--border); }
+    .step:last-child::before { display: none; }
+    .step.done::before { background: var(--brand); }
+    .step__dot { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); border: 2px solid var(--border-2); color: var(--text-dim); font-size: .8rem; font-weight: 800; z-index: 1; }
+    .step.done .step__dot { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .step.now .step__dot { border-color: var(--brand); color: var(--brand-ink); box-shadow: 0 0 0 4px var(--accent-ring); }
+    .step__label { font-weight: 700; padding-top: 4px; color: var(--text-2); }
+    .step.done .step__label, .step.now .step__label { color: var(--text); }
+    .step.now .step__label { color: var(--brand-ink); }
+    .step__sub { font-size: .82rem; color: var(--text-2); font-weight: 500; }
+    .row { display: flex; justify-content: space-between; gap: 12px; font-size: .95rem; color: var(--text-2); }
+    .row span:last-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .row--good { color: var(--good); font-weight: 700; }
+    .row--total { color: var(--text); font-weight: 800; font-size: 1.1rem; border-top: 1px dashed var(--border-2); padding-top: 10px; }
+    .items { display: grid; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+    .items li { display: flex; gap: 8px; }
+    .items__q { font-weight: 800; color: var(--brand-ink); flex: none; }
+    .items__n { flex: 1; min-width: 0; }
+    .items__n small { display: block; color: var(--text-2); }
+    .items__p { font-weight: 700; white-space: nowrap; }
+    .kv { display: grid; gap: 2px; }
+    .kv span { font-size: .8rem; color: var(--text-2); font-weight: 600; }
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: .78rem; font-weight: 800; background: var(--surface-2); color: var(--text-2); }
+    .badge--good { background: var(--delivery-success-light); color: var(--good); }
+    .badge--warn { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
+    .driver { display: flex; align-items: center; gap: 12px; }
+    .driver__av { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--brand-ink); flex: none; }
+    .driver__txt { flex: 1; min-width: 0; display: grid; }
+    .map { height: 240px; border-radius: 16px; overflow: hidden; background: var(--surface-2); }
+    .sham__amount { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--accent-soft); flex-wrap: wrap; }
+    .sham__amount strong { flex: 1; font-size: 1.25rem; color: var(--brand-ink); }
+    .sham__qr { width: 200px; max-width: 70%; aspect-ratio: 1; object-fit: contain; margin: 0 auto; background: #fff; padding: 10px; border-radius: 16px; border: 1px solid var(--border); }
+    .field { display: grid; gap: 6px; }
+    .field span { font-weight: 700; font-size: .9rem; }
+    .input { width: 100%; min-height: 48px; padding: 11px 14px; border: 1.5px solid var(--border-2); border-radius: 14px; background: var(--surface); color: var(--text); font-size: 16px; }
+    .input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--accent-ring); outline: none; }
+    .err { color: var(--bad); font-weight: 600; font-size: .88rem; }
+    .err[hidden] { display: none; }
+    .stars { display: flex; justify-content: center; gap: 6px; direction: ltr; }
+    .stars button { font-size: 2.1rem; line-height: 1; width: 48px; height: 48px; color: var(--border-2); }
+    .stars button.on { color: #F5A524; }
+    .toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 50; background: var(--text); color: var(--surface); padding: 12px 18px; border-radius: 14px; font-weight: 600; box-shadow: var(--shadow-lg); max-width: calc(100vw - 32px); }
+    .toast--good { background: #0F7A57; color: #fff; }
+    .toast--bad { background: #B42323; color: #fff; }
+    .foot { text-align: center; padding: 8px 0 0; }
+    [hidden] { display: none !important; }
+    @media (prefers-reduced-motion: reduce) { .hero__icon.live::after, .spinner { animation: none; } }
+  </style>
 </head>
 <body>
+  <header class="top">
+    <a class="icon-btn" id="back" href="/" aria-label="Back"></a>
+    <div class="top__brand" id="brand"><span class="ph" id="brand-ph"></span><span id="brand-name"></span></div>
+    <button class="icon-btn" id="share" hidden aria-label="Share"></button>
+  </header>
+  <main class="wrap" id="main">
+    <div class="state"><div class="spinner"></div></div>
+  </main>
 
-  <!-- Header -->
-  <div id="track-header">
-    <div class="track-header__logo">
-      <div class="track-header__logo-icon" id="store-logo-wrap"><i data-lucide="bike" class="icon-md"></i></div>
-      <span class="track-header__store" id="store-name-label">Delivery</span>
-    </div>
-    <h1 id="header-title">Order Tracking</h1>
-    <p id="track-order-num">Loading...</p>
-    <div class="header-actions">
-      <button class="header-btn" id="share-btn" title="Share" onclick="shareOrder()" style="display:none"><i data-lucide="share-2" class="icon-md"></i></button>
-    </div>
-  </div>
-
-  <!-- Loading -->
-  <div id="loading">
-    <div class="spinner"></div>
-    <p id="loading-text">Loading order...</p>
-  </div>
-
-  <!-- Error -->
-  <div id="error-state">
-    <div class="error-icon"><i data-lucide="alert-triangle" class="icon-2xl"></i></div>
-    <h2 id="error-title">Order not found</h2>
-    <p class="error-msg" id="error-msg">The tracking link may be invalid or expired.</p>
-    <button class="retry-btn" onclick="loadOrder()">Try Again</button>
-  </div>
-
-  <!-- Main content -->
-  <div id="track-content" class="hidden">
-    <!-- Map or placeholder -->
-    <div class="map-wrap">
-      <div id="map-placeholder"><span><i data-lucide="map" class="icon-2xl"></i></span></div>
-      <div id="map" style="display:none"></div>
-    </div>
-
-    <div class="track-body">
-      <!-- Current status -->
-      <div class="current-status" id="current-status">
-        <div class="status-icon" id="status-icon"><i data-lucide="clock" class="icon-xl"></i></div>
-        <div>
-          <div class="status-label" id="status-text">Pending</div>
-          <div class="status-sublabel" id="eta-text">Calculating delivery time...</div>
-        </div>
-      </div>
-
-      <!-- Cancelled banner (shown only when cancelled) -->
-      <div id="cancelled-banner" class="cancelled-banner hidden">
-        <span><i data-lucide="x-circle" class="icon-lg"></i></span>
-        <span id="cancelled-msg">This order has been cancelled.</span>
-      </div>
-
-      <!-- Pipeline -->
-      <div class="pipeline-wrap" id="pipeline-wrap">
-        <div class="pipeline-title" id="pipeline-title">Order Progress</div>
-        <div class="status-pipeline" id="pipeline"></div>
-      </div>
-
-      <!-- Driver card -->
-      <div id="driver-info" class="hidden">
-        <div class="driver-card">
-          <div class="driver-card__avatar"><i data-lucide="car" class="icon-xl"></i></div>
-          <div class="driver-card__info">
-            <div class="driver-card__name" id="driver-name">Your Driver</div>
-            <div class="driver-card__rating" id="driver-rating"><i data-lucide="star" class="icon-sm"></i> —</div>
-          </div>
-          <a id="driver-call" href="#" class="driver-card__call"><i data-lucide="phone" class="icon-md"></i></a>
-        </div>
-      </div>
-
-      <!-- Order items -->
-      <div class="order-summary">
-        <div class="order-summary__title" id="items-title">Order Details</div>
-        <div id="order-items"></div>
-        <div class="summary-row total">
-          <span id="total-label">Total</span>
-          <span id="order-total">—</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="track-footer">
-      <span class="track-footer__live"><span class="live-dot"></span><span id="footer-text">Live · updates every 10s</span></span>
-      <span>·</span>
-      <a id="support-link" href="#">Contact Support</a>
-    </div>
-  </div>
-
-  <!-- Rating overlay -->
-  <div class="rating-overlay" id="rating-overlay">
-    <div class="rating-sheet">
-      <div class="rating-sheet__handle"></div>
-      <div class="rating-sheet__title" id="rating-title">How was your order?</div>
-      <div class="rating-sheet__sub" id="rating-sub">Rate your experience to help us improve</div>
-      <div class="star-row" id="star-row">
-        <button class="star-btn" data-v="1" onclick="setStar(1)"><i data-lucide="star" class="icon-xl"></i></button>
-        <button class="star-btn" data-v="2" onclick="setStar(2)"><i data-lucide="star" class="icon-xl"></i></button>
-        <button class="star-btn" data-v="3" onclick="setStar(3)"><i data-lucide="star" class="icon-xl"></i></button>
-        <button class="star-btn" data-v="4" onclick="setStar(4)"><i data-lucide="star" class="icon-xl"></i></button>
-        <button class="star-btn" data-v="5" onclick="setStar(5)"><i data-lucide="star" class="icon-xl"></i></button>
-      </div>
-      <textarea class="rating-comment" id="rating-comment" placeholder="Tell us more (optional)..."></textarea>
-      <button class="submit-rating-btn" id="submit-rating-btn" onclick="submitRating()" disabled>Submit Rating</button>
-    </div>
-  </div>
-
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/api/delivery-app/js/vendor/icons.js?v=20260925a"></script>
   <script>
-    // ── Config ─────────────────────────────────────────────────────────────────
-    const TOKEN = location.pathname.split("/track/")[1]?.replace(/\/$/, "");
-    const LANG  = new URLSearchParams(location.search).get("lang") || "en";
-    const IS_AR = LANG === "ar";
+  (function () {
+    "use strict";
+    var token = decodeURIComponent((location.pathname.match(/\/track\/([^/?#]+)/) || [])[1] || "");
+    var qs = new URLSearchParams(location.search);
+    var basePath = location.pathname.indexOf("/api/") === 0 ? "/api" : "";
+    var html = document.documentElement;
+    var lang = qs.get("lang") === "ar" ? "ar" : qs.get("lang") === "en" ? "en" : null;
+    var justPlaced = qs.get("new") === "1";
+    if (justPlaced) { qs.delete("new"); history.replaceState(null, "", location.pathname + (qs.toString() ? "?" + qs : "")); }
 
-    // Apply RTL
-    if (IS_AR) {
-      document.getElementById("html-root").setAttribute("lang", "ar");
-      document.getElementById("html-root").setAttribute("dir", "rtl");
+    var state = { order: null, driver: null, store: null, pay: null, timer: null, lastOk: 0, failing: false, map: null, marker: null };
+
+    function T(en, ar) { return lang === "ar" ? ar : en; }
+    function esc(s) { return s == null ? "" : String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
+    function icon(n, s) { return '<i data-lucide="' + n + '" style="width:' + (s || 20) + 'px;height:' + (s || 20) + 'px" aria-hidden="true"></i>'; }
+    function icons() { if (window.lucide) try { lucide.createIcons(); } catch (e) {} }
+    function $(id) { return document.getElementById(id); }
+
+    var ZERO = { SYP: 1, IQD: 1, LBP: 1, IRR: 1, JPY: 1, KRW: 1 };
+    function money(n) {
+      var c = String((state.store && state.store.currency) || "CHF").toUpperCase();
+      var d = ZERO[c] ? 0 : 2;
+      var v = Math.abs(Number(n) || 0);
+      var s;
+      try { s = v.toLocaleString(c === "CHF" ? "de-CH" : "en-US", { minimumFractionDigits: d, maximumFractionDigits: d }); } catch (e) { s = v.toFixed(d); }
+      var out = c === "SYP" ? s + (lang === "ar" ? " ل.س" : " SYP") : c === "USD" ? "$" + s : c === "EUR" ? "€" + s : c + " " + s;
+      return (Number(n) < 0 ? "−" : "") + out;
     }
-
-    // ── i18n ───────────────────────────────────────────────────────────────────
-    const T = {
-      en: {
-        trackTitle: "Order Tracking", loading: "Loading order...", retry: "Try Again",
-        orderNotFound: "Order not found", orderNotFoundMsg: "The tracking link may be invalid or expired.",
-        orderNum: n => `Order #${n}`,
-        steps: { pending:"Received", accepted:"Accepted", preparing:"Preparing", ready:"Ready", on_way:"On the Way", delivered:"Delivered" },
-        stepSubs: { pending:"We received your order", accepted:"Restaurant confirmed your order", preparing:"Kitchen is preparing your food", ready:"Ready for pickup by driver", on_way:"Driver is on the way!", delivered:"Order delivered successfully" },
-        currentStatuses: { pending:"Order Received", accepted:"Confirmed", preparing:"Being Prepared", ready:"Ready for Driver", on_way:"Driver On the Way", delivered:"Delivered!", cancelled:"Cancelled" },
-        eta: "Est. delivery time", minutes: m => `~${m} minutes`,
-        orderProgress: "Order Progress", orderDetails: "Order Details", total: "Total",
-        driverOnWay: "Your Driver", liveUpdates: "Live tracking updates every 10s", support: "Contact Support",
-        ratingTitle: "How was your order?", ratingSub: "Rate your experience to help us improve",
-        ratingPlaceholder: "Tell us more (optional)...", submitRating: "Submit Rating", ratingThanks: "Thanks for your feedback!",
-        share: "Share tracking link", cancelled: "This order has been cancelled.",
-        itemsTitle: "Order Details",
-      },
-      ar: {
-        trackTitle: "تتبع الطلب", loading: "جاري تحميل الطلب...", retry: "حاول مرة أخرى",
-        orderNotFound: "الطلب غير موجود", orderNotFoundMsg: "رابط التتبع قد يكون غير صحيح أو منتهي الصلاحية.",
-        orderNum: n => `طلب #${n}`,
-        steps: { pending:"استُلم", accepted:"مقبول", preparing:"يُحضَّر", ready:"جاهز", on_way:"في الطريق", delivered:"تم التوصيل" },
-        stepSubs: { pending:"استلمنا طلبك", accepted:"المطعم قبل طلبك", preparing:"المطبخ يحضر طعامك", ready:"جاهز لاستلام السائق", on_way:"السائق في الطريق إليك!", delivered:"تم توصيل الطلب بنجاح" },
-        currentStatuses: { pending:"تم استلام الطلب", accepted:"تم التأكيد", preparing:"جاري التحضير", ready:"جاهز للسائق", on_way:"السائق في الطريق", delivered:"تم التوصيل!", cancelled:"ملغي" },
-        eta: "وقت التوصيل المتوقع", minutes: m => `~${m} دقيقة`,
-        orderProgress: "مراحل الطلب", orderDetails: "تفاصيل الطلب", total: "الإجمالي",
-        driverOnWay: "السائق", liveUpdates: "تحديثات مباشرة كل 10 ثوانٍ", support: "تواصل مع الدعم",
-        ratingTitle: "كيف كان طلبك؟", ratingSub: "قيّم تجربتك لمساعدتنا على التحسين",
-        ratingPlaceholder: "أخبرنا المزيد (اختياري)...", submitRating: "إرسال التقييم", ratingThanks: "شكراً لملاحظاتك!",
-        share: "مشاركة رابط التتبع", cancelled: "تم إلغاء هذا الطلب.",
-        itemsTitle: "تفاصيل الطلب",
-      }
-    };
-    const t = T[IS_AR ? "ar" : "en"];
-
-    // Apply i18n to static labels
-    document.getElementById("header-title").textContent     = t.trackTitle;
-    document.getElementById("loading-text").textContent     = t.loading;
-    document.getElementById("error-title").textContent      = t.orderNotFound;
-    document.getElementById("error-msg").textContent        = t.orderNotFoundMsg;
-    document.getElementById("pipeline-title").textContent   = t.orderProgress;
-    document.getElementById("items-title").textContent      = t.itemsTitle;
-    document.getElementById("total-label").textContent      = t.total;
-    document.getElementById("footer-text").textContent      = t.liveUpdates;
-    document.getElementById("support-link").textContent     = t.support;
-    document.getElementById("rating-title").textContent     = t.ratingTitle;
-    document.getElementById("rating-sheet__sub") && (document.querySelector(".rating-sheet__sub").textContent = t.ratingSub);
-    document.getElementById("rating-comment").placeholder   = t.ratingPlaceholder;
-    document.getElementById("submit-rating-btn").textContent = t.submitRating;
-    document.getElementById("cancelled-msg").textContent    = t.cancelled;
-
-    // ── State ──────────────────────────────────────────────────────────────────
-    let map, driverMarker, customerMarker, es;
-    let currentOrder = null;
-    let currentStore = null;
-    let selectedStar = 0;
-    let currency = "CHF";
-
-    const STATUS_COLORS = {
-      pending: "#F59E0B", accepted: "#3B82F6", preparing: "#8B5CF6",
-      ready: "#2FD3C6", on_way: "#FF5722", delivered: "#10B981", cancelled: "#EF4444",
-    };
-    const STATUS_ICONS = {
-      pending: '<i data-lucide="clock" class="icon-xl"></i>', accepted: '<i data-lucide="check-circle" class="icon-xl"></i>', preparing: '<i data-lucide="chef-hat" class="icon-xl"></i>', ready: '<i data-lucide="package" class="icon-xl"></i>', on_way: '<i data-lucide="car" class="icon-xl"></i>', delivered: '<i data-lucide="party-popper" class="icon-xl"></i>', cancelled: '<i data-lucide="x-circle" class="icon-xl"></i>',
-    };
-    const STEPS = [
-      { key: "pending" }, { key: "accepted" }, { key: "preparing" },
-      { key: "ready" }, { key: "on_way" }, { key: "delivered" },
-    ];
-
-    // ── Main load ──────────────────────────────────────────────────────────────
-    async function loadOrder() {
-      document.getElementById("loading").style.display = "flex";
-      document.getElementById("error-state").style.display = "none";
-      document.getElementById("track-content").classList.add("hidden");
-
-      if (!TOKEN) {
-        showError(t.orderNotFound, t.orderNotFoundMsg);
-        return;
-      }
+    function fmtTime(d, withDate) {
       try {
-        const resp = await fetch(`/api/delivery/orders/track/${TOKEN}`);
-        if (!resp.ok) throw new Error(resp.status === 404 ? t.orderNotFound : "Server error");
-        const data = await resp.json();
-        currentOrder = data.order;
-        currentStore = data.store;
-        renderStore(currentStore);
-        renderOrder(currentOrder, data.driver);
-        connectSSE(currentOrder.id);
-        document.getElementById("share-btn").style.display = "flex";
-      } catch (err) {
-        showError(t.orderNotFound, err.message || t.orderNotFoundMsg);
-      }
+        var dt = new Date(d); if (isNaN(dt)) return "";
+        var o = { hour: "2-digit", minute: "2-digit" };
+        if (withDate) { o.day = "numeric"; o.month = "short"; }
+        return dt.toLocaleString(lang === "ar" ? "ar-SY-u-nu-latn" : "en-GB", o);
+      } catch (e) { return ""; }
+    }
+    function toast(msg, kind) {
+      var t = document.createElement("div");
+      t.className = "toast" + (kind ? " toast--" + kind : "");
+      t.setAttribute("role", kind === "bad" ? "alert" : "status");
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(function () { t.remove(); }, kind === "bad" ? 5000 : 3000);
     }
 
-    function showError(title, msg) {
-      document.getElementById("loading").style.display = "none";
-      const err = document.getElementById("error-state");
-      err.style.display = "flex";
-      document.getElementById("error-title").textContent = title;
-      document.getElementById("error-msg").textContent  = msg;
-    }
-
-    // ── Apply store branding ───────────────────────────────────────────────────
-    function renderStore(store) {
-      if (!store) return;
-      currency = store.currency || currency;
-
-      // Primary color — used for the logo gradient + accents only.
-      // The header itself stays dark glass for the modern look; we tint the
-      // accent CSS variables so the rest of the page picks up the brand.
-      const primary = store.primaryColor || "#FF5722";
-      document.documentElement.style.setProperty("--primary", primary);
-      document.documentElement.style.setProperty("--delivery-primary", primary);
-      document.documentElement.style.setProperty("--accent", primary);
-      document.getElementById("theme-meta").content = primary;
-
-      // Logo / name
-      if (store.logo) {
-        document.getElementById("store-logo-wrap").innerHTML = `<img src="${store.logo}" alt="${store.name || ''}" style="width:32px;height:32px;border-radius:8px;object-fit:cover" />`;
-      }
-      document.getElementById("store-name-label").textContent = store.name || "Delivery";
-      if (store.name) {
-        document.getElementById("page-title").textContent = `${t.trackTitle} — ${store.name}`;
-      }
-
-      // Support link
-      if (store.supportPhone) {
-        document.getElementById("support-link").href = `tel:${store.supportPhone}`;
-      } else if (store.slug) {
-        document.getElementById("support-link").href = `/order/${store.slug}`;
-      }
-    }
-
-    // ── Render order ───────────────────────────────────────────────────────────
-    function renderOrder(order, driver) {
-      document.getElementById("loading").style.display = "none";
-      document.getElementById("track-content").classList.remove("hidden");
-
-      document.getElementById("track-order-num").textContent = t.orderNum(order.orderNumber || order.id);
-
-      updateStatus(order.status);
-
-      // Map: prefer DB coords, fall back to geocoding the customer address.
-      // This makes the map work even for broadcast orders that didn't capture
-      // GPS at checkout — we resolve the typed address into lat/lng on demand.
-      function showMap(custLat, custLng, drvLat, drvLng) {
-        document.getElementById("map-placeholder").style.display = "none";
-        const mapEl = document.getElementById("map");
-        mapEl.style.display = "block";
-        const lat = custLat != null ? Number(custLat) : Number(drvLat);
-        const lng = custLng != null ? Number(custLng) : Number(drvLng);
-        if (!isFinite(lat) || !isFinite(lng)) return;
-        map = L.map("map", { zoomControl: true }).setView([lat, lng], 14);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
-        if (custLat != null && custLng != null) {
-          customerMarker = L.marker([Number(custLat), Number(custLng)], {
-            icon: L.divIcon({
-              html: '<div style="background:#2FD3C6;color:#fff;border:3px solid #fff;border-radius:50%;width:28px;height:28px;display:grid;place-items:center;font-size:14px;box-shadow:0 4px 12px rgba(47,211,198,.5)">📍</div>',
-              className: "", iconSize: [28, 28], iconAnchor: [14, 14],
-            }),
-          }).addTo(map).bindPopup(IS_AR ? "موقع التسليم" : "Delivery location");
-        }
-        if (drvLat != null && drvLng != null) {
-          driverMarker = L.marker([Number(drvLat), Number(drvLng)], {
-            icon: L.divIcon({
-              html: '<div style="background:#FF5722;color:#fff;border:3px solid #fff;border-radius:50%;width:32px;height:32px;display:grid;place-items:center;box-shadow:0 4px 14px rgba(255,87,34,.5)"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg></div>',
-              className: "", iconSize: [32, 32], iconAnchor: [16, 16],
-            }),
-          }).addTo(map);
-        }
-        // If both customer & driver: fit the bounds and draw a path
-        if (customerMarker && driverMarker) {
-          const bounds = L.latLngBounds([customerMarker.getLatLng(), driverMarker.getLatLng()]);
-          map.fitBounds(bounds.pad(0.4));
-          L.polyline([driverMarker.getLatLng(), customerMarker.getLatLng()], {
-            color: "#FF5722", weight: 3, opacity: 0.55, dashArray: "6,8",
-          }).addTo(map);
-        }
-      }
-
-      const hasDriverCoords = order.driverLat && order.driverLng;
-      const hasCustomerCoords = order.customerLat && order.customerLng;
-      if (hasDriverCoords || hasCustomerCoords) {
-        showMap(order.customerLat, order.customerLng, order.driverLat, order.driverLng);
-      } else if (order.customerAddress) {
-        // Last-ditch: try to geocode the typed address client-side via Nominatim
-        try {
-          fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(order.customerAddress), {
-            headers: { "Accept-Language": (currentStore?.language || "en") },
-          })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (j) {
-              if (!j || !j.length) return;
-              const lat = parseFloat(j[0].lat), lng = parseFloat(j[0].lon);
-              if (isFinite(lat) && isFinite(lng)) showMap(lat, lng, null, null);
-            })
-            .catch(function () {});
-        } catch (_) {}
-      }
-
-      // Items — defensive parse: MySQL sometimes returns JSON columns as strings
-      const fmt = (v) => `${currency} ${parseFloat(v || 0).toFixed(2)}`;
-      const itemsEl = document.getElementById("order-items");
-      let _items = order.items;
-      if (typeof _items === "string") { try { _items = JSON.parse(_items); } catch { _items = []; } }
-      if (!Array.isArray(_items)) _items = [];
-      itemsEl.innerHTML = _items.map(i => `
-        <div class="summary-row">
-          <span>${i.productName || i.name || "—"} ×${i.quantity}</span>
-          <span>${fmt(parseFloat(i.unitPrice || 0) * i.quantity)}</span>
-        </div>
-      `).join("");
-      document.getElementById("order-total").textContent = fmt(order.totalAmount);
-
-      // Driver info
-      if (driver || order.driverId) {
-        const driverEl = document.getElementById("driver-info");
-        driverEl.classList.remove("hidden");
-        document.getElementById("driver-name").textContent = driver?.name || t.driverOnWay;
-        if (driver?.rating) document.getElementById("driver-rating").textContent = `${driver.rating}`;
-        if (driver?.phone || order.driverPhone) {
-          document.getElementById("driver-call").href = `tel:${driver?.phone || order.driverPhone}`;
-        }
-      }
-
-      // Show rating sheet for delivered orders
-      if (order.status === "delivered" && !order.rating) {
-        setTimeout(() => openRatingSheet(), 1200);
-      }
-
-      if (window.lucide) lucide.createIcons();
-    }
-
-    // ── Status update ──────────────────────────────────────────────────────────
-    function updateStatus(status) {
-      const color = STATUS_COLORS[status] || "#FF5722";
-      const icon  = STATUS_ICONS[status] || '<i data-lucide="clock" class="icon-xl"></i>';
-      const label = t.currentStatuses[status] || status;
-
-      document.documentElement.style.setProperty("--status-color", color);
-      const statusIconEl = document.getElementById("status-icon");
-      statusIconEl.innerHTML = icon;
-      // "live" pulse ring while the order is actively in motion
-      const isLive = (status === "on_way" || status === "preparing" || status === "ready");
-      statusIconEl.classList.toggle("live", isLive);
-      document.getElementById("status-text").textContent = label;
-
-      // ETA / sublabel — include the live indicator dot for active states
-      const etaEl = document.getElementById("eta-text");
-      let sub = "";
-      if (status === "on_way") {
-        sub = t.minutes(currentOrder?.maxDeliveryTime || 30);
-      } else if (status === "preparing") {
-        sub = (IS_AR ? "المطعم يحضر طلبك الآن" : "Restaurant is preparing your order");
-      } else if (status === "ready") {
-        sub = (IS_AR ? "جاهز — في انتظار السائق" : "Ready — waiting for driver");
-      } else if (status === "accepted") {
-        sub = (IS_AR ? "تم تأكيد طلبك" : "Order confirmed");
-      } else if (status === "delivered") {
-        sub = (IS_AR ? "تم التوصيل بنجاح" : "Successfully delivered");
-      } else if (status === "pending") {
-        sub = (IS_AR ? "في انتظار تأكيد المطعم" : "Awaiting restaurant confirmation");
-      }
-      etaEl.innerHTML = isLive
-        ? '<span class="live-dot"></span>' + sub
-        : sub;
-
-      // Cancelled banner
-      const cancelledBanner = document.getElementById("cancelled-banner");
-      const pipelineWrap   = document.getElementById("pipeline-wrap");
-      if (status === "cancelled") {
-        cancelledBanner.classList.remove("hidden");
-        pipelineWrap.style.display = "none";
-      } else {
-        cancelledBanner.classList.add("hidden");
-        pipelineWrap.style.display = "";
-      }
-
-      // Pipeline
-      const currentIdx = STEPS.findIndex(s => s.key === status);
-      const pipeline   = document.getElementById("pipeline");
-      pipeline.innerHTML = STEPS.map((s, i) => {
-        const isDone   = i < currentIdx;
-        const isActive = i === currentIdx;
-        const sub      = isActive ? (t.stepSubs[s.key] || "") : "";
-        return `
-          <div class="pipeline-step ${isDone ? "done" : ""} ${isActive ? "active" : ""}">
-            <div class="pipeline-step__dot">${isDone ? '<i data-lucide="check" class="icon-sm"></i>' : i + 1}</div>
-            <div class="pipeline-step__content">
-              <div class="pipeline-step__label">${t.steps[s.key] || s.key}</div>
-              ${sub ? `<div class="pipeline-step__time">${sub}</div>` : ""}
-            </div>
-          </div>
-        `;
-      }).join("");
-
-      // Open rating after delivery
-      if (status === "delivered" && currentOrder && !currentOrder.rating) {
-        setTimeout(() => openRatingSheet(), 1500);
-      }
-
-      if (window.lucide) lucide.createIcons();
-    }
-
-    // ── SSE ────────────────────────────────────────────────────────────────────
-    function connectSSE(orderId) {
-      if (es) es.close();
-      es = new EventSource(`/api/delivery/orders/${orderId}/status-stream`);
-      es.onmessage = (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          if (data.status) {
-            if (currentOrder) currentOrder.status = data.status;
-            updateStatus(data.status);
-          }
-          if (data.driverLat && data.driverLng) {
-            const ll = [Number(data.driverLat), Number(data.driverLng)];
-            if (map) {
-              if (driverMarker) {
-                driverMarker.setLatLng(ll);
-              } else {
-                driverMarker = L.marker(ll, { icon: L.divIcon({ html: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF5722" stroke-width="2"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>', className: "", iconSize: [24, 24] }) }).addTo(map);
-              }
-              map.panTo(ll);
-            }
-          }
-        } catch (_) {}
-      };
-      es.onerror = () => {
-        // EventSource auto-reconnects; no action needed
-      };
-    }
-
-    // ── Share ──────────────────────────────────────────────────────────────────
-    function shareOrder() {
-      const url  = location.href;
-      const text = currentStore?.name ? `${t.trackTitle} — ${currentStore.name}` : t.trackTitle;
-      if (navigator.share) {
-        navigator.share({ title: text, url }).catch(() => {});
-      } else {
-        navigator.clipboard?.writeText(url).then(() => {
-          const btn = document.getElementById("share-btn");
-          btn.innerHTML = '<i data-lucide="check" class="icon-md"></i>'; setTimeout(() => { btn.innerHTML = '<i data-lucide="share-2" class="icon-md"></i>'; if (window.lucide) lucide.createIcons(); }, 2000); if (window.lucide) lucide.createIcons();
-        }).catch(() => {
-          prompt(IS_AR ? "انسخ الرابط:" : "Copy tracking link:", url);
+    /** fetch with a timeout; never hangs. */
+    function http(path, opts) {
+      opts = opts || {};
+      var ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, opts.timeout || 15000);
+      return fetch(path, {
+        method: opts.method || "GET",
+        headers: { "Content-Type": "application/json" },
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+        signal: ctrl ? ctrl.signal : undefined,
+      }).then(function (r) {
+        clearTimeout(timer);
+        return r.text().then(function (txt) {
+          var data = null; try { data = txt ? JSON.parse(txt) : null; } catch (e) {}
+          if (!r.ok) { var e = new Error((data && data.error) || "HTTP " + r.status); e.status = r.status; throw e; }
+          return data;
         });
-      }
-    }
-
-    // ── Rating ─────────────────────────────────────────────────────────────────
-    function openRatingSheet() {
-      document.getElementById("rating-overlay").classList.add("open");
-    }
-    function setStar(v) {
-      selectedStar = v;
-      document.querySelectorAll(".star-btn").forEach((btn, i) => {
-        btn.classList.toggle("active", i < v);
+      }, function () {
+        clearTimeout(timer);
+        var e = new Error(T("Connection problem. Check your internet and try again.", "تعذّر الاتصال. تحقّق من الإنترنت وحاول مرة أخرى."));
+        e.network = true; throw e;
       });
-      document.getElementById("submit-rating-btn").disabled = false;
     }
-    async function submitRating() {
-      if (!selectedStar || !currentOrder) return;
-      const btn = document.getElementById("submit-rating-btn");
-      btn.disabled = true;
-      btn.textContent = IS_AR ? "جاري الإرسال..." : "Submitting...";
-      try {
-        const token = localStorage.getItem("delivery_token");
-        const headers = { "Content-Type": "application/json" };
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        await fetch(`/api/delivery/orders/${currentOrder.id}/rate`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            overallRating: selectedStar,
-            comment: document.getElementById("rating-comment").value,
-          }),
-        });
-        document.getElementById("rating-title").textContent = t.ratingThanks;
-        document.querySelector(".rating-sheet__sub").textContent = IS_AR ? "شكراً لك!" : "Thank you!";
-        document.querySelector(".star-row").style.display = "none";
-        document.getElementById("rating-comment").style.display = "none";
-        btn.style.display = "none";
-        setTimeout(() => document.getElementById("rating-overlay").classList.remove("open"), 2200);
-      } catch (_) {
-        btn.disabled = false;
-        btn.textContent = t.submitRating;
+
+    function applyLang(order, store) {
+      if (!lang) {
+        var l = String(order && order.language || "").slice(0, 2);
+        // The order's own language when the storefront recorded it; Syrian-pound stores default to Arabic.
+        lang = l === "ar" || l === "en" ? l : (String(store && store.currency || "").toUpperCase() === "SYP" ? "ar" : "en");
+      }
+      html.lang = lang; html.dir = lang === "ar" ? "rtl" : "ltr";
+    }
+
+    function brand(store) {
+      var p = String(store && store.primaryColor || "").toLowerCase();
+      if (/^#[0-9a-f]{6}$/.test(p) && p !== "#ff5722") {
+        var n = parseInt(p.slice(1), 16), rgb = [n >> 16 & 255, n >> 8 & 255, n & 255];
+        var L = rgb.map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+        if (0.2126 * L[0] + 0.7152 * L[1] + 0.0722 * L[2] <= 0.3) {
+          html.style.setProperty("--brand", p);
+          html.style.setProperty("--accent-soft", "color-mix(in srgb, " + p + " 12%, var(--surface))");
+        }
       }
     }
 
-    // Close rating overlay on backdrop click
-    document.getElementById("rating-overlay").addEventListener("click", (e) => {
-      if (e.target === e.currentTarget) e.currentTarget.classList.remove("open");
+    var FINAL = { delivered: 1, completed: 1, cancelled: 1, rejected: 1, refunded: 1 };
+    function isPickup(o) { return o.orderType === "pickup" || o.orderType === "dine_in"; }
+    function steps(o) {
+      var s = [
+        { k: "pending", l: T("Order sent", "تم إرسال الطلب"), sub: T("Waiting for the store to confirm", "بانتظار تأكيد المتجر") },
+        { k: "accepted", l: T("Confirmed", "تم التأكيد"), sub: T("The store accepted your order", "قبل المتجر طلبك") },
+        { k: "preparing", l: T("Being prepared", "قيد التحضير"), sub: T("Your order is being prepared", "يتم تحضير طلبك الآن") },
+        { k: "ready", l: isPickup(o) ? T("Ready for pickup", "جاهز للاستلام") : T("Ready", "جاهز"), sub: isPickup(o) ? T("Come and collect it", "يمكنك استلامه الآن") : T("Waiting for the driver", "بانتظار المندوب") },
+      ];
+      if (!isPickup(o)) s.push({ k: "on_way", l: T("On the way", "في الطريق"), sub: T("The driver is heading to you", "المندوب في طريقه إليك") });
+      s.push({ k: "delivered", l: isPickup(o) ? T("Collected", "تم الاستلام") : T("Delivered", "تم التوصيل"), sub: T("Enjoy!", "بالهناء والعافية!") });
+      return s;
+    }
+    function stepIndex(o, list) {
+      var st = o.status === "completed" ? "delivered" : o.status === "confirmed" ? "accepted" : o.status === "out_for_delivery" ? "on_way" : o.status;
+      if (isPickup(o) && st === "on_way") st = "ready";
+      for (var i = 0; i < list.length; i++) if (list[i].k === st) return i;
+      return 0;
+    }
+    var PAY = function (m) {
+      return ({ cash: T("Cash", "نقداً"), card: T("Card", "بطاقة"), stripe: T("Card", "بطاقة"), shamcash: T("Sham Cash", "شام كاش"), wallet: T("Wallet", "المحفظة"), online: T("Online", "دفع إلكتروني") })[m] || m || "";
+    };
+    function itemsOf(o) {
+      var it = o.items;
+      if (typeof it === "string") { try { it = JSON.parse(it); } catch (e) { it = []; } }
+      return Array.isArray(it) ? it : [];
+    }
+    function referenceSent(o) { return /شام كاش - رقم العملية/.test(String(o.notes || "")); }
+
+    function render() {
+      var o = state.order, st = state.store || {}, d = state.driver;
+      if (!o) return;
+      var list = steps(o), idx = stepIndex(o, list);
+      var cancelled = o.status === "cancelled" || o.status === "rejected" || o.status === "refunded";
+      var done = o.status === "delivered" || o.status === "completed";
+      var cur = list[idx];
+      var heroIcon = cancelled ? "x" : done ? "check" : ({ pending: "clock", accepted: "circle-check", preparing: "chef-hat", ready: "package", on_way: "bike" })[cur.k] || "clock";
+      var live = !cancelled && !done;
+      var unpaid = o.paymentStatus !== "paid";
+      var items = itemsOf(o);
+      var sub = Number(o.subtotal) || items.reduce(function (a, i) { return a + (Number(i.total) || (Number(i.unitPrice) || 0) * (Number(i.quantity) || 1)); }, 0);
+      var fee = Number(o.deliveryFee) || 0, disc = Number(o.discountAmount) || 0, wal = Number(o.walletAmountUsed) || 0;
+      var phone = String(st.supportPhone || "").replace(/[^\d+]/g, "");
+      var wa = phone.replace(/\D/g, "");
+
+      var h = "";
+      if (justPlaced) {
+        h += '<div class="banner banner--good">' + icon("circle-check", 22) + "<div>" + esc(T("Order received — thank you!", "تم استلام طلبك — شكراً لك!")) +
+          "<p>" + esc(T("We've sent the details to your WhatsApp. This page updates by itself.", "أرسلنا التفاصيل إلى واتساب. تتحدّث هذه الصفحة تلقائياً.")) + "</p></div></div>";
+      }
+      if (state.failing) {
+        h += '<div class="banner banner--warn">' + icon("wifi-off", 20) + "<div>" + esc(T("Connection problem — showing the last update. Retrying…", "مشكلة في الاتصال — نعرض آخر تحديث. نعيد المحاولة…")) + "</div></div>";
+      }
+      h += '<section class="card hero">' +
+        '<div class="hero__icon ' + (live ? "live " : "") + (done ? "hero__icon--done" : cancelled ? "hero__icon--bad" : "") + '">' + icon(heroIcon, 34) + "</div>" +
+        '<h1 class="hero__status">' + esc(cancelled ? (o.status === "refunded" ? T("Refunded", "تم الاسترداد") : T("Order cancelled", "تم إلغاء الطلب")) : done ? list[list.length - 1].l : cur.l) + "</h1>" +
+        '<p class="muted">' + esc(cancelled ? T("Contact the store if you have questions.", "تواصل مع المتجر إن كان لديك استفسار.") : done ? cur.sub : cur.sub) + "</p>" +
+        '<p class="hero__num">' + esc(T("Order", "الطلب")) + " #" + esc(o.orderNumber || o.id) + "</p>" +
+        (o.scheduledAt && live ? '<p class="small">' + icon("calendar-clock", 14) + " " + esc(T("Scheduled for ", "موعد الطلب: ") + fmtTime(o.scheduledAt, true)) + "</p>" : "") +
+        (live ? '<div class="hero__meta muted"><span>' + esc(T("Updated ", "آخر تحديث ") + fmtTime(state.lastOk || Date.now())) + '</span><button type="button" id="refresh">' + esc(T("Refresh", "تحديث")) + "</button></div>" : "") +
+      "</section>";
+
+      if (!cancelled) {
+        h += '<section class="card"><div class="steps">' + list.map(function (s, i) {
+          var cls = done || i < idx ? "done" : i === idx ? "now" : "";
+          return '<div class="step ' + cls + '"><div class="step__dot">' + (cls === "done" ? icon("check", 16) : i + 1) + "</div>" +
+            '<div><div class="step__label">' + esc(s.l) + "</div>" + (cls === "now" && !done ? '<div class="step__sub">' + esc(s.sub) + "</div>" : "") + "</div></div>";
+        }).join("") + "</div></section>";
+      }
+
+      if (d && (d.driverName || d.driverPhone) && !isPickup(o) && !cancelled && !done) {
+        var dp = String(d.driverPhone || "").replace(/[^\d+]/g, "");
+        h += '<section class="card"><div class="driver"><span class="driver__av">' + icon("bike", 24) + '</span><div class="driver__txt"><strong>' + esc(d.driverName || T("Your driver", "المندوب")) + '</strong><span class="muted small">' + esc(T("Your driver", "مندوب التوصيل")) + "</span></div>" +
+          (dp ? '<a class="btn btn-soft" href="tel:' + esc(dp) + '">' + icon("phone", 18) + " " + esc(T("Call", "اتصال")) + "</a>" : "") + "</div>" +
+          (d.currentLat && d.currentLng && o.status === "on_way" ? '<div class="map" id="map"></div>' : "") + "</section>";
+      }
+
+      // Payment
+      var payBlock = "";
+      if (!cancelled && unpaid && state.pay && state.pay.shamcash && (o.paymentMethod === "shamcash")) {
+        var sc = state.pay.shamcash;
+        var qr = sc.qrImage ? (/^data:image\//i.test(sc.qrImage) || /^https?:/i.test(sc.qrImage) ? sc.qrImage : basePath + (sc.qrImage.charAt(0) === "/" ? "" : "/") + sc.qrImage) : "";
+        if (referenceSent(o)) {
+          payBlock = '<div class="banner banner--good">' + icon("circle-check", 20) + "<div>" + esc(T("Transaction number sent. The store will confirm your payment.", "تم إرسال رقم العملية. سيؤكّد المتجر دفعتك.")) + "</div></div>";
+        } else {
+          payBlock =
+            '<p class="small">' + esc(T("Send exactly this amount to the store's Sham Cash account, then enter the transaction number.", "حوّل هذا المبلغ بالضبط إلى حساب شام كاش الخاص بالمتجر، ثم أدخل رقم العملية.")) + "</p>" +
+            '<div class="sham__amount"><span class="muted">' + esc(T("Amount", "المبلغ")) + "</span><strong>" + esc(money(o.totalAmount)) + "</strong></div>" +
+            (qr ? '<img class="sham__qr" src="' + esc(qr) + '" alt="QR" loading="lazy">' : "") +
+            (sc.phone ? '<div class="row"><span>' + esc(T("Account / number", "رقم الحساب")) + '</span><span dir="ltr"><strong>' + esc(sc.phone) + '</strong> <button type="button" class="btn btn-ghost" style="min-height:36px;padding:4px 10px" data-copy="' + esc(sc.phone) + '">' + icon("copy", 16) + "</button></span></div>" : "") +
+            (sc.holderName ? '<div class="row"><span>' + esc(T("Account name", "اسم صاحب الحساب")) + "</span><strong>" + esc(sc.holderName) + "</strong></div>" : "") +
+            '<form id="sham-form" class="field" novalidate><span>' + esc(T("Transaction number", "رقم العملية")) + '</span><input class="input" id="sham-ref" dir="ltr" maxlength="40" autocomplete="off">' +
+            '<p class="err" id="sham-err" hidden></p><button class="btn btn-primary btn-block" type="submit"><span>' + esc(T("Send transaction number", "أرسل رقم العملية")) + "</span></button></form>";
+        }
+      } else if (!cancelled && unpaid && state.pay && state.pay.card && (o.paymentMethod === "card" || o.paymentMethod === "stripe")) {
+        payBlock = '<div id="card-pay"><button class="btn btn-primary btn-block" id="card-start"><span>' + esc(T("Pay now by card", "ادفع الآن بالبطاقة")) + " · " + esc(money(o.totalAmount)) + "</span></button></div>";
+      }
+      h += '<section class="card"><h2>' + icon("wallet", 18) + " " + esc(T("Payment", "الدفع")) + "</h2>" +
+        '<div class="row"><span>' + esc(PAY(o.paymentMethod)) + "</span>" +
+        (o.paymentStatus === "paid" ? '<span class="badge badge--good">' + esc(T("Paid", "مدفوع")) + "</span>"
+          : '<span class="badge badge--warn">' + esc(o.paymentMethod === "cash" ? (isPickup(o) ? T("Pay at the store", "الدفع عند الاستلام") : T("Pay on delivery", "الدفع عند التوصيل")) : T("Not paid yet", "غير مدفوع بعد")) + "</span>") +
+        "</div>" + payBlock + "</section>";
+
+      // Items + totals
+      h += '<section class="card"><h2>' + icon("receipt", 18) + " " + esc(T("Your order", "طلبك")) + '</h2><ul class="items">' + items.map(function (i) {
+        var q = Number(i.quantity) || 1;
+        var line = Number(i.total) || (Number(i.unitPrice) || 0) * q;
+        var opts = [i.variant].concat(Array.isArray(i.modifiers) ? i.modifiers.map(function (m) { return typeof m === "string" ? m : (m && (m.name || m.label)) || ""; }) : []).filter(Boolean).join(" · ");
+        return '<li><span class="items__q">' + q + '×</span><span class="items__n">' + esc(i.name || i.productName || "") +
+          (opts ? "<small>" + esc(opts) + "</small>" : "") + (i.notes ? "<small>“" + esc(i.notes) + "”</small>" : "") + '</span><span class="items__p">' + esc(money(line)) + "</span></li>";
+      }).join("") + "</ul>" +
+        '<div class="row"><span>' + esc(T("Subtotal", "المجموع الفرعي")) + "</span><span>" + esc(money(sub)) + "</span></div>" +
+        (disc ? '<div class="row row--good"><span>' + esc(T("Discount", "الخصم")) + "</span><span>−" + esc(money(disc)) + "</span></div>" : "") +
+        (!isPickup(o) ? '<div class="row"><span>' + esc(T("Delivery", "التوصيل")) + "</span><span>" + (fee ? esc(money(fee)) : esc(T("Free", "مجاني"))) + "</span></div>" : "") +
+        (wal ? '<div class="row row--good"><span>' + esc(T("Wallet", "المحفظة")) + "</span><span>−" + esc(money(wal)) + "</span></div>" : "") +
+        '<div class="row row--total"><span>' + esc(T("Total", "الإجمالي")) + "</span><span>" + esc(money(o.totalAmount)) + "</span></div></section>";
+
+      // Delivery details
+      var addr = [o.customerAddress, o.buildingName, o.floor ? T("Floor ", "الطابق ") + o.floor : ""].filter(Boolean).join("، ");
+      h += '<section class="card"><h2>' + icon(isPickup(o) ? "store" : "map-pin", 18) + " " + esc(o.orderType === "dine_in" ? T("Dine-in", "داخل المطعم") : isPickup(o) ? T("Pickup", "استلام من المتجر") : T("Delivery address", "عنوان التوصيل")) + "</h2>" +
+        (o.orderType === "dine_in" && o.tableNumber ? '<p><strong>' + esc(o.tableNumber) + "</strong></p>" : "") +
+        (!isPickup(o) && addr ? "<p>" + esc(addr) + "</p>" : "") +
+        (!isPickup(o) && o.addressNotes ? '<p class="muted small">' + esc(o.addressNotes) + "</p>" : "") +
+        '<div class="kv"><span>' + esc(T("Name", "الاسم")) + "</span>" + esc(o.customerName || "") + "</div>" +
+        (o.notes ? '<div class="kv"><span>' + esc(T("Notes", "ملاحظات")) + "</span>" + esc(String(o.notes).replace(/\s*\|?\s*شام كاش - رقم العملية:.*$/, "")) + "</div>" : "") +
+        '<div class="kv"><span>' + esc(T("Placed", "وقت الطلب")) + "</span>" + esc(fmtTime(o.createdAt, true)) + "</div></section>";
+
+      // Rating
+      var ratedKey = "kassenta_rated_" + token;
+      var rated = false; try { rated = !!localStorage.getItem(ratedKey); } catch (e) {}
+      if (done && !rated) {
+        h += '<section class="card" id="rate"><h2>' + icon("star", 18) + " " + esc(T("How was your order?", "كيف كان طلبك؟")) + '</h2>' +
+          '<div class="stars" role="radiogroup" aria-label="' + esc(T("Rating", "التقييم")) + '">' + [1, 2, 3, 4, 5].map(function (n) { return '<button type="button" data-star="' + n + '" aria-label="' + n + '">★</button>'; }).join("") + "</div>" +
+          '<textarea class="input" id="rate-comment" rows="2" maxlength="500" placeholder="' + esc(T("Tell the store more (optional)", "أخبر المتجر المزيد (اختياري)")) + '"></textarea>' +
+          '<p class="err" id="rate-err" hidden></p><button class="btn btn-primary btn-block" id="rate-send" disabled><span>' + esc(T("Send rating", "أرسل التقييم")) + "</span></button></section>";
+      }
+
+      // Contact + back
+      h += '<section class="card"><h2>' + icon("headset", 18) + " " + esc(T("Need help?", "تحتاج مساعدة؟")) + '</h2><div class="btn-row">' +
+        (wa ? '<a class="btn btn-soft" href="https://wa.me/' + esc(wa) + '?text=' + encodeURIComponent(T("Order #", "الطلب #") + (o.orderNumber || o.id)) + '" target="_blank" rel="noopener">' + icon("message-circle", 18) + " " + esc(T("WhatsApp", "واتساب")) + "</a>" : "") +
+        (phone ? '<a class="btn btn-soft" href="tel:' + esc(phone) + '">' + icon("phone", 18) + " " + esc(T("Call the store", "اتصل بالمتجر")) + "</a>" : "") +
+        (st.slug ? '<a class="btn btn-ghost" href="' + esc(basePath + "/order/" + encodeURIComponent(st.slug)) + '">' + icon("store", 18) + " " + esc(T("Back to the store", "العودة إلى المتجر")) + "</a>" : "") +
+        "</div></section>";
+      h += '<p class="foot small muted">' + esc(T("Powered by Kassenta", "بدعم من Kassenta")) + "</p>";
+
+      var y = window.scrollY;
+      var focusId = document.activeElement && document.activeElement.id;
+      var keep = {};
+      ["sham-ref", "rate-comment"].forEach(function (id) { var el = $(id); if (el) keep[id] = el.value; });
+      $("main").innerHTML = h;
+      Object.keys(keep).forEach(function (id) { var el = $(id); if (el) el.value = keep[id]; });
+      if (focusId && $(focusId)) $(focusId).focus({ preventScroll: true });
+      window.scrollTo(0, y);
+      bind();
+      icons();
+      drawMap();
+    }
+
+    var stars = 0;
+    function bind() {
+      var r = $("refresh"); if (r) r.onclick = function () { r.disabled = true; load(true); };
+      document.querySelectorAll("[data-copy]").forEach(function (b) {
+        b.onclick = function () {
+          var v = b.getAttribute("data-copy");
+          (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(v) : Promise.reject()).then(function () { toast(T("Copied", "تم النسخ"), "good"); }, function () { window.prompt("", v); });
+        };
+      });
+      var f = $("sham-form");
+      if (f) f.onsubmit = function (e) {
+        e.preventDefault();
+        var btn = f.querySelector("button"), err = $("sham-err");
+        var ref = String($("sham-ref").value).replace(/[٠-٩]/g, function (c) { return c.charCodeAt(0) - 0x660; }).replace(/[^\w\- ]/g, "").trim();
+        if (ref.length < 3) { err.textContent = T("Enter the transaction number from Sham Cash.", "أدخل رقم العملية من شام كاش."); err.hidden = false; return; }
+        btn.disabled = true; btn.classList.add("is-loading"); err.hidden = true;
+        http("/api/payments/order/" + state.order.id + "/shamcash/reference", { method: "POST", body: { trackingToken: token, reference: ref }, timeout: 20000 })
+          .then(function () { toast(T("Thanks! The store will confirm your payment.", "شكراً! سيؤكّد المتجر دفعتك."), "good"); return load(true); })
+          .catch(function (ex) { err.textContent = ex.message; err.hidden = false; btn.disabled = false; btn.classList.remove("is-loading"); });
+      };
+      document.querySelectorAll("[data-star]").forEach(function (b) {
+        b.onclick = function () {
+          stars = Number(b.getAttribute("data-star"));
+          document.querySelectorAll("[data-star]").forEach(function (x) { x.classList.toggle("on", Number(x.getAttribute("data-star")) <= stars); });
+          $("rate-send").disabled = false;
+        };
+      });
+      var rs = $("rate-send");
+      if (rs) rs.onclick = function () {
+        if (!stars || rs.disabled) return;
+        rs.disabled = true; rs.classList.add("is-loading");
+        http("/api/delivery/orders/" + state.order.id + "/rate", { method: "POST", body: { trackingToken: token, overallRating: stars, comment: $("rate-comment").value.trim() || undefined }, timeout: 20000 })
+          .then(function () {
+            try { localStorage.setItem("kassenta_rated_" + token, String(stars)); } catch (e) {}
+            toast(T("Thank you for your rating!", "شكراً لتقييمك!"), "good");
+            var box = $("rate"); if (box) box.innerHTML = '<p class="banner banner--good">' + esc(T("Thank you for your rating!", "شكراً لتقييمك!")) + "</p>";
+          })
+          .catch(function (ex) { var e = $("rate-err"); e.textContent = ex.message; e.hidden = false; rs.disabled = false; rs.classList.remove("is-loading"); });
+      };
+      var cs = $("card-start");
+      if (cs) cs.onclick = startCard;
+    }
+
+    // ── Card payment for an unpaid card order (never for SYP stores) ─────
+    function loadScript(src, ms) {
+      return new Promise(function (res, rej) {
+        var s = document.createElement("script"); s.src = src; s.async = true;
+        var t = setTimeout(function () { rej(new Error("timeout")); }, ms || 15000);
+        s.onload = function () { clearTimeout(t); res(); }; s.onerror = function () { clearTimeout(t); rej(new Error("load")); };
+        document.head.appendChild(s);
+      });
+    }
+    function startCard() {
+      var box = $("card-pay");
+      box.innerHTML = '<div class="state" style="padding:24px"><div class="spinner"></div></div>';
+      stopPolling();
+      loadScript("/api/delivery-app/js/stripe-payments.js?v=20260925a").then(function () {
+        return KassentaPay.init({ basePath: "", tenantId: state.order.tenantId });
+      }).then(function () {
+        return KassentaPay.createOrderIntent(state.order.id, token);
+      }).then(function (intent) {
+        box.innerHTML = '<div id="pe"></div><p class="err" id="pe-err" hidden></p><button class="btn btn-primary btn-block" id="pe-pay" disabled><span>' + esc(T("Pay", "ادفع") + " " + money(state.order.totalAmount)) + "</span></button>";
+        return KassentaPay.mount($("pe"), intent.clientSecret, { locale: lang, primaryColor: getComputedStyle(html).getPropertyValue("--brand").trim() || undefined, dark: html.getAttribute("data-theme") === "dark" });
+      }).then(function () {
+        var b = $("pe-pay"); b.disabled = false;
+        b.onclick = function () {
+          b.disabled = true; b.classList.add("is-loading");
+          KassentaPay.confirm(KassentaPay.returnUrl({})).then(function (pi) {
+            if (!pi) return;
+            return KassentaPay.waitForSettlement(pi.id, { timeoutMs: 40000 }).then(function (r) {
+              toast(r.settled ? T("Payment received — thank you!", "تم استلام الدفع — شكراً لك!") : T("Payment is processing.", "الدفع قيد المعالجة."), r.settled ? "good" : null);
+              load(true); startPolling();
+            });
+          }).catch(function (e) { var er = $("pe-err"); er.textContent = e.message; er.hidden = false; b.disabled = false; b.classList.remove("is-loading"); });
+        };
+      }).catch(function (e) {
+        box.innerHTML = '<p class="err">' + esc(e.message === "timeout" || e.message === "load" ? T("Card payment couldn't load on this connection.", "تعذّر تحميل الدفع بالبطاقة على هذا الاتصال.") : e.message) + '</p><button class="btn btn-soft btn-block" id="card-start"><span>' + esc(T("Try again", "أعد المحاولة")) + "</span></button>";
+        $("card-start").onclick = startCard;
+        startPolling();
+      });
+    }
+    function resumeCardReturn() {
+      var p = new URLSearchParams(location.search);
+      if (!p.get("kassenta_pay_return") || !p.get("payment_intent")) return;
+      loadScript("/api/delivery-app/js/stripe-payments.js?v=20260925a").then(function () {
+        var pi = KassentaPay.pendingReturn();
+        KassentaPay.clearReturn();
+        toast(T("Confirming your payment…", "جارٍ تأكيد الدفع…"));
+        return KassentaPay.waitForSettlement(pi.paymentIntentId, { timeoutMs: 40000 }).then(function (r) {
+          toast(r.settled ? T("Payment received — thank you!", "تم استلام الدفع — شكراً لك!") : T("Payment is still processing.", "الدفع ما زال قيد المعالجة."), r.settled ? "good" : null);
+          load(true);
+        });
+      }).catch(function () {});
+    }
+
+    // ── Map (self-hosted Leaflet, only while a driver is on the way) ─────
+    function drawMap() {
+      var el = $("map"), d = state.driver;
+      if (!el || !d) { state.map = null; return; }
+      var ll = [Number(d.currentLat), Number(d.currentLng)];
+      var go = function () {
+        var Lf = window.Leaflet;
+        if (!Lf || !$("map")) return;
+        state.map = Lf.map(el, { zoomControl: false, attributionControl: true }).setView(ll, 15);
+        Lf.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(state.map);
+        Lf.circleMarker(ll, { radius: 9, color: "#fff", weight: 3, fillColor: getComputedStyle(html).getPropertyValue("--brand").trim() || "#0A6E65", fillOpacity: 1 }).addTo(state.map);
+        if (state.order.customerLat && state.order.customerLng) {
+          var home = [Number(state.order.customerLat), Number(state.order.customerLng)];
+          Lf.circleMarker(home, { radius: 8, color: "#fff", weight: 3, fillColor: "#D64545", fillOpacity: 1 }).addTo(state.map);
+          state.map.fitBounds([ll, home], { padding: [30, 30], maxZoom: 16 });
+        }
+      };
+      if (window.Leaflet) return go();
+      var link = document.createElement("link"); link.rel = "stylesheet"; link.href = "/api/delivery-app/css/vendor/leaflet.css"; document.head.appendChild(link);
+      loadScript("/api/delivery-app/js/vendor/leaflet.js", 15000).then(function () {
+        window.Leaflet = window.L && window.L.noConflict ? window.L.noConflict() : window.L;
+        go();
+      }).catch(function () { var m = $("map"); if (m) m.remove(); });
+    }
+
+    // ── Loading + polling (status changes reach this page by polling) ────
+    function load(manual) {
+      return http("/api/delivery/orders/track/" + encodeURIComponent(token), { timeout: 12000 }).then(function (r) {
+        var first = !state.order;
+        state.order = r.order; state.driver = r.driver; state.store = r.store || {};
+        state.lastOk = Date.now(); state.failing = false;
+        if (first) {
+          applyLang(state.order, state.store);
+          brand(state.store);
+          head();
+          // Sham Cash details for an unpaid transfer, card availability for an unpaid card order.
+          if (state.order.paymentStatus !== "paid" && ["shamcash", "card", "stripe"].indexOf(state.order.paymentMethod) >= 0) {
+            http("/api/payments/config?tenantId=" + encodeURIComponent(state.order.tenantId), { timeout: 10000 }).then(function (pc) {
+              var cur = String((state.store && state.store.currency) || pc.currency || "").toUpperCase();
+              var sc = pc && pc.shamcash && pc.shamcash.enabled ? pc.shamcash : null;
+              var card = !!(pc && pc.cardAvailable !== false && pc.stripe && pc.stripe.status === "connected" && pc.stripe.publishableKey && ["SYP", "IRR", "KPW", "CUP", "SDG"].indexOf(cur) < 0);
+              state.pay = { shamcash: sc, card: card };
+              render();
+            }).catch(function () {});
+          }
+        }
+        render();
+        if (FINAL[state.order.status]) stopPolling();
+      }).catch(function (e) {
+        if (!state.order) {
+          applyLang(null, null); head();
+          $("main").innerHTML = '<div class="state">' + icon(e.status === 404 ? "search-x" : "wifi-off", 44) +
+            "<h1>" + esc(e.status === 404 ? T("Order not found", "الطلب غير موجود") : T("We couldn't load your order", "تعذّر تحميل طلبك")) + "</h1>" +
+            '<p class="muted">' + esc(e.status === 404 ? T("Check the link in your WhatsApp message.", "تحقّق من الرابط في رسالة واتساب.") : e.message) + "</p>" +
+            (e.status === 404 ? "" : '<button class="btn btn-primary" id="retry"><span>' + esc(T("Try again", "أعد المحاولة")) + "</span></button>") + "</div>";
+          icons();
+          var b = $("retry"); if (b) b.onclick = function () { $("main").innerHTML = '<div class="state"><div class="spinner"></div></div>'; load(true); };
+          if (e.status === 404) stopPolling();
+        } else {
+          state.failing = true;
+          render();
+          if (manual) toast(e.message, "bad");
+        }
+      });
+    }
+    function startPolling() {
+      stopPolling();
+      state.timer = setInterval(function () { if (!document.hidden) load(false); }, 15000);
+    }
+    function stopPolling() { if (state.timer) clearInterval(state.timer); state.timer = null; }
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden && state.timer && state.order && Date.now() - state.lastOk > 10000) load(false);
     });
 
-    // ── Init ───────────────────────────────────────────────────────────────────
-    if (window.lucide) lucide.createIcons();
-    loadOrder();
+    function head() {
+      var st = state.store || {};
+      document.title = T("Order tracking", "تتبّع الطلب") + (st.name ? " — " + st.name : "");
+      $("brand-name").textContent = st.name || T("Order tracking", "تتبّع الطلب");
+      if (st.logo) { var img = document.createElement("img"); img.src = st.logo; img.alt = ""; img.onerror = function () { img.remove(); }; $("brand-ph").replaceWith(img); }
+      else $("brand-ph").innerHTML = icon("store", 20);
+      var back = $("back");
+      back.innerHTML = icon(lang === "ar" ? "chevron-right" : "chevron-left", 24);
+      back.setAttribute("aria-label", T("Back to the store", "العودة إلى المتجر"));
+      back.href = st.slug ? basePath + "/order/" + encodeURIComponent(st.slug) : "/";
+      var sh = $("share");
+      if (navigator.share) {
+        sh.hidden = false; sh.innerHTML = icon("share-2", 20); sh.setAttribute("aria-label", T("Share", "مشاركة"));
+        sh.onclick = function () { navigator.share({ title: document.title, url: location.href.split("?")[0] + "?lang=" + lang }).catch(function () {}); };
+      }
+      icons();
+    }
+
+    if (!token) { applyLang(null, null); $("main").innerHTML = '<div class="state"><h1>' + esc(T("Order not found", "الطلب غير موجود")) + "</h1></div>"; return; }
+    resumeCardReturn();
+    load(false);
+    startPolling();
+  })();
   </script>
 </body>
 </html>

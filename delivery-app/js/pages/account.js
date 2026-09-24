@@ -1,482 +1,320 @@
 /**
- * account.js — Profile, order history, addresses, loyalty, wallet
- * Professional Just Eat-inspired design
+ * account.js — account hub, order history (with "order again"), saved
+ * addresses, language and theme.
  */
 window.pages = window.pages || {};
 
 pages.account = {
-  _customer: null,
-  _orders: [],
-  _loyalty: null,
-  _wallet: null,
-  _addresses: [],
+  async render(params, container, alive) {
+    const storeCfg = await shop.config();
+    const logged = auth.isLoggedIn();
+    let c = auth.getCustomer();
+    const draw = () => {
+      const name = auth.displayName(c);
+      const theme = safeStorage.get("kassenta_theme") || "system";
+      container.innerHTML = `
+${ui.topBar(L("Account", "حسابي"))}
+<div class="page page--account">
+  ${logged ? `
+  <section class="card profile">
+    <span class="profile__avatar">${esc((name || "?").trim().charAt(0).toUpperCase())}</span>
+    <div class="profile__txt">
+      <strong>${esc(name || L("Welcome", "أهلاً بك"))}</strong>
+      <span class="muted" dir="ltr">${esc((c && (c.phone || c.email)) || "")}</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" data-edit>${icon("pencil", "icon-sm")} ${esc(L("Edit", "تعديل"))}</button>
+  </section>` : `
+  <section class="card signin-card">
+    <span class="signin-card__icon">${icon("user-round", "icon-lg")}</span>
+    <div><strong>${esc(L("Sign in for a better experience", "سجّل الدخول لتجربة أفضل"))}</strong>
+    <p class="muted small">${esc(L("Track your orders, save addresses and earn rewards.", "تابع طلباتك واحفظ عناوينك واكسب المكافآت."))}</p></div>
+    <button class="btn btn-primary btn-block" data-signin>${esc(L("Sign in with your mobile", "سجّل الدخول برقم موبايلك"))}</button>
+  </section>`}
 
-  async render(params, container) {
-    const cfg = window.DELIVERY_CONFIG || {};
-    const rtl = isRtl();
-    const customer = auth.getCustomer();
+  <nav class="card menu-list" aria-label="${esc(L("Account", "حسابي"))}">
+    ${logged ? `
+    <button class="menu-list__item" data-nav="history">${icon("receipt", "icon-md")}<span>${esc(L("My orders", "طلباتي"))}</span>${chev()}</button>
+    <button class="menu-list__item" data-nav="addresses">${icon("map-pin", "icon-md")}<span>${esc(L("Saved addresses", "العناوين المحفوظة"))}</span>${chev()}</button>
+    <button class="menu-list__item" data-nav="favorites">${icon("heart", "icon-md")}<span>${esc(L("Favourites", "المفضلة"))}</span>${chev()}</button>
+    ${storeCfg.enableLoyalty ? `<button class="menu-list__item" data-nav="rewards">${icon("award", "icon-md")}<span>${esc(L("Points & rewards", "النقاط والمكافآت"))}</span>${chev()}</button>` : ""}
+    ${storeCfg.enableWallet ? `<div class="menu-list__item menu-list__item--static">${icon("wallet", "icon-md")}<span>${esc(L("Wallet balance", "رصيد المحفظة"))}</span><b id="wallet-bal">…</b></div>` : ""}
+    ` : ""}
+    ${storeCfg.enablePromos !== false ? `<button class="menu-list__item" data-nav="offers">${icon("ticket-percent", "icon-md")}<span>${esc(L("Offers", "العروض"))}</span>${chev()}</button>` : ""}
+    <button class="menu-list__item" data-nav="reviews">${icon("star", "icon-md")}<span>${esc(L("Reviews", "التقييمات"))}</span>${chev()}</button>
+    <button class="menu-list__item" data-nav="help">${icon("life-buoy", "icon-md")}<span>${esc(L("Help & contact", "المساعدة والتواصل"))}</span>${chev()}</button>
+  </nav>
 
-    if (!customer) {
-      container.innerHTML = pages.account._guestView(cfg, rtl);
-      _setBottomNavActive("account");
-      if (window.lucide) window.lucide.createIcons();
+  <section class="card">
+    <h2 class="card__title">${icon("languages", "icon-sm")} ${esc(L("Language", "اللغة"))}</h2>
+    <div class="seg seg--sm">
+      <button class="seg__btn ${kx.lang() === "ar" ? "is-on" : ""}" data-lang="ar" lang="ar">العربية</button>
+      <button class="seg__btn ${kx.lang() === "en" ? "is-on" : ""}" data-lang="en" lang="en">English</button>
+    </div>
+    <h2 class="card__title">${icon("sun-moon", "icon-sm")} ${esc(L("Appearance", "المظهر"))}</h2>
+    <div class="seg seg--sm">
+      ${[["system", L("Auto", "تلقائي")], ["light", L("Light", "فاتح")], ["dark", L("Dark", "داكن")]].map(([k, t]) =>
+        `<button class="seg__btn ${theme === k ? "is-on" : ""}" data-theme-set="${k}">${esc(t)}</button>`).join("")}
+    </div>
+  </section>
+
+  ${logged ? `<button class="btn btn-ghost btn-danger-text btn-block" data-logout>${icon("log-out", "icon-sm")} ${esc(L("Sign out", "تسجيل الخروج"))}</button>` : ""}
+  <p class="small muted center">${esc(storeCfg.storeName || "")} · ${esc(L("Powered by Kassenta", "بدعم من Kassenta"))}</p>
+</div>`;
+      bind();
+      refreshIcons();
+      if (logged && storeCfg.enableWallet && c && c.id) {
+        api.wallet.get(c.id).then(w => {
+          const el = container.querySelector("#wallet-bal");
+          if (el) el.textContent = formatCurrency(Number(w && w.balance) || 0);
+        }).catch(() => { const el = container.querySelector("#wallet-bal"); if (el) el.textContent = "—"; });
+      }
+    };
+    const chev = () => icon(isRtl() ? "chevron-left" : "chevron-right", "icon-sm menu-list__chev");
+
+    const bind = () => {
+      const si = container.querySelector("[data-signin]");
+      if (si) si.onclick = () => auth.requireLogin("account");
+      container.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => { if (b.dataset.lang !== kx.lang()) kx.setLang(b.dataset.lang); });
+      container.querySelectorAll("[data-theme-set]").forEach(b => b.onclick = () => {
+        window.setTheme && window.setTheme(b.dataset.themeSet);
+        container.querySelectorAll("[data-theme-set]").forEach(x => x.classList.toggle("is-on", x === b));
+      });
+      const lo = container.querySelector("[data-logout]");
+      if (lo) lo.onclick = async () => {
+        if (!(await confirmDialog(L("Sign out of your account?", "هل تريد تسجيل الخروج؟"), L("Sign out", "تسجيل الخروج"), true))) return;
+        await Promise.race([auth.logout(), kx.wait(3000)]);
+        showToast(L("Signed out", "تم تسجيل الخروج"), "success");
+        router.replace("home");
+      };
+      const ed = container.querySelector("[data-edit]");
+      if (ed) ed.onclick = () => pages.account._editProfile(() => { c = auth.getCustomer(); draw(); });
+    };
+
+    draw();
+    if (logged) auth.loadMe().then(fresh => { if (fresh && alive()) { c = fresh; draw(); } });
+  },
+
+  _editProfile(done) {
+    const c = auth.getCustomer() || {};
+    const sh = sheet(`
+      <h2 class="sheet__title">${esc(L("Edit profile", "تعديل الملف الشخصي"))}</h2>
+      <form id="pf" novalidate>
+        <label class="field"><span class="field__label">${esc(L("Name", "الاسم"))}</span>
+          <input class="input" id="pf-name" maxlength="80" value="${esc(auth.displayName(c))}" autocomplete="name"></label>
+        <label class="field"><span class="field__label">${esc(L("Email", "البريد الإلكتروني"))} <span class="muted">(${esc(L("optional", "اختياري"))})</span></span>
+          <input class="input" id="pf-email" type="email" dir="ltr" maxlength="120" value="${esc(c.email || "")}" autocomplete="email"></label>
+        ${c.phone ? `<label class="field"><span class="field__label">${esc(L("Mobile", "الموبايل"))}</span>
+          <input class="input" value="${esc(c.phone)}" dir="ltr" disabled></label>` : ""}
+        <p class="field__err" id="pf-err" hidden></p>
+        <button class="btn btn-primary btn-lg btn-block" type="submit">${esc(L("Save", "حفظ"))}</button>
+      </form>`, { label: L("Edit profile", "تعديل الملف الشخصي") });
+    const form = sh.body.querySelector("#pf");
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = form.querySelector("button[type=submit]");
+      if (btn.disabled) return;
+      const name = form.querySelector("#pf-name").value.trim();
+      const email = form.querySelector("#pf-email").value.trim();
+      const err = form.querySelector("#pf-err");
+      if (name.length < 2) { err.textContent = L("Enter your name", "أدخل اسمك"); err.hidden = false; return; }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = L("Enter a valid email", "أدخل بريداً إلكترونياً صحيحاً"); err.hidden = false; return; }
+      btn.disabled = true; btn.classList.add("is-loading"); err.hidden = true;
+      try {
+        await api.auth.updateMe({ name, email: email || undefined });
+        await auth.loadMe();
+        sh.close();
+        showToast(L("Saved", "تم الحفظ"), "success");
+        done();
+      } catch (ex) {
+        err.textContent = ex.message; err.hidden = false;
+        btn.disabled = false; btn.classList.remove("is-loading");
+      }
+    };
+  },
+
+  // ── Order history ─────────────────────────────────────────────────────
+  async renderHistory(params, container, alive) {
+    if (!auth.isLoggedIn()) {
+      // Guests: their most recent order from this device, plus a way to see all of them.
+      const last = safeStorage.json("kassenta_last_order_" + kx.cfg.tenantId, null);
+      const recent = last && last.token && Date.now() - last.at < 14 * 864e5;
+      container.innerHTML = ui.topBar(L("My orders", "طلباتي"), { back: "home" }) + `<div class="page">
+        ${recent ? `<a class="promo-card" href="${esc(kx.trackUrl(last.token))}">
+          <span class="promo-card__icon">${icon("navigation", "icon-lg")}</span>
+          <span class="promo-card__txt"><strong>${esc(L("Your last order", "طلبك الأخير"))} ${last.number ? "#" + esc(last.number) : ""}</strong>
+          <span>${esc(kx.fmtDate(last.at, true))} · ${esc(L("Track it", "تتبّعه"))}</span></span>
+          ${icon(isRtl() ? "chevron-left" : "chevron-right", "icon-md")}</a>` : ""}
+        ${ui.empty("receipt", L("See all your orders", "اطّلع على كل طلباتك"), L("Sign in with the mobile number you order with.", "سجّل الدخول برقم الموبايل الذي تطلب به."),
+          `<button class="btn btn-primary" data-signin>${esc(L("Sign in", "تسجيل الدخول"))}</button>`)}
+      </div>`;
+      container.querySelector("[data-signin]").onclick = () => auth.requireLogin("history");
       return;
     }
-
-    pages.account._customer = customer;
-    container.innerHTML = pages.account._skeleton(rtl);
-
-    try {
-      const [loyalty, wallet, orders, addresses] = await Promise.all([
-        api.loyalty.get(customer.id).catch(() => ({ points: 0, tier: "bronze", nextTierPoints: 500 })),
-        api.wallet.get(customer.id).catch(() => ({ balance: 0 })),
-        api.orders.history(cfg.tenantId).catch(() => []),
-        api.addresses.list().catch(() => []),
-      ]);
-
-      pages.account._loyalty = loyalty;
-      pages.account._wallet = wallet;
-      pages.account._orders = Array.isArray(orders) ? orders : (orders?.orders || []);
-      pages.account._addresses = addresses;
-
-      container.innerHTML = pages.account._build(customer, loyalty, wallet, cfg, rtl);
-      _setBottomNavActive("account");
-      if (window.lucide) window.lucide.createIcons();
-
-    } catch (err) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-state__icon"><i data-lucide="alert-triangle" class="icon-2xl"></i></div><div class="empty-state__title">${err.message}</div><button class="btn btn-primary mt-md" onclick="router.navigate('account')">${isRtl() ? "إعادة المحاولة" : "Retry"}</button></div>`;
-      if (window.lucide) window.lucide.createIcons();
+    container.innerHTML = ui.topBar(L("My orders", "طلباتي"), { back: "account" }) +
+      `<div class="page">${'<div class="card"><div class="sk sk--line"></div><div class="sk sk--line" style="width:60%"></div></div>'.repeat(3)}</div>`;
+    const orders = await api.orders.history(kx.cfg.tenantId);
+    if (!alive()) return;
+    const list = (Array.isArray(orders) ? orders : []).slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    if (!list.length) {
+      container.innerHTML = ui.topBar(L("My orders", "طلباتي"), { back: "account" }) +
+        ui.empty("receipt", L("No orders yet", "لا توجد طلبات بعد"), L("Your orders will appear here.", "ستظهر طلباتك هنا."),
+          `<button class="btn btn-primary" data-nav="menu">${esc(L("Start ordering", "ابدأ الطلب"))}</button>`);
+      return;
     }
-  },
-
-  _guestView(cfg, rtl) {
-    return `
-<div class="account-page">
-  <!-- Guest Hero -->
-  <div class="account-hero account-hero--guest">
-    <div class="account-hero__bg"></div>
-    <div class="account-hero__content">
-      <div class="account-avatar account-avatar--guest">
-        <i data-lucide="user" class="icon-3xl"></i>
-      </div>
-      <h1 class="account-hero__title">${rtl ? "مرحباً بك في Kassenta" : "Welcome to Kassenta"}</h1>
-      <p class="account-hero__sub">${rtl ? "سجل دخولك لتتبع طلباتك واكسب النقاط" : "Sign in to track orders, earn points & more"}</p>
-      <div class="account-hero__actions">
-        <button class="btn btn-primary btn-lg" onclick="router.navigate('login')">
-          <i data-lucide="log-in" class="icon-sm"></i>
-          ${rtl ? "تسجيل الدخول" : "Sign in"}
-        </button>
-        <button class="btn btn-outline-white btn-lg" onclick="router.navigate('login')">
-          ${rtl ? "إنشاء حساب" : "Create account"}
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Guest quick links -->
-  <div class="account-section">
-    <div class="account-quick-grid">
-      <div class="account-quick-card" onclick="router.navigate('offers')">
-        <div class="account-quick-card__icon" style="background: rgba(255,87,34,0.1); color: var(--delivery-primary);"><i data-lucide="tag" class="icon-lg"></i></div>
-        <span>${rtl ? "العروض" : "Offers"}</span>
-      </div>
-      <div class="account-quick-card" onclick="router.navigate('rewards')">
-        <div class="account-quick-card__icon" style="background: rgba(255,193,7,0.1); color: #F59E0B;"><i data-lucide="award" class="icon-lg"></i></div>
-        <span>${rtl ? "المكافآت" : "Rewards"}</span>
-      </div>
-      <div class="account-quick-card" onclick="router.navigate('stamps')">
-        <div class="account-quick-card__icon" style="background: rgba(108,92,231,0.1); color: #6C5CE7;"><i data-lucide="stamp" class="icon-lg"></i></div>
-        <span>${rtl ? "الطوابع" : "Stamps"}</span>
-      </div>
-      <div class="account-quick-card" onclick="router.navigate('help')">
-        <div class="account-quick-card__icon" style="background: rgba(0,184,148,0.1); color: #00B894;"><i data-lucide="help-circle" class="icon-lg"></i></div>
-        <span>${rtl ? "المساعدة" : "Help"}</span>
-      </div>
-    </div>
-  </div>
+    const active = (s) => ["pending", "accepted", "confirmed", "preparing", "ready", "on_way", "out_for_delivery"].indexOf(s) >= 0;
+    container.innerHTML = `
+${ui.topBar(L("My orders", "طلباتي"), { back: "account" })}
+<div class="page page--orders">
+  ${list.map(o => {
+    const items = pages.account._items(o);
+    const cur = o.currency || undefined;
+    return `<article class="card order-card">
+      <header class="order-card__head">
+        <div><strong>#${esc(o.orderNumber || o.id)}</strong><span class="muted small">${esc(kx.fmtDate(o.createdAt, true))}</span></div>
+        <span class="status status--${esc(o.status)}">${esc(kx.statusLabel(o.status, o.orderType))}</span>
+      </header>
+      <p class="order-card__items">${esc(items.map(i => i.quantity + "× " + (i.name || i.productName || "")).join("، "))}</p>
+      <footer class="order-card__foot">
+        <span class="price">${esc(formatCurrency(o.totalAmount, cur))}</span>
+        <div class="order-card__btns">
+          ${o.trackingToken ? `<a class="btn ${active(o.status) ? "btn-primary" : "btn-ghost"} btn-sm" href="${esc(kx.trackUrl(o.trackingToken))}">${icon(active(o.status) ? "navigation" : "eye", "icon-sm")} ${esc(active(o.status) ? L("Track", "تتبّع") : L("Details", "التفاصيل"))}</a>` : ""}
+          ${items.length ? `<button class="btn btn-soft btn-sm" data-reorder="${o.id}">${icon("rotate-ccw", "icon-sm")} ${esc(L("Order again", "اطلب مجدداً"))}</button>` : ""}
+        </div>
+      </footer>
+    </article>`;
+  }).join("")}
 </div>`;
+    container.querySelectorAll("[data-reorder]").forEach(b => b.onclick = async () => {
+      const o = list.find(x => String(x.id) === b.dataset.reorder);
+      b.disabled = true;
+      try { await pages.account.reorder(o); } catch (e) { showToast(e.message, "error"); }
+      b.disabled = false;
+    });
   },
 
-  _skeleton(rtl) {
-    return `<div class="account-page">
-      <div class="account-hero">
-        <div class="account-hero__bg"></div>
-        <div class="account-hero__content">
-          <div class="skeleton" style="width:80px;height:80px;border-radius:50%;margin:0 auto var(--space-md)"></div>
-          <div class="skeleton" style="width:150px;height:20px;margin:0 auto var(--space-sm);border-radius:8px"></div>
-          <div class="skeleton" style="width:100px;height:14px;margin:0 auto;border-radius:8px"></div>
-        </div>
-      </div>
-      <div style="padding:var(--space-md)">
-        ${Array(4).fill('<div class="skeleton" style="height:60px;border-radius:12px;margin-bottom:var(--space-sm)"></div>').join("")}
-      </div>
-    </div>`;
+  _items(o) {
+    let items = o.items;
+    if (typeof items === "string") { try { items = JSON.parse(items); } catch (e) { items = []; } }
+    return Array.isArray(items) ? items : [];
   },
 
-  _build(customer, loyalty, wallet, cfg, rtl) {
-    const tierColors = { bronze: "#CD7F32", silver: "#9CA3AF", gold: "#F59E0B", platinum: "#6366F1" };
-    const tierGradients = {
-      bronze: "linear-gradient(135deg, #CD7F32, #B8860B)",
-      silver: "linear-gradient(135deg, #C0C0C0, #A8A8A8)",
-      gold: "linear-gradient(135deg, #FFD700, #F59E0B)",
-      platinum: "linear-gradient(135deg, #6366F1, #8B5CF6)"
-    };
-    const tier = loyalty.tier || "bronze";
-    const points = loyalty.points || 0;
-    const nextPoints = loyalty.nextTierPoints || 500;
-    const progress = Math.min(100, Math.round((points / nextPoints) * 100));
-    const initials = (customer.name || customer.phone || "?").charAt(0).toUpperCase();
-    const recentOrders = pages.account._orders.slice(0, 3);
-    const currency = cfg.currency || "CHF";
-
-    return `
-<div class="account-page">
-  <!-- Profile Hero -->
-  <div class="account-hero">
-    <div class="account-hero__bg"></div>
-    <div class="account-hero__content">
-      <div class="account-avatar">
-        <span class="account-avatar__initials">${initials}</span>
-        <button class="account-avatar__edit" onclick="pages.account._editProfile()" aria-label="Edit profile">
-          <i data-lucide="pencil" class="icon-xs"></i>
-        </button>
-      </div>
-      <h1 class="account-hero__name">${customer.name || customer.phone || "Guest"}</h1>
-      <p class="account-hero__contact">${customer.phone || customer.email || ""}</p>
-      <div class="account-tier-badge" style="background:${tierGradients[tier]}">
-        ${tier === "gold" || tier === "platinum" ? '<i data-lucide="trophy" class="icon-xs"></i>' : '<i data-lucide="medal" class="icon-xs"></i>'}
-        ${tier.charAt(0).toUpperCase() + tier.slice(1)} ${rtl ? "عضو" : "Member"}
-      </div>
-    </div>
-  </div>
-
-  <!-- Stats -->
-  <div class="account-stats-bar">
-    <div class="account-stat-item">
-      <div class="account-stat-item__value">${pages.account._orders.length}</div>
-      <div class="account-stat-item__label">${rtl ? "طلبات" : "Orders"}</div>
-    </div>
-    <div class="account-stat-item account-stat-item--highlight">
-      <div class="account-stat-item__value">${points.toLocaleString()}</div>
-      <div class="account-stat-item__label">${rtl ? "نقاط" : "Points"}</div>
-    </div>
-    <div class="account-stat-item">
-      <div class="account-stat-item__value">${formatCurrency(wallet.balance || 0, currency)}</div>
-      <div class="account-stat-item__label">${rtl ? "المحفظة" : "Wallet"}</div>
-    </div>
-  </div>
-
-  <!-- Loyalty Progress -->
-  <div class="account-section">
-    <div class="account-loyalty-card" onclick="router.navigate('rewards')">
-      <div class="account-loyalty-card__left">
-        <div class="account-loyalty-card__icon" style="color:${tierColors[tier]}">
-          <i data-lucide="star" class="icon-lg"></i>
-        </div>
-        <div class="account-loyalty-card__info">
-          <div class="account-loyalty-card__title">${points.toLocaleString()} ${rtl ? "نقطة" : "points"}</div>
-          <div class="account-loyalty-card__sub">${tier === "platinum" ? (rtl ? "أعلى مستوى!" : "Top tier!") : (rtl ? `${(nextPoints - points).toLocaleString()} نقطة للمستوى التالي` : `${(nextPoints - points).toLocaleString()} pts to next tier`)}</div>
-        </div>
-      </div>
-      <div class="account-loyalty-card__right">
-        <div class="account-loyalty-progress">
-          <svg viewBox="0 0 36 36" class="account-loyalty-ring">
-            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="var(--delivery-border)" stroke-width="3"/>
-            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="${tierColors[tier]}" stroke-width="3" stroke-dasharray="${progress}, 100" stroke-linecap="round"/>
-          </svg>
-          <span class="account-loyalty-ring__text">${progress}%</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Quick Actions -->
-  <div class="account-section">
-    <div class="account-quick-grid">
-      <div class="account-quick-card" onclick="router.navigate('history')">
-        <div class="account-quick-card__icon" style="background: rgba(255,87,34,0.1); color: var(--delivery-primary);"><i data-lucide="clipboard-list" class="icon-lg"></i></div>
-        <span>${rtl ? "الطلبات" : "Orders"}</span>
-        ${pages.account._orders.length > 0 ? `<span class="account-quick-card__badge">${pages.account._orders.length}</span>` : ""}
-      </div>
-      <div class="account-quick-card" onclick="router.navigate('favorites')">
-        <div class="account-quick-card__icon" style="background: rgba(233,30,99,0.1); color: #E91E63;"><i data-lucide="heart" class="icon-lg"></i></div>
-        <span>${rtl ? "المفضلة" : "Favorites"}</span>
-      </div>
-      <div class="account-quick-card" onclick="pages.account._showAddresses()">
-        <div class="account-quick-card__icon" style="background: rgba(33,150,243,0.1); color: #2196F3;"><i data-lucide="map-pin" class="icon-lg"></i></div>
-        <span>${rtl ? "العناوين" : "Addresses"}</span>
-        ${pages.account._addresses.length > 0 ? `<span class="account-quick-card__badge">${pages.account._addresses.length}</span>` : ""}
-      </div>
-      <div class="account-quick-card" onclick="pages.account._topUpWallet()">
-        <div class="account-quick-card__icon" style="background: rgba(0,184,148,0.1); color: #00B894;"><i data-lucide="wallet" class="icon-lg"></i></div>
-        <span>${rtl ? "المحفظة" : "Wallet"}</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Recent Orders -->
-  ${recentOrders.length > 0 ? `
-  <div class="account-section">
-    <div class="account-section__header">
-      <h3>${rtl ? "آخر الطلبات" : "Recent orders"}</h3>
-      <a onclick="router.navigate('history')" href="javascript:void(0)">${rtl ? "عرض الكل" : "See all"}</a>
-    </div>
-    <div class="account-orders-list">
-      ${recentOrders.map(order => {
-        var statusIcon = order.status === "delivered" ? "check-circle" : order.status === "pending" ? "clock" : "truck";
-        var statusColor = order.status === "delivered" ? "var(--delivery-success)" : order.status === "cancelled" ? "var(--delivery-danger)" : "var(--delivery-primary)";
-        return `
-        <div class="account-order-card" onclick="router.navigate('tracking', {token: '${order.trackingToken || order.id}'})">
-          <div class="account-order-card__status" style="color:${statusColor}">
-            <i data-lucide="${statusIcon}" class="icon-md"></i>
-          </div>
-          <div class="account-order-card__info">
-            <div class="account-order-card__id">${order.orderNumber || "#" + order.id}</div>
-            <div class="account-order-card__date">${new Date(order.createdAt).toLocaleDateString()}</div>
-            <div class="account-order-card__items">${(order.items || []).map(i => i.name).slice(0, 2).join(", ")}</div>
-          </div>
-          <div class="account-order-card__right">
-            <div class="account-order-card__total">${formatCurrency(order.total || 0, currency)}</div>
-            <span class="account-order-card__status-text" style="color:${statusColor}">${order.status}</span>
-          </div>
-        </div>`;
-      }).join("")}
-    </div>
-  </div>` : ""}
-
-  <!-- Menu Items -->
-  <div class="account-section">
-    <div class="account-menu-list">
-      <div class="account-menu-row" onclick="router.navigate('rewards')">
-        <div class="account-menu-row__icon" style="color:#F59E0B"><i data-lucide="award" class="icon-md"></i></div>
-        <span class="account-menu-row__label">${rtl ? "المكافآت" : "Rewards"}</span>
-        <span class="account-menu-row__arrow"><i data-lucide="chevron-right" class="icon-sm"></i></span>
-      </div>
-      <div class="account-menu-row" onclick="router.navigate('stamps')">
-        <div class="account-menu-row__icon" style="color:#6C5CE7"><i data-lucide="stamp" class="icon-md"></i></div>
-        <span class="account-menu-row__label">${rtl ? "بطاقات الطوابع" : "Stamp Cards"}</span>
-        <span class="account-menu-row__arrow"><i data-lucide="chevron-right" class="icon-sm"></i></span>
-      </div>
-      <div class="account-menu-row" onclick="router.navigate('giftcards')">
-        <div class="account-menu-row__icon" style="color:#E91E63"><i data-lucide="gift" class="icon-md"></i></div>
-        <span class="account-menu-row__label">${rtl ? "بطاقات الهدايا" : "Gift Cards"}</span>
-        <span class="account-menu-row__arrow"><i data-lucide="chevron-right" class="icon-sm"></i></span>
-      </div>
-      <div class="account-menu-row" onclick="router.navigate('offers')">
-        <div class="account-menu-row__icon" style="color:#FF5722"><i data-lucide="tag" class="icon-md"></i></div>
-        <span class="account-menu-row__label">${rtl ? "العروض والخصومات" : "Offers & Promos"}</span>
-        <span class="account-menu-row__arrow"><i data-lucide="chevron-right" class="icon-sm"></i></span>
-      </div>
-    </div>
-  </div>
-
-  <div class="account-section">
-    <div class="account-menu-list">
-      <div class="account-menu-row" onclick="router.navigate('help')">
-        <div class="account-menu-row__icon" style="color:#00B894"><i data-lucide="help-circle" class="icon-md"></i></div>
-        <span class="account-menu-row__label">${rtl ? "مركز المساعدة" : "Help Center"}</span>
-        <span class="account-menu-row__arrow"><i data-lucide="chevron-right" class="icon-sm"></i></span>
-      </div>
-      <div class="account-menu-row" onclick="pages.account._showNotificationSettings()">
-        <div class="account-menu-row__icon" style="color:#2196F3"><i data-lucide="bell" class="icon-md"></i></div>
-        <span class="account-menu-row__label">${rtl ? "الإشعارات" : "Notifications"}</span>
-        <span class="account-menu-row__arrow"><i data-lucide="chevron-right" class="icon-sm"></i></span>
-      </div>
-      <div class="account-menu-row account-menu-row--danger" onclick="pages.account._logout()">
-        <div class="account-menu-row__icon"><i data-lucide="log-out" class="icon-md"></i></div>
-        <span class="account-menu-row__label">${rtl ? "تسجيل الخروج" : "Sign out"}</span>
-      </div>
-    </div>
-  </div>
-
-  <p class="account-version">Kassenta v2.0</p>
-  <div class="home-spacer"></div>
-</div>`;
-  },
-
-  async renderHistory(params, container) {
-    const cfg = window.DELIVERY_CONFIG || {};
-    const rtl = isRtl();
-    const customer = auth.getCustomer();
-    if (!customer) { router.navigate("login"); return; }
-
-    container.innerHTML = `<div class="top-bar top-bar--sticky"><button class="top-bar__icon" onclick="history.back()">${rtl ? "›" : "‹"}</button><span class="top-bar__title">${rtl ? "سجل الطلبات" : "Order history"}</span></div><div style="display:flex;justify-content:center;padding:var(--space-3xl)"><div class="loading-spinner"></div></div>`;
-
-    try {
-      const orders = await api.orders.history(cfg.tenantId);
-      const list = Array.isArray(orders) ? orders : (orders?.orders || []);
-      const currency = cfg.currency || "CHF";
-
-      const topBar = `<div class="top-bar top-bar--sticky"><button class="top-bar__icon" onclick="history.back()">${rtl ? "›" : "‹"}</button><span class="top-bar__title">${rtl ? "سجل الطلبات" : "Order history"} (${list.length})</span></div>`;
-
-      if (list.length === 0) {
-        container.innerHTML = topBar + `<div class="empty-state" style="margin-top:var(--space-3xl)"><div class="empty-state__icon"><i data-lucide="clipboard-list" class="icon-2xl"></i></div><div class="empty-state__title">${rtl ? "لا طلبات بعد" : "No orders yet"}</div><button class="btn btn-primary mt-md" onclick="router.navigate('home')">${rtl ? "اطلب الآن" : "Order now"}</button></div>`;
-        if (window.lucide) window.lucide.createIcons();
-        return;
+  /**
+   * Put a past order back in the cart at today's prices — the customer
+   * reviews it and checks out normally (nothing is ordered behind their back).
+   */
+  async reorder(order) {
+    const menu = await shop.menu();
+    const missing = [];
+    let added = 0;
+    pages.account._items(order).forEach(it => {
+      const p = menu.byId[it.productId];
+      if (!p) { missing.push(it.name || it.productName || ""); return; }
+      let variant = null;
+      if (it.variant) {
+        variant = shop.variants(p).find(v => v.name === it.variant) || null;
+        if (!variant) { missing.push(shop.productName(p)); return; }
       }
+      const groups = shop.modGroups(p);
+      const mods = [];
+      (Array.isArray(it.modifiers) ? it.modifiers : []).forEach(line => {
+        const s = String(line && (line.name || line) || "");
+        const i = s.indexOf(": ");
+        const gName = i >= 0 ? s.slice(0, i) : "";
+        const labels = (i >= 0 ? s.slice(i + 2) : s).split(", ");
+        const g = groups.find(x => x.name === gName) || (gName ? null : groups[0]);
+        if (!g) return;
+        labels.forEach(lb => {
+          const opt = g.options.find(o => o.label === lb.trim());
+          if (opt) mods.push({ group: g.name, label: opt.label, price: opt.price });
+        });
+      });
+      cart.add(p, { qty: Number(it.quantity) || 1, variant, mods, notes: it.notes || "" });
+      added++;
+    });
+    if (!added) throw new Error(L("These items are no longer available.", "هذه الأصناف لم تعد متوفرة."));
+    if (missing.length) showToast(L("Not available any more: ", "لم يعد متوفراً: ") + missing.filter(Boolean).join("، "), "info", 5000);
+    else showToast(L("Added to your cart — check it and order.", "أُضيف إلى سلتك — راجعها ثم اطلب."), "success");
+    router.navigate("cart");
+  },
 
-      container.innerHTML = topBar + `<div class="account-section">
-        <div class="account-orders-list">
-          ${list.map(order => {
-            var statusIcon = order.status === "delivered" ? "check-circle" : order.status === "pending" ? "clock" : "truck";
-            var statusColor = order.status === "delivered" ? "var(--delivery-success)" : order.status === "cancelled" ? "var(--delivery-danger)" : "var(--delivery-primary)";
-            return `
-            <div class="account-order-card" onclick="router.navigate('tracking', {token: '${order.trackingToken || order.id}'})">
-              <div class="account-order-card__status" style="color:${statusColor}">
-                <i data-lucide="${statusIcon}" class="icon-md"></i>
-              </div>
-              <div class="account-order-card__info">
-                <div class="account-order-card__id">${order.orderNumber || "#" + order.id}</div>
-                <div class="account-order-card__date">${new Date(order.createdAt).toLocaleString()}</div>
-                <div class="account-order-card__items">${(order.items || []).map(i => i.name).slice(0,2).join(", ")}</div>
-              </div>
-              <div class="account-order-card__right">
-                <div class="account-order-card__total">${formatCurrency(order.total || 0, currency)}</div>
-                <span class="account-order-card__status-text" style="color:${statusColor}">${order.status}</span>
-                ${order.status === "delivered" ? `<button class="btn btn-xs btn-outline" onclick="event.stopPropagation();api.orders.reorder(${order.id}).then(()=>{showToast('${rtl ? "تمت الإضافة" : "Added to cart"}','success');router.navigate('cart')}).catch(e=>showToast(e.message,'error'))">${rtl ? "أعد الطلب" : "Reorder"}</button>` : ""}
-              </div>
-            </div>`;
-          }).join("")}
+  // ── Saved addresses ───────────────────────────────────────────────────
+  async renderAddresses(params, container, alive) {
+    if (!auth.isLoggedIn()) { auth.requireLogin("addresses"); return; }
+    const top = ui.topBar(L("Saved addresses", "العناوين المحفوظة"), { back: "account",
+      right: `<button class="icon-btn" data-add aria-label="${esc(L("Add address", "إضافة عنوان"))}">${icon("plus", "icon-md")}</button>` });
+    container.innerHTML = top + ui.spinner();
+    const load = async () => {
+      const list = await api.addresses.list();
+      if (!alive()) return;
+      const rows = Array.isArray(list) ? list : [];
+      container.innerHTML = top + (rows.length ? `<div class="page">${rows.map(a => `
+        <article class="card addr-card">
+          <div class="addr-card__txt">
+            <strong>${icon("map-pin", "icon-sm")} ${esc(a.label || L("Address", "عنوان"))} ${a.isDefault ? `<span class="badge">${esc(L("Default", "افتراضي"))}</span>` : ""}</strong>
+            <span class="muted">${esc([a.city, a.street, a.buildingName, a.floor ? L("Floor ", "طابق ") + a.floor : ""].filter(Boolean).join("، "))}</span>
+            ${a.notes ? `<span class="muted small">${esc(a.notes)}</span>` : ""}
+          </div>
+          <div class="addr-card__btns">
+            ${a.isDefault ? "" : `<button class="btn btn-ghost btn-sm" data-def="${a.id}">${esc(L("Make default", "اجعله افتراضياً"))}</button>`}
+            <button class="btn btn-ghost btn-sm btn-danger-text" data-del="${a.id}" aria-label="${esc(L("Delete", "حذف"))}">${icon("trash-2", "icon-sm")}</button>
+          </div>
+        </article>`).join("")}</div>`
+        : ui.empty("map-pin", L("No saved addresses", "لا توجد عناوين محفوظة"), L("Addresses you save at checkout appear here.", "تظهر هنا العناوين التي تحفظها عند إتمام الطلب."),
+          `<button class="btn btn-primary" data-add>${icon("plus", "icon-sm")} ${esc(L("Add address", "إضافة عنوان"))}</button>`));
+      refreshIcons();
+      container.querySelectorAll("[data-add]").forEach(b => b.onclick = () => pages.account._addressForm(load));
+      container.querySelectorAll("[data-def]").forEach(b => b.onclick = async () => {
+        b.disabled = true;
+        try { await api.addresses.setDefault(b.dataset.def); await load(); } catch (e) { showToast(e.message, "error"); b.disabled = false; }
+      });
+      container.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+        if (!(await confirmDialog(L("Delete this address?", "حذف هذا العنوان؟"), L("Delete", "حذف"), true))) return;
+        b.disabled = true;
+        try { await api.addresses.delete(b.dataset.del); await load(); } catch (e) { showToast(e.message, "error"); b.disabled = false; }
+      });
+    };
+    await load();
+  },
+
+  _addressForm(onSaved) {
+    const sh = sheet(`
+      <h2 class="sheet__title">${esc(L("New address", "عنوان جديد"))}</h2>
+      <form id="af" novalidate>
+        <label class="field"><span class="field__label">${esc(L("Label", "التسمية"))}</span>
+          <input class="input" id="af-label" maxlength="40" placeholder="${esc(L("Home, Work…", "المنزل، العمل…"))}"></label>
+        <label class="field"><span class="field__label">${esc(L("Area / neighbourhood", "المنطقة / الحي"))} *</span>
+          <input class="input" id="af-city" maxlength="80"></label>
+        <label class="field"><span class="field__label">${esc(L("Street", "الشارع"))} *</span>
+          <input class="input" id="af-street" maxlength="120"></label>
+        <div class="grid-2">
+          <label class="field"><span class="field__label">${esc(L("Building", "البناء"))}</span><input class="input" id="af-building" maxlength="80"></label>
+          <label class="field"><span class="field__label">${esc(L("Floor / apartment", "الطابق / الشقة"))}</span><input class="input" id="af-floor" maxlength="30"></label>
         </div>
-      </div><div class="home-spacer"></div>`;
-      if (window.lucide) window.lucide.createIcons();
-
-    } catch (err) {
-      container.innerHTML += `<div class="empty-state"><div class="empty-state__icon"><i data-lucide="alert-triangle" class="icon-2xl"></i></div><div class="empty-state__title">${err.message}</div></div>`;
-      if (window.lucide) window.lucide.createIcons();
-    }
-  },
-
-  _editProfile() {
-    const customer = pages.account._customer;
-    if (!customer) return;
-    const name = prompt(isRtl() ? "اسمك" : "Your name:", customer.name || "");
-    if (name === null) return;
-    api.auth.updateMe({ name }).then(() => {
-      auth.cacheCustomer({ ...customer, name });
-      showToast(isRtl() ? "تم التحديث" : "Profile updated", "success");
-      router.navigate("account");
-    }).catch(err => showToast(err.message, "error"));
-  },
-
-  _showAddresses() {
-    const addrs = pages.account._addresses;
-    const rtl = isRtl();
-    const app = document.getElementById("app");
-    if (!app) return;
-
-    const iconMap = { home: "home", work: "building-2" };
-
-    app.innerHTML = `
-<div class="account-page">
-  <div class="top-bar top-bar--sticky">
-    <button class="top-bar__icon" onclick="router.navigate('account')">${rtl ? "›" : "‹"}</button>
-    <span class="top-bar__title">${rtl ? "عناوين التوصيل" : "Delivery Addresses"}</span>
-  </div>
-  ${addrs.length === 0 ? `
-    <div class="empty-state" style="margin-top:var(--space-3xl)">
-      <div class="empty-state__icon"><i data-lucide="map-pin" class="icon-2xl"></i></div>
-      <h3 class="empty-state__title">${rtl ? "لا عناوين محفوظة" : "No saved addresses"}</h3>
-      <p class="empty-state__text">${rtl ? "ستظهر عناوينك هنا بعد الطلب الأول" : "Your addresses will appear here after your first order"}</p>
-    </div>
-  ` : `
-    <div class="account-section">
-      <div class="account-orders-list">
-        ${addrs.map(addr => `
-          <div class="account-order-card">
-            <div class="account-order-card__status" style="color:var(--delivery-primary)">
-              <i data-lucide="${iconMap[addr.label] || "map-pin"}" class="icon-md"></i>
-            </div>
-            <div class="account-order-card__info">
-              <div class="account-order-card__id">${addr.label || (rtl ? "عنوان" : "Address")}</div>
-              <div class="account-order-card__items">${addr.address}${addr.floor ? ", " + addr.floor : ""}</div>
-              ${addr.notes ? `<div class="account-order-card__date">${addr.notes}</div>` : ""}
-            </div>
-            <div class="account-order-card__right">
-              ${addr.isDefault ? `<span class="badge badge-success" style="font-size:0.6875rem">${rtl ? "افتراضي" : "Default"}</span>` : `<button class="btn btn-xs btn-outline" onclick="api.addresses.setDefault(${addr.id}).then(()=>{showToast('${rtl ? "تم التعيين" : "Default set"}','success');pages.account._showAddresses()}).catch(e=>showToast(e.message,'error'))">${rtl ? "تعيين" : "Set default"}</button>`}
-              <button class="btn btn-xs btn-ghost" onclick="if(confirm('${rtl ? "حذف؟" : "Delete?"}')){api.addresses.delete(${addr.id}).then(()=>{pages.account._addresses=pages.account._addresses.filter(a=>a.id!==${addr.id});pages.account._showAddresses();showToast('${rtl ? "تم الحذف" : "Deleted"}','success')}).catch(e=>showToast(e.message,'error'))}" aria-label="Delete">
-                <i data-lucide="trash-2" class="icon-sm" style="color:var(--delivery-danger)"></i>
-              </button>
-            </div>
-          </div>`).join("")}
-      </div>
-    </div>
-  `}
-</div>`;
-    if (window.lucide) window.lucide.createIcons();
-  },
-
-  _showNotificationSettings() {
-    const rtl = isRtl();
-    var prefs = JSON.parse(localStorage.getItem("barmagly_notif_prefs") || '{"orders":true,"promos":true,"restaurants":true}');
-
-    const app = document.getElementById("app");
-    if (!app) return;
-    app.innerHTML = `
-<div class="account-page">
-  <div class="top-bar top-bar--sticky">
-    <button class="top-bar__icon" onclick="router.navigate('account')">${rtl ? "›" : "‹"}</button>
-    <span class="top-bar__title">${rtl ? "الإشعارات" : "Notifications"}</span>
-  </div>
-  <div class="account-section">
-    <div class="account-menu-list">
-      <div class="account-menu-row">
-        <div class="account-menu-row__icon" style="color:var(--delivery-primary)"><i data-lucide="truck" class="icon-md"></i></div>
-        <span class="account-menu-row__label">${rtl ? "تحديثات الطلبات" : "Order updates"}</span>
-        <label class="toggle-switch">
-          <input type="checkbox" ${prefs.orders ? "checked" : ""} onchange="pages.account._toggleNotif('orders', this.checked)">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-      <div class="account-menu-row">
-        <div class="account-menu-row__icon" style="color:#E91E63"><i data-lucide="megaphone" class="icon-md"></i></div>
-        <span class="account-menu-row__label">${rtl ? "العروض الترويجية" : "Promotions"}</span>
-        <label class="toggle-switch">
-          <input type="checkbox" ${prefs.promos ? "checked" : ""} onchange="pages.account._toggleNotif('promos', this.checked)">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-      <div class="account-menu-row">
-        <div class="account-menu-row__icon" style="color:#00B894"><i data-lucide="store" class="icon-md"></i></div>
-        <span class="account-menu-row__label">${rtl ? "مطاعم جديدة" : "New restaurants"}</span>
-        <label class="toggle-switch">
-          <input type="checkbox" ${prefs.restaurants ? "checked" : ""} onchange="pages.account._toggleNotif('restaurants', this.checked)">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-    </div>
-  </div>
-</div>`;
-    if (window.lucide) window.lucide.createIcons();
-  },
-
-  _toggleNotif(key, val) {
-    var prefs = JSON.parse(localStorage.getItem("barmagly_notif_prefs") || '{"orders":true,"promos":true,"restaurants":true}');
-    prefs[key] = val;
-    localStorage.setItem("barmagly_notif_prefs", JSON.stringify(prefs));
-    showToast(isRtl() ? "تم الحفظ" : "Saved", "success");
-  },
-
-  _topUpWallet() {
-    const amount = parseFloat(prompt(isRtl() ? "أدخل المبلغ للشحن:" : "Enter amount to top up:") || "0");
-    if (!amount || amount <= 0) return;
-    const cfg = window.DELIVERY_CONFIG || {};
-    const customer = auth.getCustomer();
-    if (!customer) return;
-    api.wallet.topup(customer.id, cfg.tenantId, amount).then(() => {
-      showToast(isRtl() ? "تم شحن المحفظة" : "Wallet topped up", "success");
-      router.navigate("account");
-    }).catch(err => showToast(err.message, "error"));
-  },
-
-  _logout() {
-    const confirmed = confirm(isRtl() ? "هل تريد تسجيل الخروج؟" : "Sign out?");
-    if (!confirmed) return;
-    auth.logout();
-    api.auth.logout().catch(() => {});
-    showToast(isRtl() ? "تم تسجيل الخروج" : "Signed out", "success");
-    router.navigate("home");
-    const navLabel = document.getElementById("nav-user-label");
-    if (navLabel) navLabel.textContent = isRtl() ? "تسجيل الدخول" : "Sign in";
+        <label class="field"><span class="field__label">${esc(L("Directions for the driver", "إرشادات للمندوب"))}</span><input class="input" id="af-notes" maxlength="200"></label>
+        <p class="field__err" id="af-err" hidden></p>
+        <button class="btn btn-primary btn-lg btn-block" type="submit">${esc(L("Save address", "حفظ العنوان"))}</button>
+      </form>`, { label: L("New address", "عنوان جديد") });
+    const form = sh.body.querySelector("#af");
+    const v = (id) => form.querySelector("#" + id).value.trim();
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = form.querySelector("button[type=submit]");
+      const err = form.querySelector("#af-err");
+      if (btn.disabled) return;
+      if (!v("af-city") || v("af-street").length < 2) { err.textContent = L("Enter the area and street", "أدخل المنطقة والشارع"); err.hidden = false; return; }
+      btn.disabled = true; btn.classList.add("is-loading"); err.hidden = true;
+      try {
+        await api.addresses.create({
+          label: v("af-label") || v("af-city"), city: v("af-city"), street: v("af-street"),
+          buildingName: v("af-building") || null, floor: v("af-floor") || null, notes: v("af-notes") || null,
+        });
+        sh.close();
+        showToast(L("Address saved", "تم حفظ العنوان"), "success");
+        onSaved();
+      } catch (ex) {
+        err.textContent = ex.message; err.hidden = false;
+        btn.disabled = false; btn.classList.remove("is-loading");
+      }
+    };
   },
 };

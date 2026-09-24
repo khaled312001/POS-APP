@@ -1,110 +1,84 @@
 /**
- * auth.js — Customer session management (OTP + email/password)
- * Uses localStorage to persist the session token.
+ * auth.js — customer session (phone OTP over WhatsApp, or Google).
+ * The token lives in localStorage; storage failures never throw.
  */
+(function () {
+  "use strict";
 
-const SESSION_KEY = "barmagly_delivery_token";
-const CUSTOMER_KEY = "barmagly_delivery_customer";
+  var SESSION_KEY = "barmagly_delivery_token";
+  var CUSTOMER_KEY = "barmagly_delivery_customer";
+  var RETURN_KEY = "kassenta_after_login";
+  var s = window.safeStorage;
 
-const auth = {
-  // ── Token helpers ──────────────────────────────────────────────────────────
-  getToken() {
-    return localStorage.getItem(SESSION_KEY);
-  },
+  var auth = {
+    getToken: function () { return s.get(SESSION_KEY); },
+    setToken: function (t) { if (t) s.set(SESSION_KEY, t); },
+    isLoggedIn: function () { return !!s.get(SESSION_KEY); },
 
-  setToken(token) {
-    localStorage.setItem(SESSION_KEY, token);
-  },
+    clearSession: function () {
+      s.del(SESSION_KEY);
+      s.del(CUSTOMER_KEY);
+      auth._emit();
+    },
 
-  clearSession() {
-    localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(CUSTOMER_KEY);
-  },
+    getCustomer: function () {
+      if (!auth.isLoggedIn()) return null;
+      return s.json(CUSTOMER_KEY, null);
+    },
 
-  isLoggedIn() {
-    return Boolean(localStorage.getItem(SESSION_KEY));
-  },
+    cacheCustomer: function (c) {
+      if (!c) return;
+      // /auth/me answers { customer }, the login calls answer the object itself.
+      if (c.customer && typeof c.customer === "object") c = c.customer;
+      s.set(CUSTOMER_KEY, JSON.stringify(c));
+      auth._emit();
+    },
 
-  // ── Customer cache ─────────────────────────────────────────────────────────
-  getCachedCustomer() {
-    try {
-      return JSON.parse(localStorage.getItem(CUSTOMER_KEY) || "null");
-    } catch {
-      return null;
-    }
-  },
+    setSession: function (token, customer) {
+      auth.setToken(token);
+      if (customer) auth.cacheCustomer(customer);
+      else auth._emit();
+    },
 
-  cacheCustomer(customer) {
-    localStorage.setItem(CUSTOMER_KEY, JSON.stringify(customer));
-  },
+    /** Refresh the cached profile; keeps the cache when offline. */
+    loadMe: function () {
+      if (!auth.isLoggedIn()) return Promise.resolve(null);
+      return api.auth.getMe().then(function (r) {
+        auth.cacheCustomer(r);
+        return auth.getCustomer();
+      }).catch(function () { return auth.getCustomer(); });
+    },
 
-  // ── Session shorthand (used by login page) ────────────────────────────────
-  setSession(token, customer) {
-    if (token) this.setToken(token);
-    if (customer) this.cacheCustomer(customer);
-  },
+    logout: function () {
+      var p = api.auth.logout().catch(function () {});
+      auth.clearSession();
+      return p;
+    },
 
-  /** Return cached customer synchronously (may be null if not logged in) */
-  getCustomer() {
-    return this.getCachedCustomer();
-  },
+    /** Name that is safe to greet with (the server defaults it to the phone). */
+    displayName: function (c) {
+      c = c || auth.getCustomer();
+      if (!c) return "";
+      var n = String(c.name || "").trim();
+      if (!n || /^[+\d\s()-]{6,}$/.test(n) || n === c.email) return "";
+      return n;
+    },
 
-  // ── OTP flow ───────────────────────────────────────────────────────────────
-  async requestOtp(phone, tenantId) {
-    return api.auth.requestOtp(phone, tenantId);
-  },
-
-  async verifyOtp(phone, tenantId, otp) {
-    const result = await api.auth.verifyOtp(phone, tenantId, otp);
-    if (result.token) {
-      this.setToken(result.token);
-      if (result.customer) {
-        this.cacheCustomer(result.customer);
-      }
-    }
-    return result;
-  },
-
-  // ── Email/password login ───────────────────────────────────────────────────
-  async loginWithEmail(email, password, tenantId) {
-    const result = await api.auth.login(email, password, tenantId);
-    if (result.token) {
-      this.setToken(result.token);
-      if (result.customer) {
-        this.cacheCustomer(result.customer);
-      }
-    }
-    return result;
-  },
-
-  // ── Load current customer from server ─────────────────────────────────────
-  async loadMe() {
-    if (!this.isLoggedIn()) return null;
-    try {
-      const customer = await api.auth.getMe();
-      this.cacheCustomer(customer);
-      return customer;
-    } catch {
-      return this.getCachedCustomer();
-    }
-  },
-
-  // ── Logout ─────────────────────────────────────────────────────────────────
-  async logout() {
-    try {
-      await api.auth.logout();
-    } catch (_) { }
-    this.clearSession();
-  },
-
-  // ── UI helpers ─────────────────────────────────────────────────────────────
-  requireAuth() {
-    if (!this.isLoggedIn()) {
+    /** Send the customer to login and bring them back here afterwards. */
+    requireLogin: function (returnRoute, params) {
+      s.set(RETURN_KEY, JSON.stringify({ name: returnRoute || "home", params: params || {} }));
       router.navigate("login");
-      return false;
-    }
-    return true;
-  },
-};
+    },
+    takeReturn: function () {
+      var r = s.json(RETURN_KEY, null);
+      s.del(RETURN_KEY);
+      return r;
+    },
 
-window.auth = auth;
+    _listeners: [],
+    onChange: function (fn) { auth._listeners.push(fn); },
+    _emit: function () { auth._listeners.forEach(function (fn) { try { fn(auth.getCustomer()); } catch (e) {} }); },
+  };
+
+  window.auth = auth;
+})();

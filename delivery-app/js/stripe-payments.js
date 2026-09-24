@@ -55,10 +55,13 @@
     });
   }
 
-  /** Load Stripe.js once, on demand. */
+  /**
+   * Load Stripe.js once, on demand. Gives up after 20 s: js.stripe.com can be
+   * slow or blocked on some networks, and a checkout must never hang on it.
+   */
   function loadStripeJs() {
     if (window.Stripe) return Promise.resolve(window.Stripe);
-    return new Promise(function (resolve, reject) {
+    var loading = new Promise(function (resolve, reject) {
       var existing = document.querySelector('script[src="' + STRIPE_JS + '"]');
       if (existing) {
         existing.addEventListener("load", function () { resolve(window.Stripe); });
@@ -71,6 +74,13 @@
       s.onload = function () { resolve(window.Stripe); };
       s.onerror = function () { reject(new Error("Could not load Stripe.js")); };
       document.head.appendChild(s);
+    });
+    var timeout = new Promise(function (_, reject) {
+      setTimeout(function () { reject(new Error("Card payment could not be loaded. Check your connection and try again.")); }, 20000);
+    });
+    return Promise.race([loading, timeout]).then(function (S) {
+      if (!S) throw new Error("Could not load Stripe.js");
+      return S;
     });
   }
 
@@ -98,7 +108,8 @@
   /** True when online payment can actually be offered right now. */
   KassentaPay.isAvailable = function () {
     var c = KassentaPay.config;
-    return !!(c && c.stripe && c.stripe.status === "connected" && c.stripe.publishableKey);
+    // cardAvailable=false: the store's currency cannot be charged by Stripe (e.g. SYP).
+    return !!(c && c.cardAvailable !== false && c.stripe && c.stripe.status === "connected" && c.stripe.publishableKey);
   };
 
   /** Which methods the account offers, for labelling the button honestly. */

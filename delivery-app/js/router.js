@@ -1,134 +1,147 @@
 /**
- * router.js — History API pushState SPA router
- * Matches routes to page modules and renders them into #app.
+ * router.js — History API router for the storefront.
+ * Pages may register cleanup with router.onLeave(fn); it runs before the next
+ * page renders, so timers, streams and observers never leak across pages.
  */
+(function () {
+  "use strict";
 
-const router = {
-  _routes: [],
-  _slug: null,
-  _current: null,
-  _basePath: "",
+  var router = {
+    _routes: [],
+    _slug: null,
+    _current: null,
+    _basePath: "",
+    _leave: [],
+    _seq: 0,
+    _listeners: [],
 
-  init(slug, basePath = "") {
-    this._slug = slug;
-    this._basePath = basePath || "";
-    window.addEventListener("popstate", () => this._resolve());
-    document.addEventListener("click", (e) => {
-      const a = e.target.closest("a[data-route]");
-      if (!a) return;
-      e.preventDefault();
-      this.navigate(a.dataset.route, a.dataset.params ? JSON.parse(a.dataset.params) : {});
-    });
-  },
+    init: function (slug, basePath) {
+      router._slug = slug;
+      router._basePath = basePath || "";
+      window.addEventListener("popstate", function () {
+        if (router._depth > 0) router._depth--;
+        router._resolve();
+      });
+      document.addEventListener("click", function (e) {
+        var a = e.target.closest && e.target.closest("a[data-route]");
+        if (!a || e.metaKey || e.ctrlKey) return;
+        e.preventDefault();
+        var params = {};
+        try { params = a.dataset.params ? JSON.parse(a.dataset.params) : {}; } catch (_) {}
+        router.navigate(a.dataset.route, params);
+      });
+    },
 
-  define(routes) {
-    this._routes = routes;
-  },
+    define: function (routes) { router._routes = routes; },
 
-  navigate(name, params = {}) {
-    const route = this._routes.find(r => r.name === name);
-    if (!route) return;
-    const path = this._buildPath(route.path, params);
-    history.pushState({ name, params }, "", path);
-    this._render(route, params);
-  },
+    url: function (name, params) {
+      var r = router._routes.find(function (x) { return x.name === name; });
+      return r ? router._buildPath(r.path, params || {}) : "#";
+    },
 
-  replace(name, params = {}) {
-    const route = this._routes.find(r => r.name === name);
-    if (!route) return;
-    const path = this._buildPath(route.path, params);
-    history.replaceState({ name, params }, "", path);
-    this._render(route, params);
-  },
+    navigate: function (name, params) {
+      var r = router._routes.find(function (x) { return x.name === name; });
+      if (!r) return;
+      var path = router._buildPath(r.path, params || {});
+      if (path !== location.pathname) history.pushState({ name: name, params: params || {} }, "", path);
+      router._render(r, params || {}, true);
+    },
 
-  _resolve() {
-    // Strip basePath prefix before matching routes
-    let path = location.pathname;
-    if (this._basePath && path.startsWith(this._basePath)) {
-      path = path.slice(this._basePath.length) || "/";
-    }
-    for (const route of this._routes) {
-      const params = this._match(route.path, path);
-      if (params !== null) {
-        this._render(route, params);
-        return;
+    replace: function (name, params) {
+      var r = router._routes.find(function (x) { return x.name === name; });
+      if (!r) return;
+      history.replaceState({ name: name, params: params || {} }, "", router._buildPath(r.path, params || {}));
+      router._render(r, params || {}, true);
+    },
+
+    back: function (fallback) {
+      // Only step back inside this storefront; a first visit goes to a sensible page.
+      if (router._depth > 0) history.back();
+      else router.replace(fallback || "home");
+    },
+    _depth: 0,
+
+    onLeave: function (fn) { router._leave.push(fn); },
+    onRoute: function (fn) { router._listeners.push(fn); },
+
+    _resolve: function () {
+      var path = location.pathname;
+      if (router._basePath && path.indexOf(router._basePath) === 0) path = path.slice(router._basePath.length) || "/";
+      path = path.replace(/\/+$/, "") || "/";
+      for (var i = 0; i < router._routes.length; i++) {
+        var params = router._match(router._routes[i].path, path);
+        if (params) return router._render(router._routes[i], params, false);
       }
-    }
-    // Default to home
-    const home = this._routes.find(r => r.name === "home");
-    if (home) this._render(home, {});
-  },
+      var home = router._routes.find(function (r) { return r.name === "home"; });
+      if (home) router._render(home, {}, false);
+    },
 
-  _match(pattern, path) {
-    const patternParts = pattern.split("/").filter(Boolean);
-    const pathParts = path.split("/").filter(Boolean);
-    if (patternParts.length !== pathParts.length) return null;
-
-    const params = {};
-    for (let i = 0; i < patternParts.length; i++) {
-      if (patternParts[i].startsWith(":")) {
-        params[patternParts[i].slice(1)] = decodeURIComponent(pathParts[i]);
-      } else if (patternParts[i] !== pathParts[i]) {
-        return null;
+    _match: function (pattern, path) {
+      var pp = pattern.split("/").filter(Boolean);
+      var ap = path.split("/").filter(Boolean);
+      if (pp.length !== ap.length) return null;
+      var params = {};
+      for (var i = 0; i < pp.length; i++) {
+        if (pp[i].charAt(0) === ":") {
+          try { params[pp[i].slice(1)] = decodeURIComponent(ap[i]); } catch (e) { params[pp[i].slice(1)] = ap[i]; }
+        } else if (pp[i] !== ap[i]) return null;
       }
-    }
-    return params;
-  },
+      return params;
+    },
 
-  _buildPath(pattern, params) {
-    let path = pattern;
-    for (const [key, val] of Object.entries(params)) {
-      path = path.replace(`:${key}`, encodeURIComponent(val));
-    }
-    // Replace :slug placeholder
-    path = path.replace(":slug", this._slug);
-    // Prepend basePath for external URL
-    return this._basePath + path;
-  },
+    _buildPath: function (pattern, params) {
+      var path = pattern;
+      Object.keys(params || {}).forEach(function (k) { path = path.replace(":" + k, encodeURIComponent(params[k])); });
+      return router._basePath + path;
+    },
 
-  async _render(route, params) {
-    this._current = { route, params };
-    const app = document.getElementById("app");
-    if (!app) return;
+    _render: function (route, params, pushed) {
+      var seq = ++router._seq;
+      if (pushed) router._depth++;
+      var leave = router._leave;
+      router._leave = [];
+      leave.forEach(function (fn) { try { fn(); } catch (e) {} });
+      if (window.closeAllSheets) closeAllSheets();
 
-    // Show loading state
-    if (route.loader) {
-      app.innerHTML = `<div class="flex items-center justify-center" style="min-height:60vh">
-        <div class="loading-spinner"></div>
-      </div>`;
-    }
+      router._current = { route: route, params: params };
+      var app = document.getElementById("app");
+      if (!app) return;
+      document.body.setAttribute("data-page", route.name);
+      window.scrollTo(0, 0);
+      router._listeners.forEach(function (fn) { try { fn(route.name, params); } catch (e) {} });
 
-    try {
-      await route.render(params, app);
-    } catch (err) {
-      console.error("[router] Render error:", err);
-      app.innerHTML = `<div class="empty-state">
-        <div class="empty-state__icon"><i data-lucide="alert-triangle" class="icon-2xl"></i></div>
-        <h2 class="empty-state__title">Something went wrong</h2>
-        <p class="empty-state__text">${err.message || "Please try again."}</p>
-        <button class="btn btn-primary mt-md" onclick="router.navigate('home')">Go Home</button>
-      </div>`;
-    }
+      var done = function () { if (seq === router._seq) refreshIcons(); };
+      var fail = function (err) {
+        if (seq !== router._seq) return;
+        console.error("[router]", err);
+        app.innerHTML = router.errorState(err, function () { router._render(route, params, false); });
+        router._bindRetry(app, function () { router._render(route, params, false); });
+        refreshIcons();
+      };
+      try {
+        var r = route.render(params, app, function () { return seq === router._seq; });
+        if (r && r.then) r.then(done, fail); else done();
+      } catch (err) { fail(err); }
+    },
 
-    // Initialize Lucide icons after page render
-    if (window.lucide) window.lucide.createIcons();
+    /** Uniform error block with a retry button (data-retry). */
+    errorState: function (err, _retry, title) {
+      var net = err && err.network;
+      return '<div class="state">' +
+        '<div class="state__icon">' + icon(net ? "wifi-off" : "alert-triangle", "icon-xl") + "</div>" +
+        '<h2 class="state__title">' + esc(title || (net ? L("You seem to be offline", "يبدو أنك غير متصل") : L("Something went wrong", "حدث خطأ ما"))) + "</h2>" +
+        '<p class="state__text">' + esc((err && err.message) || L("Please try again.", "حاول مرة أخرى.")) + "</p>" +
+        '<button class="btn btn-primary" data-retry>' + icon("refresh-cw", "icon-sm") + " " + esc(L("Try again", "أعد المحاولة")) + "</button>" +
+        "</div>";
+    },
+    _bindRetry: function (root, fn) {
+      var b = root.querySelector("[data-retry]");
+      if (b) b.onclick = fn;
+    },
 
-    this._updateBottomNav(route.name);
-  },
+    getCurrent: function () { return router._current; },
+    getSlug: function () { return router._slug; },
+  };
 
-  _updateBottomNav(routeName) {
-    document.querySelectorAll(".bottom-nav__item").forEach(el => {
-      el.classList.toggle("active", el.dataset.route === routeName);
-    });
-  },
-
-  getCurrent() {
-    return this._current;
-  },
-
-  getSlug() {
-    return this._slug;
-  },
-};
-
-window.router = router;
+  window.router = router;
+})();

@@ -1,288 +1,100 @@
 /**
- * help.js — Help Center with FAQ accordion and support tickets
+ * help.js — contact the store (WhatsApp / call), the store's own FAQ, and a
+ * message form (help ticket). Also answers the common questions honestly
+ * when the store hasn't written an FAQ.
  */
 window.pages = window.pages || {};
 
 pages.help = {
-  _faq: [],
-  _tickets: [],
-
-  _t: {
-    en: {
-      title: "Help Center",
-      searchFaq: "Search FAQ...",
-      faqTitle: "Frequently Asked Questions",
-      ticketsTitle: "Your Tickets",
-      submitTicket: "Submit a Ticket",
-      subject: "Subject",
-      message: "Describe your issue...",
-      send: "Send",
-      sending: "Sending...",
-      sent: "Ticket submitted successfully!",
-      noTickets: "No support tickets yet",
-      contactTitle: "Contact Us",
-      contactEmail: "info@kassenta.com",
-      contactHours: "Mon–Sun, 9:00 – 22:00",
-      subjectOptions: ["Order Issue", "Payment Problem", "Delivery Issue", "Account Help", "Other"],
-      statusOpen: "Open",
-      statusInProgress: "In Progress",
-      statusResolved: "Resolved",
-      emptyFaq: "No FAQ entries available",
-      back: "Back",
-    },
-    ar: {
-      title: "مركز المساعدة",
-      searchFaq: "ابحث في الأسئلة الشائعة...",
-      faqTitle: "الأسئلة الشائعة",
-      ticketsTitle: "تذاكر الدعم",
-      submitTicket: "إرسال تذكرة",
-      subject: "الموضوع",
-      message: "صف مشكلتك...",
-      send: "إرسال",
-      sending: "جاري الإرسال...",
-      sent: "تم إرسال التذكرة بنجاح!",
-      noTickets: "لا توجد تذاكر دعم بعد",
-      contactTitle: "اتصل بنا",
-      contactEmail: "info@kassenta.com",
-      contactHours: "الاثنين – الأحد، 9:00 – 22:00",
-      subjectOptions: ["مشكلة في الطلب", "مشكلة في الدفع", "مشكلة في التوصيل", "مساعدة الحساب", "أخرى"],
-      statusOpen: "مفتوح",
-      statusInProgress: "قيد المعالجة",
-      statusResolved: "تم الحل",
-      emptyFaq: "لا توجد أسئلة شائعة",
-      back: "رجوع",
-    },
-    de: {
-      title: "Hilfe-Center",
-      searchFaq: "FAQ durchsuchen...",
-      faqTitle: "Häufig gestellte Fragen",
-      ticketsTitle: "Ihre Tickets",
-      submitTicket: "Ticket erstellen",
-      subject: "Betreff",
-      message: "Beschreiben Sie Ihr Problem...",
-      send: "Senden",
-      sending: "Wird gesendet...",
-      sent: "Ticket erfolgreich gesendet!",
-      noTickets: "Noch keine Support-Tickets",
-      contactTitle: "Kontaktieren Sie uns",
-      contactEmail: "info@kassenta.com",
-      contactHours: "Mo–So, 9:00 – 22:00",
-      subjectOptions: ["Bestellproblem", "Zahlungsproblem", "Lieferproblem", "Kontohilfe", "Sonstiges"],
-      statusOpen: "Offen",
-      statusInProgress: "In Bearbeitung",
-      statusResolved: "Gelöst",
-      emptyFaq: "Keine FAQ-Einträge verfügbar",
-      back: "Zurück",
-    },
-  },
-
-  async render(params, container) {
-    const cfg = window.DELIVERY_CONFIG || {};
-    const lang = cfg.language || "en";
-    const t = pages.help._t[lang] || pages.help._t.en;
+  async render(params, container, alive) {
+    const top = ui.topBar(L("Help & contact", "المساعدة والتواصل"), { back: "account" });
+    container.innerHTML = top + ui.spinner();
+    const storeCfg = await shop.config();
+    const [faq, tickets] = await Promise.all([
+      api.help.getFaq(kx.cfg.tenantId).catch(() => []),
+      auth.isLoggedIn() ? api.help.getTickets().catch(() => []) : Promise.resolve([]),
+    ]);
+    if (!alive()) return;
+    const wa = String(storeCfg.socialWhatsapp || "").replace(/\D/g, "");
+    const phone = String(storeCfg.supportPhone || storeCfg.phone || "").replace(/[^\d+]/g, "");
+    const ar = kx.lang() === "ar";
+    const entries = (Array.isArray(faq) ? faq : []).map(f => ({ q: (ar && f.questionAr) || f.question, a: (ar && f.answerAr) || f.answer }));
+    if (!entries.length) {
+      entries.push(
+        { q: L("How do I pay?", "كيف أدفع؟"), a: L("Choose a payment method at checkout. Cash is paid when you receive your order.", "اختر طريقة الدفع عند إتمام الطلب. الدفع النقدي يكون عند استلام الطلب.") },
+        { q: L("How do I follow my order?", "كيف أتابع طلبي؟"), a: L("After ordering you get a tracking link on screen and on WhatsApp. Signed-in customers also find it under My orders.", "بعد الطلب يظهر لك رابط التتبع على الشاشة ويصلك عبر واتساب. ويمكن للمسجّلين إيجاده في «طلباتي».") },
+        { q: L("Can I change or cancel an order?", "هل يمكنني تعديل الطلب أو إلغاؤه؟"), a: L("Contact the store as soon as possible — before it is being prepared.", "تواصل مع المتجر بأسرع وقت — قبل أن يبدأ تحضير الطلب.") },
+      );
+    }
+    const tlist = Array.isArray(tickets) ? tickets : [];
+    const tStatus = { open: L("Open", "مفتوحة"), in_progress: L("In progress", "قيد المعالجة"), resolved: L("Resolved", "تم الحل"), closed: L("Closed", "مغلقة") };
 
     container.innerHTML = `
-<div class="help-page">
-  <header class="help-page__header">
-    <button class="btn-icon" onclick="history.back()" aria-label="${t.back}">
-      <i data-lucide="arrow-left" class="icon-md"></i>
-    </button>
-    <h2 class="help-page__title">${t.title}</h2>
-  </header>
+${top}
+<div class="page page--help">
+  ${(wa || phone) ? `<section class="card">
+    <h2 class="card__title">${icon("headset", "icon-sm")} ${esc(L("Contact", "تواصل معنا"))} ${esc(storeCfg.storeName || "")}</h2>
+    <div class="btn-row">
+      ${wa ? `<a class="btn btn-primary" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">${icon("message-circle", "icon-sm")} ${esc(L("WhatsApp", "واتساب"))}</a>` : ""}
+      ${phone ? `<a class="btn btn-soft" href="tel:${esc(phone)}">${icon("phone", "icon-sm")} ${esc(L("Call", "اتصال"))}</a>` : ""}
+    </div>
+    ${phone ? `<p class="small muted">${icon("phone", "icon-xs")} <span dir="ltr">${esc(storeCfg.supportPhone || storeCfg.phone)}</span></p>` : ""}
+    ${storeCfg.openingHours ? `<p class="small muted">${icon("clock", "icon-xs")} ${esc(storeCfg.openingHours)}</p>` : ""}
+    ${storeCfg.address ? `<p class="small muted">${icon("map-pin", "icon-xs")} ${esc(storeCfg.address)}</p>` : ""}
+  </section>` : ""}
 
-  <div class="help-page__body">
-    <!-- Contact Card -->
-    <section class="help-contact-card">
-      <div class="help-contact-card__icon"><i data-lucide="headphones" class="icon-lg"></i></div>
-      <div class="help-contact-card__info">
-        <h3>${t.contactTitle}</h3>
-        <p><i data-lucide="mail" class="icon-xs"></i> ${t.contactEmail}</p>
-        <p><i data-lucide="clock" class="icon-xs"></i> ${t.contactHours}</p>
-      </div>
-    </section>
+  <section class="card">
+    <h2 class="card__title">${icon("circle-help", "icon-sm")} ${esc(L("Questions", "أسئلة شائعة"))}</h2>
+    <div class="faq">${entries.map(e => `<details class="faq__item"><summary>${esc(e.q)}</summary><p>${esc(e.a)}</p></details>`).join("")}</div>
+  </section>
 
-    <!-- FAQ Section -->
-    <section class="help-section">
-      <h3 class="help-section__title"><i data-lucide="help-circle" class="icon-sm"></i> ${t.faqTitle}</h3>
-      <div class="help-faq__search">
-        <i data-lucide="search" class="icon-sm"></i>
-        <input type="search" placeholder="${t.searchFaq}" id="faq-search" aria-label="${t.searchFaq}">
-      </div>
-      <div id="faq-list" class="help-faq__list">
-        <div class="skeleton skeleton-text" style="height:48px;margin-bottom:8px"></div>
-        <div class="skeleton skeleton-text" style="height:48px;margin-bottom:8px"></div>
-        <div class="skeleton skeleton-text" style="height:48px"></div>
-      </div>
-    </section>
+  <section class="card">
+    <h2 class="card__title">${icon("mail", "icon-sm")} ${esc(L("Send us a message", "أرسل لنا رسالة"))}</h2>
+    <form id="tk" novalidate>
+      <label class="field"><span class="field__label">${esc(L("Subject", "الموضوع"))}</span>
+        <input class="input" id="tk-subject" maxlength="120"></label>
+      <label class="field"><span class="field__label">${esc(L("Message", "الرسالة"))}</span>
+        <textarea class="input" id="tk-message" rows="4" maxlength="2000"></textarea></label>
+      ${auth.isLoggedIn() ? "" : `<label class="field"><span class="field__label">${esc(L("Your mobile, so we can reply", "رقم موبايلك لنرد عليك"))}</span>
+        <input class="input" id="tk-phone" type="tel" dir="ltr" inputmode="tel" maxlength="20" placeholder="${esc(kx.phoneHint().replace(/^[^\d+]*/, ""))}"></label>`}
+      <p class="field__err" id="tk-err" hidden></p>
+      <button class="btn btn-primary btn-block" type="submit">${esc(L("Send", "إرسال"))}</button>
+    </form>
+  </section>
 
-    <!-- Submit Ticket -->
-    <section class="help-section">
-      <h3 class="help-section__title"><i data-lucide="message-square" class="icon-sm"></i> ${t.submitTicket}</h3>
-      <form class="help-ticket-form" id="ticket-form">
-        <div class="form-group">
-          <label class="form-label">${t.subject}</label>
-          <select class="form-select" id="ticket-subject" required>
-            ${t.subjectOptions.map(function (opt) { return '<option value="' + opt + '">' + opt + '</option>'; }).join("")}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">${t.message}</label>
-          <textarea class="form-textarea" id="ticket-message" rows="4" placeholder="${t.message}" required></textarea>
-        </div>
-        <button type="submit" class="btn btn-primary btn-full" id="ticket-submit">${t.send}</button>
-      </form>
-    </section>
-
-    <!-- My Tickets -->
-    ${auth.isLoggedIn() ? `<section class="help-section">
-      <h3 class="help-section__title"><i data-lucide="ticket" class="icon-sm"></i> ${t.ticketsTitle}</h3>
-      <div id="tickets-list">
-        <div class="skeleton skeleton-text" style="height:60px;margin-bottom:8px"></div>
-      </div>
-    </section>` : ""}
-  </div>
+  ${tlist.length ? `<section class="card">
+    <h2 class="card__title">${icon("inbox", "icon-sm")} ${esc(L("Your messages", "رسائلك"))}</h2>
+    <ul class="tickets">${tlist.map(t => `<li>
+      <div class="tickets__head"><strong>${esc(t.subject)}</strong><span class="badge">${esc(tStatus[t.status] || t.status)}</span></div>
+      <p class="small">${esc(t.message)}</p>
+      ${t.response ? `<p class="tickets__reply">${icon("reply", "icon-xs")} ${esc(t.response)}</p>` : ""}
+      <small class="muted">${esc(kx.fmtDate(t.createdAt, true))}</small></li>`).join("")}</ul>
+  </section>` : ""}
 </div>`;
+    refreshIcons();
 
-    if (window.lucide) window.lucide.createIcons();
-
-    // Load FAQ
-    pages.help._loadFaq(cfg, t, lang);
-
-    // Load tickets if logged in
-    if (auth.isLoggedIn()) {
-      pages.help._loadTickets(t);
-    }
-
-    // FAQ search filter
-    document.getElementById("faq-search").addEventListener("input", function (e) {
-      pages.help._filterFaq(e.target.value, lang);
-    });
-
-    // Ticket form
-    document.getElementById("ticket-form").addEventListener("submit", function (e) {
+    const form = container.querySelector("#tk");
+    form.onsubmit = async (e) => {
       e.preventDefault();
-      pages.help._submitTicket(cfg, t);
-    });
-  },
-
-  _loadFaq: async function (cfg, t, lang) {
-    try {
-      var data = await api.help.getFaq(cfg.tenantId);
-      pages.help._faq = Array.isArray(data) ? data : (data.faq || []);
-      pages.help._renderFaq(pages.help._faq, t, lang);
-    } catch (err) {
-      document.getElementById("faq-list").innerHTML = `<p class="text-muted text-sm">${t.emptyFaq}</p>`;
-    }
-  },
-
-  _renderFaq: function (items, t, lang) {
-    var el = document.getElementById("faq-list");
-    if (!el) return;
-
-    if (!items || items.length === 0) {
-      el.innerHTML = `<p class="text-muted text-sm">${t.emptyFaq}</p>`;
-      return;
-    }
-
-    el.innerHTML = items.map(function (faq, i) {
-      var question = (lang === "ar" && faq.questionAr) ? faq.questionAr : faq.question;
-      var answer = (lang === "ar" && faq.answerAr) ? faq.answerAr : faq.answer;
-      return `<div class="help-faq__item" id="faq-item-${i}">
-        <button class="help-faq__question" onclick="pages.help._toggleFaq(${i})" aria-expanded="false">
-          <span>${question}</span>
-          <i data-lucide="chevron-down" class="icon-sm help-faq__chevron"></i>
-        </button>
-        <div class="help-faq__answer">${answer}</div>
-      </div>`;
-    }).join("");
-    if (window.lucide) window.lucide.createIcons();
-  },
-
-  _toggleFaq: function (idx) {
-    var item = document.getElementById("faq-item-" + idx);
-    if (!item) return;
-    var isOpen = item.classList.contains("open");
-    // Close all
-    document.querySelectorAll(".help-faq__item.open").forEach(function (el) { el.classList.remove("open"); });
-    if (!isOpen) item.classList.add("open");
-  },
-
-  _filterFaq: function (query, lang) {
-    var filtered = pages.help._faq.filter(function (faq) {
-      var q = (lang === "ar" && faq.questionAr) ? faq.questionAr : faq.question;
-      var a = (lang === "ar" && faq.answerAr) ? faq.answerAr : faq.answer;
-      var search = query.toLowerCase();
-      return q.toLowerCase().indexOf(search) >= 0 || a.toLowerCase().indexOf(search) >= 0;
-    });
-    var t = pages.help._t[lang] || pages.help._t.en;
-    pages.help._renderFaq(filtered, t, lang);
-  },
-
-  _loadTickets: async function (t) {
-    try {
-      var data = await api.help.getTickets();
-      pages.help._tickets = Array.isArray(data) ? data : (data.tickets || []);
-      pages.help._renderTickets(t);
-    } catch (err) {
-      var el = document.getElementById("tickets-list");
-      if (el) el.innerHTML = `<p class="text-muted text-sm">${t.noTickets}</p>`;
-    }
-  },
-
-  _renderTickets: function (t) {
-    var el = document.getElementById("tickets-list");
-    if (!el) return;
-    var tickets = pages.help._tickets;
-
-    if (!tickets || tickets.length === 0) {
-      el.innerHTML = `<p class="text-muted text-sm">${t.noTickets}</p>`;
-      return;
-    }
-
-    var statusMap = { open: t.statusOpen, in_progress: t.statusInProgress, resolved: t.statusResolved };
-    var statusClass = { open: "warning", in_progress: "info", resolved: "success" };
-
-    el.innerHTML = tickets.map(function (ticket) {
-      var status = ticket.status || "open";
-      return `<div class="help-ticket-card">
-        <div class="help-ticket-card__header">
-          <h4>${ticket.subject}</h4>
-          <span class="badge badge-${statusClass[status] || 'default'}">${statusMap[status] || status}</span>
-        </div>
-        <p class="help-ticket-card__message">${ticket.message}</p>
-        <span class="help-ticket-card__date">${new Date(ticket.createdAt).toLocaleDateString()}</span>
-      </div>`;
-    }).join("");
-  },
-
-  _submitTicket: async function (cfg, t) {
-    var btn = document.getElementById("ticket-submit");
-    var subject = document.getElementById("ticket-subject").value;
-    var message = document.getElementById("ticket-message").value.trim();
-
-    if (!message) return;
-
-    btn.disabled = true;
-    btn.textContent = t.sending;
-
-    try {
-      await api.help.submitTicket({
-        tenantId: cfg.tenantId,
-        subject: subject,
-        message: message,
-      });
-      showToast(t.sent, "success");
-      document.getElementById("ticket-message").value = "";
-
-      // Reload tickets
-      if (auth.isLoggedIn()) {
-        pages.help._loadTickets(t);
+      const btn = form.querySelector("button[type=submit]");
+      const err = form.querySelector("#tk-err");
+      if (btn.disabled) return;
+      const subject = form.querySelector("#tk-subject").value.trim();
+      let message = form.querySelector("#tk-message").value.trim();
+      const ph = form.querySelector("#tk-phone");
+      if (subject.length < 2 || message.length < 5) { err.textContent = L("Write a subject and a short message.", "اكتب الموضوع ورسالة قصيرة."); err.hidden = false; return; }
+      if (ph) {
+        const n = kx.normalizePhone(ph.value);
+        if (!n.valid) { err.textContent = L("Enter your mobile number so the store can reply. ", "أدخل رقم موبايلك ليتمكّن المتجر من الرد. ") + kx.phoneHint(); err.hidden = false; return; }
+        message += "\n\n" + L("Phone: ", "الهاتف: ") + n.value;
       }
-    } catch (err) {
-      showToast(err.message || "Error", "error");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = t.send;
-    }
+      btn.disabled = true; btn.classList.add("is-loading"); err.hidden = true;
+      try {
+        await api.help.submitTicket({ subject, message, tenantId: kx.cfg.tenantId });
+        form.reset();
+        showToast(L("Message sent. The store will get back to you.", "تم إرسال رسالتك. سيتواصل معك المتجر."), "success", 4000);
+      } catch (ex) { err.textContent = ex.message; err.hidden = false; }
+      btn.disabled = false; btn.classList.remove("is-loading");
+    };
   },
 };

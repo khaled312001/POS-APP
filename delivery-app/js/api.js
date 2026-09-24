@@ -1,292 +1,100 @@
 /**
- * api.js — API client for Kassenta Delivery
- * Wraps fetch with auth headers, error handling, and base URL resolution.
+ * api.js — typed wrappers over the storefront's server endpoints.
+ * Every call goes through window.http (core.js): timeout, one retry for GETs,
+ * never a silent retry for writes.
  */
+(function () {
+  "use strict";
 
-const API_BASE = "";  // same origin — no CORS
+  function q(v) { return encodeURIComponent(v == null ? "" : v); }
+  function post(path, body, opts) { return http(path, Object.assign({ method: "POST", body: body || {} }, opts || {})); }
 
-// ── Global utilities ───────────────────────────────────────────────────────
+  var api = {
+    auth: {
+      // payload: { credential } (ID token) or { accessToken } (OAuth popup)
+      googleLogin: function (payload, tenantId) {
+        return post("/api/delivery/auth/google", Object.assign({}, payload, { tenantId: tenantId }), { timeout: 20000 });
+      },
+      requestOtp: function (phone, tenantId) {
+        // The server waits for WhatsApp to accept the message; allow for it.
+        return post("/api/delivery/auth/request-otp", { phone: phone, tenantId: tenantId }, { timeout: 45000 });
+      },
+      verifyOtp: function (phone, tenantId, otp) {
+        return post("/api/delivery/auth/verify-otp", { phone: phone, tenantId: tenantId, otp: otp }, { timeout: 20000 });
+      },
+      logout: function () { return post("/api/delivery/auth/logout", {}, { timeout: 8000 }); },
+      getMe: function () { return http("/api/delivery/auth/me"); },
+      updateMe: function (data) { return http("/api/delivery/auth/me", { method: "PUT", body: data }); },
+    },
 
-function isRtl() {
-  const cfg = window.DELIVERY_CONFIG || {};
-  const lang = cfg.language || document.documentElement.lang || "en";
-  return lang === "ar" || document.documentElement.dir === "rtl";
-}
+    store: {
+      getConfig: function (slug) { return http("/api/delivery/store/" + q(slug), { auth: false }); },
+      getMenu: function (slug) { return http("/api/delivery/store/" + q(slug) + "/menu", { auth: false }); },
+      getPromos: function (slug) { return http("/api/delivery/store/" + q(slug) + "/promos", { auth: false }); },
+    },
 
-// Fix image URLs: prepend /api if on CDN (path starts with /api/)
-function fixImageUrl(url) {
-  if (!url) return url;
-  // Already absolute URL
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  // Already has /api/ prefix
-  if (url.startsWith("/api/")) return url;
-  // On Hostinger CDN, prepend /api to relative /uploads/ and /assets/ paths
-  const cfg = window.DELIVERY_CONFIG || {};
-  const base = cfg.basePath || "";
-  if (base && (url.startsWith("/uploads/") || url.startsWith("/assets/") || url.startsWith("/objects/"))) {
-    return base + url;
-  }
-  return url;
-}
+    zones: {
+      getZones: function (tenantId) { return http("/api/delivery/zones?tenantId=" + q(tenantId), { auth: false }); },
+    },
 
-// showToast and formatCurrency are defined in index.html bootstrap script;
-// provide fallbacks here in case they're called before bootstrap runs.
-function showToast(msg, type, duration) {
-  if (window.showToast && window.showToast !== showToast) {
-    return window.showToast(msg, type, duration);
-  }
-  duration = duration || 3000;
-  var container = document.getElementById("toast-container");
-  if (!container) return;
-  var el = document.createElement("div");
-  el.className = "toast" + (type ? " " + type : "");
-  el.textContent = msg;
-  container.appendChild(el);
-  setTimeout(function() { el.remove(); }, duration + 300);
-}
+    promos: {
+      /** Resolves to the server result; `valid:false` comes back as HTTP 200. */
+      validate: function (tenantId, code, orderTotal, orderType, customerId) {
+        return post("/api/delivery/promo/validate", {
+          tenantId: tenantId, code: code, orderTotal: orderTotal, orderType: orderType, customerId: customerId,
+        }, { timeout: 15000 });
+      },
+    },
 
-function formatCurrency(amount, currency) {
-  if (window.formatCurrency && window.formatCurrency !== formatCurrency) {
-    return window.formatCurrency(amount, currency);
-  }
-  var c = currency || (window.DELIVERY_CONFIG || {}).currency || "CHF";
-  try {
-    return new Intl.NumberFormat(isRtl() ? "ar" : "de-CH", {
-      style: "currency", currency: c, minimumFractionDigits: 0,
-    }).format(amount || 0);
-  } catch (_) {
-    return c + " " + (amount || 0);
-  }
-}
+    addresses: {
+      list: function () { return http("/api/delivery/addresses"); },
+      create: function (data) { return post("/api/delivery/addresses", data); },
+      update: function (id, data) { return http("/api/delivery/addresses/" + q(id), { method: "PUT", body: data }); },
+      delete: function (id) { return http("/api/delivery/addresses/" + q(id), { method: "DELETE" }); },
+      setDefault: function (id) { return http("/api/delivery/addresses/" + q(id) + "/default", { method: "PUT", body: {} }); },
+    },
 
-// ── Core fetch wrapper ─────────────────────────────────────────────────────
+    orders: {
+      create: function (data) { return post("/api/delivery/orders", data, { timeout: 45000 }); },
+      track: function (token) { return http("/api/delivery/orders/track/" + q(token), { auth: false }); },
+      history: function (tenantId) { return http("/api/delivery/orders/history?tenantId=" + q(tenantId)); },
+      rate: function (orderId, data) { return post("/api/delivery/orders/" + q(orderId) + "/rate", data); },
+    },
 
-async function apiFetch(path, options = {}) {
-  const token = auth.getToken();
-  const headers = {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
+    payments: {
+      shamCashReference: function (orderId, trackingToken, reference) {
+        return post("/api/payments/order/" + q(orderId) + "/shamcash/reference", { trackingToken: trackingToken, reference: reference }, { auth: false });
+      },
+    },
+
+    loyalty: {
+      get: function (customerId) { return http("/api/delivery/loyalty/" + q(customerId)); },
+    },
+
+    wallet: {
+      get: function (customerId) { return http("/api/delivery/wallet/" + q(customerId)); },
+    },
+
+    favorites: {
+      // Rows: { id, productId, productName, productPrice, productImage, ... }
+      list: function () { return http("/api/delivery/favorites"); },
+      add: function (productId, tenantId) { return post("/api/delivery/favorites", { productId: productId, tenantId: tenantId }); },
+      // NB: the server deletes by the favourite row id, not the product id.
+      remove: function (favoriteId) { return http("/api/delivery/favorites/" + q(favoriteId), { method: "DELETE" }); },
+    },
+
+    help: {
+      getFaq: function (tenantId) { return http("/api/delivery/help/faq?tenantId=" + q(tenantId), { auth: false }); },
+      getTickets: function () { return http("/api/delivery/help/tickets"); },
+      submitTicket: function (data) { return post("/api/delivery/help/ticket", data); },
+    },
+
+    reviews: {
+      getForStore: function (slug, page, limit) {
+        return http("/api/delivery/store/" + q(slug) + "/reviews?page=" + (page || 1) + "&limit=" + (limit || 10), { auth: false });
+      },
+    },
   };
 
-  const resp = await fetch(API_BASE + path, {
-    ...options,
-    headers,
-  });
-
-  if (resp.status === 401) {
-    auth.clearSession();
-    router.navigate("login");
-    throw new Error("Unauthorized");
-  }
-
-  if (!resp.ok) {
-    const body = await resp.json().catch(() => ({}));
-    throw new Error(body.error || body.message || `HTTP ${resp.status}`);
-  }
-
-  if (resp.status === 204) return null;
-  return resp.json();
-}
-
-// ── Customer Auth ──────────────────────────────────────────────────────────
-
-const authApi = {
-  // payload: { credential } (ID token) or { accessToken } (OAuth popup)
-  googleLogin: (payload, tenantId) =>
-    apiFetch("/api/delivery/auth/google", {
-      method: "POST",
-      body: JSON.stringify({ ...payload, tenantId }),
-    }),
-
-  requestOtp: (phone, tenantId) =>
-    apiFetch("/api/delivery/auth/request-otp", {
-      method: "POST",
-      body: JSON.stringify({ phone, tenantId }),
-    }),
-
-  verifyOtp: (phone, tenantId, otp) =>
-    apiFetch("/api/delivery/auth/verify-otp", {
-      method: "POST",
-      body: JSON.stringify({ phone, tenantId, otp }),
-    }),
-
-  login: (email, password, tenantId) =>
-    apiFetch("/api/delivery/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password, tenantId }),
-    }),
-
-  register: (data) =>
-    apiFetch("/api/delivery/auth/register", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  logout: () =>
-    apiFetch("/api/delivery/auth/logout", { method: "POST" }),
-
-  getMe: () => apiFetch("/api/delivery/auth/me"),
-
-  updateMe: (data) =>
-    apiFetch("/api/delivery/auth/me", {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
-};
-
-// ── Store / Menu ────────────────────────────────────────────────────────────
-
-const storeApi = {
-  getConfig: (slug) => apiFetch(`/api/delivery/store/${slug}`),
-  getMenu: (slug) => apiFetch(`/api/delivery/store/${slug}/menu`),
-  getProduct: (slug, productId) => apiFetch(`/api/delivery/store/${slug}/product/${productId}`),
-  getPromos: (slug) => apiFetch(`/api/delivery/store/${slug}/promos`),
-};
-
-// ── Delivery Zones ──────────────────────────────────────────────────────────
-
-const zonesApi = {
-  getZones: (tenantId) => apiFetch(`/api/delivery/zones?tenantId=${tenantId}`),
-};
-
-// ── Promo codes ─────────────────────────────────────────────────────────────
-
-const promosApi = {
-  validate: (tenantId, code, orderTotal, orderType, customerId) =>
-    apiFetch("/api/delivery/promo/validate", {
-      method: "POST",
-      body: JSON.stringify({ tenantId, code, orderTotal, orderType, customerId }),
-    }),
-};
-
-// ── Addresses ──────────────────────────────────────────────────────────────
-
-const addressesApi = {
-  list: () => apiFetch("/api/delivery/addresses"),
-  create: (data) => apiFetch("/api/delivery/addresses", { method: "POST", body: JSON.stringify(data) }),
-  update: (id, data) => apiFetch(`/api/delivery/addresses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  delete: (id) => apiFetch(`/api/delivery/addresses/${id}`, { method: "DELETE" }),
-  setDefault: (id) => apiFetch(`/api/delivery/addresses/${id}/default`, { method: "PUT" }),
-};
-
-// ── Orders ─────────────────────────────────────────────────────────────────
-
-const ordersApi = {
-  create: (data) =>
-    apiFetch("/api/delivery/orders", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  track: (token) => apiFetch(`/api/delivery/orders/track/${token}`),
-
-  history: (tenantId) => apiFetch(`/api/delivery/orders/history?tenantId=${tenantId}`),
-
-  rate: (orderId, data) =>
-    apiFetch(`/api/delivery/orders/${orderId}/rate`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  reorder: (orderId) =>
-    apiFetch(`/api/delivery/orders/${orderId}/reorder`, { method: "POST" }),
-
-  /**
-   * SSE stream for live order status.
-   * @param {number} orderId
-   * @param {function} onEvent - called with parsed JSON event data
-   * @returns {EventSource}
-   */
-  statusStream: (orderId, onEvent) => {
-    const token = auth.getToken();
-    const url = `/api/delivery/orders/${orderId}/status-stream${token ? `?token=${token}` : ""}`;
-    const es = new EventSource(url);
-    es.onmessage = (e) => {
-      try { onEvent(JSON.parse(e.data)); } catch (_) { }
-    };
-    return es;
-  },
-};
-
-// ── Loyalty & Wallet ────────────────────────────────────────────────────────
-
-const loyaltyApi = {
-  get: (customerId) => apiFetch(`/api/delivery/loyalty/${customerId}`),
-  redeem: (customerId, tenantId, points) =>
-    apiFetch("/api/delivery/loyalty/redeem", {
-      method: "POST",
-      body: JSON.stringify({ customerId, tenantId, points }),
-    }),
-};
-
-const walletApi = {
-  get: (customerId) => apiFetch(`/api/delivery/wallet/${customerId}`),
-  topup: (customerId, tenantId, amount) =>
-    apiFetch("/api/delivery/wallet/topup", {
-      method: "POST",
-      body: JSON.stringify({ customerId, tenantId, amount }),
-    }),
-};
-
-// ── Referral ────────────────────────────────────────────────────────────────
-
-const referralApi = {
-  lookup: (code) => apiFetch(`/api/delivery/referral/${code}`),
-};
-
-// ── Favorites ──────────────────────────────────────────────────────────────
-
-const favoritesApi = {
-  list: () => apiFetch("/api/delivery/favorites"),
-  add: (productId, tenantId) =>
-    apiFetch("/api/delivery/favorites", {
-      method: "POST",
-      body: JSON.stringify({ productId, tenantId }),
-    }),
-  remove: (productId) =>
-    apiFetch(`/api/delivery/favorites/${productId}`, { method: "DELETE" }),
-};
-
-// ── Search ─────────────────────────────────────────────────────────────────
-
-const searchApi = {
-  query: (q, tenantId) => apiFetch(`/api/delivery/search?q=${encodeURIComponent(q)}&tenantId=${tenantId || ""}`),
-};
-
-// ── Help ───────────────────────────────────────────────────────────────────
-
-const helpApi = {
-  getFaq: (tenantId) => apiFetch(`/api/delivery/help/faq?tenantId=${tenantId || ""}`),
-  getTickets: () => apiFetch("/api/delivery/help/tickets"),
-  submitTicket: (data) =>
-    apiFetch("/api/delivery/help/ticket", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-};
-
-// ── Reviews ───────────────────────────────────────────────────────────────
-
-const reviewsApi = {
-  getForStore: (slug, page, limit) =>
-    apiFetch(`/api/delivery/store/${slug}/reviews?page=${page || 1}&limit=${limit || 10}`),
-};
-
-// ── Exports ─────────────────────────────────────────────────────────────────
-
-window.api = {
-  auth: authApi,
-  store: storeApi,
-  zones: zonesApi,
-  promos: promosApi,
-  addresses: addressesApi,
-  orders: ordersApi,
-  loyalty: loyaltyApi,
-  wallet: walletApi,
-  referral: referralApi,
-  favorites: favoritesApi,
-  search: searchApi,
-  help: helpApi,
-  reviews: reviewsApi,
-};
+  window.api = api;
+})();
