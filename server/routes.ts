@@ -3560,15 +3560,14 @@ async function test(){
       if (process.env.NODE_ENV === "development") {
         return res.json({ success: true, otp }); // expose OTP in dev only
       }
-      // Sent over WhatsApp from the store's own number when the store has
-      // linked one, otherwise from the platform number.
+      // Login codes are a platform service: always sent from the platform's
+      // own WhatsApp (linked in Super Admin), never from a store's number.
       const tenant = await storage.getTenant(Number(tenantId));
       const sent = await whatsappService.sendMessage(
         phone,
         `🔐 رمز الدخول إلى ${tenant?.businessName || "المتجر"}: *${otp}*\n` +
           `Your login code: *${otp}*\n\n` +
           `صالح لمدة 10 دقائق. لا تشاركه مع أحد.`,
-        Number(tenantId),
       );
       if (!sent) {
         return res.status(503).json({ error: "تعذّر إرسال الرمز عبر واتساب. تأكد أن الرقم مسجّل على واتساب ومكتوب مع رمز الدولة، أو سجّل الدخول بـ Google." });
