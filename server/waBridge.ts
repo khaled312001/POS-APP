@@ -135,6 +135,63 @@ async function baileys() {
   B = fs.existsSync(entry) ? await import(pathToFileURL(entry).href) : await import("@whiskeysockets/baileys" as any);
   return B;
 }
+/**
+ * Baileys' useMultiFileAuthState, with every file written to a temp file and
+ * renamed into place. The stock one rewrites files in place, so a process
+ * killed mid-write (host restarts, the shared host's process reaper) left a
+ * half-written creds.json — Baileys then starts a fresh login and the store
+ * has to scan the QR again. A rename is atomic: a file is either the old
+ * version or the new one. Same file names as the stock version, so existing
+ * logins keep working.
+ */
+async function atomicAuthState(folder: string) {
+  const { initAuthCreds, BufferJSON, proto } = await baileys();
+  fs.mkdirSync(folder, { recursive: true });
+  const fix = (f: string) => f.replace(/\//g, "__").replace(/:/g, "-");
+  const file = (f: string) => path.join(folder, fix(f));
+  const write = async (data: any, f: string) => {
+    const target = file(f);
+    const tmp = `${target}.${process.pid}.${crypto.randomBytes(4).toString("hex")}.tmp`;
+    await fs.promises.writeFile(tmp, JSON.stringify(data, BufferJSON.replacer));
+    await fs.promises.rename(tmp, target);
+  };
+  const read = async (f: string) => {
+    try { return JSON.parse(await fs.promises.readFile(file(f), "utf8"), BufferJSON.reviver); } catch { return null; }
+  };
+  const remove = async (f: string) => { try { await fs.promises.unlink(file(f)); } catch { } };
+  // Leftovers of writes that never got renamed.
+  try { for (const f of fs.readdirSync(folder)) if (f.endsWith(".tmp")) fs.rmSync(path.join(folder, f), { force: true }); } catch { }
+  const creds = (await read("creds.json")) || initAuthCreds();
+  return {
+    state: {
+      creds,
+      keys: {
+        get: async (type: string, ids: string[]) => {
+          const data: Record<string, any> = {};
+          await Promise.all(ids.map(async (id) => {
+            let value = await read(`${type}-${id}.json`);
+            if (type === "app-state-sync-key" && value) value = proto.Message.AppStateSyncKeyData.fromObject(value);
+            data[id] = value;
+          }));
+          return data;
+        },
+        set: async (data: Record<string, Record<string, any>>) => {
+          const tasks: Promise<void>[] = [];
+          for (const category in data) {
+            for (const id in data[category]) {
+              const value = data[category][id];
+              const f = `${category}-${id}.json`;
+              tasks.push(value ? write(value, f) : remove(f));
+            }
+          }
+          await Promise.all(tasks);
+        },
+      },
+    },
+    saveCreds: () => write(creds, "creds.json"),
+  };
+}
+
 let waVersion: number[] | undefined;
 let waVersionAt = 0;
 async function version() {
@@ -202,6 +259,9 @@ class Session {
   groupsAt = 0;
   private reconnectTimer: any = null;
   private attempts = 0;
+  private loggedOutStrikes = 0;
+  /** Disconnected on purpose (Disconnect / Log out): don't bring it back. */
+  userStopped = false;
   private stopped = true;
   private lastSendAt = 0;
   private sending = false;
@@ -248,13 +308,14 @@ class Session {
 
   async start() {
     this.stopped = false;
+    this.userStopped = false;
     if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
     const b = await baileys();
     const makeWASocket = b.default?.default || b.default || b.makeWASocket;
-    const { useMultiFileAuthState, Browsers, DisconnectReason } = b;
+    const { Browsers, DisconnectReason } = b;
     this.close();
     fs.mkdirSync(this.authDir, { recursive: true });
-    const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
+    const { state, saveCreds } = await atomicAuthState(this.authDir);
     this.status = "connecting";
     this.qr = null;
     const sock = makeWASocket({
@@ -283,6 +344,7 @@ class Session {
         this.qr = null;
         this.lastError = null;
         this.attempts = 0;
+        this.loggedOutStrikes = 0;
         this.connectedAt = Date.now();
         this.phone = String(sock.user?.id || "").split(":")[0].split("@")[0] || null;
         this.name = sock.user?.name || sock.user?.verifiedName || null;
@@ -296,11 +358,23 @@ class Session {
         this.status = "disconnected";
         this.qr = null;
         if (this.stopped) return;
-        if (code === DisconnectReason.loggedOut) {
+        if (code === DisconnectReason.loggedOut && state.creds?.registered) {
+          // WhatsApp said "logged out". That is final when the device was
+          // removed on the phone, but it is also seen once after a rough
+          // restart — so try the same login again twice before giving up,
+          // and keep the files (archived) instead of deleting them.
+          this.loggedOutStrikes++;
+          if (this.loggedOutStrikes <= 2) {
+            this.lastError = "WhatsApp رفض الجلسة — إعادة المحاولة…";
+            this.event(`Logged-out reply (${this.loggedOutStrikes}/2) — retrying the same login`);
+            this.schedule(this.loggedOutStrikes === 1 ? 20_000 : 120_000);
+            return;
+          }
           this.lastError = "تم إلغاء ربط واتساب من الهاتف — اربطه من جديد";
-          this.event("Logged out from the phone — credentials removed");
-          this.wipeAuth();
+          this.event("Logged out from the phone — relink needed");
+          this.archiveAuth();
           this.stopped = true;
+          notifyRelink(this).catch(() => { });
           return;
         }
         if (code === DisconnectReason.restartRequired) {
@@ -342,6 +416,16 @@ class Session {
     });
   }
 
+  /** Linked, meant to be on, but not connected and nothing scheduled. */
+  needsRevive() {
+    return !this.userStopped && !this.reconnectTimer && !this.sock && this.status === "disconnected" && this.hasCreds();
+  }
+
+  revive() {
+    this.stopped = false;
+    this.start().catch((e) => { this.event(`Start failed: ${e?.message || e}`); this.schedule(); });
+  }
+
   private schedule(delay?: number) {
     if (this.stopped || this.reconnectTimer) return;
     this.attempts++;
@@ -368,6 +452,14 @@ class Session {
     this.qr = null;
   }
 
+  /** Keep the last login's files instead of deleting them. */
+  archiveAuth() {
+    try {
+      for (const f of fs.readdirSync(this.dir)) if (f.startsWith("auth.old-")) fs.rmSync(path.join(this.dir, f), { recursive: true, force: true });
+      if (fs.existsSync(this.authDir)) fs.renameSync(this.authDir, path.join(this.dir, `auth.old-${Date.now()}`));
+    } catch { this.wipeAuth(); }
+  }
+
   wipeAuth() {
     try { fs.rmSync(this.authDir, { recursive: true, force: true }); } catch { }
     this.phone = null;
@@ -376,6 +468,7 @@ class Session {
 
   async logout() {
     this.stopped = true;
+    this.userStopped = true;
     try { await this.sock?.logout(); } catch { }
     this.stop();
     this.wipeAuth();
@@ -519,6 +612,34 @@ class Session {
 }
 
 const sessions = new Map<string, Session>();
+
+/**
+ * A store's WhatsApp was unlinked for good (removed on the phone, or the
+ * phone was offline for weeks): tell the owner from the platform number, on
+ * the store's own number and the owner's number.
+ */
+async function notifyRelink(s: Session) {
+  const tenantId = tenantOfKey(s.key);
+  if (!tenantId) return;
+  const platform = sessions.get("platform");
+  if (!platform || !platform.hasCreds()) return;
+  const [rows]: any = await pool.query("SELECT business_name, owner_phone, metadata FROM tenants WHERE id = ?", [tenantId]);
+  const t = rows?.[0];
+  if (!t) return;
+  let meta: any = {};
+  try { meta = typeof t.metadata === "string" ? JSON.parse(t.metadata) : t.metadata || {}; } catch { }
+  const targets = new Set<string>();
+  for (const v of [s.phone, meta.whatsappLinkedPhone, meta.whatsappAdminPhone, t.owner_phone]) {
+    const d = String(v || "").replace(/\D/g, "");
+    if (d.length >= 8) targets.add(d);
+  }
+  const base = (process.env.APP_URL || "https://kassenta.com").replace(/\/$/, "");
+  const text =
+    `⚠️ واتساب متجر ${t.business_name} لم يعد مربوطاً بـ Kassenta.\n` +
+    `رسائل الطلبات متوقفة حتى تعيد الربط: افتح ${base}/app/whatsapp ثم امسح رمز QR من هاتف المتجر.\n\n` +
+    `The WhatsApp of ${t.business_name} is no longer linked to Kassenta. Order messages are paused until you relink it at ${base}/app/whatsapp.`;
+  for (const to of targets) await platform.send(to, text, false).catch(() => { });
+}
 const validKey = (k: unknown): k is string => typeof k === "string" && /^(platform|t\d{1,9})$/.test(k);
 function session(key: string): Session {
   let s = sessions.get(key);
@@ -558,6 +679,7 @@ const server = http.createServer(async (req, res) => {
         return send(200, s.view());
       case "POST /disconnect":
         s.stop();
+        s.userStopped = true;
         s.event("Stopped");
         return send(200, s.view());
       case "POST /logout":
@@ -622,14 +744,16 @@ async function main() {
     if (!validKey(key)) continue;
     const s = session(key);
     if (!s.hasCreds()) continue;
-    setTimeout(() => s.start().catch((e) => s.event(`Start failed: ${e?.message || e}`)), delay);
+    setTimeout(() => s.revive(), delay);
     delay += 2500;
   }
 
-  // Retry queued messages and nudge dead sessions back up.
+  // Retry queued messages and bring any linked session that dropped (and
+  // has no retry pending) back up.
   setInterval(() => {
     for (const s of sessions.values()) {
       if (s.status === "connected") s.pump();
+      else if (s.needsRevive()) { s.event("Reviving dropped session"); s.revive(); }
     }
   }, 15_000);
 

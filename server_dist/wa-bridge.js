@@ -142,6 +142,64 @@ async function baileys() {
   B = import_fs.default.existsSync(entry) ? await import((0, import_url.pathToFileURL)(entry).href) : await import("@whiskeysockets/baileys");
   return B;
 }
+async function atomicAuthState(folder) {
+  const { initAuthCreds, BufferJSON, proto } = await baileys();
+  import_fs.default.mkdirSync(folder, { recursive: true });
+  const fix = (f) => f.replace(/\//g, "__").replace(/:/g, "-");
+  const file = (f) => import_path.default.join(folder, fix(f));
+  const write = async (data, f) => {
+    const target = file(f);
+    const tmp = `${target}.${process.pid}.${import_crypto.default.randomBytes(4).toString("hex")}.tmp`;
+    await import_fs.default.promises.writeFile(tmp, JSON.stringify(data, BufferJSON.replacer));
+    await import_fs.default.promises.rename(tmp, target);
+  };
+  const read = async (f) => {
+    try {
+      return JSON.parse(await import_fs.default.promises.readFile(file(f), "utf8"), BufferJSON.reviver);
+    } catch {
+      return null;
+    }
+  };
+  const remove = async (f) => {
+    try {
+      await import_fs.default.promises.unlink(file(f));
+    } catch {
+    }
+  };
+  try {
+    for (const f of import_fs.default.readdirSync(folder)) if (f.endsWith(".tmp")) import_fs.default.rmSync(import_path.default.join(folder, f), { force: true });
+  } catch {
+  }
+  const creds = await read("creds.json") || initAuthCreds();
+  return {
+    state: {
+      creds,
+      keys: {
+        get: async (type, ids) => {
+          const data = {};
+          await Promise.all(ids.map(async (id) => {
+            let value = await read(`${type}-${id}.json`);
+            if (type === "app-state-sync-key" && value) value = proto.Message.AppStateSyncKeyData.fromObject(value);
+            data[id] = value;
+          }));
+          return data;
+        },
+        set: async (data) => {
+          const tasks = [];
+          for (const category in data) {
+            for (const id in data[category]) {
+              const value = data[category][id];
+              const f = `${category}-${id}.json`;
+              tasks.push(value ? write(value, f) : remove(f));
+            }
+          }
+          await Promise.all(tasks);
+        }
+      }
+    },
+    saveCreds: () => write(creds, "creds.json")
+  };
+}
 var waVersion;
 var waVersionAt = 0;
 async function version() {
@@ -213,6 +271,9 @@ var Session = class {
   groupsAt = 0;
   reconnectTimer = null;
   attempts = 0;
+  loggedOutStrikes = 0;
+  /** Disconnected on purpose (Disconnect / Log out): don't bring it back. */
+  userStopped = false;
   stopped = true;
   lastSendAt = 0;
   sending = false;
@@ -259,16 +320,17 @@ var Session = class {
   }
   async start() {
     this.stopped = false;
+    this.userStopped = false;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
     const b = await baileys();
     const makeWASocket = b.default?.default || b.default || b.makeWASocket;
-    const { useMultiFileAuthState, Browsers, DisconnectReason } = b;
+    const { Browsers, DisconnectReason } = b;
     this.close();
     import_fs.default.mkdirSync(this.authDir, { recursive: true });
-    const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
+    const { state, saveCreds } = await atomicAuthState(this.authDir);
     this.status = "connecting";
     this.qr = null;
     const sock = makeWASocket({
@@ -298,6 +360,7 @@ var Session = class {
         this.qr = null;
         this.lastError = null;
         this.attempts = 0;
+        this.loggedOutStrikes = 0;
         this.connectedAt = Date.now();
         this.phone = String(sock.user?.id || "").split(":")[0].split("@")[0] || null;
         this.name = sock.user?.name || sock.user?.verifiedName || null;
@@ -311,11 +374,20 @@ var Session = class {
         this.status = "disconnected";
         this.qr = null;
         if (this.stopped) return;
-        if (code === DisconnectReason.loggedOut) {
+        if (code === DisconnectReason.loggedOut && state.creds?.registered) {
+          this.loggedOutStrikes++;
+          if (this.loggedOutStrikes <= 2) {
+            this.lastError = "WhatsApp \u0631\u0641\u0636 \u0627\u0644\u062C\u0644\u0633\u0629 \u2014 \u0625\u0639\u0627\u062F\u0629 \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629\u2026";
+            this.event(`Logged-out reply (${this.loggedOutStrikes}/2) \u2014 retrying the same login`);
+            this.schedule(this.loggedOutStrikes === 1 ? 2e4 : 12e4);
+            return;
+          }
           this.lastError = "\u062A\u0645 \u0625\u0644\u063A\u0627\u0621 \u0631\u0628\u0637 \u0648\u0627\u062A\u0633\u0627\u0628 \u0645\u0646 \u0627\u0644\u0647\u0627\u062A\u0641 \u2014 \u0627\u0631\u0628\u0637\u0647 \u0645\u0646 \u062C\u062F\u064A\u062F";
-          this.event("Logged out from the phone \u2014 credentials removed");
-          this.wipeAuth();
+          this.event("Logged out from the phone \u2014 relink needed");
+          this.archiveAuth();
           this.stopped = true;
+          notifyRelink(this).catch(() => {
+          });
           return;
         }
         if (code === DisconnectReason.restartRequired) {
@@ -354,6 +426,17 @@ var Session = class {
       }
     });
   }
+  /** Linked, meant to be on, but not connected and nothing scheduled. */
+  needsRevive() {
+    return !this.userStopped && !this.reconnectTimer && !this.sock && this.status === "disconnected" && this.hasCreds();
+  }
+  revive() {
+    this.stopped = false;
+    this.start().catch((e) => {
+      this.event(`Start failed: ${e?.message || e}`);
+      this.schedule();
+    });
+  }
   schedule(delay) {
     if (this.stopped || this.reconnectTimer) return;
     this.attempts++;
@@ -389,6 +472,15 @@ var Session = class {
     this.status = "disconnected";
     this.qr = null;
   }
+  /** Keep the last login's files instead of deleting them. */
+  archiveAuth() {
+    try {
+      for (const f of import_fs.default.readdirSync(this.dir)) if (f.startsWith("auth.old-")) import_fs.default.rmSync(import_path.default.join(this.dir, f), { recursive: true, force: true });
+      if (import_fs.default.existsSync(this.authDir)) import_fs.default.renameSync(this.authDir, import_path.default.join(this.dir, `auth.old-${Date.now()}`));
+    } catch {
+      this.wipeAuth();
+    }
+  }
   wipeAuth() {
     try {
       import_fs.default.rmSync(this.authDir, { recursive: true, force: true });
@@ -399,6 +491,7 @@ var Session = class {
   }
   async logout() {
     this.stopped = true;
+    this.userStopped = true;
     try {
       await this.sock?.logout();
     } catch {
@@ -549,6 +642,32 @@ var Session = class {
   }
 };
 var sessions = /* @__PURE__ */ new Map();
+async function notifyRelink(s) {
+  const tenantId = tenantOfKey(s.key);
+  if (!tenantId) return;
+  const platform = sessions.get("platform");
+  if (!platform || !platform.hasCreds()) return;
+  const [rows] = await pool.query("SELECT business_name, owner_phone, metadata FROM tenants WHERE id = ?", [tenantId]);
+  const t = rows?.[0];
+  if (!t) return;
+  let meta = {};
+  try {
+    meta = typeof t.metadata === "string" ? JSON.parse(t.metadata) : t.metadata || {};
+  } catch {
+  }
+  const targets = /* @__PURE__ */ new Set();
+  for (const v of [s.phone, meta.whatsappLinkedPhone, meta.whatsappAdminPhone, t.owner_phone]) {
+    const d = String(v || "").replace(/\D/g, "");
+    if (d.length >= 8) targets.add(d);
+  }
+  const base = (process.env.APP_URL || "https://kassenta.com").replace(/\/$/, "");
+  const text = `\u26A0\uFE0F \u0648\u0627\u062A\u0633\u0627\u0628 \u0645\u062A\u062C\u0631 ${t.business_name} \u0644\u0645 \u064A\u0639\u062F \u0645\u0631\u0628\u0648\u0637\u0627\u064B \u0628\u0640 Kassenta.
+\u0631\u0633\u0627\u0626\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062A \u0645\u062A\u0648\u0642\u0641\u0629 \u062D\u062A\u0649 \u062A\u0639\u064A\u062F \u0627\u0644\u0631\u0628\u0637: \u0627\u0641\u062A\u062D ${base}/app/whatsapp \u062B\u0645 \u0627\u0645\u0633\u062D \u0631\u0645\u0632 QR \u0645\u0646 \u0647\u0627\u062A\u0641 \u0627\u0644\u0645\u062A\u062C\u0631.
+
+The WhatsApp of ${t.business_name} is no longer linked to Kassenta. Order messages are paused until you relink it at ${base}/app/whatsapp.`;
+  for (const to of targets) await platform.send(to, text, false).catch(() => {
+  });
+}
 var validKey = (k) => typeof k === "string" && /^(platform|t\d{1,9})$/.test(k);
 function session(key) {
   let s = sessions.get(key);
@@ -597,6 +716,7 @@ var server = import_http.default.createServer(async (req, res) => {
         return send(200, s.view());
       case "POST /disconnect":
         s.stop();
+        s.userStopped = true;
         s.event("Stopped");
         return send(200, s.view());
       case "POST /logout":
@@ -662,12 +782,16 @@ async function main() {
     if (!validKey(key)) continue;
     const s = session(key);
     if (!s.hasCreds()) continue;
-    setTimeout(() => s.start().catch((e) => s.event(`Start failed: ${e?.message || e}`)), delay);
+    setTimeout(() => s.revive(), delay);
     delay += 2500;
   }
   setInterval(() => {
     for (const s of sessions.values()) {
       if (s.status === "connected") s.pump();
+      else if (s.needsRevive()) {
+        s.event("Reviving dropped session");
+        s.revive();
+      }
     }
   }, 15e3);
   setInterval(() => {

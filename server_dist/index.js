@@ -4162,16 +4162,14 @@ async function ensureBridge() {
       if (import_fs.default.statSync(LOG_FILE).size > 2e6) import_fs.default.renameSync(LOG_FILE, LOG_FILE + ".1");
     } catch {
     }
-    const out = import_fs.default.openSync(LOG_FILE, "a");
-    const child = (0, import_child_process.spawn)(process.execPath, [script], {
+    const child = (0, import_child_process.spawn)(process.execPath, ["-e", LAUNCHER, script, LOG_FILE], {
       cwd: process.cwd(),
       detached: true,
-      stdio: ["ignore", out, out],
+      stdio: "ignore",
       env: { ...process.env, UV_THREADPOOL_SIZE: "2", NODE_OPTIONS: "--v8-pool-size=2" }
     });
     child.unref();
-    import_fs.default.closeSync(out);
-    console.log(`[WhatsApp] started bridge (pid ${child.pid})`);
+    console.log(`[WhatsApp] starting bridge (launcher pid ${child.pid})`);
   } catch (e) {
     console.error("[WhatsApp] could not start bridge:", e?.message || e);
   }
@@ -4204,7 +4202,7 @@ function startBridgeWatchdog() {
   }, 3e4);
   watchdog.unref?.();
 }
-var import_http, import_fs, import_path, import_child_process, ROOT, SOCK_PATH, SPAWN_MARK, LOG_FILE, healthyAt, watchdog;
+var import_http, import_fs, import_path, import_child_process, ROOT, SOCK_PATH, SPAWN_MARK, LOG_FILE, healthyAt, LAUNCHER, watchdog;
 var init_waClient = __esm({
   "server/waClient.ts"() {
     "use strict";
@@ -4217,6 +4215,14 @@ var init_waClient = __esm({
     SPAWN_MARK = import_path.default.join(ROOT, "spawn.mark");
     LOG_FILE = import_path.default.join(ROOT, "bridge.log");
     healthyAt = 0;
+    LAUNCHER = [
+      'const { spawn } = require("child_process");',
+      'const fs = require("fs");',
+      "const [script, log] = process.argv.slice(1);",
+      'const out = fs.openSync(log, "a");',
+      'spawn(process.execPath, [script], { cwd: process.cwd(), detached: true, stdio: ["ignore", out, out], env: process.env }).unref();',
+      "process.exit(0);"
+    ].join("\n");
     watchdog = null;
   }
 });

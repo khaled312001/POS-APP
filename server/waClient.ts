@@ -75,16 +75,18 @@ export async function ensureBridge(): Promise<boolean> {
   try {
     // Keep the log small: start fresh when it passes 2 MB.
     try { if (fs.statSync(LOG_FILE).size > 2e6) fs.renameSync(LOG_FILE, LOG_FILE + ".1"); } catch { }
-    const out = fs.openSync(LOG_FILE, "a");
-    const child = spawn(process.execPath, [script], {
+    // Started through a short-lived launcher, so the bridge's parent is init,
+    // not this web process: when LiteSpeed restarts or reaps the web app it
+    // kills that process's children, which used to take WhatsApp down (and a
+    // kill in the middle of a credential write could unlink a store).
+    const child = spawn(process.execPath, ["-e", LAUNCHER, script, LOG_FILE], {
       cwd: process.cwd(),
       detached: true,
-      stdio: ["ignore", out, out],
+      stdio: "ignore",
       env: { ...process.env, UV_THREADPOOL_SIZE: "2", NODE_OPTIONS: "--v8-pool-size=2" },
     });
     child.unref();
-    fs.closeSync(out);
-    console.log(`[WhatsApp] started bridge (pid ${child.pid})`);
+    console.log(`[WhatsApp] starting bridge (launcher pid ${child.pid})`);
   } catch (e: any) {
     console.error("[WhatsApp] could not start bridge:", e?.message || e);
   }
@@ -106,6 +108,15 @@ export async function bridge<T = any>(method: "GET" | "POST", route: string, bod
     throw new Error("خدمة واتساب لا تستجيب حالياً، حاول بعد قليل");
   }
 }
+
+const LAUNCHER = [
+  'const { spawn } = require("child_process");',
+  'const fs = require("fs");',
+  'const [script, log] = process.argv.slice(1);',
+  'const out = fs.openSync(log, "a");',
+  'spawn(process.execPath, [script], { cwd: process.cwd(), detached: true, stdio: ["ignore", out, out], env: process.env }).unref();',
+  'process.exit(0);',
+].join("\n");
 
 let watchdog: any = null;
 export function startBridgeWatchdog() {
