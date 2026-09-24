@@ -913,6 +913,7 @@ export default function SettingsScreen() {
             <Text style={styles.sectionTitle}>{t("management")}</Text>
             <SettingRow icon="cube" label={t("suppliers")} value={`${suppliers.length} ${t("suppliers")}`} onPress={() => setShowSuppliers(true)} color={Colors.success} rtl={isRTL} />
             <SettingRow icon="storefront" label={language === "ar" ? "تجار الجملة" : language === "de" ? "Großhändler" : "Wholesale traders"} value={language === "ar" ? "الذمم والكشوفات والتحصيل" : language === "de" ? "Forderungen, Auszüge, Zahlungen" : "Receivables, statements, payments"} onPress={() => router.push("/wholesale" as any)} color={Colors.hueIndigo} rtl={isRTL} />
+            {isAdmin && <SettingRow icon="logo-whatsapp" label={language === "ar" ? "واتساب المتجر" : language === "de" ? "WhatsApp des Geschäfts" : "Store WhatsApp"} value={language === "ar" ? "الربط، المحادثات، رسائل الطلبات والعروض" : language === "de" ? "Verbindung, Chats, Bestell- und Angebotsnachrichten" : "Link, chats, order messages and offers"} onPress={() => router.push("/whatsapp" as any)} color={"#25D366"} rtl={isRTL} />}
             <SettingRow icon="wallet" label={t("expenses")} value={`${expenses.length} ${t("expenses")}`} onPress={() => setShowExpenses(true)} color={Colors.warning} rtl={isRTL} />
             <SettingRow icon="time" label={t("attendance")} value={`${shifts.length} ${t("attendance")}`} onPress={() => setShowAttendance(true)} color={Colors.warning} rtl={isRTL} />
             {isAdmin && <SettingRow icon="pulse" label={t("shiftMonitor")} value={`${allActiveShifts.length} ${t("activeShiftsCount")}`} onPress={() => { setShiftMonitorTab("active"); setShowShiftMonitor(true); }} color={Colors.hueTeal} rtl={isRTL} />}
@@ -2357,7 +2358,7 @@ export default function SettingsScreen() {
               />
 
               {/* WhatsApp number: only takes effect once verified by a code sent over WhatsApp. */}
-              <WhatsAppVerify />
+              <WhatsAppVerify onOpen={() => setShowStoreSettings(false)} />
 
               {/* Sham Cash: the store's own QR code and number (saves on its own). */}
               <View style={{ height: 1, backgroundColor: Colors.cardBorder, marginVertical: 16 }} />

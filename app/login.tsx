@@ -1,27 +1,21 @@
-import React, { useState, useEffect } from "react";
-import { StyleSheet, Text, View, Pressable, Platform, Alert, Dimensions, FlatList, ActivityIndicator, TextInput, Modal, ScrollView } from "react-native";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import {
+  Text, View, Pressable, Platform, Alert, ActivityIndicator, TextInput, Modal,
+  ScrollView, Image, Animated, useWindowDimensions,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constants/colors";
 import { themedStyles } from "@/lib/themed-styles";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest, getQueryFn } from "@/lib/query-client";
+import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { useLanguage } from "@/lib/language-context";
 import { useLicense } from "@/lib/license-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-
-function getApiUrl() {
-  if (__DEV__) {
-    const domain = process.env.EXPO_PUBLIC_DOMAIN || 'localhost';
-    return `https://${domain}`;
-  }
-  return 'https://kassenta.com';
-}
 
 interface Employee {
   id: number;
@@ -44,85 +38,182 @@ function getRoleBadgeColor(role: string): string {
 }
 
 function getInitial(name: string): string {
-  return name.charAt(0).toUpperCase();
+  return name.trim().charAt(0).toUpperCase();
+}
+
+const COPY = {
+  en: {
+    who: "Who's working?",
+    signOutStore: "Sign out of store",
+    confirmTitle: "Sign out of this store?",
+    confirmBody: "This device will be disconnected from the store. To use it again you will need the store email and license key.",
+    confirm: "Sign out",
+    cancel: "Cancel",
+    wrongPin: "Wrong PIN, try again",
+    noEmployees: "No employees yet",
+    noEmployeesHint: "Add employees from Settings in the owner account.",
+    roles: { owner: "Owner", admin: "Admin", manager: "Manager", cashier: "Cashier" } as Record<string, string>,
+    types: { pharmacy: "Pharmacy", restaurant: "Restaurant", supermarket: "Supermarket", cafe: "Café", retail: "Store", bakery: "Bakery" } as Record<string, string>,
+    store: "Store",
+  },
+  de: {
+    who: "Wer arbeitet gerade?",
+    signOutStore: "Vom Geschäft abmelden",
+    confirmTitle: "Von diesem Geschäft abmelden?",
+    confirmBody: "Dieses Gerät wird vom Geschäft getrennt. Zum erneuten Anmelden brauchen Sie die Geschäfts-E-Mail und den Lizenzschlüssel.",
+    confirm: "Abmelden",
+    cancel: "Abbrechen",
+    wrongPin: "Falsche PIN, bitte erneut versuchen",
+    noEmployees: "Noch keine Mitarbeiter",
+    noEmployeesHint: "Mitarbeiter im Inhaberkonto unter Einstellungen hinzufügen.",
+    roles: { owner: "Inhaber", admin: "Admin", manager: "Manager", cashier: "Kassierer" } as Record<string, string>,
+    types: { pharmacy: "Apotheke", restaurant: "Restaurant", supermarket: "Supermarkt", cafe: "Café", retail: "Geschäft", bakery: "Bäckerei" } as Record<string, string>,
+    store: "Geschäft",
+  },
+  ar: {
+    who: "من يعمل الآن؟",
+    signOutStore: "تسجيل الخروج من المتجر",
+    confirmTitle: "تسجيل الخروج من هذا المتجر؟",
+    confirmBody: "سيُفصل هذا الجهاز عن المتجر. للدخول مرة أخرى ستحتاج بريد المتجر ومفتاح الترخيص.",
+    confirm: "تسجيل الخروج",
+    cancel: "إلغاء",
+    wrongPin: "رمز خاطئ، حاول مرة أخرى",
+    noEmployees: "لا يوجد موظفون بعد",
+    noEmployeesHint: "أضف الموظفين من الإعدادات في حساب المالك.",
+    roles: { owner: "المالك", admin: "مدير النظام", manager: "مدير", cashier: "كاشير" } as Record<string, string>,
+    types: { pharmacy: "صيدلية", restaurant: "مطعم", supermarket: "سوبر ماركت", cafe: "مقهى", retail: "متجر", bakery: "مخبز" } as Record<string, string>,
+    store: "متجر",
+  },
+};
+
+const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  pharmacy: "medkit",
+  restaurant: "restaurant",
+  cafe: "cafe",
+  supermarket: "cart",
+  bakery: "pizza",
+};
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * Employee grid that always fits the space it is given: picks the column
+ * count that gives the largest tiles without overflowing, so the screen never
+ * needs to scroll. Only with a very long staff list does it fall back to
+ * scrolling the grid itself.
+ */
+function gridLayout(count: number, w: number, h: number, gap: number) {
+  let best = { cols: 1, size: 0 };
+  const n = Math.max(1, count);
+  for (let cols = 1; cols <= Math.min(n, 8); cols++) {
+    const rows = Math.ceil(n / cols);
+    const size = Math.min((w - gap * (cols - 1)) / cols, (h - gap * (rows - 1)) / rows, 168);
+    if (size >= best.size) best = { cols, size }; // ties → more columns (shorter grid)
+  }
+  return { cols: best.cols, size: Math.floor(best.size), fits: best.size >= 92 };
 }
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const { login } = useAuth();
-  const { t, isRTL, rtlTextAlign, rtlText } = useLanguage();
-  const { logoutLicense, tenant } = useLicense();
+  const { t, isRTL, language } = useLanguage();
+  const c = (COPY as any)[language] ?? COPY.en;
+  const { logoutLicense, tenant, isValid, isValidating } = useLicense();
   const [mode, setMode] = useState<"select" | "pin">("select");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [pin, setPin] = useState("");
+  const [pinError, setPinError] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [screenDims, setScreenDims] = useState(Dimensions.get("window"));
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [showShiftPrompt, setShowShiftPrompt] = useState(false);
   const [showOpeningCashInput, setShowOpeningCashInput] = useState(false);
   const [openingCash, setOpeningCash] = useState("");
   const [loggedInEmployee, setLoggedInEmployee] = useState<Employee | null>(null);
   const [showTabletBanner, setShowTabletBanner] = useState(false);
+  const shake = useRef(new Animated.Value(0)).current;
+
+  // Without a store licence there is nothing to sign in to (e.g. right after
+  // "sign out of store"): go back to the licence screen.
+  useEffect(() => {
+    if (!isValidating && isValid === false) router.replace("/license-gate" as any);
+  }, [isValid, isValidating]);
 
   // Show tablet recommendation once for phone users
   useEffect(() => {
-    const isPhone = screenDims.width < 600;
-    if (isPhone && Platform.OS !== 'web') {
-      AsyncStorage.getItem('barmagly_tablet_tip_shown').then(shown => {
+    if (width < 600 && Platform.OS !== "web") {
+      AsyncStorage.getItem("barmagly_tablet_tip_shown").then((shown) => {
         if (!shown) setShowTabletBanner(true);
       });
     }
   }, []);
 
-  // Google sign-in used to be wired here through a browser redirect, but it
-  // had no button and expected an `employee` the server never returns — this
-  // screen is the employee PIN pad, reached only once a licence is active.
-  // Google identifies the *store owner*, so it now lives on the licence gate.
-  useEffect(() => {
-    const sub = Dimensions.addEventListener("change", ({ window }) => setScreenDims(window));
-    return () => sub?.remove();
-  }, []);
-  const screenWidth = screenDims.width;
-  const isTablet = screenWidth > 700;
-  const NUM_COLUMNS = isTablet ? 3 : 2;
-  const CARD_GAP = 12;
-  const GRID_PADDING = 24;
-  const CARD_WIDTH = (screenWidth - GRID_PADDING * 2 - CARD_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
-  const topPad = Platform.OS === "web" ? 67 : 0;
-  const bottomPad = Platform.OS === "web" ? 34 : 0;
-
   const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({
-    queryKey: [tenant?.id ? `/api/employees?tenantId=${tenant.id}` : "/api/employees"],
+    queryKey: [`/api/employees?tenantId=${tenant?.id}`],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!tenant?.id,
   });
+  const staff = employees || [];
+
+  // ── Layout budget ────────────────────────────────────────────────────────
+  const compact = height < 560;
+  const gutter = width < 480 ? 16 : 24;
+  const headerH = compact ? 56 : 72;
+  // Measured space below the header (on the web an install banner can take
+  // part of the window); the window size is only the first-frame estimate.
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null);
+  const bodyW = Math.min((box?.w ?? width) - gutter * 2, 980);
+  const bodyH = (box?.h ?? height - insets.top - insets.bottom - headerH) - (compact ? 16 : 32);
+  const titleH = compact ? 40 : 64;
+  const gap = width < 480 ? 10 : 14;
+  const grid = gridLayout(staff.length, bodyW, bodyH - titleH - 8, gap);
+
+  // PIN stage: side by side when the screen is short and wide (landscape phone)
+  const pinRow = width > height && height < 640;
+  const infoH = pinRow ? 0 : compact ? 170 : 200;
+  const keyH = clamp((bodyH - infoH - 16) / 4 - 10, 44, 76);
+  const keyW = clamp(keyH * 1.35, 64, 104);
+
+  const storeType = (tenant?.storeType || "").toLowerCase();
+  const typeLabel = c.types[storeType] || c.store;
+  const typeIcon = TYPE_ICONS[storeType] || "storefront";
+  const logoUri = tenant?.logo
+    ? /^(https?:|data:)/.test(tenant.logo)
+      ? tenant.logo
+      : `${getApiUrl().replace(/\/$/, "")}${tenant.logo.startsWith("/api/") ? tenant.logo : `/api${tenant.logo}`}`
+    : null;
+
+  // ── Actions ──────────────────────────────────────────────────────────────
+  const tap = (style = Haptics.ImpactFeedbackStyle.Light) => {
+    if (Platform.OS !== "web") Haptics.impactAsync(style);
+  };
 
   const handleSelectEmployee = (emp: Employee) => {
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    tap(Haptics.ImpactFeedbackStyle.Medium);
     setSelectedEmployee(emp);
     setPin("");
+    setPinError(false);
     setMode("pin");
   };
 
-  const handleBack = () => {
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleBack = useCallback(() => {
+    tap();
     setMode("select");
     setSelectedEmployee(null);
     setPin("");
-  };
+    setPinError(false);
+  }, []);
 
-  const handlePinPress = (digit: string) => {
-    if (pin.length < 4) {
-      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const newPin = pin + digit;
-      setPin(newPin);
-      if (newPin.length === 4) {
-        handleLogin(newPin);
-      }
-    }
-  };
-
-  const handleDelete = () => {
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setPin(pin.slice(0, -1));
+  const failPin = () => {
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    setPinError(true);
+    setPin("");
+    shake.setValue(0);
+    Animated.sequence(
+      [10, -10, 8, -8, 4, 0].map((v) =>
+        Animated.timing(shake, { toValue: v, duration: 50, useNativeDriver: Platform.OS !== "web" }),
+      ),
+    ).start();
   };
 
   const handleLogin = async (pinCode: string) => {
@@ -145,13 +236,44 @@ export default function LoginScreen() {
       } catch {
         router.replace("/(tabs)");
       }
-    } catch (e: any) {
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert(t("loginFailed"), t("invalidPinTryAgain"));
-      setPin("");
+    } catch {
+      failPin();
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePinPress = (digit: string) => {
+    if (loading || pin.length >= 4) return;
+    tap();
+    setPinError(false);
+    const newPin = pin + digit;
+    setPin(newPin);
+    if (newPin.length === 4) handleLogin(newPin);
+  };
+
+  const handleDelete = () => {
+    tap();
+    setPin((p) => p.slice(0, -1));
+  };
+
+  // Physical keyboard on web / tablets with keyboards: digits, Backspace, Esc.
+  useEffect(() => {
+    if (Platform.OS !== "web" || mode !== "pin" || typeof window === "undefined") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (/^[0-9]$/.test(e.key)) handlePinPress(e.key);
+      else if (e.key === "Backspace") handleDelete();
+      else if (e.key === "Escape") handleBack();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const handleSignOutStore = async () => {
+    setConfirmSignOut(false);
+    try { await AsyncStorage.removeItem("barmagly_employee"); } catch { }
+    await logoutLicense();
+    router.replace("/license-gate" as any);
   };
 
   const handleStartShift = async () => {
@@ -190,179 +312,225 @@ export default function LoginScreen() {
     router.replace("/(tabs)");
   };
 
-  const renderEmployeeCard = ({ item }: { item: Employee }) => {
+  // "row" already follows the layout direction (document dir on the web,
+  // I18nManager on native), so Arabic runs right-to-left without reversing.
+  const row = "row" as const;
+  const roleLabel = (role: string) => c.roles[role.toLowerCase()] || role;
+
+  // ── Pieces ───────────────────────────────────────────────────────────────
+  const header = (
+    <View style={[styles.header, { height: headerH, flexDirection: row, paddingHorizontal: gutter }]}>
+      <View style={[styles.brand, { flexDirection: row }]}>
+        <View style={[styles.brandLogo, compact && { width: 40, height: 40, borderRadius: 12 }]}>
+          {logoUri ? (
+            <Image source={{ uri: logoUri }} style={styles.brandLogoImg} resizeMode="cover" />
+          ) : (
+            <Ionicons name={typeIcon} size={compact ? 20 : 24} color={Colors.white} />
+          )}
+        </View>
+        <View style={{ flexShrink: 1, alignItems: "flex-start" }}>
+          <Text style={[styles.storeName, compact && { fontSize: 16 }]} numberOfLines={1}>
+            {tenant?.name || " "}
+          </Text>
+          <Text style={styles.storeType} numberOfLines={1}>{typeLabel}</Text>
+        </View>
+      </View>
+      <Pressable
+        onPress={() => setConfirmSignOut(true)}
+        style={({ pressed, hovered }: any) => [
+          styles.signOutBtn,
+          { flexDirection: row },
+          (pressed || hovered) && styles.signOutBtnActive,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={c.signOutStore}
+      >
+        <Ionicons name="log-out-outline" size={18} color={Colors.white} />
+        {width >= 420 && <Text style={styles.signOutText}>{c.signOutStore}</Text>}
+      </Pressable>
+    </View>
+  );
+
+  const employeeTile = (item: Employee, size: number) => {
     const badgeColor = getRoleBadgeColor(item.role);
+    const avatar = clamp(size * 0.4, 36, 64);
     return (
       <Pressable
-        style={({ pressed }) => [
-          styles.employeeCard,
-          { width: CARD_WIDTH },
-          pressed && styles.employeeCardPressed,
-        ]}
+        key={item.id}
         onPress={() => handleSelectEmployee(item)}
+        style={({ pressed, hovered }: any) => [
+          styles.tile,
+          { width: size, height: size },
+          hovered && styles.tileHover,
+          pressed && styles.tilePressed,
+        ]}
       >
-        <View style={[styles.avatar, { borderColor: badgeColor }]}>
-          <Text style={styles.avatarText}>{getInitial(item.name)}</Text>
+        <View style={[styles.avatar, { width: avatar, height: avatar, borderRadius: avatar / 2, borderColor: badgeColor }]}>
+          <Text style={[styles.avatarText, { fontSize: avatar * 0.42 }]}>{getInitial(item.name)}</Text>
         </View>
-        <Text style={[styles.employeeName, rtlText]} numberOfLines={1}>{item.name}</Text>
-        <View style={[styles.roleBadge, { backgroundColor: badgeColor }]}>
-          <Text style={styles.roleBadgeText}>{item.role}</Text>
+        <Text style={[styles.tileName, { fontSize: clamp(size * 0.095, 12, 16) }]} numberOfLines={1}>
+          {item.name}
+        </Text>
+        <View style={[styles.roleBadge, { backgroundColor: badgeColor + "33", borderColor: badgeColor }]}>
+          <Text style={[styles.roleBadgeText, { fontSize: clamp(size * 0.07, 10, 12) }]}>{roleLabel(item.role)}</Text>
         </View>
       </Pressable>
     );
   };
 
+  const selectView = (
+    <View style={{ width: bodyW, height: bodyH, alignItems: "center" }}>
+      <View style={{ height: titleH, justifyContent: "center", alignItems: "center" }}>
+        <Text style={[styles.title, compact && { fontSize: 20 }]}>{c.who}</Text>
+        {!compact && <Text style={styles.subtitle}>{t("selectEmployee")}</Text>}
+      </View>
+      {employeesLoading || isValidating || !tenant ? (
+        <View style={styles.center}><ActivityIndicator size="large" color={Colors.white} /></View>
+      ) : staff.length === 0 ? (
+        <View style={styles.center}>
+          <Ionicons name="people-outline" size={44} color="rgba(255,255,255,0.55)" />
+          <Text style={styles.emptyTitle}>{c.noEmployees}</Text>
+          <Text style={styles.emptyHint}>{c.noEmployeesHint}</Text>
+        </View>
+      ) : grid.fits ? (
+        <View style={[styles.center, { width: bodyW }]}>
+          <View style={[styles.grid, { gap, width: grid.cols * grid.size + gap * (grid.cols - 1), flexDirection: row }]}>
+            {staff.map((e) => employeeTile(e, grid.size))}
+          </View>
+        </View>
+      ) : (
+        <ScrollView style={{ width: bodyW }} contentContainerStyle={[styles.grid, { gap, flexDirection: row, paddingBottom: 12 }]}>
+          {staff.map((e) => employeeTile(e, 104))}
+        </ScrollView>
+      )}
+      {__DEV__ && (
+        <Pressable
+          onPress={async () => {
+            await AsyncStorage.removeItem("hasSeenIntro");
+            await logoutLicense();
+            router.replace("/");
+          }}
+          style={{ position: "absolute", bottom: 0 }}
+        >
+          <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, textDecorationLine: "underline" }}>Reset App Flow (Dev Only)</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+
+  const pinInfo = selectedEmployee && (
+    <View style={{ alignItems: "center" }}>
+      <View style={[styles.avatarLarge, compact && { width: 56, height: 56, borderRadius: 28 }, { borderColor: getRoleBadgeColor(selectedEmployee.role) }]}>
+        <Text style={[styles.avatarLargeText, compact && { fontSize: 24 }]}>{getInitial(selectedEmployee.name)}</Text>
+      </View>
+      <Text style={[styles.selectedName, compact && { fontSize: 17 }]} numberOfLines={1}>{selectedEmployee.name}</Text>
+      <Text style={[styles.subtitle, { marginTop: 2 }]}>{pinError ? " " : t("enterPin")}</Text>
+      <Animated.View style={[styles.pinDots, { transform: [{ translateX: shake }] }]}>
+        {[0, 1, 2, 3].map((i) => (
+          <View key={i} style={[styles.dot, i < pin.length && styles.dotFilled, pinError && styles.dotError]} />
+        ))}
+      </Animated.View>
+      <Text style={styles.pinError}>{pinError ? c.wrongPin : " "}</Text>
+    </View>
+  );
+
+  const keypad = (
+    <View style={{ width: keyW * 3 + 24, flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8, opacity: loading ? 0.5 : 1, direction: "ltr" }}>
+      {["1", "2", "3", "4", "5", "6", "7", "8", "9", "back", "0", "del"].map((key) => {
+        const icon = key === "del" ? "backspace-outline" : key === "back" ? "people-outline" : null;
+        return (
+          <Pressable
+            key={key}
+            disabled={loading}
+            onPress={() => (key === "del" ? handleDelete() : key === "back" ? handleBack() : handlePinPress(key))}
+            style={({ pressed, hovered }: any) => [
+              styles.key,
+              { width: keyW, height: keyH, borderRadius: keyH / 2.4 },
+              icon && styles.keyGhost,
+              hovered && styles.keyHover,
+              pressed && styles.keyPressed,
+            ]}
+            accessibilityLabel={key === "del" ? "Delete" : key === "back" ? "Back" : key}
+          >
+            {icon ? (
+              <Ionicons name={icon as any} size={clamp(keyH * 0.38, 20, 28)} color={Colors.white} />
+            ) : (
+              <Text style={[styles.keyText, { fontSize: clamp(keyH * 0.42, 20, 30) }]}>{key}</Text>
+            )}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
+  const pinView = (
+    <View style={[styles.center, { width: bodyW, height: bodyH, flexDirection: pinRow ? row : "column", gap: pinRow ? 40 : 12 }]}>
+      {pinInfo}
+      {loading && !pinRow ? (
+        <View style={{ height: keyH * 4 + 24, justifyContent: "center" }}><ActivityIndicator size="large" color={Colors.white} /></View>
+      ) : keypad}
+    </View>
+  );
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top + topPad, paddingBottom: insets.bottom + bottomPad }]}>
+    <View style={styles.container}>
       <LinearGradient
         colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
-        style={styles.gradient}
+        style={[styles.gradient, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + bottomPad + 20 }]}
-          showsVerticalScrollIndicator={false}
-          bounces={false}
+        {header}
+        <View
+          style={styles.body}
+          onLayout={(e) => {
+            const { width: w, height: h } = e.nativeEvent.layout;
+            if (!box || Math.abs(box.w - w) > 1 || Math.abs(box.h - h) > 1) setBox({ w, h });
+          }}
         >
-          {/* Tablet Recommendation Banner */}
-          {showTabletBanner && (
-            <Pressable
-              onPress={() => {
-                AsyncStorage.setItem('barmagly_tablet_tip_shown', 'true');
-                setShowTabletBanner(false);
-              }}
-              style={{
-                backgroundColor: `${Colors.accent}15`,
-                borderWidth: 1,
-                borderColor: `${Colors.accent}40`,
-                borderRadius: 14,
-                padding: 14,
-                marginBottom: 16,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
-              }}
-            >
-              <Ionicons name="tablet-landscape-outline" size={28} color={Colors.accent} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: Colors.accent, fontWeight: '700', fontSize: 13 }}>
-                  Best on Tablet or iPad
-                </Text>
-                <Text style={{ color: Colors.textSecondary, fontSize: 12, marginTop: 2, lineHeight: 17 }}>
-                  For the best POS experience, we recommend using a tablet or iPad. The interface is fully optimized for larger screens.
-                </Text>
-              </View>
-              <Ionicons name="close" size={18} color={Colors.textMuted} />
-            </Pressable>
-          )}
+          {mode === "select" ? selectView : pinView}
+        </View>
 
-          <View style={[styles.logoWrap, screenDims.height < 700 && { marginBottom: 12 }]}>
-            <View style={[styles.logoCircle, screenDims.height < 700 && { width: 56, height: 56, borderRadius: 28 }]}>
-              <Ionicons name="storefront" size={screenDims.height < 700 ? 28 : 36} color={Colors.accent} />
-            </View>
-            <Text style={[styles.appName, screenDims.height < 700 && { fontSize: 24 }]}>{tenant?.name || "POS System"}</Text>
-          </View>
-
-          {mode === "select" ? (
-            <View style={styles.selectionContainer}>
-              <Text style={[styles.modeLabel, rtlTextAlign, rtlText]}>{t("selectEmployee")}</Text>
-              {employeesLoading ? (
-                <ActivityIndicator size="large" color={Colors.white} style={{ marginTop: 32 }} />
-              ) : (
-                <FlatList
-                  data={employees || []}
-                  renderItem={renderEmployeeCard}
-                  keyExtractor={(item) => item.id.toString()}
-                  numColumns={NUM_COLUMNS}
-                  key={NUM_COLUMNS}
-                  scrollEnabled={!!(employees && employees.length)}
-                  contentContainerStyle={styles.gridContent}
-                  columnWrapperStyle={styles.gridRow}
-                  showsVerticalScrollIndicator={false}
-                  ListEmptyComponent={
-                    <Text style={[styles.emptyText, rtlText]}>{t("noEmployees")}</Text>
-                  }
-                  ListFooterComponent={() => (
-                    <View style={styles.footerOptions}>
-                      <Pressable style={styles.logoutLicenseBtn} onPress={logoutLicense}>
-                        <Ionicons name="log-out-outline" size={16} color={Colors.textMuted} />
-                        <Text style={styles.logoutLicenseText}>{t("logout") + " Store License"}</Text>
-                      </Pressable>
-                    </View>
-                  )}
-                />
-              )}
-
-              {__DEV__ && (
-                <Pressable
-                  onPress={async () => {
-                    try {
-                      await AsyncStorage.removeItem("hasSeenIntro");
-                      await logoutLicense();
-                      router.replace("/");
-                    } catch (e) {
-                      console.error("Reset failed", e);
-                    }
-                  }}
-                  style={{ marginTop: 20 }}
-                >
-                  <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, textDecorationLine: "underline" }}>
-                    Reset App Flow (Dev Only)
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-          ) : (
-            <View style={styles.pinContainer}>
-              <Pressable style={[styles.backButton, isRTL ? { left: undefined, right: 0 } : undefined]} onPress={handleBack}>
-                <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={Colors.white} />
-              </Pressable>
-
-              {selectedEmployee && (
-                <View style={styles.selectedUserInfo}>
-                  <View style={[styles.avatarLarge, { borderColor: getRoleBadgeColor(selectedEmployee.role) }]}>
-                    <Text style={styles.avatarLargeText}>{getInitial(selectedEmployee.name)}</Text>
-                  </View>
-                  <Text style={[styles.selectedUserName, rtlText]}>{selectedEmployee.name}</Text>
-                </View>
-              )}
-
-              <Text style={[styles.modeLabel, rtlTextAlign, rtlText]}>{t("enterPin")}</Text>
-              <View style={styles.pinDots}>
-                {[0, 1, 2, 3].map((i) => (
-                  <View key={i} style={[styles.dot, i < pin.length && styles.dotFilled]} />
-                ))}
-              </View>
-
-              {loading ? (
-                <ActivityIndicator size="large" color={Colors.white} style={{ marginTop: 24 }} />
-              ) : (
-                <View style={styles.keypad}>
-                  {["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"].map((key) => {
-                    if (key === "") return <View key="empty" style={styles.keyBtn} />;
-                    if (key === "del") {
-                      return (
-                        <Pressable key="del" style={styles.keyBtn} onPress={handleDelete}>
-                          <Ionicons name="backspace" size={24} color={Colors.white} />
-                        </Pressable>
-                      );
-                    }
-                    return (
-                      <Pressable key={key} style={styles.keyBtn} onPress={() => handlePinPress(key)}>
-                        <Text style={styles.keyText}>{key}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-          )}
-        </ScrollView>
+        {showTabletBanner && (
+          <Pressable
+            onPress={() => {
+              AsyncStorage.setItem("barmagly_tablet_tip_shown", "true");
+              setShowTabletBanner(false);
+            }}
+            style={[styles.tabletTip, { bottom: insets.bottom + 12, flexDirection: row }]}
+          >
+            <Ionicons name="tablet-landscape-outline" size={22} color={Colors.white} />
+            <Text style={styles.tabletTipText}>Best on a tablet or iPad — the POS is optimized for larger screens.</Text>
+            <Ionicons name="close" size={16} color="rgba(255,255,255,0.7)" />
+          </Pressable>
+        )}
       </LinearGradient>
+
+      {/* Sign out of the store (licence) */}
+      <Modal visible={confirmSignOut} animationType="fade" transparent onRequestClose={() => setConfirmSignOut(false)}>
+        <View style={styles.backdrop}>
+          <View style={styles.dialog}>
+            <View style={styles.dialogIcon}>
+              <Ionicons name="log-out-outline" size={28} color={Colors.danger} />
+            </View>
+            <Text style={styles.dialogTitle}>{c.confirmTitle}</Text>
+            {!!tenant?.name && <Text style={styles.dialogStore}>{tenant.name}</Text>}
+            <Text style={styles.dialogBody}>{c.confirmBody}</Text>
+            <View style={[styles.dialogActions, { flexDirection: row }]}>
+              <Pressable onPress={() => setConfirmSignOut(false)} style={[styles.dialogBtn, styles.dialogBtnGhost]}>
+                <Text style={styles.dialogBtnGhostText}>{c.cancel}</Text>
+              </Pressable>
+              <Pressable onPress={handleSignOutStore} style={[styles.dialogBtn, { backgroundColor: Colors.danger }]}>
+                <Text style={styles.dialogBtnText}>{c.confirm}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={showShiftPrompt} animationType="fade" transparent>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 24 }}>
-          <View style={{ backgroundColor: Colors.surface, borderRadius: 20, padding: 24, width: "100%", maxWidth: 380, borderWidth: 1, borderColor: Colors.cardBorder }}>
+        <View style={styles.backdrop}>
+          <View style={styles.dialog}>
             {!showOpeningCashInput ? (
               <>
                 <View style={{ alignItems: "center", marginBottom: 20 }}>
@@ -372,12 +540,12 @@ export default function LoginScreen() {
                   <Text style={{ color: Colors.text, fontSize: 20, fontWeight: "700", marginBottom: 8 }}>{t("shiftPromptTitle")}</Text>
                   <Text style={{ color: Colors.textSecondary, fontSize: 14, textAlign: "center" }}>{t("shiftPromptMessage")}</Text>
                 </View>
-                <Pressable onPress={() => setShowOpeningCashInput(true)} style={{ backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10 }}>
+                <Pressable onPress={() => setShowOpeningCashInput(true)} style={{ backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10, alignSelf: "stretch" }}>
                   <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "700" }}>{t("startShiftNow")}</Text>
                 </Pressable>
                 {/* Only allow skip for non-admin/cashier roles (e.g. manager access without shift) */}
                 {loggedInEmployee && loggedInEmployee.role === "manager" && (
-                  <Pressable onPress={handleSkipShift} style={{ borderRadius: 12, paddingVertical: 14, alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder }}>
+                  <Pressable onPress={handleSkipShift} style={{ borderRadius: 12, paddingVertical: 14, alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder, alignSelf: "stretch" }}>
                     <Text style={{ color: Colors.textSecondary, fontSize: 16, fontWeight: "500" }}>{t("skipForNow")}</Text>
                   </Pressable>
                 )}
@@ -393,7 +561,7 @@ export default function LoginScreen() {
               <>
                 <Text style={{ color: Colors.text, fontSize: 18, fontWeight: "700", marginBottom: 16, textAlign: "center" }}>{t("enterOpeningCash")}</Text>
                 <TextInput
-                  style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, fontSize: 18, color: Colors.text, textAlign: "center", borderWidth: 1, borderColor: Colors.cardBorder, marginBottom: 16 }}
+                  style={{ alignSelf: "stretch", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, fontSize: 18, color: Colors.text, textAlign: "center", borderWidth: 1, borderColor: Colors.cardBorder, marginBottom: 16 }}
                   value={openingCash}
                   onChangeText={setOpeningCash}
                   keyboardType="decimal-pad"
@@ -401,10 +569,10 @@ export default function LoginScreen() {
                   placeholderTextColor={Colors.textMuted}
                   autoFocus
                 />
-                <Pressable onPress={handleStartShift} style={{ backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10 }}>
+                <Pressable onPress={handleStartShift} style={{ alignSelf: "stretch", backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10 }}>
                   <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "700" }}>{t("startShift")}</Text>
                 </Pressable>
-                <Pressable onPress={() => setShowOpeningCashInput(false)} style={{ borderRadius: 12, paddingVertical: 14, alignItems: "center" }}>
+                <Pressable onPress={() => setShowOpeningCashInput(false)} style={{ alignSelf: "stretch", borderRadius: 12, paddingVertical: 14, alignItems: "center" }}>
                   <Text style={{ color: Colors.textSecondary, fontSize: 15 }}>{t("cancel")}</Text>
                 </Pressable>
               </>
@@ -423,195 +591,299 @@ const styles = themedStyles((Colors) => ({
   },
   gradient: {
     flex: 1,
+    overflow: "hidden" as const,
   },
-  content: {
+  header: {
     alignItems: "center",
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    width: "100%",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.12)",
+    gap: 12,
   },
-  logoWrap: {
+  brand: {
     alignItems: "center",
-    marginBottom: 24,
+    gap: 12,
+    flexShrink: 1,
   },
-  logoCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "rgba(0,0,0,0.3)",
+  brandLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+    overflow: "hidden" as const,
   },
-  appName: {
-    fontSize: 32,
-    fontWeight: "900" as const,
+  brandLogoImg: { width: "100%", height: "100%" },
+  storeName: {
     color: Colors.white,
-    letterSpacing: 1,
+    fontSize: 19,
+    fontWeight: "800" as const,
   },
-  appDesc: {
-    fontSize: 14,
+  storeType: {
     color: "rgba(255,255,255,0.7)",
-    marginTop: 4,
-  },
-  modeLabel: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: "600" as const,
-    marginBottom: 16,
+    marginTop: 1,
+  },
+  signOutBtn: {
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
+  },
+  signOutBtnActive: {
+    backgroundColor: "rgba(220,38,38,0.85)",
+    borderColor: "rgba(220,38,38,1)",
+  },
+  signOutText: {
+    color: Colors.white,
+    fontSize: 13,
+    fontWeight: "700" as const,
+  },
+  body: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  title: {
+    color: Colors.white,
+    fontSize: 26,
+    fontWeight: "800" as const,
     textAlign: "center" as const,
   },
-  selectionContainer: {
-    flex: 1,
-    width: "100%",
-    alignItems: "center",
+  subtitle: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 14,
+    fontWeight: "500" as const,
+    marginTop: 4,
+    textAlign: "center" as const,
   },
-  gridContent: {
-    paddingBottom: 16,
-  },
-  gridRow: {
-    gap: 12,
+  grid: {
+    flexWrap: "wrap" as const,
     justifyContent: "center",
-    marginBottom: 12,
+    alignSelf: "center",
   },
-  employeeCard: {
+  tile: {
     backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 12,
-    alignItems: "center",
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 8,
   },
-  employeeCardPressed: {
-    backgroundColor: "rgba(255,255,255,0.2)",
+  tileHover: {
+    backgroundColor: "rgba(255,255,255,0.17)",
+    borderColor: "rgba(255,255,255,0.4)",
+  },
+  tilePressed: {
+    backgroundColor: "rgba(255,255,255,0.24)",
     transform: [{ scale: 0.96 }],
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "rgba(0,0,0,0.3)",
+    backgroundColor: "rgba(0,0,0,0.25)",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 8,
     borderWidth: 2,
   },
   avatarText: {
     color: Colors.white,
-    fontSize: 24,
-    fontWeight: "700" as const,
+    fontWeight: "800" as const,
   },
-  employeeName: {
+  tileName: {
     color: Colors.white,
-    fontSize: 14,
-    fontWeight: "600" as const,
-    marginBottom: 8,
+    fontWeight: "700" as const,
+    marginBottom: 6,
     textAlign: "center" as const,
+    maxWidth: "100%",
   },
   roleBadge: {
     paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
   },
   roleBadgeText: {
     color: Colors.white,
-    fontSize: 11,
     fontWeight: "700" as const,
-    textTransform: "capitalize" as const,
   },
-  pinContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    width: "100%",
+  emptyTitle: {
+    color: Colors.white,
+    fontSize: 17,
+    fontWeight: "700" as const,
+    marginTop: 10,
   },
-  backButton: {
-    position: "absolute" as const,
-    top: 0,
-    left: 0,
-    padding: 8,
-    zIndex: 10,
-  },
-  selectedUserInfo: {
-    alignItems: "center",
-    marginBottom: 24,
+  emptyHint: {
+    color: "rgba(255,255,255,0.65)",
+    fontSize: 13,
+    marginTop: 4,
+    textAlign: "center" as const,
   },
   avatarLarge: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "rgba(0,0,0,0.3)",
+    backgroundColor: "rgba(0,0,0,0.25)",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 8,
     borderWidth: 3,
   },
   avatarLargeText: {
     color: Colors.white,
-    fontSize: 32,
-    fontWeight: "700" as const,
+    fontSize: 30,
+    fontWeight: "800" as const,
   },
-  selectedUserName: {
+  selectedName: {
     color: Colors.white,
     fontSize: 20,
-    fontWeight: "700" as const,
+    fontWeight: "800" as const,
   },
   pinDots: {
     flexDirection: "row" as const,
-    gap: 20,
-    marginBottom: 32,
+    gap: 18,
+    marginTop: 14,
   },
   dot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.5)",
+    borderColor: "rgba(255,255,255,0.55)",
     backgroundColor: "transparent",
   },
   dotFilled: {
     backgroundColor: Colors.white,
     borderColor: Colors.white,
   },
-  keypad: {
-    flexDirection: "row" as const,
-    flexWrap: "wrap" as const,
-    width: 280,
-    justifyContent: "center",
+  dotError: {
+    borderColor: "#FCA5A5",
   },
-  keyBtn: {
-    width: 280 / 3,
-    height: 64,
+  pinError: {
+    color: "#FECACA",
+    fontSize: 13,
+    fontWeight: "700" as const,
+    marginTop: 8,
+    minHeight: 18,
+  },
+  key: {
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+  },
+  keyGhost: {
+    backgroundColor: "transparent",
+    borderColor: "transparent",
+  },
+  keyHover: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  keyPressed: {
+    backgroundColor: "rgba(255,255,255,0.3)",
+    transform: [{ scale: 0.95 }],
   },
   keyText: {
     color: Colors.white,
-    fontSize: 28,
     fontWeight: "600" as const,
   },
-  emptyText: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 16,
-    marginTop: 32,
+  tabletTip: {
+    position: "absolute" as const,
+    left: 16,
+    right: 16,
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.35)",
+  },
+  tabletTipText: {
+    flex: 1,
+    color: Colors.white,
+    fontSize: 12,
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  dialog: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    alignItems: "center",
+  },
+  dialogIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.danger + "1F",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  dialogTitle: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: "800" as const,
     textAlign: "center" as const,
   },
-  footerOptions: {
-    paddingVertical: 24,
-    gap: 16,
-    alignItems: 'center',
-    width: '100%',
+  dialogStore: {
+    color: Colors.accent,
+    fontSize: 14,
+    fontWeight: "700" as const,
+    marginTop: 4,
   },
-  logoutLicenseBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  dialogBody: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center" as const,
     marginTop: 10,
   },
-  logoutLicenseText: {
-    color: Colors.textMuted,
-    fontSize: 14,
-    fontWeight: "600",
+  dialogActions: {
+    gap: 10,
+    marginTop: 20,
+    alignSelf: "stretch",
+  },
+  dialogBtn: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  dialogBtnGhost: {
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  dialogBtnGhostText: {
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: "600" as const,
+  },
+  dialogBtnText: {
+    color: Colors.white,
+    fontSize: 15,
+    fontWeight: "700" as const,
   },
 }));

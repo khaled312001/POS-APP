@@ -18,6 +18,7 @@ import {
 } from "./stripeClient";
 import { registerPaymentRoutes, registerStripeWebhook } from "./paymentRoutes";
 import { registerWhatsAppVerifyRoutes } from "./whatsappVerifyRoutes";
+import { registerWhatsAppStoreRoutes } from "./whatsappStoreRoutes";
 import { runStripeMigrations } from "./stripeMigrations";
 import { runShamCashMigrations } from "./shamcash";
 import { runWholesaleMigrations } from "./wholesale";
@@ -1230,6 +1231,7 @@ async function initStripe() {
 
   registerPaymentRoutes(app);
   registerWhatsAppVerifyRoutes(app);
+  registerWhatsAppStoreRoutes(app);
   registerSuperAdminRoutes(app);
   registerBroadcastRoutes(app);
   registerCustomerExtraRoutes(app);

@@ -92,6 +92,13 @@ async function apiFetch(path, options = {}) {
 // ── Customer Auth ──────────────────────────────────────────────────────────
 
 const authApi = {
+  // payload: { credential } (ID token) or { accessToken } (OAuth popup)
+  googleLogin: (payload, tenantId) =>
+    apiFetch("/api/delivery/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ ...payload, tenantId }),
+    }),
+
   requestOtp: (phone, tenantId) =>
     apiFetch("/api/delivery/auth/request-otp", {
       method: "POST",

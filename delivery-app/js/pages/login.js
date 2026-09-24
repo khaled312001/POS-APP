@@ -14,6 +14,7 @@ pages.login = {
     const rtl = isRtl();
     container.innerHTML = pages.login._build(rtl);
     pages.login._bindEvents(rtl);
+    if (!pages.login._isNativeApp()) pages.login._loadGoogle().catch(() => {});
     if (window.lucide) window.lucide.createIcons();
   },
 
@@ -43,10 +44,6 @@ pages.login = {
         <button class="auth-social-btn auth-social-btn--google" onclick="pages.login._googleSignIn()">
           <svg viewBox="0 0 24 24" width="20" height="20"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
           ${rtl ? "المتابعة مع Google" : "Continue with Google"}
-        </button>
-        <button class="auth-social-btn auth-social-btn--apple" onclick="pages.login._appleSignIn()">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
-          ${rtl ? "المتابعة مع Apple" : "Continue with Apple"}
         </button>
       </div>
 
@@ -257,36 +254,88 @@ pages.login = {
     document.getElementById("tab-email").classList.toggle("active", tab === "email");
   },
 
-  _googleSignIn() {
-    const rtl = isRtl();
-    // Try Google Identity Services
-    if (window.google && window.google.accounts) {
-      window.google.accounts.id.initialize({
-        client_id: window.DELIVERY_CONFIG?.googleClientId || "",
-        callback: pages.login._handleGoogleResponse,
-      });
-      window.google.accounts.id.prompt();
-    } else {
-      showToast(rtl ? "Google Sign-In غير متاح حالياً" : "Google Sign-In is not available yet", "info");
-    }
+  // ── Google Sign-In ──────────────────────────────────────────────────────
+  // Web: Google's OAuth popup (one click, not blocked like One Tap can be);
+  // the server re-reads the profile from Google with the access token.
+  // Android app: this page runs in a WebView where Google's web SDK cannot
+  // work, so the app signs in with Play Services and hands back an ID token
+  // (same bridge as /customer/).
+  _GOOGLE_CLIENT_ID: "852311970344-8q8a01gm3jip4k9vooljk8ttjpd30802.apps.googleusercontent.com",
+
+  _loadGoogle() {
+    if (window.google && window.google.accounts && window.google.accounts.oauth2) return Promise.resolve();
+    if (pages.login._gisPromise) return pages.login._gisPromise;
+    pages.login._gisPromise = new Promise((resolve, reject) => {
+      const sc = document.createElement("script");
+      sc.src = "https://accounts.google.com/gsi/client";
+      sc.async = true;
+      sc.onload = () => resolve();
+      sc.onerror = () => { pages.login._gisPromise = null; reject(new Error("gsi")); };
+      document.head.appendChild(sc);
+    });
+    return pages.login._gisPromise;
   },
 
-  async _handleGoogleResponse(response) {
+  _isNativeApp() {
+    return !!(window.__KASSENTA_NATIVE__ && window.ReactNativeWebView);
+  },
+
+  _googleSignIn() {
+    const rtl = isRtl();
+    if (pages.login._isNativeApp()) {
+      window.__kassentaGoogleResult = (res) => {
+        if (!res || !res.ok) {
+          if (!res || !res.cancelled) showToast((res && res.error) || (rtl ? "تعذّر تسجيل الدخول بـ Google" : "Google sign-in failed"), "error");
+          return;
+        }
+        pages.login._finishGoogle({ credential: res.idToken });
+      };
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: "google-signin" }));
+      return;
+    }
+    // The popup must open inside this click, so the library is preloaded
+    // when the page renders; if it isn't there yet, ask for one more tap.
+    if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+      pages.login._loadGoogle().catch(() => {});
+      showToast(rtl ? "جاري تحميل Google… اضغط مرة أخرى" : "Loading Google… tap again", "info");
+      return;
+    }
+    const client = window.google.accounts.oauth2.initTokenClient({
+      client_id: pages.login._GOOGLE_CLIENT_ID,
+      scope: "openid email profile",
+      callback: (tokenResp) => {
+        if (!tokenResp || !tokenResp.access_token) {
+          showToast(rtl ? "تم إلغاء تسجيل الدخول" : "Sign-in cancelled", "info");
+          return;
+        }
+        pages.login._finishGoogle({ accessToken: tokenResp.access_token });
+      },
+      error_callback: (err) => {
+        const type = (err && err.type) || "";
+        console.error("[google] popup failed:", type, err);
+        if (type === "popup_closed") return;
+        if (type === "popup_failed_to_open") {
+          showToast(rtl ? "اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة" : "Allow pop-ups for this site, then try again", "error");
+          return;
+        }
+        showToast(rtl ? "تعذّر تسجيل الدخول بـ Google" : "Google sign-in failed", "error");
+      },
+    });
+    client.requestAccessToken({ prompt: "select_account" });
+  },
+
+  async _finishGoogle(payload) {
     const cfg = window.DELIVERY_CONFIG || {};
     try {
-      const result = await api.auth.googleLogin(response.credential, cfg.tenantId);
+      const result = await api.auth.googleLogin(payload, cfg.tenantId);
       auth.setSession(result.token, result.customer);
       showToast(isRtl() ? "مرحباً " + (result.customer?.name || "") : "Welcome " + (result.customer?.name || ""), "success");
       const navLabel = document.getElementById("nav-user-label");
       if (navLabel && result.customer?.name) navLabel.textContent = result.customer.name.split(" ")[0];
       history.back();
     } catch (err) {
-      showToast(err.message || "Google sign-in failed", "error");
+      showToast(err.message || (isRtl() ? "تعذّر تسجيل الدخول بـ Google" : "Google sign-in failed"), "error");
     }
-  },
-
-  _appleSignIn() {
-    showToast(isRtl() ? "قريباً!" : "Coming soon!", "info");
   },
 
   async _sendOtp() {

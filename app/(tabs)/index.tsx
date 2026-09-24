@@ -32,7 +32,7 @@ import {
   PIZZA_TOPPINGS, TOPPING_PRICE, TOPPING_GRID, SAUCE_ROW, SAUCE_NAMES,
   calcToppingsPrice, getToppingDisplayName, getToppingEmoji, getToppingInfo,
 } from "@/utils/toppingUtils";
-import { formatMoney, currencyLabel, setCurrency } from "@/lib/currency";
+import { formatMoney, currencyLabel, setCurrency, isZeroDecimalCurrency } from "@/lib/currency";
 import ShamCashTillModal from "@/components/ShamCashTillModal";
 
 type ProductVariantOption = {
@@ -186,6 +186,8 @@ export default function POSScreen() {
   const [discountInput, setDiscountInput] = useState("");
   const [discountType, setDiscountType] = useState<"fixed" | "percent">("fixed");
   const [manualAdjustment, setManualAdjustment] = useState(0);
+  // ± step for the manual adjustment: 1 in CHF-style currencies, 10 in SYP.
+  const adjustStep = isZeroDecimalCurrency() ? 10 : 1;
   const [showScanner, setShowScanner] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
@@ -2386,16 +2388,16 @@ export default function POSScreen() {
               <Text style={[styles.summaryValue, rtlTextAlign]}>{formatMoney(cart.tax)}</Text>
             </View>
             <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }, { alignItems: "center" }]}>
-              <Text style={[styles.summaryLabel, rtlTextAlign]}>Anpassung</Text>
+              <Text style={[styles.summaryLabel, rtlTextAlign]}>{language === "ar" ? "تعديل المبلغ" : language === "de" ? "Anpassung" : "Adjustment"}</Text>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Pressable onPress={() => setManualAdjustment(v => Math.round((v - 1) * 100) / 100)}
+                <Pressable onPress={() => setManualAdjustment(v => Math.round((v - adjustStep) * 100) / 100)}
                   style={{ backgroundColor: "#e74c3c", borderRadius: 4, width: 24, height: 24, alignItems: "center", justifyContent: "center" }}>
                   <Text style={{ color: "#fff", fontSize: 16, lineHeight: 22 }}>−</Text>
                 </Pressable>
                 <Text style={{ color: manualAdjustment >= 0 ? Colors.success : "#e74c3c", fontSize: 13, fontWeight: "700", minWidth: 60, textAlign: "center" }}>
-                  {manualAdjustment >= 0 ? "+" : ""}{manualAdjustment.toFixed(2)} Fr
+                  {manualAdjustment > 0 ? "+" : ""}{formatMoney(manualAdjustment)}
                 </Text>
-                <Pressable onPress={() => setManualAdjustment(v => Math.round((v + 1) * 100) / 100)}
+                <Pressable onPress={() => setManualAdjustment(v => Math.round((v + adjustStep) * 100) / 100)}
                   style={{ backgroundColor: Colors.success, borderRadius: 4, width: 24, height: 24, alignItems: "center", justifyContent: "center" }}>
                   <Text style={{ color: "#fff", fontSize: 16, lineHeight: 22 }}>+</Text>
                 </Pressable>

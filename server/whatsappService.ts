@@ -1,23 +1,16 @@
-import path from 'path';
-import fs from 'fs';
-import { pathToFileURL } from 'url';
-// @ts-ignore -- qrcode ships no type declarations
-import QRCode from 'qrcode';
-
 /**
- * Platform WhatsApp session, over Baileys (WhatsApp Web's own WebSocket
- * protocol — no browser). It replaced wppconnect + headless Chrome, which
- * needs ~50 threads: on the shared hosting account that budget is shared by
- * every site, so Chrome never got a renderer and took the other sites down
- * with it. Baileys runs inside the node process (~11 threads).
+ * WhatsApp messaging for the platform and for each store.
  *
- * Baileys is ESM-only and is installed on the server in its own folder
- * (wa-baileys/ next to the app, or BAILEYS_DIR) so the app's node_modules are
- * left alone; a normal node_modules install is used as a fallback.
+ * The sessions themselves live in the WhatsApp bridge process
+ * (server/waBridge.ts), reached through server/waClient.ts:
+ *   - "platform"      the platform's own number (verification codes, and the
+ *                     fallback sender for stores that haven't linked one);
+ *   - "t<tenantId>"   a store's own WhatsApp, linked by the store owner.
+ * Order messages for a store go out from the store's own number when it is
+ * linked, using the store's templates (server/waTemplates.ts).
  */
-const STORAGE_DIR = path.resolve(process.cwd(), ".whatsapp");
-const AUTH_DIR = path.join(STORAGE_DIR, "auth");
-const BAILEYS_DIR = process.env.BAILEYS_DIR || path.resolve(process.cwd(), "wa-baileys");
+import { bridge, ensureBridge, startBridgeWatchdog } from "./waClient";
+import { renderTemplate, resolveTemplate, statusEvent, type TemplateLang, type TemplateEvent } from "./waTemplates";
 
 export type WhatsAppStatus = "disconnected" | "connecting" | "qr_ready" | "connected";
 
@@ -43,322 +36,246 @@ interface OrderData {
     notes?: string | null;
 }
 
-let baileys: any = null;
-let sock: any = null;
-let status: WhatsAppStatus = "disconnected";
-let lastQrCode: string | null = null;
-let lastError: string | null = null;
-let connectionLog: { time: string; event: string }[] = [];
-let connectionPhase: "idle" | "starting" | "awaiting_qr" | "qr_scanned" | "ready" = "idle";
-let reconnectTimer: any = null;
-let reconnectAttempts = 0;
-let manualStop = false;
-let pendingMessages: { phone: string; text: string; timestamp: number }[] = [];
-
-function log(event: string) {
-    const entry = { time: new Date().toISOString(), event };
-    connectionLog.unshift(entry);
-    if (connectionLog.length > 100) connectionLog.length = 100;
-    console.log(`[WhatsApp] ${event}`);
+export interface SessionView {
+    key: string;
+    status: WhatsAppStatus;
+    qrCode: string | null;
+    phone: string | null;
+    name: string | null;
+    lastError: string | null;
+    connectedAt: string | null;
+    linked: boolean;
+    pending: number;
+    log: { time: string; event: string }[];
 }
 
-// Baileys wants a pino-style logger; its protocol chatter is not useful here.
-const quietLogger: any = {
-    level: "silent",
-    child() { return quietLogger; },
-    trace() { }, debug() { }, info() { },
-    warn() { },
-    error() { },
-    fatal(obj: any, msg?: string) { console.error("[WhatsApp] fatal", msg || "", obj?.err?.message || ""); },
+const EMPTY: SessionView = {
+    key: "platform", status: "disconnected", qrCode: null, phone: null, name: null,
+    lastError: null, connectedAt: null, linked: false, pending: 0, log: [],
 };
 
-async function loadBaileys(): Promise<any> {
-    if (baileys) return baileys;
-    const entry = path.join(BAILEYS_DIR, "node_modules", "@whiskeysockets", "baileys", "lib", "index.js");
+export const storeKey = (tenantId: number) => `t${tenantId}`;
+
+// Several routes read the platform status synchronously, so keep a copy that
+// is refreshed in the background and after every action.
+let platform: SessionView = { ...EMPTY };
+let refreshTimer: any = null;
+
+async function refreshPlatform(): Promise<SessionView> {
     try {
-        baileys = fs.existsSync(entry)
-            ? await import(pathToFileURL(entry).href)
-            : await import("@whiskeysockets/baileys" as any);
-        return baileys;
-    } catch (err: any) {
-        lastError = `Baileys not installed: ${err?.message || err}`;
-        log(lastError);
-        return null;
+        platform = await bridge<SessionView>("GET", "/status?key=platform", undefined, 5000);
+    } catch (e: any) {
+        platform = { ...platform, status: "disconnected", lastError: e?.message || String(e) };
+    }
+    return platform;
+}
+
+// Short cache so a burst of order messages doesn't ask the bridge each time.
+const storeCache = new Map<number, { at: number; view: SessionView }>();
+
+export async function storeSession(tenantId: number, fresh = false): Promise<SessionView> {
+    const hit = storeCache.get(tenantId);
+    if (!fresh && hit && Date.now() - hit.at < 5000) return hit.view;
+    try {
+        const view = await bridge<SessionView>("GET", `/status?key=${storeKey(tenantId)}`, undefined, 5000);
+        storeCache.set(tenantId, { at: Date.now(), view });
+        return view;
+    } catch {
+        return { ...EMPTY, key: storeKey(tenantId) };
     }
 }
 
-function toJid(phone: string): string {
-    let digits = phone.replace(/\D/g, "");
-
-    // Normalize Swiss numbers
-    // 1. If it starts with 410... (e.g. 410791234567) -> 41791234567
-    if (digits.startsWith("410") && digits.length === 12) {
-        digits = "41" + digits.slice(3);
-    }
-    // 2. If it starts with 0... (10 digits, e.g., 0791234567) -> 41791234567
-    else if (digits.startsWith("0") && digits.length === 10) {
-        digits = "41" + digits.slice(1);
-    }
-    // 3. If it has 9 digits and doesn't start with 0 (e.g. 791234567) -> 41791234567
-    else if (digits.length === 9 && !digits.startsWith("0")) {
-        digits = "41" + digits;
-    }
-
-    return `${digits}@s.whatsapp.net`;
-}
-
-function hasSession(): boolean {
-    return fs.existsSync(path.join(AUTH_DIR, "creds.json"));
-}
-
-function queue(phone: string, text: string) {
-    pendingMessages.push({ phone, text, timestamp: Date.now() });
-    if (pendingMessages.length > 50) pendingMessages.shift();
-}
-
-async function flushPending() {
-    if (!pendingMessages.length) return;
-    const toSend = pendingMessages;
-    pendingMessages = [];
-    log(`Flushing ${toSend.length} queued message(s)`);
-    for (const m of toSend) {
-        if (Date.now() - m.timestamp < 10 * 60 * 1000) {
-            await whatsappService.sendText(m.phone, m.text);
-        } else {
-            log(`Dropped stale queued message for ${m.phone} (>10min old)`);
-        }
+async function sendVia(key: string, to: string, text: string): Promise<{ ok: boolean; queued?: boolean; error?: string }> {
+    try {
+        return await bridge("POST", "/send", { key, to, text, wait: true }, 60000);
+    } catch (e: any) {
+        return { ok: false, error: e?.message || String(e) };
     }
 }
 
-function scheduleReconnect(delayMs?: number) {
-    if (manualStop || reconnectTimer) return;
-    reconnectAttempts++;
-    const delay = delayMs ?? Math.min(60000, 5000 * reconnectAttempts);
-    log(`Reconnecting in ${Math.round(delay / 1000)}s…`);
-    reconnectTimer = setTimeout(() => {
-        reconnectTimer = null;
-        startSocket().catch((e) => log(`Reconnect failed: ${e?.message || e}`));
-    }, delay);
+// ── Store context for templates ─────────────────────────────────────────────
+interface StoreContext { name: string; meta: any; currency: string; lang: TemplateLang }
+
+async function storeContext(tenantId: number): Promise<StoreContext> {
+    const { storage } = await import("./storage");
+    const tenant: any = await storage.getTenant(tenantId);
+    let currency = "CHF";
+    try {
+        const { pool } = await import("./db");
+        const [rows]: any = await pool.query(
+            "SELECT currency FROM branches WHERE tenant_id = ? ORDER BY is_main DESC, id LIMIT 1", [tenantId]);
+        if (rows?.[0]?.currency) currency = String(rows[0].currency);
+    } catch { }
+    const meta = (tenant?.metadata as any) || {};
+    const lang: TemplateLang = meta.whatsappTemplates?.lang || (currency === "SYP" ? "ar" : "en");
+    return { name: tenant?.businessName || "Store", meta, currency, lang };
 }
 
-function closeSocket() {
-    const s = sock;
-    sock = null;
-    if (!s) return;
-    try { s.ev.removeAllListeners(); } catch { }
-    try { s.end(undefined); } catch { }
+const ZERO_DECIMAL = new Set(["SYP", "IQD", "LBP", "JPY", "KRW"]);
+function money(v: unknown, currency: string): string {
+    const n = Number(v) || 0;
+    if (ZERO_DECIMAL.has(currency)) {
+        const s = Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        return currency === "SYP" ? `${s} ل.س` : `${s} ${currency}`;
+    }
+    return `${n.toFixed(2)} ${currency}`;
 }
 
-async function startSocket(): Promise<void> {
-    const B = await loadBaileys();
-    if (!B) { status = "disconnected"; connectionPhase = "idle"; return; }
-    const makeWASocket = B.default?.default || B.default || B.makeWASocket;
-    const { useMultiFileAuthState, fetchLatestBaileysVersion, Browsers, DisconnectReason } = B;
+function orderVars(order: OrderData, ctx: StoreContext) {
+    const ar = ctx.lang === "ar";
+    const payment: Record<string, string> = ar
+        ? { cash: "نقداً", card: "بطاقة", shamcash: "شام كاش", online: "دفع إلكتروني", credit: "آجل" }
+        : { cash: "Cash", card: "Card", shamcash: "Sham Cash", online: "Online", credit: "On account" };
+    return {
+        orderNumber: order.orderNumber,
+        storeName: ctx.name,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        address: order.customerAddress || "",
+        items: (order.items || [])
+            .map((i, idx) => `  ${idx + 1}. ${i.name} × ${i.quantity} — ${money(i.unitPrice, ctx.currency)}`)
+            .join("\n"),
+        subtotal: money(order.subtotal, ctx.currency),
+        deliveryFee: order.deliveryFee && Number(order.deliveryFee) > 0 ? money(order.deliveryFee, ctx.currency) : "",
+        total: money(order.totalAmount, ctx.currency),
+        orderType: order.orderType === "delivery" ? (ar ? "🚚 توصيل" : "🚚 Delivery") : (ar ? "🏪 استلام" : "🏪 Pickup"),
+        paymentMethod: payment[order.paymentMethod] || order.paymentMethod,
+        notes: order.notes || "",
+    };
+}
 
-    closeSocket();
-    fs.mkdirSync(AUTH_DIR, { recursive: true });
-    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-    let version: number[] | undefined;
-    try { version = (await fetchLatestBaileysVersion()).version; } catch { }
-
-    status = "connecting";
-    connectionPhase = hasSession() && state.creds?.registered ? "starting" : "awaiting_qr";
-    const s = makeWASocket({
-        auth: state,
-        logger: quietLogger,
-        version,
-        browser: Browsers.ubuntu("Kassenta"),
-        markOnlineOnConnect: false,
-        syncFullHistory: false,
-    });
-    sock = s;
-    s.ev.on("creds.update", saveCreds);
-    s.ev.on("connection.update", async (u: any) => {
-        if (sock !== s) return;
-        if (u.qr) {
-            try {
-                lastQrCode = await QRCode.toDataURL(u.qr, { margin: 1, width: 320 });
-                status = "qr_ready";
-                connectionPhase = "awaiting_qr";
-                log("QR code generated — scan with WhatsApp");
-            } catch (e: any) {
-                log(`QR render failed: ${e?.message || e}`);
-            }
-        }
-        if (u.connection === "open") {
-            status = "connected";
-            connectionPhase = "ready";
-            lastQrCode = null;
-            lastError = null;
-            reconnectAttempts = 0;
-            log(`✅ WhatsApp connected as ${String(s.user?.id || "").split(":")[0]}`);
-            flushPending().catch(() => { });
-        }
-        if (u.connection === "close") {
-            const code = u.lastDisconnect?.error?.output?.statusCode;
-            const reason = u.lastDisconnect?.error?.message || "closed";
-            status = "disconnected";
-            connectionPhase = "idle";
-            lastQrCode = null;
-            sock = null;
-            if (code === DisconnectReason.loggedOut) {
-                // Unlinked from the phone: the saved credentials are dead.
-                lastError = "WhatsApp was logged out from the phone — connect again and scan the QR code";
-                log(lastError);
-                try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }); } catch { }
-                return;
-            }
-            if (code === DisconnectReason.restartRequired) {
-                // Normal right after the QR is scanned.
-                connectionPhase = "qr_scanned";
-                log("QR scanned — restarting the session");
-                scheduleReconnect(500);
-                return;
-            }
-            if (code === DisconnectReason.timedOut && !state.creds?.registered) {
-                lastError = "QR code expired — press connect to get a new one";
-                log(lastError);
-                return;
-            }
-            lastError = `${reason}${code ? ` (${code})` : ""}`;
-            log(`Connection closed: ${lastError}`);
-            scheduleReconnect();
-        }
-    });
-    s.ev.on("messages.upsert", ({ messages, type }: any) => {
-        if (type !== "notify") return;
-        for (const m of messages || []) {
-            if (m.key?.fromMe) continue;
-            const body = m.message?.conversation || m.message?.extendedTextMessage?.text || "";
-            log(`Msg from ${m.key?.remoteJid}: ${body.slice(0, 80)}`);
-        }
-    });
+function templateText(ctx: StoreContext, event: TemplateEvent, vars: Record<string, any>): string | null {
+    const t = resolveTemplate(ctx.meta.whatsappTemplates, event, ctx.lang);
+    return t.enabled ? renderTemplate(t.text, vars) : null;
 }
 
 export const whatsappService = {
-    getStatus(): { status: WhatsAppStatus; lastError: string | null; log: typeof connectionLog; phase: string } {
-        return { status, lastError, log: connectionLog.slice(0, 20), phase: connectionPhase };
+    // ── Platform session ────────────────────────────────────────────────────
+    getStatus(): { status: WhatsAppStatus; lastError: string | null; log: SessionView["log"]; phase: string } {
+        const phase = platform.status === "connected" ? "ready" : platform.status === "qr_ready" ? "awaiting_qr" : platform.status === "connecting" ? "starting" : "idle";
+        return { status: platform.status, lastError: platform.lastError, log: platform.log || [], phase };
     },
 
     getQrCode(): string | null {
-        return lastQrCode;
+        return platform.qrCode;
     },
 
-    /** Whether a linked session is saved (survives restarts). */
-    hasSession,
+    hasSession(): boolean {
+        return !!platform.linked;
+    },
 
     sessionModified(): string | null {
-        try { return fs.statSync(path.join(AUTH_DIR, "creds.json")).mtime.toISOString(); } catch { return null; }
+        return platform.connectedAt;
     },
 
-    /** On boot: resume a linked session; never start a QR flow on its own. */
+    /** On boot: make sure the bridge runs (it resumes every linked session). */
     async autoConnect(): Promise<void> {
-        if (process.env.WHATSAPP_DISABLED === "1" || !hasSession()) return;
-        await this.connect();
+        if (process.env.WHATSAPP_DISABLED === "1") return;
+        startBridgeWatchdog();
+        await ensureBridge();
+        if (!refreshTimer) {
+            refreshTimer = setInterval(() => { refreshPlatform().catch(() => { }); }, 5000);
+            refreshTimer.unref?.();
+        }
+        await refreshPlatform();
     },
 
     async connect(): Promise<{ status: WhatsAppStatus; qrCode?: string }> {
-        if (process.env.WHATSAPP_DISABLED === "1") {
-            lastError = "WhatsApp is disabled on this server (WHATSAPP_DISABLED=1)";
-            return { status: "disconnected" };
-        }
-        if (sock && (status === "connected" || status === "qr_ready" || status === "connecting")) {
-            return { status, qrCode: lastQrCode || undefined };
-        }
-        manualStop = false;
-        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-        lastError = null;
-        lastQrCode = null;
-        log("Connecting…");
-        await startSocket();
-        // The QR usually arrives within a couple of seconds; give the caller
-        // a chance to get it in the same response.
-        for (let i = 0; i < 16 && status === "connecting"; i++) {
-            await new Promise(r => setTimeout(r, 250));
-        }
-        return { status, qrCode: lastQrCode || undefined };
+        if (process.env.WHATSAPP_DISABLED === "1") return { status: "disconnected" };
+        platform = await bridge<SessionView>("POST", "/connect", { key: "platform" }, 15000);
+        return { status: platform.status, qrCode: platform.qrCode || undefined };
     },
 
     async disconnect(): Promise<void> {
-        manualStop = true;
-        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-        closeSocket();
-        status = "disconnected";
-        lastQrCode = null;
-        connectionPhase = "idle";
-        pendingMessages = [];
-        log("Disconnected (manual)");
+        platform = await bridge<SessionView>("POST", "/disconnect", { key: "platform" });
     },
 
-    /** Unlink the device and forget the saved session. */
     async logout(): Promise<void> {
-        manualStop = true;
-        try { await sock?.logout(); } catch { }
-        await this.disconnect();
-        try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }); } catch { }
-        log("Logged out — session removed");
+        platform = await bridge<SessionView>("POST", "/logout", { key: "platform" });
     },
 
     /** Alias — several routes historically call sendMessage(). */
-    async sendMessage(phone: string, text: string): Promise<boolean> {
-        return this.sendText(phone, text);
+    async sendMessage(phone: string, text: string, tenantId?: number): Promise<boolean> {
+        return this.sendText(phone, text, tenantId);
     },
 
-    async sendText(phone: string, text: string): Promise<boolean> {
-        if (!sock || status !== "connected") {
-            log(`Cannot send — not ready (status="${status}"). Queuing message for ${phone}`);
-            queue(phone, text);
-            if (hasSession() && !manualStop && !sock) scheduleReconnect();
-            return false;
-        }
-        const jid = toJid(phone);
-        try {
-            const [found] = (await sock.onWhatsApp(jid)) || [];
-            if (found && found.exists === false) {
-                log(`${phone} is not on WhatsApp — not sent`);
-                return false;
+    /**
+     * Send from the store's own WhatsApp when it is linked, else from the
+     * platform number. true = sent, or queued on a linked session (it goes
+     * out as soon as the session is back).
+     */
+    async sendText(phone: string, text: string, tenantId?: number): Promise<boolean> {
+        if (!phone || !text) return false;
+        if (tenantId) {
+            const s = await storeSession(tenantId);
+            if (s.linked || s.status === "connected") {
+                const r = await sendVia(storeKey(tenantId), phone, text);
+                if (r.ok || r.queued) return true;
+                console.log(`[WhatsApp] store ${tenantId} send failed (${r.error}) — trying the platform number`);
             }
-            await sock.sendMessage(found?.jid || jid, { text });
-            log(`Message sent to ${phone}`);
-            return true;
-        } catch (err: any) {
-            log(`Failed to send to ${phone}: ${err?.message || err}`);
+        }
+        if (!platform.linked && platform.status !== "connected") await refreshPlatform();
+        if (!platform.linked && platform.status !== "connected") {
+            console.log(`[WhatsApp] platform number not linked — message to ${phone} not sent`);
             return false;
         }
+        const r = await sendVia("platform", phone, text);
+        return r.ok || !!r.queued;
     },
 
-    async sendOrderNotification(order: OrderData, storeName?: string, adminPhone?: string): Promise<boolean> {
-        if (!adminPhone) {
-            log("No admin phone configured for this store — skipping admin notification");
-            return false;
+    // ── Store sessions ──────────────────────────────────────────────────────
+    storeSession,
+    async storeConnect(tenantId: number): Promise<SessionView> {
+        const v = await bridge<SessionView>("POST", "/connect", { key: storeKey(tenantId) }, 15000);
+        storeCache.delete(tenantId);
+        return v;
+    },
+    async storeLogout(tenantId: number): Promise<SessionView> {
+        const v = await bridge<SessionView>("POST", "/logout", { key: storeKey(tenantId) });
+        storeCache.delete(tenantId);
+        return v;
+    },
+    async storeSend(tenantId: number, to: string, text: string) {
+        return sendVia(storeKey(tenantId), to, text);
+    },
+    async storeGroups(tenantId: number, refresh = false) {
+        return bridge<{ groups: { id: string; name: string; size: number }[]; refreshedAt: string | null }>(
+            "GET", `/groups?key=${storeKey(tenantId)}${refresh ? "&refresh=1" : ""}`, undefined, 30000);
+    },
+    async storeMarkRead(tenantId: number, jid: string) {
+        return bridge("POST", "/read", { key: storeKey(tenantId), jid });
+    },
+
+    // ── Order messages ──────────────────────────────────────────────────────
+    async sendOrderNotification(order: OrderData, storeName?: string, adminPhone?: string, tenantId?: number): Promise<boolean> {
+        if (tenantId) {
+            const ctx = await storeContext(tenantId);
+            const text = templateText(ctx, "order_new", orderVars(order, ctx));
+            if (!text) return false;
+            const s = await storeSession(tenantId);
+            if (s.linked || s.status === "connected") {
+                // From the store's own number: to its alert group, and to the
+                // owner's number (its own chat when none is set).
+                const alerts = ctx.meta.whatsappAlerts || {};
+                const targets = new Set<string>();
+                if (alerts.groupJid && alerts.groupEnabled !== false) targets.add(alerts.groupJid);
+                if (alerts.notifyOwner !== false) {
+                    const owner = adminPhone || s.phone;
+                    if (owner) targets.add(owner.replace(/\D/g, ""));
+                }
+                let any = false;
+                for (const to of targets) {
+                    const r = await sendVia(storeKey(tenantId), to, text);
+                    any = any || r.ok || !!r.queued;
+                }
+                return any;
+            }
+            if (!adminPhone) return false;
+            return this.sendText(adminPhone, text);
         }
-
-        const itemLines = order.items
-            .map((i, idx) => `  ${idx + 1}. ${i.name} x ${i.quantity} — ${Number(i.unitPrice).toFixed(2)}`)
-            .join("\n");
-
-        const msg = [
-            `🛒 New Order ${order.orderNumber}`,
-            storeName ? `Store: ${storeName}` : "",
-            `👤 ${order.customerName}`,
-            `📞 ${order.customerPhone}`,
-            order.customerAddress ? `📍 ${order.customerAddress}` : "",
-            ``,
-            `Items:`,
-            itemLines,
-            ``,
-            `Subtotal: ${Number(order.subtotal).toFixed(2)}`,
-            order.deliveryFee && Number(order.deliveryFee) > 0 ? `Delivery: ${Number(order.deliveryFee).toFixed(2)}` : "",
-            `Total: ${Number(order.totalAmount).toFixed(2)}`,
-            ``,
-            `Type: ${order.orderType === "delivery" ? "🚚 Delivery" : "🏪 Pickup"}`,
-            `Payment: ${order.paymentMethod}`,
-            order.notes ? `Notes: ${order.notes}` : "",
-        ]
-            .filter(Boolean)
-            .join("\n");
-
-        return this.sendText(adminPhone, msg);
+        if (!adminPhone) return false;
+        const ctx: StoreContext = { name: storeName || "Store", meta: {}, currency: "CHF", lang: "en" };
+        return this.sendText(adminPhone, renderTemplate(resolveTemplate(undefined, "order_new", "en").text, orderVars(order, ctx)));
     },
 
     async sendCustomerConfirmation(
@@ -366,18 +283,16 @@ export const whatsappService = {
         orderNumber: string,
         storeName: string,
         totalAmount: string | number,
+        tenantId?: number,
+        customerName?: string,
     ): Promise<boolean> {
-        const msg = [
-            `✅ Order Confirmed — ${orderNumber}`,
-            ``,
-            `Thank you for ordering from ${storeName}!`,
-            `Total: ${Number(totalAmount).toFixed(2)}`,
-            ``,
-            `We'll update you when your order is being prepared.`,
-            `If you have questions, reply to this message.`,
-        ].join("\n");
-
-        return this.sendText(customerPhone, msg);
+        const ctx: StoreContext = tenantId
+            ? await storeContext(tenantId)
+            : { name: storeName, meta: {}, currency: "CHF", lang: "en" };
+        const text = templateText(ctx, "order_confirmed", {
+            orderNumber, storeName: ctx.name, customerName: customerName || "", total: money(totalAmount, ctx.currency),
+        });
+        return text ? this.sendText(customerPhone, text, tenantId) : false;
     },
 
     async sendStatusUpdate(
@@ -385,18 +300,16 @@ export const whatsappService = {
         orderNumber: string,
         newStatus: string,
         storeName: string,
+        tenantId?: number,
+        customerName?: string,
     ): Promise<boolean> {
-        const statusText: Record<string, string> = {
-            accepted: "✅ Your order has been accepted!",
-            preparing: "👨‍🍳 Your order is being prepared…",
-            ready: "🎉 Your order is ready for pickup/delivery!",
-            delivered: "🚀 Your order has been delivered. Enjoy!",
-            cancelled: "❌ Unfortunately your order has been cancelled.",
-        };
-
-        const text = statusText[newStatus] || `Order status: ${newStatus}`;
-        const msg = `${storeName} — Order ${orderNumber}\n\n${text}`;
-        return this.sendText(customerPhone, msg);
+        const event = statusEvent(newStatus);
+        if (!event) return false;
+        const ctx: StoreContext = tenantId
+            ? await storeContext(tenantId)
+            : { name: storeName, meta: {}, currency: "CHF", lang: "en" };
+        const text = templateText(ctx, event, { orderNumber, storeName: ctx.name, customerName: customerName || "" });
+        return text ? this.sendText(customerPhone, text, tenantId) : false;
     },
 
     // ── Delivery Platform Notifications ───────────────────────────────────────

@@ -2958,7 +2958,7 @@ async function test(){
           orderType: orderData.orderType || "delivery",
           paymentMethod: orderData.paymentMethod || "cash",
           notes: orderData.notes,
-        }, storeName, adminPhone);
+        }, storeName, adminPhone, resolvedTenantId);
         // Confirm to customer
         if (orderData.customerPhone) {
           await whatsappService.sendCustomerConfirmation(
@@ -2966,6 +2966,8 @@ async function test(){
             orderNumber,
             storeName,
             orderData.totalAmount,
+            resolvedTenantId,
+            orderData.customerName,
           );
         }
       } catch (waErr) {
@@ -3009,6 +3011,8 @@ async function test(){
             (order as any).orderNumber,
             req.body.status,
             storeName,
+            (order as any).tenantId || undefined,
+            (order as any).customerName,
           );
         } catch (waErr) {
           console.error("[WhatsApp] Failed to send status update:", waErr);
@@ -3537,17 +3541,39 @@ async function test(){
 
   // ── Customer Auth ─────────────────────────────────────────────────────────
 
-  app.post("/api/delivery/auth/request-otp", async (req: Request, res: Response) => {
+  app.post(
+    "/api/delivery/auth/request-otp",
+    rateLimit({
+      name: "customer-otp",
+      max: 5,
+      windowMs: 15 * 60 * 1000,
+      keyFn: (req: any) => `${req.body?.tenantId}:${String(req.body?.phone || "").replace(/\D/g, "")}`,
+      message: "محاولات كثيرة، انتظر قليلاً ثم أعد المحاولة. / Too many attempts, try again shortly.",
+    }),
+    async (req: Request, res: Response) => {
     try {
       const { phone, tenantId } = req.body;
       if (!phone || !tenantId) return res.status(400).json({ error: "phone and tenantId required" });
+      if (String(phone).replace(/\D/g, "").length < 8) return res.status(400).json({ error: "رقم الهاتف غير صالح — اكتبه مع رمز الدولة" });
       const otp = await createOtp(phone, Number(tenantId));
       // In production: send via WhatsApp. For now return in dev.
       if (process.env.NODE_ENV === "development") {
         return res.json({ success: true, otp }); // expose OTP in dev only
       }
-      await whatsappService.sendMessage(phone, `Your verification code is: *${otp}*\nValid for 10 minutes.`);
-      res.json({ success: true });
+      // Sent over WhatsApp from the store's own number when the store has
+      // linked one, otherwise from the platform number.
+      const tenant = await storage.getTenant(Number(tenantId));
+      const sent = await whatsappService.sendMessage(
+        phone,
+        `🔐 رمز الدخول إلى ${tenant?.businessName || "المتجر"}: *${otp}*\n` +
+          `Your login code: *${otp}*\n\n` +
+          `صالح لمدة 10 دقائق. لا تشاركه مع أحد.`,
+        Number(tenantId),
+      );
+      if (!sent) {
+        return res.status(503).json({ error: "تعذّر إرسال الرمز عبر واتساب. تأكد أن الرقم مسجّل على واتساب ومكتوب مع رمز الدولة، أو سجّل الدخول بـ Google." });
+      }
+      res.json({ success: true, channel: "whatsapp" });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
@@ -4068,7 +4094,8 @@ async function test(){
             config.socialWhatsapp,
             isDineIn
               ? `🍽 New dine-in order #${orderNumber}\nTable: ${tableNumber || "N/A"}\nCustomer: ${customerName || customerPhone}\nTotal: ${totalAmount}`
-              : `🛎 New delivery order #${orderNumber}\nCustomer: ${customerName || customerPhone}\nTotal: ${totalAmount}\nAddress: ${customerAddress || "Pickup"}`
+              : `🛎 New delivery order #${orderNumber}\nCustomer: ${customerName || customerPhone}\nTotal: ${totalAmount}\nAddress: ${customerAddress || "Pickup"}`,
+            Number(tenantId) || undefined,
           );
         }
       } catch (_) {}
@@ -4206,7 +4233,7 @@ async function test(){
       if (order?.customerPhone && (order as any).trackingToken) {
         try {
           await whatsappService.sendMessage(order.customerPhone,
-            `🛵 Your order is on the way!\nTrack live: ${process.env.APP_URL || ""}/track/${(order as any).trackingToken}`);
+            `🛵 Your order is on the way!\nTrack live: ${process.env.APP_URL || ""}/track/${(order as any).trackingToken}`, (order as any).tenantId || undefined);
         } catch (_) {}
       }
       callerIdService.broadcast({ type: "delivery_status_change", orderId, status: "on_way", driverName: driver.driverName }, driver.tenantId!);
@@ -4235,7 +4262,7 @@ async function test(){
           setTimeout(async () => {
             try {
               await whatsappService.sendMessage(order.customerPhone,
-                `⭐ How was your order?\nLeave a quick review: ${process.env.APP_URL || ""}/track/${(order as any).trackingToken}#rate`);
+                `⭐ How was your order?\nLeave a quick review: ${process.env.APP_URL || ""}/track/${(order as any).trackingToken}#rate`, (order as any).tenantId || undefined);
             } catch (_) {}
           }, 10 * 60 * 1000); // 10 minutes later
         }
@@ -4362,7 +4389,7 @@ async function test(){
       if (driver?.driverPhone && driver.driverAccessToken && order) {
         try {
           await whatsappService.sendMessage(driver.driverPhone,
-            `🛵 New delivery assignment!\nOrder #${order.orderNumber}\nCustomer: ${order.customerName}\nAddress: ${order.customerAddress || "Pickup"}\nOpen app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`);
+            `🛵 New delivery assignment!\nOrder #${order.orderNumber}\nCustomer: ${order.customerName}\nAddress: ${order.customerAddress || "Pickup"}\nOpen app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`, (order as any).tenantId || undefined);
         } catch (_) {}
       }
       res.json({ success: true });
@@ -4386,7 +4413,12 @@ async function test(){
           cancelled: "❌ Your order has been cancelled. Contact us if you need help.",
         };
         if (messages[status]) {
-          try { await whatsappService.sendMessage(order.customerPhone, messages[status]); } catch (_) {}
+          try {
+            const tid = (order as any).tenantId || undefined;
+            // Stores use their own templates (and their own number, if linked).
+            if (tid) await whatsappService.sendStatusUpdate(order.customerPhone, order.orderNumber, status, "", tid, order.customerName);
+            else await whatsappService.sendMessage(order.customerPhone, messages[status]);
+          } catch (_) {}
         }
       }
       if (order?.tenantId) {

@@ -2110,8 +2110,8 @@ var init_storage = __esm({
       },
       async createActivityLog(data) {
         const _ins_log = await db.insert(activityLog).values(data).$returningId();
-        const [log3] = await db.select().from(activityLog).where((0, import_drizzle_orm.eq)(activityLog.id, _ins_log[0]?.id ?? 0));
-        return log3;
+        const [log2] = await db.select().from(activityLog).where((0, import_drizzle_orm.eq)(activityLog.id, _ins_log[0]?.id ?? 0));
+        return log2;
       },
       // Calls
       async getCalls(tenantId, limit = 500) {
@@ -3062,10 +3062,10 @@ var init_storage = __esm({
         }
       },
       // ── Online Orders ──────────────────────────────────────────────────────────
-      async getOnlineOrders(tenantId, status2) {
+      async getOnlineOrders(tenantId, status) {
         const conditions = [];
         if (tenantId) conditions.push((0, import_drizzle_orm.eq)(onlineOrders.tenantId, tenantId));
-        if (status2) conditions.push((0, import_drizzle_orm.eq)(onlineOrders.status, status2));
+        if (status) conditions.push((0, import_drizzle_orm.eq)(onlineOrders.status, status));
         if (conditions.length > 0) {
           const orders2 = await db.select().from(onlineOrders).where((0, import_drizzle_orm.and)(...conditions)).orderBy((0, import_drizzle_orm.desc)(onlineOrders.createdAt));
           return orders2.map((order) => normalizeOnlineOrderRecord(order));
@@ -3856,11 +3856,11 @@ var init_callerIdService = __esm({
       /**
        * Broadcast delivery order status change to tenant POS clients
        */
-      broadcastDeliveryStatus(tenantId, orderId, status2, driverName) {
+      broadcastDeliveryStatus(tenantId, orderId, status, driverName) {
         this.broadcast({
           type: "delivery_status_change",
           orderId,
-          status: status2,
+          status,
           driverName: driverName ?? null,
           timestamp: (/* @__PURE__ */ new Date()).toISOString()
         }, tenantId);
@@ -4085,6 +4085,139 @@ var init_emailService = __esm({
       auth: { user: SMTP_USER, pass: SMTP_PASS },
       tls: { rejectUnauthorized: false }
     });
+  }
+});
+
+// server/waClient.ts
+var waClient_exports = {};
+__export(waClient_exports, {
+  bridge: () => bridge,
+  bridgeCall: () => bridgeCall,
+  ensureBridge: () => ensureBridge,
+  startBridgeWatchdog: () => startBridgeWatchdog
+});
+function bridgeScript() {
+  const candidates = [
+    import_path.default.resolve(process.cwd(), "server_dist", "wa-bridge.js"),
+    import_path.default.resolve(__dirname, "wa-bridge.js")
+  ];
+  return candidates.find((p) => import_fs.default.existsSync(p)) || null;
+}
+function bridgeCall(method, route, body, timeoutMs = 2e4) {
+  return new Promise((resolve3, reject) => {
+    const payload = body ? JSON.stringify(body) : void 0;
+    const req = import_http.default.request(
+      {
+        socketPath: SOCK_PATH,
+        path: route,
+        method,
+        headers: payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {},
+        timeout: timeoutMs
+      },
+      (res) => {
+        let d = "";
+        res.setEncoding("utf8");
+        res.on("data", (c) => d += c);
+        res.on("end", () => {
+          let j = {};
+          try {
+            j = d ? JSON.parse(d) : {};
+          } catch {
+            j = { error: d };
+          }
+          if ((res.statusCode || 500) >= 400 && res.statusCode !== 409) return reject(new Error(j.error || `bridge ${res.statusCode}`));
+          resolve3(j);
+        });
+      }
+    );
+    req.on("timeout", () => req.destroy(new Error("bridge timeout")));
+    req.on("error", reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+async function ensureBridge() {
+  if (process.env.WHATSAPP_DISABLED === "1") return false;
+  if (Date.now() - healthyAt < 1e4) return true;
+  try {
+    await bridgeCall("GET", "/health", void 0, 3e3);
+    healthyAt = Date.now();
+    return true;
+  } catch {
+  }
+  const script = bridgeScript();
+  if (!script) return false;
+  import_fs.default.mkdirSync(ROOT, { recursive: true });
+  try {
+    const st = import_fs.default.statSync(SPAWN_MARK);
+    if (Date.now() - st.mtimeMs < 2e4) return false;
+  } catch {
+  }
+  try {
+    import_fs.default.writeFileSync(SPAWN_MARK, String(process.pid));
+  } catch {
+  }
+  try {
+    try {
+      if (import_fs.default.statSync(LOG_FILE).size > 2e6) import_fs.default.renameSync(LOG_FILE, LOG_FILE + ".1");
+    } catch {
+    }
+    const out = import_fs.default.openSync(LOG_FILE, "a");
+    const child = (0, import_child_process.spawn)(process.execPath, [script], {
+      cwd: process.cwd(),
+      detached: true,
+      stdio: ["ignore", out, out],
+      env: { ...process.env, UV_THREADPOOL_SIZE: "2", NODE_OPTIONS: "--v8-pool-size=2" }
+    });
+    child.unref();
+    import_fs.default.closeSync(out);
+    console.log(`[WhatsApp] started bridge (pid ${child.pid})`);
+  } catch (e) {
+    console.error("[WhatsApp] could not start bridge:", e?.message || e);
+  }
+  return false;
+}
+async function bridge(method, route, body, timeoutMs) {
+  try {
+    return await bridgeCall(method, route, body, timeoutMs);
+  } catch (e) {
+    if (!/ENOENT|ECONNREFUSED|timeout/i.test(String(e?.message))) throw e;
+    healthyAt = 0;
+    await ensureBridge();
+    for (let i = 0; i < 16; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      try {
+        return await bridgeCall(method, route, body, timeoutMs);
+      } catch {
+      }
+    }
+    throw new Error("\u062E\u062F\u0645\u0629 \u0648\u0627\u062A\u0633\u0627\u0628 \u0644\u0627 \u062A\u0633\u062A\u062C\u064A\u0628 \u062D\u0627\u0644\u064A\u0627\u064B\u060C \u062D\u0627\u0648\u0644 \u0628\u0639\u062F \u0642\u0644\u064A\u0644");
+  }
+}
+function startBridgeWatchdog() {
+  if (watchdog || process.env.WHATSAPP_DISABLED === "1") return;
+  ensureBridge().catch(() => {
+  });
+  watchdog = setInterval(() => {
+    ensureBridge().catch(() => {
+    });
+  }, 3e4);
+  watchdog.unref?.();
+}
+var import_http, import_fs, import_path, import_child_process, ROOT, SOCK_PATH, SPAWN_MARK, LOG_FILE, healthyAt, watchdog;
+var init_waClient = __esm({
+  "server/waClient.ts"() {
+    "use strict";
+    import_http = __toESM(require("http"));
+    import_fs = __toESM(require("fs"));
+    import_path = __toESM(require("path"));
+    import_child_process = require("child_process");
+    ROOT = import_path.default.resolve(process.cwd(), ".whatsapp");
+    SOCK_PATH = import_path.default.join(ROOT, "bridge.sock");
+    SPAWN_MARK = import_path.default.join(ROOT, "spawn.mark");
+    LOG_FILE = import_path.default.join(ROOT, "bridge.log");
+    healthyAt = 0;
+    watchdog = null;
   }
 });
 
@@ -7019,354 +7152,360 @@ async function repriceOrder(opts) {
 init_emailService();
 
 // server/whatsappService.ts
-var import_path = __toESM(require("path"));
-var import_fs = __toESM(require("fs"));
-var import_url = require("url");
-var import_qrcode = __toESM(require("qrcode"));
-var STORAGE_DIR = import_path.default.resolve(process.cwd(), ".whatsapp");
-var AUTH_DIR = import_path.default.join(STORAGE_DIR, "auth");
-var BAILEYS_DIR = process.env.BAILEYS_DIR || import_path.default.resolve(process.cwd(), "wa-baileys");
-var baileys = null;
-var sock = null;
-var status = "disconnected";
-var lastQrCode = null;
-var lastError = null;
-var connectionLog = [];
-var connectionPhase = "idle";
-var reconnectTimer = null;
-var reconnectAttempts = 0;
-var manualStop = false;
-var pendingMessages = [];
-function log(event) {
-  const entry = { time: (/* @__PURE__ */ new Date()).toISOString(), event };
-  connectionLog.unshift(entry);
-  if (connectionLog.length > 100) connectionLog.length = 100;
-  console.log(`[WhatsApp] ${event}`);
-}
-var quietLogger = {
-  level: "silent",
-  child() {
-    return quietLogger;
+init_waClient();
+
+// server/waTemplates.ts
+var TEMPLATE_EVENTS = [
+  "order_new",
+  "order_confirmed",
+  "status_accepted",
+  "status_preparing",
+  "status_ready",
+  "status_on_way",
+  "status_delivered",
+  "status_cancelled"
+];
+var TEMPLATE_VARIABLES = {
+  order_new: ["orderNumber", "storeName", "customerName", "customerPhone", "address", "items", "subtotal", "deliveryFee", "total", "orderType", "paymentMethod", "notes"],
+  order_confirmed: ["orderNumber", "storeName", "customerName", "total"],
+  status_accepted: ["orderNumber", "storeName", "customerName"],
+  status_preparing: ["orderNumber", "storeName", "customerName"],
+  status_ready: ["orderNumber", "storeName", "customerName"],
+  status_on_way: ["orderNumber", "storeName", "customerName"],
+  status_delivered: ["orderNumber", "storeName", "customerName"],
+  status_cancelled: ["orderNumber", "storeName", "customerName"]
+};
+var DEFAULTS = {
+  ar: {
+    order_new: [
+      "\u{1F6D2} \u0637\u0644\u0628 \u062C\u062F\u064A\u062F {{orderNumber}}",
+      "\u{1F464} {{customerName}}",
+      "\u{1F4DE} {{customerPhone}}",
+      "\u{1F4CD} {{address}}",
+      "",
+      "\u0627\u0644\u0623\u0635\u0646\u0627\u0641:",
+      "{{items}}",
+      "",
+      "\u0627\u0644\u0645\u062C\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064A: {{subtotal}}",
+      "\u0627\u0644\u062A\u0648\u0635\u064A\u0644: {{deliveryFee}}",
+      "\u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A: {{total}}",
+      "",
+      "\u0627\u0644\u0646\u0648\u0639: {{orderType}}",
+      "\u0627\u0644\u062F\u0641\u0639: {{paymentMethod}}",
+      "\u0645\u0644\u0627\u062D\u0638\u0627\u062A: {{notes}}"
+    ].join("\n"),
+    order_confirmed: [
+      "\u2705 \u062A\u0645 \u062A\u0623\u0643\u064A\u062F \u0637\u0644\u0628\u0643 {{orderNumber}}",
+      "",
+      "\u0634\u0643\u0631\u0627\u064B \u0644\u0637\u0644\u0628\u0643 \u0645\u0646 {{storeName}}!",
+      "\u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A: {{total}}",
+      "",
+      "\u0633\u0646\u0631\u0633\u0644 \u0644\u0643 \u062A\u062D\u062F\u064A\u062B\u0627\u064B \u0639\u0646\u062F \u062A\u062C\u0647\u064A\u0632 \u0637\u0644\u0628\u0643. \u0644\u0623\u064A \u0627\u0633\u062A\u0641\u0633\u0627\u0631 \u0631\u062F\u0651 \u0639\u0644\u0649 \u0647\u0630\u0647 \u0627\u0644\u0631\u0633\u0627\u0644\u0629."
+    ].join("\n"),
+    status_accepted: "{{storeName}} \u2014 \u0627\u0644\u0637\u0644\u0628 {{orderNumber}}\n\n\u2705 \u062A\u0645 \u0642\u0628\u0648\u0644 \u0637\u0644\u0628\u0643!",
+    status_preparing: "{{storeName}} \u2014 \u0627\u0644\u0637\u0644\u0628 {{orderNumber}}\n\n\u{1F468}\u200D\u{1F373} \u0637\u0644\u0628\u0643 \u0642\u064A\u062F \u0627\u0644\u062A\u062D\u0636\u064A\u0631\u2026",
+    status_ready: "{{storeName}} \u2014 \u0627\u0644\u0637\u0644\u0628 {{orderNumber}}\n\n\u{1F389} \u0637\u0644\u0628\u0643 \u062C\u0627\u0647\u0632!",
+    status_on_way: "{{storeName}} \u2014 \u0627\u0644\u0637\u0644\u0628 {{orderNumber}}\n\n\u{1F6F5} \u0637\u0644\u0628\u0643 \u0641\u064A \u0627\u0644\u0637\u0631\u064A\u0642 \u0625\u0644\u064A\u0643.",
+    status_delivered: "{{storeName}} \u2014 \u0627\u0644\u0637\u0644\u0628 {{orderNumber}}\n\n\u{1F680} \u062A\u0645 \u062A\u0648\u0635\u064A\u0644 \u0637\u0644\u0628\u0643. \u0628\u0627\u0644\u0647\u0646\u0627\u0621 \u0648\u0627\u0644\u0634\u0641\u0627\u0621!",
+    status_cancelled: "{{storeName}} \u2014 \u0627\u0644\u0637\u0644\u0628 {{orderNumber}}\n\n\u274C \u0646\u0623\u0633\u0641\u060C \u062A\u0645 \u0625\u0644\u063A\u0627\u0621 \u0637\u0644\u0628\u0643. \u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627 \u0644\u0623\u064A \u0645\u0633\u0627\u0639\u062F\u0629."
   },
-  trace() {
-  },
-  debug() {
-  },
-  info() {
-  },
-  warn() {
-  },
-  error() {
-  },
-  fatal(obj, msg) {
-    console.error("[WhatsApp] fatal", msg || "", obj?.err?.message || "");
+  en: {
+    order_new: [
+      "\u{1F6D2} New Order {{orderNumber}}",
+      "\u{1F464} {{customerName}}",
+      "\u{1F4DE} {{customerPhone}}",
+      "\u{1F4CD} {{address}}",
+      "",
+      "Items:",
+      "{{items}}",
+      "",
+      "Subtotal: {{subtotal}}",
+      "Delivery: {{deliveryFee}}",
+      "Total: {{total}}",
+      "",
+      "Type: {{orderType}}",
+      "Payment: {{paymentMethod}}",
+      "Notes: {{notes}}"
+    ].join("\n"),
+    order_confirmed: [
+      "\u2705 Order Confirmed \u2014 {{orderNumber}}",
+      "",
+      "Thank you for ordering from {{storeName}}!",
+      "Total: {{total}}",
+      "",
+      "We'll update you when your order is being prepared. If you have questions, reply to this message."
+    ].join("\n"),
+    status_accepted: "{{storeName}} \u2014 Order {{orderNumber}}\n\n\u2705 Your order has been accepted!",
+    status_preparing: "{{storeName}} \u2014 Order {{orderNumber}}\n\n\u{1F468}\u200D\u{1F373} Your order is being prepared\u2026",
+    status_ready: "{{storeName}} \u2014 Order {{orderNumber}}\n\n\u{1F389} Your order is ready!",
+    status_on_way: "{{storeName}} \u2014 Order {{orderNumber}}\n\n\u{1F6F5} Your order is on the way.",
+    status_delivered: "{{storeName}} \u2014 Order {{orderNumber}}\n\n\u{1F680} Your order has been delivered. Enjoy!",
+    status_cancelled: "{{storeName}} \u2014 Order {{orderNumber}}\n\n\u274C Unfortunately your order has been cancelled."
   }
 };
-async function loadBaileys() {
-  if (baileys) return baileys;
-  const entry = import_path.default.join(BAILEYS_DIR, "node_modules", "@whiskeysockets", "baileys", "lib", "index.js");
+function defaultTemplate(event, lang) {
+  return DEFAULTS[lang]?.[event] ?? DEFAULTS.en[event];
+}
+function resolveTemplate(settings, event, fallbackLang) {
+  const lang = settings?.lang || fallbackLang;
+  const o = settings?.overrides?.[event] || {};
+  return {
+    enabled: o.enabled !== false,
+    text: o.text && o.text.trim() || defaultTemplate(event, lang),
+    isDefault: !(o.text && o.text.trim())
+  };
+}
+function renderTemplate(text2, vars) {
+  return text2.split("\n").map((line) => {
+    const names = [...line.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]);
+    if (names.length && names.every((n) => vars[n] == null || String(vars[n]).trim() === "")) return null;
+    return line.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, n) => vars[n] == null ? "" : String(vars[n]));
+  }).filter((l) => l !== null).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function statusEvent(status) {
+  const map = {
+    accepted: "status_accepted",
+    confirmed: "status_accepted",
+    preparing: "status_preparing",
+    ready: "status_ready",
+    on_way: "status_on_way",
+    out_for_delivery: "status_on_way",
+    delivered: "status_delivered",
+    completed: "status_delivered",
+    cancelled: "status_cancelled"
+  };
+  return map[status] || null;
+}
+
+// server/whatsappService.ts
+var EMPTY = {
+  key: "platform",
+  status: "disconnected",
+  qrCode: null,
+  phone: null,
+  name: null,
+  lastError: null,
+  connectedAt: null,
+  linked: false,
+  pending: 0,
+  log: []
+};
+var storeKey = (tenantId) => `t${tenantId}`;
+var platform = { ...EMPTY };
+var refreshTimer = null;
+async function refreshPlatform() {
   try {
-    baileys = import_fs.default.existsSync(entry) ? await import((0, import_url.pathToFileURL)(entry).href) : await import("@whiskeysockets/baileys");
-    return baileys;
-  } catch (err) {
-    lastError = `Baileys not installed: ${err?.message || err}`;
-    log(lastError);
-    return null;
+    platform = await bridge("GET", "/status?key=platform", void 0, 5e3);
+  } catch (e) {
+    platform = { ...platform, status: "disconnected", lastError: e?.message || String(e) };
   }
+  return platform;
 }
-function toJid(phone) {
-  let digits2 = phone.replace(/\D/g, "");
-  if (digits2.startsWith("410") && digits2.length === 12) {
-    digits2 = "41" + digits2.slice(3);
-  } else if (digits2.startsWith("0") && digits2.length === 10) {
-    digits2 = "41" + digits2.slice(1);
-  } else if (digits2.length === 9 && !digits2.startsWith("0")) {
-    digits2 = "41" + digits2;
-  }
-  return `${digits2}@s.whatsapp.net`;
-}
-function hasSession() {
-  return import_fs.default.existsSync(import_path.default.join(AUTH_DIR, "creds.json"));
-}
-function queue(phone, text2) {
-  pendingMessages.push({ phone, text: text2, timestamp: Date.now() });
-  if (pendingMessages.length > 50) pendingMessages.shift();
-}
-async function flushPending() {
-  if (!pendingMessages.length) return;
-  const toSend = pendingMessages;
-  pendingMessages = [];
-  log(`Flushing ${toSend.length} queued message(s)`);
-  for (const m of toSend) {
-    if (Date.now() - m.timestamp < 10 * 60 * 1e3) {
-      await whatsappService.sendText(m.phone, m.text);
-    } else {
-      log(`Dropped stale queued message for ${m.phone} (>10min old)`);
-    }
-  }
-}
-function scheduleReconnect(delayMs) {
-  if (manualStop || reconnectTimer) return;
-  reconnectAttempts++;
-  const delay = delayMs ?? Math.min(6e4, 5e3 * reconnectAttempts);
-  log(`Reconnecting in ${Math.round(delay / 1e3)}s\u2026`);
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
-    startSocket().catch((e) => log(`Reconnect failed: ${e?.message || e}`));
-  }, delay);
-}
-function closeSocket() {
-  const s = sock;
-  sock = null;
-  if (!s) return;
+var storeCache = /* @__PURE__ */ new Map();
+async function storeSession(tenantId, fresh = false) {
+  const hit = storeCache.get(tenantId);
+  if (!fresh && hit && Date.now() - hit.at < 5e3) return hit.view;
   try {
-    s.ev.removeAllListeners();
+    const view = await bridge("GET", `/status?key=${storeKey(tenantId)}`, void 0, 5e3);
+    storeCache.set(tenantId, { at: Date.now(), view });
+    return view;
+  } catch {
+    return { ...EMPTY, key: storeKey(tenantId) };
+  }
+}
+async function sendVia(key, to, text2) {
+  try {
+    return await bridge("POST", "/send", { key, to, text: text2, wait: true }, 6e4);
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+async function storeContext(tenantId) {
+  const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+  const tenant = await storage2.getTenant(tenantId);
+  let currency = "CHF";
+  try {
+    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const [rows] = await pool2.query(
+      "SELECT currency FROM branches WHERE tenant_id = ? ORDER BY is_main DESC, id LIMIT 1",
+      [tenantId]
+    );
+    if (rows?.[0]?.currency) currency = String(rows[0].currency);
   } catch {
   }
-  try {
-    s.end(void 0);
-  } catch {
-  }
+  const meta2 = tenant?.metadata || {};
+  const lang = meta2.whatsappTemplates?.lang || (currency === "SYP" ? "ar" : "en");
+  return { name: tenant?.businessName || "Store", meta: meta2, currency, lang };
 }
-async function startSocket() {
-  const B = await loadBaileys();
-  if (!B) {
-    status = "disconnected";
-    connectionPhase = "idle";
-    return;
+var ZERO_DECIMAL = /* @__PURE__ */ new Set(["SYP", "IQD", "LBP", "JPY", "KRW"]);
+function money2(v, currency) {
+  const n = Number(v) || 0;
+  if (ZERO_DECIMAL.has(currency)) {
+    const s = Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return currency === "SYP" ? `${s} \u0644.\u0633` : `${s} ${currency}`;
   }
-  const makeWASocket = B.default?.default || B.default || B.makeWASocket;
-  const { useMultiFileAuthState, fetchLatestBaileysVersion, Browsers, DisconnectReason } = B;
-  closeSocket();
-  import_fs.default.mkdirSync(AUTH_DIR, { recursive: true });
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-  let version;
-  try {
-    version = (await fetchLatestBaileysVersion()).version;
-  } catch {
-  }
-  status = "connecting";
-  connectionPhase = hasSession() && state.creds?.registered ? "starting" : "awaiting_qr";
-  const s = makeWASocket({
-    auth: state,
-    logger: quietLogger,
-    version,
-    browser: Browsers.ubuntu("Kassenta"),
-    markOnlineOnConnect: false,
-    syncFullHistory: false
-  });
-  sock = s;
-  s.ev.on("creds.update", saveCreds);
-  s.ev.on("connection.update", async (u) => {
-    if (sock !== s) return;
-    if (u.qr) {
-      try {
-        lastQrCode = await import_qrcode.default.toDataURL(u.qr, { margin: 1, width: 320 });
-        status = "qr_ready";
-        connectionPhase = "awaiting_qr";
-        log("QR code generated \u2014 scan with WhatsApp");
-      } catch (e) {
-        log(`QR render failed: ${e?.message || e}`);
-      }
-    }
-    if (u.connection === "open") {
-      status = "connected";
-      connectionPhase = "ready";
-      lastQrCode = null;
-      lastError = null;
-      reconnectAttempts = 0;
-      log(`\u2705 WhatsApp connected as ${String(s.user?.id || "").split(":")[0]}`);
-      flushPending().catch(() => {
-      });
-    }
-    if (u.connection === "close") {
-      const code = u.lastDisconnect?.error?.output?.statusCode;
-      const reason = u.lastDisconnect?.error?.message || "closed";
-      status = "disconnected";
-      connectionPhase = "idle";
-      lastQrCode = null;
-      sock = null;
-      if (code === DisconnectReason.loggedOut) {
-        lastError = "WhatsApp was logged out from the phone \u2014 connect again and scan the QR code";
-        log(lastError);
-        try {
-          import_fs.default.rmSync(AUTH_DIR, { recursive: true, force: true });
-        } catch {
-        }
-        return;
-      }
-      if (code === DisconnectReason.restartRequired) {
-        connectionPhase = "qr_scanned";
-        log("QR scanned \u2014 restarting the session");
-        scheduleReconnect(500);
-        return;
-      }
-      if (code === DisconnectReason.timedOut && !state.creds?.registered) {
-        lastError = "QR code expired \u2014 press connect to get a new one";
-        log(lastError);
-        return;
-      }
-      lastError = `${reason}${code ? ` (${code})` : ""}`;
-      log(`Connection closed: ${lastError}`);
-      scheduleReconnect();
-    }
-  });
-  s.ev.on("messages.upsert", ({ messages, type }) => {
-    if (type !== "notify") return;
-    for (const m of messages || []) {
-      if (m.key?.fromMe) continue;
-      const body = m.message?.conversation || m.message?.extendedTextMessage?.text || "";
-      log(`Msg from ${m.key?.remoteJid}: ${body.slice(0, 80)}`);
-    }
-  });
+  return `${n.toFixed(2)} ${currency}`;
+}
+function orderVars(order, ctx) {
+  const ar = ctx.lang === "ar";
+  const payment = ar ? { cash: "\u0646\u0642\u062F\u0627\u064B", card: "\u0628\u0637\u0627\u0642\u0629", shamcash: "\u0634\u0627\u0645 \u0643\u0627\u0634", online: "\u062F\u0641\u0639 \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A", credit: "\u0622\u062C\u0644" } : { cash: "Cash", card: "Card", shamcash: "Sham Cash", online: "Online", credit: "On account" };
+  return {
+    orderNumber: order.orderNumber,
+    storeName: ctx.name,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    address: order.customerAddress || "",
+    items: (order.items || []).map((i, idx) => `  ${idx + 1}. ${i.name} \xD7 ${i.quantity} \u2014 ${money2(i.unitPrice, ctx.currency)}`).join("\n"),
+    subtotal: money2(order.subtotal, ctx.currency),
+    deliveryFee: order.deliveryFee && Number(order.deliveryFee) > 0 ? money2(order.deliveryFee, ctx.currency) : "",
+    total: money2(order.totalAmount, ctx.currency),
+    orderType: order.orderType === "delivery" ? ar ? "\u{1F69A} \u062A\u0648\u0635\u064A\u0644" : "\u{1F69A} Delivery" : ar ? "\u{1F3EA} \u0627\u0633\u062A\u0644\u0627\u0645" : "\u{1F3EA} Pickup",
+    paymentMethod: payment[order.paymentMethod] || order.paymentMethod,
+    notes: order.notes || ""
+  };
+}
+function templateText(ctx, event, vars) {
+  const t2 = resolveTemplate(ctx.meta.whatsappTemplates, event, ctx.lang);
+  return t2.enabled ? renderTemplate(t2.text, vars) : null;
 }
 var whatsappService = {
+  // ── Platform session ────────────────────────────────────────────────────
   getStatus() {
-    return { status, lastError, log: connectionLog.slice(0, 20), phase: connectionPhase };
+    const phase = platform.status === "connected" ? "ready" : platform.status === "qr_ready" ? "awaiting_qr" : platform.status === "connecting" ? "starting" : "idle";
+    return { status: platform.status, lastError: platform.lastError, log: platform.log || [], phase };
   },
   getQrCode() {
-    return lastQrCode;
+    return platform.qrCode;
   },
-  /** Whether a linked session is saved (survives restarts). */
-  hasSession,
+  hasSession() {
+    return !!platform.linked;
+  },
   sessionModified() {
-    try {
-      return import_fs.default.statSync(import_path.default.join(AUTH_DIR, "creds.json")).mtime.toISOString();
-    } catch {
-      return null;
-    }
+    return platform.connectedAt;
   },
-  /** On boot: resume a linked session; never start a QR flow on its own. */
+  /** On boot: make sure the bridge runs (it resumes every linked session). */
   async autoConnect() {
-    if (process.env.WHATSAPP_DISABLED === "1" || !hasSession()) return;
-    await this.connect();
+    if (process.env.WHATSAPP_DISABLED === "1") return;
+    startBridgeWatchdog();
+    await ensureBridge();
+    if (!refreshTimer) {
+      refreshTimer = setInterval(() => {
+        refreshPlatform().catch(() => {
+        });
+      }, 5e3);
+      refreshTimer.unref?.();
+    }
+    await refreshPlatform();
   },
   async connect() {
-    if (process.env.WHATSAPP_DISABLED === "1") {
-      lastError = "WhatsApp is disabled on this server (WHATSAPP_DISABLED=1)";
-      return { status: "disconnected" };
-    }
-    if (sock && (status === "connected" || status === "qr_ready" || status === "connecting")) {
-      return { status, qrCode: lastQrCode || void 0 };
-    }
-    manualStop = false;
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-    lastError = null;
-    lastQrCode = null;
-    log("Connecting\u2026");
-    await startSocket();
-    for (let i = 0; i < 16 && status === "connecting"; i++) {
-      await new Promise((r) => setTimeout(r, 250));
-    }
-    return { status, qrCode: lastQrCode || void 0 };
+    if (process.env.WHATSAPP_DISABLED === "1") return { status: "disconnected" };
+    platform = await bridge("POST", "/connect", { key: "platform" }, 15e3);
+    return { status: platform.status, qrCode: platform.qrCode || void 0 };
   },
   async disconnect() {
-    manualStop = true;
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-    closeSocket();
-    status = "disconnected";
-    lastQrCode = null;
-    connectionPhase = "idle";
-    pendingMessages = [];
-    log("Disconnected (manual)");
+    platform = await bridge("POST", "/disconnect", { key: "platform" });
   },
-  /** Unlink the device and forget the saved session. */
   async logout() {
-    manualStop = true;
-    try {
-      await sock?.logout();
-    } catch {
-    }
-    await this.disconnect();
-    try {
-      import_fs.default.rmSync(AUTH_DIR, { recursive: true, force: true });
-    } catch {
-    }
-    log("Logged out \u2014 session removed");
+    platform = await bridge("POST", "/logout", { key: "platform" });
   },
   /** Alias — several routes historically call sendMessage(). */
-  async sendMessage(phone, text2) {
-    return this.sendText(phone, text2);
+  async sendMessage(phone, text2, tenantId) {
+    return this.sendText(phone, text2, tenantId);
   },
-  async sendText(phone, text2) {
-    if (!sock || status !== "connected") {
-      log(`Cannot send \u2014 not ready (status="${status}"). Queuing message for ${phone}`);
-      queue(phone, text2);
-      if (hasSession() && !manualStop && !sock) scheduleReconnect();
-      return false;
-    }
-    const jid = toJid(phone);
-    try {
-      const [found] = await sock.onWhatsApp(jid) || [];
-      if (found && found.exists === false) {
-        log(`${phone} is not on WhatsApp \u2014 not sent`);
-        return false;
+  /**
+   * Send from the store's own WhatsApp when it is linked, else from the
+   * platform number. true = sent, or queued on a linked session (it goes
+   * out as soon as the session is back).
+   */
+  async sendText(phone, text2, tenantId) {
+    if (!phone || !text2) return false;
+    if (tenantId) {
+      const s = await storeSession(tenantId);
+      if (s.linked || s.status === "connected") {
+        const r2 = await sendVia(storeKey(tenantId), phone, text2);
+        if (r2.ok || r2.queued) return true;
+        console.log(`[WhatsApp] store ${tenantId} send failed (${r2.error}) \u2014 trying the platform number`);
       }
-      await sock.sendMessage(found?.jid || jid, { text: text2 });
-      log(`Message sent to ${phone}`);
-      return true;
-    } catch (err) {
-      log(`Failed to send to ${phone}: ${err?.message || err}`);
+    }
+    if (!platform.linked && platform.status !== "connected") await refreshPlatform();
+    if (!platform.linked && platform.status !== "connected") {
+      console.log(`[WhatsApp] platform number not linked \u2014 message to ${phone} not sent`);
       return false;
     }
+    const r = await sendVia("platform", phone, text2);
+    return r.ok || !!r.queued;
   },
-  async sendOrderNotification(order, storeName, adminPhone) {
-    if (!adminPhone) {
-      log("No admin phone configured for this store \u2014 skipping admin notification");
-      return false;
+  // ── Store sessions ──────────────────────────────────────────────────────
+  storeSession,
+  async storeConnect(tenantId) {
+    const v = await bridge("POST", "/connect", { key: storeKey(tenantId) }, 15e3);
+    storeCache.delete(tenantId);
+    return v;
+  },
+  async storeLogout(tenantId) {
+    const v = await bridge("POST", "/logout", { key: storeKey(tenantId) });
+    storeCache.delete(tenantId);
+    return v;
+  },
+  async storeSend(tenantId, to, text2) {
+    return sendVia(storeKey(tenantId), to, text2);
+  },
+  async storeGroups(tenantId, refresh = false) {
+    return bridge(
+      "GET",
+      `/groups?key=${storeKey(tenantId)}${refresh ? "&refresh=1" : ""}`,
+      void 0,
+      3e4
+    );
+  },
+  async storeMarkRead(tenantId, jid) {
+    return bridge("POST", "/read", { key: storeKey(tenantId), jid });
+  },
+  // ── Order messages ──────────────────────────────────────────────────────
+  async sendOrderNotification(order, storeName, adminPhone, tenantId) {
+    if (tenantId) {
+      const ctx2 = await storeContext(tenantId);
+      const text2 = templateText(ctx2, "order_new", orderVars(order, ctx2));
+      if (!text2) return false;
+      const s = await storeSession(tenantId);
+      if (s.linked || s.status === "connected") {
+        const alerts = ctx2.meta.whatsappAlerts || {};
+        const targets = /* @__PURE__ */ new Set();
+        if (alerts.groupJid && alerts.groupEnabled !== false) targets.add(alerts.groupJid);
+        if (alerts.notifyOwner !== false) {
+          const owner = adminPhone || s.phone;
+          if (owner) targets.add(owner.replace(/\D/g, ""));
+        }
+        let any = false;
+        for (const to of targets) {
+          const r = await sendVia(storeKey(tenantId), to, text2);
+          any = any || r.ok || !!r.queued;
+        }
+        return any;
+      }
+      if (!adminPhone) return false;
+      return this.sendText(adminPhone, text2);
     }
-    const itemLines = order.items.map((i, idx) => `  ${idx + 1}. ${i.name} x ${i.quantity} \u2014 ${Number(i.unitPrice).toFixed(2)}`).join("\n");
-    const msg = [
-      `\u{1F6D2} New Order ${order.orderNumber}`,
-      storeName ? `Store: ${storeName}` : "",
-      `\u{1F464} ${order.customerName}`,
-      `\u{1F4DE} ${order.customerPhone}`,
-      order.customerAddress ? `\u{1F4CD} ${order.customerAddress}` : "",
-      ``,
-      `Items:`,
-      itemLines,
-      ``,
-      `Subtotal: ${Number(order.subtotal).toFixed(2)}`,
-      order.deliveryFee && Number(order.deliveryFee) > 0 ? `Delivery: ${Number(order.deliveryFee).toFixed(2)}` : "",
-      `Total: ${Number(order.totalAmount).toFixed(2)}`,
-      ``,
-      `Type: ${order.orderType === "delivery" ? "\u{1F69A} Delivery" : "\u{1F3EA} Pickup"}`,
-      `Payment: ${order.paymentMethod}`,
-      order.notes ? `Notes: ${order.notes}` : ""
-    ].filter(Boolean).join("\n");
-    return this.sendText(adminPhone, msg);
+    if (!adminPhone) return false;
+    const ctx = { name: storeName || "Store", meta: {}, currency: "CHF", lang: "en" };
+    return this.sendText(adminPhone, renderTemplate(resolveTemplate(void 0, "order_new", "en").text, orderVars(order, ctx)));
   },
-  async sendCustomerConfirmation(customerPhone, orderNumber, storeName, totalAmount) {
-    const msg = [
-      `\u2705 Order Confirmed \u2014 ${orderNumber}`,
-      ``,
-      `Thank you for ordering from ${storeName}!`,
-      `Total: ${Number(totalAmount).toFixed(2)}`,
-      ``,
-      `We'll update you when your order is being prepared.`,
-      `If you have questions, reply to this message.`
-    ].join("\n");
-    return this.sendText(customerPhone, msg);
+  async sendCustomerConfirmation(customerPhone, orderNumber, storeName, totalAmount, tenantId, customerName) {
+    const ctx = tenantId ? await storeContext(tenantId) : { name: storeName, meta: {}, currency: "CHF", lang: "en" };
+    const text2 = templateText(ctx, "order_confirmed", {
+      orderNumber,
+      storeName: ctx.name,
+      customerName: customerName || "",
+      total: money2(totalAmount, ctx.currency)
+    });
+    return text2 ? this.sendText(customerPhone, text2, tenantId) : false;
   },
-  async sendStatusUpdate(customerPhone, orderNumber, newStatus, storeName) {
-    const statusText = {
-      accepted: "\u2705 Your order has been accepted!",
-      preparing: "\u{1F468}\u200D\u{1F373} Your order is being prepared\u2026",
-      ready: "\u{1F389} Your order is ready for pickup/delivery!",
-      delivered: "\u{1F680} Your order has been delivered. Enjoy!",
-      cancelled: "\u274C Unfortunately your order has been cancelled."
-    };
-    const text2 = statusText[newStatus] || `Order status: ${newStatus}`;
-    const msg = `${storeName} \u2014 Order ${orderNumber}
-
-${text2}`;
-    return this.sendText(customerPhone, msg);
+  async sendStatusUpdate(customerPhone, orderNumber, newStatus, storeName, tenantId, customerName) {
+    const event = statusEvent(newStatus);
+    if (!event) return false;
+    const ctx = tenantId ? await storeContext(tenantId) : { name: storeName, meta: {}, currency: "CHF", lang: "en" };
+    const text2 = templateText(ctx, event, { orderNumber, storeName: ctx.name, customerName: customerName || "" });
+    return text2 ? this.sendText(customerPhone, text2, tenantId) : false;
   },
   // ── Delivery Platform Notifications ───────────────────────────────────────
   /** Notify driver about new assignment + deep link to driver PWA */
@@ -7429,8 +7568,8 @@ ${text2}`;
   },
   // ── Food Tracker™ automatic milestone messages ────────────────────────────
   /** Sends the right WhatsApp message per order milestone (accepted/ready/on_way) */
-  async sendFoodTrackerUpdate(customerPhone, orderNumber, storeName, status2, trackingToken, baseUrl) {
-    if (status2 === "accepted") {
+  async sendFoodTrackerUpdate(customerPhone, orderNumber, storeName, status, trackingToken, baseUrl) {
+    if (status === "accepted") {
       const msg = [
         `\u2705 Order Received \u2014 ${storeName}`,
         ``,
@@ -7439,7 +7578,7 @@ ${text2}`;
       ].join("\n");
       return this.sendText(customerPhone, msg);
     }
-    if (status2 === "ready") {
+    if (status === "ready") {
       const msg = [
         `\u{1F468}\u200D\u{1F373} Order Ready \u2014 ${storeName}`,
         ``,
@@ -7448,7 +7587,7 @@ ${text2}`;
       ].join("\n");
       return this.sendText(customerPhone, msg);
     }
-    if (status2 === "on_way" && trackingToken && baseUrl) {
+    if (status === "on_way" && trackingToken && baseUrl) {
       const trackLink = `${baseUrl}/track/${trackingToken}`;
       const msg = [
         `\u{1F6F5} On the Way! \u2014 ${storeName}`,
@@ -9062,8 +9201,8 @@ async function registerRoutes(app2) {
     try {
       const tenantId = Number(req.query.tenantId);
       if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
-      const status2 = await storage.getOnboardingStatus(tenantId);
-      res.json(status2);
+      const status = await storage.getOnboardingStatus(tenantId);
+      res.json(status);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -11556,13 +11695,15 @@ async function test(){
           orderType: orderData.orderType || "delivery",
           paymentMethod: orderData.paymentMethod || "cash",
           notes: orderData.notes
-        }, storeName, adminPhone);
+        }, storeName, adminPhone, resolvedTenantId);
         if (orderData.customerPhone) {
           await whatsappService.sendCustomerConfirmation(
             orderData.customerPhone,
             orderNumber,
             storeName,
-            orderData.totalAmount
+            orderData.totalAmount,
+            resolvedTenantId,
+            orderData.customerName
           );
         }
       } catch (waErr) {
@@ -11576,8 +11717,8 @@ async function test(){
   app2.get("/api/online-orders", async (req, res) => {
     try {
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) : void 0;
-      const status2 = req.query.status;
-      const orders = await storage.getOnlineOrders(tenantId, status2);
+      const status = req.query.status;
+      const orders = await storage.getOnlineOrders(tenantId, status);
       res.json(orders);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -11599,7 +11740,9 @@ async function test(){
             order.customerPhone,
             order.orderNumber,
             req.body.status,
-            storeName
+            storeName,
+            order.tenantId || void 0,
+            order.customerName
           );
         } catch (waErr) {
           console.error("[WhatsApp] Failed to send status update:", waErr);
@@ -12157,21 +12300,42 @@ async function test(){
       res.status(500).json({ error: e.message });
     }
   });
-  app2.post("/api/delivery/auth/request-otp", async (req, res) => {
-    try {
-      const { phone, tenantId } = req.body;
-      if (!phone || !tenantId) return res.status(400).json({ error: "phone and tenantId required" });
-      const otp = await createOtp(phone, Number(tenantId));
-      if (process.env.NODE_ENV === "development") {
-        return res.json({ success: true, otp });
+  app2.post(
+    "/api/delivery/auth/request-otp",
+    rateLimit({
+      name: "customer-otp",
+      max: 5,
+      windowMs: 15 * 60 * 1e3,
+      keyFn: (req) => `${req.body?.tenantId}:${String(req.body?.phone || "").replace(/\D/g, "")}`,
+      message: "\u0645\u062D\u0627\u0648\u0644\u0627\u062A \u0643\u062B\u064A\u0631\u0629\u060C \u0627\u0646\u062A\u0638\u0631 \u0642\u0644\u064A\u0644\u0627\u064B \u062B\u0645 \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629. / Too many attempts, try again shortly."
+    }),
+    async (req, res) => {
+      try {
+        const { phone, tenantId } = req.body;
+        if (!phone || !tenantId) return res.status(400).json({ error: "phone and tenantId required" });
+        if (String(phone).replace(/\D/g, "").length < 8) return res.status(400).json({ error: "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062A\u0641 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D \u2014 \u0627\u0643\u062A\u0628\u0647 \u0645\u0639 \u0631\u0645\u0632 \u0627\u0644\u062F\u0648\u0644\u0629" });
+        const otp = await createOtp(phone, Number(tenantId));
+        if (process.env.NODE_ENV === "development") {
+          return res.json({ success: true, otp });
+        }
+        const tenant = await storage.getTenant(Number(tenantId));
+        const sent = await whatsappService.sendMessage(
+          phone,
+          `\u{1F510} \u0631\u0645\u0632 \u0627\u0644\u062F\u062E\u0648\u0644 \u0625\u0644\u0649 ${tenant?.businessName || "\u0627\u0644\u0645\u062A\u062C\u0631"}: *${otp}*
+Your login code: *${otp}*
+
+\u0635\u0627\u0644\u062D \u0644\u0645\u062F\u0629 10 \u062F\u0642\u0627\u0626\u0642. \u0644\u0627 \u062A\u0634\u0627\u0631\u0643\u0647 \u0645\u0639 \u0623\u062D\u062F.`,
+          Number(tenantId)
+        );
+        if (!sent) {
+          return res.status(503).json({ error: "\u062A\u0639\u0630\u0651\u0631 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0631\u0645\u0632 \u0639\u0628\u0631 \u0648\u0627\u062A\u0633\u0627\u0628. \u062A\u0623\u0643\u062F \u0623\u0646 \u0627\u0644\u0631\u0642\u0645 \u0645\u0633\u062C\u0651\u0644 \u0639\u0644\u0649 \u0648\u0627\u062A\u0633\u0627\u0628 \u0648\u0645\u0643\u062A\u0648\u0628 \u0645\u0639 \u0631\u0645\u0632 \u0627\u0644\u062F\u0648\u0644\u0629\u060C \u0623\u0648 \u0633\u062C\u0651\u0644 \u0627\u0644\u062F\u062E\u0648\u0644 \u0628\u0640 Google." });
+        }
+        res.json({ success: true, channel: "whatsapp" });
+      } catch (e) {
+        res.status(500).json({ error: e.message });
       }
-      await whatsappService.sendMessage(phone, `Your verification code is: *${otp}*
-Valid for 10 minutes.`);
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
     }
-  });
+  );
   app2.post("/api/delivery/auth/verify-otp", async (req, res) => {
     try {
       const { phone, tenantId, otp } = req.body;
@@ -12672,7 +12836,8 @@ Customer: ${customerName || customerPhone}
 Total: ${totalAmount}` : `\u{1F6CE} New delivery order #${orderNumber}
 Customer: ${customerName || customerPhone}
 Total: ${totalAmount}
-Address: ${customerAddress || "Pickup"}`
+Address: ${customerAddress || "Pickup"}`,
+            Number(tenantId) || void 0
           );
         }
       } catch (_) {
@@ -12813,7 +12978,8 @@ Address: ${customerAddress || "Pickup"}`
           await whatsappService.sendMessage(
             order.customerPhone,
             `\u{1F6F5} Your order is on the way!
-Track live: ${process.env.APP_URL || ""}/track/${order.trackingToken}`
+Track live: ${process.env.APP_URL || ""}/track/${order.trackingToken}`,
+            order.tenantId || void 0
           );
         } catch (_) {
         }
@@ -12845,7 +13011,8 @@ Track live: ${process.env.APP_URL || ""}/track/${order.trackingToken}`
               await whatsappService.sendMessage(
                 order.customerPhone,
                 `\u2B50 How was your order?
-Leave a quick review: ${process.env.APP_URL || ""}/track/${order.trackingToken}#rate`
+Leave a quick review: ${process.env.APP_URL || ""}/track/${order.trackingToken}#rate`,
+                order.tenantId || void 0
               );
             } catch (_) {
             }
@@ -12864,19 +13031,19 @@ Leave a quick review: ${process.env.APP_URL || ""}/track/${order.trackingToken}#
       if (!token) return res.status(401).json({ error: "Driver token required" });
       const driver = await storage.getVehicleByAccessToken(token);
       if (!driver) return res.status(401).json({ error: "Invalid driver token" });
-      const status2 = String(req.body?.status || "").trim();
-      if (!["available", "offline", "on_delivery"].includes(status2)) {
+      const status = String(req.body?.status || "").trim();
+      if (!["available", "offline", "on_delivery"].includes(status)) {
         return res.status(400).json({ error: "status must be available | offline | on_delivery" });
       }
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
       const { eq: eq10 } = await import("drizzle-orm");
-      await db2.update(vehicles2).set({ driverStatus: status2, locationUpdatedAt: /* @__PURE__ */ new Date() }).where(eq10(vehicles2.id, driver.id));
+      await db2.update(vehicles2).set({ driverStatus: status, locationUpdatedAt: /* @__PURE__ */ new Date() }).where(eq10(vehicles2.id, driver.id));
       try {
-        callerIdService.broadcast({ type: "driver_status_change", vehicleId: driver.id, status: status2 }, driver.tenantId);
+        callerIdService.broadcast({ type: "driver_status_change", vehicleId: driver.id, status }, driver.tenantId);
       } catch {
       }
-      res.json({ success: true, driverStatus: status2 });
+      res.json({ success: true, driverStatus: status });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -12885,18 +13052,18 @@ Leave a quick review: ${process.env.APP_URL || ""}/track/${order.trackingToken}#
     try {
       const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
       const token = (req.body?.token || bearer || "").trim();
-      const { lat, lng, orderId, status: status2 } = req.body || {};
+      const { lat, lng, orderId, status } = req.body || {};
       if (!token) return res.status(401).json({ error: "Driver token required" });
       const driver = await storage.getVehicleByAccessToken(token);
       if (!driver) return res.status(401).json({ error: "Invalid driver token" });
-      if (status2 && ["available", "offline", "on_delivery"].includes(status2)) {
+      if (status && ["available", "offline", "on_delivery"].includes(status)) {
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { vehicles: vehicles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
           const { eq: eq10 } = await import("drizzle-orm");
-          await db2.update(vehicles2).set({ driverStatus: status2, locationUpdatedAt: /* @__PURE__ */ new Date() }).where(eq10(vehicles2.id, driver.id));
+          await db2.update(vehicles2).set({ driverStatus: status, locationUpdatedAt: /* @__PURE__ */ new Date() }).where(eq10(vehicles2.id, driver.id));
           try {
-            callerIdService.broadcast({ type: "driver_status_change", vehicleId: driver.id, status: status2 }, driver.tenantId);
+            callerIdService.broadcast({ type: "driver_status_change", vehicleId: driver.id, status }, driver.tenantId);
           } catch {
           }
         } catch (_) {
@@ -12955,9 +13122,9 @@ Leave a quick review: ${process.env.APP_URL || ""}/track/${order.trackingToken}#
   });
   app2.get("/api/delivery/manage/orders", async (req, res) => {
     try {
-      const { tenantId, status: status2, orderType } = req.query;
+      const { tenantId, status, orderType } = req.query;
       const tid = req.tenantId || Number(tenantId);
-      const orders = await storage.getDeliveryOrders(tid, { status: status2, orderType });
+      const orders = await storage.getDeliveryOrders(tid, { status, orderType });
       res.json(orders);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -12979,7 +13146,8 @@ Leave a quick review: ${process.env.APP_URL || ""}/track/${order.trackingToken}#
 Order #${order.orderNumber}
 Customer: ${order.customerName}
 Address: ${order.customerAddress || "Pickup"}
-Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
+Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`,
+            order.tenantId || void 0
           );
         } catch (_) {
         }
@@ -12991,10 +13159,10 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
   });
   app2.put("/api/delivery/manage/orders/:id/status", async (req, res) => {
     try {
-      const { status: status2 } = req.body;
-      if (!status2) return res.status(400).json({ error: "status required" });
+      const { status } = req.body;
+      if (!status) return res.status(400).json({ error: "status required" });
       const orderId = Number(req.params.id);
-      await storage.updateOnlineOrder(orderId, { status: status2 });
+      await storage.updateOnlineOrder(orderId, { status });
       const order = await storage.getOnlineOrder(orderId);
       if (order?.customerPhone) {
         const messages = {
@@ -13004,15 +13172,17 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
           delivered: "\u{1F389} Your order has been delivered. Enjoy your meal!",
           cancelled: "\u274C Your order has been cancelled. Contact us if you need help."
         };
-        if (messages[status2]) {
+        if (messages[status]) {
           try {
-            await whatsappService.sendMessage(order.customerPhone, messages[status2]);
+            const tid = order.tenantId || void 0;
+            if (tid) await whatsappService.sendStatusUpdate(order.customerPhone, order.orderNumber, status, "", tid, order.customerName);
+            else await whatsappService.sendMessage(order.customerPhone, messages[status]);
           } catch (_) {
           }
         }
       }
       if (order?.tenantId) {
-        callerIdService.broadcast({ type: "delivery_status_change", orderId, status: status2 }, order.tenantId);
+        callerIdService.broadcast({ type: "delivery_status_change", orderId, status }, order.tenantId);
       }
       res.json({ success: true });
     } catch (e) {
@@ -13833,7 +14003,7 @@ async function onInvoice(invoice, paid) {
 async function onSubscriptionChanged(sub) {
   const custId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
   if (!custId) return "subscription has no customer";
-  const status2 = sub.status === "active" || sub.status === "trialing" ? "active" : sub.status === "past_due" || sub.status === "unpaid" ? "past_due" : "cancelled";
+  const status = sub.status === "active" || sub.status === "trialing" ? "active" : sub.status === "past_due" || sub.status === "unpaid" ? "past_due" : "cancelled";
   await q2(
     `UPDATE tenant_subscriptions
         SET status = ?,
@@ -13841,12 +14011,12 @@ async function onSubscriptionChanged(sub) {
             auto_renew = ?,
             cancelled_at = CASE WHEN ? = 'cancelled' THEN COALESCE(cancelled_at, NOW()) ELSE cancelled_at END
       WHERE stripe_customer_id = ?`,
-    [status2, sub.id, sub.cancel_at_period_end ? 0 : 1, status2, custId]
+    [status, sub.id, sub.cancel_at_period_end ? 0 : 1, status, custId]
   );
-  if (status2 === "cancelled") {
+  if (status === "cancelled") {
     await q2(`UPDATE tenants SET status = 'suspended' WHERE stripe_customer_id = ?`, [custId]);
   }
-  return `subscription ${sub.id} -> ${status2}`;
+  return `subscription ${sub.id} -> ${status}`;
 }
 async function dispatchStripeEvent(event) {
   const obj = event.data.object;
@@ -13936,9 +14106,9 @@ async function q3(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return Array.isArray(rows) ? rows : [];
 }
-function badRequest(message, status2 = 400) {
+function badRequest(message, status = 400) {
   const err = new Error(message);
-  err.statusCode = status2;
+  err.statusCode = status;
   return err;
 }
 function toMinor(major, label) {
@@ -14454,8 +14624,8 @@ function registerSuperAdminRoutes(app2) {
   });
   app2.get("/api/super-admin/analytics/activity", requireSuperAdmin, async (_req, res) => {
     try {
-      const log3 = await storage.getActivityLog(100);
-      res.json(log3);
+      const log2 = await storage.getActivityLog(100);
+      res.json(log2);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -14546,7 +14716,7 @@ function registerSuperAdminRoutes(app2) {
   });
   app2.post("/api/super-admin/tenants", requireSuperAdmin, async (req, res) => {
     try {
-      const { businessName, ownerName, ownerEmail, ownerPhone, status: status2, maxBranches, maxEmployees, storeType, address } = req.body;
+      const { businessName, ownerName, ownerEmail, ownerPhone, status, maxBranches, maxEmployees, storeType, address } = req.body;
       const passwordHash = await bcrypt7.hash("admin123", 10);
       const tenant = await storage.createTenant({
         businessName,
@@ -14555,7 +14725,7 @@ function registerSuperAdminRoutes(app2) {
         ownerPhone: ownerPhone || null,
         address: address || null,
         passwordHash,
-        status: status2 || "active",
+        status: status || "active",
         maxBranches: maxBranches || 1,
         maxEmployees: maxEmployees || 5,
         storeType: storeType || "supermarket"
@@ -14657,7 +14827,7 @@ function registerSuperAdminRoutes(app2) {
   });
   app2.post("/api/super-admin/subscriptions", requireSuperAdmin, async (req, res) => {
     try {
-      const { tenantId, planType, planName, price, status: status2, autoRenew, paymentMethod } = req.body;
+      const { tenantId, planType, planName, price, status, autoRenew, paymentMethod } = req.body;
       const startDate = /* @__PURE__ */ new Date();
       let endDate = /* @__PURE__ */ new Date();
       if (planType === "monthly") endDate = (0, import_date_fns5.addMonths)(startDate, 1);
@@ -14668,7 +14838,7 @@ function registerSuperAdminRoutes(app2) {
         planType: planType || "trial",
         planName: planName || "Starter",
         price: price || "0",
-        status: status2 || "active",
+        status: status || "active",
         startDate,
         endDate,
         autoRenew: autoRenew || false,
@@ -14850,9 +15020,9 @@ function registerSuperAdminRoutes(app2) {
       const source = ["online_order", "pos_sale"].includes(String(req.query.source)) ? String(req.query.source) : "all";
       const stripeOnly = String(req.query.includeOffline || "") !== "1";
       const tenantId = req.query.tenantId ? Number(req.query.tenantId) || null : null;
-      const status2 = req.query.status ? String(req.query.status).slice(0, 40) : null;
+      const status = req.query.status ? String(req.query.status).slice(0, 40) : null;
       const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
-      const union = paymentSources({ source, stripeOnly, tenantId, status: status2 });
+      const union = paymentSources({ source, stripeOnly, tenantId, status });
       let rows = [];
       let totals = {};
       try {
@@ -15423,8 +15593,8 @@ function registerSuperAdminRoutes(app2) {
   app2.get("/api/super-admin/activity", requireSuperAdmin, async (req, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit) : 200;
-      const log3 = await storage.getActivityLog(limit);
-      res.json(log3);
+      const log2 = await storage.getActivityLog(limit);
+      res.json(log2);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -16788,8 +16958,8 @@ async function call(apiKey, method, path5, body) {
     if (res.status >= 500 || res.status === 401 || res.status === 403) {
       console.error(`[shamcash] ${method} ${path5} -> ${res.status} ${code}: ${data?.message ?? ""}`);
     }
-    const status2 = res.status === 401 || res.status === 403 ? 503 : res.status;
-    throw new ShamCashError(msg, status2, code);
+    const status = res.status === 401 || res.status === 403 ? 503 : res.status;
+    throw new ShamCashError(msg, status, code);
   }
   return data;
 }
@@ -16951,11 +17121,11 @@ async function refreshInvoice(invoiceNumber) {
   if (row.status !== "paid") {
     const remote = await call(await apiKeyForRow(row), "GET", `/v1/invoices/${encodeURIComponent(invoiceNumber)}`);
     const inv = remote?.data ?? remote;
-    const status2 = String(inv?.status ?? "").toLowerCase();
-    if (status2 === "paid") {
+    const status = String(inv?.status ?? "").toLowerCase();
+    if (status === "paid") {
       await markSettled(row, inv?.transactionRef ?? inv?.tranId ?? inv?.tran_id ?? null);
-    } else if (status2 === "expired" || status2 === "cancelled") {
-      await q5(`UPDATE shamcash_invoices SET status = ? WHERE id = ?`, [status2, row.id]);
+    } else if (status === "expired" || status === "cancelled") {
+      await q5(`UPDATE shamcash_invoices SET status = ? WHERE id = ?`, [status, row.id]);
     }
   }
   const [fresh] = await q5(`SELECT * FROM shamcash_invoices WHERE id = ?`, [row.id]);
@@ -17036,10 +17206,10 @@ async function q6(sqlText, params = []) {
   return Array.isArray(rows) ? rows : [];
 }
 function fail(res, e, fallback = 500) {
-  const status2 = e?.statusCode ?? (e?.code === "STRIPE_NOT_CONFIGURED" ? 503 : fallback);
+  const status = e?.statusCode ?? (e?.code === "STRIPE_NOT_CONFIGURED" ? 503 : fallback);
   const message = e?.message || "Payment error";
-  if (status2 >= 500) console.error("[payments]", message);
-  res.status(status2).json({ error: message, code: e?.code });
+  if (status >= 500) console.error("[payments]", message);
+  res.status(status).json({ error: message, code: e?.code });
 }
 var DEFAULT_GATEWAY = {
   enabledMethods: ["cash", "card", "mobile", "nfc"],
@@ -17418,8 +17588,8 @@ function registerPaymentRoutes(app2) {
   });
   app2.get("/api/payments/health", health);
   app2.post("/api/payment-gateway/test-stripe", async (_req, res) => {
-    const status2 = await stripeAccountStatus();
-    res.json({ success: status2.connected, ...status2 });
+    const status = await stripeAccountStatus();
+    res.json({ success: status.connected, ...status });
   });
   app2.get("/api/stripe/publishable-key", async (_req, res) => {
     const key = await getStripePublishableKey();
@@ -17460,6 +17630,410 @@ function registerPaymentRoutes(app2) {
       res.json({ status: pi.status, amount: pi.amount, currency: pi.currency });
     } catch (e) {
       fail(res, e);
+    }
+  });
+}
+
+// server/whatsappStoreRoutes.ts
+init_storage();
+init_db();
+function tenantOf2(req, res) {
+  const tenantId = Number(req.tenantId ?? 0) || 0;
+  if (!tenantId) {
+    res.status(400).json({ error: "tenant required" });
+    return null;
+  }
+  return tenantId;
+}
+async function readMeta2(tenantId) {
+  const tenant = await storage.getTenant(tenantId);
+  return { ...tenant?.metadata || {} };
+}
+async function writeMeta(tenantId, meta2) {
+  await storage.updateTenant(tenantId, { metadata: meta2 });
+}
+async function storeLang(tenantId, meta2) {
+  if (meta2.whatsappTemplates?.lang) return meta2.whatsappTemplates.lang;
+  try {
+    const [rows] = await pool.query("SELECT currency FROM branches WHERE tenant_id = ? ORDER BY is_main DESC, id LIMIT 1", [tenantId]);
+    return rows?.[0]?.currency === "SYP" ? "ar" : "en";
+  } catch {
+    return "en";
+  }
+}
+var fail2 = (res, e) => res.status(500).json({ error: e?.message || "Error" });
+function phoneKey(raw) {
+  let d = String(raw || "").replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.startsWith("410") && d.length === 12) d = "41" + d.slice(3);
+  else if (d.startsWith("0") && d.length === 10 && /^07/.test(d)) d = "41" + d.slice(1);
+  else if (d.startsWith("09") && d.length === 10) d = "963" + d.slice(1);
+  return d.length >= 8 && d.length <= 15 ? d : "";
+}
+var CAMPAIGN_DAILY_CAP = 1e3;
+async function ensureCampaignTable() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS wa_campaigns (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    audience VARCHAR(20) NOT NULL,
+    body TEXT NOT NULL,
+    promo_code VARCHAR(64) NULL,
+    recipients INT NOT NULL DEFAULT 0,
+    created_by VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_wa_campaign_tenant (tenant_id, created_at)
+  ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+}
+async function audienceList(tenantId, audience) {
+  const rows = [];
+  if (audience === "all" || audience === "wholesale") {
+    const [r] = await pool.query(
+      `SELECT name, phone FROM customers WHERE tenant_id = ? AND phone IS NOT NULL AND phone <> ''${audience === "wholesale" ? " AND customer_type = 'wholesale'" : ""}`,
+      [tenantId]
+    );
+    rows.push(...r);
+  }
+  if (audience === "all" || audience === "online") {
+    const [r] = await pool.query(
+      "SELECT customer_name AS name, customer_phone AS phone FROM online_orders WHERE tenant_id = ? AND customer_phone IS NOT NULL AND customer_phone <> '' ORDER BY id DESC",
+      [tenantId]
+    );
+    rows.push(...r);
+  }
+  let optedOut = /* @__PURE__ */ new Set();
+  try {
+    const [o] = await pool.query("SELECT phone FROM wa_optouts WHERE session_key = ?", [storeKey(tenantId)]);
+    optedOut = new Set(o.map((x) => String(x.phone)));
+  } catch {
+  }
+  const seen = /* @__PURE__ */ new Map();
+  for (const r of rows) {
+    const k = phoneKey(r.phone);
+    if (!k || optedOut.has(k) || seen.has(k)) continue;
+    seen.set(k, { phone: k, name: String(r.name || "").trim() });
+  }
+  return [...seen.values()];
+}
+function registerWhatsAppStoreRoutes(app2) {
+  app2.get("/api/whatsapp/session", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      const view = await whatsappService.storeSession(tenantId, true);
+      const meta2 = await readMeta2(tenantId);
+      if (view.status === "connected" && view.phone && (meta2.whatsappAdminPhone !== view.phone || !meta2.whatsappVerifiedAt)) {
+        if (!meta2.whatsappAdminPhone || meta2.whatsappLinkedPhone === meta2.whatsappAdminPhone) {
+          meta2.whatsappAdminPhone = view.phone;
+          meta2.whatsappVerifiedAt = (/* @__PURE__ */ new Date()).toISOString();
+        }
+        meta2.whatsappLinkedPhone = view.phone;
+        await writeMeta(tenantId, meta2);
+      }
+      res.json({ ...view, alerts: meta2.whatsappAlerts || {} });
+    } catch (e) {
+      fail2(res, e);
+    }
+  });
+  app2.post("/api/whatsapp/session/connect", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      res.json(await whatsappService.storeConnect(tenantId));
+    } catch (e) {
+      fail2(res, e);
+    }
+  });
+  app2.post("/api/whatsapp/session/logout", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      const view = await whatsappService.storeLogout(tenantId);
+      const meta2 = await readMeta2(tenantId);
+      if (meta2.whatsappLinkedPhone && meta2.whatsappAdminPhone === meta2.whatsappLinkedPhone) {
+        meta2.whatsappAdminPhone = "";
+        meta2.whatsappVerifiedAt = null;
+      }
+      meta2.whatsappLinkedPhone = "";
+      await writeMeta(tenantId, meta2);
+      res.json(view);
+    } catch (e) {
+      fail2(res, e);
+    }
+  });
+  app2.post(
+    "/api/whatsapp/session/test",
+    requireAdmin,
+    rateLimit({ name: "wa-store-test", max: 10, windowMs: 10 * 60 * 1e3, keyFn: (req) => String(req.tenantId ?? "unknown") }),
+    async (req, res) => {
+      try {
+        const tenantId = tenantOf2(req, res);
+        if (tenantId == null) return;
+        const view = await whatsappService.storeSession(tenantId, true);
+        if (view.status !== "connected") return res.status(409).json({ error: "\u0648\u0627\u062A\u0633\u0627\u0628 \u0627\u0644\u0645\u062A\u062C\u0631 \u063A\u064A\u0631 \u0645\u062A\u0635\u0644 \u062D\u0627\u0644\u064A\u0627\u064B" });
+        const to = String(req.body?.phone || "").replace(/\D/g, "") || view.phone || "";
+        if (!to) return res.status(400).json({ error: "\u0627\u0643\u062A\u0628 \u0631\u0642\u0645\u0627\u064B \u0644\u0625\u0631\u0633\u0627\u0644 \u0631\u0633\u0627\u0644\u0629 \u0627\u0644\u0627\u062E\u062A\u0628\u0627\u0631" });
+        const tenant = await storage.getTenant(tenantId);
+        const text2 = String(req.body?.text || "").trim() || `\u2705 \u0631\u0633\u0627\u0644\u0629 \u0627\u062E\u062A\u0628\u0627\u0631 \u0645\u0646 ${tenant?.businessName || "Kassenta"}
+\u0648\u0627\u062A\u0633\u0627\u0628 \u0627\u0644\u0645\u062A\u062C\u0631 \u0645\u0631\u0628\u0648\u0637 \u0648\u064A\u0639\u0645\u0644.
+
+Test message \u2014 the store's WhatsApp is connected.`;
+        const r = await whatsappService.storeSend(tenantId, to, text2);
+        if (!r.ok) return res.status(502).json({ error: r.error || (r.queued ? "\u062A\u0645 \u0648\u0636\u0639 \u0627\u0644\u0631\u0633\u0627\u0644\u0629 \u0641\u064A \u0627\u0644\u0627\u0646\u062A\u0638\u0627\u0631" : "\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u0625\u0631\u0633\u0627\u0644") });
+        res.json({ ok: true, to });
+      } catch (e) {
+        fail2(res, e);
+      }
+    }
+  );
+  app2.get("/api/whatsapp/chats", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      const q7 = String(req.query.q || "").trim();
+      const params = [storeKey(tenantId)];
+      let where = "session_key = ?";
+      if (q7) {
+        where += " AND (name LIKE ? OR phone LIKE ? OR last_message LIKE ?)";
+        params.push(`%${q7}%`, `%${q7.replace(/\D/g, "") || q7}%`, `%${q7}%`);
+      }
+      const [rows] = await pool.query(
+        `SELECT jid, name, phone, is_group AS isGroup, last_message AS lastMessage, last_from_me AS lastFromMe,
+                last_at AS lastAt, unread
+           FROM wa_chats WHERE ${where} ORDER BY last_at DESC LIMIT 200`,
+        params
+      );
+      res.json(rows.map((r) => ({ ...r, isGroup: !!r.isGroup, lastFromMe: !!r.lastFromMe })));
+    } catch (e) {
+      if (/doesn't exist/i.test(String(e?.message))) return res.json([]);
+      fail2(res, e);
+    }
+  });
+  app2.get("/api/whatsapp/unread", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      const [rows] = await pool.query("SELECT COALESCE(SUM(unread), 0) AS n FROM wa_chats WHERE session_key = ?", [storeKey(tenantId)]);
+      res.json({ unread: Number(rows?.[0]?.n || 0) });
+    } catch {
+      res.json({ unread: 0 });
+    }
+  });
+  app2.get("/api/whatsapp/chats/:jid/messages", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      const jid = String(req.params.jid);
+      const before = req.query.before ? new Date(String(req.query.before)) : null;
+      const params = [storeKey(tenantId), jid];
+      let where = "session_key = ? AND jid = ?";
+      if (before && !isNaN(before.getTime())) {
+        where += " AND ts < ?";
+        params.push(before);
+      }
+      const [rows] = await pool.query(
+        `SELECT id, wa_id AS waId, from_me AS fromMe, sender, sender_name AS senderName, msg_type AS type, body, status, ts
+           FROM wa_messages WHERE ${where} ORDER BY ts DESC, id DESC LIMIT 60`,
+        params
+      );
+      res.json(rows.reverse().map((r) => ({ ...r, fromMe: !!r.fromMe })));
+    } catch (e) {
+      if (/doesn't exist/i.test(String(e?.message))) return res.json([]);
+      fail2(res, e);
+    }
+  });
+  const sendLimiter = rateLimit({ name: "wa-store-send", max: 60, windowMs: 60 * 1e3, keyFn: (req) => String(req.tenantId ?? "unknown") });
+  app2.post("/api/whatsapp/chats/:jid/send", requireAdmin, sendLimiter, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      const text2 = String(req.body?.text || "").trim();
+      if (!text2) return res.status(400).json({ error: "\u0627\u0644\u0631\u0633\u0627\u0644\u0629 \u0641\u0627\u0631\u063A\u0629" });
+      const r = await whatsappService.storeSend(tenantId, String(req.params.jid), text2);
+      if (!r.ok && !r.queued) return res.status(502).json({ error: r.error || "\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u0625\u0631\u0633\u0627\u0644" });
+      res.json(r);
+    } catch (e) {
+      fail2(res, e);
+    }
+  });
+  app2.post("/api/whatsapp/send", requireAdmin, sendLimiter, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      const phone = String(req.body?.phone || "").replace(/\D/g, "");
+      const text2 = String(req.body?.text || "").trim();
+      if (phone.length < 8 || !text2) return res.status(400).json({ error: "\u0627\u0643\u062A\u0628 \u0627\u0644\u0631\u0642\u0645 \u0645\u0639 \u0631\u0645\u0632 \u0627\u0644\u062F\u0648\u0644\u0629 \u0648\u0646\u0635 \u0627\u0644\u0631\u0633\u0627\u0644\u0629" });
+      const r = await whatsappService.storeSend(tenantId, phone, text2);
+      if (!r.ok && !r.queued) return res.status(502).json({ error: r.error || "\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u0625\u0631\u0633\u0627\u0644" });
+      res.json(r);
+    } catch (e) {
+      fail2(res, e);
+    }
+  });
+  app2.post("/api/whatsapp/chats/:jid/read", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      await whatsappService.storeMarkRead(tenantId, String(req.params.jid));
+      res.json({ ok: true });
+    } catch (e) {
+      fail2(res, e);
+    }
+  });
+  app2.get("/api/whatsapp/templates", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      const meta2 = await readMeta2(tenantId);
+      const lang = await storeLang(tenantId, meta2);
+      const settings = { ...meta2.whatsappTemplates || {}, lang };
+      res.json({
+        lang,
+        events: TEMPLATE_EVENTS.map((event) => {
+          const t2 = resolveTemplate(settings, event, lang);
+          return { event, enabled: t2.enabled, text: t2.text, isDefault: t2.isDefault, defaultText: defaultTemplate(event, lang), variables: TEMPLATE_VARIABLES[event] };
+        })
+      });
+    } catch (e) {
+      fail2(res, e);
+    }
+  });
+  app2.put("/api/whatsapp/templates", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      const meta2 = await readMeta2(tenantId);
+      const lang = req.body?.lang === "en" ? "en" : req.body?.lang === "ar" ? "ar" : await storeLang(tenantId, meta2);
+      const overrides = {};
+      const incoming = req.body?.events || [];
+      for (const e of Array.isArray(incoming) ? incoming : []) {
+        if (!TEMPLATE_EVENTS.includes(e?.event)) continue;
+        const event = e.event;
+        const text2 = typeof e.text === "string" ? e.text.slice(0, 2e3) : "";
+        const o = {};
+        if (e.enabled === false) o.enabled = false;
+        if (text2.trim() && text2.trim() !== defaultTemplate(event, lang).trim()) o.text = text2;
+        if (Object.keys(o).length) overrides[event] = o;
+      }
+      meta2.whatsappTemplates = { lang, overrides };
+      await writeMeta(tenantId, meta2);
+      res.json({ ok: true });
+    } catch (e) {
+      fail2(res, e);
+    }
+  });
+  app2.get("/api/whatsapp/campaigns", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      await ensureCampaignTable();
+      const [all, online, wholesale] = await Promise.all([
+        audienceList(tenantId, "all"),
+        audienceList(tenantId, "online"),
+        audienceList(tenantId, "wholesale")
+      ]);
+      let optedOut = 0;
+      try {
+        const [o] = await pool.query("SELECT COUNT(*) AS n FROM wa_optouts WHERE session_key = ?", [storeKey(tenantId)]);
+        optedOut = Number(o?.[0]?.n || 0);
+      } catch {
+      }
+      const [campaigns] = await pool.query(
+        "SELECT id, audience, body, promo_code AS promoCode, recipients, created_by AS createdBy, created_at AS createdAt FROM wa_campaigns WHERE tenant_id = ? ORDER BY id DESC LIMIT 30",
+        [tenantId]
+      );
+      const [today] = await pool.query(
+        "SELECT COALESCE(SUM(recipients), 0) AS n FROM wa_campaigns WHERE tenant_id = ? AND created_at >= CURDATE()",
+        [tenantId]
+      );
+      const sentToday = Number(today?.[0]?.n || 0);
+      res.json({
+        audience: { all: all.length, online: online.length, wholesale: wholesale.length, optedOut },
+        remainingToday: Math.max(0, CAMPAIGN_DAILY_CAP - sentToday),
+        campaigns
+      });
+    } catch (e) {
+      fail2(res, e);
+    }
+  });
+  app2.post(
+    "/api/whatsapp/campaigns",
+    requireAdmin,
+    rateLimit({ name: "wa-campaign", max: 5, windowMs: 60 * 60 * 1e3, keyFn: (req) => String(req.tenantId ?? "unknown") }),
+    async (req, res) => {
+      try {
+        const tenantId = tenantOf2(req, res);
+        if (tenantId == null) return;
+        const body = String(req.body?.text || "").trim().slice(0, 3e3);
+        const audience = ["all", "online", "wholesale"].includes(req.body?.audience) ? req.body.audience : "all";
+        const promoCode = String(req.body?.promoCode || "").trim().slice(0, 64);
+        if (!body) return res.status(400).json({ error: "\u0627\u0643\u062A\u0628 \u0646\u0635 \u0627\u0644\u0639\u0631\u0636" });
+        const view = await whatsappService.storeSession(tenantId, true);
+        if (!view.linked && view.status !== "connected") return res.status(409).json({ error: "\u0627\u0631\u0628\u0637 \u0648\u0627\u062A\u0633\u0627\u0628 \u0627\u0644\u0645\u062A\u062C\u0631 \u0623\u0648\u0644\u0627\u064B" });
+        await ensureCampaignTable();
+        const [today] = await pool.query(
+          "SELECT COALESCE(SUM(recipients), 0) AS n FROM wa_campaigns WHERE tenant_id = ? AND created_at >= CURDATE()",
+          [tenantId]
+        );
+        const remaining = Math.max(0, CAMPAIGN_DAILY_CAP - Number(today?.[0]?.n || 0));
+        const list = (await audienceList(tenantId, audience)).slice(0, remaining);
+        if (!list.length) {
+          return res.status(400).json({ error: remaining ? "\u0644\u0627 \u064A\u0648\u062C\u062F \u0632\u0628\u0627\u0626\u0646 \u0628\u0623\u0631\u0642\u0627\u0645 \u0647\u0648\u0627\u062A\u0641 \u0641\u064A \u0647\u0630\u0647 \u0627\u0644\u0641\u0626\u0629" : "\u0648\u0635\u0644\u062A \u0644\u0644\u062D\u062F \u0627\u0644\u064A\u0648\u0645\u064A \u0644\u0631\u0633\u0627\u0626\u0644 \u0627\u0644\u0639\u0631\u0648\u0636\u060C \u062C\u0631\u0651\u0628 \u063A\u062F\u0627\u064B" });
+        }
+        const tenant = await storage.getTenant(tenantId);
+        const meta2 = tenant?.metadata || {};
+        const lang = await storeLang(tenantId, meta2);
+        let storeLink = "";
+        try {
+          const [lp] = await pool.query("SELECT slug FROM landing_page_config WHERE tenant_id = ? LIMIT 1", [tenantId]);
+          if (lp?.[0]?.slug) storeLink = `${process.env.APP_URL || "https://kassenta.com"}/order/${lp[0].slug}`;
+        } catch {
+        }
+        const footer = lang === "ar" ? "\n\n\u0644\u0625\u064A\u0642\u0627\u0641 \u0631\u0633\u0627\u0626\u0644 \u0627\u0644\u0639\u0631\u0648\u0636 \u0623\u0631\u0633\u0644: \u0625\u0644\u063A\u0627\u0621" : "\n\nReply STOP to stop offers";
+        const fill = (name) => body.replace(/\{\{\s*customerName\s*\}\}/g, name || (lang === "ar" ? "\u0639\u0645\u064A\u0644\u0646\u0627 \u0627\u0644\u0639\u0632\u064A\u0632" : "there")).replace(/\{\{\s*storeName\s*\}\}/g, tenant?.businessName || "").replace(/\{\{\s*storeLink\s*\}\}/g, storeLink).replace(/\{\{\s*promoCode\s*\}\}/g, promoCode) + footer;
+        const { bridge: bridge2 } = await Promise.resolve().then(() => (init_waClient(), waClient_exports));
+        const r = await bridge2("POST", "/send-batch", {
+          key: storeKey(tenantId),
+          items: list.map((c) => ({ to: c.phone, text: fill(c.name) }))
+        }, 6e4);
+        const queued = Number(r?.queued || 0);
+        await pool.query(
+          "INSERT INTO wa_campaigns (tenant_id, audience, body, promo_code, recipients, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+          [tenantId, audience, body, promoCode || null, queued, req.employee?.name || null]
+        );
+        res.json({ ok: true, recipients: queued, etaMinutes: Math.ceil(queued * 2 / 60) });
+      } catch (e) {
+        fail2(res, e);
+      }
+    }
+  );
+  app2.get("/api/whatsapp/groups", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      const r = await whatsappService.storeGroups(tenantId, req.query.refresh === "1");
+      const meta2 = await readMeta2(tenantId);
+      res.json({ ...r, alerts: meta2.whatsappAlerts || {} });
+    } catch (e) {
+      fail2(res, e);
+    }
+  });
+  app2.put("/api/whatsapp/alerts", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = tenantOf2(req, res);
+      if (tenantId == null) return;
+      const b = req.body || {};
+      const groupJid = typeof b.groupJid === "string" && b.groupJid.endsWith("@g.us") ? b.groupJid : "";
+      const meta2 = await readMeta2(tenantId);
+      meta2.whatsappAlerts = {
+        groupJid,
+        groupName: groupJid ? String(b.groupName || "").slice(0, 200) : "",
+        groupEnabled: b.groupEnabled !== false,
+        notifyOwner: b.notifyOwner !== false
+      };
+      await writeMeta(tenantId, meta2);
+      res.json({ ok: true, alerts: meta2.whatsappAlerts });
+    } catch (e) {
+      fail2(res, e);
     }
   });
 }
@@ -17595,7 +18169,7 @@ async function runStripeMigrations() {
 }
 
 // server/wholesaleRoutes.ts
-function tenantOf2(req) {
+function tenantOf3(req) {
   const t2 = req.tenantId;
   if (!t2 || !Number.isInteger(t2)) throw new WholesaleError("Store not identified", 401, "NO_TENANT");
   return t2;
@@ -17611,7 +18185,7 @@ function employeeOf(req) {
   const fromBody = Number(req.body?.employeeId);
   return Number.isInteger(fromBody) && fromBody > 0 ? fromBody : null;
 }
-function fail2(res, e) {
+function fail3(res, e) {
   if (e instanceof WholesaleError) {
     return res.status(e.statusCode).json({ error: e.message, code: e.code, ...e.details || {} });
   }
@@ -17622,31 +18196,31 @@ var wrap = (fn) => async (req, res) => {
   try {
     await fn(req, res);
   } catch (e) {
-    fail2(res, e);
+    fail3(res, e);
   }
 };
 function registerWholesaleRoutes(app2) {
   app2.get("/api/wholesale/summary", wrap(async (req, res) => {
-    res.json(await getSummary(tenantOf2(req)));
+    res.json(await getSummary(tenantOf3(req)));
   }));
   app2.get("/api/wholesale/traders", wrap(async (req, res) => {
-    res.json(await listTraders(tenantOf2(req), {
+    res.json(await listTraders(tenantOf3(req), {
       search: typeof req.query.search === "string" ? req.query.search : void 0,
       includeInactive: req.query.includeInactive === "1" || req.query.includeInactive === "true"
     }));
   }));
   app2.get("/api/wholesale/traders/:id", wrap(async (req, res) => {
-    res.json(await getTrader(tenantOf2(req), idParam(req.params.id)));
+    res.json(await getTrader(tenantOf3(req), idParam(req.params.id)));
   }));
   app2.get("/api/wholesale/traders/:id/statement", wrap(async (req, res) => {
-    res.json(await getStatement(tenantOf2(req), idParam(req.params.id), req.query.from, req.query.to));
+    res.json(await getStatement(tenantOf3(req), idParam(req.params.id), req.query.from, req.query.to));
   }));
   app2.post("/api/wholesale/traders", requireManager, wrap(async (req, res) => {
-    res.status(201).json(await createTrader(tenantOf2(req), req.body || {}, employeeOf(req)));
+    res.status(201).json(await createTrader(tenantOf3(req), req.body || {}, employeeOf(req)));
   }));
   app2.put("/api/wholesale/traders/:id", requireManager, wrap(async (req, res) => {
     const b = req.body || {};
-    res.json(await updateTrader(tenantOf2(req), idParam(req.params.id), {
+    res.json(await updateTrader(tenantOf3(req), idParam(req.params.id), {
       name: b.name,
       shopName: b.shopName,
       phone: b.phone,
@@ -17659,16 +18233,16 @@ function registerWholesaleRoutes(app2) {
     }));
   }));
   app2.delete("/api/wholesale/traders/:id", requireManager, wrap(async (req, res) => {
-    res.json(await deactivateTrader(tenantOf2(req), idParam(req.params.id)));
+    res.json(await deactivateTrader(tenantOf3(req), idParam(req.params.id)));
   }));
   app2.post("/api/wholesale/traders/:id/payments", requireStaff, wrap(async (req, res) => {
-    res.status(201).json(await recordPayment(tenantOf2(req), idParam(req.params.id), req.body || {}, employeeOf(req)));
+    res.status(201).json(await recordPayment(tenantOf3(req), idParam(req.params.id), req.body || {}, employeeOf(req)));
   }));
   app2.post("/api/wholesale/traders/:id/charges", requireManager, wrap(async (req, res) => {
-    res.status(201).json(await recordCharge(tenantOf2(req), idParam(req.params.id), req.body || {}, employeeOf(req)));
+    res.status(201).json(await recordCharge(tenantOf3(req), idParam(req.params.id), req.body || {}, employeeOf(req)));
   }));
   app2.delete("/api/wholesale/entries/:id", requireManager, wrap(async (req, res) => {
-    res.json(await voidLedgerEntry(tenantOf2(req), idParam(req.params.id)));
+    res.json(await voidLedgerEntry(tenantOf3(req), idParam(req.params.id)));
   }));
 }
 
@@ -21405,7 +21979,7 @@ if (!usingMySql) {
   }
 }
 var app = (0, import_express2.default)();
-var log2 = console.log;
+var log = console.log;
 app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -21508,7 +22082,7 @@ function setupRequestLogging(app2) {
       if (logLine.length > 80) {
         logLine = logLine.slice(0, 79) + "\u2026";
       }
-      log2(logLine);
+      log(logLine);
     });
     next();
   });
@@ -21523,15 +22097,15 @@ function getAppName() {
     return "App Landing Page";
   }
 }
-function serveExpoManifest(platform, res) {
+function serveExpoManifest(platform2, res) {
   const manifestPath = path4.resolve(
     process.cwd(),
     "static-build",
-    platform,
+    platform2,
     "manifest.json"
   );
   if (!fs5.existsSync(manifestPath)) {
-    return res.status(404).json({ error: `Manifest not found for platform: ${platform}` });
+    return res.status(404).json({ error: `Manifest not found for platform: ${platform2}` });
   }
   res.setHeader("expo-protocol-version", "1");
   res.setHeader("expo-sfv-version", "0");
@@ -21547,7 +22121,7 @@ function configureExpoAndLanding(app2) {
     "dashboard.html"
   );
   const appName = getAppName();
-  log2("Serving static Expo files with dynamic manifest routing");
+  log("Serving static Expo files with dynamic manifest routing");
   app2.use(async (req, res, next) => {
     const isDeliveryApiPath = req.path.startsWith("/api/order/") || req.path.startsWith("/api/track/") || req.path === "/api/driver" || req.path.startsWith("/api/driver/") || req.path.startsWith("/api/super-admin") || req.path.startsWith("/api/super_admin") || req.path.startsWith("/api/uploads/") || req.path.startsWith("/api/assets/") || req.path.startsWith("/api/objects/") || req.path.startsWith("/api/sounds/") || req.path === "/api/restaurants" || req.path === "/api/restaurants/" || req.path === "/api/order" || req.path === "/api/order/";
     if (req.path.startsWith("/api") && !isDeliveryApiPath) {
@@ -21944,9 +22518,9 @@ function configureExpoAndLanding(app2) {
     if (req.path !== "/landing" && req.path !== "/manifest") {
       return next();
     }
-    const platform = req.header("expo-platform");
-    if (platform && (platform === "ios" || platform === "android")) {
-      return serveExpoManifest(platform, res);
+    const platform2 = req.header("expo-platform");
+    if (platform2 && (platform2 === "ios" || platform2 === "android")) {
+      return serveExpoManifest(platform2, res);
     }
     if (req.path === "/landing") {
       return res.redirect(301, "/");
@@ -22025,7 +22599,7 @@ function configureExpoAndLanding(app2) {
         });
         res.json({ ok: true });
       } catch (e) {
-        log2(`[contact] send failed: ${e?.message}`);
+        log(`[contact] send failed: ${e?.message}`);
         res.status(502).json({ error: "Could not send the message. Please email info@kassenta.com." });
       }
     }
@@ -22049,7 +22623,7 @@ function configureExpoAndLanding(app2) {
           [p.name, p.description, p.price.toFixed(2), p.interval, JSON.stringify(p.features)]
         );
       }
-      log2(`[plans] seeded ${missing.length} subscription_plans row(s) from the site catalogue`);
+      log(`[plans] seeded ${missing.length} subscription_plans row(s) from the site catalogue`);
       rows = await read2();
     }
     const plans = PLANS.map((plan2) => {
@@ -22075,7 +22649,7 @@ function configureExpoAndLanding(app2) {
       res.setHeader("Cache-Control", "public, max-age=60");
       res.json(planCache.body);
     } catch (e) {
-      log2(`[plans] catalogue read failed: ${e?.message}`);
+      log(`[plans] catalogue read failed: ${e?.message}`);
       res.json({ currency: CURRENCY, checkout: false, plans: [] });
     }
   });
@@ -22270,33 +22844,33 @@ function configureExpoAndLanding(app2) {
     }
     next();
   });
-  log2("Expo routing: Checking expo-platform header on / and /manifest");
+  log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 function setupErrorHandler(app2) {
   app2.use((err, _req, res, next) => {
     const error = err;
-    const status2 = error.status || error.statusCode || 500;
+    const status = error.status || error.statusCode || 500;
     const message = error.message || "Internal Server Error";
     console.error("Internal Server Error:", err);
     if (res.headersSent) {
       return next(err);
     }
-    return res.status(status2).json({ message });
+    return res.status(status).json({ message });
   });
 }
 async function initStripe() {
   const configured = await isStripeConfigured();
   if (!configured) {
-    log2(
+    log(
       "Stripe is not configured - set STRIPE_SECRET_KEY (and STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET) to enable card, TWINT and wallet payments."
     );
     return;
   }
   const mode = await getStripeMode();
   if (!getStripeWebhookSecret()) {
-    log2("Stripe: STRIPE_WEBHOOK_SECRET is not set - payments cannot be confirmed.");
+    log("Stripe: STRIPE_WEBHOOK_SECRET is not set - payments cannot be confirmed.");
   }
-  log2(`Stripe ready in ${mode} mode`);
+  log(`Stripe ready in ${mode} mode`);
 }
 (async () => {
   try {
@@ -22335,6 +22909,7 @@ async function initStripe() {
   configureExpoAndLanding(app);
   registerPaymentRoutes(app);
   registerWhatsAppVerifyRoutes(app);
+  registerWhatsAppStoreRoutes(app);
   registerSuperAdminRoutes(app);
   registerBroadcastRoutes(app);
   registerCustomerExtraRoutes(app);
@@ -22345,11 +22920,11 @@ async function initStripe() {
   const port = parseInt(process.env.PORT || (isProduction ? "8081" : "5000"), 10);
   await new Promise((resolve3, reject) => {
     server.listen({ port, host: "0.0.0.0" }, () => {
-      log2(`express server serving on port ${port}`);
+      log(`express server serving on port ${port}`);
       resolve3();
     }).on("error", (err) => {
       if (err.code === "EADDRINUSE") {
-        log2(`[ERROR] Port ${port} is already in use.`);
+        log(`[ERROR] Port ${port} is already in use.`);
         process.exit(1);
       } else {
         reject(err);
@@ -22357,10 +22932,10 @@ async function initStripe() {
     });
   });
   await callerIdService.init(server);
-  whatsappService.autoConnect().catch((err) => log2("WhatsApp auto-connect error:", err));
-  initStripe().catch((err) => log2("Stripe init error (non-fatal):", err));
+  whatsappService.autoConnect().catch((err) => log("WhatsApp auto-connect error:", err));
+  initStripe().catch((err) => log("Stripe init error (non-fatal):", err));
   if (usingMySql) {
-    log2("MySQL mode active; skipping legacy Postgres-only startup migrations");
+    log("MySQL mode active; skipping legacy Postgres-only startup migrations");
   } else {
     try {
       const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
@@ -22382,9 +22957,9 @@ async function initStripe() {
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
-      log2("Platform tables ready");
+      log("Platform tables ready");
     } catch (err) {
-      log2("Error ensuring platform tables:", err);
+      log("Error ensuring platform tables:", err);
     }
     try {
       const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
@@ -22565,10 +23140,10 @@ async function initStripe() {
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS order_count integer DEFAULT 0;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS legacy_ref text;
     `);
-      log2("Customer extended columns migration complete");
-      log2("Schema migration complete");
+      log("Customer extended columns migration complete");
+      log("Schema migration complete");
     } catch (err) {
-      log2("Schema migration error (non-fatal):", err);
+      log("Schema migration error (non-fatal):", err);
     }
   }
   try {
@@ -22586,21 +23161,21 @@ async function initStripe() {
           role: "super_admin",
           isActive: true
         });
-        log2(`Super admin bootstrapped from environment: ${email}`);
+        log(`Super admin bootstrapped from environment: ${email}`);
       } else {
-        log2(
+        log(
           "[SECURITY] No super admin exists. Set SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD to bootstrap one \u2014 refusing to create a default account."
         );
       }
     }
   } catch (err) {
-    log2("Error checking super admin:", err);
+    log("Error checking super admin:", err);
   }
   try {
     const { seedPizzaLemon: seedPizzaLemon2 } = await Promise.resolve().then(() => (init_seedPizzaLemon(), seedPizzaLemon_exports));
     await seedPizzaLemon2();
   } catch (err) {
-    log2("Error seeding Pizza Lemon data:", err);
+    log("Error seeding Pizza Lemon data:", err);
   }
   try {
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
@@ -22646,22 +23221,22 @@ async function initStripe() {
           const r = await db2.execute(sql8.raw(`UPDATE \`${table}\` SET tenant_id = ${tid} WHERE tenant_id IS NULL`));
           const affected = r[0]?.affectedRows ?? 0;
           if (affected > 0) {
-            log2(`[migration] Fixed ${affected} rows in ${table}`);
+            log(`[migration] Fixed ${affected} rows in ${table}`);
             totalFixed += affected;
           }
         } catch {
         }
       }
-      if (totalFixed > 0) log2(`[migration] Total tenant_id backfill: ${totalFixed} rows \u2192 tenant ${tid}`);
-      else log2(`[migration] tenant_id backfill: nothing to fix`);
+      if (totalFixed > 0) log(`[migration] Total tenant_id backfill: ${totalFixed} rows \u2192 tenant ${tid}`);
+      else log(`[migration] tenant_id backfill: nothing to fix`);
     }
   } catch (err) {
-    log2("Error during tenant_id backfill:", err);
+    log("Error during tenant_id backfill:", err);
   }
   if (!isProduction) {
-    const http = await import("http");
+    const http2 = await import("http");
     const expoPort = 8080;
-    const proxy = http.createServer((req, res) => {
+    const proxy = http2.createServer((req, res) => {
       const targetPort = (req.url || "").startsWith("/api") ? port : expoPort;
       const options = {
         hostname: "127.0.0.1",
@@ -22670,7 +23245,7 @@ async function initStripe() {
         method: req.method,
         headers: req.headers
       };
-      const proxyReq = http.request(options, (proxyRes) => {
+      const proxyReq = http2.request(options, (proxyRes) => {
         res.writeHead(proxyRes.statusCode || 500, proxyRes.headers);
         proxyRes.pipe(res, { end: true });
       });
@@ -22681,7 +23256,7 @@ async function initStripe() {
       req.pipe(proxyReq, { end: true });
     });
     proxy.listen(8081, "0.0.0.0", () => {
-      log2(`proxy on port 8081 \u2192 Expo:${expoPort} (API\u2192${port}) (default preview)`);
+      log(`proxy on port 8081 \u2192 Expo:${expoPort} (API\u2192${port}) (default preview)`);
     });
   }
 })();
