@@ -97,9 +97,12 @@ const COPY = {
 };
 
 const SAMPLE: Record<string, string> = {
-  orderNumber: "#1042", storeName: "Kassenta", customerName: "Ahmad", customerPhone: "+963 944 123 456",
-  address: "Damascus, Mazzeh", items: "  1. Shawarma × 2 — 30,000\n  2. Ayran × 2 — 8,000", subtotal: "38,000",
-  deliveryFee: "5,000", total: "43,000", orderType: "🚚 Delivery", paymentMethod: "Cash", notes: "",
+  orderNumber: "DEL-1042", orderTime: "24/09/2026, 19:30", storeName: "Kassenta", customerName: "Ahmad",
+  customerPhone: "+963 944 123 456", orderType: "🚚 Delivery", table: "", address: "Damascus, Mazzeh, Floor 3",
+  scheduledAt: "", items: "▫️ 2 × Shawarma (Large) — 30,000\n      + Garlic sauce\n▫️ 2 × Ayran — 8,000",
+  itemCount: "4", subtotal: "38,000", discount: "3,000", deliveryFee: "5,000", total: "40,000",
+  paymentMethod: "Cash on delivery", notes: "Please ring twice", eta: "35 min",
+  trackingLink: "https://kassenta.com/track/…",
 };
 
 function render(text: string, vars: Record<string, string>) {

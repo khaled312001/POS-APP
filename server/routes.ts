@@ -2940,36 +2940,11 @@ async function test(){
       // ── WhatsApp notifications ────────────────────────────────
       try {
         const tenant = await storage.getTenant(resolvedTenantId);
-        const storeName = tenant?.businessName || "Online Store";
-        // Get store-specific admin phone from metadata, fallback to global platform setting
-        const storeAdminPhone = verifiedStorePhone(tenant?.metadata) || undefined;
-        const globalAdminPhone = await storage.getPlatformSetting("whatsapp_admin_phone");
-        const adminPhone = storeAdminPhone || globalAdminPhone || undefined;
-        // Notify admin
-        await whatsappService.sendOrderNotification({
-          orderNumber,
-          customerName: orderData.customerName,
-          customerPhone: orderData.customerPhone,
-          customerAddress: orderData.customerAddress,
-          items: orderData.items || [],
-          subtotal: orderData.subtotal,
-          deliveryFee: orderData.deliveryFee,
-          totalAmount: orderData.totalAmount,
-          orderType: orderData.orderType || "delivery",
-          paymentMethod: orderData.paymentMethod || "cash",
-          notes: orderData.notes,
-        }, storeName, adminPhone, resolvedTenantId);
-        // Confirm to customer
-        if (orderData.customerPhone) {
-          await whatsappService.sendCustomerConfirmation(
-            orderData.customerPhone,
-            orderNumber,
-            storeName,
-            orderData.totalAmount,
-            resolvedTenantId,
-            orderData.customerName,
-          );
-        }
+        // The store's verified number; unset → the store's own WhatsApp chat.
+        const adminPhone = verifiedStorePhone(tenant?.metadata) || undefined;
+        // From the store's own WhatsApp: the whole order to the store, and a
+        // confirmation with the whole order to the customer.
+        await whatsappService.orderPlaced(order as any, resolvedTenantId, adminPhone);
       } catch (waErr) {
         console.error("[WhatsApp] Failed to send order notifications:", waErr);
       }
@@ -3004,16 +2979,9 @@ async function test(){
       // WhatsApp status update to customer
       if (req.body.status && (order as any).customerPhone) {
         try {
-          const tenant = (order as any).tenantId ? await storage.getTenant((order as any).tenantId) : null;
-          const storeName = tenant?.businessName || "Store";
-          await whatsappService.sendStatusUpdate(
-            (order as any).customerPhone,
-            (order as any).orderNumber,
-            req.body.status,
-            storeName,
-            (order as any).tenantId || undefined,
-            (order as any).customerName,
-          );
+          if ((order as any).tenantId) {
+            await whatsappService.orderStatusChanged(order as any, req.body.status, (order as any).tenantId);
+          }
         } catch (waErr) {
           console.error("[WhatsApp] Failed to send status update:", waErr);
         }
@@ -4085,18 +4053,13 @@ async function test(){
         await recordPromoUsage(resolvedPromoId, customer?.id, order.id, finalDiscount);
       }
 
-      // Notify via WhatsApp
+      // WhatsApp from the store's own number: the whole order to the store
+      // (alert group / owner) and a confirmation to the customer.
       try {
+        const tenantRow = await storage.getTenant(Number(tenantId));
         const config = await storage.getLandingPageConfigByTenantId(Number(tenantId));
-        if (config?.socialWhatsapp) {
-          await whatsappService.sendMessage(
-            config.socialWhatsapp,
-            isDineIn
-              ? `🍽 New dine-in order #${orderNumber}\nTable: ${tableNumber || "N/A"}\nCustomer: ${customerName || customerPhone}\nTotal: ${totalAmount}`
-              : `🛎 New delivery order #${orderNumber}\nCustomer: ${customerName || customerPhone}\nTotal: ${totalAmount}\nAddress: ${customerAddress || "Pickup"}`,
-            Number(tenantId) || undefined,
-          );
-        }
+        const adminPhone = verifiedStorePhone(tenantRow?.metadata) || config?.socialWhatsapp || undefined;
+        whatsappService.orderPlaced(order as any, Number(tenantId), adminPhone).catch(() => {});
       } catch (_) {}
 
       // Broadcast to POS via WebSocket (public broadcast: (payload, tenantId))
@@ -4231,8 +4194,7 @@ async function test(){
       const order = await storage.getOnlineOrder(orderId);
       if (order?.customerPhone && (order as any).trackingToken) {
         try {
-          await whatsappService.sendMessage(order.customerPhone,
-            `🛵 Your order is on the way!\nTrack live: ${process.env.APP_URL || ""}/track/${(order as any).trackingToken}`, (order as any).tenantId || undefined);
+          if ((order as any).tenantId) await whatsappService.orderStatusChanged(order as any, "on_way", (order as any).tenantId);
         } catch (_) {}
       }
       callerIdService.broadcast({ type: "delivery_status_change", orderId, status: "on_way", driverName: driver.driverName }, driver.tenantId!);
@@ -4256,14 +4218,9 @@ async function test(){
         if (customerId) {
           await awardLoyaltyPoints(customerId, driver.tenantId!, orderId, Number(order.totalAmount));
         }
-        // Send rating request after delivery
-        if (order.customerPhone && (order as any).trackingToken) {
-          setTimeout(async () => {
-            try {
-              await whatsappService.sendMessage(order.customerPhone,
-                `⭐ How was your order?\nLeave a quick review: ${process.env.APP_URL || ""}/track/${(order as any).trackingToken}#rate`, (order as any).tenantId || undefined);
-            } catch (_) {}
-          }, 10 * 60 * 1000); // 10 minutes later
+        // "Delivered", with the whole order and the rating link, from the store's number
+        if (order.customerPhone && (order as any).tenantId) {
+          whatsappService.orderStatusChanged(order as any, "delivered", (order as any).tenantId).catch(() => {});
         }
       }
       callerIdService.broadcast({ type: "delivery_status_change", orderId, status: "delivered", driverName: driver.driverName }, driver.tenantId!);
@@ -4402,23 +4359,12 @@ async function test(){
       const orderId = Number(req.params.id);
       await storage.updateOnlineOrder(orderId, { status });
       const order = await storage.getOnlineOrder(orderId);
-      // Send WhatsApp to customer based on status (Food Tracker™ style)
-      if (order?.customerPhone) {
-        const messages: Record<string, string> = {
-          accepted: "✅ Your order has been confirmed and is being prepared!",
-          preparing: "👨‍🍳 Your order is being prepared fresh for you!",
-          ready: "✅ Your order is ready! The driver is collecting it now.",
-          delivered: "🎉 Your order has been delivered. Enjoy your meal!",
-          cancelled: "❌ Your order has been cancelled. Contact us if you need help.",
-        };
-        if (messages[status]) {
-          try {
-            const tid = (order as any).tenantId || undefined;
-            // Stores use their own templates (and their own number, if linked).
-            if (tid) await whatsappService.sendStatusUpdate(order.customerPhone, order.orderNumber, status, "", tid, order.customerName);
-            else await whatsappService.sendMessage(order.customerPhone, messages[status]);
-          } catch (_) {}
-        }
+      // WhatsApp to the customer from the store's own number, with the whole
+      // order (statuses without a template are skipped).
+      if (order?.customerPhone && order.tenantId) {
+        try {
+          await whatsappService.orderStatusChanged(order as any, status, order.tenantId);
+        } catch (_) {}
       }
       if (order?.tenantId) {
         callerIdService.broadcast({ type: "delivery_status_change", orderId, status }, order.tenantId);
