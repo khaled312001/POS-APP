@@ -7165,82 +7165,151 @@ var TEMPLATE_EVENTS = [
   "status_delivered",
   "status_cancelled"
 ];
-var TEMPLATE_VARIABLES = {
-  order_new: ["orderNumber", "storeName", "customerName", "customerPhone", "address", "items", "subtotal", "deliveryFee", "total", "orderType", "paymentMethod", "notes"],
-  order_confirmed: ["orderNumber", "storeName", "customerName", "total"],
-  status_accepted: ["orderNumber", "storeName", "customerName"],
-  status_preparing: ["orderNumber", "storeName", "customerName"],
-  status_ready: ["orderNumber", "storeName", "customerName"],
-  status_on_way: ["orderNumber", "storeName", "customerName"],
-  status_delivered: ["orderNumber", "storeName", "customerName"],
-  status_cancelled: ["orderNumber", "storeName", "customerName"]
+var ORDER_VARIABLES = [
+  "orderNumber",
+  "orderTime",
+  "storeName",
+  "customerName",
+  "customerPhone",
+  "orderType",
+  "table",
+  "address",
+  "scheduledAt",
+  "items",
+  "itemCount",
+  "subtotal",
+  "discount",
+  "deliveryFee",
+  "total",
+  "paymentMethod",
+  "notes",
+  "eta",
+  "trackingLink"
+];
+var TEMPLATE_VARIABLES = Object.fromEntries(
+  TEMPLATE_EVENTS.map((e) => [e, ORDER_VARIABLES])
+);
+var DETAILS = {
+  ar: (forStore) => [
+    "\u{1F9FE} \u0631\u0642\u0645 \u0627\u0644\u0637\u0644\u0628: {{orderNumber}}",
+    "\u{1F552} \u0627\u0644\u0648\u0642\u062A: {{orderTime}}",
+    "\u{1F464} \u0627\u0644\u0627\u0633\u0645: {{customerName}}",
+    ...forStore ? ["\u{1F4DE} \u0627\u0644\u0647\u0627\u062A\u0641: {{customerPhone}}"] : [],
+    "\u{1F4E6} \u0627\u0644\u0646\u0648\u0639: {{orderType}}",
+    "\u{1FA91} \u0627\u0644\u0637\u0627\u0648\u0644\u0629: {{table}}",
+    "\u{1F4CD} \u0627\u0644\u0639\u0646\u0648\u0627\u0646: {{address}}",
+    "\u{1F4C5} \u0645\u0648\u0639\u062F \u0627\u0644\u0627\u0633\u062A\u0644\u0627\u0645: {{scheduledAt}}",
+    "",
+    "\u{1F6CD} \u0627\u0644\u0623\u0635\u0646\u0627\u0641 ({{itemCount}}):",
+    "{{items}}",
+    "",
+    "\u0627\u0644\u0645\u062C\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064A: {{subtotal}}",
+    "\u0627\u0644\u062E\u0635\u0645: \u2212{{discount}}",
+    "\u0627\u0644\u062A\u0648\u0635\u064A\u0644: {{deliveryFee}}",
+    "\u{1F4B0} *\u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A: {{total}}*",
+    "\u{1F4B3} \u0627\u0644\u062F\u0641\u0639: {{paymentMethod}}",
+    "\u{1F4DD} \u0645\u0644\u0627\u062D\u0638\u0627\u062A: {{notes}}"
+  ],
+  en: (forStore) => [
+    "\u{1F9FE} Order: {{orderNumber}}",
+    "\u{1F552} Time: {{orderTime}}",
+    "\u{1F464} Name: {{customerName}}",
+    ...forStore ? ["\u{1F4DE} Phone: {{customerPhone}}"] : [],
+    "\u{1F4E6} Type: {{orderType}}",
+    "\u{1FA91} Table: {{table}}",
+    "\u{1F4CD} Address: {{address}}",
+    "\u{1F4C5} Scheduled for: {{scheduledAt}}",
+    "",
+    "\u{1F6CD} Items ({{itemCount}}):",
+    "{{items}}",
+    "",
+    "Subtotal: {{subtotal}}",
+    "Discount: \u2212{{discount}}",
+    "Delivery: {{deliveryFee}}",
+    "\u{1F4B0} *Total: {{total}}*",
+    "\u{1F4B3} Payment: {{paymentMethod}}",
+    "\u{1F4DD} Notes: {{notes}}"
+  ]
 };
+function customerMessage(lang, head2, tail) {
+  return [...head2, "", ...DETAILS[lang](false), "", ...tail].join("\n");
+}
 var DEFAULTS = {
   ar: {
-    order_new: [
-      "\u{1F6D2} \u0637\u0644\u0628 \u062C\u062F\u064A\u062F {{orderNumber}}",
-      "\u{1F464} {{customerName}}",
-      "\u{1F4DE} {{customerPhone}}",
-      "\u{1F4CD} {{address}}",
-      "",
-      "\u0627\u0644\u0623\u0635\u0646\u0627\u0641:",
-      "{{items}}",
-      "",
-      "\u0627\u0644\u0645\u062C\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064A: {{subtotal}}",
-      "\u0627\u0644\u062A\u0648\u0635\u064A\u0644: {{deliveryFee}}",
-      "\u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A: {{total}}",
-      "",
-      "\u0627\u0644\u0646\u0648\u0639: {{orderType}}",
-      "\u0627\u0644\u062F\u0641\u0639: {{paymentMethod}}",
-      "\u0645\u0644\u0627\u062D\u0638\u0627\u062A: {{notes}}"
-    ].join("\n"),
-    order_confirmed: [
-      "\u2705 \u062A\u0645 \u062A\u0623\u0643\u064A\u062F \u0637\u0644\u0628\u0643 {{orderNumber}}",
-      "",
-      "\u0634\u0643\u0631\u0627\u064B \u0644\u0637\u0644\u0628\u0643 \u0645\u0646 {{storeName}}!",
-      "\u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A: {{total}}",
-      "",
-      "\u0633\u0646\u0631\u0633\u0644 \u0644\u0643 \u062A\u062D\u062F\u064A\u062B\u0627\u064B \u0639\u0646\u062F \u062A\u062C\u0647\u064A\u0632 \u0637\u0644\u0628\u0643. \u0644\u0623\u064A \u0627\u0633\u062A\u0641\u0633\u0627\u0631 \u0631\u062F\u0651 \u0639\u0644\u0649 \u0647\u0630\u0647 \u0627\u0644\u0631\u0633\u0627\u0644\u0629."
-    ].join("\n"),
-    status_accepted: "{{storeName}} \u2014 \u0627\u0644\u0637\u0644\u0628 {{orderNumber}}\n\n\u2705 \u062A\u0645 \u0642\u0628\u0648\u0644 \u0637\u0644\u0628\u0643!",
-    status_preparing: "{{storeName}} \u2014 \u0627\u0644\u0637\u0644\u0628 {{orderNumber}}\n\n\u{1F468}\u200D\u{1F373} \u0637\u0644\u0628\u0643 \u0642\u064A\u062F \u0627\u0644\u062A\u062D\u0636\u064A\u0631\u2026",
-    status_ready: "{{storeName}} \u2014 \u0627\u0644\u0637\u0644\u0628 {{orderNumber}}\n\n\u{1F389} \u0637\u0644\u0628\u0643 \u062C\u0627\u0647\u0632!",
-    status_on_way: "{{storeName}} \u2014 \u0627\u0644\u0637\u0644\u0628 {{orderNumber}}\n\n\u{1F6F5} \u0637\u0644\u0628\u0643 \u0641\u064A \u0627\u0644\u0637\u0631\u064A\u0642 \u0625\u0644\u064A\u0643.",
-    status_delivered: "{{storeName}} \u2014 \u0627\u0644\u0637\u0644\u0628 {{orderNumber}}\n\n\u{1F680} \u062A\u0645 \u062A\u0648\u0635\u064A\u0644 \u0637\u0644\u0628\u0643. \u0628\u0627\u0644\u0647\u0646\u0627\u0621 \u0648\u0627\u0644\u0634\u0641\u0627\u0621!",
-    status_cancelled: "{{storeName}} \u2014 \u0627\u0644\u0637\u0644\u0628 {{orderNumber}}\n\n\u274C \u0646\u0623\u0633\u0641\u060C \u062A\u0645 \u0625\u0644\u063A\u0627\u0621 \u0637\u0644\u0628\u0643. \u062A\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627 \u0644\u0623\u064A \u0645\u0633\u0627\u0639\u062F\u0629."
+    order_new: ["\u{1F6D2} *\u0637\u0644\u0628 \u062C\u062F\u064A\u062F \u2014 {{storeName}}*", "", ...DETAILS.ar(true), "", "\u{1F517} {{trackingLink}}"].join("\n"),
+    order_confirmed: customerMessage(
+      "ar",
+      ["\u2705 *\u062A\u0645 \u0627\u0633\u062A\u0644\u0627\u0645 \u0637\u0644\u0628\u0643 \u2014 {{storeName}}*", "\u0634\u0643\u0631\u0627\u064B {{customerName}}! \u0648\u0635\u0644\u0646\u0627 \u0637\u0644\u0628\u0643 \u0648\u0633\u0646\u0628\u062F\u0623 \u0628\u062A\u062C\u0647\u064A\u0632\u0647."],
+      ["\u23F1 \u0627\u0644\u0648\u0642\u062A \u0627\u0644\u0645\u062A\u0648\u0642\u0639: {{eta}}", "\u{1F517} \u062A\u0627\u0628\u0639 \u0637\u0644\u0628\u0643: {{trackingLink}}", "", "\u0644\u0623\u064A \u0627\u0633\u062A\u0641\u0633\u0627\u0631 \u0631\u062F\u0651 \u0639\u0644\u0649 \u0647\u0630\u0647 \u0627\u0644\u0631\u0633\u0627\u0644\u0629."]
+    ),
+    status_accepted: customerMessage(
+      "ar",
+      ["\u2705 *\u062A\u0645 \u0642\u0628\u0648\u0644 \u0637\u0644\u0628\u0643 \u2014 {{storeName}}*"],
+      ["\u23F1 \u0627\u0644\u0648\u0642\u062A \u0627\u0644\u0645\u062A\u0648\u0642\u0639: {{eta}}", "\u{1F517} \u062A\u0627\u0628\u0639 \u0637\u0644\u0628\u0643: {{trackingLink}}"]
+    ),
+    status_preparing: customerMessage(
+      "ar",
+      ["\u{1F468}\u200D\u{1F373} *\u0637\u0644\u0628\u0643 \u0642\u064A\u062F \u0627\u0644\u062A\u062D\u0636\u064A\u0631 \u2014 {{storeName}}*"],
+      ["\u23F1 \u0627\u0644\u0648\u0642\u062A \u0627\u0644\u0645\u062A\u0648\u0642\u0639: {{eta}}", "\u{1F517} \u062A\u0627\u0628\u0639 \u0637\u0644\u0628\u0643: {{trackingLink}}"]
+    ),
+    status_ready: customerMessage(
+      "ar",
+      ["\u{1F389} *\u0637\u0644\u0628\u0643 \u062C\u0627\u0647\u0632 \u2014 {{storeName}}*"],
+      ["\u{1F517} \u062A\u0627\u0628\u0639 \u0637\u0644\u0628\u0643: {{trackingLink}}"]
+    ),
+    status_on_way: customerMessage(
+      "ar",
+      ["\u{1F6F5} *\u0637\u0644\u0628\u0643 \u0641\u064A \u0627\u0644\u0637\u0631\u064A\u0642 \u0625\u0644\u064A\u0643 \u2014 {{storeName}}*"],
+      ["\u{1F517} \u062A\u062A\u0628\u0651\u0639 \u0627\u0644\u0645\u0646\u062F\u0648\u0628 \u0645\u0628\u0627\u0634\u0631\u0629: {{trackingLink}}"]
+    ),
+    status_delivered: customerMessage(
+      "ar",
+      ["\u{1F680} *\u062A\u0645 \u062A\u0648\u0635\u064A\u0644 \u0637\u0644\u0628\u0643 \u2014 {{storeName}}*", "\u0628\u0627\u0644\u0647\u0646\u0627\u0621 \u0648\u0627\u0644\u0634\u0641\u0627\u0621! \u0634\u0643\u0631\u0627\u064B \u0644\u0627\u062E\u062A\u064A\u0627\u0631\u0643 \u0644\u0646\u0627."],
+      ["\u2B50 \u0642\u064A\u0651\u0645 \u0637\u0644\u0628\u0643: {{trackingLink}}"]
+    ),
+    status_cancelled: customerMessage(
+      "ar",
+      ["\u274C *\u062A\u0645 \u0625\u0644\u063A\u0627\u0621 \u0637\u0644\u0628\u0643 \u2014 {{storeName}}*", "\u0646\u0623\u0633\u0641 \u0644\u0630\u0644\u0643. \u0644\u0623\u064A \u0645\u0633\u0627\u0639\u062F\u0629 \u0631\u062F\u0651 \u0639\u0644\u0649 \u0647\u0630\u0647 \u0627\u0644\u0631\u0633\u0627\u0644\u0629."],
+      []
+    )
   },
   en: {
-    order_new: [
-      "\u{1F6D2} New Order {{orderNumber}}",
-      "\u{1F464} {{customerName}}",
-      "\u{1F4DE} {{customerPhone}}",
-      "\u{1F4CD} {{address}}",
-      "",
-      "Items:",
-      "{{items}}",
-      "",
-      "Subtotal: {{subtotal}}",
-      "Delivery: {{deliveryFee}}",
-      "Total: {{total}}",
-      "",
-      "Type: {{orderType}}",
-      "Payment: {{paymentMethod}}",
-      "Notes: {{notes}}"
-    ].join("\n"),
-    order_confirmed: [
-      "\u2705 Order Confirmed \u2014 {{orderNumber}}",
-      "",
-      "Thank you for ordering from {{storeName}}!",
-      "Total: {{total}}",
-      "",
-      "We'll update you when your order is being prepared. If you have questions, reply to this message."
-    ].join("\n"),
-    status_accepted: "{{storeName}} \u2014 Order {{orderNumber}}\n\n\u2705 Your order has been accepted!",
-    status_preparing: "{{storeName}} \u2014 Order {{orderNumber}}\n\n\u{1F468}\u200D\u{1F373} Your order is being prepared\u2026",
-    status_ready: "{{storeName}} \u2014 Order {{orderNumber}}\n\n\u{1F389} Your order is ready!",
-    status_on_way: "{{storeName}} \u2014 Order {{orderNumber}}\n\n\u{1F6F5} Your order is on the way.",
-    status_delivered: "{{storeName}} \u2014 Order {{orderNumber}}\n\n\u{1F680} Your order has been delivered. Enjoy!",
-    status_cancelled: "{{storeName}} \u2014 Order {{orderNumber}}\n\n\u274C Unfortunately your order has been cancelled."
+    order_new: ["\u{1F6D2} *New order \u2014 {{storeName}}*", "", ...DETAILS.en(true), "", "\u{1F517} {{trackingLink}}"].join("\n"),
+    order_confirmed: customerMessage(
+      "en",
+      ["\u2705 *We got your order \u2014 {{storeName}}*", "Thank you {{customerName}}! We'll start on it right away."],
+      ["\u23F1 Estimated time: {{eta}}", "\u{1F517} Follow your order: {{trackingLink}}", "", "Questions? Just reply to this message."]
+    ),
+    status_accepted: customerMessage(
+      "en",
+      ["\u2705 *Your order has been accepted \u2014 {{storeName}}*"],
+      ["\u23F1 Estimated time: {{eta}}", "\u{1F517} Follow your order: {{trackingLink}}"]
+    ),
+    status_preparing: customerMessage(
+      "en",
+      ["\u{1F468}\u200D\u{1F373} *Your order is being prepared \u2014 {{storeName}}*"],
+      ["\u23F1 Estimated time: {{eta}}", "\u{1F517} Follow your order: {{trackingLink}}"]
+    ),
+    status_ready: customerMessage(
+      "en",
+      ["\u{1F389} *Your order is ready \u2014 {{storeName}}*"],
+      ["\u{1F517} Follow your order: {{trackingLink}}"]
+    ),
+    status_on_way: customerMessage(
+      "en",
+      ["\u{1F6F5} *Your order is on the way \u2014 {{storeName}}*"],
+      ["\u{1F517} Track the driver live: {{trackingLink}}"]
+    ),
+    status_delivered: customerMessage(
+      "en",
+      ["\u{1F680} *Your order has been delivered \u2014 {{storeName}}*", "Enjoy, and thank you for choosing us!"],
+      ["\u2B50 Rate your order: {{trackingLink}}"]
+    ),
+    status_cancelled: customerMessage(
+      "en",
+      ["\u274C *Your order has been cancelled \u2014 {{storeName}}*", "We're sorry. Reply to this message if you need help."],
+      []
+    )
   }
 };
 function defaultTemplate(event, lang) {
@@ -7346,22 +7415,64 @@ function money2(v, currency) {
   }
   return `${n.toFixed(2)} ${currency}`;
 }
+var TIME_ZONE = { SYP: "Asia/Damascus", EGP: "Africa/Cairo", SAR: "Asia/Riyadh", AED: "Asia/Dubai" };
+function when(v, ctx) {
+  const d = v ? new Date(v) : null;
+  if (!d || isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: TIME_ZONE[ctx.currency] || "Europe/Zurich",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(d);
+}
+var BASE_URL = () => (process.env.APP_URL || "https://kassenta.com").replace(/\/$/, "");
 function orderVars(order, ctx) {
   const ar = ctx.lang === "ar";
-  const payment = ar ? { cash: "\u0646\u0642\u062F\u0627\u064B", card: "\u0628\u0637\u0627\u0642\u0629", shamcash: "\u0634\u0627\u0645 \u0643\u0627\u0634", online: "\u062F\u0641\u0639 \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A", credit: "\u0622\u062C\u0644" } : { cash: "Cash", card: "Card", shamcash: "Sham Cash", online: "Online", credit: "On account" };
+  const payment = ar ? { cash: "\u0646\u0642\u062F\u0627\u064B \u0639\u0646\u062F \u0627\u0644\u0627\u0633\u062A\u0644\u0627\u0645", card: "\u0628\u0637\u0627\u0642\u0629", stripe: "\u0628\u0637\u0627\u0642\u0629", shamcash: "\u0634\u0627\u0645 \u0643\u0627\u0634", online: "\u062F\u0641\u0639 \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A", credit: "\u0622\u062C\u0644", wallet: "\u0627\u0644\u0645\u062D\u0641\u0638\u0629" } : { cash: "Cash on delivery", card: "Card", stripe: "Card", shamcash: "Sham Cash", online: "Online", credit: "On account", wallet: "Wallet" };
+  const types = ar ? { delivery: "\u{1F69A} \u062A\u0648\u0635\u064A\u0644", pickup: "\u{1F3EA} \u0627\u0633\u062A\u0644\u0627\u0645 \u0645\u0646 \u0627\u0644\u0645\u062A\u062C\u0631", dine_in: "\u{1F37D} \u062F\u0627\u062E\u0644 \u0627\u0644\u0645\u0637\u0639\u0645" } : { delivery: "\u{1F69A} Delivery", pickup: "\u{1F3EA} Pickup", dine_in: "\u{1F37D} Dine-in" };
+  const items = Array.isArray(order.items) ? order.items : [];
+  const itemLines = items.map((i) => {
+    const qty = Number(i.quantity) || 1;
+    const lineTotal = i.total != null ? Number(i.total) : Number(i.unitPrice) * qty;
+    const lines = [`\u25AB\uFE0F ${qty} \xD7 ${i.name}${i.variant ? ` (${i.variant})` : ""} \u2014 ${money2(lineTotal, ctx.currency)}`];
+    const mods = Array.isArray(i.modifiers) ? i.modifiers.filter(Boolean) : [];
+    if (mods.length) lines.push(`      + ${mods.join(ar ? "\u060C " : ", ")}`);
+    if (i.notes) lines.push(`      \u{1F4DD} ${i.notes}`);
+    return lines.join("\n");
+  });
+  const address = [
+    order.customerAddress,
+    order.buildingName,
+    order.floor ? ar ? `\u0627\u0644\u0637\u0627\u0628\u0642 ${order.floor}` : `Floor ${order.floor}` : "",
+    order.addressNotes
+  ].map((x) => x == null ? "" : String(x).trim()).filter(Boolean).join(ar ? "\u060C " : ", ");
+  const paid = order.paymentStatus === "paid" ? ar ? " \u2705 \u0645\u062F\u0641\u0648\u0639" : " \u2705 paid" : "";
+  const discount = Number(order.discountAmount) || 0;
+  const fee = Number(order.deliveryFee) || 0;
   return {
     orderNumber: order.orderNumber,
+    orderTime: when(order.createdAt || /* @__PURE__ */ new Date(), ctx),
     storeName: ctx.name,
     customerName: order.customerName,
     customerPhone: order.customerPhone,
-    address: order.customerAddress || "",
-    items: (order.items || []).map((i, idx) => `  ${idx + 1}. ${i.name} \xD7 ${i.quantity} \u2014 ${money2(i.unitPrice, ctx.currency)}`).join("\n"),
+    orderType: types[order.orderType] || order.orderType,
+    table: order.tableNumber || "",
+    address: order.orderType === "delivery" ? address : "",
+    scheduledAt: when(order.scheduledAt, ctx),
+    items: itemLines.join("\n"),
+    itemCount: String(items.reduce((n, i) => n + (Number(i.quantity) || 1), 0)),
     subtotal: money2(order.subtotal, ctx.currency),
-    deliveryFee: order.deliveryFee && Number(order.deliveryFee) > 0 ? money2(order.deliveryFee, ctx.currency) : "",
+    discount: discount > 0 ? money2(discount, ctx.currency) : "",
+    deliveryFee: fee > 0 ? money2(fee, ctx.currency) : "",
     total: money2(order.totalAmount, ctx.currency),
-    orderType: order.orderType === "delivery" ? ar ? "\u{1F69A} \u062A\u0648\u0635\u064A\u0644" : "\u{1F69A} Delivery" : ar ? "\u{1F3EA} \u0627\u0633\u062A\u0644\u0627\u0645" : "\u{1F3EA} Pickup",
-    paymentMethod: payment[order.paymentMethod] || order.paymentMethod,
-    notes: order.notes || ""
+    paymentMethod: (payment[order.paymentMethod] || order.paymentMethod) + paid,
+    notes: order.notes || "",
+    eta: order.estimatedTime ? ar ? `${order.estimatedTime} \u062F\u0642\u064A\u0642\u0629` : `${order.estimatedTime} min` : "",
+    trackingLink: order.trackingToken ? `${BASE_URL()}/track/${order.trackingToken}` : ""
   };
 }
 function templateText(ctx, event, vars) {
@@ -7413,19 +7524,22 @@ var whatsappService = {
     return this.sendText(phone, text2, tenantId);
   },
   /**
-   * Send from the store's own WhatsApp when it is linked, else from the
-   * platform number. true = sent, or queued on a linked session (it goes
-   * out as soon as the session is back).
+   * With a tenantId: from that store's own WhatsApp only (true = sent, or
+   * queued on its linked session and sent once it is back). A store that
+   * hasn't linked a number sends nothing. Without one: the platform number
+   * (login/verification codes, system messages).
    */
   async sendText(phone, text2, tenantId) {
     if (!phone || !text2) return false;
     if (tenantId) {
       const s = await storeSession(tenantId);
-      if (s.linked || s.status === "connected") {
-        const r2 = await sendVia(storeKey(tenantId), phone, text2);
-        if (r2.ok || r2.queued) return true;
-        console.log(`[WhatsApp] store ${tenantId} send failed (${r2.error}) \u2014 trying the platform number`);
+      if (!s.linked && s.status !== "connected") {
+        console.log(`[WhatsApp] store ${tenantId} has no linked WhatsApp \u2014 message to ${phone} not sent`);
+        return false;
       }
+      const r2 = await sendVia(storeKey(tenantId), phone, text2);
+      if (!r2.ok && !r2.queued) console.log(`[WhatsApp] store ${tenantId} send failed: ${r2.error}`);
+      return r2.ok || !!r2.queued;
     }
     if (!platform.linked && platform.status !== "connected") await refreshPlatform();
     if (!platform.linked && platform.status !== "connected") {
@@ -7461,51 +7575,48 @@ var whatsappService = {
   async storeMarkRead(tenantId, jid) {
     return bridge("POST", "/read", { key: storeKey(tenantId), jid });
   },
-  // ── Order messages ──────────────────────────────────────────────────────
-  async sendOrderNotification(order, storeName, adminPhone, tenantId) {
-    if (tenantId) {
-      const ctx2 = await storeContext(tenantId);
-      const text2 = templateText(ctx2, "order_new", orderVars(order, ctx2));
-      if (!text2) return false;
-      const s = await storeSession(tenantId);
-      if (s.linked || s.status === "connected") {
-        const alerts = ctx2.meta.whatsappAlerts || {};
-        const targets = /* @__PURE__ */ new Set();
-        if (alerts.groupJid && alerts.groupEnabled !== false) targets.add(alerts.groupJid);
-        if (alerts.notifyOwner !== false) {
-          const owner = adminPhone || s.phone;
-          if (owner) targets.add(owner.replace(/\D/g, ""));
-        }
-        let any = false;
-        for (const to of targets) {
-          const r = await sendVia(storeKey(tenantId), to, text2);
-          any = any || r.ok || !!r.queued;
-        }
-        return any;
-      }
-      if (!adminPhone) return false;
-      return this.sendText(adminPhone, text2);
+  // ── Order messages (always from the store's own number) ───────────────
+  /** New order → the store: its alert group and/or the owner's number. */
+  async sendOrderNotification(order, _storeName, adminPhone, tenantId) {
+    if (!tenantId) return false;
+    const s = await storeSession(tenantId);
+    if (!s.linked && s.status !== "connected") return false;
+    const ctx = await storeContext(tenantId);
+    const text2 = templateText(ctx, "order_new", orderVars(order, ctx));
+    if (!text2) return false;
+    const alerts = ctx.meta.whatsappAlerts || {};
+    const targets = /* @__PURE__ */ new Set();
+    if (alerts.groupJid && alerts.groupEnabled !== false) targets.add(alerts.groupJid);
+    if (alerts.notifyOwner !== false) {
+      const owner = String(adminPhone || s.phone || "").replace(/\D/g, "");
+      if (owner) targets.add(owner);
     }
-    if (!adminPhone) return false;
-    const ctx = { name: storeName || "Store", meta: {}, currency: "CHF", lang: "en" };
-    return this.sendText(adminPhone, renderTemplate(resolveTemplate(void 0, "order_new", "en").text, orderVars(order, ctx)));
+    let any = false;
+    for (const to of targets) {
+      const r = await sendVia(storeKey(tenantId), to, text2);
+      any = any || r.ok || !!r.queued;
+    }
+    return any;
   },
-  async sendCustomerConfirmation(customerPhone, orderNumber, storeName, totalAmount, tenantId, customerName) {
-    const ctx = tenantId ? await storeContext(tenantId) : { name: storeName, meta: {}, currency: "CHF", lang: "en" };
-    const text2 = templateText(ctx, "order_confirmed", {
-      orderNumber,
-      storeName: ctx.name,
-      customerName: customerName || "",
-      total: money2(totalAmount, ctx.currency)
-    });
-    return text2 ? this.sendText(customerPhone, text2, tenantId) : false;
+  /** New order → the customer: confirmation with the whole order. */
+  async sendOrderConfirmation(order, tenantId) {
+    if (!order.customerPhone || !tenantId) return false;
+    const ctx = await storeContext(tenantId);
+    const text2 = templateText(ctx, "order_confirmed", orderVars(order, ctx));
+    return text2 ? this.sendText(order.customerPhone, text2, tenantId) : false;
   },
-  async sendStatusUpdate(customerPhone, orderNumber, newStatus, storeName, tenantId, customerName) {
-    const event = statusEvent(newStatus);
-    if (!event) return false;
-    const ctx = tenantId ? await storeContext(tenantId) : { name: storeName, meta: {}, currency: "CHF", lang: "en" };
-    const text2 = templateText(ctx, event, { orderNumber, storeName: ctx.name, customerName: customerName || "" });
-    return text2 ? this.sendText(customerPhone, text2, tenantId) : false;
+  /** Both messages for a new order. */
+  async orderPlaced(order, tenantId, adminPhone) {
+    await this.sendOrderNotification(order, void 0, adminPhone, tenantId).catch((e) => console.error("[WhatsApp] store alert failed:", e?.message || e));
+    await this.sendOrderConfirmation(order, tenantId).catch((e) => console.error("[WhatsApp] customer confirmation failed:", e?.message || e));
+  },
+  /** Status change → the customer, with the whole order. */
+  async orderStatusChanged(order, status, tenantId) {
+    const event = statusEvent(status);
+    if (!event || !order.customerPhone || !tenantId) return false;
+    const ctx = await storeContext(tenantId);
+    const text2 = templateText(ctx, event, orderVars(order, ctx));
+    return text2 ? this.sendText(order.customerPhone, text2, tenantId) : false;
   },
   // ── Delivery Platform Notifications ───────────────────────────────────────
   /** Notify driver about new assignment + deep link to driver PWA */
@@ -11679,33 +11790,8 @@ async function test(){
       });
       try {
         const tenant = await storage.getTenant(resolvedTenantId);
-        const storeName = tenant?.businessName || "Online Store";
-        const storeAdminPhone = verifiedStorePhone(tenant?.metadata) || void 0;
-        const globalAdminPhone = await storage.getPlatformSetting("whatsapp_admin_phone");
-        const adminPhone = storeAdminPhone || globalAdminPhone || void 0;
-        await whatsappService.sendOrderNotification({
-          orderNumber,
-          customerName: orderData.customerName,
-          customerPhone: orderData.customerPhone,
-          customerAddress: orderData.customerAddress,
-          items: orderData.items || [],
-          subtotal: orderData.subtotal,
-          deliveryFee: orderData.deliveryFee,
-          totalAmount: orderData.totalAmount,
-          orderType: orderData.orderType || "delivery",
-          paymentMethod: orderData.paymentMethod || "cash",
-          notes: orderData.notes
-        }, storeName, adminPhone, resolvedTenantId);
-        if (orderData.customerPhone) {
-          await whatsappService.sendCustomerConfirmation(
-            orderData.customerPhone,
-            orderNumber,
-            storeName,
-            orderData.totalAmount,
-            resolvedTenantId,
-            orderData.customerName
-          );
-        }
+        const adminPhone = verifiedStorePhone(tenant?.metadata) || void 0;
+        await whatsappService.orderPlaced(order, resolvedTenantId, adminPhone);
       } catch (waErr) {
         console.error("[WhatsApp] Failed to send order notifications:", waErr);
       }
@@ -11734,16 +11820,9 @@ async function test(){
       }
       if (req.body.status && order.customerPhone) {
         try {
-          const tenant = order.tenantId ? await storage.getTenant(order.tenantId) : null;
-          const storeName = tenant?.businessName || "Store";
-          await whatsappService.sendStatusUpdate(
-            order.customerPhone,
-            order.orderNumber,
-            req.body.status,
-            storeName,
-            order.tenantId || void 0,
-            order.customerName
-          );
+          if (order.tenantId) {
+            await whatsappService.orderStatusChanged(order, req.body.status, order.tenantId);
+          }
         } catch (waErr) {
           console.error("[WhatsApp] Failed to send status update:", waErr);
         }
@@ -12825,20 +12904,11 @@ Your login code: *${otp}*
         await recordPromoUsage(resolvedPromoId, customer?.id, order.id, finalDiscount);
       }
       try {
+        const tenantRow = await storage.getTenant(Number(tenantId));
         const config = await storage.getLandingPageConfigByTenantId(Number(tenantId));
-        if (config?.socialWhatsapp) {
-          await whatsappService.sendMessage(
-            config.socialWhatsapp,
-            isDineIn ? `\u{1F37D} New dine-in order #${orderNumber}
-Table: ${tableNumber || "N/A"}
-Customer: ${customerName || customerPhone}
-Total: ${totalAmount}` : `\u{1F6CE} New delivery order #${orderNumber}
-Customer: ${customerName || customerPhone}
-Total: ${totalAmount}
-Address: ${customerAddress || "Pickup"}`,
-            Number(tenantId) || void 0
-          );
-        }
+        const adminPhone = verifiedStorePhone(tenantRow?.metadata) || config?.socialWhatsapp || void 0;
+        whatsappService.orderPlaced(order, Number(tenantId), adminPhone).catch(() => {
+        });
       } catch (_) {
       }
       try {
@@ -12974,12 +13044,7 @@ Address: ${customerAddress || "Pickup"}`,
       const order = await storage.getOnlineOrder(orderId);
       if (order?.customerPhone && order.trackingToken) {
         try {
-          await whatsappService.sendMessage(
-            order.customerPhone,
-            `\u{1F6F5} Your order is on the way!
-Track live: ${process.env.APP_URL || ""}/track/${order.trackingToken}`,
-            order.tenantId || void 0
-          );
+          if (order.tenantId) await whatsappService.orderStatusChanged(order, "on_way", order.tenantId);
         } catch (_) {
         }
       }
@@ -13004,18 +13069,9 @@ Track live: ${process.env.APP_URL || ""}/track/${order.trackingToken}`,
         if (customerId) {
           await awardLoyaltyPoints(customerId, driver.tenantId, orderId, Number(order.totalAmount));
         }
-        if (order.customerPhone && order.trackingToken) {
-          setTimeout(async () => {
-            try {
-              await whatsappService.sendMessage(
-                order.customerPhone,
-                `\u2B50 How was your order?
-Leave a quick review: ${process.env.APP_URL || ""}/track/${order.trackingToken}#rate`,
-                order.tenantId || void 0
-              );
-            } catch (_) {
-            }
-          }, 10 * 60 * 1e3);
+        if (order.customerPhone && order.tenantId) {
+          whatsappService.orderStatusChanged(order, "delivered", order.tenantId).catch(() => {
+          });
         }
       }
       callerIdService.broadcast({ type: "delivery_status_change", orderId, status: "delivered", driverName: driver.driverName }, driver.tenantId);
@@ -13163,21 +13219,10 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`,
       const orderId = Number(req.params.id);
       await storage.updateOnlineOrder(orderId, { status });
       const order = await storage.getOnlineOrder(orderId);
-      if (order?.customerPhone) {
-        const messages = {
-          accepted: "\u2705 Your order has been confirmed and is being prepared!",
-          preparing: "\u{1F468}\u200D\u{1F373} Your order is being prepared fresh for you!",
-          ready: "\u2705 Your order is ready! The driver is collecting it now.",
-          delivered: "\u{1F389} Your order has been delivered. Enjoy your meal!",
-          cancelled: "\u274C Your order has been cancelled. Contact us if you need help."
-        };
-        if (messages[status]) {
-          try {
-            const tid = order.tenantId || void 0;
-            if (tid) await whatsappService.sendStatusUpdate(order.customerPhone, order.orderNumber, status, "", tid, order.customerName);
-            else await whatsappService.sendMessage(order.customerPhone, messages[status]);
-          } catch (_) {
-          }
+      if (order?.customerPhone && order.tenantId) {
+        try {
+          await whatsappService.orderStatusChanged(order, status, order.tenantId);
+        } catch (_) {
         }
       }
       if (order?.tenantId) {
@@ -22215,7 +22260,14 @@ function configureExpoAndLanding(app2) {
         isLogin ? "super-admin-login.html" : "super-admin-dashboard.html"
       );
       try {
-        const superAdminTemplate = fs5.readFileSync(superAdminTemplatePath, "utf-8");
+        let superAdminTemplate = fs5.readFileSync(superAdminTemplatePath, "utf-8");
+        if (superAdminTemplate.includes("<!--SA_I18N-->")) {
+          try {
+            const i18n = fs5.readFileSync(path4.resolve(process.cwd(), "server", "templates", "super-admin-i18n.js"), "utf-8");
+            superAdminTemplate = superAdminTemplate.replace("<!--SA_I18N-->", () => `<script>${i18n}</script>`);
+          } catch {
+          }
+        }
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
         return res.status(200).send(superAdminTemplate);
