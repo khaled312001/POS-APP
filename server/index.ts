@@ -372,7 +372,15 @@ function configureExpoAndLanding(app: express.Application) {
         isLogin ? "super-admin-login.html" : "super-admin-dashboard.html"
       );
       try {
-        const superAdminTemplate = fs.readFileSync(superAdminTemplatePath, "utf-8");
+        let superAdminTemplate = fs.readFileSync(superAdminTemplatePath, "utf-8");
+        // English / German / Arabic: the translation layer is inlined where
+        // the page marks it (server/templates/super-admin-i18n.js).
+        if (superAdminTemplate.includes("<!--SA_I18N-->")) {
+          try {
+            const i18n = fs.readFileSync(path.resolve(process.cwd(), "server", "templates", "super-admin-i18n.js"), "utf-8");
+            superAdminTemplate = superAdminTemplate.replace("<!--SA_I18N-->", () => `<script>${i18n}</script>`);
+          } catch { }
+        }
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         // Auth pages must never be cached by the browser — a stale cached copy
         // reintroduces old redirect logic after a fix/deploy.
