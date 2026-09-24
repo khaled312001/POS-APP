@@ -144,7 +144,10 @@ export function normalizeStorePhone(raw: string, currency: string = getCurrency(
   else if (digits.startsWith("00")) digits = digits.slice(2);
   else if (digits.startsWith("0")) digits = "963" + digits.slice(1); // 09xxxxxxxx / 011xxxxxxx
   else if (/^9\d{8}$/.test(digits)) digits = "963" + digits; // 9xxxxxxxx (mobile without 0)
-  return digits.replace(/\D/g, "");
+  // Same spelling as the server and the storefront (server/phone.ts: +963…),
+  // so a customer the till saves is the one who orders online.
+  digits = digits.replace(/\D/g, "");
+  return digits ? "+" + digits : "";
 }
 
 /**
@@ -160,7 +163,7 @@ export function isValidStorePhone(raw: string, currency: string = getCurrency())
     return /^\+?[\d]+$/.test(cleaned) && d.length >= 6 && d.length <= 15;
   }
   if (!/^\+?\d+$/.test(cleaned)) return false;
-  const n = normalizeStorePhone(cleaned, currency);
+  const n = normalizeStorePhone(cleaned, currency).replace(/^\+/, "");
   if (n.startsWith("963")) return /^963\d{8,9}$/.test(n) && !(n[3] === "9" && n.length !== 12);
   return n.length >= 8 && n.length <= 15;
 }
