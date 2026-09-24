@@ -13,6 +13,7 @@
  * No handler here ever accepts an amount for an order or a sale. Amounts come
  * from the stored record - see paymentService.ts.
  */
+import { verifyPlanToken } from "./planSignup";
 import type { Express, Request, Response } from "express";
 import express from "express";
 import { requireAdmin, type EmployeeRequest } from "./employeeAuth";
@@ -383,6 +384,14 @@ export function registerPaymentRoutes(app: Express): void {
         const rows = await q(
           `SELECT b.tenant_id FROM sales s JOIN branches b ON b.id = s.branch_id WHERE s.id = ? LIMIT 1`, [Number(saleId)]);
         if (!rows.length || Number(rows[0].tenant_id) !== licenceTenant) return res.status(404).json({ error: "Sale not found" });
+      }
+
+      // A plan bought from the app's plans page names its store with the
+      // plan token from Google sign-in.
+      if (planId && req.body?.planToken) {
+        const who = verifyPlanToken(req.body.planToken);
+        if (!who) return res.status(401).json({ error: "Sign in with Google again." });
+        licenceTenant = who.tenantId;
       }
 
       const base = process.env.PUBLIC_BASE_URL || `https://${req.get("host")}`;

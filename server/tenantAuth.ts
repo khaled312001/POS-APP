@@ -43,6 +43,7 @@ const PUBLIC_ROUTES = [
   "/api/health",
   "/api/license/validate",
   "/api/auth/google",
+  "/api/auth/plan-status",         // plans page: signed plan token, see planSignup.ts
   "/api/landing/subscribe",
   "/api/landing/plans",             // Public plan catalogue for the pricing page
   "/api/landing/checkout-session",  // Read-only Checkout status for /pay/success

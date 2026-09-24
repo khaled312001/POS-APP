@@ -29,6 +29,182 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
+// server/jwtSecret.ts
+function resolveSecret() {
+  const fromEnv = process.env.JWT_SECRET;
+  if (fromEnv && fromEnv.length >= 32) return fromEnv;
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "[SECURITY] JWT_SECRET is not set (or too short). Using a random per-process secret; all sessions will be invalidated on restart. Set a strong JWT_SECRET (>=32 chars) in the environment."
+    );
+  }
+  return import_crypto.default.randomBytes(48).toString("hex");
+}
+var import_crypto, JWT_SECRET;
+var init_jwtSecret = __esm({
+  "server/jwtSecret.ts"() {
+    "use strict";
+    import_crypto = __toESM(require("crypto"));
+    JWT_SECRET = resolveSecret();
+  }
+});
+
+// server/employeeAuth.ts
+function employeeAuthMode() {
+  return process.env.EMPLOYEE_AUTH_MODE === "strict" ? "strict" : "soft";
+}
+function generateEmployeeToken(claims) {
+  return import_jsonwebtoken.default.sign(claims, JWT_SECRET, { expiresIn: TOKEN_TTL });
+}
+function verifyEmployeeToken(token) {
+  try {
+    return import_jsonwebtoken.default.verify(token, JWT_SECRET);
+  } catch {
+    return null;
+  }
+}
+function isHashedPin(stored) {
+  return typeof stored === "string" && stored.startsWith("$2");
+}
+function hashPin(pin) {
+  return import_bcrypt.default.hash(pin, BCRYPT_ROUNDS);
+}
+async function verifyPin(pin, stored) {
+  if (!stored || !pin) return false;
+  if (isHashedPin(stored)) return import_bcrypt.default.compare(pin, stored);
+  return stored === pin;
+}
+function attachEmployee() {
+  return (req, _res, next) => {
+    const raw = req.headers[EMPLOYEE_TOKEN_HEADER];
+    const token = Array.isArray(raw) ? raw[0] : raw;
+    if (token) {
+      const claims = verifyEmployeeToken(token);
+      if (claims) req.employee = claims;
+    }
+    next();
+  };
+}
+function requireRole(...roles) {
+  const allowed = /* @__PURE__ */ new Set([...roles, "owner", "admin"]);
+  return (req, res, next) => {
+    const emp = req.employee;
+    if (!emp) {
+      if (employeeAuthMode() === "strict") {
+        return res.status(401).json({
+          error: "Employee authentication required",
+          code: "EMPLOYEE_TOKEN_REQUIRED"
+        });
+      }
+      console.warn(
+        `[employeeAuth] soft-mode passthrough: ${req.method} ${req.path} \u2014 no employee token`
+      );
+      return next();
+    }
+    if (typeof req.tenantId === "number" && typeof emp.tenantId === "number" && emp.tenantId !== req.tenantId) {
+      return res.status(403).json({ error: "Employee does not belong to this tenant" });
+    }
+    if (!allowed.has(emp.role) && !emp.permissions?.some((p) => allowed.has(p))) {
+      return res.status(403).json({
+        error: "Insufficient permissions",
+        code: "FORBIDDEN_ROLE",
+        required: [...allowed]
+      });
+    }
+    next();
+  };
+}
+function guardTenantRoutes() {
+  return (req, res, next) => {
+    if (!req.path.startsWith("/api")) return next();
+    if (req.path.startsWith("/api/super-admin")) return next();
+    if (GUARD_EXEMPT.some((re) => re.test(req.path))) return next();
+    const rule = ROUTE_RULES.find(
+      (r) => r.methods.includes(req.method) && r.path.test(req.path)
+    );
+    if (!rule) return next();
+    return requireRole(...rule.roles)(req, res, next);
+  };
+}
+var import_jsonwebtoken, import_bcrypt, EMPLOYEE_TOKEN_HEADER, TOKEN_TTL, BCRYPT_ROUNDS, requireManager, requireAdmin, requireStaff, GUARD_EXEMPT, ROUTE_RULES;
+var init_employeeAuth = __esm({
+  "server/employeeAuth.ts"() {
+    "use strict";
+    import_jsonwebtoken = __toESM(require("jsonwebtoken"));
+    import_bcrypt = __toESM(require("bcrypt"));
+    init_jwtSecret();
+    EMPLOYEE_TOKEN_HEADER = "x-employee-token";
+    TOKEN_TTL = "12h";
+    BCRYPT_ROUNDS = 10;
+    requireManager = requireRole("manager");
+    requireAdmin = requireRole();
+    requireStaff = requireRole("manager", "cashier");
+    GUARD_EXEMPT = [
+      /^\/api\/employees\/login$/
+      // the login itself cannot require a login
+    ];
+    ROUTE_RULES = [
+      // Catalogue & stock — cashiers are read-only.
+      {
+        methods: ["POST", "PUT", "PATCH", "DELETE"],
+        path: /^\/api\/(products|categories|inventory|suppliers|purchase-orders|stock-counts)(\/|$)/,
+        roles: ["manager"],
+        label: "catalogue"
+      },
+      // Store-level configuration and staff — owner/admin only.
+      {
+        methods: ["POST", "PUT", "PATCH", "DELETE"],
+        path: /^\/api\/(branches|employees)(\/|$)/,
+        roles: [],
+        label: "store-admin"
+      },
+      // Destructive customer/sale operations.
+      {
+        methods: ["DELETE"],
+        path: /^\/api\/(customers|sales|returns)(\/|$)/,
+        roles: ["manager"],
+        label: "destructive"
+      },
+      // Business intelligence — hidden from cashiers.
+      {
+        methods: ["GET"],
+        path: /^\/api\/(reports|analytics)(\/|$)/,
+        roles: ["manager"],
+        label: "reporting"
+      },
+      // Operational settings.
+      {
+        methods: ["PUT", "PATCH", "POST"],
+        path: /^\/api\/(store-settings|payment-gateway|vehicles|table-qr-codes)(\/|$)/,
+        roles: ["manager"],
+        label: "operations"
+      },
+      // Promo codes and delivery zones — the real paths (/api/promo-codes and
+      // /api/delivery-zones never existed, so these were open to cashiers).
+      {
+        methods: ["POST", "PUT", "PATCH", "DELETE"],
+        path: /^\/api\/delivery\/(promos|manage\/zones)(\/|$)/,
+        roles: ["manager"],
+        label: "delivery-settings"
+      },
+      // Deleting a QR code, vehicle, online order or expense is a manager decision.
+      {
+        methods: ["DELETE"],
+        path: /^\/api\/(vehicles|table-qr-codes|online-orders|expenses)(\/|$)/,
+        roles: ["manager"],
+        label: "operations-delete"
+      },
+      // Backups contain the whole tenant database.
+      {
+        methods: ["POST", "PUT", "DELETE"],
+        path: /^\/api\/backup(\/|$)/,
+        roles: [],
+        label: "backup"
+      }
+    ];
+  }
+});
+
 // shared/schema.ts
 var schema_exports = {};
 __export(schema_exports, {
@@ -1679,6 +1855,7 @@ var import_drizzle_orm, fs, storage;
 var init_storage = __esm({
   "server/storage.ts"() {
     "use strict";
+    init_employeeAuth();
     init_db();
     import_drizzle_orm = require("drizzle-orm");
     init_storeTime();
@@ -1783,16 +1960,16 @@ var init_storage = __esm({
       // Products
       async getProducts(search) {
         if (search) {
-          const q8 = `%${search.toLowerCase()}%`;
+          const q9 = `%${search.toLowerCase()}%`;
           return db.select().from(products).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q8}`,
-                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q8}`,
-                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q8}`,
-                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q8}`,
-                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q8}`
+                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q9}`,
+                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q9}`,
+                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q9}`,
+                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q9}`,
+                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q9}`
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -1801,17 +1978,17 @@ var init_storage = __esm({
       },
       async getProductsByTenant(tenantId, search) {
         if (search) {
-          const q8 = `%${search.toLowerCase()}%`;
+          const q9 = `%${search.toLowerCase()}%`;
           return db.select().from(products).where(
             (0, import_drizzle_orm.and)(
               (0, import_drizzle_orm.eq)(products.tenantId, tenantId),
               (0, import_drizzle_orm.eq)(products.isActive, true),
               (0, import_drizzle_orm.or)(
-                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q8}`,
-                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q8}`,
-                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q8}`,
-                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q8}`,
-                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q8}`
+                import_drizzle_orm.sql`LOWER(${products.name}) LIKE ${q9}`,
+                import_drizzle_orm.sql`LOWER(${products.nameAr}) LIKE ${q9}`,
+                import_drizzle_orm.sql`LOWER(${products.sku}) LIKE ${q9}`,
+                import_drizzle_orm.sql`LOWER(${products.barcode}) LIKE ${q9}`,
+                import_drizzle_orm.sql`LOWER(${products.description}) LIKE ${q9}`
               )
             )
           ).orderBy((0, import_drizzle_orm.desc)(products.createdAt));
@@ -2535,12 +2712,12 @@ var init_storage = __esm({
           if (!ids.length) return [];
           where = (0, import_drizzle_orm.inArray)(sales.branchId, ids);
         }
-        const q8 = db.select({
+        const q9 = db.select({
           method: sales.paymentMethod,
           count: import_drizzle_orm.sql`count(*)`,
           total: import_drizzle_orm.sql`coalesce(sum(${sales.totalAmount}), 0)`
         }).from(sales);
-        const result = await (where ? q8.where(where) : q8).groupBy(sales.paymentMethod);
+        const result = await (where ? q9.where(where) : q9).groupBy(sales.paymentMethod);
         return result.map((r) => ({ method: r.method, count: Number(r.count), total: Number(r.total) }));
       },
       // Dashboard Stats
@@ -2840,8 +3017,8 @@ var init_storage = __esm({
         if (tenantId) {
           conditions.push(import_drizzle_orm.sql`${inventoryMovements.productId} IN (SELECT id FROM products WHERE tenant_id = ${tenantId})`);
         }
-        const q8 = db.select().from(inventoryMovements);
-        return (conditions.length ? q8.where((0, import_drizzle_orm.and)(...conditions)) : q8).orderBy((0, import_drizzle_orm.desc)(inventoryMovements.createdAt)).limit(l);
+        const q9 = db.select().from(inventoryMovements);
+        return (conditions.length ? q9.where((0, import_drizzle_orm.and)(...conditions)) : q9).orderBy((0, import_drizzle_orm.desc)(inventoryMovements.createdAt)).limit(l);
       },
       async createInventoryMovement(data) {
         const _ins_mov = await db.insert(inventoryMovements).values(data).$returningId();
@@ -3629,23 +3806,24 @@ var init_storage = __esm({
           const [newBranch] = await db.insert(branches).values({
             tenantId,
             name: "Main Branch",
-            address: tenant.address || "Main Street",
-            phone: tenant.ownerPhone || "123456789",
+            address: tenant.address || null,
+            phone: tenant.ownerPhone || null,
             isMain: true,
             currency: "CHF",
-            taxRate: "10"
-          });
+            taxRate: "0"
+          }).$returningId();
           branchId = newBranch.id;
         } else {
           branchId = tenantBranches[0].id;
         }
-        const tenantEmployees = await db.select({ id: employees.id }).from(employees).innerJoin(branches, (0, import_drizzle_orm.eq)(employees.branchId, branches.id)).where((0, import_drizzle_orm.eq)(branches.tenantId, tenantId)).limit(1);
+        const tenantEmployees = await db.select({ id: employees.id }).from(employees).where((0, import_drizzle_orm.eq)(employees.tenantId, tenantId)).limit(1);
         if (tenantEmployees.length === 0) {
           this.seedLog(`Creating default admin for tenant ${tenantId}`);
           await this.createEmployee({
-            name: tenant.ownerName.split(" ")[0] || "Admin",
+            tenantId,
+            name: tenant.ownerName || "Admin",
             email: tenant.ownerEmail,
-            pin: "1234",
+            pin: await hashPin("1234"),
             role: "admin",
             branchId,
             permissions: ["all"]
@@ -4819,7 +4997,7 @@ async function seedPizzaLemon() {
   if (activeSub) {
     subId = activeSub.id;
   } else {
-    const endDate = (0, import_date_fns.addYears)(/* @__PURE__ */ new Date(), 2);
+    const endDate = (0, import_date_fns2.addYears)(/* @__PURE__ */ new Date(), 2);
     const [newSub] = await db.insert(tenantSubscriptions).values({
       tenantId: tenant.id,
       planType: "yearly",
@@ -4833,7 +5011,7 @@ async function seedPizzaLemon() {
     subId = newSub.id;
   }
   if (!isAlreadySeeded) {
-    const endDate = (0, import_date_fns.addYears)(/* @__PURE__ */ new Date(), 2);
+    const endDate = (0, import_date_fns2.addYears)(/* @__PURE__ */ new Date(), 2);
     await db.insert(licenseKeys).values({
       licenseKey: LICENSE_KEY,
       tenantId: tenant.id,
@@ -5105,7 +5283,7 @@ async function seedPizzaLemon() {
     `[PIZZA LEMON]    Menu: ${PIZZAS.length} Pizza, ${CALZONES.length} Calzone, ${PIDE.length} Pide, ${LAHMACUN.length} Lahmacun, ${TELLERGERICHTE.length} Tellergerichte, ${FINGERFOOD.length} Fingerfood, ${SALATE.length} Salat, ${DESSERTS.length} Dessert, ${GETRAENKE.length} Getr\xE4nke, ${BIER.length} Bier, ${ALKOHOL.length} Alkohol, ${EXTRAS.length} Extra = ${total} total`
   );
 }
-var import_drizzle_orm4, import_bcrypt3, import_date_fns, STORE_EMAIL, STORE_PASSWORD, LICENSE_KEY, BUSINESS_NAME, IMG, PIZZA_LEMON_CATEGORIES, PIZZAS, CALZONES, PIDE, LAHMACUN, TELLERGERICHTE, FINGERFOOD, SALATE, DESSERTS, GETRAENKE, BIER, ALKOHOL, EXTRAS;
+var import_drizzle_orm4, import_bcrypt3, import_date_fns2, STORE_EMAIL, STORE_PASSWORD, LICENSE_KEY, BUSINESS_NAME, IMG, PIZZA_LEMON_CATEGORIES, PIZZAS, CALZONES, PIDE, LAHMACUN, TELLERGERICHTE, FINGERFOOD, SALATE, DESSERTS, GETRAENKE, BIER, ALKOHOL, EXTRAS;
 var init_seedPizzaLemon = __esm({
   "server/seedPizzaLemon.ts"() {
     "use strict";
@@ -5113,7 +5291,7 @@ var init_seedPizzaLemon = __esm({
     import_drizzle_orm4 = require("drizzle-orm");
     init_schema();
     import_bcrypt3 = __toESM(require("bcrypt"));
-    import_date_fns = require("date-fns");
+    import_date_fns2 = require("date-fns");
     STORE_EMAIL = "admin@pizzalemon.ch";
     STORE_PASSWORD = "pizzalemon123";
     LICENSE_KEY = "PIZZALEMON-MAIN-2024-LMNA-B001";
@@ -5359,7 +5537,7 @@ async function seedZurichRestaurants() {
         maxBranches: 3,
         maxEmployees: 20
       });
-      const endDate = (0, import_date_fns2.addYears)(/* @__PURE__ */ new Date(), 2);
+      const endDate = (0, import_date_fns3.addYears)(/* @__PURE__ */ new Date(), 2);
       const [sub] = await db.insert(tenantSubscriptions).values({
         tenantId: r.id,
         planType: "yearly",
@@ -5509,7 +5687,7 @@ async function seedZurichRestaurants() {
     `[ZURICH] \u2713 Finished. Created ${createdCount}, skipped ${skippedCount}, total products inserted this run: ${totalProducts}.`
   );
 }
-var import_drizzle_orm5, import_bcrypt4, import_date_fns2, U, IMG2, HERO, RESTAURANTS;
+var import_drizzle_orm5, import_bcrypt4, import_date_fns3, U, IMG2, HERO, RESTAURANTS;
 var init_seedZurichRestaurants = __esm({
   "server/seedZurichRestaurants.ts"() {
     "use strict";
@@ -5517,7 +5695,7 @@ var init_seedZurichRestaurants = __esm({
     import_drizzle_orm5 = require("drizzle-orm");
     init_schema();
     import_bcrypt4 = __toESM(require("bcrypt"));
-    import_date_fns2 = require("date-fns");
+    import_date_fns3 = require("date-fns");
     U = (id) => `https://images.unsplash.com/photo-${id}?w=800&q=80&auto=format&fit=crop`;
     IMG2 = {
       // Italian / pizza / pasta
@@ -6466,7 +6644,7 @@ function pick(arr) {
   return arr[rand(0, arr.length - 1)];
 }
 function uuid() {
-  return crypto5.randomUUID().split("-")[0].toUpperCase();
+  return crypto6.randomUUID().split("-")[0].toUpperCase();
 }
 async function seedAllDemoData() {
   console.log("[SEED] Starting comprehensive demo data seeding...");
@@ -6496,7 +6674,7 @@ async function seedAllDemoData() {
         maxBranches: 5,
         maxEmployees: 20
       }).returning();
-      const endDate = (0, import_date_fns3.addMonths)(/* @__PURE__ */ new Date(), 12);
+      const endDate = (0, import_date_fns4.addMonths)(/* @__PURE__ */ new Date(), 12);
       const [sub] = await db.insert(tenantSubscriptions).values({
         tenantId: tenant.id,
         planType: pick(["monthly", "yearly", "trial"]),
@@ -6685,7 +6863,7 @@ async function seedAllDemoData() {
           paymentMethod: pick(["cash", "card", "mobile"]),
           paymentStatus: "completed",
           status: "completed",
-          createdAt: (0, import_date_fns3.addDays)(/* @__PURE__ */ new Date(), -rand(0, 30))
+          createdAt: (0, import_date_fns4.addDays)(/* @__PURE__ */ new Date(), -rand(0, 30))
         }).returning();
         await db.insert(saleItems).values({
           saleId: sale.id,
@@ -6738,7 +6916,7 @@ async function seedAllDemoData() {
         const [shift] = await db.insert(shifts).values({
           employeeId: eId,
           branchId: bId,
-          startTime: (0, import_date_fns3.addDays)(/* @__PURE__ */ new Date(), -1),
+          startTime: (0, import_date_fns4.addDays)(/* @__PURE__ */ new Date(), -1),
           endTime: /* @__PURE__ */ new Date(),
           openingCash: "500.00",
           closingCash: "1200.00",
@@ -6776,7 +6954,7 @@ async function seedAllDemoData() {
           category: pick(["Rent", "Utilities", "Supplies"]),
           amount: String(rand(100, 500)),
           description: "Demo expense",
-          date: (0, import_date_fns3.addDays)(/* @__PURE__ */ new Date(), -rand(0, 30)),
+          date: (0, import_date_fns4.addDays)(/* @__PURE__ */ new Date(), -rand(0, 30)),
           employeeId: pick(employeeIds)
         });
       }
@@ -6844,16 +7022,16 @@ async function seedAllDemoData() {
   }
   console.log("[SEED] \u2705 All demo data seeded successfully!");
 }
-var import_drizzle_orm6, crypto5, import_bcrypt5, import_date_fns3, DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
+var import_drizzle_orm6, crypto6, import_bcrypt5, import_date_fns4, DEMO_STORES, CATEGORY_NAMES, PRODUCT_NAMES, CUSTOMER_NAMES, SUPPLIER_NAMES;
 var init_seedAllDemoData = __esm({
   "server/seedAllDemoData.ts"() {
     "use strict";
     init_db();
     import_drizzle_orm6 = require("drizzle-orm");
     init_schema();
-    crypto5 = __toESM(require("crypto"));
+    crypto6 = __toESM(require("crypto"));
     import_bcrypt5 = __toESM(require("bcrypt"));
-    import_date_fns3 = require("date-fns");
+    import_date_fns4 = require("date-fns");
     DEMO_STORES = [
       { biz: "Glow Beauty Salon", owner: "Sara Ahmed", email: "sara@glow.com", phone: "+201001234567" },
       { biz: "The Gentlemen's Barber", owner: "Mohamed Ali", email: "mohamed@barber.com", phone: "+201009876543" },
@@ -6934,7 +7112,7 @@ init_storage();
 
 // server/objectStorage.ts
 var import_storage = require("@google-cloud/storage");
-var import_crypto = require("crypto");
+var import_crypto2 = require("crypto");
 var REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 var objectStorageClient = new import_storage.Storage({
   credentials: {
@@ -7020,7 +7198,7 @@ var ObjectStorageService = class {
   }
   async getObjectEntityUploadURL() {
     const privateObjectDir = this.getPrivateObjectDir();
-    const objectId = (0, import_crypto.randomUUID)();
+    const objectId = (0, import_crypto2.randomUUID)();
     const fullPath = `${privateObjectDir}/uploads/${objectId}`;
     const { bucketName, objectName } = parseObjectPath(fullPath);
     return signObjectURL({ bucketName, objectName, method: "PUT", ttlSec: 900 });
@@ -7172,26 +7350,11 @@ var pushService = {
 };
 
 // server/superAdminAuth.ts
-var import_jsonwebtoken = __toESM(require("jsonwebtoken"));
+var import_jsonwebtoken2 = __toESM(require("jsonwebtoken"));
 init_storage();
-
-// server/jwtSecret.ts
-var import_crypto2 = __toESM(require("crypto"));
-function resolveSecret() {
-  const fromEnv = process.env.JWT_SECRET;
-  if (fromEnv && fromEnv.length >= 32) return fromEnv;
-  if (process.env.NODE_ENV === "production") {
-    console.error(
-      "[SECURITY] JWT_SECRET is not set (or too short). Using a random per-process secret; all sessions will be invalidated on restart. Set a strong JWT_SECRET (>=32 chars) in the environment."
-    );
-  }
-  return import_crypto2.default.randomBytes(48).toString("hex");
-}
-var JWT_SECRET = resolveSecret();
-
-// server/superAdminAuth.ts
+init_jwtSecret();
 function generateToken(adminId, email, role) {
-  return import_jsonwebtoken.default.sign({ id: adminId, email, role }, JWT_SECRET, { expiresIn: "24h" });
+  return import_jsonwebtoken2.default.sign({ id: adminId, email, role }, JWT_SECRET, { expiresIn: "24h" });
 }
 var requireSuperAdmin = async (req, res, next) => {
   try {
@@ -7200,7 +7363,7 @@ var requireSuperAdmin = async (req, res, next) => {
       return res.status(401).json({ error: "Unauthorized: Missing or invalid token" });
     }
     const token = authHeader.split(" ")[1];
-    const decoded = import_jsonwebtoken.default.verify(token, JWT_SECRET);
+    const decoded = import_jsonwebtoken2.default.verify(token, JWT_SECRET);
     const admin = await storage.getSuperAdmin(decoded.id);
     if (!admin || !admin.isActive) {
       return res.status(401).json({ error: "Unauthorized: Admin account disabled or not found" });
@@ -7216,154 +7379,8 @@ var requireSuperAdmin = async (req, res, next) => {
   }
 };
 
-// server/employeeAuth.ts
-var import_jsonwebtoken2 = __toESM(require("jsonwebtoken"));
-var import_bcrypt = __toESM(require("bcrypt"));
-var EMPLOYEE_TOKEN_HEADER = "x-employee-token";
-var TOKEN_TTL = "12h";
-var BCRYPT_ROUNDS = 10;
-function employeeAuthMode() {
-  return process.env.EMPLOYEE_AUTH_MODE === "strict" ? "strict" : "soft";
-}
-function generateEmployeeToken(claims) {
-  return import_jsonwebtoken2.default.sign(claims, JWT_SECRET, { expiresIn: TOKEN_TTL });
-}
-function verifyEmployeeToken(token) {
-  try {
-    return import_jsonwebtoken2.default.verify(token, JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
-function isHashedPin(stored) {
-  return typeof stored === "string" && stored.startsWith("$2");
-}
-function hashPin(pin) {
-  return import_bcrypt.default.hash(pin, BCRYPT_ROUNDS);
-}
-async function verifyPin(pin, stored) {
-  if (!stored || !pin) return false;
-  if (isHashedPin(stored)) return import_bcrypt.default.compare(pin, stored);
-  return stored === pin;
-}
-function attachEmployee() {
-  return (req, _res, next) => {
-    const raw = req.headers[EMPLOYEE_TOKEN_HEADER];
-    const token = Array.isArray(raw) ? raw[0] : raw;
-    if (token) {
-      const claims = verifyEmployeeToken(token);
-      if (claims) req.employee = claims;
-    }
-    next();
-  };
-}
-function requireRole(...roles) {
-  const allowed = /* @__PURE__ */ new Set([...roles, "owner", "admin"]);
-  return (req, res, next) => {
-    const emp = req.employee;
-    if (!emp) {
-      if (employeeAuthMode() === "strict") {
-        return res.status(401).json({
-          error: "Employee authentication required",
-          code: "EMPLOYEE_TOKEN_REQUIRED"
-        });
-      }
-      console.warn(
-        `[employeeAuth] soft-mode passthrough: ${req.method} ${req.path} \u2014 no employee token`
-      );
-      return next();
-    }
-    if (typeof req.tenantId === "number" && typeof emp.tenantId === "number" && emp.tenantId !== req.tenantId) {
-      return res.status(403).json({ error: "Employee does not belong to this tenant" });
-    }
-    if (!allowed.has(emp.role) && !emp.permissions?.some((p) => allowed.has(p))) {
-      return res.status(403).json({
-        error: "Insufficient permissions",
-        code: "FORBIDDEN_ROLE",
-        required: [...allowed]
-      });
-    }
-    next();
-  };
-}
-var requireManager = requireRole("manager");
-var requireAdmin = requireRole();
-var requireStaff = requireRole("manager", "cashier");
-var GUARD_EXEMPT = [
-  /^\/api\/employees\/login$/
-  // the login itself cannot require a login
-];
-var ROUTE_RULES = [
-  // Catalogue & stock — cashiers are read-only.
-  {
-    methods: ["POST", "PUT", "PATCH", "DELETE"],
-    path: /^\/api\/(products|categories|inventory|suppliers|purchase-orders|stock-counts)(\/|$)/,
-    roles: ["manager"],
-    label: "catalogue"
-  },
-  // Store-level configuration and staff — owner/admin only.
-  {
-    methods: ["POST", "PUT", "PATCH", "DELETE"],
-    path: /^\/api\/(branches|employees)(\/|$)/,
-    roles: [],
-    label: "store-admin"
-  },
-  // Destructive customer/sale operations.
-  {
-    methods: ["DELETE"],
-    path: /^\/api\/(customers|sales|returns)(\/|$)/,
-    roles: ["manager"],
-    label: "destructive"
-  },
-  // Business intelligence — hidden from cashiers.
-  {
-    methods: ["GET"],
-    path: /^\/api\/(reports|analytics)(\/|$)/,
-    roles: ["manager"],
-    label: "reporting"
-  },
-  // Operational settings.
-  {
-    methods: ["PUT", "PATCH", "POST"],
-    path: /^\/api\/(store-settings|payment-gateway|vehicles|table-qr-codes)(\/|$)/,
-    roles: ["manager"],
-    label: "operations"
-  },
-  // Promo codes and delivery zones — the real paths (/api/promo-codes and
-  // /api/delivery-zones never existed, so these were open to cashiers).
-  {
-    methods: ["POST", "PUT", "PATCH", "DELETE"],
-    path: /^\/api\/delivery\/(promos|manage\/zones)(\/|$)/,
-    roles: ["manager"],
-    label: "delivery-settings"
-  },
-  // Deleting a QR code, vehicle, online order or expense is a manager decision.
-  {
-    methods: ["DELETE"],
-    path: /^\/api\/(vehicles|table-qr-codes|online-orders|expenses)(\/|$)/,
-    roles: ["manager"],
-    label: "operations-delete"
-  },
-  // Backups contain the whole tenant database.
-  {
-    methods: ["POST", "PUT", "DELETE"],
-    path: /^\/api\/backup(\/|$)/,
-    roles: [],
-    label: "backup"
-  }
-];
-function guardTenantRoutes() {
-  return (req, res, next) => {
-    if (!req.path.startsWith("/api")) return next();
-    if (req.path.startsWith("/api/super-admin")) return next();
-    if (GUARD_EXEMPT.some((re) => re.test(req.path))) return next();
-    const rule = ROUTE_RULES.find(
-      (r) => r.methods.includes(req.method) && r.path.test(req.path)
-    );
-    if (!rule) return next();
-    return requireRole(...rule.roles)(req, res, next);
-  };
-}
+// server/routes.ts
+init_employeeAuth();
 
 // server/stripeClient.ts
 var import_stripe = __toESM(require("stripe"));
@@ -7656,6 +7673,104 @@ async function repriceOrder(opts) {
 
 // server/routes.ts
 init_emailService();
+
+// server/planSignup.ts
+var import_crypto3 = __toESM(require("crypto"));
+var import_jsonwebtoken3 = __toESM(require("jsonwebtoken"));
+var import_date_fns = require("date-fns");
+init_jwtSecret();
+init_db();
+init_storage();
+init_emailService();
+var PLAN_SECRET = `${JWT_SECRET}:plan-signup`;
+function signPlanToken(tenantId, email) {
+  return import_jsonwebtoken3.default.sign({ typ: "plan", t: tenantId, em: email }, PLAN_SECRET, { expiresIn: "12h" });
+}
+function verifyPlanToken(token) {
+  if (typeof token !== "string" || !token) return null;
+  try {
+    const c = import_jsonwebtoken3.default.verify(token, PLAN_SECRET);
+    if (c?.typ !== "plan" || !Number(c.t)) return null;
+    return { tenantId: Number(c.t), email: String(c.em || "") };
+  } catch {
+    return null;
+  }
+}
+async function q(sqlText, params = []) {
+  const [rows] = await pool.query(sqlText, params);
+  return rows;
+}
+async function activeLicenseFor(tenantId) {
+  const rows = await q(
+    `SELECT * FROM license_keys
+      WHERE tenant_id = ? AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())
+      ORDER BY expires_at IS NULL DESC, expires_at DESC LIMIT 1`,
+    [tenantId]
+  );
+  return rows[0] || null;
+}
+async function provisionPaidPlan(tenantId, planId, ref) {
+  const done = await q(`SELECT 1 FROM license_keys WHERE tenant_id = ? AND notes LIKE ? LIMIT 1`, [tenantId, `%${ref}%`]);
+  if (done.length) return `plan ${planId} for tenant ${tenantId} already provisioned (${ref})`;
+  const [plan2] = await q(`SELECT id, name, price, \`interval\` FROM subscription_plans WHERE id = ? LIMIT 1`, [planId]);
+  if (!plan2) return `plan ${planId} not found`;
+  const tenant = await storage.getTenant(tenantId);
+  if (!tenant) return `tenant ${tenantId} not found`;
+  const yearly = String(plan2.interval || "").toLowerCase().startsWith("year");
+  const extend = (from) => yearly ? (0, import_date_fns.addYears)(from, 1) : (0, import_date_fns.addMonths)(from, 1);
+  const current = await activeLicenseFor(tenantId);
+  if (current) {
+    const base = current.expires_at && new Date(current.expires_at) > /* @__PURE__ */ new Date() ? new Date(current.expires_at) : /* @__PURE__ */ new Date();
+    const until = extend(base);
+    await q(
+      `UPDATE license_keys SET expires_at = ?, notes = CONCAT(COALESCE(notes, ''), ?) WHERE id = ?`,
+      [until, ` | paid ${plan2.name} ${ref}`, current.id]
+    );
+    if (current.subscription_id) {
+      await q(
+        `UPDATE tenant_subscriptions SET status = 'active', end_date = ?, last_payment_date = NOW() WHERE id = ?`,
+        [until, current.subscription_id]
+      );
+    }
+    return `tenant ${tenantId} licence extended to ${until.toISOString()}`;
+  }
+  const startDate = /* @__PURE__ */ new Date();
+  const endDate = extend(startDate);
+  const sub = await storage.createTenantSubscription({
+    tenantId,
+    planType: yearly ? "yearly" : "monthly",
+    planName: String(plan2.name),
+    price: String(plan2.price),
+    status: "active",
+    startDate,
+    endDate,
+    autoRenew: false,
+    paymentMethod: "stripe"
+  });
+  const licenseKey = `KASSENTA-${Array.from({ length: 4 }, () => import_crypto3.default.randomBytes(2).toString("hex").toUpperCase()).join("-")}`;
+  await storage.createLicenseKey({
+    licenseKey,
+    tenantId,
+    subscriptionId: sub.id,
+    status: "active",
+    maxActivations: 3,
+    expiresAt: endDate,
+    notes: `In-app plan purchase: ${plan2.name} ${ref}`
+  });
+  await q(`UPDATE tenants SET status = 'active' WHERE id = ?`, [tenantId]);
+  sendLicenseKeyEmail({
+    to: tenant.ownerEmail,
+    ownerName: tenant.ownerName,
+    businessName: tenant.businessName,
+    licenseKey,
+    planName: String(plan2.name),
+    planType: yearly ? "yearly" : "monthly",
+    tempPassword: "Google sign-in",
+    expiresAt: endDate
+  }).catch(() => {
+  });
+  return `tenant ${tenantId}: ${plan2.name} licence created`;
+}
 
 // server/whatsappService.ts
 init_waClient();
@@ -8231,8 +8346,9 @@ var whatsappService = {
 };
 
 // server/whatsappVerifyRoutes.ts
-var import_crypto3 = __toESM(require("crypto"));
+var import_crypto4 = __toESM(require("crypto"));
 init_storage();
+init_employeeAuth();
 
 // server/rateLimit.ts
 var buckets = /* @__PURE__ */ new Map();
@@ -8277,7 +8393,7 @@ function rateLimit(opts) {
 var CODE_TTL_MS = 10 * 60 * 1e3;
 var MAX_ATTEMPTS = 5;
 var pending = /* @__PURE__ */ new Map();
-var hash = (code) => import_crypto3.default.createHash("sha256").update(code).digest("hex");
+var hash = (code) => import_crypto4.default.createHash("sha256").update(code).digest("hex");
 var digits = (v) => String(v ?? "").replace(/\D/g, "");
 function tenantOf(req, res) {
   const tenantId = Number(req.tenantId ?? 0) || 0;
@@ -8334,7 +8450,7 @@ function registerWhatsAppVerifyRoutes(app2) {
         if (whatsappService.getStatus().status !== "connected") {
           return res.status(503).json({ error: "\u062E\u062F\u0645\u0629 \u0648\u0627\u062A\u0633\u0627\u0628 \u063A\u064A\u0631 \u0645\u062A\u0635\u0644\u0629 \u062D\u0627\u0644\u064A\u0627\u064B. \u062D\u0627\u0648\u0644 \u0644\u0627\u062D\u0642\u0627\u064B \u0623\u0648 \u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062F\u0639\u0645." });
         }
-        const code = String(import_crypto3.default.randomInt(1e5, 1e6));
+        const code = String(import_crypto4.default.randomInt(1e5, 1e6));
         const tenant = await storage.getTenant(tenantId);
         const sent = await whatsappService.sendText(
           phone,
@@ -8369,7 +8485,7 @@ Kassenta WhatsApp verification code: *${code}*
       const code = digits(req.body?.code);
       const a = Buffer.from(hash(code));
       const b = Buffer.from(p.codeHash);
-      if (a.length !== b.length || !import_crypto3.default.timingSafeEqual(a, b)) {
+      if (a.length !== b.length || !import_crypto4.default.timingSafeEqual(a, b)) {
         return res.status(400).json({ error: "\u0627\u0644\u0631\u0645\u0632 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D." });
       }
       pending.delete(tenantId);
@@ -8585,12 +8701,12 @@ async function ownedBy(req, resolve3, id) {
 
 // server/serverMigrations.ts
 init_db();
-async function q(sqlText, params = []) {
+async function q2(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return rows;
 }
 async function columnExists(table, column) {
-  const rows = await q(
+  const rows = await q2(
     `SELECT 1 FROM information_schema.COLUMNS
       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
     [table, column]
@@ -8598,7 +8714,7 @@ async function columnExists(table, column) {
   return rows.length > 0;
 }
 async function indexExists(table, index) {
-  const rows = await q(
+  const rows = await q2(
     `SELECT 1 FROM information_schema.STATISTICS
       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1`,
     [table, index]
@@ -8609,7 +8725,7 @@ var salesClientRefReady = false;
 async function migrateSkuPerTenant() {
   try {
     if (!await indexExists("products", "ux_products_tenant_sku")) {
-      await q(`ALTER TABLE products ADD UNIQUE INDEX ux_products_tenant_sku (tenant_id, sku(191))`);
+      await q2(`ALTER TABLE products ADD UNIQUE INDEX ux_products_tenant_sku (tenant_id, sku(191))`);
       console.log("[migrations] products: added UNIQUE (tenant_id, sku)");
     }
   } catch (e) {
@@ -8617,7 +8733,7 @@ async function migrateSkuPerTenant() {
     return;
   }
   try {
-    const rows = await q(
+    const rows = await q2(
       `SELECT INDEX_NAME AS name
          FROM information_schema.STATISTICS
         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND NON_UNIQUE = 0
@@ -8625,7 +8741,7 @@ async function migrateSkuPerTenant() {
        HAVING COUNT(*) = 1 AND MAX(COLUMN_NAME) = 'sku'`
     );
     for (const r of rows) {
-      await q(`ALTER TABLE products DROP INDEX \`${String(r.name).replace(/`/g, "")}\``);
+      await q2(`ALTER TABLE products DROP INDEX \`${String(r.name).replace(/`/g, "")}\``);
       console.log(`[migrations] products: dropped global sku index ${r.name}`);
     }
   } catch (e) {
@@ -8635,11 +8751,11 @@ async function migrateSkuPerTenant() {
 async function migrateSalesClientRef() {
   try {
     if (!await columnExists("sales", "client_ref")) {
-      await q(`ALTER TABLE sales ADD COLUMN client_ref VARCHAR(100) NULL`);
+      await q2(`ALTER TABLE sales ADD COLUMN client_ref VARCHAR(100) NULL`);
       console.log("[migrations] sales: added client_ref");
     }
     if (!await indexExists("sales", "ux_sales_branch_client_ref")) {
-      await q(`ALTER TABLE sales ADD UNIQUE INDEX ux_sales_branch_client_ref (branch_id, client_ref)`);
+      await q2(`ALTER TABLE sales ADD UNIQUE INDEX ux_sales_branch_client_ref (branch_id, client_ref)`);
     }
     salesClientRefReady = true;
   } catch (e) {
@@ -8662,17 +8778,17 @@ async function migrateOrderClientRef() {
   ];
   for (const [table, index, cols, setReady] of targets) {
     try {
-      const exists = await q(
+      const exists = await q2(
         `SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1`,
         [table]
       );
       if (!exists.length) continue;
       if (!await columnExists(table, "client_ref")) {
-        await q(`ALTER TABLE \`${table}\` ADD COLUMN client_ref VARCHAR(100) NULL`);
+        await q2(`ALTER TABLE \`${table}\` ADD COLUMN client_ref VARCHAR(100) NULL`);
         console.log(`[migrations] ${table}: added client_ref`);
       }
       if (!await indexExists(table, index)) {
-        await q(`ALTER TABLE \`${table}\` ADD INDEX ${index} (${cols})`);
+        await q2(`ALTER TABLE \`${table}\` ADD INDEX ${index} (${cols})`);
       }
       setReady();
     } catch (e) {
@@ -8688,7 +8804,7 @@ async function ensureBroadcastClientRef() {
 async function migrateCustomerPhoneVerified() {
   try {
     if (!await columnExists("customers", "phone_verified_at")) {
-      await q(`ALTER TABLE customers ADD COLUMN phone_verified_at DATETIME NULL`);
+      await q2(`ALTER TABLE customers ADD COLUMN phone_verified_at DATETIME NULL`);
       console.log("[migrations] customers: added phone_verified_at");
     }
   } catch (e) {
@@ -8704,8 +8820,9 @@ async function runServerMigrations() {
 }
 
 // server/tenantAuth.ts
-var import_jsonwebtoken3 = __toESM(require("jsonwebtoken"));
+var import_jsonwebtoken4 = __toESM(require("jsonwebtoken"));
 init_storage();
+init_jwtSecret();
 var DOWNLOAD_SECRET = `${JWT_SECRET}:download-link`;
 var DOWNLOAD_TTL_SECONDS = 300;
 var DOWNLOADABLE_PATHS = [
@@ -8713,13 +8830,13 @@ var DOWNLOADABLE_PATHS = [
   /^\/api\/reports\/(sales|inventory|profit|employee-performance)-export$/
 ];
 function signDownloadToken(tenantId, path5, employee) {
-  return import_jsonwebtoken3.default.sign({ typ: "dl", t: tenantId, p: path5, emp: employee || void 0 }, DOWNLOAD_SECRET, {
+  return import_jsonwebtoken4.default.sign({ typ: "dl", t: tenantId, p: path5, emp: employee || void 0 }, DOWNLOAD_SECRET, {
     expiresIn: DOWNLOAD_TTL_SECONDS
   });
 }
 function verifyDownloadToken(token, path5) {
   try {
-    const c = import_jsonwebtoken3.default.verify(token, DOWNLOAD_SECRET);
+    const c = import_jsonwebtoken4.default.verify(token, DOWNLOAD_SECRET);
     if (c?.typ !== "dl" || c.p !== path5 || !Number.isInteger(c.t) || c.t <= 0) return null;
     return c;
   } catch {
@@ -8730,6 +8847,8 @@ var PUBLIC_ROUTES = [
   "/api/health",
   "/api/license/validate",
   "/api/auth/google",
+  "/api/auth/plan-status",
+  // plans page: signed plan token, see planSignup.ts
   "/api/landing/subscribe",
   "/api/landing/plans",
   // Public plan catalogue for the pricing page
@@ -8898,7 +9017,7 @@ function tenantAuthMiddleware() {
     if (authHeader && authHeader.startsWith("Bearer ")) {
       try {
         const token = authHeader.split(" ")[1];
-        const decoded = import_jsonwebtoken3.default.verify(token, JWT_SECRET);
+        const decoded = import_jsonwebtoken4.default.verify(token, JWT_SECRET);
         const admin = await storage.getSuperAdmin(decoded.id);
         if (admin && admin.isActive) {
           const tenantId2 = req.query.tenantId ? Number(req.query.tenantId) : req.body?.tenantId ? Number(req.body.tenantId) : void 0;
@@ -8941,8 +9060,8 @@ function tenantAuthMiddleware() {
       req.tenantId = license.tenantId;
       req.licenseKey = licenseKey;
       if (!queryTenant) {
-        const q8 = { ...req.query, tenantId: String(license.tenantId) };
-        Object.defineProperty(req, "query", { value: q8, writable: true, configurable: true, enumerable: true });
+        const q9 = { ...req.query, tenantId: String(license.tenantId) };
+        Object.defineProperty(req, "query", { value: q9, writable: true, configurable: true, enumerable: true });
       }
       next();
     } catch (error) {
@@ -8953,17 +9072,18 @@ function tenantAuthMiddleware() {
 }
 
 // server/customerAuthService.ts
-var import_crypto4 = __toESM(require("crypto"));
+var import_crypto5 = __toESM(require("crypto"));
 var import_bcrypt2 = __toESM(require("bcrypt"));
 init_db();
 init_schema();
 var import_drizzle_orm2 = require("drizzle-orm");
-var import_jsonwebtoken4 = __toESM(require("jsonwebtoken"));
+var import_jsonwebtoken5 = __toESM(require("jsonwebtoken"));
+init_jwtSecret();
 var SESSION_TTL_DAYS = 30;
 var OTP_TTL_MINUTES = 10;
 var OTP_MAX_ATTEMPTS = 5;
 function generateToken2(bytes = 32) {
-  return import_crypto4.default.randomBytes(bytes).toString("hex");
+  return import_crypto5.default.randomBytes(bytes).toString("hex");
 }
 function generateOtp() {
   return Math.floor(1e5 + Math.random() * 9e5).toString();
@@ -9037,12 +9157,12 @@ async function findOrCreateCustomerByPhone(phone, tenantId) {
 }
 var PHONE_PROOF_SECRET = `${JWT_SECRET}:phone-proof`;
 function signPhoneProof(phone, tenantId) {
-  return import_jsonwebtoken4.default.sign({ typ: "phone", ph: phone, t: tenantId }, PHONE_PROOF_SECRET, { expiresIn: "15m" });
+  return import_jsonwebtoken5.default.sign({ typ: "phone", ph: phone, t: tenantId }, PHONE_PROOF_SECRET, { expiresIn: "15m" });
 }
 function verifyPhoneProof(token, phone, tenantId) {
   if (typeof token !== "string" || !token) return false;
   try {
-    const c = import_jsonwebtoken4.default.verify(token, PHONE_PROOF_SECRET);
+    const c = import_jsonwebtoken5.default.verify(token, PHONE_PROOF_SECRET);
     return c?.typ === "phone" && c.ph === phone && Number(c.t) === Number(tenantId);
   } catch {
     return false;
@@ -9105,14 +9225,14 @@ async function getAuthenticatedCustomer(authHeader) {
 }
 
 // server/deliveryService.ts
-var import_crypto5 = __toESM(require("crypto"));
+var import_crypto6 = __toESM(require("crypto"));
 init_db();
 init_storeTime();
 init_phone();
 init_schema();
 var import_drizzle_orm3 = require("drizzle-orm");
 function generateTrackingToken() {
-  return import_crypto5.default.randomBytes(20).toString("hex");
+  return import_crypto6.default.randomBytes(20).toString("hex");
 }
 async function validatePromoCode(tenantId, code, orderTotal, orderType, customerId) {
   const now = /* @__PURE__ */ new Date();
@@ -9374,9 +9494,10 @@ var MK = {
   orderId: "kassenta_order_id",
   saleId: "kassenta_sale_id",
   tenantId: "kassenta_tenant_id",
-  customerId: "kassenta_customer_id"
+  customerId: "kassenta_customer_id",
+  planId: "kassenta_plan_id"
 };
-async function q2(sqlText, params = []) {
+async function q3(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -9414,7 +9535,7 @@ async function markOnlineOrderFailed(pi) {
   const orderId = metaInt(pi, MK.orderId);
   if (!orderId) return "no order id in metadata";
   const reason = pi.last_payment_error?.message ?? pi.last_payment_error?.code ?? "payment failed";
-  await q2(
+  await q3(
     `UPDATE online_orders
         SET payment_status = 'failed',
             stripe_payment_intent_id = ?,
@@ -9428,7 +9549,7 @@ async function markSalePaid(pi) {
   const saleId = metaInt(pi, MK.saleId);
   if (!saleId) return "no sale id in metadata";
   const chargeId = typeof pi.latest_charge === "string" ? pi.latest_charge : pi.latest_charge?.id ?? null;
-  await q2(
+  await q3(
     `UPDATE sales
         SET payment_status = 'paid',
             stripe_payment_intent_id = ?,
@@ -9443,7 +9564,7 @@ async function creditWallet2(pi) {
   const customerId = metaInt(pi, MK.customerId);
   const tenantId = metaInt(pi, MK.tenantId);
   if (!customerId || !tenantId) return "missing customer/tenant in metadata";
-  const existing = await q2(
+  const existing = await q3(
     `SELECT id FROM wallet_transactions WHERE stripe_payment_intent_id = ? LIMIT 1`,
     [pi.id]
   );
@@ -9493,7 +9614,7 @@ async function creditWallet2(pi) {
 async function activateSubscription(pi) {
   const tenantId = metaInt(pi, MK.tenantId);
   if (!tenantId) return "no tenant id in metadata";
-  await q2(
+  await q3(
     `UPDATE tenant_subscriptions
         SET status = 'active',
             last_payment_date = NOW(),
@@ -9501,7 +9622,7 @@ async function activateSubscription(pi) {
       WHERE tenant_id = ?`,
     [tenantId]
   );
-  await q2(`UPDATE tenants SET status = 'active' WHERE id = ?`, [tenantId]);
+  await q3(`UPDATE tenants SET status = 'active' WHERE id = ?`, [tenantId]);
   return `tenant ${tenantId} subscription -> active`;
 }
 async function applyRefund(charge) {
@@ -9519,7 +9640,7 @@ async function applyRefund(charge) {
       WHERE stripe_payment_intent_id = ?`,
     [fully ? "refunded" : "partially_refunded", refunded, refundId, piId]
   );
-  await q2(
+  await q3(
     `UPDATE sales
         SET payment_status = ?,
             stripe_refund_id = COALESCE(?, stripe_refund_id)
@@ -9542,7 +9663,7 @@ async function onPaymentIntentSucceeded(pi) {
       return activateSubscription(pi);
     default:
       if (metaInt(pi, MK.orderId)) return markOnlineOrderPaid(pi);
-      await q2(
+      await q3(
         `UPDATE online_orders SET payment_status = 'paid', paid_at = COALESCE(paid_at, NOW())
           WHERE stripe_payment_intent_id = ? AND payment_status <> 'paid'`,
         [pi.id]
@@ -9554,9 +9675,13 @@ async function onCheckoutCompleted(session) {
   const tenantId = metaInt(session, MK.tenantId);
   const kind = meta(session, MK.kind);
   if (kind === "tenant_subscription" && tenantId) {
+    const planId = metaInt(session, MK.planId);
+    if (planId && session.payment_status === "paid") {
+      return provisionPaidPlan(tenantId, planId, session.id);
+    }
     const subId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null;
     const custId = typeof session.customer === "string" ? session.customer : session.customer?.id ?? null;
-    await q2(
+    await q3(
       `UPDATE tenant_subscriptions
           SET status = 'active',
               stripe_subscription_id = COALESCE(?, stripe_subscription_id),
@@ -9566,7 +9691,7 @@ async function onCheckoutCompleted(session) {
       [subId, custId, tenantId]
     );
     if (custId) {
-      await q2(`UPDATE tenants SET stripe_customer_id = ?, status = 'active' WHERE id = ?`, [
+      await q3(`UPDATE tenants SET stripe_customer_id = ?, status = 'active' WHERE id = ?`, [
         custId,
         tenantId
       ]);
@@ -9576,7 +9701,7 @@ async function onCheckoutCompleted(session) {
   const orderId = metaInt(session, MK.orderId);
   if (orderId && session.payment_status === "paid") {
     const piId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null;
-    await q2(
+    await q3(
       `UPDATE online_orders
           SET payment_status = 'paid',
               stripe_payment_intent_id = COALESCE(?, stripe_payment_intent_id),
@@ -9592,7 +9717,7 @@ async function onInvoice(invoice, paid) {
   const custId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id ?? null;
   if (!custId) return "invoice has no customer";
   if (paid) {
-    await q2(
+    await q3(
       `UPDATE tenant_subscriptions
           SET status = 'active',
               last_payment_date = NOW(),
@@ -9603,7 +9728,7 @@ async function onInvoice(invoice, paid) {
     );
     return `invoice ${invoice.id} paid for customer ${custId}`;
   }
-  await q2(
+  await q3(
     `UPDATE tenant_subscriptions
         SET status = 'past_due',
             last_invoice_id = ?,
@@ -9617,7 +9742,7 @@ async function onSubscriptionChanged(sub) {
   const custId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
   if (!custId) return "subscription has no customer";
   const status = sub.status === "active" || sub.status === "trialing" ? "active" : sub.status === "past_due" || sub.status === "unpaid" ? "past_due" : "cancelled";
-  await q2(
+  await q3(
     `UPDATE tenant_subscriptions
         SET status = ?,
             stripe_subscription_id = ?,
@@ -9627,7 +9752,7 @@ async function onSubscriptionChanged(sub) {
     [status, sub.id, sub.cancel_at_period_end ? 0 : 1, status, custId]
   );
   if (status === "cancelled") {
-    await q2(`UPDATE tenants SET status = 'suspended' WHERE stripe_customer_id = ?`, [custId]);
+    await q3(`UPDATE tenants SET status = 'suspended' WHERE stripe_customer_id = ?`, [custId]);
   }
   return `subscription ${sub.id} -> ${status}`;
 }
@@ -9673,7 +9798,7 @@ async function processStripeWebhook(rawBody, signature) {
   const stripe = await requireStripeClient();
   const event = stripe.webhooks.constructEvent(rawBody, signature, secret);
   try {
-    await q2(
+    await q3(
       `INSERT INTO stripe_webhook_events (id, type, api_version, livemode, status, payload)
        VALUES (?, ?, ?, ?, 'received', ?)`,
       [
@@ -9692,7 +9817,7 @@ async function processStripeWebhook(rawBody, signature) {
   }
   try {
     const outcome = await dispatchStripeEvent(event);
-    await q2(
+    await q3(
       `UPDATE stripe_webhook_events SET status='processed', processed_at=NOW(), error=? WHERE id=?`,
       [outcome.slice(0, 500), event.id]
     ).catch(() => {
@@ -9701,7 +9826,7 @@ async function processStripeWebhook(rawBody, signature) {
     return { received: true, eventId: event.id, outcome };
   } catch (e) {
     const msg = String(e?.message || e);
-    await q2(
+    await q3(
       `UPDATE stripe_webhook_events SET status='failed', error=? WHERE id=?`,
       [msg.slice(0, 500), event.id]
     ).catch(() => {
@@ -9715,7 +9840,7 @@ async function processStripeWebhook(rawBody, signature) {
 var DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || "CHF").toLowerCase();
 var MIN_MAJOR = 0.5;
 var MAX_MAJOR = 2e4;
-async function q3(sqlText, params = []) {
+async function q4(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -9734,7 +9859,7 @@ function toMinor(major, label) {
 async function currencyFor(tenantId) {
   if (!tenantId) return DEFAULT_CURRENCY;
   try {
-    const rows = await q3(
+    const rows = await q4(
       `SELECT currency FROM branches WHERE tenant_id = ? AND currency IS NOT NULL AND currency <> ''
         ORDER BY is_main DESC, id LIMIT 1`,
       [tenantId]
@@ -9744,7 +9869,7 @@ async function currencyFor(tenantId) {
   } catch {
   }
   try {
-    const rows = await q3(
+    const rows = await q4(
       `SELECT currency FROM payment_gateway_settings WHERE tenant_id IN (?, 0)
         ORDER BY tenant_id DESC LIMIT 1`,
       [tenantId]
@@ -9794,7 +9919,7 @@ async function buildIntent(opts) {
   };
 }
 async function createOrderPaymentIntent(orderId) {
-  const rows = await q3(
+  const rows = await q4(
     `SELECT id, tenant_id, order_number, total_amount, payment_status,
             customer_email, stripe_payment_intent_id
        FROM online_orders WHERE id = ? LIMIT 1`,
@@ -9834,14 +9959,14 @@ async function createOrderPaymentIntent(orderId) {
     receiptEmail: order.customer_email || null,
     idempotencyKey: `order-${order.id}-${amountMinor}`
   });
-  await q3(`UPDATE online_orders SET stripe_payment_intent_id = ? WHERE id = ?`, [
+  await q4(`UPDATE online_orders SET stripe_payment_intent_id = ? WHERE id = ?`, [
     result.paymentIntentId,
     orderId
   ]);
   return result;
 }
 async function createSalePaymentIntent(saleId) {
-  const rows = await q3(
+  const rows = await q4(
     `SELECT s.id, s.receipt_number, s.total_amount, s.payment_status, b.tenant_id
        FROM sales s LEFT JOIN branches b ON b.id = s.branch_id
       WHERE s.id = ? LIMIT 1`,
@@ -9861,14 +9986,14 @@ async function createSalePaymentIntent(saleId) {
     description: `Receipt ${sale.receipt_number}`,
     idempotencyKey: `sale-${sale.id}-${amountMinor}`
   });
-  await q3(`UPDATE sales SET stripe_payment_intent_id = ? WHERE id = ?`, [
+  await q4(`UPDATE sales SET stripe_payment_intent_id = ? WHERE id = ?`, [
     result.paymentIntentId,
     saleId
   ]);
   return result;
 }
 async function createWalletTopupIntent(opts) {
-  const rows = await q3(`SELECT id, email, tenant_id FROM customers WHERE id = ? LIMIT 1`, [
+  const rows = await q4(`SELECT id, email, tenant_id FROM customers WHERE id = ? LIMIT 1`, [
     opts.customerId
   ]);
   const customer = rows[0];
@@ -9891,7 +10016,7 @@ async function createWalletTopupIntent(opts) {
 async function createSubscriptionIntent(opts) {
   let amount = opts.amount ?? null;
   if (opts.planId) {
-    const rows = await q3(`SELECT id, name, price FROM subscription_plans WHERE id = ? LIMIT 1`, [
+    const rows = await q4(`SELECT id, name, price FROM subscription_plans WHERE id = ? LIMIT 1`, [
       opts.planId
     ]);
     if (!rows.length) throw badRequest(`Plan ${opts.planId} not found`, 404);
@@ -9956,14 +10081,14 @@ async function createCheckoutSession(opts) {
   let amount = opts.amount ?? null;
   let label = opts.description ?? "Kassenta";
   if (opts.planId) {
-    const rows = await q3(`SELECT id, name, price FROM subscription_plans WHERE id = ? LIMIT 1`, [
+    const rows = await q4(`SELECT id, name, price FROM subscription_plans WHERE id = ? LIMIT 1`, [
       opts.planId
     ]);
     if (!rows.length) throw badRequest(`Plan ${opts.planId} not found`, 404);
     amount = Number(rows[0].price);
     label = `Kassenta ${rows[0].name}`;
   } else if (opts.orderId) {
-    const rows = await q3(
+    const rows = await q4(
       `SELECT order_number, total_amount, tenant_id FROM online_orders WHERE id = ? LIMIT 1`,
       [opts.orderId]
     );
@@ -9971,7 +10096,7 @@ async function createCheckoutSession(opts) {
     amount = Number(rows[0].total_amount);
     label = `Order ${rows[0].order_number}`;
   } else if (opts.saleId) {
-    const rows = await q3(
+    const rows = await q4(
       `SELECT s.receipt_number, s.total_amount, b.tenant_id
          FROM sales s LEFT JOIN branches b ON b.id = s.branch_id
         WHERE s.id = ? LIMIT 1`,
@@ -9982,10 +10107,11 @@ async function createCheckoutSession(opts) {
     label = `Receipt ${rows[0].receipt_number}`;
   }
   if (amount === null) throw badRequest("Nothing to charge: pass planId, orderId, saleId or amount");
-  const currency = await currencyFor(opts.tenantId ?? null);
+  const currency = await currencyFor(opts.planId ? null : opts.tenantId ?? null);
   const amountMinor = toMinor(amount, label);
   const metadata = { [MK.kind]: opts.kind };
   if (opts.tenantId) metadata[MK.tenantId] = String(opts.tenantId);
+  if (opts.planId) metadata[MK.planId] = String(opts.planId);
   if (opts.orderId) metadata[MK.orderId] = String(opts.orderId);
   if (opts.saleId) metadata[MK.saleId] = String(opts.saleId);
   const session = await stripe.checkout.sessions.create({
@@ -10015,7 +10141,7 @@ async function createCheckoutSession(opts) {
 // server/wholesale.ts
 init_db();
 init_storeTime();
-async function q4(sqlText, params = []) {
+async function q5(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -10058,7 +10184,7 @@ var PAYMENTS_TABLE = `
     KEY ix_wp_sale (sale_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`;
 async function columnExists2(table, column) {
-  const rows = await q4(
+  const rows = await q5(
     `SELECT 1 FROM information_schema.COLUMNS
       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
     [table, column]
@@ -10066,7 +10192,7 @@ async function columnExists2(table, column) {
   return rows.length > 0;
 }
 async function indexExists2(table, index) {
-  const rows = await q4(
+  const rows = await q5(
     `SELECT 1 FROM information_schema.STATISTICS
       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1`,
     [table, index]
@@ -10078,7 +10204,7 @@ async function runWholesaleMigrations() {
   for (const [table, column, def] of COLUMNS) {
     try {
       if (await columnExists2(table, column)) continue;
-      await q4(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${def}`);
+      await q5(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${def}`);
       added++;
     } catch (e) {
       const msg = String(e?.message || e);
@@ -10086,13 +10212,13 @@ async function runWholesaleMigrations() {
     }
   }
   try {
-    await q4(PAYMENTS_TABLE);
+    await q5(PAYMENTS_TABLE);
   } catch (e) {
     console.error("[wholesale] wholesale_payments:", e?.message || e);
   }
   try {
     if (!await indexExists2("customers", "ix_customers_tenant_type")) {
-      await q4(`ALTER TABLE customers ADD INDEX ix_customers_tenant_type (tenant_id, customer_type)`);
+      await q5(`ALTER TABLE customers ADD INDEX ix_customers_tenant_type (tenant_id, customer_type)`);
     }
   } catch (e) {
     const msg = String(e?.message || e);
@@ -10199,7 +10325,7 @@ async function listTraders(tenantId, opts = {}) {
     where.push("(c.name LIKE ? OR c.shop_name LIKE ? OR c.phone LIKE ? OR c.tax_number LIKE ?)");
     params.push(like2, like2, like2, like2);
   }
-  const rows = await q4(
+  const rows = await q5(
     `SELECT ${TRADER_COLUMNS},
        (SELECT MAX(p.created_at) FROM wholesale_payments p
          WHERE p.customer_id = c.id AND p.kind = 'payment') AS last_payment_at,
@@ -10214,7 +10340,7 @@ async function listTraders(tenantId, opts = {}) {
   return rows.map(mapTrader);
 }
 async function getTrader(tenantId, id) {
-  const rows = await q4(
+  const rows = await q5(
     `SELECT ${TRADER_COLUMNS} FROM customers c
       WHERE c.id = ? AND c.tenant_id = ? AND c.customer_type = 'wholesale' LIMIT 1`,
     [id, tenantId]
@@ -10360,7 +10486,7 @@ async function updateTrader(tenantId, id, input) {
   }
   if (sets.length > 0) {
     params.push(id, tenantId);
-    await q4(`UPDATE customers SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ? AND customer_type = 'wholesale'`, params);
+    await q5(`UPDATE customers SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ? AND customer_type = 'wholesale'`, params);
   }
   return getTrader(tenantId, id);
 }
@@ -10411,7 +10537,7 @@ async function recordCharge(tenantId, customerId, body, employeeId) {
   });
 }
 async function voidLedgerEntry(tenantId, entryId) {
-  const rows = await q4(
+  const rows = await q5(
     `SELECT id, customer_id, kind, amount FROM wholesale_payments WHERE id = ? AND tenant_id = ? LIMIT 1`,
     [entryId, tenantId]
   );
@@ -10460,7 +10586,7 @@ async function holdCreditForSale(tenantId, customerId, totalAmount) {
 }
 async function releaseCreditHold(hold) {
   try {
-    await q4(
+    await q5(
       `UPDATE customers SET wholesale_balance = wholesale_balance - ? WHERE id = ? AND tenant_id = ?`,
       [fromCents(hold.cents), hold.customerId, hold.tenantId]
     );
@@ -10469,7 +10595,7 @@ async function releaseCreditHold(hold) {
   }
 }
 async function creditSaleOfTenant(tenantId, saleId) {
-  const rows = await q4(
+  const rows = await q5(
     `SELECT s.id, s.customer_id, s.total_amount, s.receipt_number
        FROM sales s JOIN customers c ON c.id = s.customer_id
       WHERE s.id = ? AND s.payment_method = 'credit' AND c.tenant_id = ? LIMIT 1`,
@@ -10547,13 +10673,13 @@ async function getStatement(tenantId, customerId, fromRaw, toRaw) {
   const tz = await storeTimeZone(tenantId);
   const from = parseDate(fromRaw, false, tz);
   const to = parseDate(toRaw, true, tz);
-  const saleRows = await q4(
+  const saleRows = await q5(
     `SELECT id, receipt_number, total_amount, created_at FROM sales
       WHERE customer_id = ? AND payment_method = 'credit' ${from ? "AND created_at >= ?" : ""}
       ORDER BY created_at ASC, id ASC`,
     from ? [customerId, from] : [customerId]
   );
-  const ledgerRows = await q4(
+  const ledgerRows = await q5(
     `SELECT id, kind, amount, method, note, sale_id, created_at FROM wholesale_payments
       WHERE customer_id = ? AND tenant_id = ? ${from ? "AND created_at >= ?" : ""}
       ORDER BY created_at ASC, id ASC`,
@@ -10622,7 +10748,7 @@ async function getStatement(tenantId, customerId, fromRaw, toRaw) {
   };
 }
 async function getSummary(tenantId) {
-  const [totals] = await q4(
+  const [totals] = await q5(
     `SELECT COUNT(*) AS traders,
             COALESCE(SUM(CASE WHEN is_active = 1 OR is_active IS NULL THEN 1 ELSE 0 END), 0) AS active,
             COALESCE(SUM(CASE WHEN wholesale_balance > 0 THEN wholesale_balance ELSE 0 END), 0) AS receivables,
@@ -10632,18 +10758,18 @@ async function getSummary(tenantId) {
     [tenantId]
   );
   const monthStart2 = monthStart(await storeTimeZone(tenantId));
-  const [collected] = await q4(
+  const [collected] = await q5(
     `SELECT COALESCE(SUM(amount), 0) AS total FROM wholesale_payments
       WHERE tenant_id = ? AND kind = 'payment' AND created_at >= ?`,
     [tenantId, monthStart2]
   );
-  const [creditSales] = await q4(
+  const [creditSales] = await q5(
     `SELECT COALESCE(SUM(s.total_amount), 0) AS total, COUNT(*) AS count
        FROM sales s JOIN customers c ON c.id = s.customer_id
       WHERE c.tenant_id = ? AND s.payment_method = 'credit' AND s.created_at >= ?`,
     [tenantId, monthStart2]
   );
-  const top = await q4(
+  const top = await q5(
     `SELECT ${TRADER_COLUMNS} FROM customers c
       WHERE c.tenant_id = ? AND c.customer_type = 'wholesale' AND c.wholesale_balance > 0
       ORDER BY c.wholesale_balance DESC LIMIT 5`,
@@ -10665,8 +10791,8 @@ async function getSummary(tenantId) {
 
 // server/routes.ts
 var bcrypt6 = __toESM(require("bcrypt"));
-var crypto6 = __toESM(require("crypto"));
-var import_date_fns4 = require("date-fns");
+var crypto7 = __toESM(require("crypto"));
+var import_date_fns5 = require("date-fns");
 var import_google_auth_library = require("google-auth-library");
 var TIMESTAMP_FIELDS = [
   "createdAt",
@@ -10730,8 +10856,8 @@ function productWriteError(res, e) {
 function analyticsTenant(req) {
   const t2 = reqTenant(req);
   if (t2) return t2;
-  const q8 = Number(req?.query?.tenantId);
-  return Number.isFinite(q8) && q8 > 0 ? q8 : void 0;
+  const q9 = Number(req?.query?.tenantId);
+  return Number.isFinite(q9) && q9 > 0 ? q9 : void 0;
 }
 var ORDER_STATUSES = /* @__PURE__ */ new Set([
   "pending",
@@ -11168,9 +11294,9 @@ async function registerRoutes(app2) {
       const startDate = /* @__PURE__ */ new Date();
       let endDate = /* @__PURE__ */ new Date();
       if (isYearly) {
-        endDate = (0, import_date_fns4.addYears)(startDate, 1);
+        endDate = (0, import_date_fns5.addYears)(startDate, 1);
       } else {
-        endDate = (0, import_date_fns4.addMonths)(startDate, 1);
+        endDate = (0, import_date_fns5.addMonths)(startDate, 1);
       }
       const subscription = await storage.createTenantSubscription({
         tenantId: tenant.id,
@@ -11185,7 +11311,7 @@ async function registerRoutes(app2) {
       });
       const randomSegments = Array.from(
         { length: 4 },
-        () => crypto6.randomBytes(2).toString("hex").toUpperCase()
+        () => crypto7.randomBytes(2).toString("hex").toUpperCase()
       );
       const licenseKey = `KASSENTA-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
@@ -11262,7 +11388,7 @@ async function registerRoutes(app2) {
         metadata: { stripeChargeId: paymentIntentId }
       });
       const startDate = /* @__PURE__ */ new Date();
-      const endDate = isYearly ? (0, import_date_fns4.addYears)(startDate, 1) : (0, import_date_fns4.addMonths)(startDate, 1);
+      const endDate = isYearly ? (0, import_date_fns5.addYears)(startDate, 1) : (0, import_date_fns5.addMonths)(startDate, 1);
       const subscription = await storage.createTenantSubscription({
         tenantId: tenant.id,
         planType,
@@ -11274,7 +11400,7 @@ async function registerRoutes(app2) {
         autoRenew: true,
         paymentMethod: "stripe"
       });
-      const randomSegments = Array.from({ length: 4 }, () => crypto6.randomBytes(2).toString("hex").toUpperCase());
+      const randomSegments = Array.from({ length: 4 }, () => crypto7.randomBytes(2).toString("hex").toUpperCase());
       const licenseKey = `KASSENTA-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
         licenseKey,
@@ -11322,7 +11448,7 @@ async function registerRoutes(app2) {
       let isNew = false;
       if (!tenant) {
         isNew = true;
-        const tempPassword = "GAuth-" + crypto6.randomBytes(4).toString("hex");
+        const tempPassword = "GAuth-" + crypto7.randomBytes(4).toString("hex");
         const passwordHash = await bcrypt6.hash(tempPassword, 10);
         tenant = await storage.createTenant({
           businessName: payload.name ? `${payload.name}'s Store` : "My New Store",
@@ -11334,38 +11460,18 @@ async function registerRoutes(app2) {
           maxEmployees: 5,
           metadata: { signupMethod: "google", signupDate: (/* @__PURE__ */ new Date()).toISOString() }
         });
-        const startDate = /* @__PURE__ */ new Date();
-        const endDate = (0, import_date_fns4.addDays)(startDate, 14);
-        const sub = await storage.createTenantSubscription({
-          tenantId: tenant.id,
-          planType: "trial",
-          planName: "14-Day Free Trial",
-          price: "0",
-          status: "active",
-          startDate,
-          endDate,
-          autoRenew: false
-        });
-        const randomSegments = Array.from(
-          { length: 4 },
-          () => crypto6.randomBytes(2).toString("hex").toUpperCase()
-        );
-        const licenseKey = `TRIAL-${randomSegments.join("-")}`;
-        await storage.createLicenseKey({
-          licenseKey,
-          tenantId: tenant.id,
-          subscriptionId: sub.id,
-          status: "active",
-          maxActivations: 3,
-          expiresAt: endDate,
-          notes: "Auto-generated Google Trial"
-        });
         await storage.ensureTenantData(tenant.id);
       }
       const licenses = await storage.getLicenseKeys(tenant.id);
       const activeLicense = licenses.find((l) => l.status === "active" && (!l.expiresAt || new Date(l.expiresAt) > /* @__PURE__ */ new Date()));
       if (!activeLicense) {
-        return res.status(403).json({ error: "No active license found for this account. Your trial may have expired." });
+        return res.json({
+          success: true,
+          needsPlan: true,
+          isNew,
+          planToken: signPlanToken(tenant.id, email),
+          tenant: { id: tenant.id, name: tenant.businessName, email: tenant.ownerEmail }
+        });
       }
       const employees2 = await storage.getEmployeesByTenant(tenant.id);
       const adminEmployee = employees2.find((e) => e.role === "admin" || e.email === email);
@@ -11390,6 +11496,12 @@ async function registerRoutes(app2) {
       console.error("[GOOGLE AUTH] Error:", e);
       res.status(500).json({ error: e.message });
     }
+  });
+  app2.post("/api/auth/plan-status", async (req, res) => {
+    const who = verifyPlanToken(req.body?.planToken);
+    if (!who) return res.status(401).json({ error: "Sign in with Google again." });
+    const lic = await activeLicenseFor(who.tenantId).catch(() => null);
+    res.json(lic ? { active: true, licenseKey: lic.license_key } : { active: false });
   });
   app2.get("/api/tenant/onboarding-status", async (req, res) => {
     try {
@@ -12627,7 +12739,7 @@ async function registerRoutes(app2) {
         const tz = await storeTimeZone(reqTenant(req));
         let candidate = "";
         for (let i = 0; i < 5; i++) {
-          candidate = `PO-${compactDate(tz)}-${crypto6.randomInt(1e4, 99999)}`;
+          candidate = `PO-${compactDate(tz)}-${crypto7.randomInt(1e4, 99999)}`;
           if (!await storage.purchaseOrderNumberExists(candidate)) break;
         }
         data.orderNumber = candidate;
@@ -12854,7 +12966,7 @@ async function registerRoutes(app2) {
       const tenantId = reqTenant(req) ?? (req.body.tenantId ? Number(req.body.tenantId) : void 0);
       if (!tenantId || !tableId || !tableName) return res.status(400).json({ error: "tenantId, tableId, tableName required" });
       if (!await ownedBy(req, resolvers.table, Number(tableId))) return res.status(404).json({ error: "Table not found" });
-      const qrToken = `TBL-${crypto6.randomBytes(16).toString("hex")}`;
+      const qrToken = `TBL-${crypto7.randomBytes(16).toString("hex")}`;
       const qr = await storage.createTableQrCode({
         tenantId: Number(tenantId),
         tableId: Number(tableId),
@@ -12875,11 +12987,11 @@ async function registerRoutes(app2) {
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
       const allTables = await storage.getTables(branchId ? Number(branchId) : void 0, Number(tenantId));
       const existing = await storage.getTableQrCodes(Number(tenantId));
-      const existingTableIds = new Set(existing.map((q8) => q8.tableId));
+      const existingTableIds = new Set(existing.map((q9) => q9.tableId));
       const created = [];
       for (const table of allTables) {
         if (existingTableIds.has(table.id)) continue;
-        const qrToken = `TBL-${crypto6.randomBytes(16).toString("hex")}`;
+        const qrToken = `TBL-${crypto7.randomBytes(16).toString("hex")}`;
         const qr = await storage.createTableQrCode({
           tenantId: Number(tenantId),
           tableId: table.id,
@@ -16065,14 +16177,14 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`,
   });
   app2.get("/api/delivery/search", async (req, res) => {
     try {
-      const q8 = (req.query.q || "").trim();
+      const q9 = (req.query.q || "").trim();
       const tenantId = Number(req.query.tenantId);
       if (!tenantId) return res.status(400).json({ error: "tenantId required" });
-      if (!q8) return res.json([]);
+      if (!q9) return res.json([]);
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { products: products2, categories: categories2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
       const { eq: eq10, and: and7, or: or5, like: like2, sql: sql8 } = await import("drizzle-orm");
-      const pattern = `%${q8}%`;
+      const pattern = `%${q9}%`;
       const results = await db2.select({
         id: products2.id,
         name: products2.name,
@@ -16304,14 +16416,14 @@ Sitemap: https://kassenta.com/api/delivery/sitemap.xml
 
 // server/superAdminRoutes.ts
 var bcrypt7 = __toESM(require("bcrypt"));
-var crypto7 = __toESM(require("crypto"));
+var crypto8 = __toESM(require("crypto"));
 var fs4 = __toESM(require("fs"));
 var path3 = __toESM(require("path"));
 init_storage();
-var import_date_fns5 = require("date-fns");
+var import_date_fns6 = require("date-fns");
 init_db();
 var import_drizzle_orm7 = require("drizzle-orm");
-async function q5(text2, params = []) {
+async function q6(text2, params = []) {
   const [rows] = await pool.query(text2, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -16659,7 +16771,7 @@ function registerSuperAdminRoutes(app2) {
         storeType: storeType || "supermarket"
       });
       const startDate = /* @__PURE__ */ new Date();
-      const endDate = (0, import_date_fns5.addDays)(startDate, 14);
+      const endDate = (0, import_date_fns6.addDays)(startDate, 14);
       const sub = await storage.createTenantSubscription({
         tenantId: tenant.id,
         planType: "trial",
@@ -16672,7 +16784,7 @@ function registerSuperAdminRoutes(app2) {
       });
       const randomSegments = Array.from(
         { length: 4 },
-        () => crypto7.randomBytes(2).toString("hex").toUpperCase()
+        () => crypto8.randomBytes(2).toString("hex").toUpperCase()
       );
       const licenseKey = `TRIAL-${randomSegments.join("-")}`;
       await storage.createLicenseKey({
@@ -16726,7 +16838,7 @@ function registerSuperAdminRoutes(app2) {
       const tenantMap = Object.fromEntries(tenantList.map((t2) => [t2.id, t2]));
       const billingMap = {};
       try {
-        const rows = await q5(
+        const rows = await q6(
           `SELECT id, stripe_customer_id, stripe_subscription_id, stripe_price_id,
                   last_invoice_id, last_payment_error
              FROM tenant_subscriptions`
@@ -16758,9 +16870,9 @@ function registerSuperAdminRoutes(app2) {
       const { tenantId, planType, planName, price, status, autoRenew, paymentMethod } = req.body;
       const startDate = /* @__PURE__ */ new Date();
       let endDate = /* @__PURE__ */ new Date();
-      if (planType === "monthly") endDate = (0, import_date_fns5.addMonths)(startDate, 1);
-      else if (planType === "yearly") endDate = (0, import_date_fns5.addYears)(startDate, 1);
-      else endDate = (0, import_date_fns5.addDays)(startDate, 30);
+      if (planType === "monthly") endDate = (0, import_date_fns6.addMonths)(startDate, 1);
+      else if (planType === "yearly") endDate = (0, import_date_fns6.addYears)(startDate, 1);
+      else endDate = (0, import_date_fns6.addDays)(startDate, 30);
       const sub = await storage.createTenantSubscription({
         tenantId,
         planType: planType || "trial",
@@ -16808,7 +16920,7 @@ function registerSuperAdminRoutes(app2) {
       const now = /* @__PURE__ */ new Date();
       const currentEnd = sub.endDate ? new Date(sub.endDate) : now;
       const base = currentEnd > now ? currentEnd : now;
-      const newEnd = months > 0 ? (0, import_date_fns5.addMonths)(base, months) : (0, import_date_fns5.addDays)(base, days);
+      const newEnd = months > 0 ? (0, import_date_fns6.addMonths)(base, months) : (0, import_date_fns6.addDays)(base, days);
       const { tenantSubscriptions: tenantSubscriptions2, licenseKeys: licenseKeys2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
       const renewable = (0, import_drizzle_orm7.and)(
         (0, import_drizzle_orm7.eq)(licenseKeys2.tenantId, sub.tenantId),
@@ -16846,7 +16958,7 @@ function registerSuperAdminRoutes(app2) {
   app2.post("/api/super-admin/licenses/generate", requireSuperAdmin, async (req, res) => {
     try {
       const { tenantId, subscriptionId, maxActivations, expiresAt, notes, customKey } = req.body;
-      const segments = Array.from({ length: 4 }, () => crypto7.randomBytes(2).toString("hex").toUpperCase());
+      const segments = Array.from({ length: 4 }, () => crypto8.randomBytes(2).toString("hex").toUpperCase());
       const licenseKey = customKey || `KASSENTA-${segments.join("-")}`;
       const key = await storage.createLicenseKey({
         licenseKey,
@@ -16854,7 +16966,7 @@ function registerSuperAdminRoutes(app2) {
         subscriptionId: subscriptionId || null,
         status: "active",
         maxActivations: maxActivations || 3,
-        expiresAt: expiresAt ? new Date(expiresAt) : (0, import_date_fns5.addYears)(/* @__PURE__ */ new Date(), 1),
+        expiresAt: expiresAt ? new Date(expiresAt) : (0, import_date_fns6.addYears)(/* @__PURE__ */ new Date(), 1),
         notes: notes || null
       });
       res.json(key);
@@ -16954,13 +17066,13 @@ function registerSuperAdminRoutes(app2) {
       let rows = [];
       let totals = {};
       try {
-        rows = await q5(
+        rows = await q6(
           `SELECT * FROM ( ${union.sql} ) p
             ORDER BY COALESCE(p.paidAt, p.createdAt) DESC
             LIMIT ?`,
           [...union.params, limit]
         );
-        const agg = await q5(
+        const agg = await q6(
           `SELECT COUNT(*) AS n,
                   SUM(CASE WHEN p.status IN ('paid','completed') THEN p.amount ELSE 0 END) AS collected,
                   SUM(COALESCE(p.refunded, 0)) AS refunded,
@@ -17031,7 +17143,7 @@ function registerSuperAdminRoutes(app2) {
   app2.get("/api/super-admin/payments/events", requireSuperAdmin, async (req, res) => {
     const limit = Math.min(Math.max(Number(req.query.limit) || 40, 1), 200);
     try {
-      const rows = await q5(
+      const rows = await q6(
         `SELECT id, type, status, livemode, error, received_at, processed_at
            FROM stripe_webhook_events
           ORDER BY received_at DESC
@@ -17059,7 +17171,7 @@ function registerSuperAdminRoutes(app2) {
       if (!/^pi_[A-Za-z0-9_]+$/.test(paymentIntentId)) {
         return res.status(400).json({ error: "A Stripe PaymentIntent id (pi_...) is required" });
       }
-      const known = await q5(
+      const known = await q6(
         `SELECT total_amount AS amount, COALESCE(amount_refunded, 0) AS refunded
            FROM online_orders WHERE stripe_payment_intent_id = ?
           UNION ALL
@@ -17715,7 +17827,7 @@ function registerSuperAdminRoutes(app2) {
 }
 
 // server/broadcastRoutes.ts
-var import_crypto6 = require("crypto");
+var import_crypto7 = require("crypto");
 init_db();
 init_schema();
 var import_drizzle_orm8 = require("drizzle-orm");
@@ -17778,7 +17890,7 @@ async function ensureBroadcastTables() {
 }
 var BROADCAST_TTL_MINUTES = 5;
 function generateBroadcastToken() {
-  return (0, import_crypto6.randomBytes)(20).toString("hex");
+  return (0, import_crypto7.randomBytes)(20).toString("hex");
 }
 function normalizeItems(items) {
   if (Array.isArray(items)) return items;
@@ -17798,7 +17910,7 @@ function normalizeBroadcastRow(row) {
 }
 function generateOrderNumber(tenantId) {
   const stamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10).replace(/-/g, "");
-  const suffix = (0, import_crypto6.randomBytes)(3).toString("hex").toUpperCase();
+  const suffix = (0, import_crypto7.randomBytes)(3).toString("hex").toUpperCase();
   return `BC-${tenantId}-${stamp}-${suffix}`;
 }
 function registerBroadcastRoutes(app2) {
@@ -18114,7 +18226,7 @@ function registerBroadcastRoutes(app2) {
       const [bc] = await db.select().from(broadcastOrders).where((0, import_drizzle_orm8.eq)(broadcastOrders.id, id)).limit(1);
       if (!bc) return res.status(500).json({ error: "Post-claim read failed" });
       const orderNumber = generateOrderNumber(tenantId);
-      const trackingToken = (0, import_crypto6.randomBytes)(32).toString("hex");
+      const trackingToken = (0, import_crypto7.randomBytes)(32).toString("hex");
       const bcItems = normalizeItems(bc.items);
       const posItems = bcItems.map((it, idx) => ({
         productId: it.productId || 0,
@@ -18510,20 +18622,22 @@ function registerCustomerExtraRoutes(app2) {
 }
 
 // server/index.ts
+init_employeeAuth();
 init_callerIdService();
 
 // server/paymentRoutes.ts
 var import_express = __toESM(require("express"));
+init_employeeAuth();
 init_db();
 init_storage();
 
 // server/shamcash.ts
-var import_crypto7 = __toESM(require("crypto"));
+var import_crypto8 = __toESM(require("crypto"));
 init_db();
 var BASE = (process.env.SHAMCASH_API_URL || "https://api-shamcash.com/api").replace(/\/$/, "");
 var SHAMCASH_CURRENCIES = ["SYP", "USD"];
 var INVOICE_MINUTES = 60;
-async function q6(sqlText, params = []) {
+async function q7(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -18550,7 +18664,7 @@ var PAYER_MESSAGES = {
 };
 async function runShamCashMigrations() {
   try {
-    await q6(`
+    await q7(`
       CREATE TABLE IF NOT EXISTS shamcash_invoices (
         id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
         tenant_id int NOT NULL,
@@ -18575,7 +18689,7 @@ async function runShamCashMigrations() {
   }
 }
 async function readConfigJson(tenantId) {
-  const rows = await q6(
+  const rows = await q7(
     `SELECT config_json FROM payment_gateway_settings WHERE tenant_id = ? LIMIT 1`,
     [tenantId]
   );
@@ -18624,7 +18738,7 @@ async function saveShamCashSettings(tenantId, patch) {
   if (patch.phone !== void 0) next.phone = clip2(patch.phone, 40);
   if (patch.holderName !== void 0) next.holderName = clip2(patch.holderName, 80);
   cfg.shamcash = next;
-  await q6(
+  await q7(
     `INSERT INTO payment_gateway_settings (tenant_id, config_json)
      VALUES (?, ?)
      ON DUPLICATE KEY UPDATE config_json = VALUES(config_json)`,
@@ -18636,7 +18750,7 @@ function keyFor(s) {
   return s.apiKey || process.env.SHAMCASH_API_KEY || null;
 }
 async function shamCashCurrencyFor(tenantId) {
-  const rows = await q6(
+  const rows = await q7(
     `SELECT currency FROM branches WHERE tenant_id = ? ORDER BY is_main DESC, id ASC LIMIT 1`,
     [tenantId]
   );
@@ -18672,7 +18786,7 @@ async function publicShamCashStatus(tenantId) {
 async function recordOrderReference(orderId, reference) {
   const ref = String(reference || "").replace(/[^\w\- ]/g, "").trim().slice(0, 40);
   if (!ref) throw new ShamCashError(PAYER_MESSAGES.MISSING_TRAN_ID, 400);
-  await q6(
+  await q7(
     `UPDATE online_orders
         SET payment_method = 'shamcash',
             notes = TRIM(CONCAT(COALESCE(notes, ''), CASE WHEN COALESCE(notes, '') = '' THEN '' ELSE ' | ' END, ?))
@@ -18735,7 +18849,7 @@ function matchWallet(wallets, id) {
 }
 async function loadTarget(t2) {
   if (t2.kind === "order") {
-    const rows2 = await q6(
+    const rows2 = await q7(
       `SELECT tenant_id, total_amount, payment_status, order_number FROM online_orders WHERE id = ? LIMIT 1`,
       [t2.id]
     );
@@ -18748,7 +18862,7 @@ async function loadTarget(t2) {
       label: `Order ${r2.order_number}`
     };
   }
-  const rows = await q6(
+  const rows = await q7(
     `SELECT b.tenant_id, s.total_amount, s.payment_status, s.receipt_number
        FROM sales s JOIN branches b ON b.id = s.branch_id WHERE s.id = ? LIMIT 1`,
     [t2.id]
@@ -18807,7 +18921,7 @@ async function createInvoiceFor(t2, publicBaseUrl) {
     throw new ShamCashError("\u0634\u0627\u0645 \u0643\u0627\u0634 \u064A\u062F\u0639\u0645 \u0627\u0644\u0644\u064A\u0631\u0629 \u0627\u0644\u0633\u0648\u0631\u064A\u0629 \u0648\u0627\u0644\u062F\u0648\u0644\u0627\u0631 \u0641\u0642\u0637", 400, "UNSUPPORTED_CURRENCY");
   }
   if (!(target.amount > 0)) throw new ShamCashError("\u0642\u064A\u0645\u0629 \u0627\u0644\u0637\u0644\u0628 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D\u0629", 400);
-  const open = await q6(
+  const open = await q7(
     `SELECT * FROM shamcash_invoices
       WHERE ${col(t2)} = ? AND status = 'pending' AND expires_at > NOW() + INTERVAL 2 MINUTE
       ORDER BY id DESC LIMIT 1`,
@@ -18832,23 +18946,23 @@ async function createInvoiceFor(t2, publicBaseUrl) {
     throw new ShamCashError("\u062A\u0639\u0630\u0651\u0631 \u0625\u0646\u0634\u0627\u0621 \u0641\u0627\u062A\u0648\u0631\u0629 \u0634\u0627\u0645 \u0643\u0627\u0634", 502);
   }
   const expiresAt = inv?.expiresAt ? new Date(inv.expiresAt) : new Date(Date.now() + INVOICE_MINUTES * 6e4);
-  await q6(
+  await q7(
     `INSERT INTO shamcash_invoices (tenant_id, ${col(t2)}, invoice_number, amount, currency, wallet, status, expires_at)
      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
     [target.tenantId, t2.id, invoiceNumber, target.amount.toFixed(2), currency, walletRef, expiresAt]
   );
-  const [row] = await q6(`SELECT * FROM shamcash_invoices WHERE invoice_number = ?`, [invoiceNumber]);
+  const [row] = await q7(`SELECT * FROM shamcash_invoices WHERE invoice_number = ?`, [invoiceNumber]);
   return publicInvoice(row, await payToDetails(apiKey, walletRef));
 }
 async function markSettled(row, tranId) {
-  await q6(
+  await q7(
     `UPDATE shamcash_invoices
         SET status = 'paid', tran_id = COALESCE(?, tran_id), paid_at = COALESCE(paid_at, NOW())
       WHERE id = ?`,
     [tranId, row.id]
   );
   if (row.online_order_id) {
-    await q6(
+    await q7(
       `UPDATE online_orders
           SET payment_status = 'paid', payment_method = 'shamcash',
               paid_at = COALESCE(paid_at, NOW()), payment_error = NULL
@@ -18857,7 +18971,7 @@ async function markSettled(row, tranId) {
     );
   }
   if (row.sale_id) {
-    await q6(
+    await q7(
       `UPDATE sales
           SET payment_status = 'paid', payment_method = 'shamcash', paid_at = COALESCE(paid_at, NOW())
         WHERE id = ? AND (payment_status IS NULL OR payment_status <> 'paid')`,
@@ -18871,7 +18985,7 @@ async function apiKeyForRow(row) {
   return key;
 }
 async function refreshInvoice(invoiceNumber) {
-  const [row] = await q6(`SELECT * FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
+  const [row] = await q7(`SELECT * FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
   if (!row) throw new ShamCashError("\u0641\u0627\u062A\u0648\u0631\u0629 \u063A\u064A\u0631 \u0645\u0639\u0631\u0648\u0641\u0629", 404);
   if (row.status !== "paid") {
     const remote = await call(await apiKeyForRow(row), "GET", `/v1/invoices/${encodeURIComponent(invoiceNumber)}`);
@@ -18880,16 +18994,16 @@ async function refreshInvoice(invoiceNumber) {
     if (status === "paid") {
       await markSettled(row, inv?.transactionRef ?? inv?.tranId ?? inv?.tran_id ?? null);
     } else if (status === "expired" || status === "cancelled") {
-      await q6(`UPDATE shamcash_invoices SET status = ? WHERE id = ?`, [status, row.id]);
+      await q7(`UPDATE shamcash_invoices SET status = ? WHERE id = ?`, [status, row.id]);
     }
   }
-  const [fresh] = await q6(`SELECT * FROM shamcash_invoices WHERE id = ?`, [row.id]);
+  const [fresh] = await q7(`SELECT * FROM shamcash_invoices WHERE id = ?`, [row.id]);
   return fresh;
 }
 async function verifyInvoice(t2, tranId) {
   const clean2 = String(tranId ?? "").trim();
   if (!clean2) throw new ShamCashError(PAYER_MESSAGES.MISSING_TRAN_ID, 400, "MISSING_TRAN_ID");
-  const [row] = await q6(
+  const [row] = await q7(
     `SELECT * FROM shamcash_invoices WHERE ${col(t2)} = ? ORDER BY id DESC LIMIT 1`,
     [t2.id]
   );
@@ -18904,12 +19018,12 @@ async function verifyInvoice(t2, tranId) {
   }
   const fresh = await refreshInvoice(row.invoice_number);
   if (fresh.status === "paid" && !fresh.tran_id) {
-    await q6(`UPDATE shamcash_invoices SET tran_id = ? WHERE id = ?`, [clean2, fresh.id]);
+    await q7(`UPDATE shamcash_invoices SET tran_id = ? WHERE id = ?`, [clean2, fresh.id]);
   }
   return { status: fresh.status, invoiceNumber: fresh.invoice_number };
 }
 async function invoiceStatus(t2) {
-  const [row] = await q6(
+  const [row] = await q7(
     `SELECT * FROM shamcash_invoices WHERE ${col(t2)} = ? ORDER BY id DESC LIMIT 1`,
     [t2.id]
   );
@@ -18920,11 +19034,11 @@ async function invoiceStatus(t2) {
 async function handleWebhook(rawBody, signatureHeader) {
   const secret = process.env.SHAMCASH_WEBHOOK_SECRET;
   if (secret) {
-    const expected = import_crypto7.default.createHmac("sha256", secret).update(rawBody).digest("hex");
+    const expected = import_crypto8.default.createHmac("sha256", secret).update(rawBody).digest("hex");
     const got = String(signatureHeader ?? "").replace(/^sha256=/, "");
     const a = Buffer.from(expected, "hex");
     const b = Buffer.from(got, "hex");
-    if (a.length !== b.length || !import_crypto7.default.timingSafeEqual(a, b)) {
+    if (a.length !== b.length || !import_crypto8.default.timingSafeEqual(a, b)) {
       throw new ShamCashError("bad signature", 401);
     }
   }
@@ -18936,7 +19050,7 @@ async function handleWebhook(rawBody, signatureHeader) {
   }
   const invoiceNumber = body?.invoiceNumber;
   if (!invoiceNumber) return { ignored: true };
-  const [row] = await q6(`SELECT id FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
+  const [row] = await q7(`SELECT id FROM shamcash_invoices WHERE invoice_number = ? LIMIT 1`, [invoiceNumber]);
   if (!row) return { ignored: true };
   const fresh = await refreshInvoice(String(invoiceNumber));
   return { invoiceNumber, status: fresh.status };
@@ -18956,7 +19070,7 @@ async function adminShamCashView(tenantId) {
 
 // server/paymentRoutes.ts
 var PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://kassenta.com";
-async function q7(sqlText, params = []) {
+async function q8(sqlText, params = []) {
   const [rows] = await pool.query(sqlText, params);
   return Array.isArray(rows) ? rows : [];
 }
@@ -18975,7 +19089,7 @@ var DEFAULT_GATEWAY = {
 };
 async function loadGatewaySettings(tenantId) {
   try {
-    const rows = await q7(
+    const rows = await q8(
       `SELECT tenant_id, config_json FROM payment_gateway_settings
         WHERE tenant_id IN (?, 0) ORDER BY tenant_id DESC LIMIT 1`,
       [tenantId || 0]
@@ -18992,7 +19106,7 @@ async function loadGatewaySettings(tenantId) {
 }
 async function saveGatewaySettings(tenantId, config) {
   const currency = config?.stripe?.currency || "CHF";
-  await q7(
+  await q8(
     `INSERT INTO payment_gateway_settings (tenant_id, config_json, currency, enabled_methods)
      VALUES (?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE config_json = VALUES(config_json),
@@ -19091,7 +19205,7 @@ function registerPaymentRoutes(app2) {
       const orderId = Number.parseInt(String(req.params.orderId), 10);
       if (!Number.isFinite(orderId)) return res.status(400).json({ error: "Invalid order id" });
       const token = String(req.body?.trackingToken ?? req.query.trackingToken ?? "");
-      const rows = await q7(
+      const rows = await q8(
         `SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`,
         [orderId]
       );
@@ -19109,7 +19223,7 @@ function registerPaymentRoutes(app2) {
     try {
       const stripe = await requireStripeClient();
       const pi = await stripe.paymentIntents.retrieve(String(req.params.paymentIntentId));
-      const orderRows = await q7(
+      const orderRows = await q8(
         `SELECT id, order_number, payment_status, tracking_token
            FROM online_orders WHERE stripe_payment_intent_id = ? LIMIT 1`,
         [pi.id]
@@ -19185,7 +19299,7 @@ function registerPaymentRoutes(app2) {
       }
       let licenceTenant = null;
       if (!planId && orderId) {
-        const rows = await q7(`SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [Number(orderId)]);
+        const rows = await q8(`SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [Number(orderId)]);
         const token = String(req.body?.trackingToken ?? "");
         if (!rows.length || !rows[0].tracking_token || token !== rows[0].tracking_token) {
           return res.status(403).json({ error: "Invalid tracking token for this order" });
@@ -19195,11 +19309,16 @@ function registerPaymentRoutes(app2) {
         const lic = key ? await storage.getLicenseByKey(key) : null;
         if (!lic || lic.status !== "active") return res.status(401).json({ error: "Authentication required. Provide x-license-key header." });
         licenceTenant = Number(lic.tenantId);
-        const rows = await q7(
+        const rows = await q8(
           `SELECT b.tenant_id FROM sales s JOIN branches b ON b.id = s.branch_id WHERE s.id = ? LIMIT 1`,
           [Number(saleId)]
         );
         if (!rows.length || Number(rows[0].tenant_id) !== licenceTenant) return res.status(404).json({ error: "Sale not found" });
+      }
+      if (planId && req.body?.planToken) {
+        const who = verifyPlanToken(req.body.planToken);
+        if (!who) return res.status(401).json({ error: "Sign in with Google again." });
+        licenceTenant = who.tenantId;
       }
       const base = process.env.PUBLIC_BASE_URL || `https://${req.get("host")}`;
       const kind = planId ? "tenant_subscription" : orderId ? "online_order" : "pos_sale";
@@ -19228,10 +19347,10 @@ function registerPaymentRoutes(app2) {
       if (!req.isSuperAdmin) {
         const tenantId = Number(req.tenantId || 0);
         const pi = String(paymentIntentId);
-        const own = tenantId > 0 && ((await q7(
+        const own = tenantId > 0 && ((await q8(
           `SELECT 1 FROM online_orders WHERE stripe_payment_intent_id = ? AND tenant_id = ? LIMIT 1`,
           [pi, tenantId]
-        )).length > 0 || (await q7(
+        )).length > 0 || (await q8(
           `SELECT 1 FROM sales s JOIN branches b ON b.id = s.branch_id
             WHERE s.stripe_payment_intent_id = ? AND b.tenant_id = ? LIMIT 1`,
           [pi, tenantId]
@@ -19263,7 +19382,7 @@ function registerPaymentRoutes(app2) {
       return null;
     }
     const token = String(req.body?.trackingToken ?? req.query.trackingToken ?? "");
-    const rows = await q7(`SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [orderId]);
+    const rows = await q8(`SELECT tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [orderId]);
     if (!rows.length) {
       res.status(404).json({ error: "Order not found" });
       return null;
@@ -19317,7 +19436,7 @@ function registerPaymentRoutes(app2) {
       res.status(400).json({ error: "Invalid sale id" });
       return null;
     }
-    const rows = await q7(
+    const rows = await q8(
       `SELECT b.tenant_id FROM sales s JOIN branches b ON b.id = s.branch_id WHERE s.id = ? LIMIT 1`,
       [saleId]
     );
@@ -19401,7 +19520,7 @@ function registerPaymentRoutes(app2) {
     const orderId = req.body?.orderId ?? req.body?.metadata?.orderId;
     if (orderId) {
       try {
-        const rows = await q7(`SELECT tenant_id, tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [Number(orderId)]);
+        const rows = await q8(`SELECT tenant_id, tracking_token FROM online_orders WHERE id = ? LIMIT 1`, [Number(orderId)]);
         if (!rows.length) return res.status(404).json({ error: "Order not found" });
         const tenantId = Number(req.tenantId || 0);
         const token = String(req.body?.trackingToken ?? "");
@@ -19438,6 +19557,7 @@ function registerPaymentRoutes(app2) {
 // server/whatsappStoreRoutes.ts
 init_storage();
 init_db();
+init_employeeAuth();
 init_phone();
 init_storeTime();
 function tenantOf2(req, res) {
@@ -19623,12 +19743,12 @@ Test message \u2014 the store's WhatsApp is connected.`;
     try {
       const tenantId = tenantOf2(req, res);
       if (tenantId == null) return;
-      const q8 = String(req.query.q || "").trim();
+      const q9 = String(req.query.q || "").trim();
       const params = [storeKey(tenantId)];
       let where = "session_key = ?";
-      if (q8) {
+      if (q9) {
         where += " AND (name LIKE ? OR phone LIKE ? OR last_message LIKE ?)";
-        params.push(`%${q8}%`, `%${asciiDigits(q8).replace(/\D/g, "") || q8}%`, `%${q8}%`);
+        params.push(`%${q9}%`, `%${asciiDigits(q9).replace(/\D/g, "") || q9}%`, `%${q9}%`);
       }
       const [rows] = await pool.query(
         `SELECT jid, name, phone, is_group AS isGroup, last_message AS lastMessage, last_from_me AS lastFromMe,
@@ -20003,6 +20123,7 @@ async function runStripeMigrations() {
 }
 
 // server/wholesaleRoutes.ts
+init_employeeAuth();
 function tenantOf3(req) {
   const t2 = req.tenantId;
   if (!t2 || !Number.isInteger(t2)) throw new WholesaleError("Store not identified", 401, "NO_TENANT");
@@ -20635,7 +20756,7 @@ var PRIVACY_POLICY_HTML = String.raw`<!DOCTYPE html>
 </html>`;
 
 // server/site/shell.ts
-var import_crypto8 = require("crypto");
+var import_crypto9 = require("crypto");
 
 // server/site/design.ts
 var SITE_CSS = String.raw`
@@ -21254,7 +21375,7 @@ body:has(.nav-links.open) .wa { opacity: 0; pointer-events: none; }
 function href(routePath) {
   return routePath === "/" ? "/" : `${routePath}/`;
 }
-var hash8 = (s) => (0, import_crypto8.createHash)("sha256").update(s).digest("hex").slice(0, 8);
+var hash8 = (s) => (0, import_crypto9.createHash)("sha256").update(s).digest("hex").slice(0, 8);
 var assetCache = null;
 function siteAssets() {
   if (!assetCache) {

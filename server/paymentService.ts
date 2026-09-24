@@ -454,11 +454,13 @@ export async function createCheckoutSession(opts: {
 
   if (amount === null) throw badRequest("Nothing to charge: pass planId, orderId, saleId or amount");
 
-  const currency = await currencyFor(opts.tenantId ?? null);
+  // Plans are priced in the platform currency, whatever the store sells in.
+  const currency = await currencyFor(opts.planId ? null : (opts.tenantId ?? null));
   const amountMinor = toMinor(amount, label);
 
   const metadata: Record<string, string> = { [MK.kind]: opts.kind };
   if (opts.tenantId) metadata[MK.tenantId] = String(opts.tenantId);
+  if (opts.planId) metadata[MK.planId] = String(opts.planId);
   if (opts.orderId) metadata[MK.orderId] = String(opts.orderId);
   if (opts.saleId) metadata[MK.saleId] = String(opts.saleId);
 

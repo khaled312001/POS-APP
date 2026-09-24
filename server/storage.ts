@@ -1,3 +1,4 @@
+import { hashPin } from "./employeeAuth";
 import { db, pool } from "./db";
 import { eq, desc, sql, and, gte, lte, like, or, isNull, inArray, ne } from "drizzle-orm";
 import { storeTimeZone, dayStart, daysAgoStart, monthStart as storeMonthStart } from "./storeTime";
@@ -2259,15 +2260,16 @@ export const storage = {
 
     if (tenantBranches.length === 0) {
       this.seedLog(`Creating default branch for tenant ${tenantId}`);
+      // MySQL inserts return no row: the id comes from $returningId().
       const [newBranch] = await db.insert(branches).values({
         tenantId,
         name: "Main Branch",
-        address: tenant.address || "Main Street",
-        phone: tenant.ownerPhone || "123456789",
+        address: tenant.address || null,
+        phone: tenant.ownerPhone || null,
         isMain: true,
         currency: "CHF",
-        taxRate: "10",
-      });
+        taxRate: "0",
+      } as any).$returningId();
 
       branchId = newBranch.id;
     } else {
@@ -2276,20 +2278,20 @@ export const storage = {
 
     const tenantEmployees = await db.select({ id: employees.id })
       .from(employees)
-      .innerJoin(branches, eq(employees.branchId, branches.id))
-      .where(eq(branches.tenantId, tenantId))
+      .where(eq(employees.tenantId, tenantId))
       .limit(1);
 
     if (tenantEmployees.length === 0) {
       this.seedLog(`Creating default admin for tenant ${tenantId}`);
       await this.createEmployee({
-        name: tenant.ownerName.split(" ")[0] || "Admin",
+        tenantId,
+        name: tenant.ownerName || "Admin",
         email: tenant.ownerEmail,
-        pin: "1234",
+        pin: await hashPin("1234"),
         role: "admin",
         branchId: branchId,
         permissions: ["all"],
-      });
+      } as any);
     }
   },
 

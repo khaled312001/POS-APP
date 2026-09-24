@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { useLanguage } from '@/lib/language-context';
+import PlanPicker from '@/components/PlanPicker';
 import { signInWithGoogleNative, signInWithGoogleWeb, supportsGoogle, GoogleSignInCancelled } from '@/lib/google-signin';
 
 
@@ -19,9 +20,9 @@ const COPY = {
     en: {
         verifying: 'Verifying store activation…',
         redirecting: 'Opening the staff login…',
-        subtitleA: 'Enter your store email and license key to activate, or subscribe to start your ',
-        trial: '14-day free trial',
-        subtitleB: ' instantly.',
+        subtitleA: 'Enter your store email and license key to activate, or ',
+        trial: 'sign in with Google and choose a plan',
+        subtitleB: '.',
         device: 'Device',
         detecting: 'Detecting…',
         help: 'Need help? Contact your store administrator.',
@@ -31,8 +32,8 @@ const COPY = {
     de: {
         verifying: 'Geschäftsaktivierung wird geprüft…',
         redirecting: 'Mitarbeiter-Anmeldung wird geöffnet…',
-        subtitleA: 'Geben Sie die E-Mail-Adresse und den Lizenzschlüssel Ihres Geschäfts ein, oder abonnieren Sie und starten Sie sofort Ihre ',
-        trial: '14-tägige Gratis-Testphase',
+        subtitleA: 'Geben Sie die E-Mail-Adresse und den Lizenzschlüssel Ihres Geschäfts ein, oder ',
+        trial: 'melden Sie sich mit Google an und wählen Sie einen Plan',
         subtitleB: '.',
         device: 'Gerät',
         detecting: 'Wird ermittelt…',
@@ -43,9 +44,9 @@ const COPY = {
     ar: {
         verifying: 'جارٍ التحقق من تفعيل المتجر…',
         redirecting: 'جارٍ فتح تسجيل دخول الموظفين…',
-        subtitleA: 'أدخل بريد المتجر ومفتاح الترخيص للتفعيل، أو اشترك لتبدأ ',
-        trial: 'تجربة مجانية لمدة 14 يوماً',
-        subtitleB: ' فوراً.',
+        subtitleA: 'أدخل بريد المتجر ومفتاح الترخيص للتفعيل، أو ',
+        trial: 'سجّل الدخول بـ Google واختر باقتك',
+        subtitleB: '.',
         device: 'الجهاز',
         detecting: 'جارٍ التحديد…',
         help: 'تحتاج مساعدة؟ تواصل مع مسؤول المتجر.',
@@ -55,7 +56,7 @@ const COPY = {
 };
 
 export default function LicenseGate() {
-    const { isValidating, isValid, validateLicense, validateGoogleLogin, errorReason, deviceId } = useLicense();
+    const { isValidating, isValid, validateLicense, validateGoogleLogin, errorReason, deviceId, planSignup, clearPlanSignup } = useLicense();
     const [email, setEmail] = useState('');
     const [key, setKey] = useState('');
     const [loading, setLoading] = useState(false);
@@ -182,6 +183,26 @@ export default function LicenseGate() {
                     <Text style={styles.successSubtext}>{c.redirecting}</Text>
                 </Animated.View>
             </View>
+        );
+    }
+
+    // Google account without a licence: plans page (or the key field).
+    if (planSignup) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    <View style={{ width: '100%', maxWidth: 520, alignSelf: 'center', paddingHorizontal: 16 }}>
+                        <PlanPicker
+                            signup={planSignup}
+                            onUseKey={() => {
+                                setEmail(planSignup.email);
+                                clearPlanSignup();
+                                setTimeout(() => keyInputRef.current?.focus(), 300);
+                            }}
+                        />
+                    </View>
+                </ScrollView>
+            </SafeAreaView>
         );
     }
 

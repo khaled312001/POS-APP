@@ -502,6 +502,12 @@ export default function LoginScreen() {
       </View>
       <Text style={[styles.selectedName, compact && { fontSize: 17 }]} numberOfLines={1}>{selectedEmployee.name}</Text>
       <Text style={[styles.subtitle, { marginTop: 2 }]}>{pinError ? " " : t("enterPin")}</Text>
+      {/* A new store's owner has never been told the PIN it was created with. */}
+      {tenant?.setupCompleted === false && selectedEmployee.role === "admin" ? (
+        <Text style={[styles.subtitle, { marginTop: 2, fontSize: 12 }]}>
+          {language === "ar" ? "رمز PIN الأولي: 1234 — غيّره من الإعدادات" : language === "de" ? "Erst-PIN: 1234 — in den Einstellungen ändern" : "Starting PIN: 1234 — change it in Settings"}
+        </Text>
+      ) : null}
       <Animated.View style={[styles.pinDots, { transform: [{ translateX: shake }] }]}>
         {[0, 1, 2, 3].map((i) => (
           <View key={i} style={[styles.dot, i < pin.length && styles.dotFilled, pinError && styles.dotError]} />

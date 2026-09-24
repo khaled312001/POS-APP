@@ -22,6 +22,13 @@ interface TenantInfo {
     setupCompleted: boolean;
 }
 
+/** A Google account whose store has no licence yet: it picks a plan. */
+export interface PlanSignup {
+    planToken: string;
+    email: string;
+    storeName: string;
+}
+
 interface LicenseContextType {
     isValidating: boolean;
     isValid: boolean | null;
@@ -32,6 +39,10 @@ interface LicenseContextType {
     validateGoogleLogin: (token: string, kind?: "id" | "access") => Promise<boolean>;
     logoutLicense: () => Promise<void>;
     deviceId: string;
+    planSignup: PlanSignup | null;
+    clearPlanSignup: () => void;
+    /** After paying: true once the store's licence exists (then signs in). */
+    checkPlanStatus: () => Promise<boolean>;
 }
 
 const LicenseContext = createContext<LicenseContextType | null>(null);
@@ -85,6 +96,7 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
     const [isValid, setIsValid] = useState<boolean | null>(null);
     const [tenant, setTenant] = useState<TenantInfo | null>(null);
     const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
+    const [planSignup, setPlanSignup] = useState<PlanSignup | null>(null);
     const [errorReason, setErrorReason] = useState<string | null>(null);
     const [deviceId, setDeviceId] = useState<string>("unknown-device");
 
@@ -230,6 +242,16 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
 
             const data = await parseJsonResponse(response, "Google authentication server");
 
+            if (data.success && data.needsPlan && data.planToken) {
+                setPlanSignup({
+                    planToken: String(data.planToken),
+                    email: String(data.tenant?.email || ""),
+                    storeName: String(data.tenant?.name || ""),
+                });
+                // Handled: the gate now shows the plans page.
+                return true;
+            }
+
             if (data.success && data.licenseKey) {
                 await AsyncStorage.setItem("barmagly_license_key", data.licenseKey);
                 setCachedLicenseKey(data.licenseKey);
@@ -248,6 +270,26 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
         } catch (err: any) {
             console.error("Google login validation failed:", err);
             setErrorReason(`Connection error: ${err.message}`);
+            return false;
+        }
+    };
+
+    const clearPlanSignup = () => setPlanSignup(null);
+
+    const checkPlanStatus = async (): Promise<boolean> => {
+        if (!planSignup) return false;
+        try {
+            const response = await fetch(`${getApiUrl()}/api/auth/plan-status`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ planToken: planSignup.planToken }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!data?.active || !data.licenseKey) return false;
+            const ok = await validateLicense(String(data.licenseKey));
+            if (ok) setPlanSignup(null);
+            return ok;
+        } catch {
             return false;
         }
     };
@@ -273,7 +315,10 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
                 validateLicense,
                 validateGoogleLogin,
                 logoutLicense,
-                deviceId
+                deviceId,
+                planSignup,
+                clearPlanSignup,
+                checkPlanStatus,
             }}
         >
             {children}

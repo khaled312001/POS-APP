@@ -25,12 +25,15 @@ import { requireStripeClient, getStripeWebhookSecret } from "./stripeClient";
 import { pool } from "./db";
 
 /** Metadata keys we attach when creating a PaymentIntent. */
+import { provisionPaidPlan } from "./planSignup";
+
 export const MK = {
   kind: "kassenta_kind",
   orderId: "kassenta_order_id",
   saleId: "kassenta_sale_id",
   tenantId: "kassenta_tenant_id",
   customerId: "kassenta_customer_id",
+  planId: "kassenta_plan_id",
 } as const;
 
 export type PaymentKind =
@@ -271,6 +274,12 @@ async function onCheckoutCompleted(session: Stripe.Checkout.Session): Promise<st
   const kind = meta(session, MK.kind);
 
   if (kind === "tenant_subscription" && tenantId) {
+    // A plan bought in the app (plans page after Google sign-up): create or
+    // extend the store's licence. Keyed by the session id, so retries are no-ops.
+    const planId = metaInt(session, MK.planId);
+    if (planId && session.payment_status === "paid") {
+      return provisionPaidPlan(tenantId, planId, session.id);
+    }
     const subId =
       typeof session.subscription === "string"
         ? session.subscription

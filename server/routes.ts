@@ -16,6 +16,7 @@ import {
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { repriceOrder, PricingError } from "./orderPricing";
 import { sendLicenseKeyEmail } from "./emailService";
+import { signPlanToken, verifyPlanToken, activeLicenseFor } from "./planSignup";
 import { whatsappService } from "./whatsappService";
 import { verifiedStorePhone } from "./whatsappVerifyRoutes";
 import { canonicalPhone, asciiDigits } from "./phone";
@@ -787,37 +788,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: { signupMethod: "google", signupDate: new Date().toISOString() }
         });
 
-        // 2. Create 14-Day Trial Subscription
-        const startDate = new Date();
-        const endDate = addDays(startDate, 14);
-
-        const sub = await storage.createTenantSubscription({
-          tenantId: tenant.id,
-          planType: "trial",
-          planName: "14-Day Free Trial",
-          price: "0",
-          status: "active",
-          startDate,
-          endDate,
-          autoRenew: false,
-        });
-
-        // 3. Generate Trial License Key
-        const randomSegments = Array.from({ length: 4 }, () =>
-          crypto.randomBytes(2).toString("hex").toUpperCase()
-        );
-        const licenseKey = `TRIAL-${randomSegments.join("-")}`;
-
-        await storage.createLicenseKey({
-          licenseKey,
-          tenantId: tenant.id,
-          subscriptionId: sub.id,
-          status: "active",
-          maxActivations: 3,
-          expiresAt: endDate,
-          notes: "Auto-generated Google Trial",
-        });
-
+        // No automatic trial: the owner picks a plan or enters a licence key
+        // (the app shows the plans page on `needsPlan`).
         // 4. Ensure branch & admin employee
         await storage.ensureTenantData(tenant.id);
       }
@@ -827,7 +799,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeLicense = licenses.find(l => l.status === "active" && (!l.expiresAt || new Date(l.expiresAt) > new Date()));
 
       if (!activeLicense) {
-        return res.status(403).json({ error: "No active license found for this account. Your trial may have expired." });
+        // New store, or its licence ran out: the app shows the plans page
+        // (buy a plan) and the licence-key field. The plan token ties a
+        // checkout to this store.
+        return res.json({
+          success: true,
+          needsPlan: true,
+          isNew,
+          planToken: signPlanToken(tenant.id, email),
+          tenant: { id: tenant.id, name: tenant.businessName, email: tenant.ownerEmail },
+        });
       }
 
       // 6. Find the admin employee
@@ -855,6 +836,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[GOOGLE AUTH] Error:", e);
       res.status(500).json({ error: e.message });
     }
+  });
+
+  // The plans page polls this after the owner paid in Stripe's checkout.
+  app.post("/api/auth/plan-status", async (req, res) => {
+    const who = verifyPlanToken(req.body?.planToken);
+    if (!who) return res.status(401).json({ error: "Sign in with Google again." });
+    const lic = await activeLicenseFor(who.tenantId).catch(() => null);
+    res.json(lic ? { active: true, licenseKey: lic.license_key } : { active: false });
   });
 
   app.get("/api/tenant/onboarding-status", async (req, res) => {
