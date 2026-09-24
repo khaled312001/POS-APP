@@ -72,3 +72,51 @@ export async function signInWithGoogleNative(): Promise<string> {
     throw e;
   }
 }
+
+/**
+ * Web build: Google's pop-up (Google Identity Services token client). It
+ * returns an access token; the server checks with Google that it was issued
+ * to GOOGLE_WEB_CLIENT_ID and reads the e-mail from Google's userinfo.
+ * Resolves to the access token, or throws GoogleSignInCancelled.
+ */
+let gisScript: Promise<any> | null = null;
+function loadGis(): Promise<any> {
+  const w: any = globalThis as any;
+  if (w.google?.accounts?.oauth2) return Promise.resolve(w.google);
+  if (!gisScript) {
+    gisScript = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://accounts.google.com/gsi/client";
+      s.async = true;
+      s.onload = () => (w.google?.accounts?.oauth2 ? resolve(w.google) : reject(new Error("Google sign-in could not load")));
+      s.onerror = () => { gisScript = null; reject(new Error("Google sign-in could not load")); };
+      document.head.appendChild(s);
+    });
+  }
+  return Promise.race([
+    gisScript,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Google sign-in could not load")), 10000)),
+  ]);
+}
+
+export async function signInWithGoogleWeb(): Promise<string> {
+  const google = await loadGis();
+  return new Promise<string>((resolve, reject) => {
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_WEB_CLIENT_ID,
+      scope: "openid email profile",
+      callback: (resp: any) => {
+        if (resp?.access_token) resolve(resp.access_token);
+        else reject(new GoogleSignInCancelled());
+      },
+      error_callback: (err: any) => {
+        if (err?.type === "popup_closed") reject(new GoogleSignInCancelled());
+        else reject(new Error(err?.type === "popup_failed_to_open" ? "popup_blocked" : "Google sign-in failed"));
+      },
+    });
+    client.requestAccessToken({ prompt: "select_account" });
+  });
+}
+
+/** Google sign-in is offered on Android/iOS (native picker) and on the web (pop-up). */
+export const supportsGoogle = supportsNativeGoogle || Platform.OS === "web";

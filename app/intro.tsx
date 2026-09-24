@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, TouchableOpacity, Animated, ScrollView, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TouchableOpacity, Animated, ScrollView, Platform, useWindowDimensions, I18nManager } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandLogo } from '@/components/BrandLogo';
 import { Ionicons } from '@expo/vector-icons';
@@ -96,11 +96,15 @@ export default function IntroScreen() {
     };
 
     const handleStart = async () => {
-        await AsyncStorage.setItem('hasSeenIntro', 'true');
+        try { await AsyncStorage.setItem('hasSeenIntro', 'true'); } catch { /* storage unavailable: still continue */ }
         router.replace('/license-gate');
     };
 
     const content = CONTENT[language as Lang] ?? CONTENT.en;
+    // "row" already mirrors under RTL on the web (document dir) and on native
+    // once I18nManager is RTL; only a native Arabic UI before that restart
+    // needs an explicit flip. Reversing unconditionally undid the mirroring.
+    const flipRow = isRTL && Platform.OS !== 'web' && !I18nManager.isRTL;
 
     const bannerText = TABLET_BANNER[language as Lang] ?? TABLET_BANNER.en;
 
@@ -121,9 +125,9 @@ export default function IntroScreen() {
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                         >
-                            <View style={[styles.tabletBannerContent, isRTL && { flexDirection: 'row-reverse' }]}>
-                                <Text style={[styles.tabletBannerText, isRTL && { textAlign: 'right', flex: 1 }]}>{bannerText}</Text>
-                                <Pressable onPress={dismissBanner} style={styles.tabletBannerClose} hitSlop={10}>
+                            <View style={[styles.tabletBannerContent, flipRow && { flexDirection: 'row-reverse' }]}>
+                                <Text style={[styles.tabletBannerText, isRTL && { textAlign: 'right' }]}>{bannerText}</Text>
+                                <Pressable onPress={dismissBanner} style={styles.tabletBannerClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={language === 'ar' ? 'إغلاق' : language === 'de' ? 'Schliessen' : 'Close'}>
                                     <Ionicons name="close" size={18} color="rgba(255,180,0,0.9)" />
                                 </Pressable>
                             </View>
@@ -160,7 +164,7 @@ export default function IntroScreen() {
                     <Text style={[styles.subtitle, rtlText]}>{content.subtitle}</Text>
 
                     {/* Feature pills */}
-                    <View style={[styles.featuresRow, isRTL && { flexDirection: 'row-reverse' }]}>
+                    <View style={[styles.featuresRow, flipRow && { flexDirection: 'row-reverse' }]}>
                         {content.features.map((f, i) => (
                             <View key={i} style={styles.featurePill}>
                                 <Ionicons name={f.icon as any} size={14} color={OnNavy.accent} />
@@ -186,6 +190,9 @@ export default function IntroScreen() {
                                         onPress={() => setLanguage(lang.code)}
                                         style={[styles.languageOption, selected && styles.languageOptionSelected]}
                                         activeOpacity={0.7}
+                                        accessibilityRole="radio"
+                                        accessibilityState={{ checked: selected }}
+                                        accessibilityLabel={lang.nativeLabel}
                                     >
                                         {selected && (
                                             <LinearGradient
@@ -214,24 +221,17 @@ export default function IntroScreen() {
                     <Pressable
                         style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
                         onPress={handleStart}
+                        accessibilityRole="button"
                     >
                         <LinearGradient
                             colors={[OnNavy.primary, OnNavy.secondary]}
-                            style={styles.buttonGradient}
+                            style={[styles.buttonGradient, flipRow && { flexDirection: 'row-reverse' }]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                         >
-                            {isRTL ? (
-                                <>
-                                    <Ionicons name="arrow-back" size={22} color={OnNavy.text} style={{ marginLeft: 10 }} />
-                                    <Text style={[styles.buttonText, rtlText]}>{content.start}</Text>
-                                </>
-                            ) : (
-                                <>
-                                    <Text style={styles.buttonText}>{content.start}</Text>
-                                    <Ionicons name="arrow-forward" size={22} color={OnNavy.text} style={{ marginLeft: 10 }} />
-                                </>
-                            )}
+                            {/* Label first, arrow after it in reading direction. */}
+                            <Text style={styles.buttonText}>{content.start}</Text>
+                            <Ionicons name={isRTL ? 'arrow-back' : 'arrow-forward'} size={22} color={OnNavy.text} />
                         </LinearGradient>
                     </Pressable>
 
@@ -276,7 +276,7 @@ const styles = themedStyles((Colors) => ({
         lineHeight: 19,
     },
     tabletBannerClose: {
-        padding: 4,
+        padding: 8,
         opacity: 0.85,
     },
     container: {
@@ -498,6 +498,7 @@ const styles = themedStyles((Colors) => ({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 10,
         paddingVertical: 17,
         paddingHorizontal: 32,
     },

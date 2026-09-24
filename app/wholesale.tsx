@@ -27,8 +27,12 @@ import { useCart } from "@/lib/cart-context";
 import { apiRequest, getQueryFn } from "@/lib/query-client";
 import { useLanguage } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
-import { formatMoney, currencyLabel } from "@/lib/currency";
+import { formatMoney, currencyLabel, isZeroDecimalCurrency, useCurrency } from "@/lib/currency";
 import { printHtmlViaIframe } from "@/utils/printing";
+import {
+  normalizeStorePhone, isValidStorePhone, storePhonePlaceholder,
+  storeYmd, storeDayStart, storeDayEnd, addDaysYmd, formatInStoreTz,
+} from "@/components/store-locale";
 
 interface Trader {
   id: number;
@@ -93,10 +97,32 @@ const EMPTY_FORM = {
 
 const PAY_METHODS = ["cash", "card", "transfer", "shamcash", "cheque", "other"] as const;
 
-function ymd(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+/** Arabic-Indic / Eastern Arabic-Indic digits and Arabic separators → ASCII. */
+function asciiDigits(v: string): string {
+  return String(v ?? "")
+    .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 0x06f0))
+    .replace(/٫/g, ".")
+    .replace(/٬/g, ",");
 }
+
+/**
+ * Cleans a money input while typing. Zero-decimal currencies (SYP) keep digits
+ * only ("1,250,000" → "1250000"); others keep one decimal separator and at most
+ * two decimals.
+ */
+function cleanMoneyInput(raw: string, zeroDecimals: boolean): string {
+  let s = asciiDigits(raw).replace(/[\s'’]/g, "").replace(/[^0-9.,]/g, "");
+  if (zeroDecimals) return s.replace(/[.,]/g, "");
+  if (s.includes(".") && s.includes(",")) s = s.replace(/,/g, "");
+  s = s.replace(/,/g, ".");
+  const i = s.indexOf(".");
+  if (i >= 0) s = s.slice(0, i + 1) + s.slice(i + 1).replace(/\./g, "").slice(0, 2);
+  return s;
+}
+
+const isMoney = (v: string) => /^\d+(\.\d{1,2})?$/.test(v) && Number.isFinite(Number(v));
+const isYmd = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v.trim()) && !Number.isNaN(new Date(`${v.trim()}T00:00:00Z`).getTime());
 
 function escapeHtml(s: unknown): string {
   return String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -122,13 +148,20 @@ export default function WholesaleScreen() {
   const { tenant } = useLicense();
   const { canManage, employee } = useAuth();
   const { language, isRTL } = useLanguage();
+  const currency = useCurrency();
+  const zeroDec = isZeroDecimalCurrency(currency);
   useTheme(); // re-render on theme switch (styles are theme-aware)
   const cart = useCart();
   const qc = useQueryClient();
   const tenantId = (tenant as any)?.id;
   const L = (ar: string, de: string, en: string) => (language === "ar" ? ar : language === "de" ? de : en);
   const ta = isRTL ? ({ textAlign: "right" } as const) : null;
-  const row = isRTL ? ({ flexDirection: "row-reverse" } as const) : ({ flexDirection: "row" } as const);
+  // On web the document is dir="rtl" already, so a plain "row" is right-to-left;
+  // flipping it again would lay the Arabic UI out left-to-right.
+  const flipRow = isRTL && Platform.OS !== "web";
+  const row = flipRow ? ({ flexDirection: "row-reverse" } as const) : ({ flexDirection: "row" } as const);
+  const endAlign = flipRow ? ("flex-start" as const) : ("flex-end" as const);
+  const dateLocale = language === "ar" ? "ar" : language === "de" ? "de-CH" : "en-GB";
 
   // ── list state ────────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -188,40 +221,51 @@ export default function WholesaleScreen() {
   };
 
   // ── queries ───────────────────────────────────────────────────────────────
-  const { data: summary } = useQuery<Summary>({
+  const { data: summary, refetch: refetchSummary } = useQuery<Summary>({
     queryKey: [`/api/wholesale/summary?tenantId=${tenantId || ""}`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });
 
-  const { data: traders = [], isLoading } = useQuery<Trader[]>({
+  const { data: traders = [], isLoading, isError: tradersError, refetch: refetchTraders } = useQuery<Trader[]>({
     queryKey: [`/api/wholesale/traders?tenantId=${tenantId || ""}${showInactive ? "&includeInactive=1" : ""}`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });
 
   const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
+    const s = asciiDigits(search).trim().toLowerCase();
     if (!s) return traders;
+    // Phones are stored normalised (e.g. 9639xxxxxxxx), so "09…" must still match.
+    const digits = s.replace(/\D/g, "");
+    const phoneKey = digits.length >= 6 ? normalizeStorePhone(s).replace(/\D/g, "").slice(-9) : "";
     return traders.filter((t) =>
-      [t.name, t.shopName, t.phone, t.taxNumber].some((v) => String(v || "").toLowerCase().includes(s)));
+      [t.name, t.shopName, t.phone, t.taxNumber].some((v) => String(v || "").toLowerCase().includes(s))
+      || (!!phoneKey && String(t.phone || "").replace(/\D/g, "").includes(phoneKey)));
   }, [traders, search]);
 
+  // Calendar days are the store's (Asia/Damascus for SYP), not the device's.
   const { fromDate, toDate } = useMemo(() => {
-    const now = new Date();
-    if (range === "month") return { fromDate: ymd(new Date(now.getFullYear(), now.getMonth(), 1)), toDate: "" };
-    if (range === "30d") return { fromDate: ymd(new Date(now.getTime() - 29 * 86400000)), toDate: "" };
+    const today = storeYmd();
+    if (range === "month") return { fromDate: `${today.slice(0, 7)}-01`, toDate: "" };
+    if (range === "30d") return { fromDate: addDaysYmd(today, -29), toDate: "" };
     if (range === "custom") {
-      const ok = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v.trim());
-      return { fromDate: ok(customFrom) ? customFrom.trim() : "", toDate: ok(customTo) ? customTo.trim() : "" };
+      return { fromDate: isYmd(customFrom) ? customFrom.trim() : "", toDate: isYmd(customTo) ? customTo.trim() : "" };
     }
     return { fromDate: "", toDate: "" };
   }, [range, customFrom, customTo]);
+  const customRangeInvalid =
+    range === "custom" &&
+    ((!!customFrom.trim() && !isYmd(customFrom)) || (!!customTo.trim() && !isYmd(customTo)) || (!!fromDate && !!toDate && fromDate > toDate));
+  // The server reads a bare YYYY-MM-DD in its own time zone, so the bounds are
+  // sent as exact instants of the store-local day start / end.
+  const fromParam = fromDate ? encodeURIComponent(storeDayStart(fromDate).toISOString()) : "";
+  const toParam = toDate ? encodeURIComponent(storeDayEnd(toDate).toISOString()) : "";
 
-  const { data: statement, isLoading: statementLoading } = useQuery<Statement>({
-    queryKey: [`/api/wholesale/traders/${detailId}/statement?tenantId=${tenantId || ""}&from=${fromDate}&to=${toDate}`],
+  const { data: statement, isLoading: statementLoading, isError: statementError, refetch: refetchStatement } = useQuery<Statement>({
+    queryKey: [`/api/wholesale/traders/${detailId}/statement?tenantId=${tenantId || ""}&from=${fromParam}&to=${toParam}`],
     queryFn: getQueryFn({ on401: "throw" }),
-    enabled: !!tenantId && detailId != null,
+    enabled: !!tenantId && detailId != null && !customRangeInvalid,
   });
 
   const detail: Trader | null =
@@ -239,22 +283,36 @@ export default function WholesaleScreen() {
     setForm({
       name: t.name || "", shopName: t.shopName || "", phone: t.phone || "", email: t.email || "",
       address: t.address || "", taxNumber: t.taxNumber || "",
-      creditLimit: t.creditLimit != null ? String(t.creditLimit) : "", notes: t.notes || "", openingBalance: "",
+      creditLimit: t.creditLimit != null ? (zeroDec ? String(Math.round(t.creditLimit)) : String(t.creditLimit)) : "", notes: t.notes || "", openingBalance: "",
     });
     setShowForm(true);
   };
 
   const saveTrader = async () => {
     if (!form.name.trim()) return notify(L("خطأ", "Fehler", "Error"), L("اسم التاجر مطلوب", "Name ist erforderlich", "Name is required"));
-    const money = (v: string) => v.trim().replace(",", ".");
-    const limit = money(form.creditLimit);
-    const opening = money(form.openingBalance);
-    if ((limit && !(Number(limit) >= 0)) || (opening && !(Number(opening) >= 0))) {
+    const limit = cleanMoneyInput(form.creditLimit, zeroDec);
+    const opening = cleanMoneyInput(form.openingBalance, zeroDec);
+    if ((limit && !isMoney(limit)) || (opening && !isMoney(opening))) {
       return notify(L("خطأ", "Fehler", "Error"), L("أدخل مبلغاً صحيحاً", "Bitte einen gültigen Betrag eingeben", "Enter a valid amount"));
+    }
+    const phoneRaw = form.phone.trim();
+    // Legacy numbers are only re-checked when they are actually changed.
+    const phoneChanged = !editTrader || phoneRaw !== String(editTrader.phone || "").trim();
+    if (phoneRaw && phoneChanged && !isValidStorePhone(phoneRaw)) {
+      return notify(L("خطأ", "Fehler", "Error"), L(
+        `أدخل رقم هاتف صحيحاً (مثل ${storePhonePlaceholder()})`,
+        `Bitte eine gültige Telefonnummer eingeben (z. B. ${storePhonePlaceholder()})`,
+        `Enter a valid phone number (e.g. ${storePhonePlaceholder()})`,
+      ));
+    }
+    const phone = phoneRaw && phoneChanged ? normalizeStorePhone(phoneRaw) : phoneRaw;
+    const email = form.email.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return notify(L("خطأ", "Fehler", "Error"), L("أدخل بريداً إلكترونياً صحيحاً", "Bitte eine gültige E-Mail-Adresse eingeben", "Enter a valid email address"));
     }
     const body: any = {
       tenantId, employeeId: employee?.id,
-      name: form.name.trim(), shopName: form.shopName, phone: form.phone, email: form.email,
+      name: form.name.trim(), shopName: form.shopName, phone, email,
       address: form.address, taxNumber: form.taxNumber, notes: form.notes,
       creditLimit: limit === "" ? null : limit,
     };
@@ -273,8 +331,11 @@ export default function WholesaleScreen() {
     }
   };
 
+  const [activeBusy, setActiveBusy] = useState(false);
   const setActive = (t: Trader, active: boolean) => {
+    if (activeBusy) return;
     const run = async () => {
+      setActiveBusy(true);
       try {
         if (active) await apiRequest("PUT", `/api/wholesale/traders/${t.id}`, { tenantId, isActive: true });
         else await apiRequest("DELETE", `/api/wholesale/traders/${t.id}?tenantId=${tenantId || ""}`);
@@ -282,6 +343,8 @@ export default function WholesaleScreen() {
         if (!active && !showInactive) setDetailId(null);
       } catch (e) {
         notify(L("خطأ", "Fehler", "Error"), errorText(e));
+      } finally {
+        setActiveBusy(false);
       }
     };
     if (active) return void run();
@@ -298,15 +361,15 @@ export default function WholesaleScreen() {
 
   const openLedger = (mode: LedgerMode) => {
     setLedgerMode(mode);
-    setLedgerAmount(mode === "payment" && detail && detail.balance > 0 ? String(detail.balance) : "");
+    setLedgerAmount(mode === "payment" && detail && detail.balance > 0 ? (zeroDec ? String(Math.round(detail.balance)) : String(detail.balance)) : "");
     setLedgerMethod("cash");
     setLedgerNote("");
   };
 
   const submitLedger = async () => {
     if (!detail || !ledgerMode) return;
-    const amount = ledgerAmount.trim().replace(",", ".");
-    if (!(Number(amount) > 0)) {
+    const amount = cleanMoneyInput(ledgerAmount, zeroDec);
+    if (!isMoney(amount) || !(Number(amount) > 0)) {
       return notify(L("خطأ", "Fehler", "Error"), L("أدخل مبلغاً صحيحاً أكبر من صفر", "Bitte einen gültigen Betrag über null eingeben", "Enter a valid amount greater than zero"));
     }
     setLedgerBusy(true);
@@ -324,17 +387,21 @@ export default function WholesaleScreen() {
     }
   };
 
+  const [voidingId, setVoidingId] = useState<number | null>(null);
   const voidEntry = (e: StatementEntry) => {
-    if (!canManage || !e.entryId || e.type === "return" || e.type === "sale") return;
+    if (!canManage || !e.entryId || e.type === "return" || e.type === "sale" || voidingId != null) return;
     confirm(
       L("إلغاء هذه الحركة؟", "Buchung stornieren?", "Void this entry?"),
       L("سيُعاد حساب رصيد التاجر.", "Der Saldo des Händlers wird angepasst.", "The trader's balance will be adjusted."),
       async () => {
+        setVoidingId(e.entryId);
         try {
           await apiRequest("DELETE", `/api/wholesale/entries/${e.entryId}?tenantId=${tenantId || ""}`);
           invalidate();
         } catch (err) {
           notify(L("خطأ", "Fehler", "Error"), errorText(err));
+        } finally {
+          setVoidingId(null);
         }
       },
     );
@@ -343,7 +410,8 @@ export default function WholesaleScreen() {
   const sellToTrader = (t: Trader) => {
     cart.setCustomerId(t.id);
     setDetailId(null);
-    router.navigate("/");
+    // The POS tab; "/" is the launch/redirect screen, not the till.
+    router.navigate("/(tabs)" as any);
   };
 
   const typeLabel = (t: StatementEntry["type"]) =>
@@ -365,12 +433,8 @@ export default function WholesaleScreen() {
     }
   };
 
-  const fmtDate = (iso: string) => {
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? "" : d.toLocaleString(language === "ar" ? "ar" : language === "de" ? "de-CH" : "en-GB", {
-      year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
-    });
-  };
+  const fmtDate = (iso: string) =>
+    formatInStoreTz(iso, dateLocale, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 
   const printStatement = () => {
     if (!statement || !detail) return;
@@ -396,7 +460,7 @@ export default function WholesaleScreen() {
       <h1>${escapeHtml(storeName)}</h1>
       <div>${escapeHtml(L("كشف حساب تاجر جملة", "Kontoauszug Großhändler", "Wholesale trader statement"))}</div>
       <div><b>${escapeHtml(detail.shopName || detail.name)}</b>${detail.shopName ? ` — ${escapeHtml(detail.name)}` : ""}${detail.phone ? ` · ${escapeHtml(detail.phone)}` : ""}</div>
-      <div class="muted">${escapeHtml(fromDate || L("من البداية", "Seit Beginn", "From the start"))} → ${escapeHtml(toDate || ymd(new Date()))}</div>
+      <div class="muted">${escapeHtml(fromDate || L("من البداية", "Seit Beginn", "From the start"))} → ${escapeHtml(toDate || storeYmd())}</div>
       <table>
         <thead><tr>
           <th>${escapeHtml(L("التاريخ", "Datum", "Date"))}</th>
@@ -436,19 +500,20 @@ export default function WholesaleScreen() {
     const color = pct >= 1 ? Colors.danger : pct >= 0.8 ? Colors.warning : Colors.success;
     return (
       <View style={styles.limitTrack}>
-        <View style={[styles.limitFill, { width: `${pct * 100}%`, backgroundColor: color }, isRTL && { alignSelf: "flex-end" }]} />
+        <View style={[styles.limitFill, { width: `${pct * 100}%`, backgroundColor: color }, flipRow && { alignSelf: "flex-end" }]} />
       </View>
     );
   };
 
-  const inputRow = (label: string, key: keyof typeof EMPTY_FORM, opts: { numeric?: boolean; placeholder?: string; multiline?: boolean } = {}) => (
+  const inputRow = (label: string, key: keyof typeof EMPTY_FORM, opts: { numeric?: boolean; placeholder?: string; multiline?: boolean; keyboard?: "phone-pad" | "email-address" } = {}) => (
     <View style={{ gap: 4 }}>
-      <Text style={[styles.fieldLabel, ta]}>{label}</Text>
+      <Text style={[styles.fieldLabel, ta]} numberOfLines={2}>{label}</Text>
       <TextInput
         style={[styles.input, ta, opts.multiline && { minHeight: 70, textAlignVertical: "top" }]}
         value={form[key]}
-        onChangeText={(v) => setForm((f) => ({ ...f, [key]: v }))}
-        keyboardType={opts.numeric ? "decimal-pad" : "default"}
+        onChangeText={(v) => setForm((f) => ({ ...f, [key]: opts.numeric ? cleanMoneyInput(v, zeroDec) : v }))}
+        keyboardType={opts.numeric ? (zeroDec ? "number-pad" : "decimal-pad") : opts.keyboard || "default"}
+        autoCapitalize={opts.keyboard === "email-address" ? "none" : undefined}
         placeholder={opts.placeholder}
         placeholderTextColor={Colors.textMuted}
         multiline={opts.multiline}
@@ -460,7 +525,7 @@ export default function WholesaleScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={[styles.header, row]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.navigate("/(tabs)/customers" as any))} style={styles.backBtn} accessibilityRole="button" accessibilityLabel={L("رجوع", "Zurück", "Back")}>
           <Ionicons name={isRTL ? "chevron-forward" : "chevron-back"} size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, ta]}>{L("تجار الجملة", "Großhändler", "Wholesale traders")}</Text>
@@ -512,6 +577,14 @@ export default function WholesaleScreen() {
         {/* Traders list */}
         {isLoading ? (
           <ActivityIndicator color={Colors.accent} style={{ marginTop: 30 }} />
+        ) : tradersError && traders.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="cloud-offline-outline" size={40} color={Colors.textMuted} />
+            <Text style={styles.emptyText}>{L("تعذّر تحميل التجار", "Händler konnten nicht geladen werden", "Could not load traders")}</Text>
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => { refetchTraders(); refetchSummary(); }}>
+              <Text style={styles.primaryBtnText}>{L("إعادة المحاولة", "Erneut versuchen", "Retry")}</Text>
+            </TouchableOpacity>
+          </View>
         ) : filtered.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="storefront-outline" size={40} color={Colors.textMuted} />
@@ -533,14 +606,14 @@ export default function WholesaleScreen() {
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{(t.shopName || t.name || "?").charAt(0).toUpperCase()}</Text>
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[styles.traderName, ta]} numberOfLines={1}>{t.shopName || t.name}</Text>
                   <Text style={[styles.traderMeta, ta]} numberOfLines={1}>
                     {[t.shopName ? t.name : null, t.phone].filter(Boolean).join(" · ") || " "}
                   </Text>
                 </View>
-                <View style={{ alignItems: isRTL ? "flex-start" : "flex-end" }}>
-                  <Text style={[styles.balance, { color: t.balance > 0 ? Colors.danger : Colors.success }]}>{formatMoney(t.balance)}</Text>
+                <View style={{ alignItems: endAlign, flexShrink: 0, maxWidth: "50%" }}>
+                  <Text style={[styles.balance, { color: t.balance > 0 ? Colors.danger : Colors.success }]} numberOfLines={1}>{formatMoney(t.balance)}</Text>
                   <Text style={styles.traderMeta}>
                     {t.creditLimit != null
                       ? `${L("السقف", "Limit", "Limit")} ${formatMoney(t.creditLimit)}`
@@ -566,7 +639,7 @@ export default function WholesaleScreen() {
           <View style={[styles.modalSheet, { height: "92%" }]}>
             <View style={[styles.modalHeader, row]}>
               <Text style={[styles.modalTitle, ta, { flex: 1 }]} numberOfLines={1}>{detail ? detail.shopName || detail.name : ""}</Text>
-              <TouchableOpacity onPress={() => setDetailId(null)} style={styles.modalClose}>
+              <TouchableOpacity onPress={() => setDetailId(null)} style={styles.modalClose} accessibilityRole="button" accessibilityLabel={L("إغلاق", "Schließen", "Close")}>
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -616,7 +689,7 @@ export default function WholesaleScreen() {
                         <Ionicons name="pencil" size={16} color={Colors.text} />
                         <Text style={[styles.actionBtnText, { color: Colors.text }]}>{L("تعديل", "Bearbeiten", "Edit")}</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[styles.actionBtn, styles.outlineBtn]} onPress={() => setActive(detail, !detail.isActive)}>
+                      <TouchableOpacity style={[styles.actionBtn, styles.outlineBtn, activeBusy && { opacity: 0.6 }]} disabled={activeBusy} onPress={() => setActive(detail, !detail.isActive)}>
                         <Ionicons name={detail.isActive ? "pause-circle-outline" : "play-circle-outline"} size={16} color={detail.isActive ? Colors.danger : Colors.success} />
                         <Text style={[styles.actionBtnText, { color: detail.isActive ? Colors.danger : Colors.success }]}>
                           {detail.isActive ? L("إيقاف", "Deaktivieren", "Deactivate") : L("تفعيل", "Aktivieren", "Reactivate")}
@@ -642,12 +715,22 @@ export default function WholesaleScreen() {
                 </View>
                 {range === "custom" && (
                   <View style={[row, { gap: 8 }]}>
-                    <TextInput style={[styles.input, { flex: 1 }]} value={customFrom} onChangeText={setCustomFrom} placeholder={`${L("من", "Von", "From")} YYYY-MM-DD`} placeholderTextColor={Colors.textMuted} />
-                    <TextInput style={[styles.input, { flex: 1 }]} value={customTo} onChangeText={setCustomTo} placeholder={`${L("إلى", "Bis", "To")} YYYY-MM-DD`} placeholderTextColor={Colors.textMuted} />
+                    <TextInput style={[styles.input, { flex: 1, minWidth: 0 }]} value={customFrom} onChangeText={(v) => setCustomFrom(asciiDigits(v).replace(/[^0-9-]/g, "").slice(0, 10))} placeholder={`${L("من", "Von", "From")} YYYY-MM-DD`} placeholderTextColor={Colors.textMuted} keyboardType="numbers-and-punctuation" maxLength={10} />
+                    <TextInput style={[styles.input, { flex: 1, minWidth: 0 }]} value={customTo} onChangeText={(v) => setCustomTo(asciiDigits(v).replace(/[^0-9-]/g, "").slice(0, 10))} placeholder={`${L("إلى", "Bis", "To")} YYYY-MM-DD`} placeholderTextColor={Colors.textMuted} keyboardType="numbers-and-punctuation" maxLength={10} />
                   </View>
                 )}
 
-                {statementLoading || !statement ? (
+                {customRangeInvalid ? (
+                  <Text style={[styles.warnText, ta]}>{L("أدخل التاريخين بالشكل YYYY-MM-DD، وتاريخ البداية قبل النهاية.", "Beide Daten als JJJJ-MM-TT eingeben, Beginn vor Ende.", "Enter both dates as YYYY-MM-DD, with the start before the end.")}</Text>
+                ) : statementError && !statement ? (
+                  <View style={{ alignItems: "center", gap: 10, paddingVertical: 16 }}>
+                    <Text style={styles.muted}>{L("تعذّر تحميل كشف الحساب", "Kontoauszug konnte nicht geladen werden", "Could not load the statement")}</Text>
+                    <TouchableOpacity style={[styles.actionBtn, styles.outlineBtn]} onPress={() => refetchStatement()}>
+                      <Ionicons name="refresh" size={16} color={Colors.text} />
+                      <Text style={[styles.actionBtnText, { color: Colors.text }]}>{L("إعادة المحاولة", "Erneut versuchen", "Retry")}</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : statementLoading || !statement ? (
                   <ActivityIndicator color={Colors.accent} style={{ marginTop: 20 }} />
                 ) : (
                   <View style={styles.statementBox}>
@@ -662,18 +745,31 @@ export default function WholesaleScreen() {
                       const voidable = canManage && !!e.entryId && (e.type === "payment" || e.type === "charge");
                       return (
                         <TouchableOpacity key={e.id} activeOpacity={voidable ? 0.6 : 1} onLongPress={() => voidEntry(e)} style={[styles.stRow, row]}>
-                          <View style={{ flex: 1 }}>
+                          <View style={{ flex: 1, minWidth: 0 }}>
                             <Text style={[styles.stLabel, ta]}>
                               {typeLabel(e.type)}{e.reference ? ` · ${e.reference}` : ""}{e.method && e.type !== "sale" && e.type !== "return" ? ` · ${methodLabel(e.method)}` : ""}
                             </Text>
                             <Text style={[styles.traderMeta, ta]}>{fmtDate(e.date)}{e.note ? ` · ${e.note}` : ""}</Text>
                           </View>
-                          <View style={{ alignItems: isRTL ? "flex-start" : "flex-end", minWidth: 110 }}>
-                            <Text style={[styles.stAmount, { color: e.debit ? Colors.danger : Colors.success }]}>
+                          <View style={{ alignItems: endAlign, minWidth: 96, flexShrink: 0 }}>
+                            <Text style={[styles.stAmount, { color: e.debit ? Colors.danger : Colors.success }]} numberOfLines={1}>
                               {e.debit ? `+ ${formatMoney(e.debit)}` : `− ${formatMoney(e.credit)}`}
                             </Text>
-                            <Text style={styles.traderMeta}>{formatMoney(e.balance)}</Text>
+                            <Text style={styles.traderMeta} numberOfLines={1}>{formatMoney(e.balance)}</Text>
                           </View>
+                          {voidable && (
+                            <TouchableOpacity
+                              onPress={() => voidEntry(e)}
+                              disabled={voidingId != null}
+                              style={styles.voidBtn}
+                              accessibilityRole="button"
+                              accessibilityLabel={L("إلغاء الحركة", "Buchung stornieren", "Void entry")}
+                            >
+                              {voidingId === e.entryId
+                                ? <ActivityIndicator size="small" color={Colors.danger} />
+                                : <Ionicons name="close-circle-outline" size={20} color={Colors.danger} />}
+                            </TouchableOpacity>
+                          )}
                         </TouchableOpacity>
                       );
                     })}
@@ -682,11 +778,19 @@ export default function WholesaleScreen() {
                       <Text style={[styles.stAmount, { fontWeight: "800" }]}>{formatMoney(statement.closingBalance)}</Text>
                     </View>
                     {canManage && statement.entries.some((e) => e.type === "payment" || e.type === "charge") && (
-                      <Text style={[styles.hint, ta]}>{L("اضغط مطولاً على دفعة أو قيد لإلغائه.", "Lang drücken, um eine Zahlung/Belastung zu stornieren.", "Long-press a payment or charge to void it.")}</Text>
+                      <Text style={[styles.hint, ta]}>{L("اضغط ✕ بجانب دفعة أو قيد لإلغائه.", "✕ neben einer Zahlung/Belastung tippen, um sie zu stornieren.", "Tap ✕ next to a payment or charge to void it.")}</Text>
                     )}
                   </View>
                 )}
               </ScrollView>
+            ) : statementError ? (
+              <View style={{ alignItems: "center", gap: 10, padding: 24 }}>
+                <Text style={styles.muted}>{L("تعذّر تحميل بيانات التاجر", "Händlerdaten konnten nicht geladen werden", "Could not load this trader")}</Text>
+                <TouchableOpacity style={[styles.actionBtn, styles.outlineBtn]} onPress={() => refetchStatement()}>
+                  <Ionicons name="refresh" size={16} color={Colors.text} />
+                  <Text style={[styles.actionBtnText, { color: Colors.text }]}>{L("إعادة المحاولة", "Erneut versuchen", "Retry")}</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
               <ActivityIndicator color={Colors.accent} style={{ marginTop: 40 }} />
             )}
@@ -702,7 +806,7 @@ export default function WholesaleScreen() {
               <Text style={[styles.modalTitle, ta, { flex: 1 }]}>
                 {ledgerMode === "payment" ? L("تسجيل دفعة من التاجر", "Zahlung des Händlers erfassen", "Record a payment") : L("إضافة قيد مدين", "Belastung hinzufügen", "Add a charge")}
               </Text>
-              <TouchableOpacity onPress={() => setLedgerMode(null)} style={styles.modalClose}>
+              <TouchableOpacity onPress={() => setLedgerMode(null)} style={styles.modalClose} accessibilityRole="button" accessibilityLabel={L("إغلاق", "Schließen", "Close")}>
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -713,7 +817,7 @@ export default function WholesaleScreen() {
                 </Text>
               )}
               <Text style={[styles.fieldLabel, ta]}>{L("المبلغ", "Betrag", "Amount")} ({currencyLabel()})</Text>
-              <TextInput style={[styles.input, ta, { fontSize: 20, fontWeight: "700" }]} value={ledgerAmount} onChangeText={setLedgerAmount} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={Colors.textMuted} autoFocus />
+              <TextInput style={[styles.input, ta, { fontSize: 20, fontWeight: "700" }]} value={ledgerAmount} onChangeText={(v) => setLedgerAmount(cleanMoneyInput(v, zeroDec))} keyboardType={zeroDec ? "number-pad" : "decimal-pad"} placeholder="0" placeholderTextColor={Colors.textMuted} autoFocus />
               {ledgerMode === "payment" && (
                 <>
                   <Text style={[styles.fieldLabel, ta]}>{L("طريقة الدفع", "Zahlungsart", "Method")}</Text>
@@ -746,7 +850,7 @@ export default function WholesaleScreen() {
               <Text style={[styles.modalTitle, ta, { flex: 1 }]}>
                 {editTrader ? L("تعديل التاجر", "Händler bearbeiten", "Edit trader") : L("تاجر جملة جديد", "Neuer Großhändler", "New wholesale trader")}
               </Text>
-              <TouchableOpacity onPress={() => setShowForm(false)} style={styles.modalClose}>
+              <TouchableOpacity onPress={() => setShowForm(false)} style={styles.modalClose} accessibilityRole="button" accessibilityLabel={L("إغلاق", "Schließen", "Close")}>
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -754,10 +858,10 @@ export default function WholesaleScreen() {
               {inputRow(L("اسم التاجر *", "Name *", "Name *"), "name")}
               {inputRow(L("اسم المحل", "Geschäftsname", "Shop name"), "shopName")}
               <View style={[row, { gap: 10 }]}>
-                <View style={{ flex: 1 }}>{inputRow(L("الهاتف", "Telefon", "Phone"), "phone")}</View>
-                <View style={{ flex: 1 }}>{inputRow(L("الرقم الضريبي / السجل", "Steuer-/Handelsreg.-Nr.", "Tax / register no."), "taxNumber")}</View>
+                <View style={{ flex: 1, minWidth: 0 }}>{inputRow(L("الهاتف", "Telefon", "Phone"), "phone", { keyboard: "phone-pad", placeholder: storePhonePlaceholder() })}</View>
+                <View style={{ flex: 1, minWidth: 0 }}>{inputRow(L("الرقم الضريبي / السجل", "Steuer-/Handelsreg.-Nr.", "Tax / register no."), "taxNumber")}</View>
               </View>
-              {inputRow(L("البريد الإلكتروني", "E-Mail", "Email"), "email")}
+              {inputRow(L("البريد الإلكتروني", "E-Mail", "Email"), "email", { keyboard: "email-address" })}
               {inputRow(L("العنوان", "Adresse", "Address"), "address")}
               {inputRow(`${L("سقف الدين", "Kreditlimit", "Credit limit")} (${currencyLabel()})`, "creditLimit", {
                 numeric: true,
@@ -781,9 +885,9 @@ export default function WholesaleScreen() {
 const styles = themedStyles((Colors) => ({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { alignItems: "center", padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 8 },
-  backBtn: { padding: 4 },
+  backBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 22 },
   headerTitle: { flex: 1, fontSize: 18, fontWeight: "700", color: Colors.text },
-  addBtn: { backgroundColor: Colors.accent, borderRadius: 8, padding: 6 },
+  addBtn: { backgroundColor: Colors.accent, borderRadius: 12, width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   summaryGrid: { flexWrap: "wrap", gap: 10 },
   summaryCard: { flexGrow: 1, flexBasis: 150, backgroundColor: Colors.card, borderRadius: 14, padding: 12, borderWidth: 1, gap: 6 },
   summaryLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600", flexShrink: 1 },
@@ -808,14 +912,15 @@ const styles = themedStyles((Colors) => ({
   modalSheet: { backgroundColor: Colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "92%", width: "100%", maxWidth: 760, alignSelf: "center" },
   modalHeader: { alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 8 },
   modalTitle: { fontSize: 17, fontWeight: "700", color: Colors.text },
-  modalClose: { padding: 4 },
+  modalClose: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 22 },
   balanceBox: { backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: Colors.cardBorder },
   bigBalance: { fontSize: 28, fontWeight: "900", marginVertical: 4 },
-  actionBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
+  actionBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, minHeight: 44 },
+  voidBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 18 },
   actionBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
   outlineBtn: { backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.cardBorder },
   sectionTitle: { color: Colors.text, fontSize: 15, fontWeight: "800", marginTop: 6 },
-  chip: { borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.cardBorder },
+  chip: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8, minHeight: 38, justifyContent: "center", backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.cardBorder },
   chipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
   chipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600" },
   chipTextActive: { color: Colors.textDark },
@@ -825,7 +930,7 @@ const styles = themedStyles((Colors) => ({
   stAmount: { color: Colors.text, fontSize: 14, fontWeight: "700" },
   hint: { color: Colors.textMuted, fontSize: 11, paddingBottom: 10 },
   fieldLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600" },
-  input: { backgroundColor: Colors.inputBg, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, color: Colors.text, fontSize: 14, borderWidth: 1, borderColor: Colors.inputBorder },
+  input: { backgroundColor: Colors.inputBg, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, minHeight: 46, color: Colors.text, fontSize: 14, borderWidth: 1, borderColor: Colors.inputBorder },
   primaryBtn: { backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 20, alignItems: "center" },
   primaryBtnText: { color: Colors.textDark, fontWeight: "800", fontSize: 15 },
 }));

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet, Text, View, ScrollView, Pressable, Modal,
-  TextInput, Alert, Platform, FlatList, Switch, Image, useWindowDimensions,
+  TextInput, Alert, Platform, FlatList, Switch, Image, useWindowDimensions, ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -16,7 +16,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useLicense } from "@/lib/license-context";
-import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
+import { apiRequest, apiErrorMessage, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { getDisplayNumber } from "@/lib/api-config";
 import { playClickSound } from "@/lib/sound";
 import { getChromeMetrics } from "@/lib/responsive";
@@ -24,18 +24,57 @@ import TabPageHeader from "@/components/tab-page-header";
 import { FlagIcon } from "@/components/FlagIcon";
 // Platform-aware printer: native → expo-print (Save-as-PDF), web → hidden iframe.
 import { printHtmlViaIframe, getReceiptPrinterPrefs, setReceiptPrinterPrefs, type ReceiptPrinterPrefs } from "@/utils/printing";
-import { formatMoney, currencyLabel } from "@/lib/currency";
+import { formatMoney, formatAmount, currencyLabel, getCurrency, isZeroDecimalCurrency } from "@/lib/currency";
 import Constants from "expo-constants";
 import ShamCashSettings from "@/components/ShamCashSettings";
 import WhatsAppVerify from "@/components/WhatsAppVerify";
+import { normalizeStorePhone, isValidStorePhone, storePhonePlaceholder, storeYmd, storeDayStart, formatInStoreTz } from "@/components/store-locale";
+
+/**
+ * On web the document is dir="rtl" in Arabic, so a plain "row" already lays
+ * out right-to-left; reversing it again would put the layout back to LTR.
+ * The manual flip is only for native, where this screen has always done it.
+ */
+const flipRow = (rtl: boolean) => rtl && Platform.OS !== "web";
+
+/** Alert.alert is a no-op on react-native-web, so web gets window.alert. */
+function notify(title: string, message?: string) {
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined") window.alert(message ? `${title}\n\n${message}` : title);
+    return;
+  }
+  Alert.alert(title, message);
+}
+
+/** Cross-platform confirm: Alert buttons do nothing on web. */
+function confirmAction(title: string, message: string, confirmLabel: string, cancelLabel: string, onConfirm: () => void) {
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.confirm(message ? `${title}\n\n${message}` : title)) onConfirm();
+    return;
+  }
+  Alert.alert(title, message, [
+    { text: cancelLabel, style: "cancel" },
+    { text: confirmLabel, style: "destructive", onPress: onConfirm },
+  ]);
+}
+
+/** Parses a money/number field typed with either "." or "," as decimal mark. */
+function parseNum(v: string): number {
+  const n = parseFloat(String(v ?? "").replace(",", ".").trim());
+  return Number.isFinite(n) ? n : NaN;
+}
+
+const escapeHtml = (s: unknown) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 
 function SettingRow({ icon, label, value, onPress, color, rtl }: { icon: string; label: string; value?: string; onPress?: () => void; color?: string; rtl?: boolean }) {
+  const flip = flipRow(!!rtl);
   return (
-    <Pressable style={[rowStyles.row, rtl && { flexDirection: "row-reverse" }]} onPress={onPress ? () => { playClickSound("light"); onPress(); } : undefined}>
+    <Pressable style={[rowStyles.row, flip && { flexDirection: "row-reverse" }]} onPress={onPress ? () => { playClickSound("light"); onPress(); } : undefined}>
       <View style={[rowStyles.iconWrap, { backgroundColor: (color || Colors.accent) + "20" }, rtl ? { marginLeft: 12, marginRight: 0 } : {}]}>
         <Ionicons name={icon as any} size={20} color={color || Colors.accent} />
       </View>
-      <View style={[rowStyles.info, rtl && { alignItems: "flex-end" }]}>
+      <View style={[rowStyles.info, flip && { alignItems: "flex-end" }]}>
         <Text style={[rowStyles.label, rtl && { textAlign: "right" }]}>{label}</Text>
         {value ? <Text style={[rowStyles.value, rtl && { textAlign: "right" }]}>{value}</Text> : null}
       </View>
@@ -87,12 +126,68 @@ export default function SettingsScreen() {
   const { width } = useWindowDimensions();
   const qc = useQueryClient();
   const { employee, logout, isAdmin, canManage, isCashier } = useAuth();
-  const { t, isRTL, language, setLanguage } = useLanguage();
+  const { t, isRTL, language, setLanguage, currency } = useLanguage();
   // Inline copy for strings that have no i18n key yet: (Arabic, German, English).
   const tr3 = (ar: string, de: string, en: string) => (language === "ar" ? ar : language === "de" ? de : en);
+  // Dates and times are shown on the store's clock (Asia/Damascus for SYP
+  // stores), not the device's, in the UI language with Latin digits.
+  const dtLocale = language === "ar" ? "ar-u-nu-latn" : language === "de" ? "de-CH" : "en-GB";
+  const fmtDate = (v: any) => (v ? formatInStoreTz(v, dtLocale, { year: "numeric", month: "2-digit", day: "2-digit" }) || "—" : "—");
+  const fmtTime = (v: any) => (v ? formatInStoreTz(v, dtLocale, { hour: "2-digit", minute: "2-digit" }) : "");
+  const fmtDateTime = (v: any) => (v ? formatInStoreTz(v, dtLocale, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "");
   const { tenant } = useLicense();
   const { topPad, bottomPad } = getChromeMetrics(width);
   const tenantId = tenant?.id;
+  const poStatusLabel = (st: string) =>
+    st === "received" ? tr3("مستلَم", "Erhalten", "Received")
+      : st === "ordered" ? tr3("مطلوب", "Bestellt", "Ordered")
+      : st === "draft" ? tr3("مسودة", "Entwurf", "Draft")
+      : st === "pending" ? t("pending")
+      : st || "—";
+  const expenseCatLabel = (c: string) => t((c === "salaries" ? "salariesCategory" : c === "other" ? "otherCategory" : c) as any);
+  // Manual row flip (native only; web RTL comes from the document direction).
+  const rowFlip = flipRow(isRTL);
+  // Store currency drives money inputs: SYP has no minor units.
+  const zeroDec = isZeroDecimalCurrency(currency);
+  const moneyKeyboard = zeroDec ? ("number-pad" as const) : ("decimal-pad" as const);
+  const moneyPlaceholder = zeroDec ? "0" : "0.00";
+  // Stripe does not operate in Syria: card/wallet options are marked unavailable.
+  const stripeUnavailable = String(currency || "").toUpperCase() === "SYP";
+  const phonePh = storePhonePlaceholder(currency);
+  /** Empty → "", otherwise the store's normalised form; null when invalid. */
+  const cleanPhone = (raw: string, original?: string | null): string | null => {
+    const v = String(raw ?? "").trim();
+    if (!v) return "";
+    if (original != null && v === String(original).trim()) return v; // untouched: keep as stored
+    if (!isValidStorePhone(v, currency)) return null;
+    return normalizeStorePhone(v, currency);
+  };
+  const invalidPhoneMsg = tr3("رقم الهاتف غير صالح", "Ungültige Telefonnummer", "Invalid phone number");
+  // Lists are keyed "/api/x?tenantId=…" (one string), so a plain ["/api/x"]
+  // key never matches them; invalidate by prefix instead.
+  const invalidatePrefix = (prefix: string) =>
+    qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0] ?? "").startsWith(prefix) });
+  // Excel downloads need the store's auth headers (a bare window.open sends
+  // none), so fetch the file and hand the browser a blob to save.
+  const downloadExcel = async (route: string, filename: string) => {
+    if (Platform.OS !== "web") {
+      require("react-native").Linking.openURL(`${getApiUrl().replace(/\/$/, "")}${route}`).catch(() => {});
+      return;
+    }
+    try {
+      const res = await apiRequest("GET", route);
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e: any) {
+      notify(t("error"), apiErrorMessage(e));
+    }
+  };
 
   // Landing page config for slug
   // The default queryFn joins queryKey with "/", so we must format the second
@@ -115,7 +210,7 @@ export default function SettingsScreen() {
 
   const [showExpenses, setShowExpenses] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const [expenseForm, setExpenseForm] = useState({ description: "", amount: "", category: "other", date: new Date().toISOString().split("T")[0], notes: "" });
+  const [expenseForm, setExpenseForm] = useState({ description: "", amount: "", category: "other", date: storeYmd(), notes: "" });
 
   const [showAttendance, setShowAttendance] = useState(false);
   const [activeShiftElapsed, setActiveShiftElapsed] = useState("");
@@ -138,9 +233,9 @@ export default function SettingsScreen() {
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const [showBranchForm, setShowBranchForm] = useState(false);
   const [editBranch, setEditBranch] = useState<any | null>(null);
-  const [branchForm, setBranchForm] = useState({ name: "", address: "", phone: "", currency: "CHF", taxRate: "" });
+  const [branchForm, setBranchForm] = useState({ name: "", address: "", phone: "", currency: getCurrency(), taxRate: "" });
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
-  const [warehouseForm, setWarehouseForm] = useState({ name: "", address: "", type: "main" });
+  const [warehouseForm, setWarehouseForm] = useState({ name: "", address: "" });
   // Loyalty programme (stored on the tenant's landing_page_config, which the
   // till and the online store both read)
   const [showLoyaltyConfig, setShowLoyaltyConfig] = useState(false);
@@ -151,7 +246,7 @@ export default function SettingsScreen() {
   const [printerPrefs, setPrinterPrefsState] = useState<ReceiptPrinterPrefs>(getReceiptPrinterPrefs());
   const updatePrinterPrefs = (next: Partial<ReceiptPrinterPrefs>) => setPrinterPrefsState(setReceiptPrinterPrefs(next));
   const [showStoreSettings, setShowStoreSettings] = useState(false);
-  const [storeForm, setStoreForm] = useState({ name: "", address: "", phone: "", email: "", storeType: "supermarket", taxRate: "", deliveryFee: "", whatsappAdminPhone: "" });
+  const [storeForm, setStoreForm] = useState({ name: "", address: "", phone: "", email: "", storeType: "supermarket", taxRate: "", deliveryFee: "" });
   const [storeLogo, setStoreLogo] = useState<string | null>(null);
   const [storeLogoUploading, setStoreLogoUploading] = useState(false);
 
@@ -177,6 +272,7 @@ export default function SettingsScreen() {
   const [showPaymentGateway, setShowPaymentGateway] = useState(false);
   const [pgTestResult, setPgTestResult] = useState<any>(null);
   const [pgTesting, setPgTesting] = useState(false);
+  const [pgPending, setPgPending] = useState<{ key: string; val: boolean } | null>(null);
 
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [importType, setImportType] = useState<"products" | "customers">("products");
@@ -248,7 +344,9 @@ export default function SettingsScreen() {
   const { data: warehousesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/warehouses?tenantId=${tenant.id}` : "/api/warehouses"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
   const { data: batchesList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/product-batches?tenantId=${tenant.id}` : "/api/product-batches"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
   const { data: productsList = [] } = useQuery<any[]>({ queryKey: [tenant?.id ? `/api/products?tenantId=${tenant.id}` : "/api/products"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id && canManage });
-  const { data: storeSettings } = useQuery<any>({ queryKey: [tenant?.id ? `/api/store-settings?tenantId=${tenant.id}` : "/api/store-settings"], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
+  // Same key shape as the till (index.tsx), so both share one cache entry and
+  // a save here refreshes the till's receipt header too.
+  const { data: storeSettings } = useQuery<any>({ queryKey: ["/api/store-settings", tenantId ? `?tenantId=${tenantId}` : ""], queryFn: getQueryFn({ on401: "throw" }), enabled: !!tenant?.id });
   // The route is public (checkout reads it), so the licence never scopes it:
   // without ?tenantId the server answers with the platform default settings.
   const { data: pgConfig, refetch: refetchPgConfig } = useQuery<any>({ queryKey: ["/api/payment-gateway/config", tenantId ? `?tenantId=${tenantId}` : ""], queryFn: getQueryFn({ on401: "throw" }), enabled: isAdmin && !!tenantId });
@@ -321,13 +419,13 @@ export default function SettingsScreen() {
   const createEmpMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/employees", data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [empQueryKey] }); setShowEmployeeForm(false); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const updateEmpMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/employees/${id}`, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [empQueryKey] }); setShowEmployeeForm(false); setEditEmployee(null); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const deleteEmpMutation = useMutation({
@@ -335,39 +433,32 @@ export default function SettingsScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).includes("/api/employees") });
     },
-    onError: (e: any) => {
-      console.error("Delete employee failed:", e.message);
-      if (Platform.OS === "web") {
-        window.alert(`Delete failed: ${e.message}`);
-      } else {
-        Alert.alert(t("error"), e.message);
-      }
-    },
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
+
+  const empSaving = createEmpMutation.isPending || updateEmpMutation.isPending;
 
   const createSupMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/suppliers", { ...data, tenantId: tenant?.id }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/suppliers?tenantId=${tenant.id}` : "/api/suppliers"] }); setShowSupplierForm(false); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const createExpenseMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/expenses", { ...data, tenantId: tenant?.id }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/expenses?tenantId=${tenant.id}` : "/api/expenses"] }); setShowExpenseForm(false); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const deleteExpenseMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/expenses/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/expenses?tenantId=${tenant.id}` : "/api/expenses"] }); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
-  // Populate the Public Storefront editor whenever the landing config loads.
-  useEffect(() => {
-    const c: any = landingConfigData;
-    if (!c) return;
-    setStorefrontForm({
+  // Public Storefront editor: filled from the saved config on load and again
+  // every time it is opened, so abandoned edits never linger.
+  const storefrontFromConfig = (c: any) => ({
       heroTitle: c.heroTitle || "",
       heroSubtitle: c.heroSubtitle || "",
       aboutText: c.aboutText || "",
@@ -380,7 +471,7 @@ export default function SettingsScreen() {
       acceptCard: c.acceptCard !== false,
       acceptCash: c.acceptCash !== false,
       acceptMobile: c.acceptMobile !== false,
-      minOrderAmount: c.minOrderAmount != null ? String(c.minOrderAmount) : "",
+      minOrderAmount: c.minOrderAmount != null ? (zeroDec ? String(Math.round(Number(c.minOrderAmount) || 0)) : String(c.minOrderAmount)) : "",
       estimatedDeliveryTime: c.estimatedDeliveryTime != null ? String(c.estimatedDeliveryTime) : "",
       deliveryRadius: c.deliveryRadius || "",
       openingHours: c.openingHours || "",
@@ -396,7 +487,10 @@ export default function SettingsScreen() {
       bankAccountHolder: c.bankAccountHolder || "",
       bankIban: c.bankIban || "",
       twintNumber: c.twintNumber || "",
-    });
+  });
+  useEffect(() => {
+    if (landingConfigData) setStorefrontForm(storefrontFromConfig(landingConfigData));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [landingConfigData]);
 
   const saveStorefrontMutation = useMutation({
@@ -404,10 +498,37 @@ export default function SettingsScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/landing-page-config", tenantId ? `?tenantId=${tenantId}` : ""] });
       setShowStorefront(false);
-      Alert.alert(t("saved") || "Saved", t("storefrontUpdated") || "Storefront updated");
+      notify(t("saved") || "Saved", t("storefrontUpdated") || "Storefront updated");
     },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
+
+  // The decimal/int columns reject "" (MySQL strict mode), so blank numbers
+  // are sent as their defaults; phones are normalised like everywhere else.
+  const handleSaveStorefront = () => {
+    const f = storefrontForm;
+    const c: any = landingConfigData || {};
+    const minOrder = f.minOrderAmount.trim() === "" ? 0 : parseNum(f.minOrderAmount);
+    if (!(minOrder >= 0)) return notify(t("error"), tr3("الحد الأدنى للطلب غير صالح", "Ungültiger Mindestbestellwert", "Invalid minimum order amount"));
+    const eta = f.estimatedDeliveryTime.trim() === "" ? 30 : parseInt(f.estimatedDeliveryTime, 10);
+    if (!(eta >= 0) || eta > 1440) return notify(t("error"), tr3("وقت التوصيل غير صالح", "Ungültige Lieferzeit", "Invalid delivery time"));
+    const hex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+    if (!hex.test(f.primaryColor.trim()) || !hex.test(f.accentColor.trim())) {
+      return notify(t("error"), tr3("اللون يجب أن يكون بصيغة ‎#RRGGBB", "Farben im Format #RRGGBB angeben", "Colours must be in #RRGGBB format"));
+    }
+    const phone = cleanPhone(f.phone, c.phone);
+    const wa = cleanPhone(f.socialWhatsapp, c.socialWhatsapp);
+    if (phone === null || wa === null) return notify(t("error"), invalidPhoneMsg);
+    saveStorefrontMutation.mutate({
+      ...f,
+      primaryColor: f.primaryColor.trim(),
+      accentColor: f.accentColor.trim(),
+      minOrderAmount: zeroDec ? String(Math.round(minOrder)) : minOrder.toFixed(2),
+      estimatedDeliveryTime: eta,
+      phone,
+      socialWhatsapp: wa,
+    });
+  };
 
   // ── Loyalty programme ───────────────────────────────────────────────────
   // Stored as landing_page_config.loyalty_* (the columns the online store and
@@ -431,9 +552,9 @@ export default function SettingsScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/landing-page-config", tenantId ? `?tenantId=${tenantId}` : ""] });
       setShowLoyaltyConfig(false);
-      Alert.alert(t("success"), tr3("تم حفظ إعدادات الولاء", "Treueprogramm gespeichert", "Loyalty settings saved"));
+      notify(t("success"), tr3("تم حفظ إعدادات الولاء", "Treueprogramm gespeichert", "Loyalty settings saved"));
     },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
   const handleSaveLoyalty = () => {
     const spend = parseFloat(loyaltyForm.spendPerPoint.replace(",", "."));
@@ -441,10 +562,10 @@ export default function SettingsScreen() {
     const minRedeem = parseInt(loyaltyForm.minRedeem || "0", 10);
     // decimal(14,6): below 1 point per 1,000,000 the rate would round to zero.
     if (!(spend > 0) || spend > 1000000) {
-      return Alert.alert(t("error"), tr3("أدخل مبلغاً صحيحاً لكسب نقطة واحدة", "Bitte einen gültigen Betrag pro Punkt eingeben", "Enter a valid amount per point"));
+      return notify(t("error"), tr3("أدخل مبلغاً صحيحاً لكسب نقطة واحدة", "Bitte einen gültigen Betrag pro Punkt eingeben", "Enter a valid amount per point"));
     }
     if (!(value >= 0) || value > 1000000) {
-      return Alert.alert(t("error"), tr3("أدخل قيمة صحيحة للنقطة", "Bitte einen gültigen Punktwert eingeben", "Enter a valid point value"));
+      return notify(t("error"), tr3("أدخل قيمة صحيحة للنقطة", "Bitte einen gültigen Punktwert eingeben", "Enter a valid point value"));
     }
     saveLoyaltyMutation.mutate({
       enableLoyalty: loyaltyForm.enabled,
@@ -460,7 +581,7 @@ export default function SettingsScreen() {
   const clockInMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/shifts", data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [shiftsQueryKey] }); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const clockOutMutation = useMutation({
@@ -469,7 +590,7 @@ export default function SettingsScreen() {
       qc.invalidateQueries({ queryKey: [shiftsQueryKey] });
       qc.invalidateQueries({ queryKey: [activeShiftsQueryKey] });
     },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const forceCloseShiftMutation = useMutation({
@@ -477,9 +598,9 @@ export default function SettingsScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [shiftsQueryKey] });
       qc.invalidateQueries({ queryKey: [activeShiftsQueryKey] });
-      Alert.alert(t("success"), t("shiftForceClosed"));
+      notify(t("success"), t("shiftForceClosed"));
     },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const markNotificationReadMutation = useMutation({
@@ -488,7 +609,7 @@ export default function SettingsScreen() {
       qc.invalidateQueries({ queryKey: [`/api/notifications/${employee?.id}`] });
       qc.invalidateQueries({ queryKey: [`/api/notifications/${employee?.id}/unread-count`] });
     },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const markAllNotificationsReadMutation = useMutation({
@@ -497,28 +618,21 @@ export default function SettingsScreen() {
       qc.invalidateQueries({ queryKey: [`/api/notifications/${employee?.id}`] });
       qc.invalidateQueries({ queryKey: [`/api/notifications/${employee?.id}/unread-count`] });
     },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
-  const updateShiftMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/shifts/${id}`, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/shifts"] });
-      qc.invalidateQueries({ queryKey: ["/api/shifts/active"] });
-    },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
-  });
+  const [applyingShiftHours, setApplyingShiftHours] = useState(false);
 
   const createPOMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/purchase-orders", { ...data, tenantId: tenant?.id }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/purchase-orders?tenantId=${tenant.id}` : "/api/purchase-orders"] }); setShowPOForm(false); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const receivePOMutation = useMutation({
     mutationFn: (id: number) => apiRequest("POST", `/api/purchase-orders/${id}/receive`, { items: [] }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/purchase-orders?tenantId=${tenant.id}` : "/api/purchase-orders"] }); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const createReturnMutation = useMutation({
@@ -541,7 +655,7 @@ export default function SettingsScreen() {
         type: data.type,
         totalAmount: sale.totalAmount,
         refundMethod: sale.paymentMethod,
-        branchId: employee?.branchId || branches[0]?.id || 1,
+        branchId: myBranchId,
         tenantId: tenant?.id,
         items: returnItems,
       });
@@ -549,28 +663,29 @@ export default function SettingsScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/returns?tenantId=${tenant.id}` : "/api/returns"] });
       qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/sales?limit=50&tenantId=${tenant.id}` : "/api/sales?limit=50"] });
-      qc.invalidateQueries({ queryKey: ["/api/inventory"] });
+      invalidatePrefix("/api/inventory");
+      invalidatePrefix("/api/products");
       setShowReturnForm(false);
       setReturnForm({ originalSaleId: "", reason: "", type: "refund" });
-      Alert.alert(t("success"), t("returnProcessed"));
+      notify(t("success"), t("returnProcessed"));
     },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const cashDrawerMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/cash-drawer", data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/shifts"] });
+      invalidatePrefix("/api/shifts");
       setCashDrawerForm({ type: "withdrawal", amount: "", reason: "" });
-      Alert.alert(t("success"), t("cashDrawerRecorded"));
+      notify(t("success"), t("cashDrawerRecorded"));
     },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const createWarehouseMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/warehouses", data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/warehouses"] }); setShowWarehouseForm(false); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onSuccess: () => { invalidatePrefix("/api/warehouses"); setShowWarehouseForm(false); },
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const createBranchMutation = useMutation({
@@ -586,110 +701,137 @@ export default function SettingsScreen() {
       qc.invalidateQueries({ queryKey: ["/api/store-settings"] });
       setShowBranchForm(false); setEditBranch(null);
     },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const deleteBranchMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/branches/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/branches?tenantId=${tenant.id}` : "/api/branches"] }); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const createBatchMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/product-batches", data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/product-batches"] }); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onSuccess: () => { invalidatePrefix("/api/product-batches"); },
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const updateBatchMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/product-batches/${id}`, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/product-batches"] }); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onSuccess: () => { invalidatePrefix("/api/product-batches"); },
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
   const deleteBatchMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/product-batches/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/product-batches"] }); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onSuccess: () => { invalidatePrefix("/api/product-batches"); },
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
+
+  const batchSaving = createBatchMutation.isPending || updateBatchMutation.isPending;
 
   const updateStoreSettingsMutation = useMutation({
     mutationFn: (data: any) => apiRequest("PUT", "/api/store-settings", data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/store-settings"] }); setShowStoreSettings(false); Alert.alert(t("success"), t("storeSettingsSaved")); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/store-settings"] }); setShowStoreSettings(false); notify(t("success"), t("storeSettingsSaved")); },
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
+  const storeSaving = storeLogoUploading || updateStoreSettingsMutation.isPending;
+
   const pickStoreLogo = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images' as ImagePicker.MediaType,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setStoreLogo(result.assets[0].uri);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images' as ImagePicker.MediaType,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets[0]) {
+        setStoreLogo(result.assets[0].uri);
+      }
+    } catch (e: any) {
+      notify(t("error"), apiErrorMessage(e));
     }
   };
 
-  const uriToDataUri = async (uri: string): Promise<string | null> => {
-    try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      return await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    } catch (e) {
-      console.error("Image conversion failed:", e);
-      return null;
-    }
+  // The logo is uploaded as a file and the branch keeps its path: a base64
+  // data URI in branches.logo (a TEXT column, 64 KB) fails or gets cut off
+  // for an ordinary phone photo.
+  const uploadLogo = async (uri: string): Promise<string> => {
+    const blob = await (await fetch(uri)).blob();
+    const base64: string = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result).split(",")[1] || "");
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    if (!base64) throw new Error(tr3("تعذّر قراءة الصورة", "Bild konnte nicht gelesen werden", "Could not read the image"));
+    const res = await apiRequest("POST", "/api/objects/upload", { imageData: base64, contentType: blob.type || "image/jpeg" });
+    const { objectPath } = await res.json();
+    if (!objectPath) throw new Error(tr3("فشل رفع الصورة", "Bild-Upload fehlgeschlagen", "Image upload failed"));
+    return objectPath;
   };
 
   const handleSaveStoreSettings = async () => {
-    let logoPath = storeSettings?.logo || null;
-    if (storeLogo && !storeLogo.startsWith("/objects") && !storeLogo.startsWith("data:")) {
+    const name = storeForm.name.trim();
+    if (!name) return notify(t("error"), tr3("اسم المتجر مطلوب", "Name des Geschäfts ist erforderlich", "Store name is required"));
+    const taxRate = storeForm.taxRate.trim() === "" ? 0 : parseNum(storeForm.taxRate);
+    if (!(taxRate >= 0 && taxRate <= 100)) return notify(t("error"), tr3("نسبة الضريبة يجب أن تكون بين 0 و100", "Steuersatz muss zwischen 0 und 100 liegen", "Tax rate must be between 0 and 100"));
+    const deliveryFee = storeForm.deliveryFee.trim() === "" ? 0 : parseNum(storeForm.deliveryFee);
+    if (!(deliveryFee >= 0)) return notify(t("error"), tr3("رسوم التوصيل غير صالحة", "Ungültige Liefergebühr", "Invalid delivery fee"));
+    const email = storeForm.email.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return notify(t("error"), tr3("البريد الإلكتروني غير صالح", "Ungültige E-Mail-Adresse", "Invalid email address"));
+    const phone = cleanPhone(storeForm.phone, storeSettings?.phone);
+    if (phone === null) return notify(t("error"), invalidPhoneMsg);
+
+    // null = removed, a stored path/URL = unchanged, anything else = a new pick.
+    let logo: string | null = storeLogo;
+    if (storeLogo && storeLogo !== storeSettings?.logo && !/^(\/objects|\/api\/objects|\/uploads|https?:)/.test(storeLogo)) {
       setStoreLogoUploading(true);
-      logoPath = await uriToDataUri(storeLogo);
+      try {
+        logo = await uploadLogo(storeLogo);
+      } catch (e: any) {
+        setStoreLogoUploading(false);
+        return notify(t("error"), apiErrorMessage(e));
+      }
       setStoreLogoUploading(false);
-    } else if (storeLogo && storeLogo.startsWith("data:")) {
-      logoPath = storeLogo;
     }
     updateStoreSettingsMutation.mutate({
       tenantId: tenant?.id,
-      name: storeForm.name || undefined,
-      address: storeForm.address || undefined,
-      phone: storeForm.phone || undefined,
-      email: storeForm.email || undefined,
-      logo: logoPath || undefined,
+      name,
+      // Empty strings are sent on purpose so a cleared field really clears.
+      address: storeForm.address.trim(),
+      phone,
+      email,
+      logo: logo || null,
       storeType: storeForm.storeType || "supermarket",
-      taxRate: storeForm.taxRate !== "" ? storeForm.taxRate : undefined,
-      deliveryFee: storeForm.deliveryFee !== "" ? storeForm.deliveryFee : undefined,
+      taxRate: taxRate.toFixed(2),
+      deliveryFee: zeroDec ? String(Math.round(deliveryFee)) : deliveryFee.toFixed(2),
     });
   };
 
   // Vehicle mutations
   const createVehicleMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/vehicles", { ...data, tenantId: tenant?.id, branchId: employee?.branchId || null }),
+    mutationFn: (data: any) => apiRequest("POST", "/api/vehicles", { ...data, tenantId: tenant?.id, branchId: myBranchId }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/vehicles?tenantId=${tenant.id}` : "/api/vehicles"] }); setShowVehicleForm(false); setEditVehicle(null); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
   const updateVehicleMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/vehicles/${id}`, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/vehicles?tenantId=${tenant.id}` : "/api/vehicles"] }); setShowVehicleForm(false); setEditVehicle(null); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
   const deleteVehicleMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/vehicles/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/vehicles?tenantId=${tenant.id}` : "/api/vehicles"] }); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
+  const vehicleSaving = createVehicleMutation.isPending || updateVehicleMutation.isPending;
 
   // Printer config save
   const savePrinterConfigMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/printer-configs", { ...data, tenantId: tenant?.id }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/printer-configs?tenantId=${tenant.id}` : "/api/printer-configs"] }); Alert.alert(t("success"), t("printerConfigSaved")); },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/printer-configs?tenantId=${tenant.id}` : "/api/printer-configs"] }); notify(t("success"), t("printerConfigSaved")); },
+    onError: (e: any) => notify(t("error"), apiErrorMessage(e)),
   });
 
   const rtlTextAlign = isRTL ? { textAlign: "right" as const } : {};
@@ -792,6 +934,72 @@ export default function SettingsScreen() {
     setPgTesting(false);
   };
 
+  // ── Staff report (Personalbericht): today's orders with delivery address ──
+  // The server endpoint is not tenant-scoped (see report), so rows are kept
+  // only when they were rung up by one of this store's own employees.
+  const printStaffReport = async (silentWhenEmpty: boolean) => {
+    const today = storeYmd();
+    const res = await apiRequest("GET", `/api/reports/daily-sales-report?date=${today}${tenantId ? `&tenantId=${tenantId}` : ""}`);
+    const raw: any[] = await res.json();
+    const ownIds = new Set(employees.map((e: any) => e.id));
+    const salesData = (Array.isArray(raw) ? raw : []).filter((s: any) => ownIds.has(s.employeeId));
+    if (salesData.length === 0) {
+      if (!silentWhenEmpty) notify(tr3("تقرير الموظفين", "Personalbericht", "Staff report"), tr3("لا توجد طلبات اليوم.", "Keine Bestellungen für heute gefunden.", "No orders found for today."));
+      return;
+    }
+    const locale = dtLocale;
+    const storeName = escapeHtml((storeSettings as any)?.name || tenant?.name || "POS");
+    const dateStr = escapeHtml(formatInStoreTz(new Date(), locale, { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
+    const cashierName = escapeHtml(employee?.name || "");
+    const total = salesData.reduce((sum: number, sale: any) => sum + Number(sale.totalAmount || 0), 0);
+    const rowsHtml = salesData.map((sale: any, idx: number) => {
+      const parts = String(sale.customerAddress || "").split(",");
+      const street = escapeHtml(parts[0]?.trim() || "–");
+      const city = escapeHtml(parts[1]?.trim() || sale.customerCity || parts[0]?.trim() || "–");
+      const timeStr = fmtTime(sale.createdAt);
+      return `<tr><td>${idx + 1}</td><td>${street}</td><td>${city}</td><td>${timeStr}</td><td class="num">${formatAmount(sale.totalAmount)}</td></tr>`;
+    }).join("");
+    const dir = isRTL ? "rtl" : "ltr";
+    const L = {
+      title: tr3("تقرير الموظفين", "Personalbericht", "Staff report"),
+      cashier: tr3("الكاشير", "Kassierer", "Cashier"),
+      nr: tr3("رقم", "Nr", "No."),
+      address: tr3("العنوان", "Adresse", "Address"),
+      area: tr3("المنطقة", "Gebiet", "Area"),
+      time: tr3("الوقت", "Zeit", "Time"),
+      total: tr3("المجموع", "Total", "Total"),
+      turnover: tr3("إجمالي المبيعات", "Umsatz Total", "Total sales"),
+      orders: tr3("طلبات", "Bestellungen", "orders"),
+    };
+    const html = `<!DOCTYPE html><html lang="${language}" dir="${dir}"><head><meta charset="UTF-8"><title>${L.title}</title><style>
+      body { font-family: 'Courier New', monospace; font-size: 11px; margin: 0; padding: 10px; color: #000; }
+      h2 { text-align: center; font-size: 14px; margin: 4px 0; }
+      .sub { text-align: center; font-size: 11px; margin-bottom: 8px; }
+      table { width: 100%; border-collapse: collapse; }
+      th { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 4px; text-align: start; font-size: 10px; }
+      td { padding: 2px 4px; font-size: 10px; border-bottom: 1px dotted #ccc; }
+      .num { text-align: end; white-space: nowrap; }
+      .total-row { border-top: 1px solid #000; font-weight: bold; }
+      .total-row td { padding-top: 4px; }
+    </style></head><body>
+      <h2>${L.title}</h2>
+      <div class="sub">${dateStr}</div>
+      <div class="sub">${storeName}</div>
+      <div style="font-weight:bold;margin:8px 0 4px;">${L.cashier}: ${cashierName}</div>
+      <table>
+        <thead><tr><th>${L.nr}</th><th>${L.address}</th><th>${L.area}</th><th>${L.time}</th><th class="num">${L.total} (${escapeHtml(currencyLabel())})</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+        <tfoot>
+          <tr class="total-row"><td colspan="4">${L.turnover} · ${salesData.length} ${L.orders}</td><td class="num">${formatAmount(total)}</td></tr>
+        </tfoot>
+      </table>
+      <div style="text-align:center;font-size:10px;margin-top:10px;">${fmtTime(new Date())} · ${dateStr}</div>
+    </body></html>`;
+    printHtmlViaIframe(html);
+  };
+
+  const [staffReportBusy, setStaffReportBusy] = useState(false);
+
   const handleLogout = () => {
     const isWeb = Platform.OS === "web";
     const doLogout = () => {
@@ -877,7 +1085,7 @@ export default function SettingsScreen() {
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>{employee.name}</Text>
               <View style={[styles.roleBadge, { backgroundColor: (roleColors[employee.role] || Colors.info) + "20" }]}>
-                <Text style={[styles.roleText, { color: roleColors[employee.role] || Colors.info }]}>{employee.role}</Text>
+                <Text style={[styles.roleText, { color: roleColors[employee.role] || Colors.info }]}>{t(employee.role as any)}</Text>
               </View>
             </View>
           </View>
@@ -896,13 +1104,12 @@ export default function SettingsScreen() {
                 email: storeSettings?.email || "",
                 storeType: storeSettings?.storeType || "supermarket",
                 taxRate: storeSettings?.taxRate != null ? String(storeSettings.taxRate) : "",
-                deliveryFee: storeSettings?.deliveryFee != null ? String(storeSettings.deliveryFee) : "",
-                whatsappAdminPhone: storeSettings?.whatsappAdminPhone || "",
+                deliveryFee: storeSettings?.deliveryFee != null ? (zeroDec ? String(Math.round(Number(storeSettings.deliveryFee) || 0)) : String(storeSettings.deliveryFee)) : "",
               });
               setStoreLogo(storeSettings?.logo || null);
               setShowStoreSettings(true);
             }} color={Colors.accent} rtl={isRTL} />
-            <SettingRow icon="card" label={t("paymentGateways")} value={pgConfig?.stripe?.status === "connected" ? `${t("stripeConnected")} - ${pgConfig?.stripe?.mode === "live" ? t("liveMode") : t("testMode")}` : t("stripeNotConfigured")} onPress={() => { setPgTestResult(null); setShowPaymentGateway(true); }} color={Colors.hueIndigo} rtl={isRTL} />
+            <SettingRow icon="card" label={t("paymentGateways")} value={stripeUnavailable ? tr3("شام كاش ونقداً · البطاقات غير متاحة في سوريا", "Sham Cash und Bar · Karten in Syrien nicht verfügbar", "Sham Cash and cash · cards unavailable in Syria") : pgConfig?.stripe?.status === "connected" ? `${t("stripeConnected")} - ${pgConfig?.stripe?.mode === "live" ? t("liveMode") : t("testMode")}` : t("stripeNotConfigured")} onPress={() => { setPgTestResult(null); setShowPaymentGateway(true); }} color={Colors.hueIndigo} rtl={isRTL} />
             <SettingRow icon="cloud-upload" label={t("bulkImport")} value={t("importData")} onPress={() => { setImportResult(null); setShowBulkImport(true); }} color={Colors.hueAmber} rtl={isRTL} />
             <SettingRow icon="qr-code" label={tr3("طاولات QR", "QR-Tische", "QR Tables")} value={t("manageTables")} onPress={() => router.push("/table-qr")} color={Colors.hueTeal} rtl={isRTL} />
           </>
@@ -943,7 +1150,7 @@ export default function SettingsScreen() {
         <SettingRow icon="pricetag" label={t("promoCodes")} value={t("addPromoCode")} onPress={() => router.push("/promo-codes")} color={Colors.hueViolet} rtl={isRTL} />
         <SettingRow icon="car" label={t("driverManagement")} value={t("activeDrivers")} onPress={() => router.push("/driver-management")} color={Colors.driverOnline} rtl={isRTL} />
         {isAdmin && (
-          <SettingRow icon="globe-outline" label={t("editStorefront") || "Edit Storefront"} value={t("storefrontDesc") || "Name, offers, delivery, payments"} onPress={() => setShowStorefront(true)} color={Colors.accent} rtl={isRTL} />
+          <SettingRow icon="globe-outline" label={t("editStorefront")} value={t("storefrontDesc")} onPress={() => { if (landingConfigData) setStorefrontForm(storefrontFromConfig(landingConfigData)); setShowStorefront(true); }} color={Colors.accent} rtl={isRTL} />
         )}
         <SettingRow icon="storefront" label={t("storefrontPreview")} value={slug || "—"} onPress={() => { if (slug) require("react-native").Linking.openURL(getApiUrl() + `/order/${slug}`); }} color={Colors.accent} rtl={isRTL} />
         {isAdmin && (
@@ -960,11 +1167,11 @@ export default function SettingsScreen() {
         )}
 
         <Text style={styles.sectionTitle}>{t("system")}</Text>
-        <View style={[rowStyles.row, isRTL && { flexDirection: "row-reverse" }]}>
+        <View style={[rowStyles.row, rowFlip && { flexDirection: "row-reverse" }]}>
           <View style={[rowStyles.iconWrap, { backgroundColor: Colors.accent + "20" }, isRTL ? { marginLeft: 12, marginRight: 0 } : {}]}>
             <Ionicons name="contrast-outline" size={20} color={Colors.accent} />
           </View>
-          <View style={[rowStyles.info, isRTL && { alignItems: "flex-end" }]}>
+          <View style={[rowStyles.info, rowFlip && { alignItems: "flex-end" }]}>
             <Text style={[rowStyles.label, isRTL && { textAlign: "right" }]}>{t("appearance")}</Text>
             <Text style={[rowStyles.value, isRTL && { textAlign: "right" }]}>{t("appearanceDesc")}</Text>
           </View>
@@ -972,13 +1179,13 @@ export default function SettingsScreen() {
         </View>
         <SettingRow icon="language" label={t("language")} value={language === "ar" ? "العربية" : language === "de" ? "Deutsch" : "English"} onPress={() => setShowLanguagePicker(true)} color={Colors.info} rtl={isRTL} />
         <Pressable
-          style={[rowStyles.row, isRTL && { flexDirection: "row-reverse" }]}
+          style={[rowStyles.row, rowFlip && { flexDirection: "row-reverse" }]}
           onPress={() => toggleLeftHandMode(!leftHandMode)}
         >
           <View style={[rowStyles.iconWrap, { backgroundColor: Colors.secondary + "20" }, isRTL ? { marginLeft: 12, marginRight: 0 } : {}]}>
             <Ionicons name="hand-left-outline" size={20} color={Colors.secondary} />
           </View>
-          <View style={[rowStyles.info, isRTL && { alignItems: "flex-end" }]}>
+          <View style={[rowStyles.info, rowFlip && { alignItems: "flex-end" }]}>
             <Text style={[rowStyles.label, isRTL && { textAlign: "right" }]}>{t("leftHandMode" as any)}</Text>
             <Text style={[rowStyles.value, isRTL && { textAlign: "right" }]}>{t("leftHandModeDesc" as any)}</Text>
           </View>
@@ -1006,48 +1213,44 @@ export default function SettingsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("employees")}</Text>
               <View style={styles.modalActions}>
-                <Pressable onPress={() => { setEditEmployee(null); setEmpForm({ name: "", pin: "", role: "cashier", email: "", phone: "" }); setShowEmployeeForm(true); }}>
+                <Pressable hitSlop={8} onPress={() => { setEditEmployee(null); setEmpForm({ name: "", pin: "", role: "cashier", email: "", phone: "" }); setShowEmployeeForm(true); }}>
                   <Ionicons name="add-circle" size={28} color={Colors.accent} />
                 </Pressable>
-                <Pressable onPress={() => setShowEmployees(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+                <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowEmployees(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
               </View>
             </View>
             <FlatList
               data={employees}
               keyExtractor={(item: any) => String(item.id)}
               scrollEnabled={!!employees.length}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>{tr3("لا يوجد موظفون بعد", "Noch keine Mitarbeitenden", "No employees yet")}</Text>}
               renderItem={({ item }: { item: any }) => (
                 <View style={styles.empCard}>
                   <View style={[styles.empAvatar, { backgroundColor: (roleColors[item.role] || Colors.info) + "30" }]}>
                     <Text style={styles.empInitial}>{item.name.charAt(0)}</Text>
                   </View>
                   <View style={styles.empInfo}>
-                    <Text style={styles.empName}>{item.name}</Text>
-                    <Text style={styles.empMeta}>{(item.hasPin || item.pin) ? "•••• PIN set" : "No PIN"} | {item.email || t("noEmail")}</Text>
+                    <Text style={styles.empName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.empMeta} numberOfLines={1}>{item.hasPin ? tr3("PIN مضبوط ••••", "PIN gesetzt ••••", "PIN set ••••") : tr3("بدون PIN", "Kein PIN", "No PIN")} | {item.email || t("noEmail")}</Text>
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <View style={[styles.roleBadge, { backgroundColor: (roleColors[item.role] || Colors.info) + "20" }]}>
-                      <Text style={[styles.roleText, { color: roleColors[item.role] || Colors.info }]}>{item.role}</Text>
+                      <Text style={[styles.roleText, { color: roleColors[item.role] || Colors.info }]}>{t(item.role as any)}</Text>
                     </View>
-                    <Pressable onPress={() => {
+                    <Pressable hitSlop={8} style={styles.iconBtn} accessibilityLabel={t("editEmployee" as any)} onPress={() => {
                       setEditEmployee(item);
-                      setEmpForm({ name: item.name, pin: item.pin || "", role: item.role, email: item.email || "", phone: item.phone || "" });
+                      setEmpForm({ name: item.name, pin: "", role: item.role, email: item.email || "", phone: item.phone || "" });
                       setShowEmployeeForm(true);
                     }}>
                       <Ionicons name="create-outline" size={20} color={Colors.info} />
                     </Pressable>
-                    <Pressable onPress={() => {
-                      if (Platform.OS === "web") {
-                        if (window.confirm(`${t("delete")} ${item.name}?`)) deleteEmpMutation.mutate(item.id);
-                      } else {
-                        Alert.alert(t("delete"), `${t("delete")} ${item.name}?`, [
-                          { text: t("cancel"), style: "cancel" },
-                          { text: t("delete"), style: "destructive", onPress: () => deleteEmpMutation.mutate(item.id) },
-                        ]);
-                      }
-                    }}>
-                      <Ionicons name="trash-outline" size={20} color={Colors.danger} />
-                    </Pressable>
+                    {item.id !== employee?.id && (
+                      <Pressable hitSlop={8} style={styles.iconBtn} accessibilityLabel={t("delete")} onPress={() => {
+                        confirmAction(t("delete"), `${t("delete")} ${item.name}?`, t("delete"), t("cancel"), () => deleteEmpMutation.mutate(item.id));
+                      }}>
+                        <Ionicons name="trash-outline" size={20} color={Colors.danger} />
+                      </Pressable>
+                    )}
                   </View>
                 </View>
               )}
@@ -1060,14 +1263,14 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{editEmployee ? t("editEmployee" as any) || "Edit Employee" : t("newEmployee")}</Text>
-              <Pressable onPress={() => { setShowEmployeeForm(false); setEditEmployee(null); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Text style={styles.modalTitle}>{editEmployee ? t("editEmployee" as any) : t("newEmployee")}</Text>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => { setShowEmployeeForm(false); setEditEmployee(null); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
               <Text style={styles.label}>{t("name")} *</Text>
               <TextInput style={styles.input} value={empForm.name} onChangeText={(v) => setEmpForm({ ...empForm, name: v })} placeholderTextColor={Colors.textMuted} placeholder={t("employeeName2")} />
               <Text style={styles.label}>{t("pin")}{editEmployee ? "" : " *"}</Text>
-              <TextInput style={styles.input} value={empForm.pin} onChangeText={(v) => setEmpForm({ ...empForm, pin: v })} keyboardType="number-pad" placeholderTextColor={Colors.textMuted} placeholder={editEmployee ? "•••• (leave blank to keep)" : t("fourDigitPin")} maxLength={4} />
+              <TextInput style={styles.input} value={empForm.pin} onChangeText={(v) => setEmpForm({ ...empForm, pin: v.replace(/[^0-9]/g, "") })} keyboardType="number-pad" secureTextEntry placeholderTextColor={Colors.textMuted} placeholder={editEmployee ? tr3("•••• (اتركه فارغاً للإبقاء عليه)", "•••• (leer lassen = unverändert)", "•••• (leave blank to keep)") : t("fourDigitPin")} maxLength={4} />
               <Text style={styles.label}>{t("role")}</Text>
               <View style={styles.roleRow}>
                 {["cashier", "manager", "admin", "owner"].map((r) => (
@@ -1077,22 +1280,32 @@ export default function SettingsScreen() {
                 ))}
               </View>
               <Text style={styles.label}>{t("email")}</Text>
-              <TextInput style={styles.input} value={empForm.email} onChangeText={(v) => setEmpForm({ ...empForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" />
+              <TextInput style={styles.input} value={empForm.email} onChangeText={(v) => setEmpForm({ ...empForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" keyboardType="email-address" />
               <Text style={styles.label}>{t("phone")}</Text>
-              <TextInput style={styles.input} value={empForm.phone} onChangeText={(v) => setEmpForm({ ...empForm, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+41 79 123 45 67" />
-              <Pressable style={styles.saveBtn} onPress={() => {
-                if (!empForm.name || (!editEmployee && !empForm.pin)) return Alert.alert(t("error"), t("namePinRequired"));
+              <TextInput style={styles.input} value={empForm.phone} onChangeText={(v) => setEmpForm({ ...empForm, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder={phonePh} />
+              <Pressable style={[styles.saveBtn, empSaving && { opacity: 0.6 }]} disabled={empSaving} onPress={() => {
+                const name = empForm.name.trim();
+                if (!name || (!editEmployee && !empForm.pin)) return notify(t("error"), t("namePinRequired"));
+                if (empForm.pin && !/^\d{4}$/.test(empForm.pin)) return notify(t("error"), tr3("رمز PIN يجب أن يكون 4 أرقام", "Die PIN muss aus 4 Ziffern bestehen", "The PIN must be 4 digits"));
+                const email = empForm.email.trim();
+                if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return notify(t("error"), tr3("البريد الإلكتروني غير صالح", "Ungültige E-Mail-Adresse", "Invalid email address"));
+                const phone = cleanPhone(empForm.phone, editEmployee?.phone);
+                if (phone === null) return notify(t("error"), invalidPhoneMsg);
+                const defaultPerms = empForm.role === "admin" ? ["all"] : ["pos"];
                 if (editEmployee) {
-                  // Only send pin when the admin typed a new one — blank keeps the existing PIN.
-                  const upd: any = { name: empForm.name, role: empForm.role, email: empForm.email || undefined, phone: empForm.phone || undefined, permissions: empForm.role === "admin" ? ["all"] : ["pos"] };
+                  // Blank PIN keeps the existing one; an emptied email/phone
+                  // really clears. Permissions are reset only when the role
+                  // changes, so rights granted elsewhere survive a small edit.
+                  const upd: any = { name, role: empForm.role, email: email || null, phone: phone || null };
+                  if (empForm.role !== editEmployee.role) upd.permissions = defaultPerms;
                   if (empForm.pin) upd.pin = empForm.pin;
                   updateEmpMutation.mutate({ id: editEmployee.id, data: upd });
                 } else {
-                  createEmpMutation.mutate({ name: empForm.name, pin: empForm.pin, role: empForm.role, email: empForm.email || undefined, phone: empForm.phone || undefined, tenantId: tenant?.id, branchId: branches[0]?.id ?? null, permissions: empForm.role === "admin" ? ["all"] : ["pos"] });
+                  createEmpMutation.mutate({ name, pin: empForm.pin, role: empForm.role, email: email || undefined, phone: phone || undefined, tenantId: tenant?.id, branchId: myBranchId, permissions: defaultPerms });
                 }
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>{editEmployee ? t("save" as any) || "Save Changes" : t("createEmployee")}</Text>
+                  <Text style={styles.saveBtnText}>{empSaving ? t("loading") : editEmployee ? t("save") : t("createEmployee")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -1106,24 +1319,25 @@ export default function SettingsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("suppliers")}</Text>
               <View style={styles.modalActions}>
-                <Pressable onPress={() => { setSupForm({ name: "", contactName: "", email: "", phone: "", paymentTerms: "" }); setShowSupplierForm(true); }}>
+                <Pressable hitSlop={8} onPress={() => { setSupForm({ name: "", contactName: "", email: "", phone: "", paymentTerms: "" }); setShowSupplierForm(true); }}>
                   <Ionicons name="add-circle" size={28} color={Colors.accent} />
                 </Pressable>
-                <Pressable onPress={() => setShowSuppliers(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+                <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowSuppliers(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
               </View>
             </View>
             <FlatList
               data={suppliers}
               keyExtractor={(item: any) => String(item.id)}
               scrollEnabled={!!suppliers.length}
+              ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>{tr3("لا يوجد موردون بعد", "Noch keine Lieferanten", "No suppliers yet")}</Text>}
               renderItem={({ item }: { item: any }) => (
                 <View style={styles.empCard}>
                   <View style={[styles.empAvatar, { backgroundColor: Colors.success + "30" }]}>
                     <Ionicons name="cube" size={20} color={Colors.success} />
                   </View>
                   <View style={styles.empInfo}>
-                    <Text style={styles.empName}>{item.name}</Text>
-                    <Text style={styles.empMeta}>{item.contactName || t("noContact")} | {item.phone || t("noPhone")}</Text>
+                    <Text style={styles.empName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.empMeta} numberOfLines={1}>{item.contactName || t("noContact")} | {item.phone || t("noPhone")}</Text>
                   </View>
                 </View>
               )}
@@ -1137,7 +1351,7 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("newSupplier")}</Text>
-              <Pressable onPress={() => setShowSupplierForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowSupplierForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
               <Text style={styles.label}>{t("companyName")} *</Text>
@@ -1145,17 +1359,20 @@ export default function SettingsScreen() {
               <Text style={styles.label}>{t("contactPerson")}</Text>
               <TextInput style={styles.input} value={supForm.contactName} onChangeText={(v) => setSupForm({ ...supForm, contactName: v })} placeholderTextColor={Colors.textMuted} placeholder={t("contactNamePlaceholder")} />
               <Text style={styles.label}>{t("phone")}</Text>
-              <TextInput style={styles.input} value={supForm.phone} onChangeText={(v) => setSupForm({ ...supForm, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+1234567890" />
+              <TextInput style={styles.input} value={supForm.phone} onChangeText={(v) => setSupForm({ ...supForm, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder={phonePh} />
               <Text style={styles.label}>{t("email")}</Text>
-              <TextInput style={styles.input} value={supForm.email} onChangeText={(v) => setSupForm({ ...supForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" />
+              <TextInput style={styles.input} value={supForm.email} onChangeText={(v) => setSupForm({ ...supForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" keyboardType="email-address" />
               <Text style={styles.label}>{tr3("شروط الدفع", "Zahlungsbedingungen", "Payment terms")}</Text>
               <TextInput style={styles.input} value={supForm.paymentTerms} onChangeText={(v) => setSupForm({ ...supForm, paymentTerms: v })} placeholderTextColor={Colors.textMuted} placeholder={tr3("مثال: 30 يوماً", "z. B. 30 Tage netto", "e.g. Net 30")} />
-              <Pressable style={styles.saveBtn} onPress={() => {
-                if (!supForm.name) return Alert.alert(t("error"), t("companyNameRequired"));
-                createSupMutation.mutate({ name: supForm.name, contactName: supForm.contactName || undefined, phone: supForm.phone || undefined, email: supForm.email || undefined, paymentTerms: supForm.paymentTerms || undefined });
+              <Pressable style={[styles.saveBtn, createSupMutation.isPending && { opacity: 0.6 }]} disabled={createSupMutation.isPending} onPress={() => {
+                const name = supForm.name.trim();
+                if (!name) return notify(t("error"), t("companyNameRequired"));
+                const phone = cleanPhone(supForm.phone);
+                if (phone === null) return notify(t("error"), invalidPhoneMsg);
+                createSupMutation.mutate({ name, contactName: supForm.contactName.trim() || undefined, phone: phone || undefined, email: supForm.email.trim() || undefined, paymentTerms: supForm.paymentTerms.trim() || undefined });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>{t("createSupplier")}</Text>
+                  <Text style={styles.saveBtnText}>{createSupMutation.isPending ? t("loading") : t("createSupplier")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -1169,10 +1386,10 @@ export default function SettingsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("branches")}</Text>
               <View style={styles.modalActions}>
-                <Pressable onPress={() => { setBranchForm({ name: "", address: "", phone: "", currency: "CHF", taxRate: "" }); setEditBranch(null); setShowBranchForm(true); }}>
+                <Pressable hitSlop={8} onPress={() => { setBranchForm({ name: "", address: "", phone: "", currency: getCurrency(), taxRate: "" }); setEditBranch(null); setShowBranchForm(true); }}>
                   <Ionicons name="add-circle" size={28} color={Colors.accent} />
                 </Pressable>
-                <Pressable onPress={() => setShowBranches(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+                <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowBranches(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
               </View>
             </View>
             <FlatList
@@ -1186,8 +1403,8 @@ export default function SettingsScreen() {
                     <Ionicons name="business" size={20} color={Colors.secondary} />
                   </View>
                   <View style={styles.empInfo}>
-                    <Text style={styles.empName}>{item.name}</Text>
-                    <Text style={styles.empMeta}>{item.address || t("noAddress")} | {item.currency || "CHF"} | {t("taxRate")}: {item.taxRate || "0"}%</Text>
+                    <Text style={styles.empName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.empMeta} numberOfLines={2}>{item.address || t("noAddress")} | {item.currency || getCurrency()} | {t("taxRate")}: {Number(item.taxRate || 0)}%</Text>
                     {item.phone ? <Text style={styles.empMeta}>{item.phone}</Text> : null}
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -1196,19 +1413,16 @@ export default function SettingsScreen() {
                         <Text style={[styles.roleText, { color: Colors.accent }]}>{t("main")}</Text>
                       </View>
                     )}
-                    <Pressable onPress={() => {
+                    <Pressable hitSlop={8} style={styles.iconBtn} accessibilityLabel={t("editBranch")} onPress={() => {
                       setEditBranch(item);
-                      setBranchForm({ name: item.name, address: item.address || "", phone: item.phone || "", currency: item.currency || "CHF", taxRate: item.taxRate || "" });
+                      setBranchForm({ name: item.name, address: item.address || "", phone: item.phone || "", currency: item.currency || getCurrency(), taxRate: item.taxRate != null ? String(Number(item.taxRate)) : "" });
                       setShowBranchForm(true);
                     }}>
                       <Ionicons name="pencil" size={18} color={Colors.info} />
                     </Pressable>
                     {!item.isMain && (
-                      <Pressable onPress={() => {
-                        Alert.alert(t("deleteBranch"), `${t("delete")} "${item.name}"?`, [
-                          { text: t("cancel"), style: "cancel" },
-                          { text: t("delete"), style: "destructive", onPress: () => deleteBranchMutation.mutate(item.id) },
-                        ]);
+                      <Pressable hitSlop={8} style={styles.iconBtn} accessibilityLabel={t("deleteBranch")} onPress={() => {
+                        confirmAction(t("deleteBranch"), `${t("delete")} "${item.name}"?`, t("delete"), t("cancel"), () => deleteBranchMutation.mutate(item.id));
                       }}>
                         <Ionicons name="trash" size={18} color={Colors.danger} />
                       </Pressable>
@@ -1226,7 +1440,7 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{editBranch ? t("editBranch") : t("newBranch")}</Text>
-              <Pressable onPress={() => { setShowBranchForm(false); setEditBranch(null); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => { setShowBranchForm(false); setEditBranch(null); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
               <Text style={styles.label}>{t("name")} *</Text>
@@ -1234,7 +1448,7 @@ export default function SettingsScreen() {
               <Text style={styles.label}>{t("address")}</Text>
               <TextInput style={styles.input} value={branchForm.address} onChangeText={(v) => setBranchForm({ ...branchForm, address: v })} placeholderTextColor={Colors.textMuted} placeholder={t("branchAddress")} />
               <Text style={styles.label}>{t("phone")}</Text>
-              <TextInput style={styles.input} value={branchForm.phone} onChangeText={(v) => setBranchForm({ ...branchForm, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+1234567890" />
+              <TextInput style={styles.input} value={branchForm.phone} onChangeText={(v) => setBranchForm({ ...branchForm, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder={phonePh} />
               <Text style={styles.label}>{t("currency")}</Text>
               <View style={styles.roleRow}>
                 {["CHF", "USD", "EGP", "EUR", "GBP", "SAR", "SYP"].map((c) => (
@@ -1243,14 +1457,35 @@ export default function SettingsScreen() {
                   </Pressable>
                 ))}
               </View>
+              {editBranch?.isMain && branchForm.currency !== (editBranch.currency || getCurrency()) && (
+                <Text style={{ color: Colors.warning, fontSize: 12, marginTop: 8, lineHeight: 17 }}>
+                  {tr3(
+                    "عملة الفرع الرئيسي هي عملة المتجر كله: تتغير كل الأسعار المعروضة والإيصالات، ولا تُحوَّل الأسعار المحفوظة.",
+                    "Die Währung der Hauptfiliale gilt für das ganze Geschäft: alle Preise und Belege wechseln, gespeicherte Preise werden nicht umgerechnet.",
+                    "The main branch currency is the whole store's currency: every price and receipt switches, and saved prices are not converted.",
+                  )}
+                </Text>
+              )}
               <Text style={styles.label}>{t("taxRatePercent")}</Text>
-              <TextInput style={styles.input} value={branchForm.taxRate} onChangeText={(v) => setBranchForm({ ...branchForm, taxRate: v })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" />
-              <Pressable style={styles.saveBtn} onPress={() => {
-                if (!branchForm.name) return Alert.alert(t("error"), t("branchNameRequired"));
-                createBranchMutation.mutate({ name: branchForm.name, address: branchForm.address || undefined, phone: branchForm.phone || undefined, currency: branchForm.currency, taxRate: branchForm.taxRate || "0" });
+              <TextInput style={styles.input} value={branchForm.taxRate} onChangeText={(v) => setBranchForm({ ...branchForm, taxRate: v })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0" />
+              <Pressable style={[styles.saveBtn, createBranchMutation.isPending && { opacity: 0.6 }]} disabled={createBranchMutation.isPending} onPress={() => {
+                const name = branchForm.name.trim();
+                if (!name) return notify(t("error"), t("branchNameRequired"));
+                const taxRate = branchForm.taxRate.trim() === "" ? 0 : parseNum(branchForm.taxRate);
+                if (!(taxRate >= 0 && taxRate <= 100)) return notify(t("error"), tr3("نسبة الضريبة يجب أن تكون بين 0 و100", "Steuersatz muss zwischen 0 und 100 liegen", "Tax rate must be between 0 and 100"));
+                const phone = cleanPhone(branchForm.phone, editBranch?.phone);
+                if (phone === null) return notify(t("error"), invalidPhoneMsg);
+                // On edit, empty address/phone are sent so a cleared field clears.
+                createBranchMutation.mutate({
+                  name,
+                  address: branchForm.address.trim() || (editBranch ? "" : undefined),
+                  phone: phone || (editBranch ? "" : undefined),
+                  currency: branchForm.currency,
+                  taxRate: taxRate.toFixed(2),
+                });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>{editBranch ? t("updateBranch") : t("createBranch")}</Text>
+                  <Text style={styles.saveBtnText}>{createBranchMutation.isPending ? t("loading") : editBranch ? t("updateBranch") : t("createBranch")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -1264,10 +1499,10 @@ export default function SettingsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("expenses")}</Text>
               <View style={styles.modalActions}>
-                <Pressable onPress={() => { setExpenseForm({ description: "", amount: "", category: "other", date: new Date().toISOString().split("T")[0], notes: "" }); setShowExpenseForm(true); }}>
+                <Pressable hitSlop={8} onPress={() => { setExpenseForm({ description: "", amount: "", category: "other", date: storeYmd(), notes: "" }); setShowExpenseForm(true); }}>
                   <Ionicons name="add-circle" size={28} color={Colors.accent} />
                 </Pressable>
-                <Pressable onPress={() => setShowExpenses(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+                <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowExpenses(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
               </View>
             </View>
             <FlatList
@@ -1275,30 +1510,33 @@ export default function SettingsScreen() {
               keyExtractor={(item: any) => String(item.id)}
               scrollEnabled={!!expenses.length}
               ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>{t("noExpenses")}</Text>}
-              renderItem={({ item }: { item: any }) => (
+              renderItem={({ item }: { item: any }) => {
+                // The column is "category"; rows saved by older builds may only
+                // carry it under categoryId in the response.
+                const cat = String(item.category || item.categoryId || "other");
+                const color = expenseCategoryColors[cat] || expenseCategoryColors.other;
+                return (
                 <View style={styles.empCard}>
-                  <View style={[styles.empAvatar, { backgroundColor: (expenseCategoryColors[item.categoryId] || expenseCategoryColors.other) + "30" }]}>
-                    <Ionicons name="wallet" size={20} color={expenseCategoryColors[item.categoryId] || expenseCategoryColors.other} />
+                  <View style={[styles.empAvatar, { backgroundColor: color + "30" }]}>
+                    <Ionicons name="wallet" size={20} color={color} />
                   </View>
                   <View style={styles.empInfo}>
-                    <Text style={styles.empName}>{item.description}</Text>
-                    <Text style={styles.empMeta}>{formatMoney(parseFloat(item.amount))} | {new Date(item.date).toLocaleDateString()}</Text>
+                    <Text style={styles.empName} numberOfLines={2}>{item.description || "—"}</Text>
+                    <Text style={styles.empMeta}>{formatMoney(item.amount)} | {fmtDate(item.date)}</Text>
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <View style={[styles.roleBadge, { backgroundColor: (expenseCategoryColors[item.categoryId] || expenseCategoryColors.other) + "20" }]}>
-                      <Text style={[styles.roleText, { color: expenseCategoryColors[item.categoryId] || expenseCategoryColors.other }]}>{item.categoryId || "other"}</Text>
+                    <View style={[styles.roleBadge, { backgroundColor: color + "20" }]}>
+                      <Text style={[styles.roleText, { color }]}>{expenseCatLabel(cat)}</Text>
                     </View>
-                    <Pressable onPress={() => {
-                      Alert.alert(t("deleteExpense"), `${t("delete")} "${item.description}"?`, [
-                        { text: t("cancel"), style: "cancel" },
-                        { text: t("delete"), style: "destructive", onPress: () => deleteExpenseMutation.mutate(item.id) },
-                      ]);
+                    <Pressable hitSlop={8} style={styles.iconBtn} accessibilityLabel={t("deleteExpense")} onPress={() => {
+                      confirmAction(t("deleteExpense"), `${t("delete")} "${item.description || ""}"?`, t("delete"), t("cancel"), () => deleteExpenseMutation.mutate(item.id));
                     }}>
                       <Ionicons name="trash" size={18} color={Colors.danger} />
                     </Pressable>
                   </View>
                 </View>
-              )}
+                );
+              }}
             />
           </View>
         </View>
@@ -1309,18 +1547,18 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("addExpense")}</Text>
-              <Pressable onPress={() => setShowExpenseForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowExpenseForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
               <Text style={styles.label}>{t("description")} *</Text>
               <TextInput style={styles.input} value={expenseForm.description} onChangeText={(v) => setExpenseForm({ ...expenseForm, description: v })} placeholderTextColor={Colors.textMuted} placeholder={t("expenseDescription")} />
-              <Text style={styles.label}>{t("amount")} *</Text>
-              <TextInput style={styles.input} value={expenseForm.amount} onChangeText={(v) => setExpenseForm({ ...expenseForm, amount: v })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" />
+              <Text style={styles.label}>{t("amount")} * ({currencyLabel()})</Text>
+              <TextInput style={styles.input} value={expenseForm.amount} onChangeText={(v) => setExpenseForm({ ...expenseForm, amount: v })} keyboardType={moneyKeyboard} placeholderTextColor={Colors.textMuted} placeholder={moneyPlaceholder} />
               <Text style={styles.label}>{t("category")}</Text>
               <View style={styles.roleRow}>
                 {expenseCategories.map((c) => (
                   <Pressable key={c} style={[styles.roleChip, expenseForm.category === c && { backgroundColor: expenseCategoryColors[c] }]} onPress={() => setExpenseForm({ ...expenseForm, category: c })}>
-                    <Text style={[styles.roleChipText, expenseForm.category === c && { color: Colors.white }]}>{c}</Text>
+                    <Text style={[styles.roleChipText, expenseForm.category === c && { color: Colors.white }]}>{expenseCatLabel(c)}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -1328,12 +1566,30 @@ export default function SettingsScreen() {
               <TextInput style={styles.input} value={expenseForm.date} onChangeText={(v) => setExpenseForm({ ...expenseForm, date: v })} placeholderTextColor={Colors.textMuted} placeholder="YYYY-MM-DD" />
               <Text style={styles.label}>{t("notes")}</Text>
               <TextInput style={[styles.input, { minHeight: 60 }]} value={expenseForm.notes} onChangeText={(v) => setExpenseForm({ ...expenseForm, notes: v })} placeholderTextColor={Colors.textMuted} placeholder={t("optionalNotes")} multiline />
-              <Pressable style={styles.saveBtn} onPress={() => {
-                if (!expenseForm.description || !expenseForm.amount) return Alert.alert(t("error"), t("descriptionAmountRequired"));
-                createExpenseMutation.mutate({ branchId: myBranchId, categoryId: expenseForm.category, description: expenseForm.description, amount: parseFloat(expenseForm.amount), date: expenseForm.date, notes: expenseForm.notes || undefined });
+              <Pressable style={[styles.saveBtn, createExpenseMutation.isPending && { opacity: 0.6 }]} disabled={createExpenseMutation.isPending} onPress={() => {
+                const description = expenseForm.description.trim();
+                const amount = parseNum(expenseForm.amount);
+                if (!description || !expenseForm.amount.trim()) return notify(t("error"), t("descriptionAmountRequired"));
+                if (!(amount > 0)) return notify(t("error"), tr3("المبلغ يجب أن يكون أكبر من صفر", "Der Betrag muss größer als 0 sein", "The amount must be greater than 0"));
+                const ymd = expenseForm.date.trim();
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd) || Number.isNaN(new Date(ymd).getTime())) {
+                  return notify(t("error"), tr3("التاريخ بصيغة YYYY-MM-DD", "Datum im Format JJJJ-MM-TT angeben", "Enter the date as YYYY-MM-DD"));
+                }
+                // The expenses table has category/description but no notes
+                // column, so notes travel inside the description. The date is
+                // noon of that store-local day, so no time zone shifts it.
+                const notes = expenseForm.notes.trim();
+                createExpenseMutation.mutate({
+                  branchId: myBranchId,
+                  employeeId: employee?.id,
+                  category: expenseForm.category,
+                  description: notes ? `${description} — ${notes}` : description,
+                  amount: zeroDec ? String(Math.round(amount)) : amount.toFixed(2),
+                  date: new Date(storeDayStart(ymd).getTime() + 12 * 3600000).toISOString(),
+                });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>{t("addExpense")}</Text>
+                  <Text style={styles.saveBtnText}>{createExpenseMutation.isPending ? t("loading") : t("addExpense")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -1346,7 +1602,7 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("attendance")}</Text>
-              <Pressable onPress={() => setShowAttendance(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowAttendance(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             {employee && (
               <View style={[styles.empCard, { marginBottom: 16 }]}>
@@ -1362,12 +1618,12 @@ export default function SettingsScreen() {
                   )}
                 </View>
                 {activeShift ? (
-                  <Pressable style={[styles.clockBtn, { backgroundColor: Colors.danger + "20" }]} onPress={() => clockOutMutation.mutate({ id: activeShift.id, data: {} })}>
+                  <Pressable style={[styles.clockBtn, { backgroundColor: Colors.danger + "20" }, clockOutMutation.isPending && { opacity: 0.6 }]} disabled={clockOutMutation.isPending} onPress={() => clockOutMutation.mutate({ id: activeShift.id, data: {} })}>
                     <Ionicons name="stop-circle" size={20} color={Colors.danger} />
                     <Text style={[styles.clockBtnText, { color: Colors.danger }]}>{t("clockOut")}</Text>
                   </Pressable>
                 ) : (
-                  <Pressable style={[styles.clockBtn, { backgroundColor: Colors.success + "20" }]} onPress={() => clockInMutation.mutate({ employeeId: employee.id, branchId: myBranchId, startTime: new Date().toISOString(), status: "open" })}>
+                  <Pressable style={[styles.clockBtn, { backgroundColor: Colors.success + "20" }, clockInMutation.isPending && { opacity: 0.6 }]} disabled={clockInMutation.isPending} onPress={() => clockInMutation.mutate({ employeeId: employee.id, branchId: myBranchId, startTime: new Date().toISOString(), status: "open" })}>
                     <Ionicons name="play-circle" size={20} color={Colors.success} />
                     <Text style={[styles.clockBtnText, { color: Colors.success }]}>{t("clockIn")}</Text>
                   </Pressable>
@@ -1387,10 +1643,10 @@ export default function SettingsScreen() {
                       <Ionicons name="time" size={20} color={item.endTime ? Colors.info : Colors.success} />
                     </View>
                     <View style={styles.empInfo}>
-                      <Text style={styles.empName}>{emp?.name || `Employee #${item.employeeId}`}</Text>
+                      <Text style={styles.empName} numberOfLines={1}>{emp?.name || `#${item.employeeId}`}</Text>
                       <Text style={styles.empMeta}>
-                        {new Date(item.startTime).toLocaleString()}
-                        {item.endTime ? ` - ${new Date(item.endTime).toLocaleString()}` : ` ${t("shiftActiveLabel")}`}
+                        {fmtDateTime(item.startTime)}
+                        {item.endTime ? ` - ${fmtDateTime(item.endTime)}` : ` ${t("shiftActiveLabel")}`}
                       </Text>
                     </View>
                     {item.endTime ? (
@@ -1420,10 +1676,10 @@ export default function SettingsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("purchaseOrders")}</Text>
               <View style={styles.modalActions}>
-                <Pressable onPress={() => { setPOForm({ supplierId: "", notes: "" }); setShowPOForm(true); }}>
+                <Pressable hitSlop={8} onPress={() => { setPOForm({ supplierId: "", notes: "" }); setShowPOForm(true); }}>
                   <Ionicons name="add-circle" size={28} color={Colors.accent} />
                 </Pressable>
-                <Pressable onPress={() => setShowPurchaseOrders(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+                <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowPurchaseOrders(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
               </View>
             </View>
             <FlatList
@@ -1440,15 +1696,21 @@ export default function SettingsScreen() {
                       <Ionicons name="document-text" size={20} color={statusColor} />
                     </View>
                     <View style={styles.empInfo}>
-                      <Text style={styles.empName}>PO #{item.id}</Text>
-                      <Text style={styles.empMeta}>{sup?.name || `Supplier #${item.supplierId}`} | ${parseFloat(item.totalAmount || "0").toFixed(2)}</Text>
+                      <Text style={styles.empName} numberOfLines={1}>{item.orderNumber || `PO #${item.id}`}</Text>
+                      <Text style={styles.empMeta} numberOfLines={1}>{sup?.name || `#${item.supplierId}`} | {formatMoney(item.totalAmount || 0)}</Text>
                     </View>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                       <View style={[styles.roleBadge, { backgroundColor: statusColor + "20" }]}>
-                        <Text style={[styles.roleText, { color: statusColor }]}>{item.status}</Text>
+                        <Text style={[styles.roleText, { color: statusColor }]}>{poStatusLabel(item.status)}</Text>
                       </View>
                       {item.status !== "received" && (
-                        <Pressable onPress={() => receivePOMutation.mutate(item.id)}>
+                        <Pressable hitSlop={8} style={styles.iconBtn} disabled={receivePOMutation.isPending} accessibilityLabel={tr3("تم الاستلام", "Als erhalten markieren", "Mark as received")} onPress={() => confirmAction(
+                          tr3("تأكيد الاستلام", "Wareneingang bestätigen", "Confirm receipt"),
+                          `${item.orderNumber || `PO #${item.id}`}: ${tr3("تسجيل الطلب كمستلَم؟", "Bestellung als erhalten markieren?", "Mark this order as received?")}`,
+                          tr3("تم الاستلام", "Erhalten", "Received"),
+                          t("cancel"),
+                          () => receivePOMutation.mutate(item.id),
+                        )}>
                           <Ionicons name="checkmark-circle" size={22} color={Colors.success} />
                         </Pressable>
                       )}
@@ -1466,7 +1728,7 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("createPurchaseOrder")}</Text>
-              <Pressable onPress={() => setShowPOForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowPOForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
               <Text style={styles.label}>{t("supplier")} *</Text>
@@ -1477,14 +1739,20 @@ export default function SettingsScreen() {
                   </Pressable>
                 ))}
               </View>
+              {suppliers.length === 0 && (
+                <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 4 }}>{tr3("أضف مورداً أولاً من قائمة الموردين.", "Zuerst unter Lieferanten einen Lieferanten anlegen.", "Add a supplier first under Suppliers.")}</Text>
+              )}
               <Text style={styles.label}>{t("notes")}</Text>
               <TextInput style={[styles.input, { minHeight: 60 }]} value={poForm.notes} onChangeText={(v) => setPOForm({ ...poForm, notes: v })} placeholderTextColor={Colors.textMuted} placeholder={t("optionalNotes")} multiline />
-              <Pressable style={styles.saveBtn} onPress={() => {
-                if (!poForm.supplierId) return Alert.alert(t("error"), t("pleaseSelectSupplier"));
-                createPOMutation.mutate({ branchId: myBranchId, supplierId: parseInt(poForm.supplierId), status: "draft", notes: poForm.notes || undefined });
+              <Pressable style={[styles.saveBtn, createPOMutation.isPending && { opacity: 0.6 }]} disabled={createPOMutation.isPending} onPress={() => {
+                if (!poForm.supplierId) return notify(t("error"), t("pleaseSelectSupplier"));
+                // order_number is NOT NULL + UNIQUE and the server does not
+                // generate one, so the client supplies it.
+                const orderNumber = `PO-${storeYmd().replace(/-/g, "")}-${Date.now().toString(36).slice(-5).toUpperCase()}`;
+                createPOMutation.mutate({ orderNumber, branchId: myBranchId, supplierId: parseInt(poForm.supplierId, 10), status: "draft", notes: poForm.notes.trim() || undefined });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>{t("createOrder")}</Text>
+                  <Text style={styles.saveBtnText}>{createPOMutation.isPending ? t("loading") : t("createOrder")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -1497,7 +1765,7 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("activityLog")}</Text>
-              <Pressable onPress={() => setShowActivityLog(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowActivityLog(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <FlatList
               data={activityLog}
@@ -1514,9 +1782,9 @@ export default function SettingsScreen() {
                       <Ionicons name={iconName as any} size={20} color={Colors.secondary} />
                     </View>
                     <View style={styles.empInfo}>
-                      <Text style={styles.empName}>{emp?.name || `Employee #${item.employeeId}`}</Text>
-                      <Text style={styles.empMeta}>{item.details || item.action}</Text>
-                      <Text style={[styles.empMeta, { fontSize: 10 }]}>{new Date(item.createdAt || item.timestamp).toLocaleString()}</Text>
+                      <Text style={styles.empName} numberOfLines={1}>{emp?.name || `#${item.employeeId}`}</Text>
+                      <Text style={styles.empMeta} numberOfLines={3}>{item.details || item.action}</Text>
+                      <Text style={[styles.empMeta, { fontSize: 10 }]}>{fmtDateTime(item.createdAt || item.timestamp)}</Text>
                     </View>
                     <View style={[styles.roleBadge, { backgroundColor: Colors.secondary + "20" }]}>
                       <Text style={[styles.roleText, { color: Colors.secondary }]}>{item.action?.replace(/_/g, " ") || "action"}</Text>
@@ -1535,10 +1803,10 @@ export default function SettingsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("returnsRefunds")}</Text>
               <View style={styles.modalActions}>
-                <Pressable onPress={() => { setReturnForm({ originalSaleId: "", reason: "", type: "refund" }); setShowReturnForm(true); }}>
+                <Pressable hitSlop={8} onPress={() => { setReturnForm({ originalSaleId: "", reason: "", type: "refund" }); setShowReturnForm(true); }}>
                   <Ionicons name="add-circle" size={28} color={Colors.accent} />
                 </Pressable>
-                <Pressable onPress={() => setShowReturnsManager(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+                <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowReturnsManager(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
               </View>
             </View>
             <FlatList
@@ -1552,11 +1820,11 @@ export default function SettingsScreen() {
                     <Ionicons name="swap-horizontal" size={20} color={Colors.warning} />
                   </View>
                   <View style={styles.empInfo}>
-                    <Text style={styles.empName}>Return #{item.id} - Sale #{item.originalSaleId}</Text>
-                    <Text style={styles.empMeta}>{formatMoney(item.totalAmount)} | {item.reason || t("noReason")} | {new Date(item.createdAt).toLocaleDateString()}</Text>
+                    <Text style={styles.empName} numberOfLines={1}>{tr3("مرتجع", "Retoure", "Return")} #{item.id} · {tr3("بيع", "Verkauf", "Sale")} #{item.originalSaleId}</Text>
+                    <Text style={styles.empMeta} numberOfLines={2}>{formatMoney(item.totalAmount)} | {item.reason || t("noReason")} | {fmtDate(item.createdAt)}</Text>
                   </View>
-                  <View style={[styles.roleBadge, { backgroundColor: (item.status === "completed" ? Colors.success : Colors.warning) + "20" }]}>
-                    <Text style={[styles.roleText, { color: item.status === "completed" ? Colors.success : Colors.warning }]}>{item.status || "completed"}</Text>
+                  <View style={[styles.roleBadge, { backgroundColor: ((item.status || "completed") === "completed" ? Colors.success : Colors.warning) + "20" }]}>
+                    <Text style={[styles.roleText, { color: (item.status || "completed") === "completed" ? Colors.success : Colors.warning }]}>{(item.status || "completed") === "completed" ? t("completed") : item.status === "pending" ? t("pending") : item.status}</Text>
                   </View>
                 </View>
               )}
@@ -1570,7 +1838,7 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("processReturn")}</Text>
-              <Pressable onPress={() => setShowReturnForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowReturnForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
               <Text style={styles.label}>{t("selectSaleToReturn")}</Text>
@@ -1578,14 +1846,15 @@ export default function SettingsScreen() {
                 data={salesList.filter((s: any) => s.status === "completed").slice(0, 20)}
                 keyExtractor={(item: any) => String(item.id)}
                 scrollEnabled={false}
+                ListEmptyComponent={<Text style={{ color: Colors.textMuted, textAlign: "center", paddingVertical: 16 }}>{tr3("لا توجد مبيعات مكتملة", "Keine abgeschlossenen Verkäufe", "No completed sales")}</Text>}
                 renderItem={({ item }: { item: any }) => (
                   <Pressable
                     style={[styles.empCard, returnForm.originalSaleId === String(item.id) && { borderWidth: 2, borderColor: Colors.accent }]}
                     onPress={() => setReturnForm({ ...returnForm, originalSaleId: String(item.id) })}
                   >
                     <View style={styles.empInfo}>
-                      <Text style={styles.empName}>{getDisplayNumber(item.receiptNumber)}</Text>
-                      <Text style={styles.empMeta}>{formatMoney(item.totalAmount)} | {new Date(item.createdAt).toLocaleDateString()} | {item.paymentMethod}</Text>
+                      <Text style={styles.empName}>{getDisplayNumber(item.receiptNumber) || `#${item.id}`}</Text>
+                      <Text style={styles.empMeta}>{formatMoney(item.totalAmount)} | {fmtDate(item.createdAt)} | {t(item.paymentMethod as any)}</Text>
                     </View>
                     {returnForm.originalSaleId === String(item.id) && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
                   </Pressable>
@@ -1601,12 +1870,19 @@ export default function SettingsScreen() {
               </View>
               <Text style={styles.label}>{t("reason")}</Text>
               <TextInput style={styles.input} value={returnForm.reason} onChangeText={(v) => setReturnForm({ ...returnForm, reason: v })} placeholderTextColor={Colors.textMuted} placeholder={t("reasonForReturn")} />
-              <Pressable style={styles.saveBtn} onPress={() => {
-                if (!returnForm.originalSaleId) return Alert.alert(t("error"), t("selectSaleError"));
-                createReturnMutation.mutate(returnForm);
+              <Pressable style={[styles.saveBtn, createReturnMutation.isPending && { opacity: 0.6 }]} disabled={createReturnMutation.isPending} onPress={() => {
+                if (!returnForm.originalSaleId) return notify(t("error"), t("selectSaleError"));
+                const sale = salesList.find((s: any) => String(s.id) === returnForm.originalSaleId);
+                confirmAction(
+                  t("processReturn"),
+                  `${getDisplayNumber(sale?.receiptNumber) || `#${returnForm.originalSaleId}`} · ${formatMoney(sale?.totalAmount || 0)}\n${tr3("سيُعاد المخزون ويُسجَّل البيع كمُسترد.", "Der Bestand wird zurückgebucht und der Verkauf als erstattet markiert.", "Stock is put back and the sale is marked as refunded.")}`,
+                  t("processReturn"),
+                  t("cancel"),
+                  () => createReturnMutation.mutate(returnForm),
+                );
               }}>
                 <LinearGradient colors={[Colors.warning, Colors.danger]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>{t("processReturn")}</Text>
+                  <Text style={styles.saveBtnText}>{createReturnMutation.isPending ? t("loading") : t("processReturn")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -1619,7 +1895,7 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("cashDrawer")}</Text>
-              <Pressable onPress={() => setShowCashDrawer(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowCashDrawer(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
               {/* Shift status info */}
@@ -1650,25 +1926,29 @@ export default function SettingsScreen() {
                 ))}
               </View>
 
-              <Text style={styles.label}>{t("amount")} *</Text>
-              <TextInput style={styles.input} value={cashDrawerForm.amount} onChangeText={(v) => setCashDrawerForm({ ...cashDrawerForm, amount: v })} keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} placeholder="0.00" />
+              <Text style={styles.label}>{t("amount")} * ({currencyLabel()})</Text>
+              <TextInput style={styles.input} value={cashDrawerForm.amount} onChangeText={(v) => setCashDrawerForm({ ...cashDrawerForm, amount: v })} keyboardType={moneyKeyboard} placeholderTextColor={Colors.textMuted} placeholder={moneyPlaceholder} />
 
               <Text style={styles.label}>{t("reason")}</Text>
               <TextInput style={styles.input} value={cashDrawerForm.reason} onChangeText={(v) => setCashDrawerForm({ ...cashDrawerForm, reason: v })} placeholderTextColor={Colors.textMuted} placeholder={t("reasonForOperation")} />
 
-              <Pressable style={styles.saveBtn} onPress={() => {
-                if (!cashDrawerForm.amount) return Alert.alert(t("error"), t("amountRequired"));
+              <Pressable style={[styles.saveBtn, cashDrawerMutation.isPending && { opacity: 0.6 }]} disabled={cashDrawerMutation.isPending} onPress={() => {
+                if (!cashDrawerForm.amount.trim()) return notify(t("error"), t("amountRequired"));
+                const amount = parseNum(cashDrawerForm.amount);
+                if (!(amount >= 0) || (cashDrawerForm.type !== "count" && !(amount > 0))) {
+                  return notify(t("error"), tr3("المبلغ غير صالح", "Ungültiger Betrag", "Invalid amount"));
+                }
                 cashDrawerMutation.mutate({
                   shiftId: activeShift?.id || null,
                   employeeId: employee?.id,
                   tenantId: tenant?.id,
                   type: cashDrawerForm.type,
-                  amount: cashDrawerForm.amount,
-                  reason: cashDrawerForm.reason,
+                  amount: zeroDec ? String(Math.round(amount)) : amount.toFixed(2),
+                  reason: cashDrawerForm.reason.trim(),
                 });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>{t("recordOperation")}</Text>
+                  <Text style={styles.saveBtnText}>{cashDrawerMutation.isPending ? t("loading") : t("recordOperation")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -1682,10 +1962,10 @@ export default function SettingsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("warehouses")}</Text>
               <View style={styles.modalActions}>
-                <Pressable onPress={() => { setWarehouseForm({ name: "", address: "", type: "main" }); setShowWarehouseForm(true); }}>
+                <Pressable hitSlop={8} onPress={() => { setWarehouseForm({ name: "", address: "" }); setShowWarehouseForm(true); }}>
                   <Ionicons name="add-circle" size={28} color={Colors.accent} />
                 </Pressable>
-                <Pressable onPress={() => setShowWarehouseManager(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+                <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowWarehouseManager(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
               </View>
             </View>
             <FlatList
@@ -1719,27 +1999,25 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("newWarehouse")}</Text>
-              <Pressable onPress={() => setShowWarehouseForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowWarehouseForm(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
               <Text style={styles.label}>{t("name")} *</Text>
               <TextInput style={styles.input} value={warehouseForm.name} onChangeText={(v) => setWarehouseForm({ ...warehouseForm, name: v })} placeholderTextColor={Colors.textMuted} placeholder={t("warehouseName")} />
               <Text style={styles.label}>{t("address")}</Text>
               <TextInput style={styles.input} value={warehouseForm.address} onChangeText={(v) => setWarehouseForm({ ...warehouseForm, address: v })} placeholderTextColor={Colors.textMuted} placeholder={t("warehouseAddress")} />
-              <Text style={styles.label}>{t("type")}</Text>
-              <View style={styles.roleRow}>
-                {["main", "secondary", "cold-storage"].map((wt) => (
-                  <Pressable key={wt} style={[styles.roleChip, warehouseForm.type === wt && { backgroundColor: Colors.accent }]} onPress={() => setWarehouseForm({ ...warehouseForm, type: wt })}>
-                    <Text style={[styles.roleChipText, warehouseForm.type === wt && { color: Colors.textDark }]}>{t(wt.replace("-", "") as any)}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Pressable style={styles.saveBtn} onPress={() => {
-                if (!warehouseForm.name) return Alert.alert(t("error"), t("warehouseNameRequired"));
-                createWarehouseMutation.mutate({ name: warehouseForm.name, address: warehouseForm.address || undefined, branchId: employee?.branchId || 1 });
+              {/* No "type" picker: the warehouses table has no type column, so
+                  the choice was silently dropped on save. */}
+              <Pressable style={[styles.saveBtn, createWarehouseMutation.isPending && { opacity: 0.6 }]} disabled={createWarehouseMutation.isPending} onPress={() => {
+                const name = warehouseForm.name.trim();
+                if (!name) return notify(t("error"), t("warehouseNameRequired"));
+                if (!myBranchId) return notify(t("error"), t("noBranches"));
+                // This store's own branch — never a hard-coded branch 1, which
+                // belongs to another store and hid the warehouse from this one.
+                createWarehouseMutation.mutate({ name, address: warehouseForm.address.trim() || undefined, branchId: myBranchId, isDefault: warehousesList.length === 0 });
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>{t("createWarehouse")}</Text>
+                  <Text style={styles.saveBtnText}>{createWarehouseMutation.isPending ? t("loading") : t("createWarehouse")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -1755,14 +2033,14 @@ export default function SettingsScreen() {
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>{t("productBatches")}</Text>
                   <View style={styles.modalActions}>
-                    <Pressable onPress={() => {
+                    <Pressable hitSlop={8} onPress={() => {
                       setEditBatch(null);
                       setBatchForm({ productId: productsList.length > 0 ? String(productsList[0].id) : "", batchNumber: `BATCH-${Date.now().toString(36).toUpperCase()}`, quantity: "50", expiryDate: "", costPrice: "", supplierId: "" });
                       setBatchView("form");
                     }}>
                       <Ionicons name="add-circle" size={28} color={Colors.accent} />
                     </Pressable>
-                    <Pressable onPress={() => setShowBatchManager(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+                    <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowBatchManager(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
                   </View>
                 </View>
                 <FlatList
@@ -1775,8 +2053,8 @@ export default function SettingsScreen() {
                     const isExpired = item.expiryDate && new Date(item.expiryDate) < new Date();
                     const isNearExpiry = item.expiryDate && !isExpired && (new Date(item.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24) <= 30;
                     return (
-                      <View style={[styles.empCard, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                        <Pressable style={{ flexDirection: isRTL ? "row-reverse" : "row", flex: 1, alignItems: "center", gap: 12 }} onPress={() => {
+                      <View style={[styles.empCard, { flexDirection: rowFlip ? "row-reverse" : "row" }]}>
+                        <Pressable style={{ flexDirection: rowFlip ? "row-reverse" : "row", flex: 1, alignItems: "center", gap: 12 }} onPress={() => {
                           setEditBatch(item);
                           setBatchForm({
                             productId: String(item.productId),
@@ -1792,12 +2070,12 @@ export default function SettingsScreen() {
                             <Ionicons name="layers" size={20} color={isExpired ? Colors.danger : isNearExpiry ? Colors.warning : Colors.secondary} />
                           </View>
                           <View style={[styles.empInfo, { flex: 1 }]}>
-                            <Text style={[styles.empName, rtlTextAlign]}>{prod?.name || `Product #${item.productId}`}</Text>
+                            <Text style={[styles.empName, rtlTextAlign]} numberOfLines={1}>{prod?.name || `#${item.productId}`}</Text>
                             <Text style={[styles.empMeta, rtlTextAlign]}>
                               {t("batchNumber")}: {item.batchNumber} | {t("quantity")}: {item.quantity}
-                              {item.expiryDate ? ` | ${t("expiryDate")}: ${new Date(item.expiryDate).toLocaleDateString()}` : ""}
+                              {item.expiryDate ? ` | ${t("expiryDate")}: ${new Date(item.expiryDate).toISOString().slice(0, 10)}` : ""}
                             </Text>
-                            {item.costPrice && <Text style={[styles.empMeta, { color: Colors.accent }, rtlTextAlign]}>{t("cost")}: ${Number(item.costPrice).toFixed(2)}</Text>}
+                            {item.costPrice != null && item.costPrice !== "" ? <Text style={[styles.empMeta, { color: Colors.accent }, rtlTextAlign]}>{t("cost")}: {formatMoney(item.costPrice)}</Text> : null}
                           </View>
                           {isExpired && (
                             <View style={[styles.roleBadge, { backgroundColor: Colors.danger + "20" }]}>
@@ -1825,17 +2103,8 @@ export default function SettingsScreen() {
                           }} style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.info + "20", justifyContent: "center", alignItems: "center" }}>
                             <Ionicons name="create-outline" size={18} color={Colors.info} />
                           </Pressable>
-                          <Pressable onPress={() => {
-                            if (Platform.OS === "web") {
-                              if (confirm(`${t("deleteBatch")}?`)) {
-                                deleteBatchMutation.mutate(item.id);
-                              }
-                            } else {
-                              Alert.alert(t("delete"), `${t("deleteBatch")}?`, [
-                                { text: t("cancel"), style: "cancel" },
-                                { text: t("delete"), style: "destructive", onPress: () => deleteBatchMutation.mutate(item.id) },
-                              ]);
-                            }
+                          <Pressable accessibilityLabel={t("deleteBatch")} onPress={() => {
+                            confirmAction(t("deleteBatch"), `${prod?.name || ""} · ${item.batchNumber}`, t("delete"), t("cancel"), () => deleteBatchMutation.mutate(item.id));
                           }} style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.danger + "20", justifyContent: "center", alignItems: "center" }}>
                             <Ionicons name="trash-outline" size={18} color={Colors.danger} />
                           </Pressable>
@@ -1849,10 +2118,10 @@ export default function SettingsScreen() {
               <>
                 <View style={styles.modalHeader}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                    <Pressable onPress={() => setBatchView("list")}><Ionicons name="arrow-back" size={24} color={Colors.text} /></Pressable>
+                    <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("back" as any)} onPress={() => setBatchView("list")}><Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={Colors.text} /></Pressable>
                     <Text style={styles.modalTitle}>{editBatch ? t("editBatch") : t("newBatch")}</Text>
                   </View>
-                  <Pressable onPress={() => { setBatchView("list"); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+                  <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => { setBatchView("list"); setShowBatchManager(false); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
                 </View>
                 <ScrollView>
                   <Text style={styles.label}>{t("product")}</Text>
@@ -1867,16 +2136,16 @@ export default function SettingsScreen() {
                   </ScrollView>
 
                   <Text style={styles.label}>{t("batchNumber")}</Text>
-                  <TextInput style={styles.formInput} placeholder="e.g. BATCH-001" placeholderTextColor={Colors.textMuted} value={batchForm.batchNumber} onChangeText={(v) => setBatchForm({ ...batchForm, batchNumber: v })} />
+                  <TextInput style={styles.formInput} placeholder="BATCH-001" placeholderTextColor={Colors.textMuted} value={batchForm.batchNumber} onChangeText={(v) => setBatchForm({ ...batchForm, batchNumber: v })} />
 
                   <Text style={styles.label}>{t("quantity")}</Text>
-                  <TextInput style={styles.formInput} placeholder={t("quantity")} placeholderTextColor={Colors.textMuted} value={batchForm.quantity} onChangeText={(v) => setBatchForm({ ...batchForm, quantity: v })} keyboardType="number-pad" />
+                  <TextInput style={styles.formInput} placeholder={t("quantity")} placeholderTextColor={Colors.textMuted} value={batchForm.quantity} onChangeText={(v) => setBatchForm({ ...batchForm, quantity: v.replace(/[^0-9]/g, "") })} keyboardType="number-pad" />
 
                   <Text style={styles.label}>{t("expiryDate")}</Text>
                   <TextInput style={styles.formInput} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.textMuted} value={batchForm.expiryDate} onChangeText={(v) => setBatchForm({ ...batchForm, expiryDate: v })} />
 
-                  <Text style={styles.label}>{t("costPrice")}</Text>
-                  <TextInput style={styles.formInput} placeholder="0.00" placeholderTextColor={Colors.textMuted} value={batchForm.costPrice} onChangeText={(v) => setBatchForm({ ...batchForm, costPrice: v })} keyboardType="decimal-pad" />
+                  <Text style={styles.label}>{t("costPrice")} ({currencyLabel()})</Text>
+                  <TextInput style={styles.formInput} placeholder={moneyPlaceholder} placeholderTextColor={Colors.textMuted} value={batchForm.costPrice} onChangeText={(v) => setBatchForm({ ...batchForm, costPrice: v })} keyboardType={moneyKeyboard} />
 
                   <Text style={styles.label}>{t("supplier")}</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
@@ -1892,17 +2161,29 @@ export default function SettingsScreen() {
                     </View>
                   </ScrollView>
 
-                  <Pressable style={styles.saveBtn} onPress={() => {
-                    if (!batchForm.productId || !batchForm.batchNumber) return Alert.alert(t("error"), t("productBatchRequired"));
+                  <Pressable style={[styles.saveBtn, batchSaving && { opacity: 0.6 }]} disabled={batchSaving} onPress={() => {
+                    const batchNumber = batchForm.batchNumber.trim();
+                    if (!batchForm.productId || !batchNumber) return notify(t("error"), t("productBatchRequired"));
+                    const expiry = batchForm.expiryDate.trim();
+                    if (expiry && (!/^\d{4}-\d{2}-\d{2}$/.test(expiry) || Number.isNaN(new Date(expiry).getTime()))) {
+                      return notify(t("error"), tr3("تاريخ الانتهاء بصيغة YYYY-MM-DD", "Ablaufdatum im Format JJJJ-MM-TT angeben", "Enter the expiry date as YYYY-MM-DD"));
+                    }
+                    const cost = batchForm.costPrice.trim() === "" ? null : parseNum(batchForm.costPrice);
+                    if (cost !== null && !(cost >= 0)) return notify(t("error"), tr3("سعر التكلفة غير صالح", "Ungültiger Einkaufspreis", "Invalid cost price"));
                     const payload: any = {
                       productId: Number(batchForm.productId),
-                      batchNumber: batchForm.batchNumber,
-                      quantity: Number(batchForm.quantity) || 0,
-                      branchId: employee?.branchId || 1,
+                      batchNumber,
+                      quantity: parseInt(batchForm.quantity || "0", 10) || 0,
+                      // The batch list only shows batches on this store's own
+                      // branches, so never fall back to a hard-coded branch 1.
+                      branchId: editBatch?.branchId || myBranchId,
                     };
-                    if (batchForm.expiryDate) payload.expiryDate = new Date(batchForm.expiryDate).toISOString();
-                    if (batchForm.costPrice) payload.costPrice = batchForm.costPrice;
+                    // Stored as UTC midnight of the chosen day; the list reads it back the same way.
+                    if (expiry) payload.expiryDate = new Date(`${expiry}T00:00:00.000Z`).toISOString();
+                    if (cost !== null) payload.costPrice = zeroDec ? String(Math.round(cost)) : cost.toFixed(2);
+                    else if (editBatch) payload.costPrice = null;
                     if (batchForm.supplierId) payload.supplierId = Number(batchForm.supplierId);
+                    else if (editBatch) payload.supplierId = null;
                     if (editBatch) {
                       updateBatchMutation.mutate({ id: editBatch.id, data: payload }, { onSuccess: () => setBatchView("list") });
                     } else {
@@ -1911,22 +2192,13 @@ export default function SettingsScreen() {
                   }}>
                     <LinearGradient colors={[Colors.gradientStart, Colors.accent]} style={styles.saveBtnGradient}>
                       <Ionicons name="checkmark" size={20} color={Colors.white} />
-                      <Text style={styles.saveBtnText}>{editBatch ? t("updateBatch") : t("createBatch")}</Text>
+                      <Text style={styles.saveBtnText}>{batchSaving ? t("loading") : editBatch ? t("updateBatch") : t("createBatch")}</Text>
                     </LinearGradient>
                   </Pressable>
 
                   {editBatch && (
-                    <Pressable style={[styles.saveBtn, { marginTop: 8 }]} onPress={() => {
-                      if (Platform.OS === "web") {
-                        if (window.confirm(`${t("deleteBatch")}?`)) {
-                          deleteBatchMutation.mutate(editBatch.id, { onSuccess: () => setBatchView("list") });
-                        }
-                      } else {
-                        Alert.alert(t("deleteBatch"), t("areYouSure"), [
-                          { text: t("cancel"), style: "cancel" },
-                          { text: t("delete"), style: "destructive", onPress: () => deleteBatchMutation.mutate(editBatch.id, { onSuccess: () => setBatchView("list") }) },
-                        ]);
-                      }
+                    <Pressable style={[styles.saveBtn, { marginTop: 8 }]} disabled={deleteBatchMutation.isPending} onPress={() => {
+                      confirmAction(t("deleteBatch"), t("areYouSure"), t("delete"), t("cancel"), () => deleteBatchMutation.mutate(editBatch.id, { onSuccess: () => setBatchView("list") }));
                     }}>
                       <View style={[styles.saveBtnGradient, { backgroundColor: Colors.danger + "20" }]}>
                         <Ionicons name="trash" size={20} color={Colors.danger} />
@@ -1946,7 +2218,7 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("receiptPrinter")}</Text>
-              <Pressable onPress={() => setShowPrinterSettings(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowPrinterSettings(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView>
               {/* The till prints through the system print dialog (browser or
@@ -1985,7 +2257,8 @@ export default function SettingsScreen() {
               )}
 
               <Pressable style={styles.saveBtn} onPress={() => {
-                const sampleReceipt = `================================\n        SAMPLE RECEIPT\n================================\nDate: ${new Date().toLocaleString()}\nReceipt #: TEST-001\n--------------------------------\nItem 1        x2  ${formatMoney(10)}\nItem 2        x1   ${formatMoney(5.5)}\n--------------------------------\nSubtotal:          ${formatMoney(15.5)}\nTax (10%):          ${formatMoney(1.55)}\n--------------------------------\nTOTAL:             ${formatMoney(17.05)}\n================================\n      Thank you!\n================================`;
+                const k = zeroDec ? 1000 : 1; // SYP has no minor units: use realistic amounts
+                const sampleReceipt = `================================\n        SAMPLE RECEIPT\n================================\nDate: ${fmtDateTime(new Date())}\nReceipt #: TEST-001\n--------------------------------\nItem 1        x2  ${formatMoney(10 * k)}\nItem 2        x1   ${formatMoney(5.5 * k)}\n--------------------------------\nSubtotal:          ${formatMoney(15.5 * k)}\nTax (10%):          ${formatMoney(1.55 * k)}\n--------------------------------\nTOTAL:             ${formatMoney(17.05 * k)}\n================================\n      Thank you!\n================================`;
                 // Both web and native go through the shared printer so the
                 // test print produces a real print / Save-as-PDF sheet in the app.
                 printHtmlViaIframe(`<pre style="font-family:monospace;font-size:12px;">${sampleReceipt}</pre>`);
@@ -2012,7 +2285,7 @@ export default function SettingsScreen() {
           <View style={[styles.modalContent, { maxWidth: 340, maxHeight: 420 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("language")}</Text>
-              <Pressable onPress={() => setShowLanguagePicker(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowLanguagePicker(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <Pressable
               testID="lang-en"
@@ -2024,7 +2297,7 @@ export default function SettingsScreen() {
               </View>
               <View style={styles.empInfo}>
                 <Text style={styles.empName}>English</Text>
-                <Text style={styles.empMeta}>Left to Right (LTR)</Text>
+                <Text style={styles.empMeta}>{tr3("من اليسار إلى اليمين", "Von links nach rechts", "Left to right")}</Text>
               </View>
               {language === "en" && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
             </Pressable>
@@ -2038,7 +2311,7 @@ export default function SettingsScreen() {
               </View>
               <View style={styles.empInfo}>
                 <Text style={styles.empName}>العربية</Text>
-                <Text style={styles.empMeta}>Right to Left (RTL)</Text>
+                <Text style={styles.empMeta}>{tr3("من اليمين إلى اليسار", "Von rechts nach links", "Right to left")}</Text>
               </View>
               {language === "ar" && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
             </Pressable>
@@ -2052,7 +2325,7 @@ export default function SettingsScreen() {
               </View>
               <View style={styles.empInfo}>
                 <Text style={styles.empName}>Deutsch</Text>
-                <Text style={styles.empMeta}>Left to Right (LTR)</Text>
+                <Text style={styles.empMeta}>{tr3("من اليسار إلى اليمين", "Von links nach rechts", "Left to right")}</Text>
               </View>
               {language === "de" && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
             </Pressable>
@@ -2065,7 +2338,7 @@ export default function SettingsScreen() {
           <View style={[styles.modalContent, { maxHeight: "90%" }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t("shiftMonitor")}</Text>
-              <Pressable onPress={() => setShowShiftMonitor(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowShiftMonitor(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <View style={{ flexDirection: "row", gap: 6, marginBottom: 14 }}>
               {(["active", "history", "settings"] as const).map((tab) => (
@@ -2092,15 +2365,15 @@ export default function SettingsScreen() {
                   const progressColor = isOvertime ? Colors.danger : progress > 0.8 ? Colors.warning : Colors.accent;
                   return (
                     <View style={[smStyles.shiftCard, isOvertime && { borderColor: Colors.danger + "40" }]}>
-                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", marginBottom: 8 }}>
+                      <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", marginBottom: 8 }}>
                         <View style={[styles.empAvatar, { backgroundColor: (roleColors[emp?.role || "cashier"] || Colors.info) + "30" }]}>
                           <Text style={styles.empInitial}>{emp?.name?.charAt(0) || "?"}</Text>
                         </View>
-                        <View style={[styles.empInfo, isRTL && { alignItems: "flex-end" }]}>
+                        <View style={[styles.empInfo, rowFlip && { alignItems: "flex-end" }]}>
                           <Text style={styles.empName}>{emp?.name || `#${item.employeeId}`}</Text>
-                          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                          <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", gap: 6, marginTop: 2 }}>
                             <View style={[styles.roleBadge, { backgroundColor: (roleColors[emp?.role || "cashier"] || Colors.info) + "20", marginTop: 0 }]}>
-                              <Text style={[styles.roleText, { color: roleColors[emp?.role || "cashier"] || Colors.info }]}>{emp?.role || "cashier"}</Text>
+                              <Text style={[styles.roleText, { color: roleColors[emp?.role || "cashier"] || Colors.info }]}>{t((emp?.role || "cashier") as any)}</Text>
                             </View>
                             {isOvertime && (
                               <View style={[styles.roleBadge, { backgroundColor: Colors.danger + "20", marginTop: 0 }]}>
@@ -2125,8 +2398,8 @@ export default function SettingsScreen() {
                           <Ionicons name="stop-circle" size={18} color={Colors.danger} />
                         </Pressable>
                       </View>
-                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 6 }}>
-                        <Text style={smStyles.shiftMeta}>{t("started")}: {new Date(item.startTime).toLocaleTimeString()}</Text>
+                      <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 6 }}>
+                        <Text style={smStyles.shiftMeta}>{t("started")}: {fmtTime(item.startTime)}</Text>
                         <Text style={[smStyles.shiftMeta, { color: progressColor, fontWeight: "700" as const }]}>{activeShiftsElapsed[item.id] || "00:00:00"}</Text>
                       </View>
                       <View style={smStyles.progressBarBg}>
@@ -2157,19 +2430,19 @@ export default function SettingsScreen() {
                   const emp = employees.find((e: any) => e.id === item.employeeId);
                   return (
                     <View style={smStyles.shiftCard}>
-                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", marginBottom: 6 }}>
+                      <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", marginBottom: 6 }}>
                         <View style={[styles.empAvatar, { backgroundColor: Colors.info + "30" }]}>
                           <Text style={styles.empInitial}>{emp?.name?.charAt(0) || "?"}</Text>
                         </View>
-                        <View style={[styles.empInfo, isRTL && { alignItems: "flex-end" }]}>
+                        <View style={[styles.empInfo, rowFlip && { alignItems: "flex-end" }]}>
                           <Text style={styles.empName}>{emp?.name || `#${item.employeeId}`}</Text>
                           <Text style={styles.empMeta}>{formatDuration(item.startTime, item.endTime)}</Text>
                         </View>
                       </View>
-                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                      <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
                         <View style={smStyles.statChip}>
                           <Ionicons name="time-outline" size={12} color={Colors.info} />
-                          <Text style={smStyles.statChipText}>{new Date(item.startTime).toLocaleString()} - {new Date(item.endTime).toLocaleTimeString()}</Text>
+                          <Text style={smStyles.statChipText}>{fmtDateTime(item.startTime)} - {fmtTime(item.endTime)}</Text>
                         </View>
                         <View style={smStyles.statChip}>
                           <Ionicons name="cart-outline" size={12} color={Colors.accent} />
@@ -2195,7 +2468,7 @@ export default function SettingsScreen() {
             {shiftMonitorTab === "settings" && (
               <ScrollView>
                 <Text style={styles.label}>{t("defaultShiftDuration")}</Text>
-                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 12, marginTop: 8 }}>
+                <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", gap: 12, marginTop: 8 }}>
                   <TextInput
                     style={[styles.formInput, { flex: 1 }]}
                     value={defaultShiftDuration}
@@ -2211,16 +2484,22 @@ export default function SettingsScreen() {
                 {allActiveShifts.length > 0 && (
                   <>
                     <Text style={[styles.label, { marginTop: 20 }]}>{t("updateActiveShiftsDuration")}</Text>
-                    <Pressable style={styles.saveBtn} onPress={() => {
-                      const durationVal = parseFloat(defaultShiftDuration);
-                      if (isNaN(durationVal) || durationVal <= 0) return Alert.alert(t("error"), t("invalidDuration"));
-                      allActiveShifts.forEach((s: any) => {
-                        updateShiftMutation.mutate({ id: s.id, data: { expectedDurationHours: String(durationVal) } });
-                      });
+                    <Pressable style={[styles.saveBtn, applyingShiftHours && { opacity: 0.6 }]} disabled={applyingShiftHours} onPress={async () => {
+                      const durationVal = parseNum(defaultShiftDuration);
+                      if (!(durationVal > 0 && durationVal <= 24)) return notify(t("error"), t("invalidDuration"));
+                      setApplyingShiftHours(true);
+                      // One request per shift; report once, not once per shift.
+                      const results = await Promise.allSettled(allActiveShifts.map((s: any) =>
+                        apiRequest("PUT", `/api/shifts/${s.id}`, { expectedDurationHours: durationVal.toFixed(1) })));
+                      setApplyingShiftHours(false);
+                      invalidatePrefix("/api/shifts");
+                      const failed = results.filter((r) => r.status === "rejected");
+                      if (failed.length) notify(t("error"), apiErrorMessage((failed[0] as PromiseRejectedResult).reason));
+                      else notify(t("success"), tr3("تم تحديث مدة الورديات النشطة", "Dauer der aktiven Schichten aktualisiert", "Active shifts updated"));
                     }}>
                       <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
                         <Ionicons name="refresh" size={18} color={Colors.white} />
-                        <Text style={styles.saveBtnText}>{t("applyToAllActive")}</Text>
+                        <Text style={styles.saveBtnText}>{applyingShiftHours ? t("loading") : t("applyToAllActive")}</Text>
                       </LinearGradient>
                     </Pressable>
                   </>
@@ -2238,12 +2517,12 @@ export default function SettingsScreen() {
               <Text style={styles.modalTitle}>{t("notifications")}</Text>
               <View style={styles.modalActions}>
                 {unreadCount > 0 && (
-                  <Pressable onPress={() => markAllNotificationsReadMutation.mutate()} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Pressable hitSlop={10} disabled={markAllNotificationsReadMutation.isPending} onPress={() => markAllNotificationsReadMutation.mutate()} style={{ flexDirection: "row", alignItems: "center", gap: 4, minHeight: 36, paddingHorizontal: 6 }}>
                     <Ionicons name="checkmark-done" size={20} color={Colors.accent} />
                     <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: "600" }}>{t("markAllRead")}</Text>
                   </Pressable>
                 )}
-                <Pressable onPress={() => setShowNotifications(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+                <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowNotifications(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
               </View>
             </View>
             <FlatList
@@ -2267,7 +2546,7 @@ export default function SettingsScreen() {
                       <Ionicons name={iconInfo.name as any} size={20} color={iconInfo.color} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between" }}>
                         <Text style={[smStyles.notifTitle, !item.isRead && { color: Colors.text }]}>{item.title}</Text>
                         {!item.isRead && <View style={smStyles.unreadDot} />}
                       </View>
@@ -2285,16 +2564,16 @@ export default function SettingsScreen() {
       <Modal visible={showStoreSettings} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, rowFlip && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>{t("storeSettings")}</Text>
-              <Pressable onPress={() => setShowStoreSettings(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowStoreSettings(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={[styles.label, rtlTextAlign]}>{t("storeLogo")}</Text>
-              <Pressable onPress={pickStoreLogo} style={{ alignItems: "center", marginBottom: 16, padding: 20, borderRadius: 12, borderWidth: 1, borderStyle: "dashed", borderColor: Colors.cardBorder, backgroundColor: Colors.surfaceLight }}>
+              <Pressable onPress={pickStoreLogo} style={{ alignItems: "center", marginBottom: storeLogo ? 6 : 16, padding: 20, borderRadius: 12, borderWidth: 1, borderStyle: "dashed", borderColor: Colors.cardBorder, backgroundColor: Colors.surfaceLight }}>
                 {storeLogo ? (
                   <View style={{ alignItems: "center" }}>
-                    <Image source={{ uri: storeLogo.startsWith("http") || storeLogo.startsWith("file://") || storeLogo.startsWith("data:") ? storeLogo : `${getApiUrl().replace(/\/$/, "")}${storeLogo}` }} style={{ width: 80, height: 80, borderRadius: 12 }} />
+                    <Image source={{ uri: /^(https?:|file:|data:|blob:|content:)/.test(storeLogo) ? storeLogo : `${getApiUrl().replace(/\/$/, "")}${storeLogo}` }} style={{ width: 80, height: 80, borderRadius: 12 }} resizeMode="contain" />
                     <Text style={{ color: Colors.accent, fontSize: 13, marginTop: 8 }}>{t("changeImage")}</Text>
                   </View>
                 ) : (
@@ -2304,18 +2583,23 @@ export default function SettingsScreen() {
                   </View>
                 )}
               </Pressable>
+              {storeLogo ? (
+                <Pressable hitSlop={8} onPress={() => setStoreLogo(null)} style={{ alignSelf: "center", paddingVertical: 8, paddingHorizontal: 12, marginBottom: 10 }}>
+                  <Text style={{ color: Colors.danger, fontSize: 13, fontWeight: "600" }}>{tr3("إزالة الشعار", "Logo entfernen", "Remove logo")}</Text>
+                </Pressable>
+              ) : null}
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("storeName")}</Text>
+              <Text style={[styles.label, rtlTextAlign]}>{t("storeName")} *</Text>
               <TextInput style={[styles.input, rtlTextAlign]} value={storeForm.name} onChangeText={(v) => setStoreForm({ ...storeForm, name: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storeName")} />
 
               <Text style={[styles.label, rtlTextAlign]}>{t("storeAddress")}</Text>
               <TextInput style={[styles.input, rtlTextAlign]} value={storeForm.address} onChangeText={(v) => setStoreForm({ ...storeForm, address: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storeAddress")} />
 
               <Text style={[styles.label, rtlTextAlign]}>{t("storePhone")}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storeForm.phone} onChangeText={(v) => setStoreForm({ ...storeForm, phone: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storePhone")} keyboardType="phone-pad" />
+              <TextInput style={[styles.input, rtlTextAlign]} value={storeForm.phone} onChangeText={(v) => setStoreForm({ ...storeForm, phone: v })} placeholderTextColor={Colors.textMuted} placeholder={phonePh} keyboardType="phone-pad" />
 
               <Text style={[styles.label, rtlTextAlign]}>{t("storeEmail")}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storeForm.email} onChangeText={(v) => setStoreForm({ ...storeForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storeEmail")} keyboardType="email-address" />
+              <TextInput style={[styles.input, rtlTextAlign]} value={storeForm.email} onChangeText={(v) => setStoreForm({ ...storeForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder="email@example.com" keyboardType="email-address" autoCapitalize="none" />
 
               <Text style={[styles.label, rtlTextAlign]}>{t("storeType")}</Text>
               <View style={styles.roleRow}>
@@ -2343,7 +2627,7 @@ export default function SettingsScreen() {
                 value={storeForm.taxRate}
                 onChangeText={(v) => setStoreForm({ ...storeForm, taxRate: v })}
                 placeholderTextColor={Colors.textMuted}
-                placeholder="e.g. 7.7"
+                placeholder={zeroDec ? "0" : "7.7"}
                 keyboardType="decimal-pad"
               />
 
@@ -2353,23 +2637,23 @@ export default function SettingsScreen() {
                 value={storeForm.deliveryFee}
                 onChangeText={(v) => setStoreForm({ ...storeForm, deliveryFee: v })}
                 placeholderTextColor={Colors.textMuted}
-                placeholder="e.g. 5.00"
-                keyboardType="decimal-pad"
+                placeholder={zeroDec ? "5000" : "5.00"}
+                keyboardType={moneyKeyboard}
               />
 
-              {/* WhatsApp number: only takes effect once verified by a code sent over WhatsApp. */}
-              <WhatsAppVerify onOpen={() => setShowStoreSettings(false)} />
-
-              {/* Sham Cash: the store's own QR code and number (saves on its own). */}
-              <View style={{ height: 1, backgroundColor: Colors.cardBorder, marginVertical: 16 }} />
-              <ShamCashSettings />
-              <View style={{ height: 1, backgroundColor: Colors.cardBorder, marginVertical: 8 }} />
-
-              <Pressable style={{ marginTop: 16 }} onPress={handleSaveStoreSettings}>
-                <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ paddingVertical: 14, borderRadius: 12, alignItems: "center" }}>
-                  <Text style={{ color: Colors.white, fontSize: 16, fontWeight: "700" }}>{storeLogoUploading ? t("imageUploading") : t("save")}</Text>
+              <Pressable style={[styles.saveBtn, storeSaving && { opacity: 0.6 }]} disabled={storeSaving} onPress={handleSaveStoreSettings}>
+                <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
+                  <Text style={styles.saveBtnText}>{storeLogoUploading ? t("imageUploading") : updateStoreSettingsMutation.isPending ? t("loading") : t("save")}</Text>
                 </LinearGradient>
               </Pressable>
+
+              {/* The sections below save on their own, separately from the
+                  store details above. */}
+              {/* WhatsApp: linked on the WhatsApp screen (QR), shown here as a summary. */}
+              <WhatsAppVerify onOpen={() => setShowStoreSettings(false)} />
+
+              {/* Sham Cash: the store's own QR code and number. */}
+              <ShamCashSettings />
             </ScrollView>
           </View>
         </View>
@@ -2379,128 +2663,131 @@ export default function SettingsScreen() {
       <Modal visible={showStorefront} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Text style={[styles.modalTitle, rtlTextAlign]}>{t("editStorefront") || "Edit Storefront"}</Text>
-              <Pressable onPress={() => setShowStorefront(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+            <View style={[styles.modalHeader, rowFlip && { flexDirection: "row-reverse" }]}>
+              <Text style={[styles.modalTitle, rtlTextAlign]}>{t("editStorefront")}</Text>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowStorefront(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
 
               {/* Store Identity */}
-              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("storeIdentity") || "Store Identity"}</Text>
+              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("storeIdentity")}</Text>
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("storeName") || "Store Name"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.heroTitle} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, heroTitle: v })} placeholderTextColor={Colors.textMuted} placeholder="Pizza Lemon" />
+              <Text style={[styles.label, rtlTextAlign]}>{t("storeName")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.heroTitle} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, heroTitle: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storeName")} />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("tagline") || "Tagline"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.heroSubtitle} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, heroSubtitle: v })} placeholderTextColor={Colors.textMuted} placeholder={t("tagline") || "Short catchy line"} />
+              <Text style={[styles.label, rtlTextAlign]}>{t("tagline")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.heroSubtitle} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, heroSubtitle: v })} placeholderTextColor={Colors.textMuted} placeholder={t("tagline")} />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("aboutText") || "About"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign, { height: 100, textAlignVertical: "top" }]} value={storefrontForm.aboutText} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, aboutText: v })} placeholderTextColor={Colors.textMuted} placeholder={t("aboutText") || "Tell customers about your store"} multiline numberOfLines={4} />
+              <Text style={[styles.label, rtlTextAlign]}>{t("aboutText")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign, { height: 100, textAlignVertical: "top" }]} value={storefrontForm.aboutText} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, aboutText: v })} placeholderTextColor={Colors.textMuted} placeholder={t("aboutText")} multiline numberOfLines={4} />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("primaryColor") || "Primary Color"}</Text>
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+              <Text style={[styles.label, rtlTextAlign]}>{t("primaryColor")}</Text>
+              <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
                 <TextInput style={[styles.input, rtlTextAlign, { flex: 1 }]} value={storefrontForm.primaryColor} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, primaryColor: v })} placeholderTextColor={Colors.textMuted} placeholder="#2FD3C6" autoCapitalize="none" />
                 <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: storefrontForm.primaryColor || "#2FD3C6" }} />
               </View>
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("accentColor") || "Accent Color"}</Text>
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+              <Text style={[styles.label, rtlTextAlign]}>{t("accentColor")}</Text>
+              <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
                 <TextInput style={[styles.input, rtlTextAlign, { flex: 1 }]} value={storefrontForm.accentColor} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, accentColor: v })} placeholderTextColor={Colors.textMuted} placeholder="#6366F1" autoCapitalize="none" />
                 <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: storefrontForm.accentColor || "#6366F1" }} />
               </View>
 
               {/* Offers */}
-              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("offers") || "Offers"}</Text>
-              <Text style={[styles.label, rtlTextAlign]}>{t("promoText") || "Promotion Text"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign, { height: 80, textAlignVertical: "top" }]} value={storefrontForm.promoText} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, promoText: v })} placeholderTextColor={Colors.textMuted} placeholder={t("promoTextHint") || "e.g. 10% off on app orders"} multiline numberOfLines={3} />
+              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("offers")}</Text>
+              <Text style={[styles.label, rtlTextAlign]}>{t("promoText")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign, { height: 80, textAlignVertical: "top" }]} value={storefrontForm.promoText} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, promoText: v })} placeholderTextColor={Colors.textMuted} placeholder={t("promoTextHint")} multiline numberOfLines={3} />
 
               {/* Ordering & Delivery */}
-              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("orderingDelivery") || "Ordering & Delivery"}</Text>
+              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("orderingDelivery")}</Text>
 
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
-                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("enableOnlineOrdering") || "Online Ordering"}</Text>
+              <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("enableOnlineOrdering")}</Text>
                 <Switch value={storefrontForm.enableOnlineOrdering} onValueChange={(v) => setStorefrontForm({ ...storefrontForm, enableOnlineOrdering: v })} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={storefrontForm.enableOnlineOrdering ? Colors.accent : Colors.textMuted} />
               </View>
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
-                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("enableDelivery") || "Delivery"}</Text>
+              <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("enableDelivery")}</Text>
                 <Switch value={storefrontForm.enableDelivery} onValueChange={(v) => setStorefrontForm({ ...storefrontForm, enableDelivery: v })} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={storefrontForm.enableDelivery ? Colors.accent : Colors.textMuted} />
               </View>
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
-                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("enablePickup") || "Pickup"}</Text>
+              <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("enablePickup")}</Text>
                 <Switch value={storefrontForm.enablePickup} onValueChange={(v) => setStorefrontForm({ ...storefrontForm, enablePickup: v })} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={storefrontForm.enablePickup ? Colors.accent : Colors.textMuted} />
               </View>
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("minOrderAmount") || "Minimum Order Amount"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.minOrderAmount} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, minOrderAmount: v })} placeholderTextColor={Colors.textMuted} placeholder="e.g. 20.00" keyboardType="decimal-pad" />
+              <Text style={[styles.label, rtlTextAlign]}>{t("minOrderAmount")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.minOrderAmount} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, minOrderAmount: v })} placeholderTextColor={Colors.textMuted} placeholder={zeroDec ? "20000" : "20.00"} keyboardType={moneyKeyboard} />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("estimatedDeliveryTime") || "Estimated Delivery Time (min)"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.estimatedDeliveryTime} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, estimatedDeliveryTime: v })} placeholderTextColor={Colors.textMuted} placeholder="e.g. 30" keyboardType="number-pad" />
+              <Text style={[styles.label, rtlTextAlign]}>{t("estimatedDeliveryTime")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.estimatedDeliveryTime} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, estimatedDeliveryTime: v })} placeholderTextColor={Colors.textMuted} placeholder="30" keyboardType="number-pad" />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("deliveryRadius") || "Delivery Radius"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.deliveryRadius} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, deliveryRadius: v })} placeholderTextColor={Colors.textMuted} placeholder="e.g. within 10km" />
+              <Text style={[styles.label, rtlTextAlign]}>{t("deliveryRadius")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.deliveryRadius} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, deliveryRadius: v })} placeholderTextColor={Colors.textMuted} placeholder={tr3("مثال: ضمن 10 كم", "z. B. im Umkreis von 10 km", "e.g. within 10 km")} />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("openingHours") || "Opening Hours"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.openingHours} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, openingHours: v })} placeholderTextColor={Colors.textMuted} placeholder="e.g. Mon-Sun 11:00–22:00" />
+              <Text style={[styles.label, rtlTextAlign]}>{t("openingHours")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.openingHours} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, openingHours: v })} placeholderTextColor={Colors.textMuted} placeholder={tr3("مثال: يومياً 11:00–22:00", "z. B. Mo–So 11:00–22:00", "e.g. Mon–Sun 11:00–22:00")} />
 
               {/* Payment Methods */}
-              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("paymentMethods") || "Payment Methods"}</Text>
-              <Text style={[{ color: Colors.textMuted, fontSize: 12, lineHeight: 18, marginBottom: 8 }, rtlTextAlign]}>{t("paymentMethodsHint") || "These appear on your public store page so customers know how to pay."}</Text>
+              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("paymentMethods")}</Text>
+              <Text style={[{ color: Colors.textMuted, fontSize: 12, lineHeight: 18, marginBottom: 8 }, rtlTextAlign]}>{t("paymentMethodsHint")}</Text>
 
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
-                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("acceptCard") || "Card"}</Text>
+              <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: Colors.text, fontSize: 14 }}>{t("acceptCard")}</Text>
+                  {stripeUnavailable && (
+                    <Text style={{ color: Colors.warning, fontSize: 11, marginTop: 2 }}>{tr3("الدفع بالبطاقة عبر الإنترنت غير متاح في سوريا", "Online-Kartenzahlung ist in Syrien nicht verfügbar", "Online card payment is not available in Syria")}</Text>
+                  )}
+                </View>
                 <Switch value={storefrontForm.acceptCard} onValueChange={(v) => setStorefrontForm({ ...storefrontForm, acceptCard: v })} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={storefrontForm.acceptCard ? Colors.accent : Colors.textMuted} />
               </View>
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
-                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("acceptCash") || "Cash"}</Text>
+              <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("acceptCash")}</Text>
                 <Switch value={storefrontForm.acceptCash} onValueChange={(v) => setStorefrontForm({ ...storefrontForm, acceptCash: v })} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={storefrontForm.acceptCash ? Colors.accent : Colors.textMuted} />
               </View>
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
-                <Text style={{ color: Colors.text, fontSize: 14 }}>{t("acceptMobile") || "Mobile / TWINT"}</Text>
+              <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+                <Text style={{ color: Colors.text, fontSize: 14, flex: 1 }}>{t("acceptMobile")}</Text>
                 <Switch value={storefrontForm.acceptMobile} onValueChange={(v) => setStorefrontForm({ ...storefrontForm, acceptMobile: v })} trackColor={{ false: Colors.inputBorder, true: Colors.accent + "60" }} thumbColor={storefrontForm.acceptMobile ? Colors.accent : Colors.textMuted} />
               </View>
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("paymentInstructions") || "Payment Instructions"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign, { height: 80, textAlignVertical: "top" }]} value={storefrontForm.paymentInstructions} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, paymentInstructions: v })} placeholderTextColor={Colors.textMuted} placeholder={t("paymentInstructionsHint") || "e.g. Pay on delivery or by bank transfer"} multiline numberOfLines={3} />
+              <Text style={[styles.label, rtlTextAlign]}>{t("paymentInstructions")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign, { height: 80, textAlignVertical: "top" }]} value={storefrontForm.paymentInstructions} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, paymentInstructions: v })} placeholderTextColor={Colors.textMuted} placeholder={t("paymentInstructionsHint")} multiline numberOfLines={3} />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("bankName") || "Bank Name"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.bankName} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, bankName: v })} placeholderTextColor={Colors.textMuted} placeholder={t("bankName") || "Bank Name"} />
+              <Text style={[styles.label, rtlTextAlign]}>{t("bankName")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.bankName} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, bankName: v })} placeholderTextColor={Colors.textMuted} placeholder={t("bankName")} />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("bankAccountHolder") || "Account Holder"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.bankAccountHolder} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, bankAccountHolder: v })} placeholderTextColor={Colors.textMuted} placeholder={t("bankAccountHolder") || "Account Holder"} />
+              <Text style={[styles.label, rtlTextAlign]}>{t("bankAccountHolder")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.bankAccountHolder} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, bankAccountHolder: v })} placeholderTextColor={Colors.textMuted} placeholder={t("bankAccountHolder")} />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("bankIban") || "IBAN"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.bankIban} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, bankIban: v })} placeholderTextColor={Colors.textMuted} placeholder="CH00 0000 0000 0000 0000 0" autoCapitalize="characters" />
+              <Text style={[styles.label, rtlTextAlign]}>{t("bankIban")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.bankIban} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, bankIban: v })} placeholderTextColor={Colors.textMuted} placeholder={stripeUnavailable ? "SY00 0000 0000 0000 0000 0000 0000" : "CH00 0000 0000 0000 0000 0"} autoCapitalize="characters" />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("twintNumber") || "TWINT Number"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.twintNumber} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, twintNumber: v })} placeholderTextColor={Colors.textMuted} placeholder="e.g. 079 123 45 67" keyboardType="phone-pad" />
 
               {/* Contact & Social */}
-              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("contactSocial") || "Contact & Social"}</Text>
+              <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("contactSocial")}</Text>
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("storePhone") || "Phone"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.phone} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, phone: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storePhone") || "Phone"} keyboardType="phone-pad" />
+              <Text style={[styles.label, rtlTextAlign]}>{t("storePhone")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.phone} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, phone: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storePhone")} keyboardType="phone-pad" />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("storeEmail") || "Email"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.email} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storeEmail") || "Email"} keyboardType="email-address" autoCapitalize="none" />
+              <Text style={[styles.label, rtlTextAlign]}>{t("storeEmail")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.email} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, email: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storeEmail")} keyboardType="email-address" autoCapitalize="none" />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("storeAddress") || "Address"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.address} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, address: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storeAddress") || "Address"} />
+              <Text style={[styles.label, rtlTextAlign]}>{t("storeAddress")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.address} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, address: v })} placeholderTextColor={Colors.textMuted} placeholder={t("storeAddress")} />
 
               <Text style={[styles.label, rtlTextAlign]}>WhatsApp</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.socialWhatsapp} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, socialWhatsapp: v })} placeholderTextColor={Colors.textMuted} placeholder="e.g. 41791234567" keyboardType="phone-pad" />
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.socialWhatsapp} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, socialWhatsapp: v })} placeholderTextColor={Colors.textMuted} placeholder={phonePh} keyboardType="phone-pad" />
 
               <Text style={[styles.label, rtlTextAlign]}>Instagram</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.socialInstagram} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, socialInstagram: v })} placeholderTextColor={Colors.textMuted} placeholder="@handle or URL" autoCapitalize="none" />
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.socialInstagram} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, socialInstagram: v })} placeholderTextColor={Colors.textMuted} placeholder={tr3("@الحساب أو الرابط", "@Name oder Link", "@handle or link")} autoCapitalize="none" />
 
               <Text style={[styles.label, rtlTextAlign]}>Facebook</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.socialFacebook} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, socialFacebook: v })} placeholderTextColor={Colors.textMuted} placeholder="Page name or URL" autoCapitalize="none" />
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.socialFacebook} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, socialFacebook: v })} placeholderTextColor={Colors.textMuted} placeholder={tr3("اسم الصفحة أو الرابط", "Seitenname oder Link", "Page name or link")} autoCapitalize="none" />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("footerText") || "Footer Text"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.footerText} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, footerText: v })} placeholderTextColor={Colors.textMuted} placeholder={t("footerText") || "e.g. © 2026 Pizza Lemon"} />
+              <Text style={[styles.label, rtlTextAlign]}>{t("footerText")}</Text>
+              <TextInput style={[styles.input, rtlTextAlign]} value={storefrontForm.footerText} onChangeText={(v) => setStorefrontForm({ ...storefrontForm, footerText: v })} placeholderTextColor={Colors.textMuted} placeholder={t("footerText")} />
 
-              <Pressable style={styles.saveBtn} onPress={() => saveStorefrontMutation.mutate(storefrontForm)}>
+              <Pressable style={[styles.saveBtn, saveStorefrontMutation.isPending && { opacity: 0.6 }]} disabled={saveStorefrontMutation.isPending} onPress={handleSaveStorefront}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>{t("save") || "Save"}</Text>
+                  <Text style={styles.saveBtnText}>{saveStorefrontMutation.isPending ? t("loading") : t("save")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -2511,22 +2798,45 @@ export default function SettingsScreen() {
       <Modal visible={showPaymentGateway} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, rowFlip && { flexDirection: "row-reverse" }]}>
               <Text style={styles.modalTitle}>{t("paymentGateways")}</Text>
-              <Pressable onPress={() => setShowPaymentGateway(false)}>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close")} onPress={() => setShowPaymentGateway(false)}>
                 <Ionicons name="close" size={24} color={Colors.textMuted} />
               </Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Syria: Stripe does not operate there, so the card gateway is
+                  not offered at all; the store takes cash and Sham Cash. */}
+              {stripeUnavailable && (
+                <>
+                  <View style={pgStyles.warnBox}>
+                    <View style={[pgStyles.warnHeader, rowFlip && { flexDirection: "row-reverse" }]}>
+                      <Ionicons name="information-circle" size={18} color={Colors.warning} />
+                      <Text style={[pgStyles.warnTitle, isRTL && { textAlign: "right" }]}>{tr3("الدفع بالبطاقة غير متاح في سوريا", "Kartenzahlung in Syrien nicht verfügbar", "Card payments are not available in Syria")}</Text>
+                    </View>
+                    <Text style={[pgStyles.warnText, isRTL && { textAlign: "right" }]}>
+                      {tr3(
+                        "Stripe لا يعمل في سوريا. يدفع الزبائن نقداً أو عبر شام كاش إلى حساب متجرك مباشرة.",
+                        "Stripe ist in Syrien nicht verfügbar. Kunden zahlen bar oder mit Sham Cash direkt auf das Konto des Geschäfts.",
+                        "Stripe does not operate in Syria. Customers pay cash or with Sham Cash straight into your store's account.",
+                      )}
+                    </Text>
+                  </View>
+                  <ShamCashSettings />
+                  <View style={pgStyles.divider} />
+                </>
+              )}
+
+              {!stripeUnavailable && (<>
               {/* ── Stripe: the state the server reports, never a guess ───── */}
               <View style={pgStyles.section}>
-                <View style={[pgStyles.gatewayHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                <View style={[pgStyles.gatewayHeader, rowFlip && { flexDirection: "row-reverse" }]}>
                   <View style={[pgStyles.gatewayIcon, { backgroundColor: "#635BFF20" }]}>
                     <Ionicons name="card" size={24} color="#635BFF" />
                   </View>
-                  <View style={[pgStyles.gatewayInfo, isRTL && { alignItems: "flex-end" }]}>
+                  <View style={[pgStyles.gatewayInfo, rowFlip && { alignItems: "flex-end" }]}>
                     <Text style={pgStyles.gatewayName}>Stripe</Text>
-                    <View style={[pgStyles.statusRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[pgStyles.statusRow, rowFlip && { flexDirection: "row-reverse" }]}>
                       <View style={[pgStyles.statusDot, { backgroundColor: stripeConnected ? Colors.success : Colors.danger }]} />
                       <Text style={[pgStyles.statusText, { color: stripeConnected ? Colors.success : Colors.danger }]}>
                         {stripeConnected ? t("connected") : t("disconnected")}
@@ -2551,9 +2861,9 @@ export default function SettingsScreen() {
                 <View style={pgStyles.configGrid}>
                   <View style={pgStyles.configItem}>
                     <Text style={[pgStyles.configLabel, isRTL && { textAlign: "right" }]}>{t("currency")}</Text>
-                    <View style={[pgStyles.configValueRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[pgStyles.configValueRow, rowFlip && { flexDirection: "row-reverse" }]}>
                       <Ionicons name="cash-outline" size={16} color={Colors.accent} />
-                      <Text style={pgStyles.configValue}>{(pgConfig?.currency || pgConfig?.stripe?.currency || "chf").toUpperCase()}</Text>
+                      <Text style={pgStyles.configValue}>{String(pgConfig?.currency || pgConfig?.stripe?.currency || currency).toUpperCase()}</Text>
                     </View>
                   </View>
                 </View>
@@ -2591,7 +2901,7 @@ export default function SettingsScreen() {
                 {/* What is missing, named exactly as the server environment variable */}
                 {!stripeConnected && (
                   <View style={pgStyles.warnBox}>
-                    <View style={[pgStyles.warnHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[pgStyles.warnHeader, rowFlip && { flexDirection: "row-reverse" }]}>
                       <Ionicons name="alert-circle" size={18} color={Colors.warning} />
                       <Text style={[pgStyles.warnTitle, isRTL && { textAlign: "right" }]}>{t("stripeNotConfigured")}</Text>
                     </View>
@@ -2610,7 +2920,7 @@ export default function SettingsScreen() {
                 )}
                 {stripeConnected && !hasPublishableKey && (
                   <View style={pgStyles.warnBox}>
-                    <View style={[pgStyles.warnHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[pgStyles.warnHeader, rowFlip && { flexDirection: "row-reverse" }]}>
                       <Ionicons name="alert-circle" size={18} color={Colors.warning} />
                       <Text style={[pgStyles.warnTitle, isRTL && { textAlign: "right" }]}>{t("stripeMissingPublishable")}</Text>
                     </View>
@@ -2628,7 +2938,7 @@ export default function SettingsScreen() {
 
                 {pgTestResult && (
                   <View style={[pgStyles.testResult, { borderColor: pgTestResult.success ? Colors.success + "40" : Colors.danger + "40", backgroundColor: pgTestResult.success ? Colors.success + "10" : Colors.danger + "10" }]}>
-                    <View style={[pgStyles.testResultHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[pgStyles.testResultHeader, rowFlip && { flexDirection: "row-reverse" }]}>
                       <Ionicons name={pgTestResult.success ? "checkmark-circle" : "close-circle"} size={20} color={pgTestResult.success ? Colors.success : Colors.danger} />
                       <Text style={[pgStyles.testResultText, { color: pgTestResult.success ? Colors.success : Colors.danger }]}>
                         {pgTestResult.success ? t("connectionSuccess") : t("connectionFailed")}
@@ -2669,7 +2979,7 @@ export default function SettingsScreen() {
                 ) : accountMethods.length === 0 ? (
                   <Text style={[pgStyles.mutedNote, isRTL && { textAlign: "right" }]}>{t("noAccountMethods")}</Text>
                 ) : (
-                  <View style={[pgStyles.chipRow, isRTL && { flexDirection: "row-reverse" }]}>
+                  <View style={[pgStyles.chipRow, rowFlip && { flexDirection: "row-reverse" }]}>
                     {accountMethods.map((m: string) => (
                       <View key={m} style={pgStyles.chip}>
                         <Text style={pgStyles.chipText}>{pgMethodLabel(m)}</Text>
@@ -2684,6 +2994,7 @@ export default function SettingsScreen() {
               </View>
 
               <View style={pgStyles.divider} />
+              </>)}
 
               {/* Which buttons the till offers at checkout. Sham Cash lives in
                   Store Settings; cash is the till's default and the fallback
@@ -2694,27 +3005,38 @@ export default function SettingsScreen() {
                 { key: "card", icon: "card", label: t("card"), color: "#635BFF" },
                 { key: "mobile", icon: "phone-portrait", label: t("walletPay"), color: Colors.info },
               ].map((method) => {
-                const on = method.key === "cash" || pgConfig?.enabledMethods?.includes(method.key) !== false;
+                const saved = method.key === "cash" || pgConfig?.enabledMethods?.includes(method.key) !== false;
+                // Show the new position while the save is in flight.
+                const on = pgPending?.key === method.key ? pgPending.val : saved;
+                const stripeOnly = method.key !== "cash";
                 return (
-                  <View key={method.key} style={[pgStyles.methodRow, isRTL && { flexDirection: "row-reverse" }]}>
+                  <View key={method.key} style={[pgStyles.methodRow, rowFlip && { flexDirection: "row-reverse" }]}>
                     <View style={[pgStyles.methodIconWrap, { backgroundColor: method.color + "20" }]}>
                       <Ionicons name={method.icon as any} size={20} color={method.color} />
                     </View>
-                    <Text style={[pgStyles.methodLabel, isRTL && { textAlign: "right" }]}>{method.label}</Text>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[pgStyles.methodLabel, isRTL && { textAlign: "right" }]}>{method.label}</Text>
+                      {stripeUnavailable && stripeOnly && (
+                        <Text style={[pgStyles.methodHint, { color: Colors.warning }, isRTL && { textAlign: "right" }]}>
+                          {tr3("غير متاح في سوريا — يُنصح بإيقافه", "In Syrien nicht verfügbar — besser ausschalten", "Not available in Syria — best switched off")}
+                        </Text>
+                      )}
+                    </View>
                     <Switch
                       value={on}
-                      disabled={method.key === "cash"}
+                      disabled={method.key === "cash" || !!pgPending}
                       onValueChange={async (val) => {
                         const current: string[] = pgConfig?.enabledMethods || ["cash", "card", "mobile"];
                         const updated = val
                           ? Array.from(new Set([...current, method.key]))
                           : current.filter((m: string) => m !== method.key);
+                        setPgPending({ key: method.key, val });
                         try {
                           await apiRequest("PUT", "/api/payment-gateway/config", { enabledMethods: updated });
                         } catch (e: any) {
-                          Alert.alert(t("error"), e.message);
+                          notify(t("error"), apiErrorMessage(e));
                         }
-                        refetchPgConfig();
+                        try { await refetchPgConfig(); } finally { setPgPending(null); }
                         qc.invalidateQueries({ queryKey: ["/api/payments/config"] });
                       }}
                       trackColor={{ false: Colors.inputBg, true: method.color + "60" }}
@@ -2724,6 +3046,7 @@ export default function SettingsScreen() {
                 );
               })}
 
+              {!stripeUnavailable && (<>
               <View style={pgStyles.divider} />
 
               {/* ── Mobile wallets: availability comes from the Stripe account ── */}
@@ -2735,7 +3058,7 @@ export default function SettingsScreen() {
                 ].map((mp) => {
                   const offered = accountMethods.includes(mp.key);
                   return (
-                    <View key={mp.key} style={[pgStyles.methodRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View key={mp.key} style={[pgStyles.methodRow, rowFlip && { flexDirection: "row-reverse" }]}>
                       <View style={[pgStyles.methodIconWrap, { backgroundColor: Colors.textMuted + "20" }]}>
                         <Ionicons name={mp.icon as any} size={20} color={Colors.text} />
                       </View>
@@ -2750,6 +3073,7 @@ export default function SettingsScreen() {
                   );
                 })}
               </View>
+              </>)}
 
             </ScrollView>
           </View>
@@ -2760,13 +3084,13 @@ export default function SettingsScreen() {
       <Modal visible={showBulkImport} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, rowFlip && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>{t("bulkImport")}</Text>
-              <Pressable onPress={() => setShowBulkImport(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowBulkImport(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* Tab Selector */}
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, marginBottom: 20 }}>
+              <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", gap: 8, marginBottom: 20 }}>
                 <Pressable
                   style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: importType === "products" ? Colors.accent : Colors.surfaceLight, alignItems: "center" }}
                   onPress={() => { setImportType("products"); setImportResult(null); }}
@@ -2785,7 +3109,7 @@ export default function SettingsScreen() {
 
               {/* Instructions */}
               <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginBottom: 16 }}>
-                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
                   <Ionicons name="information-circle" size={18} color={Colors.info} />
                   <Text style={{ color: Colors.text, fontSize: 14, fontWeight: "600" }}>{t("excelFormat")}</Text>
                 </View>
@@ -2802,15 +3126,8 @@ export default function SettingsScreen() {
 
               {/* Download Template Button */}
               <Pressable
-                style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.surfaceLight, borderRadius: 12, paddingVertical: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.accent + "40" }}
-                onPress={() => {
-                  const templateUrl = `${getApiUrl()}/api/${importType}/template`;
-                  if (Platform.OS === "web") {
-                    window.open(templateUrl, "_blank");
-                  } else {
-                    Alert.alert(t("downloadTemplate"), templateUrl);
-                  }
-                }}
+                style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.surfaceLight, borderRadius: 12, paddingVertical: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.accent + "40" }}
+                onPress={() => downloadExcel(`/api/${importType}/template`, `${importType}-template.xlsx`)}
               >
                 <Ionicons name="download-outline" size={20} color={Colors.accent} />
                 <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: "600" }}>{t("downloadTemplate")}</Text>
@@ -2819,15 +3136,8 @@ export default function SettingsScreen() {
               {/* Export existing data (customers only) */}
               {importType === "customers" && (
                 <Pressable
-                  style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.success + "15", borderRadius: 12, paddingVertical: 12, marginBottom: 16, borderWidth: 1, borderColor: Colors.success + "40" }}
-                  onPress={() => {
-                    const exportUrl = `${getApiUrl()}/api/customers/export${tenant?.id ? `?tenantId=${tenant.id}` : ""}`;
-                    if (Platform.OS === "web") {
-                      window.open(exportUrl, "_blank");
-                    } else {
-                      Alert.alert(t("exportCustomersExcel"), exportUrl);
-                    }
-                  }}
+                  style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.success + "15", borderRadius: 12, paddingVertical: 12, marginBottom: 16, borderWidth: 1, borderColor: Colors.success + "40" }}
+                  onPress={() => downloadExcel(`/api/customers/export${tenantId ? `?tenantId=${tenantId}` : ""}`, `customers-${storeYmd()}.xlsx`)}
                 >
                   <Ionicons name="share-outline" size={20} color={Colors.success} />
                   <Text style={{ color: Colors.success, fontSize: 14, fontWeight: "600" }}>{t("exportCustomersExcel" as any)}</Text>
@@ -2838,76 +3148,55 @@ export default function SettingsScreen() {
               <Pressable
                 style={{ borderWidth: 2, borderStyle: "dashed", borderColor: importLoading ? Colors.textMuted : Colors.accent, borderRadius: 16, padding: 30, alignItems: "center", marginBottom: 16, backgroundColor: Colors.surfaceLight }}
                 onPress={async () => {
-                  try {
+                  if (!tenantId) return notify(t("error"), tr3("لم يتم التعرف على المتجر", "Geschäft nicht erkannt", "Store not recognised"));
+                  // Sends the file and shows the server's answer; the loading
+                  // state only starts once a file was actually chosen, so a
+                  // cancelled picker never leaves the button spinning.
+                  const upload = async (base64: string) => {
                     setImportLoading(true);
                     setImportResult(null);
-
+                    try {
+                      const endpoint = importType === "products" ? "/api/products/import" : "/api/customers/import";
+                      const body: any = { fileBase64: base64, tenantId };
+                      if (importType === "products") body.branchId = myBranchId;
+                      const res = await apiRequest("POST", endpoint, body);
+                      const data = await res.json();
+                      setImportResult(data);
+                      if (data.success) invalidatePrefix(importType === "products" ? "/api/products" : "/api/customers");
+                    } catch (err: any) {
+                      setImportResult({ error: apiErrorMessage(err) });
+                    } finally {
+                      setImportLoading(false);
+                    }
+                  };
+                  const readAsBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(String(reader.result || "").split(",")[1] || "");
+                    reader.onerror = () => reject(reader.error);
+                    reader.readAsDataURL(blob);
+                  });
+                  try {
                     if (Platform.OS === "web") {
-                      // Web: use file input
                       const input = document.createElement("input");
                       input.type = "file";
                       input.accept = ".xlsx,.xls,.csv";
                       input.onchange = async (e: any) => {
-                        const file = e.target.files[0];
-                        if (!file) { setImportLoading(false); return; }
-                        const reader = new FileReader();
-                        reader.onload = async (ev) => {
-                          try {
-                            const base64 = (ev.target?.result as string).split(",")[1];
-                            const endpoint = importType === "products" ? "/api/products/import" : "/api/customers/import";
-                            const body: any = { fileBase64: base64, tenantId: tenant?.id || 1 };
-                            if (importType === "products") body.branchId = myBranchId;
-                            const res = await apiRequest("POST", endpoint, body);
-                            const data = await res.json();
-                            setImportResult(data);
-                            if (data.success) {
-                              qc.invalidateQueries({ queryKey: importType === "products" ? ["/api/products"] : ["/api/customers"] });
-                            }
-                          } catch (err: any) {
-                            setImportResult({ error: err.message });
-                          } finally {
-                            setImportLoading(false);
-                          }
-                        };
-                        reader.readAsDataURL(file);
+                        const file = e.target?.files?.[0];
+                        if (!file) return;
+                        try { await upload(await readAsBase64(file)); } catch (err: any) { setImportResult({ error: apiErrorMessage(err) }); }
                       };
                       input.click();
                     } else {
-                      // Native: use document picker
                       const result = await DocumentPicker.getDocumentAsync({
-                        type: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"],
+                        type: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "text/csv", "text/comma-separated-values"],
                         copyToCacheDirectory: true,
                       });
-                      if (!result.canceled && result.assets[0]) {
-                        const fileUri = result.assets[0].uri;
-                        const response = await fetch(fileUri);
-                        const blob = await response.blob();
-                        const reader = new FileReader();
-                        reader.onloadend = async () => {
-                          try {
-                            const base64 = (reader.result as string).split(",")[1];
-                            const endpoint = importType === "products" ? "/api/products/import" : "/api/customers/import";
-                            const body: any = { fileBase64: base64, tenantId: tenant?.id || 1 };
-                            if (importType === "products") body.branchId = myBranchId;
-                            const res = await apiRequest("POST", endpoint, body);
-                            const data = await res.json();
-                            setImportResult(data);
-                            if (data.success) {
-                              qc.invalidateQueries({ queryKey: importType === "products" ? ["/api/products"] : ["/api/customers"] });
-                            }
-                          } catch (err: any) {
-                            setImportResult({ error: err.message });
-                          } finally {
-                            setImportLoading(false);
-                          }
-                        };
-                        reader.readAsDataURL(blob);
-                      } else {
-                        setImportLoading(false);
-                      }
+                      if (result.canceled || !result.assets[0]) return;
+                      const blob = await (await fetch(result.assets[0].uri)).blob();
+                      await upload(await readAsBase64(blob));
                     }
                   } catch (err: any) {
-                    setImportResult({ error: err.message });
+                    setImportResult({ error: apiErrorMessage(err) });
                     setImportLoading(false);
                   }
                 }}
@@ -2927,7 +3216,7 @@ export default function SettingsScreen() {
                   borderRadius: 12, padding: 14, borderWidth: 1,
                   borderColor: importResult.success ? Colors.success + "30" : Colors.danger + "30"
                 }}>
-                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", gap: 8 }}>
                     <Ionicons
                       name={importResult.success ? "checkmark-circle" : "alert-circle"}
                       size={22}
@@ -2950,13 +3239,10 @@ export default function SettingsScreen() {
       <Modal visible={showVehicles} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, rowFlip && { flexDirection: "row-reverse" }]}>
               <Text style={styles.modalTitle}>{t("vehicleManagement")}</Text>
-              <Pressable
-                onPress={() => setShowVehicles(false)}
-                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.danger + "20", alignItems: "center", justifyContent: "center" }}
-              >
-                <Ionicons name="close" size={20} color={Colors.danger} />
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowVehicles(false)}>
+                <Ionicons name="close" size={24} color={Colors.textMuted} />
               </Pressable>
             </View>
             <ScrollView>
@@ -2968,20 +3254,20 @@ export default function SettingsScreen() {
                 <Text style={{ color: Colors.textMuted, textAlign: "center", padding: 24 }}>{t("noVehicles")}</Text>
               ) : (
                 vehiclesList.map((v: any) => (
-                  <View key={v.id} style={[styles.empCard, isRTL && { flexDirection: "row-reverse" }]}>
+                  <View key={v.id} style={[styles.empCard, rowFlip && { flexDirection: "row-reverse" }]}>
                     <View style={[styles.empAvatar, { backgroundColor: Colors.hueOrange + "20" }]}>
                       <Ionicons name="car" size={22} color={Colors.hueOrange} />
                     </View>
-                    <View style={[styles.empInfo, isRTL && { alignItems: "flex-end" }]}>
+                    <View style={[styles.empInfo, rowFlip && { alignItems: "flex-end" }]}>
                       <Text style={styles.empName}>{v.licensePlate}</Text>
                       <Text style={styles.empMeta}>{[v.make, v.model, v.color].filter(Boolean).join(" • ")}</Text>
-                      {v.driverName && <Text style={styles.empMeta}>{v.driverName} {v.driverPhone ? `· ${v.driverPhone}` : ""}</Text>}
+                      {!!v.driverName && <Text style={styles.empMeta}>{v.driverName} {v.driverPhone ? `· ${v.driverPhone}` : ""}</Text>}
                     </View>
-                    <View style={{ flexDirection: "row", gap: 8 }}>
-                      <Pressable onPress={() => { setEditVehicle(v); setVehicleForm({ licensePlate: v.licensePlate || "", make: v.make || "", model: v.model || "", color: v.color || "", driverName: v.driverName || "", driverPhone: v.driverPhone || "", notes: v.notes || "" }); setShowVehicleForm(true); }}>
+                    <View style={{ flexDirection: "row", gap: 4 }}>
+                      <Pressable hitSlop={6} style={styles.iconBtn} accessibilityLabel={t("editVehicle")} onPress={() => { setEditVehicle(v); setVehicleForm({ licensePlate: v.licensePlate || "", make: v.make || "", model: v.model || "", color: v.color || "", driverName: v.driverName || "", driverPhone: v.driverPhone || "", notes: v.notes || "" }); setShowVehicleForm(true); }}>
                         <Ionicons name="pencil" size={18} color={Colors.info} />
                       </Pressable>
-                      <Pressable onPress={() => Alert.alert(t("deleteVehicle"), t("areYouSure"), [{ text: t("cancel") }, { text: t("delete"), style: "destructive", onPress: () => deleteVehicleMutation.mutate(v.id) }])}>
+                      <Pressable hitSlop={6} style={styles.iconBtn} accessibilityLabel={t("deleteVehicle")} disabled={deleteVehicleMutation.isPending} onPress={() => confirmAction(t("deleteVehicle"), `${t("areYouSure")}\n${v.licensePlate}`, t("delete"), t("cancel"), () => deleteVehicleMutation.mutate(v.id))}>
                         <Ionicons name="trash" size={18} color={Colors.danger} />
                       </Pressable>
                     </View>
@@ -2997,9 +3283,9 @@ export default function SettingsScreen() {
       <Modal visible={showVehicleForm} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, rowFlip && { flexDirection: "row-reverse" }]}>
               <Text style={styles.modalTitle}>{editVehicle ? t("editVehicle") : t("addVehicle")}</Text>
-              <Pressable onPress={() => setShowVehicleForm(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowVehicleForm(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
             </View>
             <ScrollView>
               {[
@@ -3017,18 +3303,25 @@ export default function SettingsScreen() {
                     style={[styles.input, isRTL && { textAlign: "right" }]}
                     value={(vehicleForm as any)[key]}
                     onChangeText={(v) => setVehicleForm((f) => ({ ...f, [key]: v }))}
-                    placeholder={label}
+                    placeholder={key === "driverPhone" ? phonePh : label}
                     placeholderTextColor={Colors.textMuted}
+                    keyboardType={key === "driverPhone" ? "phone-pad" : "default"}
+                    autoCapitalize={key === "licensePlate" ? "characters" : "sentences"}
+                    multiline={key === "notes"}
                   />
                 </View>
               ))}
-              <Pressable style={styles.saveBtn} onPress={() => {
-                if (!vehicleForm.licensePlate.trim()) { Alert.alert(t("error"), t("licensePlate") + " required"); return; }
-                if (editVehicle) updateVehicleMutation.mutate({ id: editVehicle.id, data: vehicleForm });
-                else createVehicleMutation.mutate(vehicleForm);
+              <Pressable style={[styles.saveBtn, vehicleSaving && { opacity: 0.6 }]} disabled={vehicleSaving} onPress={() => {
+                const plate = vehicleForm.licensePlate.trim();
+                if (!plate) { notify(t("error"), tr3("رقم اللوحة مطلوب", "Kennzeichen ist erforderlich", "Licence plate is required")); return; }
+                const driverPhone = cleanPhone(vehicleForm.driverPhone, editVehicle?.driverPhone);
+                if (driverPhone === null) { notify(t("error"), invalidPhoneMsg); return; }
+                const data = { ...vehicleForm, licensePlate: plate, driverPhone, make: vehicleForm.make.trim(), model: vehicleForm.model.trim(), color: vehicleForm.color.trim(), driverName: vehicleForm.driverName.trim(), notes: vehicleForm.notes.trim() };
+                if (editVehicle) updateVehicleMutation.mutate({ id: editVehicle.id, data });
+                else createVehicleMutation.mutate(data);
               }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>{editVehicle ? t("save") : t("addVehicle")}</Text>
+                  <Text style={styles.saveBtnText}>{vehicleSaving ? t("loading") : editVehicle ? t("save") : t("addVehicle")}</Text>
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -3040,9 +3333,9 @@ export default function SettingsScreen() {
       <Modal visible={showPrinterConfig} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, rowFlip && { flexDirection: "row-reverse" }]}>
               <Text style={styles.modalTitle}>{t("printerConfig")}</Text>
-              <Pressable onPress={() => setShowPrinterConfig(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowPrinterConfig(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
             </View>
             <ScrollView>
               <Text style={{ color: Colors.textMuted, fontSize: 13, marginBottom: 16 }}>{t("printerConfigDesc")}</Text>
@@ -3062,11 +3355,11 @@ export default function SettingsScreen() {
                 const localCfg = printerConfigData[key] || { printer1: (cfg as any).printer1 || "", printer2: (cfg as any).printer2 || "" };
                 return (
                   <View key={key} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: Colors.cardBorder }}>
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
                       <Ionicons name={icon as any} size={18} color={Colors.accent} />
                       <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 14 }}>{label}</Text>
                     </View>
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8 }}>
+                    <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", gap: 8 }}>
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 4 }}>{t("printer1")}</Text>
                         <TextInput
@@ -3105,9 +3398,9 @@ export default function SettingsScreen() {
       <Modal visible={showDailyClosing} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, rowFlip && { flexDirection: "row-reverse" }]}>
               <Text style={styles.modalTitle}>{t("dailyClosingTitle")}</Text>
-              <Pressable onPress={() => setShowDailyClosing(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowDailyClosing(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
             </View>
             <ScrollView>
               <Text style={{ color: Colors.textMuted, fontSize: 13, marginBottom: 16 }}>{t("dailyClosingDesc")}</Text>
@@ -3116,144 +3409,74 @@ export default function SettingsScreen() {
               <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.hueCyan + "40" }}>
                 <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 15, marginBottom: 12 }}>{t("performDailyClosing")}</Text>
                 <View style={{ marginBottom: 10 }}>
-                  <Text style={styles.label}>{t("openingCash")}</Text>
-                  <TextInput style={styles.input} value={dailyClosingForm.openingCash} onChangeText={(v) => setDailyClosingForm((f) => ({ ...f, openingCash: v }))} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={Colors.textMuted} />
+                  <Text style={styles.label}>{t("openingCash")} ({currencyLabel()})</Text>
+                  <TextInput style={[styles.input, isRTL && { textAlign: "right" }]} value={dailyClosingForm.openingCash} onChangeText={(v) => setDailyClosingForm((f) => ({ ...f, openingCash: v }))} keyboardType={moneyKeyboard} placeholder={moneyPlaceholder} placeholderTextColor={Colors.textMuted} />
                 </View>
                 <View style={{ marginBottom: 10 }}>
-                  <Text style={styles.label}>{t("closingCash")}</Text>
-                  <TextInput style={styles.input} value={dailyClosingForm.closingCash} onChangeText={(v) => setDailyClosingForm((f) => ({ ...f, closingCash: v }))} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={Colors.textMuted} />
+                  <Text style={styles.label}>{t("closingCash")} ({currencyLabel()})</Text>
+                  <TextInput style={[styles.input, isRTL && { textAlign: "right" }]} value={dailyClosingForm.closingCash} onChangeText={(v) => setDailyClosingForm((f) => ({ ...f, closingCash: v }))} keyboardType={moneyKeyboard} placeholder={moneyPlaceholder} placeholderTextColor={Colors.textMuted} />
                 </View>
                 <View style={{ marginBottom: 10 }}>
                   <Text style={styles.label}>{t("notes")}</Text>
-                  <TextInput style={styles.input} value={dailyClosingForm.notes} onChangeText={(v) => setDailyClosingForm((f) => ({ ...f, notes: v }))} placeholder={t("optionalNotes")} placeholderTextColor={Colors.textMuted} />
+                  <TextInput style={[styles.input, isRTL && { textAlign: "right" }]} value={dailyClosingForm.notes} onChangeText={(v) => setDailyClosingForm((f) => ({ ...f, notes: v }))} placeholder={t("optionalNotes")} placeholderTextColor={Colors.textMuted} />
                 </View>
-                <Pressable style={styles.saveBtn} onPress={async () => {
-                  setDailyClosingLoading(true);
-                  try {
-                    await apiRequest("POST", "/api/daily-closings", {
-                      tenantId: tenant?.id, branchId: employee?.branchId || null,
-                      employeeId: employee?.id, openingCash: dailyClosingForm.openingCash, closingCash: dailyClosingForm.closingCash, notes: dailyClosingForm.notes,
-                    });
-                    qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/daily-closings?tenantId=${tenant.id}` : "/api/daily-closings"] });
-                    setDailyClosingForm({ openingCash: "", closingCash: "", notes: "" });
-
-                    // Auto-print Personalbericht after closing
-                    if (Platform.OS === "web") {
-                      try {
-                        const today = new Date().toISOString().split("T")[0];
-                        const res = await apiRequest("GET", `/api/reports/daily-sales-report?date=${today}`);
-                        const salesData: any[] = await res.json();
-                        if (salesData && salesData.length > 0) {
-                          const storeName = (storeSettings as any)?.name || tenant?.name || "POS System";
-                          const dateObj = new Date();
-                          const dateStr = dateObj.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-                          const cashierName = employee?.name || "Kassierer";
-                          const total = salesData.reduce((s: number, sale: any) => s + Number(sale.totalAmount || 0), 0);
-                          const rowsHtml = salesData.map((sale: any, idx: number) => {
-                            const addr = sale.customerAddress || "";
-                            const parts = addr.split(",");
-                            const street = parts[0]?.trim() || "–";
-                            const city = parts[1]?.trim() || parts[0]?.trim() || "–";
-                            const timeStr = new Date(sale.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-                            const amt = Number(sale.totalAmount || 0).toFixed(2);
-                            return `<tr><td>${idx + 1}</td><td>${street}</td><td>${city}</td><td>${timeStr}</td><td style="text-align:right;">${amt}</td></tr>`;
-                          }).join("");
-                          const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Personalbericht</title><style>
-                            body { font-family: 'Courier New', monospace; font-size: 11px; margin: 0; padding: 10px; color: #000; }
-                            h2 { text-align: center; font-size: 14px; margin: 4px 0; }
-                            .sub { text-align: center; font-size: 11px; margin-bottom: 8px; }
-                            table { width: 100%; border-collapse: collapse; }
-                            th { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 4px; text-align: left; font-size: 10px; }
-                            td { padding: 2px 4px; font-size: 10px; border-bottom: 1px dotted #ccc; }
-                            .total-row { border-top: 1px solid #000; font-weight: bold; }
-                            .total-row td { padding-top: 4px; }
-                          </style></head><body>
-                            <h2>Personalbericht</h2>
-                            <div class="sub">${dateStr}</div>
-                            <div class="sub">${storeName}</div>
-                            <br/>
-                            <div style="font-weight:bold;margin-bottom:4px;">Nr &nbsp; Kassierer: ${cashierName}</div>
-                            <table>
-                              <thead><tr><th>Nr</th><th>Adresse</th><th>Gebiet</th><th>Zeit</th><th style="text-align:right;">Total</th></tr></thead>
-                              <tbody>${rowsHtml}</tbody>
-                              <tfoot>
-                                <tr class="total-row"><td colspan="4">Umsatz Total</td><td style="text-align:right;">${total.toFixed(2)}</td></tr>
-                                <tr><td colspan="4">TAGESAUSGAB</td><td style="text-align:right;">0.00</td></tr>
-                                <tr class="total-row"><td colspan="2">${salesData.length}&nbsp;&nbsp;TOTAL Kassierer</td><td colspan="2"></td><td style="text-align:right;">${total.toFixed(2)}</td></tr>
-                              </tfoot>
-                            </table>
-                            <br/>
-                            <div style="text-align:center;font-size:10px;">${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} &nbsp; ${dateStr}</div>
-                          </body></html>`;
-                          printHtmlViaIframe(html);
-                        }
-                      } catch (_) { /* print error is non-fatal */ }
+                <Pressable style={[styles.saveBtn, dailyClosingLoading && { opacity: 0.6 }]} onPress={() => {
+                  const opening = dailyClosingForm.openingCash.trim() === "" ? 0 : parseNum(dailyClosingForm.openingCash);
+                  const closing = dailyClosingForm.closingCash.trim() === "" ? 0 : parseNum(dailyClosingForm.closingCash);
+                  if (!Number.isFinite(opening) || opening < 0 || !Number.isFinite(closing) || closing < 0) {
+                    notify(t("error"), tr3("أدخل مبالغ نقدية صحيحة", "Bitte gültige Bargeldbeträge eingeben", "Enter valid cash amounts"));
+                    return;
+                  }
+                  const today = storeYmd();
+                  const already = dailyClosingsList.some((dc: any) => String(dc.closingDate || "").slice(0, 10) === today);
+                  const run = async () => {
+                    setDailyClosingLoading(true);
+                    try {
+                      const fix = (n: number) => (zeroDec ? Math.round(n) : n).toFixed(zeroDec ? 0 : 2);
+                      await apiRequest("POST", "/api/daily-closings", {
+                        tenantId: tenant?.id, branchId: myBranchId,
+                        employeeId: employee?.id, closingDate: today,
+                        openingCash: fix(opening), closingCash: fix(closing), notes: dailyClosingForm.notes.trim(),
+                      });
+                      invalidatePrefix("/api/daily-closings");
+                      setDailyClosingForm({ openingCash: "", closingCash: "", notes: "" });
+                      notify(t("success"), t("dailyClosingDone"));
+                      // Staff report prints after the closing; a print failure
+                      // must not look like a failed closing.
+                      try { await printStaffReport(true); } catch { /* non-fatal */ }
+                    } catch (e: any) {
+                      notify(t("error"), apiErrorMessage(e));
+                    } finally {
+                      setDailyClosingLoading(false);
                     }
-
-                    Alert.alert(t("success"), t("dailyClosingDone"));
-                  } catch (e: any) { Alert.alert(t("error"), e.message); }
-                  setDailyClosingLoading(false);
+                  };
+                  if (already) {
+                    confirmAction(
+                      t("performDailyClosing"),
+                      tr3("تم إغلاق اليوم مسبقاً. هل تريد إنشاء إغلاق آخر؟", "Für heute gibt es bereits einen Abschluss. Noch einen erstellen?", "Today has already been closed. Create another closing?"),
+                      t("confirm"), t("cancel"), run,
+                    );
+                  } else run();
                 }} disabled={dailyClosingLoading}>
-                  <LinearGradient colors={["#06B6D4", "#0891B2"]} style={styles.saveBtnGradient}>
+                  <LinearGradient colors={[Colors.hueCyan, Colors.accent]} style={styles.saveBtnGradient}>
                     <Text style={styles.saveBtnText}>{dailyClosingLoading ? t("loading") : t("performDailyClosing")}</Text>
                   </LinearGradient>
                 </Pressable>
               </View>
 
               {/* Print daily report button */}
-              <Pressable style={{ backgroundColor: Colors.hueAmber + "20", borderRadius: 12, padding: 14, marginBottom: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: Colors.hueAmber + "60" }} onPress={async () => {
-                if (Platform.OS !== "web") { Alert.alert("Info", "Drucken ist nur im Web verfügbar."); return; }
-                try {
-                  const today = new Date().toISOString().split("T")[0];
-                  const res = await apiRequest("GET", `/api/reports/daily-sales-report?date=${today}`);
-                  const salesData: any[] = await res.json();
-                  if (!salesData || salesData.length === 0) { Alert.alert("Personalbericht", "Keine Bestellungen für heute gefunden."); return; }
-                  const storeName = (storeSettings as any)?.name || tenant?.name || "POS System";
-                  const dateObj = new Date();
-                  const dateStr = dateObj.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-                  const cashierName = employee?.name || "Kassierer";
-                  const total = salesData.reduce((s: number, sale: any) => s + Number(sale.totalAmount || 0), 0);
-                  const rowsHtml = salesData.map((sale: any, idx: number) => {
-                    const addr = sale.customerAddress || "";
-                    const parts = addr.split(",");
-                    const street = parts[0]?.trim() || "–";
-                    const city = parts[1]?.trim() || parts[0]?.trim() || "–";
-                    const timeStr = new Date(sale.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-                    const amt = Number(sale.totalAmount || 0).toFixed(2);
-                    return `<tr><td>${idx + 1}</td><td>${street}</td><td>${city}</td><td>${timeStr}</td><td style="text-align:right;">${amt}</td></tr>`;
-                  }).join("");
-                  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Personalbericht</title><style>
-                    body { font-family: 'Courier New', monospace; font-size: 11px; margin: 0; padding: 10px; color: #000; }
-                    h2 { text-align: center; font-size: 14px; margin: 4px 0; }
-                    .sub { text-align: center; font-size: 11px; margin-bottom: 8px; }
-                    table { width: 100%; border-collapse: collapse; }
-                    th { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 4px; text-align: left; font-size: 10px; }
-                    td { padding: 2px 4px; font-size: 10px; border-bottom: 1px dotted #ccc; }
-                    .total-row { border-top: 1px solid #000; font-weight: bold; }
-                    .total-row td { padding-top: 4px; }
-                  </style></head><body>
-                    <h2>Personalbericht</h2>
-                    <div class="sub">${dateStr}</div>
-                    <div class="sub">${storeName}</div>
-                    <br/>
-                    <div style="font-weight:bold;margin-bottom:4px;">Nr &nbsp; Kassierer: ${cashierName}</div>
-                    <table>
-                      <thead><tr><th>Nr</th><th>Adresse</th><th>Gebiet</th><th>Zeit</th><th style="text-align:right;">Total</th></tr></thead>
-                      <tbody>${rowsHtml}</tbody>
-                      <tfoot>
-                        <tr class="total-row"><td colspan="4">Umsatz Total</td><td style="text-align:right;">${total.toFixed(2)}</td></tr>
-                        <tr><td colspan="4">TAGESAUSGAB</td><td style="text-align:right;">0.00</td></tr>
-                        <tr class="total-row"><td colspan="2">${salesData.length}&nbsp;&nbsp;TOTAL Kassierer</td><td colspan="2"></td><td style="text-align:right;">${total.toFixed(2)}</td></tr>
-                      </tfoot>
-                    </table>
-                    <br/>
-                    <div style="text-align:center;font-size:10px;">${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} &nbsp; ${dateStr}</div>
-                  </body></html>`;
-                  printHtmlViaIframe(html);
-                } catch (e: any) { Alert.alert("Fehler", e.message); }
-              }}>
-                <Ionicons name="print-outline" size={20} color={Colors.hueAmber} />
-                <Text style={{ color: Colors.hueAmber, fontWeight: "700", fontSize: 14 }}>Personalbericht drucken</Text>
+              <Pressable
+                style={{ backgroundColor: Colors.hueAmber + "20", borderRadius: 12, padding: 14, minHeight: 48, marginBottom: 16, flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: Colors.hueAmber + "60", opacity: staffReportBusy ? 0.6 : 1 }}
+                disabled={staffReportBusy}
+                onPress={async () => {
+                  setStaffReportBusy(true);
+                  try { await printStaffReport(false); }
+                  catch (e: any) { notify(t("error"), apiErrorMessage(e)); }
+                  finally { setStaffReportBusy(false); }
+                }}
+              >
+                {staffReportBusy ? <ActivityIndicator size="small" color={Colors.hueAmber} /> : <Ionicons name="print-outline" size={20} color={Colors.hueAmber} />}
+                <Text style={{ color: Colors.hueAmber, fontWeight: "700", fontSize: 14 }}>{tr3("طباعة تقرير الموظفين", "Personalbericht drucken", "Print staff report")}</Text>
               </Pressable>
 
               {/* Past closings */}
@@ -3263,11 +3486,11 @@ export default function SettingsScreen() {
               ) : (
                 dailyClosingsList.slice(0, 30).map((dc: any) => (
                   <View key={dc.id} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder }}>
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
+                    <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
                       <Text style={{ color: Colors.text, fontWeight: "700" }}>{dc.closingDate}</Text>
                       <Text style={{ color: Colors.success, fontWeight: "700" }}>{formatMoney(dc.totalSales || 0)}</Text>
                     </View>
-                    <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{dc.totalTransactions} {t("transactions")} · {t("cashDrawer")}: {Number(dc.closingCash || 0).toFixed(2)}</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{dc.totalTransactions} {t("transactions")} · {t("cashDrawer")}: {formatMoney(dc.closingCash || 0)}</Text>
                   </View>
                 ))
               )}
@@ -3280,9 +3503,9 @@ export default function SettingsScreen() {
       <Modal visible={showMonthlyClosing} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, rowFlip && { flexDirection: "row-reverse" }]}>
               <Text style={styles.modalTitle}>{t("monthlyClosingTitle")}</Text>
-              <Pressable onPress={() => setShowMonthlyClosing(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowMonthlyClosing(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
             </View>
             <ScrollView>
               <Text style={{ color: Colors.textMuted, fontSize: 13, marginBottom: 16 }}>{t("monthlyClosingDesc")}</Text>
@@ -3291,25 +3514,25 @@ export default function SettingsScreen() {
                 <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 15, marginBottom: 12 }}>{t("performMonthlyClosing")}</Text>
                 <View style={{ marginBottom: 10 }}>
                   <Text style={styles.label}>{t("notes")}</Text>
-                  <TextInput style={styles.input} value={monthlyClosingForm.notes} onChangeText={(v) => setMonthlyClosingForm({ notes: v })} placeholder={t("optionalNotes")} placeholderTextColor={Colors.textMuted} />
+                  <TextInput style={[styles.input, isRTL && { textAlign: "right" }]} value={monthlyClosingForm.notes} onChangeText={(v) => setMonthlyClosingForm({ notes: v })} placeholder={t("optionalNotes")} placeholderTextColor={Colors.textMuted} />
                 </View>
-                <Pressable style={styles.saveBtn} onPress={async () => {
+                <Pressable style={[styles.saveBtn, monthlyClosingLoading && { opacity: 0.6 }]} onPress={async () => {
                   setMonthlyClosingLoading(true);
                   try {
-                    const now = new Date();
                     await apiRequest("POST", "/api/monthly-closings", {
-                      tenantId: tenant?.id, branchId: employee?.branchId || null,
+                      tenantId: tenant?.id, branchId: myBranchId,
                       employeeId: employee?.id,
-                      closingMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
-                      notes: monthlyClosingForm.notes,
+                      // The store's own calendar month, not the device's/UTC one.
+                      closingMonth: storeYmd().slice(0, 7),
+                      notes: monthlyClosingForm.notes.trim(),
                     });
-                    qc.invalidateQueries({ queryKey: [tenant?.id ? `/api/monthly-closings?tenantId=${tenant.id}` : "/api/monthly-closings"] });
-                    Alert.alert(t("success"), t("monthlyClosingDone"));
+                    invalidatePrefix("/api/monthly-closings");
+                    notify(t("success"), t("monthlyClosingDone"));
                     setMonthlyClosingForm({ notes: "" });
-                  } catch (e: any) { Alert.alert(t("error"), e.message); }
-                  setMonthlyClosingLoading(false);
+                  } catch (e: any) { notify(t("error"), apiErrorMessage(e)); }
+                  finally { setMonthlyClosingLoading(false); }
                 }} disabled={monthlyClosingLoading}>
-                  <LinearGradient colors={["#8B5CF6", "#7C3AED"]} style={styles.saveBtnGradient}>
+                  <LinearGradient colors={[Colors.hueViolet, Colors.accent]} style={styles.saveBtnGradient}>
                     <Text style={styles.saveBtnText}>{monthlyClosingLoading ? t("loading") : t("performMonthlyClosing")}</Text>
                   </LinearGradient>
                 </Pressable>
@@ -3321,7 +3544,7 @@ export default function SettingsScreen() {
               ) : (
                 monthlyClosingsList.map((mc: any) => (
                   <View key={mc.id} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder }}>
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
+                    <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
                       <Text style={{ color: Colors.text, fontWeight: "700" }}>{mc.closingMonth}</Text>
                       <Text style={{ color: Colors.success, fontWeight: "700" }}>{formatMoney(mc.totalSales || 0)}</Text>
                     </View>
@@ -3339,9 +3562,9 @@ export default function SettingsScreen() {
       <Modal visible={showAccountsReceivable} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, rowFlip && { flexDirection: "row-reverse" }]}>
               <Text style={styles.modalTitle}>{t("debitoren")}</Text>
-              <Pressable onPress={() => setShowAccountsReceivable(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowAccountsReceivable(false)}><Ionicons name="close" size={24} color={Colors.textMuted} /></Pressable>
             </View>
             <ScrollView>
               {(() => {
@@ -3359,7 +3582,7 @@ export default function SettingsScreen() {
                     ) : (
                       debtors.map((c: any) => (
                         <View key={c.id} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder }}>
-                          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center" }}>
+                          <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center" }}>
                             <View>
                               <Text style={{ color: Colors.text, fontWeight: "700" }}>{c.name}</Text>
                               <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{c.phone || t("noPhone")}</Text>
@@ -3386,9 +3609,9 @@ export default function SettingsScreen() {
       <Modal visible={showLoyaltyConfig} animationType="slide" transparent onRequestClose={() => setShowLoyaltyConfig(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, rowFlip && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>{t("loyaltyConfiguration")}</Text>
-              <Pressable onPress={() => setShowLoyaltyConfig(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+              <Pressable hitSlop={8} style={styles.closeBtn} accessibilityLabel={t("close" as any)} onPress={() => setShowLoyaltyConfig(false)}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={[{ color: Colors.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 8 }, rtlTextAlign]}>
@@ -3399,7 +3622,7 @@ export default function SettingsScreen() {
                 )}
               </Text>
 
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
+              <View style={{ flexDirection: rowFlip ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, marginTop: 8 }}>
                 <Text style={{ color: Colors.text, fontSize: 14, fontWeight: "600" }}>{tr3("تفعيل برنامج الولاء", "Treueprogramm aktiv", "Loyalty programme on")}</Text>
                 <Switch value={loyaltyForm.enabled} onValueChange={(v) => setLoyaltyForm({ ...loyaltyForm, enabled: v })} trackColor={{ false: Colors.inputBorder, true: Colors.loyaltyGold + "60" }} thumbColor={loyaltyForm.enabled ? Colors.loyaltyGold : Colors.textMuted} />
               </View>
@@ -3523,7 +3746,9 @@ const styles = themedStyles((Colors) => ({
   saveBtn: { borderRadius: 14, overflow: "hidden", marginTop: 20, marginBottom: 16 },
   saveBtnGradient: { paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 },
   saveBtnText: { color: Colors.white, fontSize: 16, fontWeight: "700" },
-  clockBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  clockBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, minHeight: 36 },
+  iconBtn: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  closeBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: "center", alignItems: "center" },
   clockBtnText: { fontSize: 13, fontWeight: "700" },
 }));
 

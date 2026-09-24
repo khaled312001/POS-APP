@@ -3,17 +3,20 @@ import { Ionicons } from "@expo/vector-icons";
 import { View, Text, StyleSheet } from "react-native";
 import { Colors } from "@/constants/colors";
 import { themedStyles } from "@/lib/themed-styles";
+import { useLanguage } from "@/lib/language-context";
 
 const STEPS = [
-  { key: "pending",   label: "Received",  labelAr: "استلام" },
-  { key: "accepted",  label: "Accepted",  labelAr: "مقبول" },
-  { key: "preparing", label: "Preparing", labelAr: "تحضير" },
-  { key: "ready",     label: "Ready",     labelAr: "جاهز" },
-  { key: "on_way",    label: "On Way",    labelAr: "في الطريق" },
-  { key: "delivered", label: "Delivered", labelAr: "تم التسليم" },
+  { key: "pending",   label: "Received",  labelAr: "استلام",     labelDe: "Eingegangen" },
+  { key: "accepted",  label: "Accepted",  labelAr: "مقبول",      labelDe: "Angenommen" },
+  { key: "preparing", label: "Preparing", labelAr: "تحضير",      labelDe: "Zubereitung" },
+  { key: "ready",     label: "Ready",     labelAr: "جاهز",       labelDe: "Fertig" },
+  { key: "on_way",    label: "On Way",    labelAr: "في الطريق",  labelDe: "Unterwegs" },
+  { key: "delivered", label: "Delivered", labelAr: "تم التسليم", labelDe: "Geliefert" },
 ];
 
-const STATUS_COLORS: Record<string, string> = {
+// Read per render: `Colors` is a live view onto the active theme, so a
+// module-scope copy would keep the palette that was active at import time.
+const statusColors = (): Record<string, string> => ({
   pending:   Colors.statusPending,
   accepted:  Colors.statusAccepted,
   preparing: Colors.statusPreparing,
@@ -21,7 +24,7 @@ const STATUS_COLORS: Record<string, string> = {
   on_way:    Colors.statusOnWay,
   delivered: Colors.statusDelivered,
   cancelled: Colors.statusCancelled,
-};
+});
 
 interface Props {
   currentStatus: string;
@@ -30,7 +33,9 @@ interface Props {
 }
 
 export default function DeliveryStatusPipeline({ currentStatus, isRtl = false, timestamps }: Props) {
+  const { language } = useLanguage();
   const currentIdx = STEPS.findIndex(s => s.key === currentStatus);
+  const STATUS_COLORS = statusColors();
 
   return (
     <View style={styles.container}>
@@ -58,7 +63,7 @@ export default function DeliveryStatusPipeline({ currentStatus, isRtl = false, t
                 isActive && styles.labelActive,
                 isDone && styles.labelDone,
               ]}>
-                {isRtl ? step.labelAr : step.label}
+                {isRtl || language === "ar" ? step.labelAr : language === "de" ? step.labelDe : step.label}
               </Text>
               {timestamps?.[step.key] && (
                 <Text style={styles.timestamp}>

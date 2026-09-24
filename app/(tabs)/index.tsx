@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "expo-router";
 import {
   StyleSheet, Text, View, FlatList, Pressable, TextInput,
-  ScrollView, Modal, Alert, Platform, Dimensions, Image, Animated, ActivityIndicator, Linking,
+  ScrollView, Modal, Alert, Platform, Dimensions, Image, Animated, ActivityIndicator, Linking, I18nManager,
 } from "react-native";
 import Svg, { Path as SvgPath, Rect as SvgRect } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,7 +17,6 @@ import { useAuth } from "@/lib/auth-context";
 import { useLicense } from "@/lib/license-context";
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { getDisplayNumber } from "@/lib/api-config";
-import { normalizeOrderItems } from "@/lib/order-items";
 import BarcodeScannerModal, { type ScanFeedback } from "@/components/BarcodeScannerModal";
 import { findProductByCode, looksLikeBarcode, normalizeBarcode, useHardwareBarcodeScanner } from "@/lib/barcode";
 import { playClickSound, playAddSound } from "@/lib/sound";
@@ -32,7 +31,9 @@ import {
   PIZZA_TOPPINGS, TOPPING_PRICE, TOPPING_GRID, SAUCE_ROW, SAUCE_NAMES,
   calcToppingsPrice, getToppingDisplayName, getToppingEmoji, getToppingInfo,
 } from "@/utils/toppingUtils";
-import { formatMoney, currencyLabel, setCurrency, isZeroDecimalCurrency } from "@/lib/currency";
+import { formatMoney, formatAmount, currencyLabel, setCurrency, isZeroDecimalCurrency } from "@/lib/currency";
+import { parseAmountInput, roundMoney, moneyString, cashSuggestions, moneyStep, toLatinDigits } from "@/lib/money-input";
+import { showAlert, confirmAsync, describeError, isUncertainFailure } from "@/lib/alert";
 import ShamCashTillModal from "@/components/ShamCashTillModal";
 
 type ProductVariantOption = {
@@ -73,6 +74,26 @@ const AnimatedProductImage = ({ uri }: { uri: string }) => {
 // polls the sale until the server says so.
 const STRIPE_METHODS = ["card", "wallet"] as const;
 const isStripeMethod = (pm: string) => (STRIPE_METHODS as readonly string[]).includes(pm);
+/**
+ * Currencies Stripe cannot charge in (Stripe does not operate in Syria). A
+ * store in one of these never sees the card/TWINT/wallet buttons at all —
+ * not greyed out, not offered — so a cashier cannot start a payment that the
+ * platform's live Stripe account would then take in the wrong currency.
+ */
+const STRIPE_UNSUPPORTED_CURRENCIES = new Set(["SYP"]);
+
+/** Reference that ties every attempt at one checkout to the sale it creates. */
+const newCheckoutRef = () =>
+  `pos-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+/** A sale row carries our checkout reference inside payment_details. */
+const saleHasCheckoutRef = (sale: any, ref: string): boolean => {
+  let details = sale?.paymentDetails;
+  if (typeof details === "string") {
+    try { details = JSON.parse(details); } catch { return false; }
+  }
+  return Array.isArray(details) && details.some((d: any) => d && d.ref === ref);
+};
 
 /** How often the till asks the server whether the webhook has landed. */
 const STRIPE_POLL_MS = 2500;
@@ -162,7 +183,17 @@ export default function POSScreen() {
   const { tenant } = useLicense();
   const qc = useQueryClient();
   const cart = useCart();
-  const { t, isRTL, rtlTextAlign, rtlText, rtlRow, language } = useLanguage();
+  const { t, isRTL, rtlTextAlign, language, currency } = useLanguage();
+  /** Picks the copy for the current language: L("عربي", "Deutsch", "English"). */
+  const L = useCallback((ar: string, de: string, en: string) => (language === "ar" ? ar : language === "de" ? de : en), [language]);
+  // Rows already follow the reading direction: the web document runs with
+  // dir="rtl" and native Arabic with I18nManager forced RTL. Reversing a row by
+  // hand on top of that flipped Arabic back to left-to-right, so rows are only
+  // reversed where nothing else does it (native, before the RTL restart).
+  const flipRow = isRTL && Platform.OS !== "web" && !I18nManager.isRTL;
+  // Physical left/right (borders, margins) is not mirrored by CSS direction.
+  const webRTL = isRTL && Platform.OS === "web";
+  const stripeCurrencyOk = !STRIPE_UNSUPPORTED_CURRENCIES.has(String(currency || "").toUpperCase());
   const { isDark, toggle: toggleTheme } = useTheme();
   const [screenDims, setScreenDims] = useState(Dimensions.get("window"));
   useEffect(() => {
@@ -171,23 +202,43 @@ export default function POSScreen() {
   }, []);
   const isTablet = screenDims.width > 600;
   const { isMobileWeb, topPad } = getChromeMetrics(screenDims.width);
+  // Icon-only header buttons below desktop width so the bar never overflows
+  // (German/Arabic labels are long); every button keeps an accessibility label.
+  const compactHeader = screenDims.width < 1180;
   const useMobileCartSidebar = isMobileWeb;
   const prefersInlineSizePicker = Platform.OS === "web";
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
-  const [showReceipt, setShowReceipt] = useState(false);
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [cashReceived, setCashReceived] = useState("");
   const [lastSale, setLastSale] = useState<any>(null);
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [discountInput, setDiscountInput] = useState("");
   const [discountType, setDiscountType] = useState<"fixed" | "percent">("fixed");
   const [manualAdjustment, setManualAdjustment] = useState(0);
   // ± step for the manual adjustment: 1 in CHF-style currencies, 10 in SYP.
-  const adjustStep = isZeroDecimalCurrency() ? 10 : 1;
+  const adjustStep = moneyStep(currency, "small");
+  /** What the customer pays: cart total plus the manual ± adjustment, in payable units. */
+  const payableTotal = roundMoney(cart.total + manualAdjustment, currency);
+  const feeStep = moneyStep(currency, "fee");
+  /** Swiss-only helpers (city chips, geo.admin.ch address search, 079 numbers). */
+  const swissStore = String(currency || "").toUpperCase() === "CHF";
+  /** Physical "end" alignment for number columns (RN-web does not swap left/right). */
+  const zeroEndAlign: "left" | "right" = webRTL ? "left" : (isRTL && I18nManager.isRTL ? "right" : isRTL ? "left" : "right");
+  const dateLocale = language === "ar" ? "ar-SY-u-nu-latn" : language === "de" ? "de-CH" : "en-GB";
+  const paymentLabel = (pm?: string | null): string => {
+    switch (String(pm || "cash").toLowerCase()) {
+      case "cash": return t("cash");
+      case "card": return t("card");
+      case "wallet": return t("walletPay");
+      case "shamcash": return L("شام كاش", "Sham Cash", "Sham Cash");
+      case "credit": return L("آجل", "Auf Rechnung", "On credit");
+      case "mobile": return L("جوال", "Mobile", "Mobile");
+      default: return String(pm).toUpperCase();
+    }
+  };
   const [showScanner, setShowScanner] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
@@ -242,7 +293,6 @@ export default function POSScreen() {
   const [ncShowSuggestions, setNcShowSuggestions] = useState(false);
   const [ncCityFilter, setNcCityFilter] = useState("Zürich");
   const ncAddrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showOnlineOrders, setShowOnlineOrders] = useState(false);
   const [showCallHistory, setShowCallHistory] = useState(false);
   const [callHistoryFilter, setCallHistoryFilter] = useState<"all" | "missed" | "answered" | "today">("all");
   const [callHistorySearch, setCallHistorySearch] = useState("");
@@ -367,10 +417,27 @@ export default function POSScreen() {
   });
 
   const { data: products = [] } = useQuery<any[]>({
-    queryKey: ["/api/products", `?tenantId=${tenantId || ""}${search ? `&search=${search}` : ""}&applyMarkup=true`],
+    queryKey: ["/api/products", `?tenantId=${tenantId || ""}${search ? `&search=${encodeURIComponent(search)}` : ""}&applyMarkup=true`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });
+
+  // Stock lives in `inventory` (per branch), not on the product row. The
+  // cashier's branch when they have one, otherwise every branch of the store.
+  const tracksStock = !!tenantId && tenant?.storeType !== "restaurant";
+  const { data: inventoryRows = [] } = useQuery<any[]>({
+    queryKey: ["/api/inventory", `?tenantId=${tenantId || ""}${employee?.branchId ? `&branchId=${employee.branchId}` : ""}`],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: tracksStock,
+  });
+  const stockByProduct = React.useMemo(() => {
+    const m = new Map<number, number>();
+    for (const r of inventoryRows as any[]) {
+      const id = Number(r.productId);
+      m.set(id, (m.get(id) || 0) + (Number(r.quantity) || 0));
+    }
+    return m;
+  }, [inventoryRows]);
 
   // Sort categories: pizza first, then rest by sortOrder
   const tenantCategories = [...(categories as any[])].sort((a, b) => {
@@ -414,18 +481,6 @@ export default function POSScreen() {
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: showInvoiceHistory && !!tenantId,
   });
-
-  const { data: onlineOrders = [] } = useQuery<any[]>({
-    queryKey: ["/api/online-orders", tenantId ? `?tenantId=${tenantId}` : ""],
-    queryFn: getQueryFn({ on401: "throw" }),
-    enabled: showOnlineOrders && !!tenantId,
-    refetchInterval: showOnlineOrders ? 30000 : false,
-  });
-
-  const normalizedOnlineOrders = (onlineOrders as any[]).map((order) => ({
-    ...order,
-    items: normalizeOrderItems(order?.items),
-  }));
 
   const { data: callHistory = [] } = useQuery<any[]>({
     queryKey: ["/api/calls", tenantId ? `?tenantId=${tenantId}` : ""],
@@ -471,8 +526,19 @@ export default function POSScreen() {
   // Sham Cash sits next to the Stripe methods for any store that set up its
   // own QR code / number, and for SYP/USD stores (greyed out until set up).
   const shamCashReady = !!paymentsConfig?.shamcash?.enabled;
-  const shamCashStore = shamCashReady || !!paymentsConfig?.shamcash?.currency;
-  const stripeReady = paymentsConfig?.stripe?.status === "connected";
+  // A Syrian-pound store always sees the Sham Cash button (greyed out until
+  // its QR/number is set up), even before the payments config has loaded.
+  const shamCashStore = shamCashReady || !!paymentsConfig?.shamcash?.currency || String(currency).toUpperCase() === "SYP";
+  const stripeAllowed = stripeCurrencyOk
+    && !STRIPE_UNSUPPORTED_CURRENCIES.has(String(paymentsConfig?.currency || "").toUpperCase());
+  const stripeReady = stripeAllowed && paymentsConfig?.stripe?.status === "connected";
+  // A method that is not on offer (Stripe for an SYP store, "on credit" once
+  // the trader is removed) must not stay selected out of sight.
+  useEffect(() => {
+    if ((isStripeMethod(paymentMethod) && !stripeAllowed) || (paymentMethod === "credit" && !cart.customerId)) {
+      setPaymentMethod("cash");
+    }
+  }, [paymentMethod, stripeAllowed, cart.customerId]);
   // Raw Stripe method ids ("apple_pay") read badly in a label.
   const stripeMethods: string[] = (paymentsConfig?.stripe?.availableMethods || [])
     .map((m: string) => m.replace(/_/g, " "));
@@ -524,7 +590,7 @@ export default function POSScreen() {
     const room = Math.max(0, cart.subtotal - cart.discount);
     const points = Math.min(balance, Math.floor(room / loyalty.pointValue + 1e-9));
     if (points < loyalty.minRedeem) return null;
-    return { points, value: Math.round(points * loyalty.pointValue * 100) / 100 };
+    return { points, value: roundMoney(points * loyalty.pointValue, currency) };
   };
   const toggleLoyaltyRedeem = () => {
     if (loyaltyRedeem) {
@@ -540,165 +606,18 @@ export default function POSScreen() {
     setLoyaltyRedeem({ customerId: cart.customerId, points, value, rate, prevRate: cart.discountRate, subtotal: cart.subtotal });
   };
 
-  const generateThermalReceiptHTML = (saleData: any, qrUrl: string | null = null, options: { isKitchen?: boolean, isPartial?: boolean, title?: string } = {}) => {
-    const { isKitchen = false, isPartial = false, title = isKitchen ? "KÜCHENBON" : (t("viewReceipt" as any) || "RECHNUNG") } = options;
-    const storeName = storeSettings?.name || tenant?.name || "POS System";
-    const storeAddr = storeSettings?.address || "";
-    const storePhone = storeSettings?.phone || "";
-    const storeEmail = storeSettings?.email || "";
-    const logoPath = storeSettings?.logo || "";
-    const logoUrl = logoPath ? (logoPath.startsWith("http") || logoPath.startsWith("data:") ? logoPath : `${getApiUrl().replace(/\/$/, "")}${logoPath}`) : "";
-
-    const receiptNum = getDisplayNumber(saleData.receiptNumber) || `#${saleData.id}`;
-    const saleDate = new Date(saleData.createdAt || saleData.date || Date.now());
-    const dateStr = saleDate.toLocaleDateString();
-    const timeStr = saleDate.toLocaleTimeString();
-    const empName = saleData.employeeName || employee?.name || "Staff";
-    const custName = saleData.customerName || "";
-    const vehicleObj = vehicles.find((v: any) => v.id == saleData.vehicleId);
-
-    const itemsHtml = (saleData.items || []).map((item: any) => `
-      <div style="display:flex;justify-content:space-between;padding:3px 0;${isKitchen ? 'font-size:14px;font-weight:bold;' : ''}">
-        <span style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.productName || item.name}</span>
-        <span style="width:40px;text-align:center;">x${item.quantity}</span>
-        ${!isKitchen ? `<span style="width:75px;text-align:right;">${formatMoney(item.total || (item.unitPrice * item.quantity))}</span>` : ""}
-      </div>
-    `).join("");
-
-    const logoHtml = logoUrl && !isKitchen ? `<div style="text-align:center;margin:8px 0;"><img src="${logoUrl}" style="max-height:55px;max-width:200px;object-fit:contain;" /></div>` : "";
-    const qrHtml = qrUrl && !isKitchen ? `<div style="text-align:center;margin-top:14px;"><img src="${qrUrl}" style="width:90px;height:90px;" /></div>` : "";
-
-    const innerContent = `
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
-  ${logoHtml}
-  <div class="center bold" style="font-size:18px;margin-bottom:4px;text-transform:uppercase;">${title}</div>
-  <div class="center bold" style="font-size:14px;">${storeName}</div>
-  ${!isKitchen ? `
-    ${storeAddr ? `<div class="center">${storeAddr}</div>` : ""}
-    ${storePhone ? `<div class="center">${storePhone}</div>` : ""}
-    ${storeEmail ? `<div class="center">${storeEmail}</div>` : ""}
-  ` : ""}
-  
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
-  
-  <div>${t("receiptDate")}: ${dateStr}, ${timeStr}</div>
-  <div>${t("receiptNumber")}: ${receiptNum}</div>
-  ${!isKitchen ? `<div>${t("servedBy")}: ${empName}</div>` : ""}
-  ${custName ? `<div>${t("customer")}: ${custName}</div>` : ""}
-  
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
-  
-  <div class="flex-between bold">
-    <span style="flex:2;">Item</span>
-    <span style="width:40px;text-align:center;">Qty</span>
-    ${!isKitchen ? `<span style="width:75px;text-align:right;">Total</span>` : ""}
-  </div>
-  
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
-  
-  ${itemsHtml}
-  
-  ${!isKitchen ? `
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"─".repeat(36)}</div>
-  
-  <div class="flex-between">
-    <span>${t("subtotal")}:</span>
-    <span>${formatMoney(saleData.subtotal || saleData.totalAmount)}</span>
-  </div>
-  ${Number(saleData.discount) > 0 ? `
-    <div class="flex-between">
-      <span>${t("discount")}:</span>
-      <span>-${formatMoney(saleData.discount)}</span>
-    </div>
-  ` : ""}
-  ${Number(saleData.minimumOrderSurcharge) > 0 ? `
-    <div class="flex-between">
-      <span>Mindestbestellwert:</span>
-      <span>+${formatMoney(saleData.minimumOrderSurcharge)}</span>
-    </div>
-  ` : ""}
-  ${Number(saleData.serviceFee || saleData.serviceFeeAmount) > 0 ? `
-    <div class="flex-between">
-      <span>${t("serviceTax") || "Service Tax"}:</span>
-      <span>${formatMoney(saleData.serviceFee || saleData.serviceFeeAmount)}</span>
-    </div>
-  ` : ""}
-  <div class="flex-between">
-    <span>${t("tax")}:</span>
-    <span>${formatMoney(saleData.tax)}</span>
-  </div>
-  ${Number(saleData.deliveryFee) > 0 ? `
-    <div class="flex-between">
-      <span>Delivery Fee:</span>
-      <span>${formatMoney(saleData.deliveryFee)}</span>
-    </div>
-  ` : ""}
-  ${vehicleObj ? `
-    <div class="flex-between" style="font-size:12px;color:#000;font-weight:700;">
-      <span>&#x1F697; Driver:</span>
-      <span>${vehicleObj.driverName || ""}${vehicleObj.licensePlate ? ` (${vehicleObj.licensePlate})` : ""}</span>
-    </div>
-  ` : ""}
-  
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
-  
-  <div class="flex-between bold" style="font-size:15px;">
-    <span>TOTAL:</span>
-    <span>${formatMoney(saleData.total || saleData.totalAmount)}</span>
-  </div>
-  
-  <div class="center sep" style="letter-spacing:1px;margin:5px 0;">${"=".repeat(36)}</div>
-  
-  <div class="flex-between">
-    <span>${t("paymentMethod")}:</span>
-    <span style="text-transform:uppercase;">${saleData.paymentMethod || "cash"}</span>
-  </div>
-  ${saleData.paymentMethod === "cash" ? `
-    <div class="flex-between">
-      <span>${t("cash")}:</span>
-      <span>${formatMoney(saleData.cashReceived || 0)}</span>
-    </div>
-    <div class="flex-between">
-      <span>${t("change")}:</span>
-      <span>${formatMoney(saleData.change || 0)}</span>
-    </div>
-  ` : ""}
-  
-  ${qrHtml}
-  ` : ""}
-  
-  <div class="center bold" style="margin-top:14px;font-size:13px;">${isKitchen ? "KÜCHENBON" : t("thankYou")}</div>
-  ${!isKitchen && storeAddr ? `<div class="center" style="font-size:10px;margin-top:2px;">${t("visitUs")}: ${storeAddr}</div>` : ""}
-  <div class="center" style="font-size:10px;color:#000;margin-top:6px;">${t("poweredBy")}</div>
-  <div class="center sep" style="margin-top:6px;overflow:hidden;white-space:nowrap;">${"=".repeat(36)}</div>
-`;
-
-    if (isPartial) return innerContent;
-
-    return `<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    @page { size: 80mm auto; margin: 4mm; }
-    body { font-family: 'Courier New', monospace; font-size: 15px; font-weight: 600; width: 72mm; margin: 0 auto; color: #000; background: #fff; padding: 0; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .center { text-align: center; }
-    .bold { font-weight: 900; }
-    .sep { letter-spacing: 1px; margin: 5px 0; overflow: hidden; white-space: nowrap; }
-    .flex-between { display: flex; justify-content: space-between; padding: 2px 0; }
-    .page-break { page-break-after: always; }
-  </style>
-</head>
-<body>
-  ${innerContent}
-</body>
-</html>`;
-  };
-
   const loadInvoiceDetails = async (saleId: number) => {
     try {
       const res = await apiRequest("GET", `/api/sales/${saleId}`);
-      const data = await res.json();
+      const raw = await res.json();
+      // The sales row names its money columns taxAmount / discountAmount /
+      // serviceFeeAmount; the receipt views read tax / discount / serviceFee.
+      const data = {
+        ...raw,
+        tax: raw?.tax ?? raw?.taxAmount,
+        discount: raw?.discount ?? raw?.discountAmount,
+        serviceFee: raw?.serviceFee ?? raw?.serviceFeeAmount,
+      };
       setSelectedInvoice(data);
       if (Platform.OS === "web") {
         try {
@@ -708,8 +627,8 @@ export default function POSScreen() {
         } catch { }
       }
       setShowReprintReceipt(true);
-    } catch {
-      Alert.alert(t("error"), t("saleNotFound"));
+    } catch (e) {
+      showAlert(t("error"), describeError(e, language, t("saleNotFound")));
     }
   };
 
@@ -720,8 +639,8 @@ export default function POSScreen() {
       const itemsText = (inv.items || []).map((item: any) =>
         `${item.productName || item.name}  x${item.quantity}  ${formatMoney(item.total || (item.unitPrice * item.quantity))}`
       ).join("\n");
-      const receiptText = `${storeSettings?.name || tenant?.name || "POS System"}\n${storeSettings?.address || ""}\n${"─".repeat(30)}\n${t("receiptNumber")}: ${getDisplayNumber(inv.receiptNumber) || "#" + inv.id}\n${t("receiptDate")}: ${new Date(inv.createdAt || inv.date).toLocaleString()}\n${"─".repeat(30)}\n${itemsText}\n${"─".repeat(30)}\nTOTAL: ${formatMoney(inv.totalAmount)}\n${t("paymentMethod")}: ${(inv.paymentMethod || "cash").toUpperCase()}\n${"═".repeat(30)}\n${t("thankYou")}`;
-      Alert.alert(t("printInvoice"), receiptText);
+      const receiptText = `${storeSettings?.name || tenant?.name || "POS System"}\n${storeSettings?.address || ""}\n${"─".repeat(30)}\n${t("receiptNumber")}: ${getDisplayNumber(inv.receiptNumber) || "#" + inv.id}\n${t("receiptDate")}: ${new Date(inv.createdAt || inv.date).toLocaleString(dateLocale)}\n${"─".repeat(30)}\n${itemsText}\n${"─".repeat(30)}\n${t("total")}: ${formatMoney(inv.totalAmount)}\n${t("paymentMethod")}: ${paymentLabel(inv.paymentMethod)}\n${"═".repeat(30)}\n${t("thankYou")}`;
+      showAlert(t("printInvoice"), receiptText);
       return;
     }
     const inv = selectedInvoice;
@@ -744,8 +663,8 @@ export default function POSScreen() {
       Number(inv.deliveryFee || 0),
       inv.paymentMethod || "cash",
       0,
-      inv.customerName || "Laufkunde",
-      inv.employeeName || employee?.name || "Staff",
+      inv.customerName || t("walkIn"),
+      inv.employeeName || employee?.name || "",
       custObj,
       vehicleObj,
       Number(inv.minimumOrderSurcharge || 0),
@@ -995,7 +914,7 @@ export default function POSScreen() {
   const creditLimitExceeded = !!selectedTrader && selectedTrader.creditLimit != null
     && creditBalanceAfterSale > Number(selectedTrader.creditLimit) + 0.004;
   const wholesaleBanner = selectedTrader ? (
-    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, marginHorizontal: 10, marginBottom: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: Colors.info + "18", borderWidth: 1, borderColor: Colors.info + "55" }}>
+    <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 8, marginHorizontal: 10, marginBottom: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: Colors.info + "18", borderWidth: 1, borderColor: Colors.info + "55" }}>
       <View style={{ backgroundColor: Colors.info, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
         <Text style={{ color: Colors.white, fontSize: 11, fontWeight: "800" }}>
           {language === "ar" ? "جملة" : language === "de" ? "Großhandel" : "Wholesale"}
@@ -1014,12 +933,15 @@ export default function POSScreen() {
     </View>
   ) : null;
 
-  const handlePhoneSearch = useCallback(async (phone: string) => {
-    const trimmed = phone.trim();
+  const handlePhoneSearch = useCallback(async (phone: string, openFormIfMissing = true) => {
+    const trimmed = toLatinDigits(phone).trim();
     if (!trimmed) {
       cart.setCustomerId(null);
       return;
     }
+    const digitsOnly = (p: string) => toLatinDigits(p || "").replace(/\D/g, "");
+    // Already showing this customer: nothing to look up.
+    if (selectedCustomer?.phone && digitsOnly(selectedCustomer.phone) === digitsOnly(trimmed)) return;
 
     setCustomerPhoneLoading(true);
     try {
@@ -1041,20 +963,22 @@ export default function POSScreen() {
     // Normalize for fuzzy matching: strip spaces, dashes, parens (fallback)
     const normalize = (p: string) => p.replace(/[\s\-().+]/g, "");
     const normTrimmed = normalize(trimmed);
-    const found = (customers as any[]).find((c: any) =>
-      c.phone && normalize(c.phone).includes(normTrimmed.slice(-8))
-    );
+    const tail = normTrimmed.slice(-8);
+    // Too short to identify anyone (and "" would match every customer).
+    const found = tail.length >= 6 ? (customers as any[]).find((c: any) =>
+      c.phone && normalize(c.phone).includes(tail)
+    ) : undefined;
     if (found) {
       cart.setCustomerId(found.id);
       setCallerCustomer(found);
-    } else {
+    } else if (openFormIfMissing) {
       setNewCustomerForm({ name: "", phone: trimmed, address: "", email: "" });
       setShowNewCustomerForm(true);
     }
-  }, [customers, cart, tenantId]);
+  }, [customers, cart, tenantId, selectedCustomer]);
 
   const handleCreateCustomer = async () => {
-    if (!newCustomerForm.name.trim()) return;
+    if (!newCustomerForm.name.trim() || customerPhoneLoading) return;
     setCustomerPhoneLoading(true);
     try {
       const res = await apiRequest("POST", "/api/customers", {
@@ -1067,10 +991,12 @@ export default function POSScreen() {
       const newCust = await res.json();
       qc.invalidateQueries({ queryKey: ["/api/customers"] });
       cart.setCustomerId(newCust.id);
+      // Keep the new customer on screen before the customer list refetches.
+      setCallerCustomer(newCust);
       setPhoneInput(newCustomerForm.phone.trim());
       setShowNewCustomerForm(false);
     } catch (e: any) {
-      Alert.alert(t("error"), e.message || "Failed to create customer");
+      showAlert(t("error"), describeError(e, language, L("تعذّر إنشاء العميل", "Kunde konnte nicht angelegt werden", "Failed to create customer")));
     } finally {
       setCustomerPhoneLoading(false);
     }
@@ -1101,34 +1027,110 @@ export default function POSScreen() {
   const handleNcAddressChange = (text: string) => {
     setNewCustomerForm(f => ({ ...f, address: text }));
     if (ncAddrTimerRef.current) clearTimeout(ncAddrTimerRef.current);
+    // geo.admin.ch only knows Swiss addresses.
+    if (!swissStore) return;
     ncAddrTimerRef.current = setTimeout(() => searchNcAddress(text, ncCityFilter), 400);
   };
 
-  const generateQR = async (text: string) => {
-    try {
-      if (Platform.OS === "web") {
-        const QRCode = require("qrcode");
-        const url = await QRCode.toDataURL(text, { width: 200, margin: 1, color: { dark: "#0A0E27", light: "#FFFFFF" } });
-        setQrDataUrl(url);
-      }
-    } catch { }
+  // ── One checkout, one sale ────────────────────────────────────────────────
+  // A flaky connection must never turn one checkout into two sales. Every
+  // attempt at the same cart carries the same reference (stored in the sale's
+  // payment_details). When an attempt fails without a definite answer —
+  // timeout, dropped connection, 5xx — the next attempt first looks for a sale
+  // with that reference and settles on it instead of writing a second one.
+  const checkoutRef = useRef<string | null>(null);
+  /** Synchronous double-submit guard for the pay buttons. */
+  const submitLock = useRef(false);
+  const checkoutUncertain = useRef(false);
+  /** Customer auto-created from the phone field during this checkout. */
+  const autoCustomerRef = useRef<{ phone: string; id: number } | null>(null);
+  const resetCheckoutRef = () => {
+    checkoutRef.current = null;
+    checkoutUncertain.current = false;
+    autoCustomerRef.current = null;
   };
+
+  const findSaleByCheckoutRef = async (ref: string): Promise<any | null> => {
+    const res = await apiRequest("GET", `/api/sales?tenantId=${tenantId || ""}&limit=40`);
+    const rows = await res.json();
+    return (Array.isArray(rows) ? rows : []).find((r: any) => saleHasCheckoutRef(r, ref)) || null;
+  };
+
+  // ── After a sale: short confirmation with the change due + reprint ────────
+  const [saleDone, setSaleDone] = useState<{ receipt: string; total: number; change: number; pm: string } | null>(null);
+  const reprintLastSale = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (!saleDone) return;
+    // Cash sales keep the change on screen a little longer.
+    const timer = setTimeout(() => setSaleDone(null), saleDone.change > 0 ? 15000 : 7000);
+    return () => clearTimeout(timer);
+  }, [saleDone]);
+
+  /** Cart header trash: asks first, then empties the lines (the customer stays). */
+  const handleClearCart = async () => {
+    if (cart.items.length === 0) return;
+    const ok = await confirmAsync(
+      L("إفراغ السلة؟", "Warenkorb leeren?", "Clear the cart?"),
+      L(`سيتم حذف ${cart.itemCount} من المنتجات من السلة.`, `${cart.itemCount} Artikel werden aus dem Warenkorb entfernt.`, `${cart.itemCount} item(s) will be removed from the cart.`),
+      L("إفراغ", "Leeren", "Clear"),
+      t("cancel"),
+      true,
+    );
+    if (!ok) return;
+    cart.clearCart();
+    setManualAdjustment(0);
+    setCashReceived("");
+    resetCheckoutRef();
+  };
+
+  const roleLabel = (role?: string | null) => {
+    const key = String(role || "").toLowerCase();
+    return ["admin", "cashier", "manager", "owner"].includes(key) ? t(key as any) : (role || "");
+  };
+
+  const itemCountLabel = (n: number) => L(
+    n === 1 ? "منتج واحد" : n === 2 ? "منتجان" : n >= 3 && n <= 10 ? `${n} منتجات` : `${n} منتج`,
+    `${n} Artikel`,
+    n === 1 ? "1 item" : `${n} items`,
+  );
+
+  /** Empties the till for the next customer (cart, phone, notes, adjustment). */
+  const resetTill = useCallback(() => {
+    cart.clearCart();
+    setManualAdjustment(0);
+    setPhoneInput("");
+    setCallerCustomer(null);
+    setActiveCallId(null);
+    setOrderNotes("");
+    setCashReceived("");
+    setPaymentMethod("cash");
+    resetCheckoutRef();
+  }, [cart]);
 
   const completeSaleAfterPayment = (saleData: any, pmOverride?: string) => {
     const pm = pmOverride ?? paymentMethod;
     playAddSound();
     const saleItems = cart.items.map((i) => ({ name: i.name, quantity: i.quantity, price: i.price, total: i.price * i.quantity }));
     const custName = selectedCustomer?.name || t("walkIn");
-    const empName = employee?.name || "Staff";
-    const cashAmt = Number(cashReceived) || 0;
+    const empName = employee?.name || "";
+    const total = payableTotal;
+    const cashGiven = parseAmountInput(cashReceived, currency);
+    const cashAmt = Number.isFinite(cashGiven) ? cashGiven : 0;
+    const change = pm === "cash" && cashAmt > 0 ? roundMoney(Math.max(0, cashAmt - total), currency) : 0;
     // Auto-print 3 copies on web (unless turned off in Settings → Receipt Printer)
     const vehicleObj = cart.vehicleId ? (vehicles as any[]).find((v: any) => v.id === cart.vehicleId) : undefined;
-    if (getReceiptPrinterPrefs().autoPrint) autoPrint3Copies(
-      saleData, cart.items, cart.subtotal, cart.tax, cart.discount, cart.serviceFee, cart.total + manualAdjustment, cart.deliveryFee,
-      pm, cashAmt, custName, empName, selectedCustomer, vehicleObj, cart.minimumOrderSurcharge,
+    const printItems = [...cart.items];
+    const printArgs = {
+      subtotal: cart.subtotal, tax: cart.tax, discount: cart.discount, serviceFee: cart.serviceFee,
+      deliveryFee: cart.deliveryFee, surcharge: cart.minimumOrderSurcharge, customer: selectedCustomer,
+    };
+    const print = () => autoPrint3Copies(
+      saleData, printItems, printArgs.subtotal, printArgs.tax, printArgs.discount, printArgs.serviceFee, total, printArgs.deliveryFee,
+      pm, cashAmt, custName, empName, printArgs.customer, vehicleObj, printArgs.surcharge,
       storeSettings, tenant, categories as any[]
     );
-    setManualAdjustment(0);
+    reprintLastSale.current = print;
+    if (getReceiptPrinterPrefs().autoPrint) print();
     setLastSale({
       ...saleData,
       items: saleItems,
@@ -1138,34 +1140,24 @@ export default function POSScreen() {
       discount: cart.discount,
       deliveryFee: cart.deliveryFee,
       minimumOrderSurcharge: cart.minimumOrderSurcharge,
-      total: cart.total,
+      total,
       paymentMethod: pm,
       cashReceived: cashAmt,
-      change: pm === "cash" && cashReceived ? cashAmt - cart.total : 0,
+      change,
       customerName: custName,
       employeeName: empName,
-      date: new Date().toLocaleString(),
+      date: new Date().toISOString(),
       vehicleId: cart.vehicleId || null,
     });
-    const custAddress = selectedCustomer?.address ||
-      [selectedCustomer?.street, selectedCustomer?.streetNr || selectedCustomer?.houseNr, selectedCustomer?.postalCode, selectedCustomer?.city]
-        .filter(Boolean).join(" ") || "";
-    const qrContent = custAddress
-      ? `https://maps.google.com/?q=${encodeURIComponent(custAddress)}`
-      : `barmagly:receipt:${saleData.receiptNumber || saleData.id}`;
-    generateQR(qrContent);
-    cart.clearCart();
-    setPhoneInput("");
-    setCallerCustomer(null);
-    setActiveCallId(null);
-    setOrderNotes("");
+    setSaleDone({
+      receipt: getDisplayNumber(saleData?.receiptNumber) || (saleData?.id ? `#${saleData.id}` : ""),
+      total,
+      change,
+      pm,
+    });
+    resetTill();
     setShowCheckout(false);
-    setCashReceived("");
     closeStripeCapture();
-    // Cash is the common path — always drop back to it for the next customer.
-    setPaymentMethod("cash");
-    // Receipt modal hidden — auto-print already handles output
-    // setShowReceipt(true);
     qc.invalidateQueries({ queryKey: ["/api/sales"] });
     qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
     qc.invalidateQueries({ queryKey: ["/api/inventory"] });
@@ -1179,6 +1171,19 @@ export default function POSScreen() {
    * otherwise — the till must never call a sale paid on its own.
    */
   const createSale = async (pm: string, stripePaymentId: string | null, paymentStatus: string = "completed", extraNote?: string) => {
+    if (!checkoutRef.current) checkoutRef.current = newCheckoutRef();
+    const ref = checkoutRef.current;
+    // The previous attempt may have reached the server: settle on that sale.
+    if (checkoutUncertain.current) {
+      const existing = await findSaleByCheckoutRef(ref);
+      if (existing) {
+        checkoutUncertain.current = false;
+        return existing;
+      }
+    }
+
+    const total = payableTotal;
+    const cashGiven = parseAmountInput(cashReceived, currency);
     const saleItems = cart.items.map((i) => ({
       productId: i.productId,
       productName: i.name,
@@ -1191,24 +1196,27 @@ export default function POSScreen() {
       branchId: employee?.branchId || 1,
       employeeId: employee?.id || 1,
       customerId: cart.customerId,
-      subtotal: cart.subtotal.toFixed(2),
-      taxAmount: cart.tax.toFixed(2),
-      serviceFeeAmount: cart.serviceFee.toFixed(2),
-      discountAmount: cart.discount.toFixed(2),
-      minimumOrderSurcharge: cart.minimumOrderSurcharge.toFixed(2),
-      totalAmount: (cart.total + manualAdjustment).toFixed(2),
+      // Whole pounds for a zero-decimal currency (SYP), cents otherwise.
+      subtotal: moneyString(cart.subtotal, currency),
+      taxAmount: moneyString(cart.tax, currency),
+      serviceFeeAmount: moneyString(cart.serviceFee, currency),
+      discountAmount: moneyString(cart.discount, currency),
+      minimumOrderSurcharge: moneyString(cart.minimumOrderSurcharge, currency),
+      totalAmount: moneyString(total, currency),
       paymentMethod: pm,
       paymentStatus,
       status: "completed",
       tableNumber: cart.tableNumber || null,
       orderType: cart.orderType,
       vehicleId: cart.vehicleId || null,
-      changeAmount: pm === "cash" && cashReceived
-        ? (Number(cashReceived) - (cart.total + manualAdjustment)).toFixed(2) : "0",
+      changeAmount: pm === "cash" && Number.isFinite(cashGiven)
+        ? moneyString(Math.max(0, cashGiven - total), currency) : "0",
       items: saleItems,
       callId: activeCallId,
       // Already inside discountAmount; the server takes the points off the balance.
       loyaltyPointsRedeemed: loyaltyRedeem && loyaltyRedeem.customerId === cart.customerId ? loyaltyRedeem.points : 0,
+      // `ref` lets a retry find this sale instead of recording it twice.
+      paymentDetails: [{ method: pm, amount: roundMoney(total, currency), ref }],
     };
     const notesParts = [];
     if (orderNotes.trim()) notesParts.push(orderNotes.trim());
@@ -1217,47 +1225,87 @@ export default function POSScreen() {
     if (notesParts.length > 0) data.notes = notesParts.join(" | ");
 
     // ── Auto-save new customer if phone was entered but no customer linked ──
-    if (!data.customerId && phoneInput.trim()) {
-      try {
-        const autoName = newCustomerForm.name.trim() || phoneInput.trim();
-        const autoRes = await apiRequest("POST", "/api/customers", {
-          tenantId,
-          name: autoName,
-          phone: phoneInput.trim(),
-          address: newCustomerForm.address.trim() || null,
-          email: newCustomerForm.email.trim() || null,
-        });
-        if (autoRes.ok) {
+    const phone = phoneInput.trim();
+    if (!data.customerId && phone) {
+      if (autoCustomerRef.current?.phone === phone) {
+        data.customerId = autoCustomerRef.current.id;
+      } else {
+        try {
+          const autoName = newCustomerForm.name.trim() || phone;
+          const autoRes = await apiRequest("POST", "/api/customers", {
+            tenantId,
+            name: autoName,
+            phone,
+            address: newCustomerForm.address.trim() || null,
+            email: newCustomerForm.email.trim() || null,
+          });
           const newCust = await autoRes.json();
-          data.customerId = newCust.id;
-          qc.invalidateQueries({ queryKey: ["/api/customers"] });
-        }
-      } catch (_) { /* non-fatal */ }
+          if (newCust?.id) {
+            data.customerId = newCust.id;
+            autoCustomerRef.current = { phone, id: newCust.id };
+            qc.invalidateQueries({ queryKey: ["/api/customers"] });
+          }
+        } catch (_) { /* non-fatal: the sale goes through as walk-in */ }
+      }
     }
 
-    const res = await apiRequest("POST", "/api/sales", data);
-    return await res.json();
+    try {
+      const res = await apiRequest("POST", "/api/sales", data);
+      const sale = await res.json();
+      checkoutUncertain.current = false;
+      return sale;
+    } catch (e) {
+      // 4xx: the server refused, nothing was written. Anything else: unknown.
+      checkoutUncertain.current = isUncertainFailure(e);
+      throw e;
+    }
   };
 
+  /** Message for a failed checkout; says plainly when a retry is safe. */
+  const checkoutErrorMessage = (e: unknown) => checkoutUncertain.current
+    ? L(
+      "انقطع الاتصال قبل أن يؤكد الخادم البيع. لن يُسجَّل البيع مرتين: اضغط «إتمام البيع» مجدداً عند عودة الاتصال وسيتحقق النظام أولاً إن كان البيع قد سُجّل. لا تغيّر محتوى السلة.",
+      "Die Verbindung brach ab, bevor der Server den Verkauf bestätigt hat. Es wird nichts doppelt gebucht: Tippen Sie wieder auf «Verkauf abschliessen», sobald die Verbindung steht – die Kasse prüft zuerst, ob der Verkauf schon gebucht ist. Warenkorb bitte nicht ändern.",
+      "The connection dropped before the server confirmed the sale. Nothing will be recorded twice: press Complete again once you are back online — the till first checks whether the sale already went through. Don't change the cart.",
+    )
+    : describeError(e, language, L("تعذّر إتمام البيع", "Verkauf fehlgeschlagen", "Failed to complete sale"));
+
   const validateBeforeComplete = (): string | null => {
+    if (cart.items.length === 0) return t("emptyCart");
     // Delivery order: customer must have phone and address
     if (cart.orderType === "delivery") {
-      if (!cart.customerId) {
-        return t("customerPhoneRequired" as any) || "Delivery requires customer phone number";
+      if (!cart.customerId || !selectedCustomer?.phone) {
+        return t("customerPhoneRequired" as any) || L("التوصيل يتطلب رقم هاتف العميل", "Lieferung erfordert die Telefonnummer des Kunden", "Delivery requires customer phone number");
       }
-      const cust = (customers as any[]).find((c: any) => c.id === cart.customerId);
-      if (!cust?.phone) {
-        return t("customerPhoneRequired" as any) || "Delivery requires customer phone number";
+      if (!selectedCustomerAddress) {
+        return t("customerAddressRequired" as any) || L("التوصيل يتطلب عنوان العميل", "Lieferung erfordert die Adresse des Kunden", "Delivery requires customer address");
       }
-      if (!cust?.address) {
-        return t("customerAddressRequired" as any) || "Delivery requires customer address";
+    }
+    if (payableTotal < 0) {
+      return L("لا يمكن أن يكون المجموع سالباً. خفّض الخصم أو التعديل.", "Der Gesamtbetrag darf nicht negativ sein. Rabatt oder Anpassung reduzieren.", "The total cannot be negative. Reduce the discount or adjustment.");
+    }
+    if (paymentMethod === "cash" && cashReceived.trim() !== "") {
+      const given = parseAmountInput(cashReceived, currency);
+      if (!Number.isFinite(given)) {
+        return L("المبلغ المستلم غير صالح.", "Der erhaltene Betrag ist ungültig.", "The cash received is not a valid amount.");
+      }
+      if (given + 1e-9 < payableTotal) {
+        return L(
+          `المبلغ المستلم أقل من المجموع (${formatMoney(payableTotal)}).`,
+          `Der erhaltene Betrag ist kleiner als der Gesamtbetrag (${formatMoney(payableTotal)}).`,
+          `Cash received is less than the total (${formatMoney(payableTotal)}).`,
+        );
       }
     }
     // Card / TWINT / wallet are captured through Stripe, so the only thing to
     // check here is that Stripe is actually reachable — the payment itself is
     // confirmed by the webhook, never by the cashier.
     if (isStripeMethod(paymentMethod) && !stripeReady) {
-      return t("stripeNotConnected");
+      return stripeAllowed ? t("stripeNotConnected") : L(
+        "الدفع بالبطاقة غير متاح لهذه العملة.",
+        "Kartenzahlung ist in dieser Währung nicht verfügbar.",
+        "Card payments are not available in this currency.",
+      );
     }
     return null;
   };
@@ -1267,9 +1315,9 @@ export default function POSScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [tenantId ? `/api/shifts?tenantId=${tenantId}` : "/api/shifts"] });
       setShowAccountSwitcher(false);
-      Alert.alert("Success", "Shift ended successfully");
+      showAlert(t("success"), L("تم إنهاء الوردية.", "Schicht beendet.", "Shift ended."));
     },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => showAlert(t("error"), describeError(e, language, L("تعذّر إنهاء الوردية", "Schicht konnte nicht beendet werden", "Could not end the shift"))),
   });
 
   const startShiftAfterSwitchMutation = useMutation({
@@ -1281,7 +1329,7 @@ export default function POSScreen() {
       setSwitchOpeningCash("");
       setSwitchedEmployee(null);
     },
-    onError: (e: any) => Alert.alert("Error", e.message),
+    onError: (e: any) => showAlert(t("error"), describeError(e, language, L("تعذّر بدء الوردية", "Schicht konnte nicht gestartet werden", "Could not start the shift"))),
   });
 
   const saleMutation = useMutation({
@@ -1292,7 +1340,7 @@ export default function POSScreen() {
       completeSaleAfterPayment(saleData);
     },
     onError: (e: any) => {
-      Alert.alert(t("error"), e.message || "Failed to complete sale");
+      showAlert(t("error"), checkoutErrorMessage(e));
     },
   });
 
@@ -1332,7 +1380,7 @@ export default function POSScreen() {
         sale,
         checkoutUrl: "",
         paymentIntentId: null,
-        amountMinor: Math.round((cart.total + manualAdjustment) * 100),
+        amountMinor: Math.round(payableTotal * 100),
         currency: String(paymentsConfig?.currency || "CHF").toUpperCase(),
       };
       setStripeCapture(bound);
@@ -1367,7 +1415,7 @@ export default function POSScreen() {
     onError: (e: any) => {
       // Deliberately keeps whatever the mutation already bound, so a half-built
       // capture still offers "take cash instead" for the sale that now exists.
-      setStripeError(e?.message || t("paymentLinkFailed"));
+      setStripeError(checkoutUncertain.current ? checkoutErrorMessage(e) : describeError(e, language, t("paymentLinkFailed")));
       setStripeStage("failed");
     },
   });
@@ -1442,7 +1490,7 @@ export default function POSScreen() {
       completeSaleAfterPayment(sale, "cash");
     },
     onError: (e: any) => {
-      setStripeError(e?.message || t("paymentLinkFailed"));
+      setStripeError(describeError(e, language, t("paymentLinkFailed")));
       setStripeStage("failed");
     },
   });
@@ -1455,19 +1503,12 @@ export default function POSScreen() {
    * the link later, the webhook still settles the row.
    */
   const parkStripeSale = useCallback(() => {
-    setManualAdjustment(0);
-    cart.clearCart();
-    setPhoneInput("");
-    setCallerCustomer(null);
-    setActiveCallId(null);
-    setOrderNotes("");
+    resetTill();
     setShowCheckout(false);
-    setCashReceived("");
-    setPaymentMethod("cash");
     closeStripeCapture();
     qc.invalidateQueries({ queryKey: ["/api/sales"] });
     qc.invalidateQueries({ queryKey: ["/api/inventory"] });
-  }, [cart, qc, closeStripeCapture]);
+  }, [resetTill, qc, closeStripeCapture]);
 
   /** Dismiss: park a sale that was already created, otherwise just close. */
   const dismissStripeCapture = useCallback(() => {
@@ -1488,7 +1529,7 @@ export default function POSScreen() {
       setShamCashOpen(false);
       completeSaleAfterPayment(sale, "shamcash");
     },
-    onError: (e: any) => Alert.alert(t("error"), e?.message || "Failed to complete sale"),
+    onError: (e: any) => showAlert(t("error"), checkoutErrorMessage(e)),
   });
 
   const checkoutBusy = saleMutation.isPending || stripeCaptureMutation.isPending || stripeStage !== "idle"
@@ -1497,7 +1538,7 @@ export default function POSScreen() {
   const openCheckoutLink = useCallback(() => {
     if (!stripeCapture) return;
     Linking.openURL(stripeCapture.checkoutUrl).catch(() => {
-      Alert.alert(t("error"), t("paymentLinkFailed"));
+      showAlert(t("error"), t("paymentLinkFailed"));
     });
   }, [stripeCapture]);
 
@@ -1628,20 +1669,34 @@ export default function POSScreen() {
 
   const maxCashierDiscountPct = 10;
   const applyDiscount = () => {
-    const val = Number(discountInput);
-    if (isNaN(val) || val <= 0) return;
+    // Percentages may have decimals in any currency; amounts follow the currency.
+    const val = parseAmountInput(discountInput, discountType === "percent" ? "PCT" : currency);
+    if (!Number.isFinite(val) || val <= 0) {
+      showAlert(t("error"), L("أدخل قيمة خصم صحيحة.", "Bitte einen gültigen Rabatt eingeben.", "Enter a valid discount."));
+      return;
+    }
+    if (cart.subtotal <= 0) return;
     let rate = 0;
+    let capped = false;
     if (discountType === "percent") {
-      rate = isCashier ? Math.min(val, maxCashierDiscountPct) : val;
+      const max = isCashier ? maxCashierDiscountPct : 100;
+      capped = val > max;
+      rate = Math.min(val, max);
     } else {
       // convert fixed amount to a percentage rate so it scales with future items
-      const maxFixed = isCashier ? cart.subtotal * (maxCashierDiscountPct / 100) : Infinity;
+      const maxFixed = isCashier ? cart.subtotal * (maxCashierDiscountPct / 100) : cart.subtotal;
+      capped = val > maxFixed + 1e-9;
       const discountAmount = Math.min(val, maxFixed);
-      rate = cart.subtotal > 0 ? (discountAmount / cart.subtotal) * 100 : 0;
+      rate = (discountAmount / cart.subtotal) * 100;
     }
     cart.setDiscount(rate); // passes rate (percentage)
     setShowDiscountModal(false);
     setDiscountInput("");
+    if (capped) {
+      showAlert(t("discount"), isCashier
+        ? t("maxDiscountWarning")
+        : L("لا يمكن أن يتجاوز الخصم قيمة الطلب.", "Der Rabatt kann den Bestellwert nicht übersteigen.", "The discount cannot exceed the order value."));
+    }
   };
   const handleSwitchAccount = async (pinCode: string) => {
     if (!switchTarget) return;
@@ -1650,7 +1705,7 @@ export default function POSScreen() {
     try {
       const res = await apiRequest("POST", "/api/employees/login", { pin: pinCode, employeeId: switchTarget.id });
       const emp = await res.json();
-      cart.clearCart();
+      resetTill();
       login(emp);
       playClickSound("medium");
       setShowAccountSwitcher(false);
@@ -1659,7 +1714,7 @@ export default function POSScreen() {
       qc.invalidateQueries();
       // Check if new user has an active shift
       try {
-        const shiftRes = await apiRequest("GET", `/api/shifts/active/${emp.id}`);
+        const shiftRes = await apiRequest("GET", `/api/shifts/active/${emp.id}?tenantId=${tenantId || ""}`);
         const activeShift = await shiftRes.json();
         if (!activeShift) {
           setSwitchedEmployee(emp);
@@ -1668,8 +1723,10 @@ export default function POSScreen() {
       } catch {
         // ignore shift check errors
       }
-    } catch {
-      setSwitchError(t("invalidPin" as any) || "Invalid PIN");
+    } catch (e) {
+      const wrongPin = t("invalidPin" as any) || L("رمز PIN غير صحيح", "Falsche PIN", "Invalid PIN");
+      // Only a 401 means the PIN was wrong; say so plainly for anything else.
+      setSwitchError(/^401:/.test(String((e as any)?.message ?? "")) ? wrongPin : describeError(e, language, wrongPin));
       setSwitchPin("");
       playClickSound("light");
     } finally {
@@ -1708,82 +1765,111 @@ export default function POSScreen() {
     };
   };
 
+  /** Calendar day on this device (the store's own timezone), not UTC. */
+  const localDateString = (d: Date = new Date()) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
   const handleEndOfDay = async () => {
+    if (zeroOutLoading || endOfDayLoading) return;
     try {
       setZeroOutLoading(true);
-      const todayStr = new Date().toISOString().split("T")[0];
-      const res = await apiRequest("GET", `/api/reports/daily-sales-report?date=${todayStr}`);
-      const salesData: any[] = await res.json();
-      setZeroOutSalesData(salesData || []);
+      const [reportRes, staffRes] = await Promise.all([
+        apiRequest("GET", `/api/reports/daily-sales-report?date=${localDateString()}&tenantId=${tenantId || ""}`),
+        apiRequest("GET", `/api/employees?tenantId=${tenantId || ""}`),
+      ]);
+      const salesData: any[] = await reportRes.json();
+      const staff: any[] = await staffRes.json();
+      // The report endpoint is not scoped to a store: keep only the sales rung
+      // up by this store's own staff.
+      const staffIds = new Set((Array.isArray(staff) ? staff : []).map((e: any) => e.id));
+      const ownSales = (Array.isArray(salesData) ? salesData : [])
+        .filter((sale: any) => staffIds.has(sale.employeeId))
+        .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      setZeroOutSalesData(ownSales);
       setShowZeroOutPreview(true);
     } catch (err: any) {
-      Alert.alert(t("error"), err.message);
+      showAlert(t("error"), describeError(err, language, L("تعذّر تحميل مبيعات اليوم", "Tagesumsatz konnte nicht geladen werden", "Could not load today's sales")));
     } finally {
       setZeroOutLoading(false);
     }
   };
 
+  const escHtml = (value: unknown) => String(value ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
   const handleZeroOutConfirm = async () => {
+    if (endOfDayLoading) return;
     try {
       setEndOfDayLoading(true);
 
       if (Platform.OS === "web" && zeroOutSalesData.length > 0) {
-        const storeName = storeSettings?.name || tenant?.name || "POS System";
+        const storeName = escHtml(storeSettings?.name || tenant?.name || "POS System");
         const dateObj = new Date();
-        const dateStr = dateObj.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-        const cashierName = employee?.name || "Kassierer";
+        const dateStr = dateObj.toLocaleDateString(dateLocale, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+        const cashierName = escHtml(employee?.name || L("الكاشير", "Kassierer", "Cashier"));
         const total = zeroOutSalesData.reduce((s: number, sale: any) => s + Number(sale.totalAmount || 0), 0);
+        const endSide = webRTL ? "left" : "right";
         const rowsHtml = zeroOutSalesData.map((sale: any, idx: number) => {
           const { street, plz, city } = getSaleAddressParts(sale);
           const gebiet = [plz, city !== "–" ? city : ""].filter(Boolean).join(" ") || "–";
-          const timeStr = new Date(sale.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-          const amt = Number(sale.totalAmount || 0).toFixed(2);
-          return `<tr><td>${idx + 1}</td><td>${sale.customerName || "–"}</td><td>${street}</td><td>${gebiet}</td><td>${timeStr}</td><td style="text-align:right;">${amt}</td></tr>`;
+          const timeStr = new Date(sale.createdAt).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" });
+          const amt = formatAmount(sale.totalAmount || 0);
+          return `<tr><td>${idx + 1}</td><td>${escHtml(sale.customerName || t("walkIn"))}</td><td>${escHtml(street)}</td><td>${escHtml(gebiet)}</td><td dir="ltr">${timeStr}</td><td style="text-align:${endSide};" dir="ltr">${amt}</td></tr>`;
         }).join("");
-        const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Personalbericht</title><style>
-          body { font-family: 'Courier New', monospace; font-size: 11px; margin: 0; padding: 10px; color: #000; }
+        const title = L("تقرير الموظفين", "Personalbericht", "Staff report");
+        const html = `<!DOCTYPE html><html lang="${language}" dir="${isRTL ? "rtl" : "ltr"}"><head><meta charset="UTF-8"><title>${title}</title><style>
+          body { font-family: 'Courier New', Tahoma, monospace; font-size: 11px; margin: 0; padding: 10px; color: #000; }
           h2 { text-align: center; font-size: 14px; margin: 4px 0; }
           .sub { text-align: center; font-size: 11px; margin-bottom: 8px; }
           table { width: 100%; border-collapse: collapse; }
-          th { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 4px; text-align: left; font-size: 10px; }
+          th { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 4px; text-align: start; font-size: 10px; }
           td { padding: 2px 4px; font-size: 10px; border-bottom: 1px dotted #ccc; }
           .total-row { border-top: 1px solid #000; font-weight: bold; }
           .total-row td { padding-top: 4px; }
         </style></head><body>
-          <h2>Personalbericht</h2>
+          <h2>${title}</h2>
           <div class="sub">${dateStr}</div>
           <div class="sub">${storeName}</div>
           <br/>
-          <div style="font-weight:bold;margin-bottom:4px;">Nr &nbsp; Kassierer: ${cashierName}</div>
+          <div style="font-weight:bold;margin-bottom:4px;">${L("الكاشير", "Kassierer", "Cashier")}: ${cashierName}</div>
           <table>
-            <thead><tr><th>Nr</th><th>Name</th><th>Adresse</th><th>Gebiet</th><th>Zeit</th><th style="text-align:right;">Total</th></tr></thead>
+            <thead><tr><th>#</th><th>${L("الاسم", "Name", "Name")}</th><th>${L("العنوان", "Adresse", "Address")}</th><th>${L("المنطقة", "Gebiet", "Area")}</th><th>${L("الوقت", "Zeit", "Time")}</th><th style="text-align:${endSide};">${L("المجموع", "Total", "Total")} (${escHtml(currencyLabel())})</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
             <tfoot>
-              <tr class="total-row"><td colspan="5">Umsatz Total</td><td style="text-align:right;">${total.toFixed(2)}</td></tr>
-              <tr><td colspan="5">TAGESAUSGAB</td><td style="text-align:right;">0.00</td></tr>
-              <tr class="total-row"><td colspan="2">${zeroOutSalesData.length}&nbsp;&nbsp;TOTAL Kassierer</td><td colspan="3"></td><td style="text-align:right;">${total.toFixed(2)}</td></tr>
+              <tr class="total-row"><td colspan="5">${L("إجمالي المبيعات", "Umsatz Total", "Total sales")}</td><td style="text-align:${endSide};" dir="ltr">${formatAmount(total)}</td></tr>
+              <tr><td colspan="5">${L("المصروفات اليومية", "Tagesausgaben", "Daily expenses")}</td><td style="text-align:${endSide};" dir="ltr">${formatAmount(0)}</td></tr>
+              <tr class="total-row"><td colspan="2">${zeroOutSalesData.length}&nbsp;&nbsp;${L("فاتورة · الإجمالي", "TOTAL Kassierer", "sales · TOTAL")}</td><td colspan="3"></td><td style="text-align:${endSide};" dir="ltr">${formatAmount(total)}</td></tr>
             </tfoot>
           </table>
           <br/>
-          <div style="text-align:center;font-size:10px;">${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} &nbsp; ${dateStr}</div>
+          <div style="text-align:center;font-size:10px;">${dateObj.toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" })} &nbsp; ${dateStr}</div>
         </body></html>`;
         printHtmlViaIframe(html);
       }
 
-      // Close active shift for this employee
+      // Close this employee's open shift with the totals it actually took.
       const shiftRes = await apiRequest("GET", `/api/shifts/active?tenantId=${tenantId}`);
       const activeShifts = await shiftRes.json();
-      const myShift = activeShifts.find((s: any) => s.employeeId === employee?.id);
+      const myShift = (Array.isArray(activeShifts) ? activeShifts : []).find((s: any) => s.employeeId === employee?.id);
       if (myShift) {
-        await apiRequest("PUT", `/api/shifts/${myShift.id}/close`, { closingCash: "0", totalSales: "0", totalTransactions: 0 });
+        const since = myShift.startTime ? new Date(myShift.startTime).getTime() : 0;
+        const shiftSales = zeroOutSalesData.filter((sale: any) =>
+          sale.employeeId === employee?.id && new Date(sale.createdAt).getTime() >= since);
+        const shiftTotal = shiftSales.reduce((sum: number, sale: any) => sum + Number(sale.totalAmount || 0), 0);
+        // The drawer is not counted on this screen, so closingCash is not sent
+        // (it used to be recorded as 0, i.e. as a full cash shortfall).
+        await apiRequest("PUT", `/api/shifts/${myShift.id}/close`, {
+          totalSales: moneyString(shiftTotal, currency),
+          totalTransactions: shiftSales.length,
+        });
         qc.invalidateQueries({ queryKey: ["/api/shifts"] });
       }
 
       setShowZeroOutPreview(false);
-      Alert.alert(t("success"), t("endOfDaySuccess"));
+      showAlert(t("success"), t("endOfDaySuccess"));
       qc.invalidateQueries();
     } catch (err: any) {
-      Alert.alert(t("error"), err.message);
+      showAlert(t("error"), describeError(err, language, L("تعذّر إغلاق اليوم", "Tagesabschluss fehlgeschlagen", "End of day failed")));
     } finally {
       setEndOfDayLoading(false);
     }
@@ -1801,18 +1887,23 @@ export default function POSScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + topPad, direction: isRTL ? "rtl" : "ltr" }]}>
+    <View style={[styles.container, { paddingTop: insets.top + topPad }, Platform.OS === "web" && { direction: isRTL ? "rtl" : "ltr" }]}>
       <View style={[styles.header, isMobileWeb && styles.headerMobile]}>
         <LinearGradient colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.headerGradient}>
-          <View style={[styles.headerContent, isRTL && { flexDirection: "row-reverse" }, isMobileWeb && styles.headerContentMobile]}>
-            <Text style={[styles.headerTitle, rtlTextAlign]}>Kassenta POS</Text>
-            <View style={[styles.headerRight, isRTL && { flexDirection: "row-reverse", alignItems: "center" }, { alignItems: "center" }, isMobileWeb && styles.headerRightMobile]}>
+          <View style={[styles.headerContent, flipRow && { flexDirection: "row-reverse" }, isMobileWeb && styles.headerContentMobile]}>
+            <Text style={[styles.headerTitle, rtlTextAlign]} numberOfLines={1}>{storeSettings?.name || tenant?.name || "Kassenta POS"}</Text>
+            <View style={[styles.headerRight, flipRow && { flexDirection: "row-reverse", alignItems: "center" }, { alignItems: "center" }, isMobileWeb && styles.headerRightMobile]}>
               <RealTimeClock />
-              <Pressable onPress={() => setShowCallHistory(true)} style={[styles.headerInvoiceBtn, { position: "relative" }]}>
+              <Pressable
+                onPress={() => setShowCallHistory(true)}
+                style={[styles.headerInvoiceBtn, { position: "relative" }]}
+                accessibilityRole="button"
+                accessibilityLabel={L("المكالمات", "Anrufe", "Calls")}
+              >
                 <Ionicons name="call-outline" size={20} color={Colors.white} />
-                <Text style={styles.headerInvoiceLabel}>{language === "ar" ? "مكالمات" : language === "de" ? "Anrufe" : "Calls"}</Text>
+                {!compactHeader && <Text style={styles.headerInvoiceLabel}>{L("مكالمات", "Anrufe", "Calls")}</Text>}
                 {incomingCalls.length > 0 && (
-                  <View style={{ position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.danger }} />
+                  <View style={{ position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: 5, backgroundColor: "#EF4444", borderWidth: 1.5, borderColor: "#FFFFFF" }} />
                 )}
               </Pressable>
               <Pressable
@@ -1825,38 +1916,57 @@ export default function POSScreen() {
                   qc.refetchQueries({ type: "active" });
                 }}
                 style={styles.headerInvoiceBtn}
+                accessibilityRole="button"
+                accessibilityLabel={L("تحديث", "Aktualisieren", "Refresh")}
               >
                 <Ionicons name="refresh-outline" size={20} color={Colors.white} />
-                <Text style={styles.headerInvoiceLabel}>{language === "ar" ? "تحديث" : language === "de" ? "Aktualisieren" : "Refresh"}</Text>
+                {!compactHeader && <Text style={styles.headerInvoiceLabel}>{L("تحديث", "Aktualisieren", "Refresh")}</Text>}
               </Pressable>
               <Pressable
                 onPress={toggleTheme}
                 style={styles.headerInvoiceBtn}
                 accessibilityRole="switch"
                 accessibilityState={{ checked: isDark }}
+                accessibilityLabel={isDark ? L("الوضع الفاتح", "Helles Design", "Light mode") : L("الوضع الداكن", "Dunkles Design", "Dark mode")}
               >
                 <Ionicons name={isDark ? "sunny-outline" : "moon-outline"} size={20} color={Colors.white} />
-                <Text style={styles.headerInvoiceLabel}>
-                  {isDark
-                    ? (language === "ar" ? "فاتح" : language === "de" ? "Hell" : "Light")
-                    : (language === "ar" ? "داكن" : language === "de" ? "Dunkel" : "Dark")}
-                </Text>
+                {!compactHeader && (
+                  <Text style={styles.headerInvoiceLabel}>
+                    {isDark ? L("فاتح", "Hell", "Light") : L("داكن", "Dunkel", "Dark")}
+                  </Text>
+                )}
               </Pressable>
-              <Pressable onPress={handleEndOfDay} style={styles.headerInvoiceBtn} disabled={endOfDayLoading || zeroOutLoading}>
+              <Pressable
+                onPress={handleEndOfDay}
+                style={[styles.headerInvoiceBtn, styles.headerDangerBtn, (endOfDayLoading || zeroOutLoading) && { opacity: 0.6 }]}
+                disabled={endOfDayLoading || zeroOutLoading}
+                accessibilityRole="button"
+                accessibilityLabel={t("endOfDay")}
+              >
                 {zeroOutLoading
-                  ? <ActivityIndicator size="small" color={Colors.danger} />
-                  : <Ionicons name="sync-outline" size={20} color={(endOfDayLoading || zeroOutLoading) ? Colors.textMuted : Colors.danger} />
+                  ? <ActivityIndicator size="small" color={Colors.white} />
+                  : <Ionicons name="sync-outline" size={20} color={Colors.white} />
                 }
-                <Text style={[styles.headerInvoiceLabel, { color: (endOfDayLoading || zeroOutLoading) ? Colors.textMuted : Colors.danger }]}>{t("endOfDay")}</Text>
+                {!compactHeader && <Text style={styles.headerInvoiceLabel}>{t("endOfDay")}</Text>}
               </Pressable>
-              <Pressable onPress={() => { setInvoiceSearch(""); setShowInvoiceHistory(true); }} style={styles.headerInvoiceBtn}>
+              <Pressable
+                onPress={() => { setInvoiceSearch(""); setShowInvoiceHistory(true); }}
+                style={styles.headerInvoiceBtn}
+                accessibilityRole="button"
+                accessibilityLabel={t("invoices")}
+              >
                 <Ionicons name="receipt-outline" size={20} color={Colors.white} />
-                <Text style={styles.headerInvoiceLabel}>{t("invoices")}</Text>
+                {!compactHeader && <Text style={styles.headerInvoiceLabel}>{t("invoices")}</Text>}
               </Pressable>
               {employee && (
-                <Pressable onPress={() => setShowAccountSwitcher(true)} style={styles.headerAvatarBtn}>
+                <Pressable
+                  onPress={() => setShowAccountSwitcher(true)}
+                  style={styles.headerAvatarBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("switchAccount" as any)}
+                >
                   <LinearGradient colors={[Colors.accent, Colors.gradientStart]} style={styles.headerAvatarCircle}>
-                    <Text style={styles.headerAvatarText}>{employee.name.charAt(0).toUpperCase()}</Text>
+                    <Text style={styles.headerAvatarText}>{(employee.name || "?").charAt(0).toUpperCase()}</Text>
                   </LinearGradient>
                 </Pressable>
               )}
@@ -1866,57 +1976,72 @@ export default function POSScreen() {
       </View>
 
       {/* ── Phone / Customer Bar ── */}
-      <View style={[styles.phoneBar, isRTL && { flexDirection: "row-reverse" }, useMobileCartSidebar && styles.phoneBarMobile]}>
-        <View style={[styles.phoneBarInputWrap, isRTL && { flexDirection: "row-reverse" }, !useMobileCartSidebar && selectedCustomer && { flex: 0, minWidth: 160, maxWidth: 200 }]}>
+      <View style={[styles.phoneBar, flipRow && { flexDirection: "row-reverse" }, useMobileCartSidebar && styles.phoneBarMobile]}>
+        <View style={[styles.phoneBarInputWrap, flipRow && { flexDirection: "row-reverse" }, !useMobileCartSidebar && selectedCustomer && { flex: 0, minWidth: 160, maxWidth: 200 }]}>
           <Ionicons name="call-outline" size={16} color={selectedCustomer ? Colors.accent : Colors.textMuted} />
           <TextInput
             style={[styles.phoneBarInput, isRTL && { textAlign: "right" }]}
-            placeholder={language === "ar" ? "رقم الهاتف..." : language === "de" ? "Telefonnummer..." : "Phone number..."}
+            placeholder={L("رقم هاتف العميل…", "Telefonnummer des Kunden…", "Customer phone number…")}
             placeholderTextColor={Colors.textMuted}
             value={phoneInput}
             onChangeText={(v) => {
-              setPhoneInput(v);
-              if (!v.trim()) cart.setCustomerId(null);
+              const clean = toLatinDigits(v);
+              setPhoneInput(clean);
+              if (!clean.trim()) { cart.setCustomerId(null); setCallerCustomer(null); }
             }}
-            onSubmitEditing={() => handlePhoneSearch(phoneInput)}
-            onBlur={() => { if (phoneInput.trim()) handlePhoneSearch(phoneInput); }}
+            onSubmitEditing={() => handlePhoneSearch(phoneInput, true)}
+            // Leaving the field only looks the number up; the "new customer"
+            // form opens on Enter, never by surprise on a stray tap elsewhere.
+            onBlur={() => { if (phoneInput.trim()) handlePhoneSearch(phoneInput, false); }}
             keyboardType="phone-pad"
             returnKeyType="search"
+            accessibilityLabel={L("رقم هاتف العميل", "Telefonnummer des Kunden", "Customer phone number")}
           />
           {customerPhoneLoading && (
-            <Ionicons name="sync" size={14} color={Colors.textMuted} />
+            <ActivityIndicator size="small" color={Colors.textMuted} />
           )}
           {phoneInput ? (
-            <Pressable onPress={() => { setPhoneInput(""); cart.setCustomerId(null); setCallerCustomer(null); }}>
-              <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+            <Pressable
+              onPress={() => { setPhoneInput(""); cart.setCustomerId(null); setCallerCustomer(null); }}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={L("مسح", "Löschen", "Clear")}
+            >
+              <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
             </Pressable>
           ) : null}
         </View>
 
         {selectedCustomer ? (
           <Pressable
-            style={[styles.phoneBarCustomer, isRTL && { flexDirection: "row-reverse" }]}
+            style={[styles.phoneBarCustomer, flipRow && { flexDirection: "row-reverse" }]}
             onPress={() => setShowCustomerPicker(true)}
           >
             <View style={styles.phoneBarAvatar}>
-              <Text style={styles.phoneBarAvatarText}>{selectedCustomer.name.charAt(0).toUpperCase()}</Text>
+              <Text style={styles.phoneBarAvatarText}>{(selectedCustomer.name || "?").charAt(0).toUpperCase()}</Text>
             </View>
-            <View style={[styles.phoneBarCustomerInfo, isRTL && { alignItems: "flex-end" }]}>
-              <Text style={styles.phoneBarCustomerName} numberOfLines={1}>{selectedCustomer.name}</Text>
-              <View style={[styles.phoneBarCustomerMeta, isRTL && { flexDirection: "row-reverse" }]}>
-                {selectedCustomer.phone && <Text style={styles.phoneBarMetaText}>{selectedCustomer.phone}</Text>}
+            <View style={[styles.phoneBarCustomerInfo, flipRow && { alignItems: "flex-end" }]}>
+              <Text style={[styles.phoneBarCustomerName, rtlTextAlign]} numberOfLines={1}>{selectedCustomer.name}</Text>
+              <View style={[styles.phoneBarCustomerMeta, flipRow && { flexDirection: "row-reverse" }]}>
+                {!!selectedCustomer.phone && <Text style={styles.phoneBarMetaText}>{selectedCustomer.phone}</Text>}
                 {selectedCustomerAddress ? <Text style={styles.phoneBarMetaDot}>·</Text> : null}
                 {selectedCustomerAddress ? <Text style={styles.phoneBarMetaText} numberOfLines={1}>{selectedCustomerAddress}</Text> : null}
               </View>
-              {selectedCustomer.email && <Text style={[styles.phoneBarMetaText, { color: Colors.info }]} numberOfLines={1}>{selectedCustomer.email}</Text>}
+              {!!selectedCustomer.email && <Text style={[styles.phoneBarMetaText, { color: Colors.info }]} numberOfLines={1}>{selectedCustomer.email}</Text>}
             </View>
-            <Pressable onPress={() => { cart.setCustomerId(null); setPhoneInput(""); setCallerCustomer(null); }} style={styles.phoneBarClear}>
+            <Pressable
+              onPress={() => { cart.setCustomerId(null); setPhoneInput(""); setCallerCustomer(null); }}
+              style={styles.phoneBarClear}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={L("إزالة العميل", "Kunde entfernen", "Remove customer")}
+            >
               <Ionicons name="close-circle" size={22} color={Colors.danger} />
             </Pressable>
           </Pressable>
         ) : (
-          <Pressable style={styles.phoneBarWalkIn} onPress={() => setShowCustomerPicker(true)}>
-            <Ionicons name="person-add-outline" size={14} color={Colors.textMuted} />
+          <Pressable style={styles.phoneBarWalkIn} onPress={() => setShowCustomerPicker(true)} accessibilityRole="button">
+            <Ionicons name="person-add-outline" size={16} color={Colors.textMuted} />
             <Text style={styles.phoneBarWalkInText}>{t("selectCustomer")}</Text>
           </Pressable>
         )}
@@ -1925,7 +2050,7 @@ export default function POSScreen() {
       {incomingCalls.length > 0 && (
         <View style={styles.callNotification}>
           {incomingCalls.length > 1 && (
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingTop: 6, paddingBottom: 2 }}>
+            <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingTop: 6, paddingBottom: 2 }}>
               <Text style={{ color: Colors.white, fontSize: 11, fontWeight: "700", opacity: 0.9 }}>
                 {t("callQueue" as any)} — {incomingCalls.length} {t("callsWaiting" as any)}
               </Text>
@@ -1941,7 +2066,7 @@ export default function POSScreen() {
             <LinearGradient
               key={call.id || idx}
               colors={idx === 0 ? [Colors.accent, Colors.gradientMid] : ["#1E3A5F", "#2A4A7F"]}
-              style={[styles.callGradient, isRTL && { flexDirection: "row-reverse" }, idx > 0 && { marginTop: 2, opacity: 0.9 }]}
+              style={[styles.callGradient, flipRow && { flexDirection: "row-reverse" }, idx > 0 && { marginTop: 2, opacity: 0.9 }]}
             >
               <View style={styles.callIconWrap}>
                 <Ionicons name="call" size={idx === 0 ? 24 : 18} color={Colors.white} />
@@ -1951,11 +2076,11 @@ export default function POSScreen() {
                   </Text>
                 )}
               </View>
-              <View style={[styles.callInfo, isRTL && { alignItems: "flex-end" }, { flex: 1 }]}>
+              <View style={[styles.callInfo, flipRow && { alignItems: "flex-end" }, { flex: 1 }]}>
                 {call.customer ? (
                   <>
                     <Text style={[styles.callNumber, idx > 0 && { fontSize: 12 }]}>{call.phoneNumber}</Text>
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                    <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 4, marginTop: 2 }}>
                       <Ionicons name="person-circle" size={13} color="rgba(255,255,255,0.95)" />
                       <Text style={[styles.callCustomer, { fontSize: idx === 0 ? 14 : 11, fontWeight: "700" }]}>
                         {call.customer.name}
@@ -2041,13 +2166,13 @@ export default function POSScreen() {
         </View>
       )}
 
-      <View style={[styles.mainContent, { flexDirection: isTablet && !useMobileCartSidebar ? (leftHandMode ? (isRTL ? "row" : "row-reverse") : (isRTL ? "row-reverse" : "row")) : "column" }]}>
+      <View style={[styles.mainContent, { flexDirection: isTablet && !useMobileCartSidebar ? (leftHandMode ? (flipRow ? "row" : "row-reverse") : (flipRow ? "row-reverse" : "row")) : "column" }]}>
         <View style={[styles.productsSection, isTablet && styles.productsSectionTablet]}>
-          <View style={[styles.searchRow, { flexDirection: isRTL ? "row-reverse" : "row", gap: 8, alignItems: "center" }]}>
-            <View style={[styles.searchBox, { flex: 1 }, isRTL && { flexDirection: "row-reverse" }]}>
+          <View style={[styles.searchRow, { flexDirection: flipRow ? "row-reverse" : "row", gap: 8, alignItems: "center" }]}>
+            <View style={[styles.searchBox, { flex: 1 }, flipRow && { flexDirection: "row-reverse" }]}>
               <Ionicons name="search" size={18} color={Colors.textMuted} />
               <TextInput
-                style={[styles.searchInput, isRTL ? { marginRight: 8, marginLeft: 0 } : null, rtlTextAlign]}
+                style={[styles.searchInput, rtlTextAlign]}
                 placeholder={t("search") + "..."}
                 placeholderTextColor={Colors.textMuted}
                 value={search}
@@ -2057,12 +2182,17 @@ export default function POSScreen() {
                 returnKeyType="search"
               />
               {search ? (
-                <Pressable onPress={() => setSearch("")}>
+                <Pressable onPress={() => setSearch("")} hitSlop={10} accessibilityRole="button" accessibilityLabel={L("مسح البحث", "Suche löschen", "Clear search")}>
                   <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
                 </Pressable>
               ) : null}
             </View>
-            <Pressable style={{ width: 40, height: 40, borderRadius: 11, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" }} onPress={() => setShowScanner(true)}>
+            <Pressable
+              style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" }}
+              onPress={() => setShowScanner(true)}
+              accessibilityRole="button"
+              accessibilityLabel={L("مسح الباركود", "Barcode scannen", "Scan barcode")}
+            >
               <Ionicons name="barcode-outline" size={22} color={Colors.textDark} />
             </Pressable>
           </View>
@@ -2120,7 +2250,9 @@ export default function POSScreen() {
               const cat = categories.find((c: any) => c.id === item.categoryId);
               const catColor = cat?.color || Colors.accent;
               const catIcon = (cat?.icon || "cube") as keyof typeof Ionicons.glyphMap;
-              const cartQty = cart.items.find((i: any) => i.id === item.id || i.productId === item.id)?.quantity || 0;
+              // Every line of this product (each size / topping combo is its own line).
+              const cartQty = cart.items.reduce((sum: number, i: any) =>
+                i.productId === item.id ? sum + (Number(i.quantity) || 0) : sum, 0);
               const isJustAdded = lastAddedId === item.id;
               const variantOptions = getProductVariantOptions(item);
               const hasInlineSizeOptions = prefersInlineSizePicker && variantOptions.length > 0;
@@ -2185,7 +2317,9 @@ export default function POSScreen() {
                     </View>
                   )}
                   {tenant?.storeType !== "restaurant" && item.trackInventory && (
-                    <Text style={[styles.barcodeText, { color: Colors.textSecondary }]}>Stock: {item.quantity || 0}</Text>
+                    <Text style={[styles.barcodeText, { color: (stockByProduct.get(Number(item.id)) ?? 0) <= 0 ? Colors.danger : Colors.textSecondary }]}>
+                      {L("المخزون", "Bestand", "Stock")}: {stockByProduct.get(Number(item.id)) ?? 0}
+                    </Text>
                   )}
                   {item.barcode ? <Text style={styles.barcodeText}>{item.barcode}</Text> : null}
                   {cartQty > 0 ? (
@@ -2210,27 +2344,39 @@ export default function POSScreen() {
         </View>
 
         {!useMobileCartSidebar && (
-        <View style={[styles.cartSection, isTablet && styles.cartSectionTablet, isTablet && isRTL && { borderLeftWidth: 0, borderRightWidth: 1, borderColor: Colors.cardBorder }]}>
-          <View style={[styles.cartHeader, isRTL && { flexDirection: "row-reverse" }]}>
+        <View style={[styles.cartSection, isTablet && styles.cartSectionTablet, isTablet && webRTL && { borderLeftWidth: 0, borderRightWidth: 1, borderColor: Colors.cardBorder }]}>
+          <View style={[styles.cartHeader, flipRow && { flexDirection: "row-reverse" }]}>
             <Text style={[styles.cartTitle, rtlTextAlign]}>{t("cart")} ({cart.itemCount})</Text>
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10 }}>
+            <View style={{ flexDirection: flipRow ? "row-reverse" : "row", gap: 10 }}>
               {/* SPEZIF notes button - always visible */}
               <Pressable
                 onPress={() => setShowOrderNotes(true)}
-                style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: orderNotes ? Colors.warning + "22" : Colors.surfaceLight, borderWidth: 1, borderColor: orderNotes ? Colors.warning : Colors.cardBorder }}
+                style={[styles.cartHeaderBtn, orderNotes ? { backgroundColor: Colors.warning + "22", borderColor: Colors.warning } : null]}
+                accessibilityRole="button"
+                accessibilityLabel={L("ملاحظة الطلب", "Bestellnotiz", "Order note")}
               >
                 <Ionicons name="create-outline" size={16} color={orderNotes ? Colors.warning : Colors.textMuted} />
                 <Text style={{ fontSize: 11, fontWeight: "700", color: orderNotes ? Colors.warning : Colors.textMuted }}>
-                  {language === "ar" ? "ملاحظة" : language === "de" ? "SPEZIF" : "NOTES"}
+                  {L("ملاحظة", "SPEZIF", "NOTES")}
                 </Text>
               </Pressable>
               {cart.items.length > 0 && (
                 <>
-                  <Pressable onPress={() => setShowDiscountModal(true)}>
-                    <Ionicons name="pricetag" size={20} color={Colors.success} />
+                  <Pressable
+                    onPress={() => setShowDiscountModal(true)}
+                    style={[styles.cartHeaderBtn, cart.discount > 0 && { backgroundColor: Colors.success + "22", borderColor: Colors.success }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("discount")}
+                  >
+                    <Ionicons name="pricetag" size={16} color={Colors.success} />
                   </Pressable>
-                  <Pressable onPress={() => cart.clearCart()}>
-                    <Ionicons name="trash" size={20} color={Colors.danger} />
+                  <Pressable
+                    onPress={handleClearCart}
+                    style={styles.cartHeaderBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel={L("إفراغ السلة", "Warenkorb leeren", "Clear cart")}
+                  >
+                    <Ionicons name="trash" size={16} color={Colors.danger} />
                   </Pressable>
                 </>
               )}
@@ -2238,42 +2384,47 @@ export default function POSScreen() {
           </View>
 
           {selectedCustomer ? (
-            <View style={[styles.cartCustomerCard, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.cartCustomerCard, flipRow && { flexDirection: "row-reverse" }]}>
               <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.cartCustomerAvatar}>
-                <Text style={styles.cartCustomerAvatarText}>{selectedCustomer.name.charAt(0).toUpperCase()}</Text>
+                <Text style={styles.cartCustomerAvatarText}>{(selectedCustomer.name || "?").charAt(0).toUpperCase()}</Text>
               </LinearGradient>
-              <View style={[styles.cartCustomerBody, isRTL && { alignItems: "flex-end" }]}>
+              <View style={[styles.cartCustomerBody, flipRow && { alignItems: "flex-end" }]}>
                 <Text style={[styles.cartCustomerName, rtlTextAlign]} numberOfLines={1}>{selectedCustomer.name}</Text>
-                <View style={[styles.cartCustomerRow, isRTL && { flexDirection: "row-reverse" }]}>
-                  {selectedCustomer.phone && (
-                    <View style={[styles.cartCustomerChip, isRTL && { flexDirection: "row-reverse" }]}>
+                <View style={[styles.cartCustomerRow, flipRow && { flexDirection: "row-reverse" }]}>
+                  {!!selectedCustomer.phone && (
+                    <View style={[styles.cartCustomerChip, flipRow && { flexDirection: "row-reverse" }]}>
                       <Ionicons name="call-outline" size={12} color={Colors.accent} />
                       <Text style={styles.cartCustomerChipText}>{selectedCustomer.phone}</Text>
                     </View>
                   )}
-                  {selectedCustomer.email && (
-                    <View style={[styles.cartCustomerChip, isRTL && { flexDirection: "row-reverse" }]}>
+                  {!!selectedCustomer.email && (
+                    <View style={[styles.cartCustomerChip, flipRow && { flexDirection: "row-reverse" }]}>
                       <Ionicons name="mail-outline" size={12} color={Colors.info} />
                       <Text style={styles.cartCustomerChipText}>{selectedCustomer.email}</Text>
                     </View>
                   )}
                 </View>
                 {selectedCustomerAddress ? (
-                  <View style={[styles.cartCustomerChip, { marginTop: 4 }, isRTL && { flexDirection: "row-reverse" }]}>
+                  <View style={[styles.cartCustomerChip, { marginTop: 4 }, flipRow && { flexDirection: "row-reverse" }]}>
                     <Ionicons name="location-outline" size={12} color={Colors.warning} />
                     <Text style={styles.cartCustomerChipText} numberOfLines={1}>{selectedCustomerAddress}</Text>
                   </View>
                 ) : null}
               </View>
-              <Pressable onPress={() => { cart.setCustomerId(null); setPhoneInput(""); }} style={styles.cartCustomerClear}>
+              <Pressable
+                onPress={() => { cart.setCustomerId(null); setPhoneInput(""); setCallerCustomer(null); }}
+                style={styles.cartCustomerClear}
+                accessibilityRole="button"
+                accessibilityLabel={L("إزالة العميل", "Kunde entfernen", "Remove customer")}
+              >
                 <Ionicons name="close-circle" size={26} color={Colors.danger} />
               </Pressable>
             </View>
           ) : (
-            <Pressable style={[styles.customerSelect, isRTL && { flexDirection: "row-reverse" }]} onPress={() => setShowCustomerPicker(true)}>
+            <Pressable style={[styles.customerSelect, flipRow && { flexDirection: "row-reverse" }]} onPress={() => setShowCustomerPicker(true)}>
               <Ionicons name="person-add" size={18} color={Colors.primary} />
               <Text style={[styles.customerSelectText, rtlTextAlign]}>
-                {`${t("selectCustomer")}(${t("walkIn")})`}
+                {`${t("selectCustomer")} (${t("walkIn")})`}
               </Text>
               <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color={Colors.primary} />
             </Pressable>
@@ -2284,7 +2435,7 @@ export default function POSScreen() {
           {orderNotes.trim() !== "" && (
             <Pressable
               onPress={() => setShowOrderNotes(true)}
-              style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, backgroundColor: Colors.warning + "18", borderWidth: 1, borderColor: Colors.warning + "44", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, marginHorizontal: 10, marginBottom: 6 }}
+              style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 6, backgroundColor: Colors.warning + "18", borderWidth: 1, borderColor: Colors.warning + "44", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, marginHorizontal: 10, marginBottom: 6 }}
             >
               <Ionicons name="create-outline" size={14} color={Colors.warning} />
               <Text style={{ color: Colors.warning, fontSize: 12, fontWeight: "700", flex: 1 }} numberOfLines={1}>{orderNotes}</Text>
@@ -2298,13 +2449,13 @@ export default function POSScreen() {
             scrollEnabled={!!cart.items.length}
             style={styles.cartList}
             renderItem={({ item, index }) => (
-              <View style={[styles.cartItem, isRTL && { flexDirection: "row-reverse" }]}>
+              <View style={[styles.cartItem, flipRow && { flexDirection: "row-reverse" }]}>
                 {/* Index badge */}
                 <View style={styles.cartItemIndexBadge}>
                   <Text style={styles.cartItemIndexText}>{index + 1}</Text>
                 </View>
                 <View style={styles.cartItemInfo}>
-                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4, flex: 1 }}>
+                  <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 4, flex: 1 }}>
                     <Text style={[styles.cartItemName, rtlTextAlign, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
                     {(() => {
                       const prod = (products as any[]).find((p: any) => p.id === item.productId);
@@ -2322,21 +2473,24 @@ export default function POSScreen() {
                               showExtras: true,
                             });
                           }}
-                          style={{ padding: 3, borderRadius: 5, backgroundColor: Colors.accent + "22" }}
+                          style={{ padding: 6, borderRadius: 8, backgroundColor: Colors.accent + "22" }}
+                          hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel={L("تعديل الإضافات", "Extras bearbeiten", "Edit extras")}
                         >
-                          <Ionicons name="create-outline" size={13} color={Colors.accent} />
+                          <Ionicons name="create-outline" size={14} color={Colors.accent} />
                         </Pressable>
                       );
                     })()}
                   </View>
                   <Text style={[styles.cartItemUnit, rtlTextAlign]}>{formatMoney(item.price)} × {item.quantity}</Text>
                 </View>
-                <View style={[styles.cartItemActions, isRTL && { flexDirection: "row-reverse" }]}>
+                <View style={[styles.cartItemActions, flipRow && { flexDirection: "row-reverse" }]}>
                   <Pressable
                     style={[styles.qtyBtn, item.quantity === 1 && { backgroundColor: `${Colors.danger}22`, borderColor: Colors.danger }]}
                     onPress={() => { cart.updateQuantity(item.id, item.quantity - 1); playClickSound("light"); }}
                   >
-                    <Ionicons name={item.quantity === 1 ? "trash-outline" : "remove"} size={14} color={item.quantity === 1 ? Colors.danger : Colors.text} />
+                    <Ionicons name={item.quantity === 1 ? "trash-outline" : "remove"} size={15} color={item.quantity === 1 ? Colors.danger : Colors.text} />
                   </Pressable>
                   <View style={styles.qtyBadge}>
                     <Text style={styles.qtyText}>{item.quantity}</Text>
@@ -2344,10 +2498,13 @@ export default function POSScreen() {
                   <Pressable
                     style={[styles.qtyBtn, { backgroundColor: `${Colors.accent}22`, borderColor: Colors.accent }]}
                     onPress={() => { cart.updateQuantity(item.id, item.quantity + 1); playClickSound("light"); }}
+                    hitSlop={4}
+                    accessibilityRole="button"
+                    accessibilityLabel={L("زيادة الكمية", "Menge erhöhen", "Increase quantity")}
                   >
-                    <Ionicons name="add" size={14} color={Colors.accent} />
+                    <Ionicons name="add" size={15} color={Colors.accent} />
                   </Pressable>
-                  <Text style={styles.cartItemTotal}>{formatMoney(item.price * item.quantity)}</Text>
+                  <Text style={[styles.cartItemTotal, webRTL && { textAlign: "left" }]}>{formatMoney(item.price * item.quantity)}</Text>
                 </View>
               </View>
             )}
@@ -2361,56 +2518,77 @@ export default function POSScreen() {
           />
 
           <View style={styles.cartSummary}>
-            <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("subtotal")}</Text>
               <Text style={[styles.summaryValue, rtlTextAlign]}>{formatMoney(cart.subtotal)}</Text>
             </View>
             {cart.discount > 0 && (
-              <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
+              <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }]}>
                 <Text style={[styles.summaryLabel, { color: Colors.success }, rtlTextAlign]}>{t("discount")}</Text>
                 <Text style={[styles.summaryValue, { color: Colors.success }, rtlTextAlign]}>-{formatMoney(cart.discount)}</Text>
               </View>
             )}
             {cart.minimumOrderSurcharge > 0 && (
-              <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
-                <Text style={[styles.summaryLabel, { color: Colors.warning ?? "#F59E0B" }, rtlTextAlign]}>Mindestbestellwert (min. {formatMoney(cart.minOrderAmount, 0)})</Text>
-                <Text style={[styles.summaryValue, { color: Colors.warning ?? "#F59E0B" }, rtlTextAlign]}>+{formatMoney(cart.minimumOrderSurcharge)}</Text>
+              <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }]}>
+                <Text style={[styles.summaryLabel, { color: Colors.warning }, rtlTextAlign]}>{L("حد أدنى للطلب", "Mindestbestellwert", "Minimum order")} ({L("الحد", "min.", "min.")} {formatMoney(cart.minOrderAmount, 0)})</Text>
+                <Text style={[styles.summaryValue, { color: Colors.warning }, rtlTextAlign]}>+{formatMoney(cart.minimumOrderSurcharge)}</Text>
               </View>
             )}
             {cart.serviceFee > 0 && (
-              <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
-                <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("serviceTax" as any) || "Service Tax"} ({cart.serviceFeeRate}%)</Text>
+              <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }]}>
+                <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("serviceTax" as any) || L("رسوم الخدمة", "Servicegebühr", "Service fee")} ({cart.serviceFeeRate}%)</Text>
                 <Text style={[styles.summaryValue, rtlTextAlign]}>{formatMoney(cart.serviceFee)}</Text>
               </View>
             )}
-            <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
+            {cart.deliveryFee > 0 && (
+              <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }]}>
+                <Text style={[styles.summaryLabel, rtlTextAlign]}>{L("رسوم التوصيل", "Liefergebühr", "Delivery fee")}</Text>
+                <Text style={styles.summaryValue}>{formatMoney(cart.deliveryFee)}</Text>
+              </View>
+            )}
+            <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("tax")} ({cart.taxRate}%)</Text>
               <Text style={[styles.summaryValue, rtlTextAlign]}>{formatMoney(cart.tax)}</Text>
             </View>
-            <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }, { alignItems: "center" }]}>
-              <Text style={[styles.summaryLabel, rtlTextAlign]}>{language === "ar" ? "تعديل المبلغ" : language === "de" ? "Anpassung" : "Adjustment"}</Text>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Pressable onPress={() => setManualAdjustment(v => Math.round((v - adjustStep) * 100) / 100)}
-                  style={{ backgroundColor: "#e74c3c", borderRadius: 4, width: 24, height: 24, alignItems: "center", justifyContent: "center" }}>
-                  <Text style={{ color: "#fff", fontSize: 16, lineHeight: 22 }}>−</Text>
+            <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }, { alignItems: "center" }]}>
+              <Text style={[styles.summaryLabel, rtlTextAlign]}>{L("تعديل المبلغ", "Anpassung", "Adjustment")}</Text>
+              <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 6 }}>
+                <Pressable
+                  onPress={() => setManualAdjustment(v => roundMoney(v - adjustStep, currency))}
+                  style={[styles.adjustBtn, { borderColor: Colors.danger, backgroundColor: Colors.danger + "14" }]}
+                  hitSlop={4}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${L("إنقاص", "Verringern um", "Decrease by")} ${formatMoney(adjustStep)}`}
+                >
+                  <Ionicons name="remove" size={16} color={Colors.danger} />
                 </Pressable>
-                <Text style={{ color: manualAdjustment >= 0 ? Colors.success : "#e74c3c", fontSize: 13, fontWeight: "700", minWidth: 60, textAlign: "center" }}>
+                <Text style={[styles.adjustValue, { color: manualAdjustment < 0 ? Colors.danger : manualAdjustment > 0 ? Colors.success : Colors.textSecondary }]}>
                   {manualAdjustment > 0 ? "+" : ""}{formatMoney(manualAdjustment)}
                 </Text>
-                <Pressable onPress={() => setManualAdjustment(v => Math.round((v + adjustStep) * 100) / 100)}
-                  style={{ backgroundColor: Colors.success, borderRadius: 4, width: 24, height: 24, alignItems: "center", justifyContent: "center" }}>
-                  <Text style={{ color: "#fff", fontSize: 16, lineHeight: 22 }}>+</Text>
+                <Pressable
+                  onPress={() => setManualAdjustment(v => roundMoney(v + adjustStep, currency))}
+                  style={[styles.adjustBtn, { borderColor: Colors.success, backgroundColor: Colors.success + "14" }]}
+                  hitSlop={4}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${L("زيادة", "Erhöhen um", "Increase by")} ${formatMoney(adjustStep)}`}
+                >
+                  <Ionicons name="add" size={16} color={Colors.success} />
                 </Pressable>
                 {manualAdjustment !== 0 && (
-                  <Pressable onPress={() => setManualAdjustment(0)} style={{ marginLeft: 2 }}>
-                    <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.4)" />
+                  <Pressable
+                    onPress={() => setManualAdjustment(0)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={L("إلغاء التعديل", "Anpassung zurücksetzen", "Reset adjustment")}
+                  >
+                    <Ionicons name="close-circle" size={20} color={Colors.textMuted} />
                   </Pressable>
                 )}
               </View>
             </View>
-            <View style={[styles.summaryRow, styles.totalRow, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.summaryRow, styles.totalRow, flipRow && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.totalLabel, rtlTextAlign]}>{t("total")}</Text>
-              <Text style={[styles.totalValue, rtlTextAlign]}>{formatMoney(cart.total + manualAdjustment)}</Text>
+              <Text style={[styles.totalValue, rtlTextAlign]}>{formatMoney(payableTotal)}</Text>
             </View>
           </View>
 
@@ -2425,15 +2603,15 @@ export default function POSScreen() {
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={styles.checkoutBtnGradient}
               >
-                <View style={[styles.checkoutBtnInner, isRTL && { flexDirection: "row-reverse" }]}>
-                  <View style={[styles.checkoutBtnLeft, isRTL && { flexDirection: "row-reverse" }]}>
+                <View style={[styles.checkoutBtnInner, flipRow && { flexDirection: "row-reverse" }]}>
+                  <View style={[styles.checkoutBtnLeft, flipRow && { flexDirection: "row-reverse" }]}>
                     <Ionicons name="bag-check" size={20} color={Colors.white} />
                     <Text style={styles.checkoutBtnText}>{t("checkout")}</Text>
                   </View>
                   <View style={styles.checkoutBtnPrice}>
-                    <Text style={styles.checkoutBtnPriceText}>{formatMoney(cart.total + manualAdjustment)}</Text>
+                    <Text style={styles.checkoutBtnPriceText}>{formatMoney(payableTotal)}</Text>
                     {cart.items.length > 0 && (
-                      <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 10, textAlign: "center" }}>{cart.itemCount} items</Text>
+                      <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 10, textAlign: "center" }}>{itemCountLabel(cart.itemCount)}</Text>
                     )}
                   </View>
                 </View>
@@ -2446,50 +2624,94 @@ export default function POSScreen() {
 
       {useMobileCartSidebar && (
         <>
-          <Pressable style={styles.mobileCartBar} onPress={() => setShowMobileCart(true)}>
+          <Pressable
+            style={[styles.mobileCartBar, flipRow && { flexDirection: "row-reverse" }]}
+            onPress={() => setShowMobileCart(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`${t("cart")} · ${itemCountLabel(cart.itemCount)} · ${formatMoney(payableTotal)}`}
+          >
             <View style={{ flex: 1 }}>
-              <Text style={styles.mobileCartBarLabel}>{t("cart")} · {cart.itemCount} {language === "de" ? "Artikel" : "items"}</Text>
-              <Text style={styles.mobileCartBarHint} numberOfLines={1}>
-                {orderNotes ? orderNotes : (language === "de" ? "Tippen zum Oeffnen" : "Tap to open")}
+              <Text style={[styles.mobileCartBarLabel, rtlTextAlign]}>{t("cart")} · {itemCountLabel(cart.itemCount)}</Text>
+              <Text style={[styles.mobileCartBarHint, rtlTextAlign]} numberOfLines={1}>
+                {orderNotes ? orderNotes : L("اضغط لفتح السلة", "Tippen zum Öffnen", "Tap to open")}
               </Text>
             </View>
             <View style={styles.mobileCartBarPrice}>
-              <Text style={styles.mobileCartBarPriceText}>{formatMoney(cart.total + manualAdjustment)}</Text>
+              <Text style={styles.mobileCartBarPriceText}>{formatMoney(payableTotal)}</Text>
             </View>
           </Pressable>
 
           <Modal visible={showMobileCart} animationType="fade" transparent onRequestClose={() => setShowMobileCart(false)}>
             <View style={styles.mobileCartOverlay}>
               <Pressable style={styles.mobileCartBackdrop} onPress={() => setShowMobileCart(false)} />
-              <View style={[styles.mobileCartDrawer, isRTL && { alignSelf: "flex-start" }]}>
-                <View style={[styles.cartHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <View style={[styles.mobileCartDrawer, flipRow && { alignSelf: "flex-start" }, webRTL && { borderLeftWidth: 0, borderRightWidth: 1, borderRightColor: Colors.cardBorder }]}>
+                <View style={[styles.cartHeader, flipRow && { flexDirection: "row-reverse" }]}>
                   <Text style={[styles.cartTitle, rtlTextAlign]}>{t("cart")} ({cart.itemCount})</Text>
-                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10 }}>
-                    <Pressable onPress={() => setShowOrderNotes(true)}>
-                      <Ionicons name="create-outline" size={20} color={orderNotes ? Colors.warning : Colors.textMuted} />
+                  <View style={{ flexDirection: flipRow ? "row-reverse" : "row", gap: 8 }}>
+                    <Pressable
+                      onPress={() => setShowOrderNotes(true)}
+                      style={[styles.cartHeaderBtn, orderNotes ? { backgroundColor: Colors.warning + "22", borderColor: Colors.warning } : null]}
+                      accessibilityRole="button"
+                      accessibilityLabel={L("ملاحظة الطلب", "Bestellnotiz", "Order note")}
+                    >
+                      <Ionicons name="create-outline" size={18} color={orderNotes ? Colors.warning : Colors.textMuted} />
                     </Pressable>
                     {cart.items.length > 0 ? (
-                      <Pressable onPress={() => cart.clearCart()}>
-                        <Ionicons name="trash" size={20} color={Colors.danger} />
-                      </Pressable>
+                      <>
+                        <Pressable
+                          onPress={() => setShowDiscountModal(true)}
+                          style={[styles.cartHeaderBtn, cart.discount > 0 && { backgroundColor: Colors.success + "22", borderColor: Colors.success }]}
+                          accessibilityRole="button"
+                          accessibilityLabel={t("discount")}
+                        >
+                          <Ionicons name="pricetag" size={18} color={Colors.success} />
+                        </Pressable>
+                        <Pressable
+                          onPress={handleClearCart}
+                          style={styles.cartHeaderBtn}
+                          accessibilityRole="button"
+                          accessibilityLabel={L("إفراغ السلة", "Warenkorb leeren", "Clear cart")}
+                        >
+                          <Ionicons name="trash" size={18} color={Colors.danger} />
+                        </Pressable>
+                      </>
                     ) : null}
-                    <Pressable onPress={() => setShowMobileCart(false)}>
+                    <Pressable
+                      onPress={() => setShowMobileCart(false)}
+                      style={styles.cartHeaderBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
+                    >
                       <Ionicons name="close" size={20} color={Colors.textMuted} />
                     </Pressable>
                   </View>
                 </View>
 
                 {selectedCustomer ? (
-                  <View style={[styles.cartCustomerCard, isRTL && { flexDirection: "row-reverse" }]}>
+                  <View style={[styles.cartCustomerCard, flipRow && { flexDirection: "row-reverse" }]}>
                     <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.cartCustomerAvatar}>
-                      <Text style={styles.cartCustomerAvatarText}>{selectedCustomer.name.charAt(0).toUpperCase()}</Text>
+                      <Text style={styles.cartCustomerAvatarText}>{(selectedCustomer.name || "?").charAt(0).toUpperCase()}</Text>
                     </LinearGradient>
-                    <View style={[styles.cartCustomerBody, isRTL && { alignItems: "flex-end" }]}>
+                    <View style={[styles.cartCustomerBody, flipRow && { alignItems: "flex-end" }]}>
                       <Text style={[styles.cartCustomerName, rtlTextAlign]} numberOfLines={1}>{selectedCustomer.name}</Text>
                       {selectedCustomer.phone ? <Text style={styles.cartCustomerChipText}>{selectedCustomer.phone}</Text> : null}
+                      {selectedCustomerAddress ? <Text style={styles.cartCustomerChipText} numberOfLines={1}>{selectedCustomerAddress}</Text> : null}
                     </View>
+                    <Pressable
+                      onPress={() => { cart.setCustomerId(null); setPhoneInput(""); setCallerCustomer(null); }}
+                      style={styles.cartCustomerClear}
+                      accessibilityRole="button"
+                      accessibilityLabel={L("إزالة العميل", "Kunde entfernen", "Remove customer")}
+                    >
+                      <Ionicons name="close-circle" size={24} color={Colors.danger} />
+                    </Pressable>
                   </View>
-                ) : null}
+                ) : (
+                  <Pressable style={[styles.customerSelect, flipRow && { flexDirection: "row-reverse" }]} onPress={() => setShowCustomerPicker(true)}>
+                    <Ionicons name="person-add" size={18} color={Colors.primary} />
+                    <Text style={[styles.customerSelectText, rtlTextAlign]}>{`${t("selectCustomer")} (${t("walkIn")})`}</Text>
+                  </Pressable>
+                )}
                 {wholesaleBanner}
 
                 <FlatList
@@ -2498,17 +2720,17 @@ export default function POSScreen() {
                   style={styles.cartList}
                   contentContainerStyle={!cart.items.length ? { flexGrow: 1, justifyContent: "center" } : { paddingBottom: 8 }}
                   renderItem={({ item }) => (
-                    <View style={[styles.cartItem, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[styles.cartItem, flipRow && { flexDirection: "row-reverse" }]}>
                       <View style={styles.cartItemInfo}>
                         <Text style={[styles.cartItemName, rtlTextAlign]} numberOfLines={2}>{item.name}</Text>
                         <Text style={[styles.cartItemUnit, rtlTextAlign]}>{formatMoney(item.price)} × {item.quantity}</Text>
                       </View>
-                      <View style={[styles.cartItemActions, isRTL && { flexDirection: "row-reverse" }]}>
+                      <View style={[styles.cartItemActions, flipRow && { flexDirection: "row-reverse" }]}>
                         <Pressable
                           style={[styles.qtyBtn, item.quantity === 1 && { backgroundColor: `${Colors.danger}22`, borderColor: Colors.danger }]}
                           onPress={() => { cart.updateQuantity(item.id, item.quantity - 1); playClickSound("light"); }}
                         >
-                          <Ionicons name={item.quantity === 1 ? "trash-outline" : "remove"} size={14} color={item.quantity === 1 ? Colors.danger : Colors.text} />
+                          <Ionicons name={item.quantity === 1 ? "trash-outline" : "remove"} size={15} color={item.quantity === 1 ? Colors.danger : Colors.text} />
                         </Pressable>
                         <View style={styles.qtyBadge}>
                           <Text style={styles.qtyText}>{item.quantity}</Text>
@@ -2516,8 +2738,10 @@ export default function POSScreen() {
                         <Pressable
                           style={[styles.qtyBtn, { backgroundColor: `${Colors.accent}22`, borderColor: Colors.accent }]}
                           onPress={() => { cart.updateQuantity(item.id, item.quantity + 1); playClickSound("light"); }}
+                          accessibilityRole="button"
+                          accessibilityLabel={L("زيادة الكمية", "Menge erhöhen", "Increase quantity")}
                         >
-                          <Ionicons name="add" size={14} color={Colors.accent} />
+                          <Ionicons name="add" size={15} color={Colors.accent} />
                         </Pressable>
                       </View>
                     </View>
@@ -2532,13 +2756,49 @@ export default function POSScreen() {
                 />
 
                 <View style={styles.cartSummary}>
-                  <View style={[styles.summaryRow, isRTL && { flexDirection: "row-reverse" }]}>
+                  <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }]}>
                     <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("subtotal")}</Text>
                     <Text style={[styles.summaryValue, rtlTextAlign]}>{formatMoney(cart.subtotal)}</Text>
                   </View>
-                  <View style={[styles.summaryRow, styles.totalRow, isRTL && { flexDirection: "row-reverse" }]}>
+                  {cart.discount > 0 && (
+                    <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }]}>
+                      <Text style={[styles.summaryLabel, { color: Colors.success }, rtlTextAlign]}>{t("discount")}</Text>
+                      <Text style={[styles.summaryValue, { color: Colors.success }]}>-{formatMoney(cart.discount)}</Text>
+                    </View>
+                  )}
+                  {cart.minimumOrderSurcharge > 0 && (
+                    <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }]}>
+                      <Text style={[styles.summaryLabel, { color: Colors.warning }, rtlTextAlign]}>{L("حد أدنى للطلب", "Mindestbestellwert", "Minimum order")}</Text>
+                      <Text style={[styles.summaryValue, { color: Colors.warning }]}>+{formatMoney(cart.minimumOrderSurcharge)}</Text>
+                    </View>
+                  )}
+                  {cart.serviceFee > 0 && (
+                    <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }]}>
+                      <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("serviceTax" as any) || L("رسوم الخدمة", "Servicegebühr", "Service fee")} ({cart.serviceFeeRate}%)</Text>
+                      <Text style={styles.summaryValue}>{formatMoney(cart.serviceFee)}</Text>
+                    </View>
+                  )}
+                  {cart.tax > 0 && (
+                    <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }]}>
+                      <Text style={[styles.summaryLabel, rtlTextAlign]}>{t("tax")} ({cart.taxRate}%)</Text>
+                      <Text style={styles.summaryValue}>{formatMoney(cart.tax)}</Text>
+                    </View>
+                  )}
+                  {cart.deliveryFee > 0 && (
+                    <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }]}>
+                      <Text style={[styles.summaryLabel, rtlTextAlign]}>{L("رسوم التوصيل", "Liefergebühr", "Delivery fee")}</Text>
+                      <Text style={styles.summaryValue}>{formatMoney(cart.deliveryFee)}</Text>
+                    </View>
+                  )}
+                  {manualAdjustment !== 0 && (
+                    <View style={[styles.summaryRow, flipRow && { flexDirection: "row-reverse" }]}>
+                      <Text style={[styles.summaryLabel, rtlTextAlign]}>{L("تعديل المبلغ", "Anpassung", "Adjustment")}</Text>
+                      <Text style={styles.summaryValue}>{manualAdjustment > 0 ? "+" : ""}{formatMoney(manualAdjustment)}</Text>
+                    </View>
+                  )}
+                  <View style={[styles.summaryRow, styles.totalRow, flipRow && { flexDirection: "row-reverse" }]}>
                     <Text style={[styles.totalLabel, rtlTextAlign]}>{t("total")}</Text>
-                    <Text style={[styles.totalValue, rtlTextAlign]}>{formatMoney(cart.total + manualAdjustment)}</Text>
+                    <Text style={styles.totalValue}>{formatMoney(payableTotal)}</Text>
                   </View>
                 </View>
 
@@ -2559,13 +2819,13 @@ export default function POSScreen() {
                     end={{ x: 1, y: 0 }}
                     style={styles.checkoutBtnGradient}
                   >
-                    <View style={[styles.checkoutBtnInner, isRTL && { flexDirection: "row-reverse" }]}>
-                      <View style={[styles.checkoutBtnLeft, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[styles.checkoutBtnInner, flipRow && { flexDirection: "row-reverse" }]}>
+                      <View style={[styles.checkoutBtnLeft, flipRow && { flexDirection: "row-reverse" }]}>
                         <Ionicons name="bag-check" size={20} color={Colors.white} />
                         <Text style={styles.checkoutBtnText}>{t("checkout")}</Text>
                       </View>
                       <View style={styles.checkoutBtnPrice}>
-                        <Text style={styles.checkoutBtnPriceText}>{formatMoney(cart.total + manualAdjustment)}</Text>
+                        <Text style={styles.checkoutBtnPriceText}>{formatMoney(payableTotal)}</Text>
                       </View>
                     </View>
                   </LinearGradient>
@@ -2576,26 +2836,26 @@ export default function POSScreen() {
         </>
       )}
 
-      <Modal visible={!!selectedProductForOptions} animationType="fade" transparent>
+      <Modal visible={!!selectedProductForOptions} animationType="fade" transparent onRequestClose={resetProductOptionsState}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxWidth: isTablet ? (showToppingsStep ? 750 : 420) : 420, padding: isTablet ? 32 : 24, maxHeight: "92%" }]}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }]}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.modalTitle, rtlTextAlign, { fontSize: 24, fontWeight: "900" }]}>{selectedProductForOptions?.name}</Text>
                 <Text style={[styles.sectionLabel, { marginTop: 4, marginBottom: 0 }, rtlTextAlign]}>
-                  {showToppingsStep ? (editingCartItemId !== null ? (language === "ar" ? "تعديل الإضافات" : language === "de" ? "Extras bearbeiten" : "Edit Extras") : (language === "ar" ? "اختر الإضافات" : language === "de" ? "Extras wählen" : "Select Extras")) : (t("selectSize" as any) || "Select Size")}
+                  {showToppingsStep ? (editingCartItemId !== null ? L("تعديل الإضافات", "Extras bearbeiten", "Edit Extras") : L("اختر الإضافات", "Extras wählen", "Select Extras")) : (t("selectSize" as any) || L("اختر الحجم", "Größe wählen", "Select size"))}
                 </Text>
               </View>
-              <Pressable onPress={resetProductOptionsState} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={28} color={Colors.textMuted} />
+              <Pressable onPress={resetProductOptionsState} style={styles.modalCloseBtn} accessibilityRole="button" accessibilityLabel={L("إغلاق", "Schliessen", "Close")}>
+                <Ionicons name="close" size={24} color={Colors.textMuted} />
               </Pressable>
             </View>
 
             {!showToppingsStep ? (
               /* ── SIZE SELECTION ── */
               <View style={{ marginTop: 20, gap: 12 }}>
-                <Text style={[styles.sectionLabel, { marginBottom: 4 }]}>
-                  {language === "ar" ? "اختر الحجم" : language === "de" ? "Größe wählen" : "CHOOSE SIZE"}
+                <Text style={[styles.sectionLabel, { marginBottom: 4 }, rtlTextAlign]}>
+                  {L("اختر الحجم", "Größe wählen", "Choose size")}
                 </Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
                   {selectedProductForOptions?.variants?.map((v: any, idx: number) => (
@@ -2637,7 +2897,7 @@ export default function POSScreen() {
                     </Text>
                     {selectedToppings.length > 0 && (
                       <View style={{ marginLeft: "auto", backgroundColor: Colors.accent, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 }}>
-                        <Text style={{ color: "#000", fontSize: 12, fontWeight: "800" }}>{selectedToppings.length}</Text>
+                        <Text style={{ color: Colors.textDark, fontSize: 12, fontWeight: "800" }}>{selectedToppings.length}</Text>
                       </View>
                     )}
                   </View>
@@ -2682,11 +2942,11 @@ export default function POSScreen() {
                               }}
                             >
                               <Text style={{ fontSize: isTablet ? 15 : 13, lineHeight: 16 }}>{toppingEmoji(toppingName)}</Text>
-                              <Text style={{ fontSize: isTablet ? 9 : 8, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : row.textColor, lineHeight: 10 }} numberOfLines={2}>
+                              <Text style={{ fontSize: isTablet ? 9 : 8, fontWeight: "700", textAlign: "center", color: isSelected ? Colors.textDark : row.textColor, lineHeight: 10 }} numberOfLines={2}>
                                 {toppingDisplayName(toppingName)}
                               </Text>
-                              <Text style={{ fontSize: 8, color: isSelected ? "#000" : row.textColor, opacity: 0.8, lineHeight: 10 }}>+2</Text>
-                              {isSelected && <Ionicons name="checkmark" size={11} color="#000" style={{ position: "absolute", top: 2, right: 3 }} />}
+                              <Text style={{ fontSize: 8, color: isSelected ? Colors.textDark : row.textColor, opacity: 0.8, lineHeight: 10 }}>+2</Text>
+                              {isSelected && <Ionicons name="checkmark" size={11} color={Colors.textDark} style={{ position: "absolute", top: 2, right: 3 }} />}
                             </Pressable>
                           </View>
                         );
@@ -2720,13 +2980,13 @@ export default function POSScreen() {
                           }}
                         >
                           <Text style={{ fontSize: isTablet ? 15 : 13, lineHeight: 16 }}>{toppingEmoji(sauce.name)}</Text>
-                          <Text style={{ fontSize: isTablet ? 10 : 9, fontWeight: "700", textAlign: "center", color: isSelected ? "#000" : sauce.textColor, lineHeight: 11 }} numberOfLines={1}>
+                          <Text style={{ fontSize: isTablet ? 10 : 9, fontWeight: "700", textAlign: "center", color: isSelected ? Colors.textDark : sauce.textColor, lineHeight: 11 }} numberOfLines={1}>
                             {toppingDisplayName(sauce.name)}
                           </Text>
-                          <Text style={{ fontSize: 8, color: isSelected ? "#000" : sauce.textColor, opacity: 0.9, lineHeight: 10, fontWeight: "700" }}>
+                          <Text style={{ fontSize: 8, color: isSelected ? Colors.textDark : sauce.textColor, opacity: 0.9, lineHeight: 10, fontWeight: "700" }}>
                             {language === "ar" ? "مجاناً" : language === "de" ? "GRATIS" : "FREE"}
                           </Text>
-                          {isSelected && <Ionicons name="checkmark" size={11} color="#000" style={{ position: "absolute", top: 2, right: 4 }} />}
+                          {isSelected && <Ionicons name="checkmark" size={11} color={Colors.textDark} style={{ position: "absolute", top: 2, right: 4 }} />}
                         </Pressable>
                       );
                     })}
@@ -2744,7 +3004,7 @@ export default function POSScreen() {
                           ? `Ausgewählte Extras (${selectedToppings.length}) — +${formatMoney(calcToppingsPrice(selectedToppings, selectedVariant?.name))}`
                           : `Selected Extras (${selectedToppings.length}) — +${formatMoney(calcToppingsPrice(selectedToppings, selectedVariant?.name))}`}
                       </Text>
-                      <Pressable onPress={() => setSelectedToppings([])}>
+                      <Pressable onPress={() => setSelectedToppings([])} hitSlop={10} accessibilityRole="button">
                         <Text style={{ color: Colors.danger, fontSize: 11, fontWeight: "600" }}>
                           {language === "ar" ? "مسح الكل" : language === "de" ? "Alle löschen" : "Clear all"}
                         </Text>
@@ -2807,9 +3067,9 @@ export default function POSScreen() {
                   </Pressable>
 
                   {selectedVariant && editingCartItemId === null && (
-                    <Pressable style={{ paddingVertical: 10 }} onPress={() => setShowToppingsStep(false)}>
+                    <Pressable style={{ paddingVertical: 12 }} onPress={() => setShowToppingsStep(false)} accessibilityRole="button">
                       <Text style={{ color: Colors.textMuted, textAlign: "center", fontSize: 13, fontWeight: "600" }}>
-                        {language === "ar" ? "← العودة للأحجام" : language === "de" ? "← Zurück zu Größen" : "← Back to sizes"}
+                        {L("→ العودة للأحجام", "← Zurück zu Größen", "← Back to sizes")}
                       </Text>
                     </Pressable>
                   )}
@@ -2829,24 +3089,30 @@ export default function POSScreen() {
         </View>
       </Modal>
 
-      <Modal visible={showCheckout} animationType="slide" transparent>
+      <Modal visible={showCheckout} animationType="slide" transparent onRequestClose={() => { if (!checkoutBusy) setShowCheckout(false); }}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+          <View style={[styles.modalContent, { maxHeight: "92%" }]}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }]}>
                 <Text style={[styles.modalTitle, rtlTextAlign]}>{t("completePayment")}</Text>
-                <Pressable onPress={() => setShowCheckout(false)}>
-                  <Ionicons name="close" size={24} color={Colors.text} />
+                <Pressable
+                  onPress={() => setShowCheckout(false)}
+                  disabled={checkoutBusy}
+                  style={[styles.modalCloseBtn, checkoutBusy && { opacity: 0.4 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
+                >
+                  <Ionicons name="close" size={22} color={Colors.text} />
                 </Pressable>
               </View>
 
-              <Text style={styles.modalTotal}>{formatMoney(cart.total + manualAdjustment)}</Text>
+              <Text style={styles.modalTotal} adjustsFontSizeToFit numberOfLines={1}>{formatMoney(payableTotal)}</Text>
 
               {selectedCustomer && (
-                <View style={[styles.customerInfo, isRTL && { flexDirection: "row-reverse" }]}>
+                <View style={[styles.customerInfo, flipRow && { flexDirection: "row-reverse" }]}>
                   <Ionicons name="person-circle" size={20} color={Colors.accent} />
                   <Text style={[styles.customerInfoText, rtlTextAlign]}>{selectedCustomer.name}</Text>
-                  <View style={[styles.loyaltyBadge, isRTL && { flexDirection: "row-reverse" }]}>
+                  <View style={[styles.loyaltyBadge, flipRow && { flexDirection: "row-reverse" }]}>
                     <Ionicons name="star" size={12} color={Colors.warning} />
                     <Text style={styles.loyaltyBadgeText}>{selectedCustomer.loyaltyPoints || 0} {t("pts")}</Text>
                   </View>
@@ -2854,20 +3120,18 @@ export default function POSScreen() {
               )}
               {selectedCustomer && loyalty.enabled && (() => {
                 // Points to earn are what the server will award on the amount paid.
-                const earn = Math.floor(Math.max(0, cart.total + manualAdjustment) * loyalty.pointsPerUnit + 1e-6);
+                const earn = Math.floor(Math.max(0, payableTotal) * loyalty.pointsPerUnit + 1e-6);
                 const redeemable = loyaltyRedeem ? null : loyaltyRedeemable();
                 if (earn <= 0 && !loyaltyRedeem && !redeemable) return null;
                 return (
-                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, marginTop: -8, marginBottom: 16 }}>
+                  <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 8, marginTop: -8, marginBottom: 16 }}>
                     <Text style={[{ flex: 1, color: Colors.textMuted, fontSize: 12 }, rtlTextAlign]}>
-                      {earn > 0
-                        ? (language === "ar" ? `+${earn} نقطة على هذا الطلب` : language === "de" ? `+${earn} Punkte für diesen Einkauf` : `+${earn} pts on this sale`)
-                        : ""}
+                      {earn > 0 ? L(`+${earn} نقطة على هذا الطلب`, `+${earn} Punkte für diesen Einkauf`, `+${earn} pts on this sale`) : ""}
                     </Text>
                     {(loyaltyRedeem || redeemable) && (
                       <Pressable
                         onPress={toggleLoyaltyRedeem}
-                        style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.warning + "60", backgroundColor: loyaltyRedeem ? Colors.warning + "25" : Colors.warning + "10" }}
+                        style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.warning + "60", backgroundColor: loyaltyRedeem ? Colors.warning + "25" : Colors.warning + "10" }}
                       >
                         <Ionicons name={loyaltyRedeem ? "close-circle" : "gift-outline"} size={16} color={Colors.warning} />
                         <Text style={{ color: Colors.warning, fontSize: 12, fontWeight: "700" }}>
@@ -2890,16 +3154,22 @@ export default function POSScreen() {
               })()}
 
               <Text style={[styles.sectionLabel, rtlTextAlign]}>{t("paymentMethod")}</Text>
-              <View style={[styles.paymentMethods, isRTL && { flexDirection: "row-reverse" }]}>
+              <View style={[styles.paymentMethods, flipRow && { flexDirection: "row-reverse" }]}>
                 {[
                   { key: "cash", icon: "cash" as const, label: t("cash") },
-                  { key: "card", icon: "card" as const, label: t("card") },
-                  { key: "wallet", icon: "wallet-outline" as const, label: t("walletPay") },
+                  // Card / wallet go through Stripe, which does not serve every
+                  // currency (not SYP): those stores never see the buttons.
+                  ...(stripeAllowed
+                    ? [
+                      { key: "card", icon: "card" as const, label: t("card") },
+                      { key: "wallet", icon: "wallet-outline" as const, label: t("walletPay") },
+                    ]
+                    : []),
                   ...(shamCashStore
-                    ? [{ key: "shamcash", icon: "wallet" as const, label: language === "ar" ? "شام كاش" : "Sham Cash" }]
+                    ? [{ key: "shamcash", icon: "wallet" as const, label: L("شام كاش", "Sham Cash", "Sham Cash") }]
                     : []),
                   ...(selectedTrader
-                    ? [{ key: "credit", icon: "document-text-outline" as const, label: language === "ar" ? "آجل" : language === "de" ? "Auf Rechnung" : "On credit" }]
+                    ? [{ key: "credit", icon: "document-text-outline" as const, label: L("آجل", "Auf Rechnung", "On credit") }]
                     : []),
                 ].filter((m) => tillMethodEnabled(m.key)).map((m) => {
                   // Nothing here talks to a card reader, so the non-cash buttons
@@ -2909,8 +3179,11 @@ export default function POSScreen() {
                     <Pressable
                       key={m.key}
                       style={[styles.paymentBtn, paymentMethod === m.key && styles.paymentBtnActive, blocked && { opacity: 0.45 }]}
-                      onPress={() => { if (!blocked) setPaymentMethod(m.key); }}
-                      disabled={blocked}
+                      onPress={() => { if (!blocked && !checkoutBusy) setPaymentMethod(m.key); }}
+                      disabled={blocked || checkoutBusy}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: paymentMethod === m.key, disabled: blocked }}
+                      accessibilityLabel={m.label}
                     >
                       <Ionicons name={m.icon} size={22} color={paymentMethod === m.key ? Colors.accent : Colors.textSecondary} />
                       <Text style={[styles.paymentBtnText, paymentMethod === m.key && { color: Colors.accent }]}>{m.label}</Text>
@@ -2918,55 +3191,103 @@ export default function POSScreen() {
                   );
                 })}
               </View>
-              {paymentsConfig !== undefined && !stripeReady && (
+              {paymentsConfig !== undefined && stripeAllowed && !stripeReady && (
                 <Text style={[styles.payHint, rtlTextAlign]}>{t("stripeNotConnected")}</Text>
               )}
               {shamCashStore && !shamCashReady && (
                 <Text style={[styles.payHint, rtlTextAlign]}>
-                  {language === "ar"
-                    ? "شام كاش غير مفعّل بعد: ارفع رمز QR أو رقم شام كاش الخاص بالمتجر من الإعدادات ← إعدادات المتجر ← شام كاش."
-                    : language === "de"
-                      ? "Sham Cash ist noch nicht aktiv: QR-Code oder Sham-Cash-Nummer unter Einstellungen → Filialeinstellungen → Sham Cash hinterlegen."
-                      : "Sham Cash is not live yet: add the store's QR code or Sham Cash number in Settings → Store Settings → Sham Cash."}
+                  {L(
+                    "شام كاش غير مفعّل بعد: أضف رمز QR أو رقم شام كاش الخاص بالمتجر من الإعدادات ← إعدادات المتجر ← شام كاش.",
+                    "Sham Cash ist noch nicht aktiv: QR-Code oder Sham-Cash-Nummer unter Einstellungen → Filialeinstellungen → Sham Cash hinterlegen.",
+                    "Sham Cash is not live yet: add the store's QR code or Sham Cash number in Settings → Store Settings → Sham Cash.",
+                  )}
                 </Text>
               )}
 
-              {paymentMethod === "cash" && (
-                <View style={styles.cashSection}>
-                  <Text style={[styles.sectionLabel, rtlTextAlign]}>{t("cashReceived")} <Text style={{ color: Colors.textMuted, fontSize: 11, textTransform: "none", letterSpacing: 0 }}>({t("optional" as any) || "optional"})</Text></Text>
-                  <TextInput
-                    style={styles.cashInput}
-                    placeholder={t("enterAmount")}
-                    placeholderTextColor={Colors.textMuted}
-                    value={cashReceived}
-                    onChangeText={setCashReceived}
-                    keyboardType="decimal-pad"
-                  />
-                  {cashReceived && Number(cashReceived) >= cart.total && (
-                    <Text style={styles.changeText}>{t("change")}: {formatMoney(Number(cashReceived) - (cart.total + manualAdjustment))}</Text>
-                  )}
-                </View>
-              )}
+              {paymentMethod === "cash" && (() => {
+                const given = parseAmountInput(cashReceived, currency);
+                const hasGiven = cashReceived.trim() !== "" && Number.isFinite(given);
+                const diff = hasGiven ? roundMoney(given - payableTotal, currency) : 0;
+                const quick = [payableTotal, ...cashSuggestions(payableTotal, currency, 4)].filter((v, i, a) => v > 0 && a.indexOf(v) === i);
+                return (
+                  <View style={styles.cashSection}>
+                    <Text style={[styles.sectionLabel, rtlTextAlign]}>
+                      {t("cashReceived")} <Text style={{ color: Colors.textMuted, fontSize: 11, textTransform: "none", letterSpacing: 0 }}>({t("optional" as any) || L("اختياري", "optional", "optional")})</Text>
+                    </Text>
+                    <TextInput
+                      style={styles.cashInput}
+                      placeholder={t("enterAmount")}
+                      placeholderTextColor={Colors.textMuted}
+                      value={cashReceived}
+                      onChangeText={setCashReceived}
+                      keyboardType={isZeroDecimalCurrency(currency) ? "number-pad" : "decimal-pad"}
+                      accessibilityLabel={t("cashReceived")}
+                    />
+                    {quick.length > 0 && (
+                      <View style={[styles.cashChipsRow, flipRow && { flexDirection: "row-reverse" }]}>
+                        {quick.map((v, i) => {
+                          const active = hasGiven && Math.abs(given - v) < 1e-9;
+                          return (
+                            <Pressable
+                              key={`${i}-${v}`}
+                              style={[styles.cashChip, active && styles.cashChipActive]}
+                              onPress={() => { setCashReceived(isZeroDecimalCurrency(currency) ? String(Math.round(v)) : String(v)); playClickSound("light"); }}
+                              accessibilityRole="button"
+                              accessibilityLabel={i === 0 ? L("المبلغ بالضبط", "Passend", "Exact amount") : formatMoney(v)}
+                            >
+                              <Text style={[styles.cashChipText, active && { color: Colors.accent }]} numberOfLines={1}>
+                                {i === 0 ? L("بالضبط", "Passend", "Exact") : formatAmount(v, isZeroDecimalCurrency(currency) ? 0 : (Number.isInteger(v) ? 0 : 2))}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    )}
+                    {cashReceived.trim() !== "" && (
+                      !Number.isFinite(given) ? (
+                        <Text style={[styles.changeText, { color: Colors.danger }]}>
+                          {L("المبلغ غير صالح", "Ungültiger Betrag", "Invalid amount")}
+                        </Text>
+                      ) : (
+                        <View style={[
+                          styles.changeBox,
+                          flipRow && { flexDirection: "row-reverse" },
+                          diff >= 0
+                            ? { borderColor: Colors.success, backgroundColor: Colors.success + "14" }
+                            : { borderColor: Colors.danger, backgroundColor: Colors.danger + "14" },
+                        ]}>
+                          <Text style={[styles.changeBoxLabel, { color: diff >= 0 ? Colors.success : Colors.danger }]}>
+                            {diff >= 0 ? t("change") : L("المبلغ ناقص", "Es fehlen", "Short by")}
+                          </Text>
+                          <Text style={[styles.changeBoxValue, { color: diff >= 0 ? Colors.success : Colors.danger }]}>
+                            {formatMoney(Math.abs(diff))}
+                          </Text>
+                        </View>
+                      )
+                    )}
+                  </View>
+                );
+              })()}
 
               {paymentMethod === "credit" && selectedTrader && (
                 <View style={[styles.payNotice, creditLimitExceeded && { borderColor: Colors.danger }]}>
-                  <View style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8 }]}>
+                  <View style={[{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 8 }]}>
                     <Ionicons name="document-text-outline" size={18} color={creditLimitExceeded ? Colors.danger : Colors.accent} />
                     <Text style={[styles.payNoticeTitle, rtlTextAlign]}>
-                      {language === "ar" ? "بيع آجل على حساب التاجر" : language === "de" ? "Verkauf auf Rechnung des Händlers" : "Sale on the trader's account"}
+                      {L("بيع آجل على حساب التاجر", "Verkauf auf Rechnung des Händlers", "Sale on the trader's account")}
                     </Text>
                   </View>
                   <Text style={[styles.payNoticeText, rtlTextAlign]}>
-                    {language === "ar" ? "الرصيد الحالي" : language === "de" ? "Aktueller Saldo" : "Current balance"}: {formatMoney(selectedTrader.balance)}
+                    {L("الرصيد الحالي", "Aktueller Saldo", "Current balance")}: {formatMoney(selectedTrader.balance)}
                     {"\n"}
-                    {language === "ar" ? "الرصيد بعد البيع" : language === "de" ? "Saldo nach Verkauf" : "Balance after sale"}: {formatMoney(creditBalanceAfterSale)}
+                    {L("الرصيد بعد البيع", "Saldo nach Verkauf", "Balance after sale")}: {formatMoney(creditBalanceAfterSale)}
                     {selectedTrader.creditLimit != null
-                      ? `\n${language === "ar" ? "سقف الدين" : language === "de" ? "Kreditlimit" : "Credit limit"}: ${formatMoney(selectedTrader.creditLimit)}`
+                      ? `\n${L("سقف الدين", "Kreditlimit", "Credit limit")}: ${formatMoney(selectedTrader.creditLimit)}`
                       : ""}
                   </Text>
                   {creditLimitExceeded && (
                     <Text style={[styles.payNoticeText, { color: Colors.danger, fontWeight: "700" }, rtlTextAlign]}>
-                      {language === "ar" ? "هذا البيع يتجاوز سقف الدين المسموح لهذا التاجر." : language === "de" ? "Dieser Verkauf überschreitet das Kreditlimit des Händlers." : "This sale exceeds the trader's credit limit."}
+                      {L("هذا البيع يتجاوز سقف الدين المسموح لهذا التاجر.", "Dieser Verkauf überschreitet das Kreditlimit des Händlers.", "This sale exceeds the trader's credit limit.")}
                     </Text>
                   )}
                 </View>
@@ -2974,7 +3295,7 @@ export default function POSScreen() {
 
               {isStripeMethod(paymentMethod) && stripeReady && (
                 <View style={styles.payNotice}>
-                  <View style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8 }]}>
+                  <View style={[{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 8 }]}>
                     <Ionicons name="qr-code-outline" size={18} color={Colors.accent} />
                     <Text style={[styles.payNoticeTitle, rtlTextAlign]}>{t("payOnCustomerPhone")}</Text>
                   </View>
@@ -2987,18 +3308,54 @@ export default function POSScreen() {
 
               <Text style={[styles.sectionLabel, rtlTextAlign]}>{t("orderSummary")}</Text>
               {cart.items.map((item) => (
-                <View key={String(item.id)} style={[styles.checkoutItem, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Text style={[styles.checkoutItemName, rtlTextAlign]}>{item.name} x{item.quantity}</Text>
-                  <Text style={[styles.checkoutItemTotal, rtlTextAlign]}>{formatMoney(item.price * item.quantity)}</Text>
+                <View key={String(item.id)} style={[styles.checkoutItem, flipRow && { flexDirection: "row-reverse" }]}>
+                  <Text style={[styles.checkoutItemName, rtlTextAlign, { flex: 1 }]}>{item.name} ×{item.quantity}</Text>
+                  <Text style={styles.checkoutItemTotal}>{formatMoney(item.price * item.quantity)}</Text>
                 </View>
               ))}
-              {/* Vehicle Picker — always shown (optional) */}
-              {(
-                <View style={{ marginBottom: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.cardBorder, padding: 8, backgroundColor: Colors.surfaceLight }}>
-                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              {cart.discount > 0 && (
+                <View style={[styles.checkoutItem, flipRow && { flexDirection: "row-reverse" }]}>
+                  <Text style={[styles.checkoutItemName, { color: Colors.success, flex: 1 }, rtlTextAlign]}>{t("discount")}</Text>
+                  <Text style={[styles.checkoutItemTotal, { color: Colors.success }]}>-{formatMoney(cart.discount)}</Text>
+                </View>
+              )}
+              {cart.tax > 0 && (
+                <View style={[styles.checkoutItem, flipRow && { flexDirection: "row-reverse" }]}>
+                  <Text style={[styles.checkoutItemName, { flex: 1 }, rtlTextAlign]}>{t("tax")} ({cart.taxRate}%)</Text>
+                  <Text style={styles.checkoutItemTotal}>{formatMoney(cart.tax)}</Text>
+                </View>
+              )}
+              {cart.serviceFee > 0 && (
+                <View style={[styles.checkoutItem, flipRow && { flexDirection: "row-reverse" }]}>
+                  <Text style={[styles.checkoutItemName, { flex: 1 }, rtlTextAlign]}>{t("serviceTax" as any) || L("رسوم الخدمة", "Servicegebühr", "Service fee")}</Text>
+                  <Text style={styles.checkoutItemTotal}>{formatMoney(cart.serviceFee)}</Text>
+                </View>
+              )}
+              {cart.minimumOrderSurcharge > 0 && (
+                <View style={[styles.checkoutItem, flipRow && { flexDirection: "row-reverse" }]}>
+                  <Text style={[styles.checkoutItemName, { flex: 1, color: Colors.warning }, rtlTextAlign]}>{L("حد أدنى للطلب", "Mindestbestellwert", "Minimum order")}</Text>
+                  <Text style={[styles.checkoutItemTotal, { color: Colors.warning }]}>+{formatMoney(cart.minimumOrderSurcharge)}</Text>
+                </View>
+              )}
+              {cart.deliveryFee > 0 && (
+                <View style={[styles.checkoutItem, flipRow && { flexDirection: "row-reverse" }]}>
+                  <Text style={[styles.checkoutItemName, { flex: 1 }, rtlTextAlign]}>{L("رسوم التوصيل", "Liefergebühr", "Delivery fee")}</Text>
+                  <Text style={styles.checkoutItemTotal}>{formatMoney(cart.deliveryFee)}</Text>
+                </View>
+              )}
+              {manualAdjustment !== 0 && (
+                <View style={[styles.checkoutItem, flipRow && { flexDirection: "row-reverse" }]}>
+                  <Text style={[styles.checkoutItemName, { flex: 1 }, rtlTextAlign]}>{L("تعديل المبلغ", "Anpassung", "Adjustment")}</Text>
+                  <Text style={styles.checkoutItemTotal}>{manualAdjustment > 0 ? "+" : ""}{formatMoney(manualAdjustment)}</Text>
+                </View>
+              )}
+              {/* Vehicle picker — only when the store has registered vehicles */}
+              {(vehicles as any[]).length > 0 && (
+                <View style={{ marginTop: 8, marginBottom: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.cardBorder, padding: 8, backgroundColor: Colors.surfaceLight }}>
+                  <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
                     <Ionicons name="car-outline" size={15} color={Colors.accent} />
                     <Text style={{ color: Colors.text, fontSize: 12, fontWeight: "600" }}>
-                      {language === "ar" ? "مركبة التوصيل (اختياري)" : language === "de" ? "Fahrzeug (optional)" : "Delivery Vehicle (optional)"}
+                      {L("مركبة التوصيل (اختياري)", "Fahrzeug (optional)", "Delivery vehicle (optional)")}
                     </Text>
                   </View>
                   {(vehicles as any[]).length === 0 ? (
@@ -3011,14 +3368,14 @@ export default function POSScreen() {
                         <Pressable
                           onPress={() => cart.setVehicleId(null)}
                           style={{
-                            paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5,
+                            paddingHorizontal: 12, minHeight: 44, borderRadius: 8, borderWidth: 1.5,
                             borderColor: !cart.vehicleId ? Colors.accent : Colors.cardBorder,
                             backgroundColor: !cart.vehicleId ? Colors.accent + "20" : Colors.surface,
                             alignItems: "center", justifyContent: "center",
                           }}
                         >
                           <Text style={{ color: !cart.vehicleId ? Colors.accent : Colors.textMuted, fontSize: 11, fontWeight: "600" }}>
-                            {language === "ar" ? "بدون" : language === "de" ? "Keins" : "None"}
+                            {L("بدون", "Keins", "None")}
                           </Text>
                         </Pressable>
                         {(vehicles as any[]).map((v: any) => {
@@ -3028,7 +3385,7 @@ export default function POSScreen() {
                               key={v.id}
                               onPress={() => cart.setVehicleId(isSelected ? null : v.id)}
                               style={{
-                                paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5,
+                                paddingHorizontal: 10, paddingVertical: 6, minHeight: 44, justifyContent: "center", borderRadius: 8, borderWidth: 1.5,
                                 borderColor: isSelected ? Colors.accent : Colors.cardBorder,
                                 backgroundColor: isSelected ? Colors.accent + "20" : Colors.surface,
                                 minWidth: 90,
@@ -3050,27 +3407,32 @@ export default function POSScreen() {
                 </View>
               )}
 
-              {/* Delivery Fee Stepper — editable in 0.50 increments of the store currency */}
-              <View style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder }]}>
-                <View style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6 }]}>
+              {/* Delivery fee stepper — step follows the currency (0.50 CHF, 50 SYP) */}
+              <View style={[{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 10, marginTop: 8, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder }]}>
+                <View style={[{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 6, flexShrink: 1 }]}>
                   <Ionicons name="bicycle-outline" size={16} color={Colors.info} />
-                  <Text style={[{ color: Colors.text, fontSize: 13, fontWeight: "600" }, rtlTextAlign]}>
-                    {t("adjustDeliveryFee" as any)}
+                  <Text style={[{ color: Colors.text, fontSize: 13, fontWeight: "600", flexShrink: 1 }, rtlTextAlign]}>
+                    {t("adjustDeliveryFee" as any) || L("رسوم التوصيل", "Liefergebühr", "Delivery fee")}
                   </Text>
                 </View>
-                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8 }}>
+                <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 8 }}>
                   <Pressable
-                    onPress={() => cart.setDeliveryFee(Math.max(0, Math.round((cart.deliveryFee - 0.5) * 100) / 100))}
-                    style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: Colors.danger + "20", justifyContent: "center", alignItems: "center" }}
+                    onPress={() => cart.setDeliveryFee(Math.max(0, roundMoney(cart.deliveryFee - feeStep, currency)))}
+                    disabled={cart.deliveryFee <= 0}
+                    style={[styles.adjustBtn, { borderColor: Colors.danger, backgroundColor: Colors.danger + "14" }, cart.deliveryFee <= 0 && { opacity: 0.4 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${L("إنقاص", "Verringern um", "Decrease by")} ${formatMoney(feeStep)}`}
                   >
                     <Ionicons name="remove" size={16} color={Colors.danger} />
                   </Pressable>
-                  <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: "700", minWidth: 60, textAlign: "center" }}>
+                  <Text style={[styles.adjustValue, { color: Colors.accent, fontSize: 14 }]}>
                     {formatMoney(cart.deliveryFee)}
                   </Text>
                   <Pressable
-                    onPress={() => cart.setDeliveryFee(Math.round((cart.deliveryFee + 0.5) * 100) / 100)}
-                    style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: Colors.success + "20", justifyContent: "center", alignItems: "center" }}
+                    onPress={() => cart.setDeliveryFee(roundMoney(cart.deliveryFee + feeStep, currency))}
+                    style={[styles.adjustBtn, { borderColor: Colors.success, backgroundColor: Colors.success + "14" }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${L("زيادة", "Erhöhen um", "Increase by")} ${formatMoney(feeStep)}`}
                   >
                     <Ionicons name="add" size={16} color={Colors.success} />
                   </Pressable>
@@ -3079,31 +3441,42 @@ export default function POSScreen() {
 
               <Pressable
                 style={[styles.completeBtn, checkoutBusy && { opacity: 0.5 }]}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: checkoutBusy, busy: checkoutBusy }}
                 onPress={() => {
+                  if (checkoutBusy) return;
                   const validationError = validateBeforeComplete();
                   if (validationError) {
-                    Alert.alert(t("error"), validationError);
+                    showAlert(t("error"), validationError);
                     return;
                   }
-                  if (checkoutBusy) return;
                   if (paymentMethod === "credit" && creditLimitExceeded) {
-                    Alert.alert(t("error"), language === "ar" ? "هذا البيع يتجاوز سقف الدين المسموح لهذا التاجر." : language === "de" ? "Dieser Verkauf überschreitet das Kreditlimit des Händlers." : "This sale exceeds the trader's credit limit.");
+                    showAlert(t("error"), L("هذا البيع يتجاوز سقف الدين المسموح لهذا التاجر.", "Dieser Verkauf überschreitet das Kreditlimit des Händlers.", "This sale exceeds the trader's credit limit."));
                     return;
                   }
                   if (paymentMethod === "shamcash") {
                     setShamCashOpen(true);
-                  } else if (isStripeMethod(paymentMethod)) {
+                    return;
+                  }
+                  // Two taps inside one frame both pass `checkoutBusy` (state
+                  // updates are async); the ref lock is synchronous.
+                  if (submitLock.current) return;
+                  submitLock.current = true;
+                  const release = { onSettled: () => { submitLock.current = false; } };
+                  if (isStripeMethod(paymentMethod)) {
                     setStripeError("");
                     setStripeStage("creating");
-                    stripeCaptureMutation.mutate();
+                    stripeCaptureMutation.mutate(undefined, release);
                   } else {
-                    saleMutation.mutate();
+                    saleMutation.mutate(undefined, release);
                   }
                 }}
                 disabled={checkoutBusy}
               >
-                <LinearGradient colors={[Colors.success, "#059669"]} style={[styles.completeBtnGradient, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Ionicons name={isStripeMethod(paymentMethod) || paymentMethod === "shamcash" ? "qr-code-outline" : "checkmark-circle"} size={22} color={Colors.white} />
+                <LinearGradient colors={[Colors.success, "#047857"]} style={[styles.completeBtnGradient, flipRow && { flexDirection: "row-reverse" }]}>
+                  {checkoutBusy
+                    ? <ActivityIndicator size="small" color={Colors.white} />
+                    : <Ionicons name={isStripeMethod(paymentMethod) || paymentMethod === "shamcash" ? "qr-code-outline" : "checkmark-circle"} size={22} color={Colors.white} />}
                   <Text style={styles.completeBtnText}>
                     {checkoutBusy
                       ? t("processing")
@@ -3120,16 +3493,29 @@ export default function POSScreen() {
           The customer pays on their own phone via Stripe-hosted Checkout. The
           till shows the link as a QR and waits for the webhook; it never marks
           the sale paid itself. */}
-      <Modal visible={stripeStage !== "idle"} animationType="fade" transparent>
+      <Modal
+        visible={stripeStage !== "idle"}
+        animationType="fade"
+        transparent
+        onRequestClose={() => {
+          if ((stripeStage === "waiting" || stripeStage === "failed") && !switchStripeSaleToCash.isPending) dismissStripeCapture();
+        }}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.payModal}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>
                 {stripeStage === "paid" ? t("paymentSuccess") : t("awaitingPayment")}
               </Text>
               {(stripeStage === "waiting" || stripeStage === "failed") && (
-                <Pressable onPress={dismissStripeCapture} disabled={switchStripeSaleToCash.isPending}>
-                  <Ionicons name="close" size={24} color={Colors.text} />
+                <Pressable
+                  onPress={dismissStripeCapture}
+                  disabled={switchStripeSaleToCash.isPending}
+                  style={styles.modalCloseBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
+                >
+                  <Ionicons name="close" size={22} color={Colors.text} />
                 </Pressable>
               )}
             </View>
@@ -3144,7 +3530,7 @@ export default function POSScreen() {
             {stripeStage === "waiting" && !!stripeCapture?.checkoutUrl && (
               <ScrollView showsVerticalScrollIndicator={false}>
                 <Text style={styles.modalTotal}>
-                  {stripeCapture.currency} {(stripeCapture.amountMinor / 100).toFixed(2)}
+                  {formatMoney(stripeCapture.amountMinor / 100)}
                 </Text>
 
                 <View style={styles.payCentre}>
@@ -3157,7 +3543,7 @@ export default function POSScreen() {
                   <Text style={styles.payLinkBtnText} numberOfLines={1}>{t("openPaymentLink")}</Text>
                 </Pressable>
 
-                <View style={[styles.payWaitRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <View style={[styles.payWaitRow, flipRow && { flexDirection: "row-reverse" }]}>
                   <ActivityIndicator size="small" color={Colors.accent} />
                   <Text style={[styles.payNoticeText, { flex: 1 }, rtlTextAlign]}>{t("waitingForPayment")}</Text>
                 </View>
@@ -3215,168 +3601,42 @@ export default function POSScreen() {
 
       <ShamCashTillModal
         visible={showShamCash}
-        amount={cart.total + manualAdjustment}
+        amount={payableTotal}
         info={paymentsConfig?.shamcash}
         busy={shamCashMutation.isPending}
-        onConfirm={(reference) => shamCashMutation.mutate(reference)}
+        onConfirm={(reference) => {
+          if (submitLock.current) return;
+          submitLock.current = true;
+          shamCashMutation.mutate(reference, { onSettled: () => { submitLock.current = false; } });
+        }}
         onCancel={() => setShamCashOpen(false)}
       />
 
-      <Modal visible={showReceipt} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={{ backgroundColor: Colors.surface, borderRadius: 16, width: "94%", maxWidth: 380, maxHeight: "90%", overflow: "hidden" }}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={{ backgroundColor: "#FFFFFF", padding: 20, margin: 12, borderRadius: 4 }}>
-                <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
-
-                {storeSettings?.logo && (
-                  <View style={{ alignItems: "center", marginVertical: 8 }}>
-                    <Image source={{ uri: storeSettings.logo.startsWith("http") || storeSettings.logo.startsWith("file://") || storeSettings.logo.startsWith("data:") ? storeSettings.logo : `${getApiUrl().replace(/\/$/, "")}${storeSettings.logo}` }} style={{ width: 50, height: 50, borderRadius: 6 }} resizeMode="contain" />
-                  </View>
-                )}
-
-                <Text style={{ textAlign: "center", color: "#000", fontSize: 18, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings?.name || tenant?.name || "POS System"}</Text>
-                {storeSettings?.address && <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.address}</Text>}
-                {storeSettings?.phone && <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.phone}</Text>}
-                {storeSettings?.email && <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.email}</Text>}
-
-                <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 6, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
-
-                <View style={{ marginVertical: 6 }}>
-                  <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptDate")}: {lastSale?.date ? new Date(lastSale.date).toLocaleDateString() : new Date().toLocaleDateString()}, {lastSale?.date ? new Date(lastSale.date).toLocaleTimeString() : new Date().toLocaleTimeString()}</Text>
-                  <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptNumber")}: {getDisplayNumber(lastSale?.receiptNumber) || `#${lastSale?.id} `}</Text>
-                  <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("servedBy")}: {lastSale?.employeeName || employee?.name}</Text>
-                  {lastSale?.customerName && <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("customer")}: {lastSale.customerName}</Text>}
-                </View>
-
-                <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"─".repeat(36)}</Text>
-
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6, marginBottom: 4 }}>
-                  <Text style={{ color: "#000", fontSize: 11, fontWeight: "700", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", flex: 2 }}>Item</Text>
-                  <Text style={{ color: "#000", fontSize: 11, fontWeight: "700", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 40, textAlign: "center" }}>Qty</Text>
-                  <Text style={{ color: "#000", fontSize: 11, fontWeight: "700", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", width: 65, textAlign: "right" }}>Total</Text>
-                </View>
-
-                <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"─".repeat(36)}</Text>
-
-                <View style={{ marginVertical: 4 }}>
-                  {lastSale?.items?.map((item: any, idx: number) => (
-                    <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                      <Text style={{ color: "#000", fontSize: 11, flex: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }} numberOfLines={1}>{item.productName || item.name}</Text>
-                      <Text style={{ color: "#000", fontSize: 11, width: 40, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>x{item.quantity}</Text>
-                      <Text style={{ color: "#000", fontSize: 11, width: 75, textAlign: "right", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(item.total || (item.unitPrice * item.quantity))}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 4, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
-
-                <View style={{ marginVertical: 4 }}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("subtotal")}:</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.subtotal || lastSale?.totalAmount)}</Text>
-                  </View>
-                  {(lastSale?.discount || 0) > 0 && (
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("discount")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>-{formatMoney(lastSale?.discount)}</Text>
-                    </View>
-                  )}
-                  {(lastSale?.serviceFee || lastSale?.serviceFeeAmount || 0) > 0 && (
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("serviceTax")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.serviceFee || lastSale?.serviceFeeAmount)}</Text>
-                    </View>
-                  )}
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("tax")}:</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.tax)}</Text>
-                  </View>
-                  {(lastSale?.deliveryFee || 0) > 0 && (
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Delivery Fee:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.deliveryFee)}</Text>
-                    </View>
-                  )}
-                  {lastSale?.vehicleId && (() => {
-                    const v = (vehicles as any[]).find((x: any) => x.id === lastSale.vehicleId); return v ? (
-                      <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                        <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Driver:</Text>
-                        <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{v.driverName || ""}{v.licensePlate ? ` (${v.licensePlate})` : ""}</Text>
-                      </View>
-                    ) : null;
-                  })()}
-
-                  <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
-
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
-                    <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>TOTAL:</Text>
-                    <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.total)}</Text>
-                  </View>
-
-                  <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
-
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2, marginTop: 4 }}>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("paymentMethod")}:</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", textTransform: "uppercase" }}>{lastSale?.paymentMethod}</Text>
-                  </View>
-                  {lastSale?.paymentMethod === "cash" && (
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("cash")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.cashReceived)}</Text>
-                    </View>
-                  )}
-                  {(lastSale?.change || 0) > 0 && (
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("change")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(lastSale?.change)}</Text>
-                    </View>
-                  )}
-                </View>
-
-                {qrDataUrl && Platform.OS === "web" && (
-                  <View style={{ alignItems: "center", marginTop: 12 }}>
-                    <Image source={{ uri: qrDataUrl }} style={{ width: 90, height: 90, resizeMode: "contain" }} />
-                  </View>
-                )}
-
-                <View style={{ alignItems: "center", marginTop: 14 }}>
-                  <Text style={{ color: "#000", fontSize: 13, fontWeight: "700", textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("thankYou")}</Text>
-                  <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 6, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
-                </View>
-              </View>
-            </ScrollView>
-
-            <Pressable style={{ margin: 12, marginTop: 0 }} onPress={() => { setShowReceipt(false); setLastSale(null); setQrDataUrl(null); }}>
-              <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={[styles.closeReceiptGradient, isRTL && { flexDirection: "row-reverse" }]}>
-                <Ionicons name="checkmark" size={20} color={Colors.white} />
-                <Text style={styles.closeReceiptText}>{t("newSale")}</Text>
-              </LinearGradient>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={showCustomerPicker} animationType="slide" transparent>
+      <Modal visible={showCustomerPicker} animationType="slide" transparent onRequestClose={() => { setShowCustomerPicker(false); setCustomerSearch(""); }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <View style={{ flex: 1, flexDirection: isRTL ? "row-reverse" : "row", alignItems: "baseline", gap: 6 }}>
+            <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }]}>
+              <View style={{ flex: 1, flexDirection: flipRow ? "row-reverse" : "row", alignItems: "baseline", gap: 6 }}>
                 <Text style={[styles.modalTitle, rtlTextAlign]}>{t("selectCustomer")}</Text>
                 <Text style={{ fontSize: 13, color: Colors.accent, fontWeight: "800", backgroundColor: Colors.accent + "15", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, overflow: "hidden" }}>
-                  {totalCustomerCount} {t("total" as any) || "Total"}
+                  {totalCustomerCount} {t("total" as any) || L("المجموع", "Total", "Total")}
                 </Text>
               </View>
-              <Pressable onPress={() => { setShowCustomerPicker(false); setCustomerSearch(""); }}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+              <Pressable
+                onPress={() => { setShowCustomerPicker(false); setCustomerSearch(""); }}
+                style={styles.modalCloseBtn}
+                accessibilityRole="button"
+                accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
+              >
+                <Ionicons name="close" size={22} color={Colors.text} />
               </Pressable>
             </View>
 
             <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
-              <View style={[styles.searchBox, { height: 42, backgroundColor: Colors.surfaceLight, borderRadius: 12, borderWidth: 1, borderColor: Colors.cardBorder }]}>
+              <View style={[styles.searchBox, { height: 44, backgroundColor: Colors.surfaceLight, borderRadius: 12, borderWidth: 1, borderColor: Colors.cardBorder }]}>
                 <Ionicons name="search" size={16} color={Colors.textMuted} />
                 <TextInput
-                  style={[styles.searchInput, { fontSize: 14, color: Colors.text }]}
+                  style={[styles.searchInput, { fontSize: 14, color: Colors.text }, rtlTextAlign]}
                   placeholder={t("search" as any) + "..."}
                   placeholderTextColor={Colors.textMuted}
                   value={customerSearch}
@@ -3384,7 +3644,7 @@ export default function POSScreen() {
                   autoFocus={Platform.OS === "web"}
                 />
                 {customerSearch ? (
-                  <Pressable onPress={() => setCustomerSearch("")}>
+                  <Pressable onPress={() => setCustomerSearch("")} hitSlop={10} accessibilityRole="button" accessibilityLabel={L("مسح البحث", "Suche löschen", "Clear search")}>
                     <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
                   </Pressable>
                 ) : null}
@@ -3392,10 +3652,11 @@ export default function POSScreen() {
             </View>
 
             <Pressable
-              style={[styles.walkInBtn, isRTL && { flexDirection: "row-reverse" }, { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.cardBorder, marginHorizontal: 20, marginBottom: 16 }]}
-              onPress={() => { cart.setCustomerId(null); setShowCustomerPicker(false); setCustomerSearch(""); }}
+              style={[styles.walkInBtn, flipRow && { flexDirection: "row-reverse" }, { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.cardBorder, marginHorizontal: 20, marginBottom: 16 }]}
+              onPress={() => { cart.setCustomerId(null); setCallerCustomer(null); setPhoneInput(""); setShowCustomerPicker(false); setCustomerSearch(""); }}
+              accessibilityRole="button"
             >
-              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.textSecondary + "15", justifyContent: "center", alignItems: "center", marginRight: 12 }}>
+              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.textSecondary + "15", justifyContent: "center", alignItems: "center", marginEnd: 12 }}>
                 <Ionicons name="person-outline" size={18} color={Colors.textSecondary} />
               </View>
               <Text style={[styles.walkInText, rtlTextAlign, { fontSize: 15, fontWeight: "600", color: Colors.textSecondary }]}>{t("walkIn")}</Text>
@@ -3404,57 +3665,102 @@ export default function POSScreen() {
               data={customers}
               keyExtractor={(item: any) => String(item.id)}
               contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
-              renderItem={({ item }: { item: any }) => (
-                <Pressable
-                  style={[styles.customerCard, cart.customerId === item.id && styles.customerCardActive, isRTL && { flexDirection: "row-reverse" }]}
-                  onPress={() => { cart.setCustomerId(item.id); setShowCustomerPicker(false); }}
-                >
-                  <View style={[styles.customerAvatar, { backgroundColor: cart.customerId === item.id ? Colors.white : Colors.primary + "15" }]}>
-                    <Text style={[styles.customerAvatarText, { color: cart.customerId === item.id ? Colors.primary : Colors.primary }]}>{item.name.charAt(0).toUpperCase()}</Text>
-                  </View>
-                  <View style={styles.customerCardInfo}>
-                    <Text style={[styles.customerCardName, rtlTextAlign, cart.customerId === item.id && { color: Colors.white }]}>{item.name}</Text>
-                    <Text style={[styles.customerCardMeta, rtlTextAlign, cart.customerId === item.id && { color: Colors.white + "CC" }]}>{item.phone || item.email || t("noContact")}</Text>
-                  </View>
-                  <View style={[styles.customerLoyalty, isRTL && { flexDirection: "row-reverse" }, { backgroundColor: cart.customerId === item.id ? Colors.white + "25" : Colors.warning + "15" }]}>
-                    <Ionicons name="star" size={12} color={cart.customerId === item.id ? Colors.white : Colors.warning} />
-                    <Text style={[styles.customerLoyaltyText, { color: cart.customerId === item.id ? Colors.white : Colors.warning, fontWeight: "700" }]}>{item.loyaltyPoints || 0}</Text>
-                  </View>
-                </Pressable>
-              )}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }: { item: any }) => {
+                const active = cart.customerId === item.id;
+                return (
+                  <Pressable
+                    style={[styles.customerCard, active && styles.customerCardActive, flipRow && { flexDirection: "row-reverse" }]}
+                    onPress={() => {
+                      cart.setCustomerId(item.id);
+                      // Keep the chosen customer on screen even after the list
+                      // (a search result page) changes underneath.
+                      setCallerCustomer(item);
+                      setPhoneInput(item.phone || "");
+                      setShowCustomerPicker(false);
+                      setCustomerSearch("");
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                  >
+                    <View style={[styles.customerAvatar, { backgroundColor: active ? Colors.accent : Colors.primary + "15" }]}>
+                      <Text style={[styles.customerAvatarText, { color: active ? Colors.textDark : Colors.primary }]}>{(item.name || "?").charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <View style={styles.customerCardInfo}>
+                      <Text style={[styles.customerCardName, rtlTextAlign]} numberOfLines={1}>{item.name}</Text>
+                      <Text style={[styles.customerCardMeta, rtlTextAlign]} numberOfLines={1}>{item.phone || item.email || t("noContact")}</Text>
+                    </View>
+                    <View style={[styles.customerLoyalty, flipRow && { flexDirection: "row-reverse" }, { backgroundColor: Colors.warning + "15", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }]}>
+                      <Ionicons name="star" size={12} color={Colors.warning} />
+                      <Text style={[styles.customerLoyaltyText, { fontWeight: "700" }]}>{item.loyaltyPoints || 0}</Text>
+                    </View>
+                    {active && <Ionicons name="checkmark-circle" size={20} color={Colors.accent} style={{ marginStart: 8 }} />}
+                  </Pressable>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={{ alignItems: "center", paddingVertical: 32, gap: 10 }}>
+                  <Ionicons name="people-outline" size={40} color={Colors.textMuted} />
+                  <Text style={{ color: Colors.textMuted, fontSize: 14, fontWeight: "600", textAlign: "center" }}>
+                    {customerSearch.trim()
+                      ? L("لا يوجد عميل مطابق", "Kein passender Kunde", "No matching customer")
+                      : L("لا يوجد عملاء بعد", "Noch keine Kunden", "No customers yet")}
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      const q = toLatinDigits(customerSearch.trim());
+                      const looksLikePhone = /^[+\d\s()-]{5,}$/.test(q);
+                      setNewCustomerForm({ name: looksLikePhone ? "" : customerSearch.trim(), phone: looksLikePhone ? q : "", address: "", email: "" });
+                      setShowCustomerPicker(false);
+                      setCustomerSearch("");
+                      setShowNewCustomerForm(true);
+                    }}
+                    style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 6, paddingHorizontal: 14, minHeight: 44, borderRadius: 12, backgroundColor: Colors.primary + "15", borderWidth: 1, borderColor: Colors.primary + "40" }}
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="person-add-outline" size={16} color={Colors.primary} />
+                    <Text style={{ color: Colors.primary, fontWeight: "700", fontSize: 14 }}>{L("عميل جديد", "Neuer Kunde", "New customer")}</Text>
+                  </Pressable>
+                </View>
+              }
             />
           </View>
         </View>
       </Modal>
 
       {/* ── New Customer Form Modal ── */}
-      <Modal visible={showNewCustomerForm} animationType="slide" transparent>
+      <Modal visible={showNewCustomerForm} animationType="slide" transparent onRequestClose={() => setShowNewCustomerForm(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: 620 }]}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <View style={[{ flexDirection: "row", alignItems: "center", gap: 10 }, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }]}>
+              <View style={[{ flexDirection: "row", alignItems: "center", gap: 10 }, flipRow && { flexDirection: "row-reverse" }]}>
                 <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.primary + "33", justifyContent: "center", alignItems: "center" }}>
                   <Ionicons name="person-add" size={20} color={Colors.primary} />
                 </View>
                 <Text style={[styles.modalTitle, rtlTextAlign]}>
-                  {language === "ar" ? "عميل جديد" : language === "de" ? "Neuer Kunde" : "New Customer"}
+                  {L("عميل جديد", "Neuer Kunde", "New Customer")}
                 </Text>
               </View>
-              <Pressable onPress={() => setShowNewCustomerForm(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+              <Pressable
+                onPress={() => setShowNewCustomerForm(false)}
+                style={styles.modalCloseBtn}
+                accessibilityRole="button"
+                accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
+              >
+                <Ionicons name="close" size={22} color={Colors.text} />
               </Pressable>
             </View>
 
             <ScrollView style={{ paddingHorizontal: 20, paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
               {/* Name */}
-              <Text style={styles.newCustLabel}>
-                {language === "ar" ? "الاسم الكامل *" : language === "de" ? "Vollständiger Name *" : "Full Name *"}
+              <Text style={[styles.newCustLabel, rtlTextAlign]}>
+                {L("الاسم الكامل *", "Vollständiger Name *", "Full Name *")}
               </Text>
-              <View style={[styles.newCustInputWrap, isRTL && { flexDirection: "row-reverse" }]}>
+              <View style={[styles.newCustInputWrap, flipRow && { flexDirection: "row-reverse" }]}>
                 <Ionicons name="person-outline" size={16} color={Colors.textMuted} />
                 <TextInput
                   style={[styles.newCustInput, isRTL && { textAlign: "right" }]}
-                  placeholder={language === "ar" ? "أدخل الاسم" : language === "de" ? "Name eingeben" : "Enter name"}
+                  placeholder={L("أدخل الاسم", "Name eingeben", "Enter name")}
                   placeholderTextColor={Colors.textMuted}
                   value={newCustomerForm.name}
                   onChangeText={(v) => setNewCustomerForm((f) => ({ ...f, name: v }))}
@@ -3462,27 +3768,28 @@ export default function POSScreen() {
               </View>
 
               {/* Phone */}
-              <Text style={styles.newCustLabel}>
-                {language === "ar" ? "رقم الهاتف" : language === "de" ? "Telefon" : "Phone Number"}
+              <Text style={[styles.newCustLabel, rtlTextAlign]}>
+                {L("رقم الهاتف", "Telefon", "Phone Number")}
               </Text>
-              <View style={[styles.newCustInputWrap, isRTL && { flexDirection: "row-reverse" }]}>
+              <View style={[styles.newCustInputWrap, flipRow && { flexDirection: "row-reverse" }]}>
                 <Ionicons name="call-outline" size={16} color={Colors.textMuted} />
                 <TextInput
                   style={[styles.newCustInput, isRTL && { textAlign: "right" }]}
-                  placeholder="079 123 45 67"
+                  placeholder={swissStore ? "079 123 45 67" : String(currency).toUpperCase() === "SYP" ? "09XX XXX XXX" : L("رقم الهاتف", "Telefonnummer", "Phone number")}
                   placeholderTextColor={Colors.textMuted}
                   value={newCustomerForm.phone}
-                  onChangeText={(v) => setNewCustomerForm((f) => ({ ...f, phone: v }))}
+                  onChangeText={(v) => setNewCustomerForm((f) => ({ ...f, phone: toLatinDigits(v) }))}
                   keyboardType="phone-pad"
                 />
               </View>
 
-              {/* Address with Swiss autocomplete */}
-              <Text style={styles.newCustLabel}>
-                {language === "ar" ? "العنوان" : language === "de" ? "Adresse" : "Address"}
+              {/* Address (Swiss stores get geo.admin.ch autocomplete) */}
+              <Text style={[styles.newCustLabel, rtlTextAlign]}>
+                {L("العنوان", "Adresse", "Address")}
               </Text>
 
-              {/* Quick city filter */}
+              {/* Quick city filter — Swiss address search only */}
+              {swissStore && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} keyboardShouldPersistTaps="handled">
                 <View style={{ flexDirection: "row", gap: 5 }}>
                   {["Zürich", "Winterthur", "Bern", "Basel", "Genf", "Luzern", "Zug", "St. Gallen"].map((c) => (
@@ -3490,7 +3797,7 @@ export default function POSScreen() {
                       key={c}
                       onPress={() => setNcCityFilter(c)}
                       style={[
-                        { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
+                        { paddingHorizontal: 12, minHeight: 32, justifyContent: "center", borderRadius: 16, borderWidth: 1 },
                         ncCityFilter === c
                           ? { backgroundColor: Colors.accent, borderColor: Colors.accent }
                           : { backgroundColor: Colors.surfaceLight, borderColor: Colors.cardBorder },
@@ -3501,18 +3808,19 @@ export default function POSScreen() {
                   ))}
                 </View>
               </ScrollView>
+              )}
 
-              <View style={[styles.newCustInputWrap, isRTL && { flexDirection: "row-reverse" }]}>
+              <View style={[styles.newCustInputWrap, flipRow && { flexDirection: "row-reverse" }]}>
                 <Ionicons name="location-outline" size={16} color={Colors.textMuted} />
                 <TextInput
                   style={[styles.newCustInput, isRTL && { textAlign: "right" }, { flex: 1 }]}
-                  placeholder={language === "ar" ? "اكتب اسم الشارع..." : language === "de" ? "Strasse tippen..." : "Type street name..."}
+                  placeholder={swissStore ? L("اكتب اسم الشارع…", "Strasse tippen…", "Type street name…") : L("المنطقة، الشارع، البناء…", "Strasse, Hausnummer, Ort…", "Area, street, building…")}
                   placeholderTextColor={Colors.textMuted}
                   value={newCustomerForm.address}
                   onChangeText={handleNcAddressChange}
                   onBlur={() => setTimeout(() => setNcShowSuggestions(false), 200)}
                 />
-                {ncAddrSearching && <ActivityIndicator size="small" color={Colors.accent} style={{ marginLeft: 6 }} />}
+                {ncAddrSearching && <ActivityIndicator size="small" color={Colors.accent} style={{ marginStart: 6 }} />}
               </View>
 
               {/* Suggestions */}
@@ -3545,17 +3853,17 @@ export default function POSScreen() {
                       </Pressable>
                     ))}
                     <Pressable onPress={() => setNcShowSuggestions(false)} style={{ padding: 7, alignItems: "center", borderTopWidth: 1, borderTopColor: Colors.cardBorder }}>
-                      <Text style={{ color: Colors.textMuted, fontSize: 10 }}>{language === "de" ? "Schließen" : "Close"}</Text>
+                      <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{L("إغلاق", "Schliessen", "Close")}</Text>
                     </Pressable>
                   </ScrollView>
                 </View>
               )}
 
               {/* Email */}
-              <Text style={styles.newCustLabel}>
-                {language === "ar" ? "البريد الإلكتروني" : language === "de" ? "E-Mail" : "Email"}
+              <Text style={[styles.newCustLabel, rtlTextAlign]}>
+                {L("البريد الإلكتروني", "E-Mail", "Email")}
               </Text>
-              <View style={[styles.newCustInputWrap, isRTL && { flexDirection: "row-reverse" }]}>
+              <View style={[styles.newCustInputWrap, flipRow && { flexDirection: "row-reverse" }]}>
                 <Ionicons name="mail-outline" size={16} color={Colors.textMuted} />
                 <TextInput
                   style={[styles.newCustInput, isRTL && { textAlign: "right" }]}
@@ -3573,18 +3881,21 @@ export default function POSScreen() {
               <Pressable
                 onPress={handleCreateCustomer}
                 disabled={customerPhoneLoading || !newCustomerForm.name.trim()}
-                style={{ opacity: !newCustomerForm.name.trim() ? 0.5 : 1 }}
+                style={{ opacity: !newCustomerForm.name.trim() || customerPhoneLoading ? 0.5 : 1 }}
+                accessibilityRole="button"
               >
                 <LinearGradient
                   colors={[Colors.primary, Colors.secondary]}
                   style={styles.newCustSaveBtn}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 >
-                  <Ionicons name={customerPhoneLoading ? "sync" : "checkmark"} size={18} color={Colors.white} />
+                  {customerPhoneLoading
+                    ? <ActivityIndicator size="small" color={Colors.white} />
+                    : <Ionicons name="checkmark" size={18} color={Colors.white} />}
                   <Text style={styles.newCustSaveBtnText}>
                     {customerPhoneLoading
-                      ? (language === "ar" ? "جاري الحفظ..." : language === "de" ? "Speichern..." : "Saving...")
-                      : (language === "ar" ? "حفظ وربط" : language === "de" ? "Speichern & Verknüpfen" : "Save & Link")}
+                      ? L("جاري الحفظ…", "Speichern…", "Saving…")
+                      : L("حفظ وربط", "Speichern & Verknüpfen", "Save & Link")}
                   </Text>
                 </LinearGradient>
               </Pressable>
@@ -3594,28 +3905,30 @@ export default function POSScreen() {
       </Modal>
 
       {/* ── Order Notes Modal ── */}
-      <Modal visible={showOrderNotes} animationType="slide" transparent>
+      <Modal visible={showOrderNotes} animationType="slide" transparent onRequestClose={() => setShowOrderNotes(false)}>
         <View style={styles.modalOverlay}>
           <View style={{ backgroundColor: Colors.surface, borderRadius: 24, width: "92%", maxWidth: 440, overflow: "hidden", borderWidth: 1, borderColor: Colors.cardBorder }}>
             {/* Header with gradient strip */}
-            <LinearGradient colors={["#1C2251", Colors.surface]} style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+            <LinearGradient colors={[Colors.accent + "22", Colors.surface]} style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
+              <View style={{ flexDirection: flipRow ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
                   <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.accent + "22", justifyContent: "center", alignItems: "center" }}>
                     <Ionicons name="document-text-outline" size={20} color={Colors.accent} />
                   </View>
-                  <View>
-                    <Text style={{ color: Colors.text, fontSize: 17, fontWeight: "800", textAlign: isRTL ? "right" : "left" }}>
-                      {language === "ar" ? "ملاحظات الطلب" : language === "de" ? "Bestellnotiz" : "Order Notes"}
+                  <View style={{ flexShrink: 1 }}>
+                    <Text style={[{ color: Colors.text, fontSize: 17, fontWeight: "800" }, rtlTextAlign]}>
+                      {L("ملاحظات الطلب", "Bestellnotiz", "Order Notes")}
                     </Text>
-                    <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 1, textAlign: isRTL ? "right" : "left" }}>
-                      {language === "ar" ? "تعليمات خاصة للطلب" : language === "de" ? "Besondere Anweisungen" : "Special instructions for this order"}
+                    <Text style={[{ color: Colors.textMuted, fontSize: 12, marginTop: 1 }, rtlTextAlign]}>
+                      {L("تعليمات خاصة للطلب", "Besondere Anweisungen", "Special instructions for this order")}
                     </Text>
                   </View>
                 </View>
                 <Pressable
                   onPress={() => setShowOrderNotes(false)}
-                  style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center" }}
+                  style={styles.modalCloseBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
                 >
                   <Ionicons name="close" size={18} color={Colors.textSecondary} />
                 </Pressable>
@@ -3626,29 +3939,29 @@ export default function POSScreen() {
             <View style={{ paddingHorizontal: 20, paddingBottom: 20 }}>
               <View style={{ backgroundColor: Colors.surfaceLight, borderRadius: 14, borderWidth: 1, borderColor: Colors.inputBorder, overflow: "hidden", marginBottom: 14 }}>
                 <TextInput
-                  style={{ color: Colors.text, fontSize: 15, padding: 14, minHeight: 110, textAlignVertical: "top", textAlign: isRTL ? "right" : "left" }}
+                  style={[{ color: Colors.text, fontSize: 15, padding: 14, minHeight: 110, textAlignVertical: "top" }, rtlTextAlign]}
                   multiline
                   value={orderNotes}
                   onChangeText={setOrderNotes}
-                  placeholder={language === "ar" ? "مثال: بدون بصل، اتصل عند الوصول..." : language === "de" ? "z.B.: ohne Zwiebeln, bei Ankunft anrufen..." : "e.g.: no onions, ring doorbell twice..."}
+                  placeholder={L("مثال: بدون بصل، اتصل عند الوصول…", "z.B.: ohne Zwiebeln, bei Ankunft anrufen…", "e.g.: no onions, ring doorbell twice…")}
                   placeholderTextColor={Colors.textMuted}
                   autoFocus
                 />
                 {orderNotes.length > 0 && (
                   <View style={{ flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 12, paddingBottom: 8 }}>
-                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{orderNotes.length} {language === "ar" ? "حرف" : "chars"}</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{orderNotes.length} {L("حرف", "Zeichen", "chars")}</Text>
                   </View>
                 )}
               </View>
 
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10 }}>
+              <View style={{ flexDirection: flipRow ? "row-reverse" : "row", gap: 10 }}>
                 {orderNotes.trim() !== "" && (
                   <Pressable
                     style={{ flex: 1, paddingVertical: 13, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.danger + "60", alignItems: "center", backgroundColor: Colors.danger + "10" }}
                     onPress={() => { setOrderNotes(""); setShowOrderNotes(false); }}
                   >
                     <Text style={{ color: Colors.danger, fontSize: 15, fontWeight: "700" }}>
-                      {language === "ar" ? "مسح" : language === "de" ? "Löschen" : "Clear"}
+                      {L("مسح", "Löschen", "Clear")}
                     </Text>
                   </Pressable>
                 )}
@@ -3663,7 +3976,7 @@ export default function POSScreen() {
                   >
                     <Ionicons name="checkmark-circle" size={18} color={Colors.textDark} />
                     <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "800" }}>
-                      {language === "ar" ? "حفظ الملاحظة" : language === "de" ? "Speichern" : "Save Note"}
+                      {L("حفظ الملاحظة", "Speichern", "Save Note")}
                     </Text>
                   </LinearGradient>
                 </Pressable>
@@ -3673,16 +3986,26 @@ export default function POSScreen() {
         </View>
       </Modal>
 
-      <Modal visible={showDiscountModal} animationType="fade" transparent>
+      <Modal visible={showDiscountModal} animationType="fade" transparent onRequestClose={() => setShowDiscountModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: 340 }]}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+          <View style={styles.modalContent}>
+            <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>{t("applyDiscount")}</Text>
-              <Pressable onPress={() => setShowDiscountModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+              <Pressable
+                onPress={() => setShowDiscountModal(false)}
+                style={styles.modalCloseBtn}
+                accessibilityRole="button"
+                accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
+              >
+                <Ionicons name="close" size={22} color={Colors.text} />
               </Pressable>
             </View>
-            <View style={[styles.discountTypeRow, isRTL && { flexDirection: "row-reverse" }]}>
+            {cart.discount > 0 && (
+              <Text style={[{ color: Colors.success, fontSize: 13, fontWeight: "700", marginBottom: 12 }, rtlTextAlign]}>
+                {L("الخصم الحالي", "Aktueller Rabatt", "Current discount")}: -{formatMoney(cart.discount)}
+              </Text>
+            )}
+            <View style={[styles.discountTypeRow, flipRow && { flexDirection: "row-reverse" }]}>
               <Pressable style={[styles.discountTypeBtn, discountType === "fixed" && styles.discountTypeBtnActive]} onPress={() => setDiscountType("fixed")}>
                 <Text style={[styles.discountTypeBtnText, discountType === "fixed" && { color: Colors.textDark }]}>{t("fixedAmount")} ({currencyLabel()})</Text>
               </Pressable>
@@ -3696,21 +4019,28 @@ export default function POSScreen() {
               placeholderTextColor={Colors.textMuted}
               value={discountInput}
               onChangeText={setDiscountInput}
-              keyboardType="decimal-pad"
+              keyboardType={discountType === "fixed" && isZeroDecimalCurrency(currency) ? "number-pad" : "decimal-pad"}
+              onSubmitEditing={applyDiscount}
+              returnKeyType="done"
             />
             {isCashier && (
               <Text style={{ color: Colors.warning, fontSize: 12, marginTop: 6, textAlign: "center" }}>
                 {t("maxDiscountWarning")}
               </Text>
             )}
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10, marginTop: 16 }}>
-              <Pressable style={[styles.completeBtn, { flex: 1 }]} onPress={() => { cart.setDiscount(0); setShowDiscountModal(false); }}>
-                <View style={[styles.completeBtnGradient, { backgroundColor: Colors.surfaceLight }]}>
-                  <Text style={styles.completeBtnText}>{t("removeDiscount")}</Text>
+            <View style={{ flexDirection: flipRow ? "row-reverse" : "row", gap: 10, marginTop: 16 }}>
+              <Pressable
+                style={[styles.completeBtn, { flex: 1 }, cart.discount <= 0 && { opacity: 0.5 }]}
+                disabled={cart.discount <= 0}
+                onPress={() => { cart.setDiscount(0); if (loyaltyRedeem) setLoyaltyRedeem(null); setShowDiscountModal(false); }}
+                accessibilityRole="button"
+              >
+                <View style={[styles.completeBtnGradient, { backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.cardBorder, borderRadius: 14 }]}>
+                  <Text style={[styles.completeBtnText, { color: Colors.text }]}>{t("removeDiscount")}</Text>
                 </View>
               </Pressable>
-              <Pressable style={[styles.completeBtn, { flex: 1 }]} onPress={applyDiscount}>
-                <LinearGradient colors={[Colors.success, "#059669"]} style={styles.completeBtnGradient}>
+              <Pressable style={[styles.completeBtn, { flex: 1 }]} onPress={applyDiscount} accessibilityRole="button">
+                <LinearGradient colors={[Colors.success, "#047857"]} style={styles.completeBtnGradient}>
                   <Text style={styles.completeBtnText}>{t("apply")}</Text>
                 </LinearGradient>
               </Pressable>
@@ -3719,29 +4049,34 @@ export default function POSScreen() {
         </View>
       </Modal>
 
-      <Modal visible={showInvoiceHistory} animationType="slide" transparent>
+      <Modal visible={showInvoiceHistory} animationType="slide" transparent onRequestClose={() => { setShowInvoiceHistory(false); setInvoiceSearch(""); }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: "85%" }]}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>{t("previousInvoices")}</Text>
-              <Pressable onPress={() => { setShowInvoiceHistory(false); setInvoiceSearch(""); }}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+              <Pressable
+                onPress={() => { setShowInvoiceHistory(false); setInvoiceSearch(""); }}
+                style={styles.modalCloseBtn}
+                accessibilityRole="button"
+                accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
+              >
+                <Ionicons name="close" size={22} color={Colors.text} />
               </Pressable>
             </View>
 
             {/* Search bar */}
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, backgroundColor: Colors.surfaceLight, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10, borderWidth: 1, borderColor: Colors.cardBorder }}>
+            <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 8, backgroundColor: Colors.surfaceLight, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10, borderWidth: 1, borderColor: Colors.cardBorder }}>
               <Ionicons name="search" size={16} color={Colors.textMuted} />
               <TextInput
-                style={{ flex: 1, color: Colors.text, fontSize: 14, textAlign: isRTL ? "right" : "left" }}
-                placeholder={language === "ar" ? "بحث برقم الفاتورة أو اسم العميل..." : language === "de" ? "Suche nach Rechnungsnr. oder Kundenname..." : "Search by invoice # or customer name..."}
+                style={[{ flex: 1, color: Colors.text, fontSize: 14, minHeight: 28 }, rtlTextAlign]}
+                placeholder={L("بحث برقم الفاتورة أو اسم العميل…", "Suche nach Rechnungsnr. oder Kundenname…", "Search by invoice # or customer name…")}
                 placeholderTextColor={Colors.textMuted}
                 value={invoiceSearch}
                 onChangeText={setInvoiceSearch}
                 autoCapitalize="none"
               />
               {invoiceSearch.length > 0 && (
-                <Pressable onPress={() => setInvoiceSearch("")}>
+                <Pressable onPress={() => setInvoiceSearch("")} hitSlop={10} accessibilityRole="button" accessibilityLabel={L("مسح البحث", "Suche löschen", "Clear search")}>
                   <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
                 </Pressable>
               )}
@@ -3749,10 +4084,10 @@ export default function POSScreen() {
 
             {/* 24h filter toggle — hidden when searching */}
             {invoiceSearch.length === 0 && (
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, paddingHorizontal: 4, paddingBottom: 10 }}>
+              <View style={{ flexDirection: flipRow ? "row-reverse" : "row", gap: 8, paddingHorizontal: 4, paddingBottom: 10 }}>
                 <Pressable
                   onPress={() => setInvoiceFilter24h(true)}
-                  style={{ flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: invoiceFilter24h ? Colors.accent : Colors.surfaceLight, alignItems: "center", borderWidth: 1, borderColor: invoiceFilter24h ? Colors.accent : Colors.cardBorder }}
+                  style={{ flex: 1, minHeight: 40, justifyContent: "center", borderRadius: 10, backgroundColor: invoiceFilter24h ? Colors.accent : Colors.surfaceLight, alignItems: "center", borderWidth: 1, borderColor: invoiceFilter24h ? Colors.accent : Colors.cardBorder }}
                 >
                   <Text style={{ color: invoiceFilter24h ? Colors.textDark : Colors.textSecondary, fontSize: 12, fontWeight: "700" }}>
                     {t("last24Hours" as any)}
@@ -3760,7 +4095,7 @@ export default function POSScreen() {
                 </Pressable>
                 <Pressable
                   onPress={() => setInvoiceFilter24h(false)}
-                  style={{ flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: !invoiceFilter24h ? Colors.accent : Colors.surfaceLight, alignItems: "center", borderWidth: 1, borderColor: !invoiceFilter24h ? Colors.accent : Colors.cardBorder }}
+                  style={{ flex: 1, minHeight: 40, justifyContent: "center", borderRadius: 10, backgroundColor: !invoiceFilter24h ? Colors.accent : Colors.surfaceLight, alignItems: "center", borderWidth: 1, borderColor: !invoiceFilter24h ? Colors.accent : Colors.cardBorder }}
                 >
                   <Text style={{ color: !invoiceFilter24h ? Colors.textDark : Colors.textSecondary, fontSize: 12, fontWeight: "700" }}>
                     {t("allInvoices" as any)}
@@ -3771,7 +4106,7 @@ export default function POSScreen() {
 
             <FlatList
               data={salesHistory.filter((s: any) => {
-                const q = invoiceSearch.trim().toLowerCase();
+                const q = toLatinDigits(invoiceSearch).trim().toLowerCase();
                 if (q) {
                   const receiptNum = String(s.receiptNumber || s.id || "").toLowerCase();
                   const custName = String(s.customerName || s.customer?.name || "").toLowerCase();
@@ -3789,7 +4124,7 @@ export default function POSScreen() {
                 return (
                   <Pressable
                     style={[{
-                      flexDirection: isRTL ? "row-reverse" : "row",
+                      flexDirection: flipRow ? "row-reverse" : "row",
                       alignItems: "center",
                       backgroundColor: Colors.surfaceLight,
                       borderRadius: 12,
@@ -3802,9 +4137,9 @@ export default function POSScreen() {
                   >
                     <View style={{
                       width: 42, height: 42, borderRadius: 12,
-                      backgroundColor: "rgba(47,211,198,0.12)",
+                      backgroundColor: Colors.accent + "1F",
                       justifyContent: "center", alignItems: "center",
-                      marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
+                      marginEnd: 12,
                     }}>
                       <Ionicons name="receipt" size={20} color={Colors.accent} />
                     </View>
@@ -3813,7 +4148,7 @@ export default function POSScreen() {
                         {getDisplayNumber(item.receiptNumber) || `#${item.id} `}
                       </Text>
                       <Text style={[{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }, rtlTextAlign]}>
-                        {saleDate.toLocaleDateString()} • {saleDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {saleDate.toLocaleDateString(dateLocale)} • {saleDate.toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" })}
                       </Text>
                       {(item.customerName || item.customer?.name) ? (
                         <Text style={[{ color: Colors.accent + "cc", fontSize: 11, marginTop: 1, fontWeight: "600" }, rtlTextAlign]}>
@@ -3821,14 +4156,14 @@ export default function POSScreen() {
                         </Text>
                       ) : null}
                       <Text style={[{ color: Colors.textMuted, fontSize: 11, marginTop: 1 }, rtlTextAlign]}>
-                        {(item.paymentMethod || "cash").toUpperCase()}
+                        {paymentLabel(item.paymentMethod || "cash")}
                       </Text>
                     </View>
-                    <View style={{ alignItems: isRTL ? "flex-start" : "flex-end" }}>
+                    <View style={{ alignItems: flipRow ? "flex-start" : "flex-end" }}>
                       <Text style={{ color: Colors.accent, fontSize: 16, fontWeight: "800" }}>
                         {formatMoney(item.totalAmount)}
                       </Text>
-                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4, marginTop: 4 }}>
+                      <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 4, marginTop: 4 }}>
                         <Ionicons name="eye-outline" size={14} color={Colors.info} />
                         <Text style={{ color: Colors.info, fontSize: 11, fontWeight: "600" }}>{t("viewInvoice")}</Text>
                       </View>
@@ -3848,12 +4183,12 @@ export default function POSScreen() {
         </View>
       </Modal>
 
-      <Modal visible={showReprintReceipt} animationType="fade" transparent>
+      <Modal visible={showReprintReceipt} animationType="fade" transparent onRequestClose={() => { setShowReprintReceipt(false); setSelectedInvoice(null); setReprintQrDataUrl(null); }}>
         <View style={styles.modalOverlay}>
           <View style={{ backgroundColor: Colors.surface, borderRadius: 16, width: "94%", maxWidth: 380, maxHeight: "90%", overflow: "hidden" }}>
             <ScrollView showsVerticalScrollIndicator={false}>
               {selectedInvoice && (
-                <View style={{ padding: 20, backgroundColor: "#fff" }}>
+                <View style={[{ padding: 20, backgroundColor: "#fff" }, Platform.OS === "web" && { direction: isRTL ? "rtl" : "ltr" } as any]}>
                   <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", letterSpacing: 1 }}>{"=".repeat(36)}</Text>
 
                   {storeSettings?.logo && (
@@ -3862,8 +4197,8 @@ export default function POSScreen() {
                     </View>
                   )}
 
-                  <Text style={{ color: "#000", fontSize: 18, fontWeight: "900", textAlign: "center", textTransform: "uppercase", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("viewReceipt" as any) || "RECHNUNG"}</Text>
-                  <Text style={{ color: "#000", fontSize: 14, fontWeight: "700", textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings?.name || tenant?.name || "POS System"}</Text>
+                  <Text style={{ color: "#000", fontSize: 18, fontWeight: "900", textAlign: "center", textTransform: "uppercase", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{L("فاتورة", "RECHNUNG", "RECEIPT")}</Text>
+                  <Text style={{ color: "#000", fontSize: 14, fontWeight: "700", textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings?.name || tenant?.name || "Kassenta POS"}</Text>
 
                   {storeSettings?.address && <Text style={{ color: "#000", fontSize: 11, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.address}</Text>}
                   {storeSettings?.phone && <Text style={{ color: "#000", fontSize: 11, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{storeSettings.phone}</Text>}
@@ -3871,18 +4206,18 @@ export default function POSScreen() {
                   <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginTop: 4, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
 
                   <View style={{ marginVertical: 4 }}>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptDate")}: {new Date(selectedInvoice.createdAt || selectedInvoice.date).toLocaleDateString("de-DE")}, {new Date(selectedInvoice.createdAt || selectedInvoice.date).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptDate")}: {new Date(selectedInvoice.createdAt || selectedInvoice.date).toLocaleDateString(dateLocale)}, {new Date(selectedInvoice.createdAt || selectedInvoice.date).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" })}</Text>
                     <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("receiptNumber")}: {getDisplayNumber(selectedInvoice.receiptNumber) || `#${selectedInvoice.id}`}</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("servedBy")}: {selectedInvoice.employeeName || selectedInvoice.employee?.name || "Cashier"}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("servedBy")}: {selectedInvoice.employeeName || selectedInvoice.employee?.name || L("الكاشير", "Kassierer", "Cashier")}</Text>
                     {selectedInvoice.customerName ? <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("customer")}: {selectedInvoice.customerName}</Text> : null}
                   </View>
 
                   <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
 
                   <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                    <Text style={{ color: "#000", fontSize: 11, fontWeight: "800", flex: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Item</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontWeight: "800", width: 40, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Qty</Text>
-                    <Text style={{ color: "#000", fontSize: 11, fontWeight: "800", width: 75, textAlign: "right", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Total</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontWeight: "800", flex: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{L("الصنف", "Artikel", "Item")}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontWeight: "800", width: 40, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{L("الكمية", "Menge", "Qty")}</Text>
+                    <Text style={{ color: "#000", fontSize: 11, fontWeight: "800", width: 75, textAlign: zeroEndAlign, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{L("المجموع", "Total", "Total")}</Text>
                   </View>
 
                   <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginBottom: 4, letterSpacing: 1 }}>{"─".repeat(36)}</Text>
@@ -3892,7 +4227,7 @@ export default function POSScreen() {
                       <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
                         <Text style={{ color: "#000", fontSize: 11, flex: 2, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }} numberOfLines={1}>{item.productName || item.name}</Text>
                         <Text style={{ color: "#000", fontSize: 11, width: 40, textAlign: "center", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>x{item.quantity}</Text>
-                        <Text style={{ color: "#000", fontSize: 11, width: 75, textAlign: "right", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(item.total || (item.unitPrice * item.quantity))}</Text>
+                        <Text style={{ color: "#000", fontSize: 11, width: 75, textAlign: zeroEndAlign, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(item.total || (item.unitPrice * item.quantity))}</Text>
                       </View>
                     ))}
                   </View>
@@ -3922,14 +4257,14 @@ export default function POSScreen() {
                     </View>
                     {(selectedInvoice.deliveryFee || 0) > 0 && (
                       <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                        <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Delivery Fee:</Text>
+                        <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{L("رسوم التوصيل", "Liefergebühr", "Delivery fee")}:</Text>
                         <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(selectedInvoice.deliveryFee)}</Text>
                       </View>
                     )}
                     {selectedInvoice?.vehicleId && (() => {
                       const v = (vehicles as any[]).find((x: any) => x.id === selectedInvoice.vehicleId); return v ? (
                         <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 }}>
-                          <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>Driver:</Text>
+                          <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{L("السائق", "Fahrer", "Driver")}:</Text>
                           <Text style={{ color: "#555", fontSize: 10, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{v.driverName || ""}{v.licensePlate ? ` (${v.licensePlate})` : ""}</Text>
                         </View>
                       ) : null;
@@ -3938,7 +4273,7 @@ export default function POSScreen() {
                     <Text style={{ textAlign: "center", color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", marginVertical: 4, letterSpacing: 1 }}>{"=".repeat(36)}</Text>
 
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
-                      <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>TOTAL:</Text>
+                      <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{L("الإجمالي", "TOTAL", "TOTAL")}:</Text>
                       <Text style={{ color: "#000", fontSize: 15, fontWeight: "900", fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{formatMoney(selectedInvoice.totalAmount)}</Text>
                     </View>
 
@@ -3946,7 +4281,7 @@ export default function POSScreen() {
 
                     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 2, marginTop: 4 }}>
                       <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{t("paymentMethod")}:</Text>
-                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace", textTransform: "uppercase" }}>{selectedInvoice.paymentMethod || "cash"}</Text>
+                      <Text style={{ color: "#000", fontSize: 11, fontFamily: Platform.OS === "web" ? "Courier New, monospace" : "monospace" }}>{paymentLabel(selectedInvoice.paymentMethod || "cash")}</Text>
                     </View>
                   </View>
 
@@ -3964,15 +4299,15 @@ export default function POSScreen() {
               )}
             </ScrollView>
 
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", margin: 12, marginTop: 0, gap: 8 }}>
+            <View style={{ flexDirection: flipRow ? "row-reverse" : "row", margin: 12, marginTop: 0, gap: 8 }}>
               <Pressable style={{ flex: 1, borderRadius: 14, overflow: "hidden" }} onPress={printReceipt}>
-                <LinearGradient colors={[Colors.info, "#2563EB"]} style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", paddingVertical: 14, gap: 8 }}>
+                <LinearGradient colors={[Colors.info, "#2563EB"]} style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", paddingVertical: 14, gap: 8 }}>
                   <Ionicons name="print" size={20} color={Colors.white} />
                   <Text style={{ color: Colors.white, fontSize: 15, fontWeight: "700" }}>{t("printInvoice")}</Text>
                 </LinearGradient>
               </Pressable>
               <Pressable style={{ flex: 1, borderRadius: 14, overflow: "hidden" }} onPress={() => { setShowReprintReceipt(false); setSelectedInvoice(null); setReprintQrDataUrl(null); }}>
-                <View style={{ backgroundColor: Colors.surfaceLight, flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", paddingVertical: 14, gap: 8, borderRadius: 14 }}>
+                <View style={{ backgroundColor: Colors.surfaceLight, flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", paddingVertical: 14, gap: 8, borderRadius: 14 }}>
                   <Ionicons name="close" size={20} color={Colors.text} />
                   <Text style={{ color: Colors.text, fontSize: 15, fontWeight: "700" }}>{t("close")}</Text>
                 </View>
@@ -3983,26 +4318,32 @@ export default function POSScreen() {
       </Modal>
 
       {/* Account Switcher Modal */}
-      <Modal visible={showAccountSwitcher} animationType="slide" transparent>
+      <Modal visible={showAccountSwitcher} animationType="slide" transparent onRequestClose={() => { if (!switchLoading) { setShowAccountSwitcher(false); setSwitchTarget(null); setSwitchPin(""); setSwitchError(""); } }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: "85%" }]}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>{t("switchAccount" as any)}</Text>
-              <Pressable onPress={() => { setShowAccountSwitcher(false); setSwitchTarget(null); setSwitchPin(""); setSwitchError(""); }}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+              <Pressable
+                onPress={() => { setShowAccountSwitcher(false); setSwitchTarget(null); setSwitchPin(""); setSwitchError(""); }}
+                disabled={switchLoading}
+                style={styles.modalCloseBtn}
+                accessibilityRole="button"
+                accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
+              >
+                <Ionicons name="close" size={22} color={Colors.text} />
               </Pressable>
             </View>
 
             {!switchTarget ? (
               <ScrollView showsVerticalScrollIndicator={false}>
                 {employee && (
-                  <View style={styles.switchCurrentAccount}>
+                  <View style={[styles.switchCurrentAccount, flipRow && { flexDirection: "row-reverse" }]}>
                     <LinearGradient colors={[Colors.accent, Colors.gradientStart]} style={styles.switchCurrentAvatar}>
-                      <Text style={styles.switchCurrentAvatarText}>{employee.name.charAt(0).toUpperCase()}</Text>
+                      <Text style={styles.switchCurrentAvatarText}>{(employee.name || "?").charAt(0).toUpperCase()}</Text>
                     </LinearGradient>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.switchCurrentName, rtlTextAlign]}>{employee.name}</Text>
-                      <Text style={[styles.switchCurrentRole, rtlTextAlign]}>{employee.role}</Text>
+                      <Text style={[styles.switchCurrentRole, rtlTextAlign]}>{roleLabel(employee.role)}</Text>
                     </View>
                     <View style={styles.switchActiveBadge}>
                       <View style={styles.switchActiveDot} />
@@ -4013,23 +4354,34 @@ export default function POSScreen() {
 
                 {/* Shift status */}
                 {myActiveShift && (
-                  <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: Colors.success + "15", borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: Colors.success + "40" }}>
-                    <Ionicons name="radio-button-on" size={16} color={Colors.success} style={{ marginRight: 8 }} />
+                  <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 8, backgroundColor: Colors.success + "15", borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: Colors.success + "40" }}>
+                    <Ionicons name="radio-button-on" size={16} color={Colors.success} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: Colors.success, fontSize: 13, fontWeight: "700" }}>
-                        {language === "ar" ? "وردية نشطة" : language === "de" ? "Aktive Schicht" : "Active Shift"}
+                      <Text style={[{ color: Colors.success, fontSize: 13, fontWeight: "700" }, rtlTextAlign]}>
+                        {L("وردية نشطة", "Aktive Schicht", "Active Shift")}
                       </Text>
-                      <Text style={{ color: Colors.textMuted, fontSize: 12 }}>
-                        {new Date(myActiveShift.startTime).toLocaleTimeString()}
+                      <Text style={[{ color: Colors.textMuted, fontSize: 12 }, rtlTextAlign]}>
+                        {L("منذ", "Seit", "Since")} {new Date(myActiveShift.startTime).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" })}
                       </Text>
                     </View>
                     <Pressable
-                      onPress={() => endShiftMutation.mutate(myActiveShift.id)}
-                      style={{ backgroundColor: Colors.danger + "20", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 6 }}
+                      onPress={async () => {
+                        if (endShiftMutation.isPending) return;
+                        const ok = await confirmAsync(
+                          L("إنهاء الوردية؟", "Schicht beenden?", "End shift?"), "",
+                          L("إنهاء الوردية", "Schicht beenden", "End Shift"), t("cancel"), true,
+                        );
+                        if (ok) endShiftMutation.mutate(myActiveShift.id);
+                      }}
+                      disabled={endShiftMutation.isPending}
+                      style={{ backgroundColor: Colors.danger + "20", paddingHorizontal: 14, minHeight: 40, borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 6, opacity: endShiftMutation.isPending ? 0.6 : 1 }}
+                      accessibilityRole="button"
                     >
-                      <Ionicons name="stop-circle" size={16} color={Colors.danger} />
+                      {endShiftMutation.isPending
+                        ? <ActivityIndicator size="small" color={Colors.danger} />
+                        : <Ionicons name="stop-circle" size={16} color={Colors.danger} />}
                       <Text style={{ color: Colors.danger, fontSize: 13, fontWeight: "700" }}>
-                        {language === "ar" ? "إنهاء الوردية" : language === "de" ? "Schicht beenden" : "End Shift"}
+                        {L("إنهاء الوردية", "Schicht beenden", "End Shift")}
                       </Text>
                     </Pressable>
                   </View>
@@ -4041,14 +4393,14 @@ export default function POSScreen() {
                   const roleColors: Record<string, string> = { admin: Colors.danger, manager: Colors.warning, cashier: Colors.info, owner: Colors.secondary };
                   const roleColor = roleColors[emp.role?.toLowerCase()] || Colors.info;
                   return (
-                    <Pressable key={emp.id} style={styles.switchEmployeeCard} onPress={() => { setSwitchTarget(emp); setSwitchPin(""); setSwitchError(""); }}>
+                    <Pressable key={emp.id} style={[styles.switchEmployeeCard, flipRow && { flexDirection: "row-reverse" }]} onPress={() => { setSwitchTarget(emp); setSwitchPin(""); setSwitchError(""); }} accessibilityRole="button">
                       <View style={[styles.switchEmployeeAvatar, { borderColor: roleColor }]}>
-                        <Text style={styles.switchEmployeeAvatarText}>{emp.name.charAt(0).toUpperCase()}</Text>
+                        <Text style={styles.switchEmployeeAvatarText}>{(emp.name || "?").charAt(0).toUpperCase()}</Text>
                       </View>
-                      <View style={{ flex: 1 }}>
+                      <View style={[{ flex: 1 }, flipRow && { alignItems: "flex-end" }]}>
                         <Text style={[styles.switchEmployeeName, rtlTextAlign]}>{emp.name}</Text>
                         <View style={[styles.switchRoleBadge, { backgroundColor: roleColor }]}>
-                          <Text style={styles.switchRoleBadgeText}>{emp.role}</Text>
+                          <Text style={styles.switchRoleBadgeText}>{roleLabel(emp.role)}</Text>
                         </View>
                       </View>
                       <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={20} color={Colors.textMuted} />
@@ -4067,46 +4419,25 @@ export default function POSScreen() {
                       setShowAccountSwitcher(false);
                       logout();
                     };
-                    const finishLogoutAfterShift = () => {
+                    const finishLogoutAfterShift = async () => {
                       // After shift closes, ask once for final logout confirmation
-                      const confirmMsg = language === "ar"
-                        ? "إنهاء الجلسة؟"
-                        : language === "de" ? "Sitzung beenden?" : "Log out now?";
-                      if (Platform.OS === "web") {
-                        if (window.confirm(confirmMsg)) doLogout();
-                      } else {
-                        Alert.alert(confirmMsg, "", [
-                          { text: language === "ar" ? "إلغاء" : language === "de" ? "Abbrechen" : "Cancel", style: "cancel" },
-                          { text: language === "ar" ? "تسجيل الخروج" : language === "de" ? "Abmelden" : "Log out", style: "destructive", onPress: doLogout },
-                        ]);
-                      }
+                      const ok = await confirmAsync(
+                        L("إنهاء الجلسة؟", "Sitzung beenden?", "Log out now?"), "",
+                        L("تسجيل الخروج", "Abmelden", "Log out"), t("cancel"), true,
+                      );
+                      if (ok) doLogout();
                     };
 
                     if (myActiveShift) {
                       // Auto-end the active shift, then log out — same UX as Settings
-                      const msg = language === "ar"
-                        ? "إنهاء الوردية وتسجيل الخروج؟"
-                        : language === "de"
-                          ? "Schicht beenden und abmelden?"
-                          : "End your shift and log out?";
+                      if (endShiftMutation.isPending) return;
+                      const msg = L("إنهاء الوردية وتسجيل الخروج؟", "Schicht beenden und abmelden?", "End your shift and log out?");
                       const proceed = () => {
                         endShiftMutation.mutate(myActiveShift.id, {
-                          onSuccess: finishLogoutAfterShift,
-                          onError: (err: any) => {
-                            const failMsg = (err?.message || "Failed to end shift");
-                            if (Platform.OS === "web") window.alert(failMsg);
-                            else Alert.alert("", failMsg);
-                          },
+                          onSuccess: () => { void finishLogoutAfterShift(); },
                         });
                       };
-                      if (Platform.OS === "web") {
-                        if (window.confirm(msg)) proceed();
-                      } else {
-                        Alert.alert(msg, "", [
-                          { text: language === "ar" ? "إلغاء" : language === "de" ? "Abbrechen" : "Cancel", style: "cancel" },
-                          { text: language === "ar" ? "متابعة" : language === "de" ? "Weiter" : "Continue", style: "destructive", onPress: proceed },
-                        ]);
-                      }
+                      void confirmAsync(msg, "", L("متابعة", "Weiter", "Continue"), t("cancel"), true).then((ok) => { if (ok) proceed(); });
                       return;
                     }
 
@@ -4123,26 +4454,32 @@ export default function POSScreen() {
                 >
                   <Ionicons name="log-out-outline" size={20} color={Colors.danger} />
                   <Text style={{ color: Colors.danger, fontSize: 15, fontWeight: "700" }}>
-                    {language === "ar" ? "تسجيل الخروج" : language === "de" ? "Abmelden" : "Log out"}
+                    {L("تسجيل الخروج", "Abmelden", "Log out")}
                   </Text>
                 </Pressable>
               </ScrollView>
             ) : (
               <View style={styles.switchPinSection}>
-                <Pressable style={styles.switchBackBtn} onPress={() => { setSwitchTarget(null); setSwitchPin(""); setSwitchError(""); }}>
+                <Pressable
+                  style={[styles.switchBackBtn, webRTL && { alignSelf: "flex-start" }]}
+                  onPress={() => { setSwitchTarget(null); setSwitchPin(""); setSwitchError(""); }}
+                  disabled={switchLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel={L("رجوع", "Zurück", "Back")}
+                >
                   <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={22} color={Colors.text} />
                 </Pressable>
 
                 <View style={styles.switchPinAvatar}>
                   <LinearGradient colors={[Colors.accent, Colors.gradientStart]} style={styles.switchPinAvatarCircle}>
-                    <Text style={styles.switchPinAvatarText}>{switchTarget.name.charAt(0).toUpperCase()}</Text>
+                    <Text style={styles.switchPinAvatarText}>{(switchTarget.name || "?").charAt(0).toUpperCase()}</Text>
                   </LinearGradient>
                   <Text style={[styles.switchPinName, rtlTextAlign]}>{switchTarget.name}</Text>
                 </View>
 
                 <Text style={[styles.switchPinLabel, rtlTextAlign]}>{t("enterPinToSwitch" as any)}</Text>
 
-                <View style={styles.switchPinDots}>
+                <View style={[styles.switchPinDots, { direction: "ltr" } as any]}>
                   {[0, 1, 2, 3].map((i) => (
                     <View key={i} style={[styles.switchDot, i < switchPin.length && styles.switchDotFilled]} />
                   ))}
@@ -4156,16 +4493,17 @@ export default function POSScreen() {
                 ) : null}
 
                 {switchLoading ? (
-                  <View style={{ paddingVertical: 20 }}>
+                  <View style={{ paddingVertical: 20, alignItems: "center", gap: 10 }}>
+                    <ActivityIndicator size="small" color={Colors.accent} />
                     <Text style={{ color: Colors.accent, textAlign: "center", fontSize: 14, fontWeight: "600" }}>{t("processing" as any)}</Text>
                   </View>
                 ) : (
-                  <View style={styles.switchKeypad}>
+                  <View style={[styles.switchKeypad, { direction: "ltr" } as any]}>
                     {["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"].map((key) => {
                       if (key === "") return <View key="empty" style={styles.switchKeyBtn} />;
                       if (key === "del") {
                         return (
-                          <Pressable key="del" style={styles.switchKeyBtn} onPress={() => { playClickSound("light"); setSwitchPin(switchPin.slice(0, -1)); }}>
+                          <Pressable key="del" style={styles.switchKeyBtn} onPress={() => { playClickSound("light"); setSwitchPin(switchPin.slice(0, -1)); }} accessibilityRole="button" accessibilityLabel={L("حذف", "Löschen", "Delete")}>
                             <Ionicons name="backspace" size={24} color={Colors.text} />
                           </Pressable>
                         );
@@ -4192,7 +4530,7 @@ export default function POSScreen() {
       />
       {scanToast ? (
         <View pointerEvents="none" style={{ position: "absolute", top: insets.top + topPad + 60, left: 16, right: 16, alignItems: "center", zIndex: 999 }}>
-          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, maxWidth: 520, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, backgroundColor: scanToast.ok ? "#047857" : "#B91C1C" }}>
+          <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 8, maxWidth: 520, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, backgroundColor: scanToast.ok ? "#047857" : "#B91C1C" }}>
             <Ionicons name={scanToast.ok ? "checkmark-circle" : "alert-circle"} size={20} color="#FFFFFF" />
             <Text style={{ color: "#FFFFFF", fontSize: 15, fontWeight: "600", flexShrink: 1 }}>{scanToast.message}</Text>
           </View>
@@ -4200,7 +4538,12 @@ export default function POSScreen() {
       ) : null}
 
       {/* ── Shift Prompt after Account Switch ── */}
-      <Modal visible={showSwitchShiftPrompt} animationType="fade" transparent onRequestClose={() => { }}>
+      <Modal
+        visible={showSwitchShiftPrompt}
+        animationType="fade"
+        transparent
+        onRequestClose={() => { if (!startShiftAfterSwitchMutation.isPending) { setShowSwitchShiftPrompt(false); setShowSwitchCashInput(false); setSwitchOpeningCash(""); } }}
+      >
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 24 }}>
           <View style={{ backgroundColor: Colors.surface, borderRadius: 20, padding: 24, width: "100%", maxWidth: 380, borderWidth: 1, borderColor: Colors.cardBorder }}>
             {!showSwitchCashInput ? (
@@ -4210,56 +4553,80 @@ export default function POSScreen() {
                     <Ionicons name="time-outline" size={30} color={Colors.accent} />
                   </View>
                   <Text style={{ color: Colors.text, fontSize: 20, fontWeight: "700", marginBottom: 8 }}>
-                    {language === "ar" ? "بدء الوردية" : language === "de" ? "Schicht starten" : "Start Shift"}
+                    {L("بدء الوردية", "Schicht starten", "Start Shift")}
                   </Text>
                   <Text style={{ color: Colors.textSecondary, fontSize: 14, textAlign: "center" }}>
-                    {switchedEmployee?.name}{language === "ar" ? " لا يوجد وردية نشطة. هل تريد بدء وردية؟" : language === "de" ? " hat keine aktive Schicht. Schicht starten?" : " has no active shift. Start one now?"}
+                    {L(
+                      `لا توجد وردية نشطة لـ ${switchedEmployee?.name || ""}. هل تريد بدء وردية؟`,
+                      `${switchedEmployee?.name || ""} hat keine aktive Schicht. Schicht starten?`,
+                      `${switchedEmployee?.name || ""} has no active shift. Start one now?`,
+                    )}
                   </Text>
                 </View>
                 <Pressable
                   onPress={() => setShowSwitchCashInput(true)}
                   style={{ backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: "center" }}
+                  accessibilityRole="button"
                 >
                   <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "700" }}>
-                    {language === "ar" ? "بدء الوردية الآن" : language === "de" ? "Schicht jetzt starten" : "Start Shift Now"}
+                    {L("بدء الوردية الآن", "Schicht jetzt starten", "Start Shift Now")}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { setShowSwitchShiftPrompt(false); setSwitchedEmployee(null); }}
+                  style={{ borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 6 }}
+                  accessibilityRole="button"
+                >
+                  <Text style={{ color: Colors.textSecondary, fontSize: 15 }}>
+                    {L("لاحقاً", "Später", "Not now")}
                   </Text>
                 </Pressable>
               </>
             ) : (
               <>
                 <Text style={{ color: Colors.text, fontSize: 18, fontWeight: "700", marginBottom: 16, textAlign: "center" }}>
-                  {language === "ar" ? "رصيد الفتح النقدي" : language === "de" ? "Öffnungskassenbestand" : "Opening Cash Balance"}
+                  {L("رصيد الفتح النقدي", "Öffnungskassenbestand", "Opening Cash Balance")} ({currencyLabel()})
                 </Text>
                 <TextInput
                   style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, fontSize: 18, color: Colors.text, textAlign: "center", borderWidth: 1, borderColor: Colors.cardBorder, marginBottom: 16 }}
                   value={switchOpeningCash}
                   onChangeText={setSwitchOpeningCash}
-                  keyboardType="decimal-pad"
-                  placeholder="0.00"
+                  keyboardType={isZeroDecimalCurrency(currency) ? "number-pad" : "decimal-pad"}
+                  placeholder={formatAmount(0)}
                   placeholderTextColor={Colors.textMuted}
                   autoFocus
                 />
                 <Pressable
                   onPress={() => {
-                    if (!switchedEmployee) return;
+                    if (!switchedEmployee || startShiftAfterSwitchMutation.isPending) return;
+                    const opening = switchOpeningCash.trim() ? parseAmountInput(switchOpeningCash, currency) : 0;
+                    if (!Number.isFinite(opening) || opening < 0) {
+                      showAlert(t("error"), L("أدخل مبلغاً صحيحاً.", "Bitte einen gültigen Betrag eingeben.", "Enter a valid amount."));
+                      return;
+                    }
                     startShiftAfterSwitchMutation.mutate({
                       employeeId: switchedEmployee.id,
                       branchId: switchedEmployee.branchId || 1,
-                      openingCash: switchOpeningCash ? Number(switchOpeningCash) : 0,
+                      openingCash: roundMoney(opening, currency),
                     });
                   }}
-                  style={{ backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10 }}
+                  disabled={startShiftAfterSwitchMutation.isPending}
+                  style={{ backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8, marginBottom: 10, opacity: startShiftAfterSwitchMutation.isPending ? 0.6 : 1 }}
+                  accessibilityRole="button"
                 >
+                  {startShiftAfterSwitchMutation.isPending && <ActivityIndicator size="small" color={Colors.textDark} />}
                   <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "700" }}>
-                    {language === "ar" ? "بدء الوردية" : language === "de" ? "Schicht starten" : "Start Shift"}
+                    {L("بدء الوردية", "Schicht starten", "Start Shift")}
                   </Text>
                 </Pressable>
                 <Pressable
                   onPress={() => setShowSwitchCashInput(false)}
+                  disabled={startShiftAfterSwitchMutation.isPending}
                   style={{ borderRadius: 12, paddingVertical: 14, alignItems: "center" }}
+                  accessibilityRole="button"
                 >
                   <Text style={{ color: Colors.textSecondary, fontSize: 15 }}>
-                    {language === "ar" ? "رجوع" : language === "de" ? "Zurück" : "Back"}
+                    {L("رجوع", "Zurück", "Back")}
                   </Text>
                 </Pressable>
               </>
@@ -4268,181 +4635,22 @@ export default function POSScreen() {
         </View>
       </Modal>
 
-      {/* ── Online Orders Panel ── */}
-      <Modal visible={showOnlineOrders} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: "92%" }]}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Text style={[styles.modalTitle, rtlTextAlign]}>
-                {language === "ar" ? "الطلبات الإلكترونية" : language === "de" ? "Online-Bestellungen" : "Online Orders"}
-              </Text>
-              <Pressable onPress={() => setShowOnlineOrders(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
-              </Pressable>
-            </View>
-
-            <FlatList
-              data={normalizedOnlineOrders as any[]}
-              keyExtractor={(item: any) => String(item.id)}
-              scrollEnabled
-              renderItem={({ item }: { item: any }) => {
-                const orderDate = new Date(item.createdAt);
-                const orderItems = normalizeOrderItems(item.items);
-                const statusColor: Record<string, string> = {
-                  pending: Colors.warning,
-                  accepted: Colors.info,
-                  preparing: Colors.secondary,
-                  ready: Colors.accent,
-                  delivered: Colors.success,
-                  cancelled: Colors.danger,
-                };
-                const payIcon: Record<string, keyof typeof Ionicons.glyphMap> = { cash: "cash-outline", card: "card-outline", mobile: "phone-portrait-outline" };
-                return (
-                  <View style={{
-                    backgroundColor: Colors.surfaceLight,
-                    borderRadius: 14, padding: 14, marginBottom: 10,
-                    borderWidth: 1, borderColor: Colors.cardBorder,
-                    borderLeftWidth: 4, borderLeftColor: statusColor[item.status] || Colors.textMuted,
-                  }}>
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                      <Text style={{ color: Colors.text, fontWeight: "800", fontSize: 14 }}>#{item.orderNumber}</Text>
-                      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                        <View style={{ backgroundColor: statusColor[item.status] || Colors.textMuted, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999 }}>
-                          <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700", textTransform: "capitalize" }}>{item.status}</Text>
-                        </View>
-                        <Text style={{ color: Colors.accent, fontWeight: "800" }}>{formatMoney(item.totalAmount)}</Text>
-                      </View>
-                    </View>
-                    <Text style={{ color: Colors.textSecondary, fontSize: 12, marginBottom: 2 }}>{item.customerName} · {item.customerPhone}
-                    </Text>
-                    {item.customerAddress && (
-                      <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 2 }}>{item.customerAddress}</Text>
-                    )}
-                    <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 6 }}>
-                      {item.paymentMethod?.toUpperCase()} · {item.orderType?.toUpperCase()} · {orderDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </Text>
-                    {/* Items */}
-                    {orderItems.map((it: any, idx: number) => (
-                      <Text key={idx} style={{ color: Colors.textMuted, fontSize: 11 }}>
-                        • {it.name} x{it.quantity} — {formatMoney(it.total)}
-                      </Text>
-                    ))}
-                    {item.notes && <Text style={{ color: Colors.warning, fontSize: 11, marginTop: 4 }}>{item.notes}</Text>}
-
-                    {/* Action buttons */}
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                      {item.status === "pending" && (
-                        <Pressable
-                          onPress={async () => {
-                            await apiRequest("PUT", `/api/online-orders/${item.id}`, { status: "accepted", estimatedTime: 30 });
-                            qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-                          }}
-                          style={{ backgroundColor: Colors.info, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
-                        >
-                          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>
-                            {language === "ar" ? "قبول" : language === "de" ? "Annehmen" : "Accept"}
-                          </Text>
-                        </Pressable>
-                      )}
-                      {item.status === "accepted" && (
-                        <Pressable
-                          onPress={async () => {
-                            await apiRequest("PUT", `/api/online-orders/${item.id}`, { status: "preparing" });
-                            qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-                          }}
-                          style={{ backgroundColor: Colors.secondary, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
-                        >
-                          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>
-                            {language === "ar" ? "قيد التحضير" : language === "de" ? "In Zubereitung" : "Preparing"}
-                          </Text>
-                        </Pressable>
-                      )}
-                      {item.status === "preparing" && (
-                        <Pressable
-                          onPress={async () => {
-                            await apiRequest("PUT", `/api/online-orders/${item.id}`, { status: "ready" });
-                            qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-                          }}
-                          style={{ backgroundColor: Colors.accent, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
-                        >
-                          <Text style={{ color: Colors.textDark || "#111", fontWeight: "700", fontSize: 12 }}>
-                            {language === "ar" ? "جاهز" : language === "de" ? "Fertig" : "Ready"}
-                          </Text>
-                        </Pressable>
-                      )}
-                      {item.status === "ready" && (
-                        <Pressable
-                          onPress={async () => {
-                            await apiRequest("PUT", `/api/online-orders/${item.id}`, { status: "delivered" });
-                            qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-                          }}
-                          style={{ backgroundColor: "#22c55e", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
-                        >
-                          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>
-                            {language === "ar" ? "تم التوصيل" : language === "de" ? "Geliefert" : "Delivered"}
-                          </Text>
-                        </Pressable>
-                      )}
-                      {item.status !== "cancelled" && item.status !== "delivered" && (
-                        <Pressable
-                          onPress={async () => {
-                            await apiRequest("PUT", `/api/online-orders/${item.id}`, { status: "cancelled" });
-                            qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-                          }}
-                          style={{ backgroundColor: Colors.danger, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
-                        >
-                          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>
-                            {language === "ar" ? "إلغاء" : language === "de" ? "Stornieren" : "Cancel"}
-                          </Text>
-                        </Pressable>
-                      )}
-                      {/* Load to POS cart */}
-                      {["pending", "accepted", "preparing"].includes(item.status) && (
-                        <Pressable
-                          onPress={() => {
-                            // Load items into cart
-                            cart.clearCart();
-                            (item.items || []).forEach((it: any) => {
-                              for (let i = 0; i < it.quantity; i++) {
-                                cart.addItem({ id: it.productId || 0, name: it.name, price: Number(it.unitPrice) || 0 });
-                              }
-                            });
-                            setShowOnlineOrders(false);
-                          }}
-                          style={{ backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.cardBorder, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}
-                        >
-                          <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 12 }}>{language === "ar" ? "تحميل للنقطة" : language === "de" ? "In POS laden" : "Load to POS"}
-                          </Text>
-                        </Pressable>
-                      )}
-                    </View>
-                  </View>
-                );
-              }}
-              ListEmptyComponent={
-                <View style={{ alignItems: "center", paddingVertical: 40 }}>
-                  <Ionicons name="globe-outline" size={40} color={Colors.textMuted} />
-                  <Text style={{ color: Colors.textMuted, fontSize: 15, marginTop: 12, fontWeight: "600" }}>
-                    {language === "ar" ? "لا توجد طلبات إلكترونية" : language === "de" ? "Keine Online-Bestellungen" : "No online orders yet"}
-                  </Text>
-                </View>
-              }
-            />
-          </View>
-        </View>
-      </Modal>
-
       {/* ── Call History Panel ── */}
-      <Modal visible={showCallHistory} animationType="slide" transparent onShow={() => { setCallHistoryFilter("all"); setCallHistorySearch(""); }}>
+      <Modal visible={showCallHistory} animationType="slide" transparent onRequestClose={() => setShowCallHistory(false)} onShow={() => { setCallHistoryFilter("all"); setCallHistorySearch(""); }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: "92%" }]}>
             {/* Header */}
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, rtlTextAlign]}>
-                {language === "ar" ? "سجل المكالمات" : language === "de" ? "Anrufhistorie" : "Call History"}
+                {L("سجل المكالمات", "Anrufhistorie", "Call History")}
               </Text>
-              <Pressable onPress={() => setShowCallHistory(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+              <Pressable
+                onPress={() => setShowCallHistory(false)}
+                style={styles.modalCloseBtn}
+                accessibilityRole="button"
+                accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
+              >
+                <Ionicons name="close" size={22} color={Colors.text} />
               </Pressable>
             </View>
 
@@ -4456,12 +4664,12 @@ export default function POSScreen() {
                 return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
               }).length;
               return (
-                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                <View style={{ flexDirection: flipRow ? "row-reverse" : "row", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
                   {[
-                    { label: language === "ar" ? "الكل" : language === "de" ? "Alle" : "Total", value: total, color: Colors.accent },
-                    { label: language === "ar" ? "فاتت" : language === "de" ? "Verpasst" : "Missed", value: missed, color: Colors.danger },
-                    { label: language === "ar" ? "رُدَّ عليها" : language === "de" ? "Beantw." : "Answered", value: answered, color: Colors.success },
-                    { label: language === "ar" ? "اليوم" : language === "de" ? "Heute" : "Today", value: todayCount, color: "#a78bfa" },
+                    { label: L("الكل", "Alle", "Total"), value: total, color: Colors.accent },
+                    { label: L("فاتت", "Verpasst", "Missed"), value: missed, color: Colors.danger },
+                    { label: L("رُدَّ عليها", "Beantw.", "Answered"), value: answered, color: Colors.success },
+                    { label: L("اليوم", "Heute", "Today"), value: todayCount, color: Colors.secondary },
                   ].map((s) => (
                     <View key={s.label} style={{ flex: 1, minWidth: 70, backgroundColor: s.color + "18", borderRadius: 10, paddingVertical: 7, paddingHorizontal: 6, alignItems: "center" }}>
                       <Text style={{ color: s.color, fontSize: 18, fontWeight: "800" }}>{s.value}</Text>
@@ -4473,24 +4681,24 @@ export default function POSScreen() {
             })()}
 
             {/* Search bar */}
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", backgroundColor: Colors.surfaceLight, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder, gap: 6 }}>
+            <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", backgroundColor: Colors.surfaceLight, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder, gap: 6 }}>
               <Ionicons name="search" size={16} color={Colors.textMuted} />
               <TextInput
                 value={callHistorySearch}
                 onChangeText={setCallHistorySearch}
-                placeholder={language === "ar" ? "ابحث برقم أو اسم..." : language === "de" ? "Suche nach Nummer oder Name..." : "Search by number or name..."}
+                placeholder={L("ابحث برقم أو اسم…", "Suche nach Nummer oder Name…", "Search by number or name…")}
                 placeholderTextColor={Colors.textMuted}
-                style={{ flex: 1, color: Colors.text, fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+                style={[{ flex: 1, color: Colors.text, fontSize: 14, minHeight: 30 }, rtlTextAlign]}
               />
               {callHistorySearch.length > 0 && (
-                <Pressable onPress={() => setCallHistorySearch("")}>
+                <Pressable onPress={() => setCallHistorySearch("")} hitSlop={10} accessibilityRole="button" accessibilityLabel={L("مسح البحث", "Suche löschen", "Clear search")}>
                   <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
                 </Pressable>
               )}
             </View>
 
             {/* Filter tabs */}
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 6, marginBottom: 10 }}>
+            <View style={{ flexDirection: flipRow ? "row-reverse" : "row", gap: 6, marginBottom: 10 }}>
               {(["all", "missed", "answered", "today"] as const).map((f) => {
                 const labels: Record<string, Record<string, string>> = {
                   all: { ar: "الكل", de: "Alle", en: "All" },
@@ -4501,8 +4709,8 @@ export default function POSScreen() {
                 const label = labels[f][language] ?? labels[f]["en"];
                 const active = callHistoryFilter === f;
                 return (
-                  <Pressable key={f} onPress={() => setCallHistoryFilter(f)} style={{ flex: 1, paddingVertical: 6, borderRadius: 8, backgroundColor: active ? Colors.accent : Colors.surfaceLight, borderWidth: 1, borderColor: active ? Colors.accent : Colors.cardBorder, alignItems: "center" }}>
-                    <Text style={{ color: active ? Colors.white : Colors.textSecondary, fontSize: 12, fontWeight: "700" }}>{label}</Text>
+                  <Pressable key={f} onPress={() => setCallHistoryFilter(f)} style={{ flex: 1, minHeight: 38, justifyContent: "center", borderRadius: 8, backgroundColor: active ? Colors.accent : Colors.surfaceLight, borderWidth: 1, borderColor: active ? Colors.accent : Colors.cardBorder, alignItems: "center" }} accessibilityRole="tab" accessibilityState={{ selected: active }}>
+                    <Text style={{ color: active ? Colors.textDark : Colors.textSecondary, fontSize: 12, fontWeight: "700" }}>{label}</Text>
                   </Pressable>
                 );
               })}
@@ -4536,7 +4744,7 @@ export default function POSScreen() {
 
                 // Apply search
                 if (callHistorySearch.trim()) {
-                  const q = callHistorySearch.trim().toLowerCase();
+                  const q = toLatinDigits(callHistorySearch).trim().toLowerCase();
                   items = items.filter((i: any) => {
                     const custName = i.customerName || customers.find((c: any) => c.id === i.customerId)?.name || "";
                     return i.phoneNumber?.includes(q) || custName.toLowerCase().includes(q);
@@ -4551,8 +4759,8 @@ export default function POSScreen() {
                 const isMissed = !hasAnswered;
                 const custFromList = customers.find((c: any) => c.id === item.customerId);
                 const custName: string | null = item.customerName || custFromList?.name || null;
-                const dateStr = callDate.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit", year: "numeric" });
-                const timeStr = callDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+                const dateStr = callDate.toLocaleDateString(dateLocale, { day: "2-digit", month: "2-digit", year: "numeric" });
+                const timeStr = callDate.toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" });
 
                 return (
                   <Pressable
@@ -4573,8 +4781,10 @@ export default function POSScreen() {
                       backgroundColor: Colors.surfaceLight,
                       borderRadius: 14, padding: 12, marginBottom: 8,
                       borderWidth: 1, borderColor: Colors.cardBorder,
-                      borderLeftWidth: 4, borderLeftColor: isMissed ? Colors.danger : Colors.success,
-                      flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10
+                      ...(webRTL
+                        ? { borderRightWidth: 4, borderRightColor: isMissed ? Colors.danger : Colors.success }
+                        : { borderLeftWidth: 4, borderLeftColor: isMissed ? Colors.danger : Colors.success }),
+                      flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 10
                     }}
                   >
                     {/* Avatar / status icon */}
@@ -4586,9 +4796,9 @@ export default function POSScreen() {
                     </View>
 
                     {/* Main info */}
-                    <View style={{ flex: 1 }}>
-                      {custName && (
-                        <Text style={{ color: Colors.accent, fontWeight: "800", fontSize: 15 }}>{custName}</Text>
+                    <View style={[{ flex: 1 }, flipRow && { alignItems: "flex-end" }]}>
+                      {!!custName && (
+                        <Text style={[{ color: Colors.accent, fontWeight: "800", fontSize: 15 }, rtlTextAlign]}>{custName}</Text>
                       )}
                       <Text style={{ color: custName ? Colors.textSecondary : Colors.text, fontWeight: custName ? "600" : "800", fontSize: custName ? 13 : 16, marginTop: custName ? 1 : 0 }}>
                         {item.phoneNumber}
@@ -4599,7 +4809,7 @@ export default function POSScreen() {
                           <Text style={{ color: Colors.textMuted, fontSize: 11, fontWeight: "500" }} numberOfLines={1}>{item.customerAddress}</Text>
                         </View>
                       ) : null}
-                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+                      <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 6, marginTop: 4 }}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
                           <Ionicons name="calendar-outline" size={12} color={Colors.textMuted} />
                           <Text style={{ color: Colors.textMuted, fontSize: 12, fontWeight: "600" }}>{dateStr}</Text>
@@ -4622,25 +4832,25 @@ export default function POSScreen() {
                     </View>
 
                     {/* Right side: badges + arrow */}
-                    <View style={{ alignItems: "flex-end", gap: 4 }}>
+                    <View style={{ alignItems: flipRow ? "flex-start" : "flex-end", gap: 4 }}>
                       {item.answeredCount > 0 && (
                         <View style={{ backgroundColor: Colors.success + "18", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
                           <Text style={{ color: Colors.success, fontSize: 12, fontWeight: "700" }}>
-                            {language === "ar" ? "تم الرد" : language === "de" ? "Beantwortet" : "Answered"}
+                            {L("تم الرد", "Beantwortet", "Answered")}
                           </Text>
                         </View>
                       )}
                       {item.missedCount > 0 && (
                         <View style={{ backgroundColor: Colors.danger + "18", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
                           <Text style={{ color: Colors.danger, fontSize: 12, fontWeight: "700" }}>
-                            {item.missedCount > 1 ? `${item.missedCount} ` : ""}{language === "ar" ? "فاتت" : language === "de" ? "Verpasst" : "Missed"}
+                            {item.missedCount > 1 ? `${item.missedCount} ` : ""}{L("فاتت", "Verpasst", "Missed")}
                           </Text>
                         </View>
                       )}
                       {item.saleId && (
                         <View style={{ backgroundColor: Colors.accent + "22", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
                           <Text style={{ color: Colors.accent, fontSize: 10, fontWeight: "800" }}>
-                            {language === "ar" ? "مباع" : language === "de" ? "Verkauft" : "SOLD"}
+                            {L("مباع", "Verkauft", "SOLD")}
                           </Text>
                         </View>
                       )}
@@ -4653,7 +4863,7 @@ export default function POSScreen() {
                 <View style={{ alignItems: "center", paddingVertical: 40 }}>
                   <Ionicons name="call-outline" size={48} color={Colors.textMuted} />
                   <Text style={{ color: Colors.textMuted, fontSize: 15, marginTop: 12, fontWeight: "600" }}>
-                    {callHistorySearch ? (language === "ar" ? "لا توجد نتائج" : language === "de" ? "Keine Ergebnisse" : "No results found") : (language === "ar" ? "لا يوجد سجل مكالمات" : language === "de" ? "Keine Anrufhistorie" : "No call history yet")}
+                    {callHistorySearch ? L("لا توجد نتائج", "Keine Ergebnisse", "No results found") : L("لا يوجد سجل مكالمات", "Keine Anrufhistorie", "No call history yet")}
                   </Text>
                 </View>
               }
@@ -4674,14 +4884,19 @@ export default function POSScreen() {
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={{ borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingVertical: 14, paddingHorizontal: 18 }}
             >
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between" }}>
-                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+              <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
                   <Ionicons name="sync-outline" size={22} color={Colors.white} />
                   <Text style={{ color: Colors.white, fontSize: 17, fontWeight: "800", letterSpacing: 0.5 }}>
-                    {language === "ar" ? "تصفير الوردية" : language === "de" ? "SCHICHT NULLSTELLEN" : "ZERO OUT SHIFT"}
+                    {L("تصفير الوردية", "SCHICHT NULLSTELLEN", "ZERO OUT SHIFT")}
                   </Text>
                 </View>
-                <Pressable onPress={() => setShowZeroOutPreview(false)} style={styles.modalCloseBtn}>
+                <Pressable
+                  onPress={() => setShowZeroOutPreview(false)}
+                  style={[styles.modalCloseBtn, { backgroundColor: "rgba(255,255,255,0.18)" }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
+                >
                   <Ionicons name="close" size={22} color={Colors.white} />
                 </Pressable>
               </View>
@@ -4689,13 +4904,13 @@ export default function POSScreen() {
 
             {/* Sub-header: store + cashier */}
             <View style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.cardBorder }}>
-              <Text style={{ color: Colors.text, fontWeight: "700", fontSize: 13 }}>
-                {storeSettings?.name || tenant?.name || "POS System"}
+              <Text style={[{ color: Colors.text, fontWeight: "700", fontSize: 13 }, rtlTextAlign]}>
+                {storeSettings?.name || tenant?.name || "Kassenta POS"}
               </Text>
-              <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }}>
-                {language === "ar" ? "الكاشير:" : language === "de" ? "Kassierer:" : "Cashier:"} {employee?.name || "–"}
+              <Text style={[{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }, rtlTextAlign]}>
+                {L("الكاشير:", "Kassierer:", "Cashier:")} {employee?.name || "–"}
                 {"  ·  "}
-                {new Date().toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+                {new Date().toLocaleDateString(dateLocale, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
               </Text>
             </View>
 
@@ -4703,20 +4918,20 @@ export default function POSScreen() {
             <ScrollView style={{ flex: 1 }}>
               {/* Table header row */}
               <View style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: flipRow ? "row-reverse" : "row",
                 backgroundColor: Colors.surfaceLight,
                 borderBottomWidth: 1, borderBottomColor: Colors.cardBorder,
                 paddingVertical: 8, paddingHorizontal: 10,
               }}>
                 {[
-                  { label: "Nr", flex: 0.4, align: "center" as const },
-                  { label: language === "ar" ? "الاسم" : "Name", flex: 1.4, align: "left" as const },
-                  { label: language === "ar" ? "العنوان" : "Adresse", flex: 1.5, align: "left" as const },
-                  { label: language === "ar" ? "المنطقة" : "Gebiet", flex: 1.1, align: "left" as const },
-                  { label: language === "ar" ? "الوقت" : "Zeit", flex: 0.8, align: "center" as const },
-                  { label: language === "ar" ? "المجموع" : "Total", flex: 0.9, align: "right" as const },
+                  { label: "#", flex: 0.4, align: "center" as const },
+                  { label: L("الاسم", "Name", "Name"), flex: 1.4, align: undefined },
+                  { label: L("العنوان", "Adresse", "Address"), flex: 1.5, align: undefined },
+                  { label: L("المنطقة", "Gebiet", "Area"), flex: 1.1, align: undefined },
+                  { label: L("الوقت", "Zeit", "Time"), flex: 0.8, align: "center" as const },
+                  { label: L("المجموع", "Total", "Total"), flex: 0.9, align: zeroEndAlign },
                 ].map((col, i) => (
-                  <Text key={i} style={{ flex: col.flex, color: Colors.textMuted, fontSize: 11, fontWeight: "700", textAlign: col.align }}>
+                  <Text key={i} style={[{ flex: col.flex, color: Colors.textMuted, fontSize: 11, fontWeight: "700" }, col.align ? { textAlign: col.align } : rtlTextAlign]}>
                     {col.label}
                   </Text>
                 ))}
@@ -4726,32 +4941,32 @@ export default function POSScreen() {
                 <View style={{ alignItems: "center", paddingVertical: 40 }}>
                   <Ionicons name="receipt-outline" size={44} color={Colors.textMuted} />
                   <Text style={{ color: Colors.textMuted, fontSize: 14, marginTop: 10, fontWeight: "600" }}>
-                    {language === "ar" ? "لا توجد مبيعات اليوم" : language === "de" ? "Keine Verkäufe heute" : "No sales today"}
+                    {L("لا توجد مبيعات اليوم", "Keine Verkäufe heute", "No sales today")}
                   </Text>
                 </View>
               ) : (
                 zeroOutSalesData.map((sale: any, idx: number) => {
                   const { street, plz, city } = getSaleAddressParts(sale);
                   const gebiet = [plz, city !== "–" ? city : ""].filter(Boolean).join(" ") || "–";
-                  const timeStr = new Date(sale.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-                  const amt = Number(sale.totalAmount || 0).toFixed(2);
+                  const timeStr = new Date(sale.createdAt).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" });
+                  const amt = formatAmount(sale.totalAmount || 0);
                   const isEven = idx % 2 === 0;
                   return (
                     <View key={sale.id} style={{
-                      flexDirection: isRTL ? "row-reverse" : "row",
+                      flexDirection: flipRow ? "row-reverse" : "row",
                       paddingVertical: 7, paddingHorizontal: 10,
                       backgroundColor: isEven ? Colors.background : Colors.surface,
-                      borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)",
+                      borderBottomWidth: 1, borderBottomColor: Colors.cardBorder,
                       alignItems: "center",
                     }}>
-                      <Text style={{ flex: 0.4, color: Colors.textMuted, fontSize: 11, textAlign: "center" }}>{zeroOutSalesData.length - idx}</Text>
-                      <Text style={{ flex: 1.4, color: Colors.text, fontSize: 12, fontWeight: "600" }} numberOfLines={1}>
-                        {sale.customerName || (language === "ar" ? "زائر" : "Walk-in")}
+                      <Text style={{ flex: 0.4, color: Colors.textMuted, fontSize: 11, textAlign: "center" }}>{idx + 1}</Text>
+                      <Text style={[{ flex: 1.4, color: Colors.text, fontSize: 12, fontWeight: "600" }, rtlTextAlign]} numberOfLines={1}>
+                        {sale.customerName || t("walkIn")}
                       </Text>
-                      <Text style={{ flex: 1.5, color: Colors.textSecondary, fontSize: 11 }} numberOfLines={1}>{street}</Text>
-                      <Text style={{ flex: 1.1, color: Colors.textSecondary, fontSize: 11 }} numberOfLines={1}>{gebiet}</Text>
+                      <Text style={[{ flex: 1.5, color: Colors.textSecondary, fontSize: 11 }, rtlTextAlign]} numberOfLines={1}>{street}</Text>
+                      <Text style={[{ flex: 1.1, color: Colors.textSecondary, fontSize: 11 }, rtlTextAlign]} numberOfLines={1}>{gebiet}</Text>
                       <Text style={{ flex: 0.8, color: Colors.textMuted, fontSize: 11, textAlign: "center" }}>{timeStr}</Text>
-                      <Text style={{ flex: 0.9, color: Colors.accent, fontSize: 12, fontWeight: "700", textAlign: "right" }}>{amt}</Text>
+                      <Text style={{ flex: 0.9, color: Colors.accent, fontSize: 12, fontWeight: "700", textAlign: zeroEndAlign }}>{amt}</Text>
                     </View>
                   );
                 })
@@ -4762,21 +4977,21 @@ export default function POSScreen() {
                 const grandTotal = zeroOutSalesData.reduce((s: number, sale: any) => s + Number(sale.totalAmount || 0), 0);
                 return (
                   <View style={{ borderTopWidth: 1, borderTopColor: Colors.cardBorder, marginTop: 4, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: Colors.surfaceLight }}>
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
+                    <View style={{ flexDirection: flipRow ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
                       <Text style={{ color: Colors.textSecondary, fontSize: 12, fontWeight: "600" }}>
-                        {language === "ar" ? "إجمالي المبيعات" : language === "de" ? "Umsatz Total" : "Total Sales"}
+                        {L("إجمالي المبيعات", "Umsatz Total", "Total sales")}
                       </Text>
                       <Text style={{ color: Colors.text, fontSize: 12, fontWeight: "700" }}>{formatMoney(grandTotal)}</Text>
                     </View>
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
+                    <View style={{ flexDirection: flipRow ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 4 }}>
                       <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>
-                        {language === "ar" ? "المصروفات اليومية" : language === "de" ? "TAGESAUSGAB" : "Daily Expenses"}
+                        {L("المصروفات اليومية", "Tagesausgaben", "Daily expenses")}
                       </Text>
-                      <Text style={{ color: Colors.textMuted, fontSize: 12 }}>0.00</Text>
+                      <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{formatMoney(0)}</Text>
                     </View>
-                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: Colors.cardBorder, paddingTop: 6 }}>
+                    <View style={{ flexDirection: flipRow ? "row-reverse" : "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: Colors.cardBorder, paddingTop: 6 }}>
                       <Text style={{ color: Colors.text, fontSize: 13, fontWeight: "800" }}>
-                        {zeroOutSalesData.length} {language === "ar" ? "فاتورة · الإجمالي" : language === "de" ? "TOTAL Kassierer" : "TOTAL Cashier"}
+                        {zeroOutSalesData.length} {L("فاتورة · الإجمالي", "TOTAL Kassierer", "sales · TOTAL")}
                       </Text>
                       <Text style={{ color: Colors.accent, fontSize: 13, fontWeight: "800" }}>{formatMoney(grandTotal)}</Text>
                     </View>
@@ -4786,44 +5001,98 @@ export default function POSScreen() {
             </ScrollView>
 
             {/* Action buttons */}
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10, padding: 14, borderTopWidth: 1, borderTopColor: Colors.cardBorder }}>
+            <View style={{ flexDirection: flipRow ? "row-reverse" : "row", gap: 10, padding: 14, borderTopWidth: 1, borderTopColor: Colors.cardBorder }}>
               <Pressable
                 onPress={handleZeroOutConfirm}
                 disabled={endOfDayLoading}
                 style={{
                   flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-                  paddingVertical: 13, borderRadius: 12,
-                  backgroundColor: endOfDayLoading ? Colors.surfaceLight : Colors.accent,
+                  minHeight: 48, paddingVertical: 13, borderRadius: 12,
+                  backgroundColor: Colors.accent,
                   opacity: endOfDayLoading ? 0.6 : 1,
                 }}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: endOfDayLoading, busy: endOfDayLoading }}
               >
                 {endOfDayLoading
-                  ? <ActivityIndicator size="small" color={Colors.white} />
-                  : <Ionicons name="print-outline" size={20} color={Colors.textDark || "#111"} />
+                  ? <ActivityIndicator size="small" color={Colors.textDark} />
+                  : <Ionicons name={Platform.OS === "web" ? "print-outline" : "checkmark-done-outline"} size={20} color={Colors.textDark} />
                 }
-                <Text style={{ color: Colors.textDark || "#111", fontWeight: "800", fontSize: 14 }}>
+                <Text style={{ color: Colors.textDark, fontWeight: "800", fontSize: 14 }}>
                   {endOfDayLoading
-                    ? (language === "ar" ? "جاري المعالجة..." : language === "de" ? "Verarbeitung..." : "Processing...")
-                    : (language === "ar" ? "طباعة وتصفير" : language === "de" ? "Drucken & Nullstellen" : "Print & Zero Out")
+                    ? L("جاري المعالجة…", "Verarbeitung…", "Processing…")
+                    : Platform.OS === "web"
+                      ? L("طباعة وتصفير", "Drucken & Nullstellen", "Print & Zero Out")
+                      : L("تصفير الوردية", "Nullstellen", "Zero Out")
                   }
                 </Text>
               </Pressable>
               <Pressable
                 onPress={() => setShowZeroOutPreview(false)}
+                disabled={endOfDayLoading}
                 style={{
-                  paddingHorizontal: 20, paddingVertical: 13, borderRadius: 12,
-                  backgroundColor: Colors.danger,
+                  paddingHorizontal: 20, minHeight: 48, borderRadius: 12,
+                  backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.cardBorder,
                   alignItems: "center", justifyContent: "center",
                 }}
+                accessibilityRole="button"
               >
-                <Text style={{ color: Colors.white, fontWeight: "800", fontSize: 14 }}>
-                  {language === "ar" ? "إغلاق" : language === "de" ? "STOP" : "STOP"}
+                <Text style={{ color: Colors.text, fontWeight: "800", fontSize: 14 }}>
+                  {t("cancel")}
                 </Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
+
+      {saleDone && (
+        <View pointerEvents="box-none" style={[styles.saleDoneWrap, { bottom: useMobileCartSidebar ? 88 : Platform.OS === "web" ? 96 : 76 + insets.bottom }]}>
+        <View
+          style={[styles.saleDoneToast, flipRow && { flexDirection: "row-reverse" }]}
+          accessibilityLiveRegion="polite"
+          accessibilityRole="alert"
+        >
+          <View style={styles.saleDoneIcon}>
+            <Ionicons name="checkmark-circle" size={26} color={Colors.success} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[styles.saleDoneTitle, rtlTextAlign]} numberOfLines={1}>
+              {L("تم البيع", "Verkauf abgeschlossen", "Sale complete")}
+              {saleDone.receipt ? ` · ${saleDone.receipt}` : ""}
+            </Text>
+            {saleDone.change > 0 ? (
+              <Text style={[styles.saleDoneChange, rtlTextAlign]}>
+                {t("change")}: {formatMoney(saleDone.change)}
+              </Text>
+            ) : (
+              <Text style={[{ color: Colors.textSecondary, fontSize: 13, marginTop: 2 }, rtlTextAlign]} numberOfLines={1}>
+                {formatMoney(saleDone.total)} · {paymentLabel(saleDone.pm)}
+              </Text>
+            )}
+          </View>
+          {Platform.OS === "web" && (
+            <Pressable
+              style={styles.saleDoneBtn}
+              onPress={() => reprintLastSale.current?.()}
+              accessibilityRole="button"
+              accessibilityLabel={L("طباعة الإيصال", "Beleg drucken", "Print receipt")}
+            >
+              <Ionicons name="print-outline" size={18} color={Colors.text} />
+              {!isMobileWeb && <Text style={styles.saleDoneBtnText}>{L("طباعة", "Drucken", "Print")}</Text>}
+            </Pressable>
+          )}
+          <Pressable
+            style={[styles.saleDoneBtn, { paddingHorizontal: 0 }]}
+            onPress={() => setSaleDone(null)}
+            accessibilityRole="button"
+            accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
+          >
+            <Ionicons name="close" size={20} color={Colors.textMuted} />
+          </Pressable>
+        </View>
+        </View>
+      )}
 
       <View style={{ height: Platform.OS === "web" ? 84 : 60 }} />
     </View>
@@ -4837,8 +5106,8 @@ const styles = themedStyles((Colors) => ({
   headerGradient: { paddingHorizontal: 16, paddingVertical: 8 },
   headerContent: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   headerContentMobile: { flexDirection: "column", alignItems: "stretch", gap: 10 },
-  headerTitle: { fontSize: 18, fontWeight: "800", color: Colors.white, letterSpacing: 0.5 },
-  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerTitle: { flexShrink: 1, fontSize: 18, fontWeight: "800", color: Colors.white, letterSpacing: 0.5, marginEnd: 12 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" },
   headerRightMobile: { flexWrap: "wrap", justifyContent: "flex-start", gap: 6 },
   employeeName: { color: Colors.white, fontSize: 13, opacity: 0.9 },
   mainContent: { flex: 1 },
@@ -4846,7 +5115,7 @@ const styles = themedStyles((Colors) => ({
   productsSectionTablet: { flex: 1 },
   searchRow: { paddingHorizontal: 12, paddingTop: 8 },
   searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 40, borderWidth: 1, borderColor: Colors.inputBorder },
-  searchInput: { flex: 1, color: Colors.text, marginLeft: 8, fontSize: 15 },
+  searchInput: { flex: 1, color: Colors.text, marginStart: 8, fontSize: 15 },
 
   // ── Category horizontal scroll row
   categoriesGrid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 10, paddingVertical: 8, gap: 6 },
@@ -4877,7 +5146,7 @@ const styles = themedStyles((Colors) => ({
   productSizeButton: { minHeight: 32, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   productSizeButtonText: { flex: 1, fontSize: 11, fontWeight: "800", textAlign: "center" as const },
   productSizeDropdown: { marginTop: 6, borderRadius: 10, borderWidth: 1, borderColor: Colors.cardBorder, backgroundColor: Colors.surfaceLight, overflow: "hidden" as const },
-  productSizeOption: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" },
+  productSizeOption: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.cardBorder },
   productSizeOptionName: { color: Colors.text, fontSize: 12, fontWeight: "700" },
   productSizeOptionPrice: { fontSize: 12, fontWeight: "800" },
   productAddBadge: { position: "absolute" as const, top: 7, right: 7, width: 20, height: 20, borderRadius: 10, justifyContent: "center", alignItems: "center" },
@@ -4892,20 +5161,23 @@ const styles = themedStyles((Colors) => ({
   cartSectionTablet: { flex: 0.7, borderTopWidth: 0, borderLeftWidth: 1, maxHeight: "100%" as any, display: "flex" as any, flexDirection: "column" as any },
   cartHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderColor: Colors.cardBorder },
   cartTitle: { color: Colors.text, fontSize: 17, fontWeight: "700" },
+  cartHeaderBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, minWidth: 40, minHeight: 36, paddingHorizontal: 8, borderRadius: 10, backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.cardBorder },
+  adjustBtn: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  adjustValue: { fontSize: 13, fontWeight: "700", minWidth: 64, textAlign: "center", fontVariant: ["tabular-nums"] },
   customerSelect: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 10, marginHorizontal: 10, marginVertical: 6, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.primary + "60", borderStyle: "dashed" as const, backgroundColor: Colors.primary + "12" },
   customerSelectText: { color: Colors.primary, fontSize: 14, fontWeight: "700", flex: 1 },
   cartList: { flex: 1 },
-  cartItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 5, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)", gap: 6 },
+  cartItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 5, borderBottomWidth: 1, borderColor: Colors.cardBorder, gap: 6 },
   cartItemIndexBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", flexShrink: 0 },
   cartItemIndexText: { color: Colors.textMuted, fontSize: 10, fontWeight: "700" },
   cartItemInfo: { flex: 1, minWidth: 0 },
   cartItemName: { color: Colors.text, fontSize: 15, fontWeight: "600" },
   cartItemUnit: { color: Colors.textMuted, fontSize: 13, marginTop: 1 },
   cartItemPrice: { color: Colors.accent, fontSize: 14, marginTop: 2, fontWeight: "500" },
-  cartItemTotal: { color: Colors.accent, fontSize: 16, fontWeight: "700", minWidth: 70, textAlign: "right" },
+  cartItemTotal: { color: Colors.accent, fontSize: 16, fontWeight: "700", minWidth: 70, textAlign: "right", fontVariant: ["tabular-nums"] },
   cartItemActions: { flexDirection: "row", alignItems: "center", gap: 6 },
-  qtyBtn: { width: 26, height: 26, borderRadius: 13, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder },
-  qtyBadge: { minWidth: 26, height: 26, borderRadius: 13, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder },
+  qtyBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder },
+  qtyBadge: { minWidth: 30, height: 30, borderRadius: 15, paddingHorizontal: 4, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: Colors.cardBorder },
   qtyText: { color: Colors.text, fontSize: 13, fontWeight: "700", textAlign: "center" },
   cartEmpty: { alignItems: "center", paddingVertical: 28 },
   cartEmptyText: { color: Colors.textMuted, fontSize: 13, marginTop: 8, fontWeight: "600" },
@@ -4919,7 +5191,7 @@ const styles = themedStyles((Colors) => ({
   totalValue: { color: Colors.accent, fontSize: 22, fontWeight: "800" },
   checkoutBtn: { marginHorizontal: 12, marginVertical: 6, borderRadius: 14, overflow: "hidden", elevation: 4, boxShadow: "0px 4px 8px rgba(124, 58, 237, 0.3)" },
   checkoutBtnDisabled: { opacity: 0.5, elevation: 0, boxShadow: "none" },
-  checkoutBtnGradient: { paddingVertical: 10, paddingHorizontal: 14 },
+  checkoutBtnGradient: { paddingVertical: 12, paddingHorizontal: 14, minHeight: 52, justifyContent: "center" },
   checkoutBtnInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   checkoutBtnLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   checkoutBtnPrice: { backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20 },
@@ -4932,16 +5204,30 @@ const styles = themedStyles((Colors) => ({
   modalTotal: { color: Colors.accent, fontSize: 36, fontWeight: "800", textAlign: "center", marginBottom: 16 },
   customerInfo: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 16 },
   customerInfoText: { color: Colors.text, fontSize: 14, fontWeight: "600", flex: 1 },
-  loyaltyBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(245,158,11,0.15)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  loyaltyBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.warning + "22", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
   loyaltyBadgeText: { color: Colors.warning, fontSize: 12, fontWeight: "700" },
   sectionLabel: { color: Colors.textSecondary, fontSize: 13, fontWeight: "600", marginBottom: 8, textTransform: "uppercase" as const, letterSpacing: 1 },
   paymentMethods: { flexDirection: "row", gap: 8, marginBottom: 16, flexWrap: "wrap" },
   paymentBtn: { flex: 1, alignItems: "center", paddingVertical: 14, borderRadius: 14, backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.cardBorder, gap: 4, minWidth: 70 },
-  paymentBtnActive: { borderColor: Colors.accent, backgroundColor: "rgba(47,211,198,0.1)" },
-  paymentBtnText: { color: Colors.textSecondary, fontSize: 11, fontWeight: "600" },
+  paymentBtnActive: { borderColor: Colors.accent, borderWidth: 2, backgroundColor: Colors.accent + "1A" },
+  paymentBtnText: { color: Colors.textSecondary, fontSize: 12, fontWeight: "700", textAlign: "center" },
   cashSection: { marginBottom: 16 },
   cashInput: { backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, color: Colors.text, fontSize: 18, fontWeight: "700", borderWidth: 1, borderColor: Colors.inputBorder, textAlign: "center" },
   changeText: { color: Colors.success, fontSize: 16, fontWeight: "700", textAlign: "center", marginTop: 8 },
+  cashChipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+  cashChip: { flexGrow: 1, minWidth: 72, minHeight: 44, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1, borderColor: Colors.cardBorder, backgroundColor: Colors.surfaceLight, alignItems: "center", justifyContent: "center" },
+  cashChipActive: { borderColor: Colors.accent, backgroundColor: Colors.accent + "1A" },
+  cashChipText: { color: Colors.text, fontSize: 14, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  changeBox: { marginTop: 10, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1 },
+  changeBoxLabel: { fontSize: 14, fontWeight: "700" },
+  changeBoxValue: { fontSize: 20, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  saleDoneWrap: { position: "absolute", left: 0, right: 0, bottom: 24, alignItems: "center", paddingHorizontal: 16, zIndex: 900 },
+  saleDoneToast: { width: "100%", maxWidth: 520, borderRadius: 16, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.success, padding: 14, flexDirection: "row", alignItems: "center", gap: 12, boxShadow: "0px 10px 30px rgba(0,0,0,0.25)", elevation: 10 },
+  saleDoneIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.success + "22", alignItems: "center", justifyContent: "center" },
+  saleDoneTitle: { color: Colors.text, fontSize: 15, fontWeight: "800" },
+  saleDoneChange: { color: Colors.success, fontSize: 18, fontWeight: "800", marginTop: 2, fontVariant: ["tabular-nums"] },
+  saleDoneBtn: { minHeight: 44, minWidth: 44, paddingHorizontal: 12, borderRadius: 12, backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.cardBorder, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  saleDoneBtnText: { color: Colors.text, fontSize: 13, fontWeight: "700" },
   // ── Card / TWINT / wallet capture (Stripe-hosted Checkout on the
   // customer's own phone). The old fake card form and its NFC dressing lived
   // here; nothing implemented either, so both are gone.
@@ -4958,7 +5244,7 @@ const styles = themedStyles((Colors) => ({
   payCashBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: Colors.warning, borderRadius: 12, paddingVertical: 13, marginTop: 12 },
   payCashBtnText: { color: Colors.warning, fontSize: 14, fontWeight: "700" },
   checkoutItem: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
-  checkoutItemName: { color: Colors.textSecondary, fontSize: 13 },
+  checkoutItemName: { color: Colors.textSecondary, fontSize: 13, flexShrink: 1 },
   checkoutItemTotal: { color: Colors.text, fontSize: 13, fontWeight: "600" },
   completeBtn: { borderRadius: 14, overflow: "hidden", marginTop: 8 },
   completeBtnGradient: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 16, gap: 8 },
@@ -4991,8 +5277,8 @@ const styles = themedStyles((Colors) => ({
   walkInBtn: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, borderRadius: 12, backgroundColor: Colors.surfaceLight, marginBottom: 8 },
   walkInText: { color: Colors.textSecondary, fontSize: 14, fontWeight: "500" },
   customerCard: { flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 12, backgroundColor: Colors.surfaceLight, marginBottom: 6, borderWidth: 1, borderColor: "transparent" },
-  customerCardActive: { borderColor: Colors.accent, backgroundColor: "rgba(47,211,198,0.1)" },
-  customerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.gradientMid, justifyContent: "center", alignItems: "center", marginRight: 10 },
+  customerCardActive: { borderColor: Colors.accent, backgroundColor: Colors.accent + "1A" },
+  customerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.gradientMid, justifyContent: "center", alignItems: "center", marginEnd: 10 },
   customerAvatarText: { color: Colors.white, fontSize: 14, fontWeight: "700" },
   customerCardInfo: { flex: 1 },
   customerCardName: { color: Colors.text, fontSize: 14, fontWeight: "600" },
@@ -5057,17 +5343,17 @@ const styles = themedStyles((Colors) => ({
   },
   phoneBarAvatarText: { color: Colors.white, fontSize: 16, fontWeight: "700" },
   phoneBarCustomerInfo: { flex: 1, minWidth: 0 },
-  phoneBarCustomerName: { color: Colors.white, fontSize: 16, fontWeight: "800" },
+  phoneBarCustomerName: { color: Colors.text, fontSize: 16, fontWeight: "800" },
   phoneBarCustomerMeta: { flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "nowrap" },
   phoneBarMetaText: { color: Colors.textSecondary, fontSize: 13, flexShrink: 1 },
   phoneBarMetaDot: { color: Colors.textSecondary, fontSize: 13 },
-  phoneBarClear: { padding: 4, flexShrink: 0 },
+  phoneBarClear: { padding: 8, flexShrink: 0 },
   phoneBarWalkIn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    minHeight: 40,
     backgroundColor: Colors.inputBg,
     borderRadius: 12,
     borderWidth: 1,
@@ -5097,7 +5383,7 @@ const styles = themedStyles((Colors) => ({
   },
   cartCustomerAvatarText: { color: Colors.white, fontSize: 17, fontWeight: "800" },
   cartCustomerBody: { flex: 1, minWidth: 0 },
-  cartCustomerName: { color: Colors.white, fontSize: 15, fontWeight: "800", marginBottom: 4 },
+  cartCustomerName: { color: Colors.text, fontSize: 15, fontWeight: "800", marginBottom: 4 },
   cartCustomerRow: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
   cartCustomerChip: {
     flexDirection: "row",
@@ -5109,7 +5395,7 @@ const styles = themedStyles((Colors) => ({
     paddingVertical: 3,
   },
   cartCustomerChipText: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600" },
-  cartCustomerClear: { padding: 8 },
+  cartCustomerClear: { padding: 10 },
 
   // New customer form
   newCustLabel: {
@@ -5149,7 +5435,7 @@ const styles = themedStyles((Colors) => ({
   newCustSaveBtnText: { color: Colors.white, fontSize: 16, fontWeight: "700" },
 
   discountTypeRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
-  discountTypeBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: Colors.surfaceLight, alignItems: "center" },
+  discountTypeBtn: { flex: 1, minHeight: 44, justifyContent: "center", paddingVertical: 10, borderRadius: 12, backgroundColor: Colors.surfaceLight, alignItems: "center" },
   discountTypeBtnActive: { backgroundColor: Colors.accent },
   discountTypeBtnText: { color: Colors.textSecondary, fontSize: 14, fontWeight: "600" },
   callNotification: { position: "absolute", top: 100, left: 20, right: 20, zIndex: 1000, borderRadius: 16, overflow: "hidden", elevation: 8, boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.3)" },
@@ -5162,10 +5448,11 @@ const styles = themedStyles((Colors) => ({
   callActionBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: "center", alignItems: "center" },
 
   // Header Invoice & Avatar
-  headerInvoiceBtn: { flexDirection: "row" as const, alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.15)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16 },
+  headerInvoiceBtn: { flexDirection: "row" as const, alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.16)", paddingHorizontal: 12, minHeight: 40, minWidth: 40, borderRadius: 20 },
+  headerDangerBtn: { backgroundColor: "#DC2626" },
   headerInvoiceLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" as const },
   headerAvatarBtn: { padding: 2 },
-  headerAvatarCircle: { width: 34, height: 34, borderRadius: 17, justifyContent: "center" as const, alignItems: "center" as const, borderWidth: 2, borderColor: "rgba(255,255,255,0.4)" },
+  headerAvatarCircle: { width: 40, height: 40, borderRadius: 20, justifyContent: "center" as const, alignItems: "center" as const, borderWidth: 2, borderColor: "rgba(255,255,255,0.4)" },
   headerAvatarText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" as const },
   mobileCartBar: {
     position: "absolute",
@@ -5191,7 +5478,7 @@ const styles = themedStyles((Colors) => ({
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginLeft: 12,
+    marginStart: 12,
   },
   mobileCartBarPriceText: { color: Colors.textDark, fontSize: 13, fontWeight: "900" },
   mobileCartOverlay: {
@@ -5228,7 +5515,7 @@ const styles = themedStyles((Colors) => ({
   switchActiveText: { color: Colors.success, fontSize: 12, fontWeight: "700" as const },
   switchSectionTitle: { color: Colors.textSecondary, fontSize: 13, fontWeight: "600" as const, textTransform: "uppercase" as const, letterSpacing: 1, marginBottom: 12 },
   switchEmployeeCard: { flexDirection: "row" as const, alignItems: "center", gap: 14, backgroundColor: Colors.surfaceLight, borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder },
-  switchEmployeeAvatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: "rgba(0,0,0,0.2)", justifyContent: "center" as const, alignItems: "center" as const, borderWidth: 2 },
+  switchEmployeeAvatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: Colors.surface, justifyContent: "center" as const, alignItems: "center" as const, borderWidth: 2 },
   switchEmployeeAvatarText: { color: Colors.text, fontSize: 20, fontWeight: "700" as const },
   switchEmployeeName: { color: Colors.text, fontSize: 15, fontWeight: "600" as const, marginBottom: 4 },
   switchRoleBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, alignSelf: "flex-start" as const },
@@ -5248,12 +5535,12 @@ const styles = themedStyles((Colors) => ({
   switchKeypad: { flexDirection: "row" as const, flexWrap: "wrap" as const, width: 260, justifyContent: "center" as const },
   switchKeyBtn: { width: 260 / 3, height: 58, justifyContent: "center" as const, alignItems: "center" as const },
   switchKeyText: { color: Colors.text, fontSize: 26, fontWeight: "600" as const },
-  modalCloseBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.05)", justifyContent: "center", alignItems: "center" },
+  modalCloseBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surfaceLight, justifyContent: "center", alignItems: "center" },
   variantBtn: { borderRadius: 18, backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.cardBorder, overflow: "hidden" as const, elevation: 4, boxShadow: "0px 2px 4px rgba(0,0,0,0.2)" },
   variantBtnInner: { flexDirection: "row" as const, alignItems: "center", justifyContent: "space-between", padding: 16 },
-  variantIconCircle: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(47, 211, 198, 0.1)", justifyContent: "center" as const, alignItems: "center" as const },
-  variantBtnName: { color: Colors.white, fontSize: 16, fontWeight: "700" as const },
-  variantPriceTag: { backgroundColor: "rgba(47, 211, 198, 0.15)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  variantIconCircle: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.accent + "1A", justifyContent: "center" as const, alignItems: "center" as const },
+  variantBtnName: { color: Colors.text, fontSize: 16, fontWeight: "700" as const },
+  variantPriceTag: { backgroundColor: Colors.accent + "22", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
   variantBtnPrice: { color: Colors.accent, fontSize: 16, fontWeight: "800" as const },
   // Size grid cards
   sizeCard: {
@@ -5266,24 +5553,24 @@ const styles = themedStyles((Colors) => ({
   },
   sizeCardSelected: {
     borderColor: Colors.accent,
-    backgroundColor: "rgba(47,211,198,0.08)",
+    backgroundColor: Colors.accent + "14",
   },
-  sizeCardName: { color: Colors.white, fontSize: 15, fontWeight: "700" as const, marginBottom: 4 },
+  sizeCardName: { color: Colors.text, fontSize: 15, fontWeight: "700" as const, marginBottom: 4 },
   sizeCardPrice: { color: Colors.accent, fontSize: 13, fontWeight: "600" as const },
   // Toppings list
   selectedSizeBadge: {
     flexDirection: "row" as const, alignItems: "center", gap: 6,
-    backgroundColor: "rgba(47,211,198,0.1)",
-    borderWidth: 1, borderColor: "rgba(47,211,198,0.3)",
+    backgroundColor: Colors.accent + "1A",
+    borderWidth: 1, borderColor: Colors.accent + "4D",
     borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, alignSelf: "flex-start" as const,
   },
   selectedSizeBadgeText: { color: Colors.accent, fontSize: 12, fontWeight: "600" as const },
   toppingRow: {
     flexDirection: "row" as const, alignItems: "center", gap: 12,
     paddingVertical: 10, paddingHorizontal: 4,
-    borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)",
+    borderBottomWidth: 1, borderBottomColor: Colors.cardBorder,
   },
-  toppingRowSelected: { backgroundColor: "rgba(47,211,198,0.06)", borderRadius: 10, borderBottomColor: "transparent" },
+  toppingRowSelected: { backgroundColor: Colors.accent + "10", borderRadius: 10, borderBottomColor: "transparent" },
   toppingIconWrap: {
     width: 40, height: 40, borderRadius: 10,
     backgroundColor: Colors.surfaceLight,
@@ -5301,5 +5588,5 @@ const styles = themedStyles((Colors) => ({
     borderColor: Colors.accent,
   },
   modalCancelBtn: { marginTop: 24, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: Colors.cardBorder, alignItems: "center" as const },
-  modalCancelBtnText: { color: Colors.textMuted, fontSize: 15, fontWeight: "600" as const },
+  modalCancelBtnText: { color: Colors.textSecondary, fontSize: 15, fontWeight: "600" as const },
 }));

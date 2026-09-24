@@ -1,24 +1,33 @@
 import { Link, Stack } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/colors";
+import { useLanguage } from "@/lib/language-context";
 import { themedStyles } from "@/lib/themed-styles";
 
+const COPY = {
+  en: { title: "Page not found", subtitle: "The screen you're looking for doesn't exist.", home: "Go to home" },
+  de: { title: "Seite nicht gefunden", subtitle: "Die gesuchte Seite existiert nicht.", home: "Zur Startseite" },
+  ar: { title: "الصفحة غير موجودة", subtitle: "الصفحة التي تبحث عنها غير موجودة.", home: "العودة إلى الرئيسية" },
+};
+
 export default function NotFoundScreen() {
+  const { language } = useLanguage();
+  const c = (COPY as any)[language] ?? COPY.en;
   return (
     <>
-      <Stack.Screen options={{ title: "Not Found", headerShown: false }} />
+      <Stack.Screen options={{ title: c.title, headerShown: false }} />
       <View style={styles.container}>
         <View style={styles.iconWrap}>
           <Ionicons name="alert-circle-outline" size={64} color={Colors.warning} />
         </View>
-        <Text style={styles.title}>Page Not Found</Text>
-        <Text style={styles.subtitle}>The screen you're looking for doesn't exist.</Text>
+        <Text style={styles.title}>{c.title}</Text>
+        <Text style={styles.subtitle}>{c.subtitle}</Text>
 
         <Link href="/" style={styles.link}>
           <View style={styles.button}>
             <Ionicons name="home-outline" size={18} color={Colors.textDark} />
-            <Text style={styles.buttonText}>Go to Home</Text>
+            <Text style={styles.buttonText}>{c.home}</Text>
           </View>
         </Link>
       </View>
@@ -64,7 +73,7 @@ const styles = themedStyles((Colors) => ({
     gap: 8,
     backgroundColor: Colors.accent,
     paddingHorizontal: 24,
-    paddingVertical: 12,
+    minHeight: 48,
     borderRadius: 12,
   },
   buttonText: {

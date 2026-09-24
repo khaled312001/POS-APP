@@ -49,6 +49,11 @@ export function setMoneyLanguage(lang: string) {
   currentLanguage = lang || "en";
 }
 
+/** UI language last reported by LanguageProvider (for plain-function templates). */
+export function getMoneyLanguage(): string {
+  return currentLanguage;
+}
+
 export function subscribeCurrency(listener: () => void): () => void {
   listeners.add(listener);
   return () => { listeners.delete(listener); };

@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
-  StyleSheet, Text, View, Pressable, TextInput,
+  Text, View, Pressable, TextInput,
   Modal, Alert, ScrollView, Platform, ActivityIndicator, useWindowDimensions,
 } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,19 +18,49 @@ import { useLicense } from "@/lib/license-context";
 import { getChromeMetrics } from "@/lib/responsive";
 import TabPageHeader, { HeaderIconButton } from "@/components/tab-page-header";
 import LoyaltyBadge from "@/components/LoyaltyBadge";
-import { formatMoney } from "@/lib/currency";
+import { formatMoney, useCurrency } from "@/lib/currency";
+import {
+  normalizeStorePhone, isValidStorePhone, storePhonePlaceholder, formatInStoreTz,
+} from "@/components/store-locale";
 import { router } from "expo-router";
 
 const PAGE_SIZE = 200;
 
-function InfoRow({ icon, label, value, isRTL }: { icon: string; label: string; value: string; isRTL?: boolean }) {
+const EMPTY_FORM = {
+  name: "", email: "", phone: "", address: "", notes: "", company: "",
+  firstName: "", lastName: "", street: "", streetNr: "", houseNr: "",
+  city: "", postalCode: "", salutation: "", zhd: "",
+  howToGo: "", screenInfo: "", customerNr: "",
+};
+
+/** Arabic-Indic / Eastern Arabic-Indic digits → ASCII. */
+function asciiDigits(v: string): string {
+  return String(v ?? "")
+    .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 0x06f0));
+}
+
+/** apiRequest throws "409: {json}" — pull out the server's message. */
+function apiErrorText(e: any): string {
+  const raw = String(e?.message || e || "");
+  const m = raw.match(/^\d{3}:\s*([\s\S]*)$/);
+  if (!m) return raw;
+  try {
+    const data = JSON.parse(m[1]);
+    return String(data?.error || data?.message || m[1]);
+  } catch {
+    return m[1] || raw;
+  }
+}
+
+function InfoRow({ icon, label, value, rowDir, textAlign }: { icon: string; label: string; value?: string | null; rowDir: "row" | "row-reverse"; textAlign: any }) {
   if (!value) return null;
   return (
-    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+    <View style={{ flexDirection: rowDir, alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
       <Ionicons name={icon as any} size={15} color={Colors.accent} style={{ marginTop: 2 }} />
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: Colors.textMuted, fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</Text>
-        <Text style={{ color: Colors.text, fontSize: 14, marginTop: 1 }}>{value}</Text>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={[{ color: Colors.textMuted, fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 }, textAlign]}>{label}</Text>
+        <Text style={[{ color: Colors.text, fontSize: 14, marginTop: 1 }, textAlign]} selectable>{value}</Text>
       </View>
     </View>
   );
@@ -42,12 +73,21 @@ export default function CustomersScreen() {
   const { canManage, canDeleteCustomers } = useAuth();
   const { t, isRTL, rtlTextAlign, rtlText, language } = useLanguage();
   const { tenant } = useLicense();
+  const currency = useCurrency();
+  const isSwissStore = currency === "CHF";
   const { topPad, bottomPad } = getChromeMetrics(width);
+  const tr = (en: string, de: string, ar: string) => (language === "ar" ? ar : language === "de" ? de : en);
+  // On web the document is dir="rtl" already, so a plain "row" is right-to-left;
+  // flipping it again would lay the Arabic UI out left-to-right.
+  const rowDir: "row" | "row-reverse" = isRTL && Platform.OS !== "web" ? "row-reverse" : "row";
+  const endAlign: "flex-start" | "flex-end" = isRTL && Platform.OS !== "web" ? "flex-start" : "flex-end";
+  const dateLocale = language === "ar" ? "ar" : language === "de" ? "de-CH" : "en-GB";
 
   // Search state — raw (shown in input) + debounced (sent to API)
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedSearchRef = useRef("");
 
   // Pagination
   const [offset, setOffset] = useState(0);
@@ -59,13 +99,8 @@ export default function CustomersScreen() {
   const [showDetail, setShowDetail] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editCustomer, setEditCustomer] = useState<any | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    name: "", email: "", phone: "", address: "", notes: "", company: "",
-    firstName: "", lastName: "", street: "", streetNr: "", houseNr: "",
-    city: "", postalCode: "", salutation: "", zhd: "",
-    howToGo: "", screenInfo: "", customerNr: ""
-  });
+  const [importing, setImporting] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
 
   // Swiss address autocomplete
   const [streetSuggestions, setStreetSuggestions] = useState<{ label: string }[]>([]);
@@ -73,6 +108,15 @@ export default function CustomersScreen() {
   const [addressSearching, setAddressSearching] = useState(false);
   const streetSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (streetSearchRef.current) clearTimeout(streetSearchRef.current);
+  }, []);
+
+  const notify = (title: string, message: string) => {
+    if (Platform.OS === "web" && typeof window !== "undefined") window.alert(`${title}\n\n${message}`);
+    else Alert.alert(title, message);
+  };
 
   // Total count query
   const { data: countData } = useQuery<{ count: number }>({
@@ -86,7 +130,13 @@ export default function CustomersScreen() {
     setSearch(text);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      setDebouncedSearch(text);
+      // Arabic-Indic digits → ASCII so a phone typed on an Arabic keyboard still matches.
+      const next = asciiDigits(text).trim();
+      // Same query as now (e.g. a letter typed and deleted): keep the list —
+      // clearing it would leave it empty, since the query key does not change.
+      if (next === debouncedSearchRef.current) return;
+      debouncedSearchRef.current = next;
+      setDebouncedSearch(next);
       setOffset(0);
       setAllCustomers([]);
       setHasMore(true);
@@ -98,7 +148,7 @@ export default function CustomersScreen() {
     ? `/api/customers?tenantId=${tenant.id}&limit=${PAGE_SIZE}&offset=${offset}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`
     : null;
 
-  const { data: pageData, isFetching } = useQuery<any[]>({
+  const { data: pageData, isFetching, isError: listError, refetch: refetchList } = useQuery<any[]>({
     queryKey: [queryUrl],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!queryUrl,
@@ -109,7 +159,10 @@ export default function CustomersScreen() {
     if (offset === 0) {
       setAllCustomers(pageData);
     } else {
-      setAllCustomers(prev => [...prev, ...pageData]);
+      setAllCustomers(prev => {
+        const seen = new Set(prev.map((c) => c.id));
+        return [...prev, ...pageData.filter((c) => !seen.has(c.id))];
+      });
     }
     setHasMore(pageData.length === PAGE_SIZE);
     loadingMore.current = false;
@@ -121,74 +174,106 @@ export default function CustomersScreen() {
     setOffset(prev => prev + PAGE_SIZE);
   };
 
+  // Refetch from the first page. The list is NOT cleared here: when the
+  // refetched page is identical, react-query keeps the same array reference,
+  // the effect above never fires, and a cleared list would stay empty.
   const invalidateCustomers = () => {
     qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).includes(`/api/customers`) });
     setOffset(0);
-    setAllCustomers([]);
     setHasMore(true);
     loadingMore.current = false;
   };
 
-  const { data: customerSales = [] } = useQuery<any[]>({
+  const { data: customerSales = [], isLoading: salesLoading, isError: salesError, refetch: refetchSales } = useQuery<any[]>({
     queryKey: [`/api/customers/${selectedCustomer?.id}/sales`],
     queryFn: getQueryFn({ on401: "throw" }),
-    enabled: !!selectedCustomer?.id,
+    enabled: !!selectedCustomer?.id && showDetail,
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(editCustomer ? "PUT" : "POST", editCustomer ? `/api/customers/${editCustomer.id}` : "/api/customers", data),
-    onSuccess: () => {
+    mutationFn: async (data: any) => {
+      const res = await apiRequest(editCustomer ? "PUT" : "POST", editCustomer ? `/api/customers/${editCustomer.id}` : "/api/customers", data);
+      return res.json().catch(() => null);
+    },
+    onSuccess: (saved: any) => {
       invalidateCustomers();
+      // Keep the detail card in sync with what was just saved.
+      if (saved && selectedCustomer && saved.id === selectedCustomer.id) setSelectedCustomer(saved);
       setShowForm(false);
       setEditCustomer(null);
       resetForm();
     },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorText(e) || tr("Could not save the customer.", "Kunde konnte nicht gespeichert werden.", "تعذّر حفظ العميل.")),
   });
 
-  const handleImportCSV = async () => {
+  const runImport = async (base64: string) => {
+    if (!tenant?.id) return;
+    setImporting(true);
     try {
-      if (Platform.OS !== "web") {
-        Alert.alert("Available on Web", "This feature is currently only available on the web version.");
-        return;
-      }
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = ".csv";
-      input.onchange = async (e: any) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async (re: any) => {
-          const content = re.target.result;
-          setLoading(true);
-          try {
-            const resRaw = await apiRequest("POST", "/api/customers/import-csv", { csv: content, tenantId: tenant?.id });
-            const res = await resRaw.json();
-            Alert.alert("Import Finished", `Imported ${res.imported} customers successfully!`);
-            invalidateCustomers();
-          } catch (err: any) {
-            Alert.alert("Error", err.message);
-          } finally {
-            setLoading(false);
-          }
-        };
-        reader.readAsText(file);
-      };
-      input.click();
+      const resRaw = await apiRequest("POST", "/api/customers/import", { fileBase64: base64, tenantId: tenant.id });
+      const res = await resRaw.json();
+      notify(t("success"), `${t("imported")} ${res.count ?? 0} ${t("customers")}`);
+      invalidateCustomers();
     } catch (err: any) {
-      Alert.alert("Error", err.message);
+      notify(t("error"), apiErrorText(err) || tr("Import failed", "Import fehlgeschlagen", "فشل الاستيراد"));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Imports the chosen spreadsheet (columns Name, Phone, Email, Address — the
+  // server's /api/customers/template). CSV files are read by the same parser.
+  const handleImport = async () => {
+    if (importing) return;
+    try {
+      if (Platform.OS === "web") {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".xlsx,.xls,.csv";
+        input.onchange = (e: any) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (re: any) => { void runImport(String(re.target.result).split(",")[1]); };
+          reader.onerror = () => notify(t("error"), tr("Could not read the file", "Datei konnte nicht gelesen werden", "تعذّرت قراءة الملف"));
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      } else {
+        const result = await DocumentPicker.getDocumentAsync({
+          type: [
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-excel",
+            "text/csv",
+            "text/comma-separated-values",
+          ],
+          copyToCacheDirectory: true,
+        });
+        if (result.canceled || !result.assets[0]) return;
+        const response = await fetch(result.assets[0].uri);
+        const blob = await response.blob();
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(String(reader.result).split(",")[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        await runImport(base64);
+      }
+    } catch (err: any) {
+      notify(t("error"), err?.message || tr("Import failed", "Import fehlgeschlagen", "فشل الاستيراد"));
     }
   };
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/customers/${id}`),
-    onSuccess: () => {
+    onSuccess: (_d, id) => {
+      setAllCustomers((prev) => prev.filter((c) => c.id !== id));
       invalidateCustomers();
       setShowDetail(false);
       setSelectedCustomer(null);
     },
-    onError: (e: any) => Alert.alert(t("error"), e.message),
+    onError: (e: any) => notify(t("error"), apiErrorText(e)),
   });
 
   const searchSwissAddress = async (streetText: string, cityText: string) => {
@@ -242,16 +327,23 @@ export default function CustomersScreen() {
 
   const handleStreetInputChange = (text: string, currentCity: string) => {
     setForm(prev => ({ ...prev, street: text }));
+    // The GeoAdmin lookup only knows Swiss addresses.
+    if (!isSwissStore) return;
     if (streetSearchRef.current) clearTimeout(streetSearchRef.current);
     streetSearchRef.current = setTimeout(() => searchSwissAddress(text, currentCity), 400);
   };
 
-  const resetForm = () => setForm({
-    name: "", email: "", phone: "", address: "", notes: "", company: "",
-    firstName: "", lastName: "", street: "", streetNr: "", houseNr: "",
-    city: "", postalCode: "", salutation: "", zhd: "",
-    howToGo: "", screenInfo: "", customerNr: ""
-  });
+  const resetForm = () => {
+    setForm(EMPTY_FORM);
+    setStreetSuggestions([]);
+    setShowStreetSuggestions(false);
+  };
+
+  const openCreate = () => {
+    setEditCustomer(null);
+    resetForm();
+    setShowForm(true);
+  };
 
   const openEdit = (c: any) => {
     setEditCustomer(c);
@@ -279,41 +371,114 @@ export default function CustomersScreen() {
   };
 
   const handleSave = () => {
-    if (!form.name && !form.lastName) return Alert.alert(t("error"), t("customerName"));
-    const name = form.name || [form.lastName, form.firstName].filter(Boolean).join(", ");
+    if (saveMutation.isPending) return;
+    const name = form.name.trim() || [form.lastName.trim(), form.firstName.trim()].filter(Boolean).join(", ");
+    if (!name) return notify(t("error"), tr("Enter the customer's name.", "Bitte den Namen des Kunden eingeben.", "أدخل اسم العميل."));
+    const phoneRaw = form.phone.trim();
+    // Legacy numbers are only re-checked when they are actually changed.
+    const phoneChanged = !editCustomer || phoneRaw !== String(editCustomer.phone || "").trim();
+    if (phoneRaw && phoneChanged && !isValidStorePhone(phoneRaw)) {
+      return notify(t("error"), tr(
+        `Enter a valid phone number (e.g. ${storePhonePlaceholder()}).`,
+        `Bitte eine gültige Telefonnummer eingeben (z. B. ${storePhonePlaceholder()}).`,
+        `أدخل رقم هاتف صحيحاً (مثل ${storePhonePlaceholder()}).`,
+      ));
+    }
+    const phone = phoneRaw ? (phoneChanged ? normalizeStorePhone(phoneRaw) : phoneRaw) : "";
+    const email = form.email.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return notify(t("error"), tr("Enter a valid email address.", "Bitte eine gültige E-Mail-Adresse eingeben.", "أدخل بريداً إلكترونياً صحيحاً."));
+    }
+    const customerNr = form.customerNr.trim();
+    if (customerNr && !/^\d+$/.test(customerNr)) {
+      return notify(t("error"), tr("Customer no. must be a number.", "Kunden-Nr. muss eine Zahl sein.", "رقم العميل يجب أن يكون رقماً."));
+    }
+    // Editing: a cleared field is sent as null so it is really cleared.
+    const empty = editCustomer ? null : undefined;
+    const val = (v: string) => v.trim() || empty;
     saveMutation.mutate({
       name,
-      email: form.email || undefined,
-      phone: form.phone || undefined,
-      address: form.address || undefined,
-      notes: form.notes || undefined,
-      company: form.company || undefined,
-      firstName: form.firstName || undefined,
-      lastName: form.lastName || undefined,
-      street: form.street || undefined,
-      streetNr: form.streetNr || undefined,
-      houseNr: form.houseNr || undefined,
-      city: form.city || undefined,
-      postalCode: form.postalCode || undefined,
-      salutation: form.salutation || undefined,
-      zhd: form.zhd || undefined,
-      howToGo: form.howToGo || undefined,
-      screenInfo: form.screenInfo || undefined,
-      customerNr: form.customerNr ? parseInt(form.customerNr) : undefined,
+      email: email || empty,
+      phone: phone || empty,
+      address: val(form.address),
+      notes: val(form.notes),
+      company: val(form.company),
+      firstName: val(form.firstName),
+      lastName: val(form.lastName),
+      street: val(form.street),
+      streetNr: val(form.streetNr),
+      houseNr: val(form.houseNr),
+      city: val(form.city),
+      postalCode: val(form.postalCode),
+      salutation: val(form.salutation),
+      zhd: val(form.zhd),
+      howToGo: val(form.howToGo),
+      screenInfo: val(form.screenInfo),
+      customerNr: customerNr ? parseInt(customerNr, 10) : empty,
       tenantId: tenant?.id,
     });
+  };
+
+  const confirmDelete = (c: any) => {
+    if (c.customerType === "wholesale") {
+      return notify(
+        tr("Wholesale trader", "Großhändler", "تاجر جملة"),
+        tr(
+          "This customer is a wholesale trader. Deactivate them from the Wholesale traders screen so their balance and statement are kept.",
+          "Dieser Kunde ist ein Großhändler. Bitte im Bereich Großhändler deaktivieren, damit Saldo und Kontoauszug erhalten bleiben.",
+          "هذا العميل تاجر جملة. أوقفه من شاشة تجار الجملة ليبقى رصيده وكشف حسابه محفوظين.",
+        ),
+      );
+    }
+    const title = t("deleteCustomer");
+    const msg = tr(
+      `Delete "${c.name}" permanently? This cannot be undone.`,
+      `„${c.name}" endgültig löschen? Dies kann nicht rückgängig gemacht werden.`,
+      `حذف "${c.name}" نهائياً؟ لا يمكن التراجع عن ذلك.`,
+    );
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      if (window.confirm(`${title}\n\n${msg}`)) deleteMutation.mutate(c.id);
+      return;
+    }
+    Alert.alert(title, msg, [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("delete"), style: "destructive", onPress: () => deleteMutation.mutate(c.id) },
+    ]);
   };
 
   // Helper to get subtitle for list card
   const getSubtitle = (item: any) => {
     const parts: string[] = [];
-    if (item.company) parts.push(item.company);
     if (item.city) parts.push(item.city);
     if (item.phone) parts.push(item.phone);
     if (parts.length === 0 && item.email) parts.push(item.email);
     if (parts.length === 0) parts.push(t("noContactInfo"));
     return parts.join(" · ");
   };
+
+  const paymentLabel = (m: string | null | undefined) => {
+    switch (String(m || "cash").toLowerCase()) {
+      case "cash": return tr("Cash", "Bar", "نقداً");
+      case "card": return tr("Card", "Karte", "بطاقة");
+      case "credit": return tr("On account", "Auf Rechnung", "آجل");
+      case "mixed":
+      case "split": return tr("Split", "Geteilt", "مقسّم");
+      case "shamcash": return "Sham Cash";
+      case "wallet": return tr("Wallet", "Guthaben", "المحفظة");
+      default: return String(m);
+    }
+  };
+
+  const spent = (c: any) => Number(c?.totalSpent || 0) || Number(c?.legacyTotalSpent || 0);
+  const initial = (s: unknown) => (String(s || "").trim().charAt(0) || "?").toUpperCase();
+  const labelText = (s: string) => <Text style={[styles.label, rtlTextAlign]} numberOfLines={1}>{s}</Text>;
+  const inputStyle = [styles.input, rtlTextAlign, rtlText];
+
+  const closeX = (onPress: () => void) => (
+    <Pressable onPress={onPress} hitSlop={10} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel={t("close")}>
+      <Ionicons name="close" size={24} color={Colors.text} />
+    </Pressable>
+  );
 
   return (
     <View
@@ -328,29 +493,44 @@ export default function CustomersScreen() {
       <TabPageHeader
         title={t("customers")}
         icon="people"
-        badgeText={`${totalCount} ${t("total" as any) || "Total"}`}
+        badgeText={`${totalCount} ${t("total")}`}
         isRTL={isRTL}
         rightActions={
-          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8 }}>
+          <View style={{ flexDirection: rowDir, gap: 8 }}>
             {/* Wholesale traders (تجار الجملة) — app/wholesale.tsx */}
-            <HeaderIconButton icon="storefront-outline" onPress={() => { playClickSound("medium"); router.push("/wholesale"); }} />
-            <HeaderIconButton icon="cloud-upload" onPress={() => { playClickSound("medium"); handleImportCSV(); }} />
-            <HeaderIconButton icon="add" onPress={() => { playClickSound("medium"); setEditCustomer(null); resetForm(); setShowForm(true); }} />
+            <HeaderIconButton icon="storefront-outline" onPress={() => { playClickSound("medium"); router.push("/wholesale" as any); }} />
+            {canManage && (
+              <HeaderIconButton icon="cloud-upload" onPress={() => { playClickSound("medium"); void handleImport(); }} />
+            )}
+            <HeaderIconButton icon="add" onPress={() => { playClickSound("medium"); openCreate(); }} />
           </View>
         }
       />
 
-      <View style={styles.searchRow}>
-        <View style={[styles.searchBox, isRTL && { flexDirection: "row-reverse" }]}>
+      {importing && (
+        <View style={[styles.banner, { flexDirection: rowDir }]}>
+          <ActivityIndicator size="small" color={Colors.accent} />
+          <Text style={[styles.bannerText, rtlTextAlign]}>{tr("Importing customers…", "Kunden werden importiert…", "جارٍ استيراد العملاء…")}</Text>
+        </View>
+      )}
+
+      <View style={[styles.searchRow, { flexDirection: rowDir }]}>
+        <View style={[styles.searchBox, { flexDirection: rowDir }]}>
           <Ionicons name="search" size={18} color={Colors.textMuted} />
           <TextInput
-            style={[styles.searchInput, isRTL ? { marginRight: 8, marginLeft: 0 } : { marginLeft: 8 }, rtlTextAlign, rtlText]}
-            placeholder={t("search") + "..."}
+            style={[styles.searchInput, rtlTextAlign, rtlText]}
+            placeholder={tr("Search name, phone, email…", "Name, Telefon, E-Mail suchen…", "ابحث بالاسم أو الهاتف أو البريد…")}
             placeholderTextColor={Colors.textMuted}
             value={search}
             onChangeText={handleSearchChange}
           />
-          {isFetching && <ActivityIndicator size="small" color={Colors.textMuted} style={{ marginLeft: 6 }} />}
+          {isFetching ? (
+            <ActivityIndicator size="small" color={Colors.textMuted} />
+          ) : !!search ? (
+            <Pressable onPress={() => handleSearchChange("")} hitSlop={10} accessibilityLabel={t("close")}>
+              <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+            </Pressable>
+          ) : null}
         </View>
         {totalCount > 0 && (
           <Text style={styles.countText}>
@@ -359,57 +539,75 @@ export default function CustomersScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: bottomPad + 16 }]}>
+      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: bottomPad + 16 }]} keyboardShouldPersistTaps="handled">
         {isFetching && allCustomers.length === 0 ? (
-          <View style={styles.empty}><ActivityIndicator size="large" color={Colors.textMuted} /></View>
+          <View style={styles.empty}><ActivityIndicator size="large" color={Colors.accent} /></View>
+        ) : listError && allCustomers.length === 0 ? (
+          <View style={styles.empty}>
+            <Ionicons name="cloud-offline-outline" size={48} color={Colors.textMuted} />
+            <Text style={styles.emptyText}>{tr("Could not load customers.", "Kunden konnten nicht geladen werden.", "تعذّر تحميل العملاء.")}</Text>
+            <Pressable style={styles.primarySmallBtn} onPress={() => refetchList()}>
+              <Text style={styles.primarySmallText}>{tr("Retry", "Erneut versuchen", "إعادة المحاولة")}</Text>
+            </Pressable>
+          </View>
         ) : allCustomers.length === 0 ? (
           <View style={styles.empty}>
-            <Ionicons name="people-outline" size={48} color={Colors.textMuted} />
-            <Text style={[styles.emptyText, rtlTextAlign]}>{t("noCustomers")}</Text>
+            <Ionicons name={debouncedSearch ? "search-outline" : "people-outline"} size={48} color={Colors.textMuted} />
+            <Text style={styles.emptyText}>
+              {debouncedSearch ? tr("No customers match your search.", "Keine Kunden gefunden.", "لا يوجد عملاء مطابقون.") : t("noCustomers")}
+            </Text>
+            {!debouncedSearch && (
+              <Pressable style={styles.primarySmallBtn} onPress={openCreate}>
+                <Text style={styles.primarySmallText}>{t("addCustomer")}</Text>
+              </Pressable>
+            )}
           </View>
         ) : (
           <>
             {allCustomers.map((item: any) => (
-              <Pressable key={String(item.id)} style={[styles.card, isRTL && { flexDirection: "row-reverse" }]} onPress={() => { playClickSound("light"); setSelectedCustomer(item); setShowDetail(true); }}>
-                <View style={[styles.avatar, isRTL ? { marginLeft: 12, marginRight: 0 } : { marginRight: 12 }]}>
-                  <Text style={styles.avatarText}>{(item.name || "U").charAt(0).toUpperCase()}</Text>
+              <Pressable key={String(item.id)} style={[styles.card, { flexDirection: rowDir }]} onPress={() => { playClickSound("light"); setSelectedCustomer(item); setShowDetail(true); }}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{initial(item.name)}</Text>
                 </View>
                 <View style={styles.cardInfo}>
-                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    <Text style={[styles.cardName, rtlTextAlign]} numberOfLines={1}>{item.name}</Text>
-                    {item.salutation ? <Text style={{ color: Colors.textMuted, fontSize: 11, fontStyle: "italic" }}>({item.salutation})</Text> : null}
+                  <View style={{ flexDirection: rowDir, alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <Text style={[styles.cardName, rtlTextAlign, { flexShrink: 1 }]} numberOfLines={1}>{item.name}</Text>
                     {item.customerNr ? (
-                      <View style={{ backgroundColor: Colors.surfaceLight, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: Colors.cardBorder }}>
+                      <View style={styles.nrTag}>
                         <Text style={{ color: Colors.accent, fontSize: 10, fontWeight: "700" }}>#{item.customerNr}</Text>
+                      </View>
+                    ) : null}
+                    {item.customerType === "wholesale" ? (
+                      <View style={[styles.nrTag, { borderColor: Colors.info }]}>
+                        <Text style={{ color: Colors.info, fontSize: 10, fontWeight: "700" }}>{tr("Wholesale", "Großhandel", "جملة")}</Text>
                       </View>
                     ) : null}
                   </View>
                   <Text style={[styles.cardMeta, rtlTextAlign]} numberOfLines={1}>{getSubtitle(item)}</Text>
-                  {item.company ? <Text style={[{ color: Colors.accent, fontSize: 11, marginTop: 2 }, rtlTextAlign]}>{item.company}</Text> : null}
+                  {item.company ? <Text style={[{ color: Colors.accent, fontSize: 11, marginTop: 2 }, rtlTextAlign]} numberOfLines={1}>{item.company}</Text> : null}
                 </View>
-                <View style={[styles.cardRight, isRTL && { alignItems: "flex-start" }]}>
+                <View style={[styles.cardRight, { alignItems: endAlign }]}>
                   {(item.orderCount > 0 || item.visitCount > 0) && (
-                    <View style={[styles.loyaltyBadge, { backgroundColor: Colors.accent + "15" }, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[styles.loyaltyBadge, { backgroundColor: Colors.accent + "15", flexDirection: rowDir }]}>
                       <Ionicons name="receipt-outline" size={12} color={Colors.accent} />
                       <Text style={[styles.loyaltyText, { color: Colors.accent }]}>{item.orderCount || item.visitCount}</Text>
                     </View>
                   )}
-                  {(Number(item.totalSpent || 0) > 0 || Number(item.legacyTotalSpent || 0) > 0) && (
-                    <Text style={styles.totalSpent}>{formatMoney(item.totalSpent || item.legacyTotalSpent || 0, 0)}</Text>
+                  {spent(item) > 0 && (
+                    <Text style={styles.totalSpent} numberOfLines={1}>{formatMoney(spent(item), 0)}</Text>
                   )}
                   {item.loyaltyPoints > 0 && (
-                    <View style={[styles.loyaltyBadge, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[styles.loyaltyBadge, { flexDirection: rowDir }]}>
                       <Ionicons name="star" size={11} color={Colors.warning} />
-                      <Text style={styles.loyaltyText}>{item.loyaltyPoints}</Text>
+                      <Text style={styles.loyaltyText}>{Number(item.loyaltyPoints).toLocaleString("en-US")}</Text>
                     </View>
                   )}
-                  {item.loyaltyTier && item.loyaltyTier !== "bronze" && (
+                  {item.loyaltyTier && item.loyaltyTier !== "bronze" ? (
                     <LoyaltyBadge tier={item.loyaltyTier} compact />
-                  )}
-                  {parseFloat(item.walletBalance || "0") > 0 && (
-                    <View style={{ backgroundColor: "rgba(16,185,129,0.12)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                      <Text style={{ color: Colors.success, fontSize: 10, fontWeight: "700" }}>{parseFloat(item.walletBalance).toFixed(2)}
-                      </Text>
+                  ) : null}
+                  {Number(item.walletBalance || 0) > 0 && (
+                    <View style={{ backgroundColor: Colors.success + "1F", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                      <Text style={{ color: Colors.success, fontSize: 10, fontWeight: "700" }} numberOfLines={1}>{formatMoney(item.walletBalance)}</Text>
                     </View>
                   )}
                 </View>
@@ -417,11 +615,11 @@ export default function CustomersScreen() {
             ))}
 
             {hasMore && (
-              <Pressable style={styles.loadMoreBtn} onPress={loadMore} disabled={isFetching}>
+              <Pressable style={[styles.loadMoreBtn, isFetching && { opacity: 0.7 }]} onPress={loadMore} disabled={isFetching}>
                 {isFetching ? (
                   <ActivityIndicator size="small" color={Colors.white} />
                 ) : (
-                  <Text style={styles.loadMoreText}>Load More</Text>
+                  <Text style={styles.loadMoreText}>{tr("Load more", "Mehr laden", "تحميل المزيد")}</Text>
                 )}
               </Pressable>
             )}
@@ -430,123 +628,117 @@ export default function CustomersScreen() {
       </ScrollView>
 
       {/* Add / Edit Customer Modal */}
-      <Modal visible={showForm} animationType="slide" transparent>
+      <Modal visible={showForm} animationType="slide" transparent onRequestClose={() => { if (!saveMutation.isPending) setShowForm(false); }}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: "90%" }]}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Text style={[styles.modalTitle, rtlTextAlign]}>{editCustomer ? t("edit") + " " + t("customers") : t("addCustomer")}</Text>
-              <Pressable onPress={() => { playClickSound("light"); setShowForm(false); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+          <View style={[styles.modalContent, { maxHeight: "92%" }]}>
+            <View style={[styles.modalHeader, { flexDirection: rowDir }]}>
+              <Text style={[styles.modalTitle, rtlTextAlign]} numberOfLines={1}>{editCustomer ? tr("Edit customer", "Kunde bearbeiten", "تعديل العميل") : t("addCustomer")}</Text>
+              {closeX(() => { if (!saveMutation.isPending) { playClickSound("light"); setShowForm(false); } })}
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={[styles.sectionLabel, rtlTextAlign]}>{language === "ar" ? "معلومات أساسية" : "Basic Info"}</Text>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={[styles.sectionLabel, rtlTextAlign]}>{tr("Basic info", "Grunddaten", "معلومات أساسية")}</Text>
 
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                <View style={{ width: 80 }}>
-                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "اللقب" : "Anrede"}</Text>
-                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.salutation} onChangeText={(v) => setForm({ ...form, salutation: v })} placeholderTextColor={Colors.textMuted} placeholder="Herr/Frau" />
+              <View style={{ flexDirection: rowDir, gap: 8 }}>
+                <View style={{ width: 90 }}>
+                  {labelText(tr("Title", "Anrede", "اللقب"))}
+                  <TextInput style={inputStyle} value={form.salutation} onChangeText={(v) => setForm({ ...form, salutation: v })} placeholderTextColor={Colors.textMuted} placeholder={tr("Mr/Ms", "Herr/Frau", "السيد/ة")} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "الاسم الأول" : "Vorname"}</Text>
-                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.firstName} onChangeText={(v) => setForm({ ...form, firstName: v })} placeholderTextColor={Colors.textMuted} placeholder={language === "ar" ? "الاسم الأول" : "First Name"} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  {labelText(tr("First name", "Vorname", "الاسم الأول"))}
+                  <TextInput style={inputStyle} value={form.firstName} onChangeText={(v) => setForm({ ...form, firstName: v })} placeholderTextColor={Colors.textMuted} placeholder={tr("First name", "Vorname", "الاسم الأول")} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "الاسم الأخير" : "Nachname"}</Text>
-                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.lastName} onChangeText={(v) => setForm({ ...form, lastName: v })} placeholderTextColor={Colors.textMuted} placeholder={language === "ar" ? "اسم العائلة" : "Last Name"} />
-                </View>
-              </View>
-
-              <Text style={[styles.label, rtlTextAlign]}>{t("customerName")} *</Text>
-              <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} placeholderTextColor={Colors.textMuted} placeholder={t("customerName")} />
-
-              <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "الشركة" : "Firma"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.company} onChangeText={(v) => setForm({ ...form, company: v })} placeholderTextColor={Colors.textMuted} placeholder={language === "ar" ? "اسم الشركة" : "Company"} />
-
-              <Text style={[styles.label, rtlTextAlign]}>{t("phone")}</Text>
-              <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.phone} onChangeText={(v) => setForm({ ...form, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder="+41..." />
-
-              <Text style={[styles.label, rtlTextAlign]}>{t("email")}</Text>
-              <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.email} onChangeText={(v) => setForm({ ...form, email: v })} keyboardType="email-address" placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" />
-
-              <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.label, rtlTextAlign]}>z.Hd. (Zusatz)</Text>
-                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.zhd} onChangeText={(v) => setForm({ ...form, zhd: v })} placeholderTextColor={Colors.textMuted} placeholder="z.Hd." />
-                </View>
-                <View style={{ width: 100 }}>
-                  <Text style={[styles.label, rtlTextAlign]}>Cust. Nr</Text>
-                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.customerNr} onChangeText={(v) => setForm({ ...form, customerNr: v })} keyboardType="numeric" placeholderTextColor={Colors.textMuted} placeholder="123" />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  {labelText(tr("Last name", "Nachname", "اسم العائلة"))}
+                  <TextInput style={inputStyle} value={form.lastName} onChangeText={(v) => setForm({ ...form, lastName: v })} placeholderTextColor={Colors.textMuted} placeholder={tr("Last name", "Nachname", "اسم العائلة")} />
                 </View>
               </View>
 
-              <Text style={[styles.sectionLabel, rtlTextAlign]}>{language === "ar" ? "معلومات التوصيل" : "Delivery Info"}</Text>
-              <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "كيف تصل" : "How to Go"}</Text>
-              <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.howToGo} onChangeText={(v) => setForm({ ...form, howToGo: v })} placeholderTextColor={Colors.textMuted} placeholder="Driving directions..." />
+              {labelText(`${t("customerName")} *`)}
+              <TextInput style={inputStyle} value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} placeholderTextColor={Colors.textMuted} placeholder={form.lastName || form.firstName ? [form.lastName, form.firstName].filter(Boolean).join(", ") : t("customerName")} />
 
-              <Text style={[styles.label, rtlTextAlign]}>Screen Info</Text>
-              <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.screenInfo} onChangeText={(v) => setForm({ ...form, screenInfo: v })} placeholderTextColor={Colors.textMuted} placeholder="Door code, etc..." />
+              {labelText(tr("Company", "Firma", "الشركة"))}
+              <TextInput style={inputStyle} value={form.company} onChangeText={(v) => setForm({ ...form, company: v })} placeholderTextColor={Colors.textMuted} placeholder={tr("Company", "Firma", "اسم الشركة")} />
 
-              <Text style={[styles.sectionLabel, rtlTextAlign]}>{language === "ar" ? "العنوان" : "Address"}</Text>
+              {labelText(t("phone"))}
+              <TextInput style={[styles.input, rtlTextAlign]} value={form.phone} onChangeText={(v) => setForm({ ...form, phone: v })} keyboardType="phone-pad" placeholderTextColor={Colors.textMuted} placeholder={storePhonePlaceholder()} />
 
-              {/* Quick city picker */}
-              <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "اختر المدينة" : "Stadt wählen"}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} keyboardShouldPersistTaps="handled">
-                <View style={{ flexDirection: "row", gap: 6, paddingBottom: 4 }}>
-                  {["Zürich", "Winterthur", "Bern", "Basel", "Genf", "Lausanne", "Luzern", "St. Gallen", "Zug", "Schaffhausen", "Frauenfeld", "Uster"].map((c) => (
-                    <Pressable
-                      key={c}
-                      onPress={() => { playClickSound("light"); setForm(prev => ({ ...prev, city: c })); }}
-                      style={[
-                        { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
-                        form.city === c
-                          ? { backgroundColor: Colors.accent, borderColor: Colors.accent }
-                          : { backgroundColor: Colors.surfaceLight, borderColor: Colors.cardBorder },
-                      ]}
-                    >
-                      <Text style={[{ fontSize: 12, fontWeight: "600" }, form.city === c ? { color: Colors.textDark } : { color: Colors.text }]}>
-                        {c}
-                      </Text>
-                    </Pressable>
-                  ))}
+              {labelText(t("email"))}
+              <TextInput style={[styles.input, rtlTextAlign]} value={form.email} onChangeText={(v) => setForm({ ...form, email: v })} keyboardType="email-address" placeholderTextColor={Colors.textMuted} placeholder="email@example.com" autoCapitalize="none" autoCorrect={false} />
+
+              <View style={{ flexDirection: rowDir, gap: 8, marginTop: 4 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  {labelText(tr("Attn. / c/o", "z.Hd. (Zusatz)", "بعناية / لدى"))}
+                  <TextInput style={inputStyle} value={form.zhd} onChangeText={(v) => setForm({ ...form, zhd: v })} placeholderTextColor={Colors.textMuted} placeholder={tr("Attn.", "z.Hd.", "بعناية")} />
                 </View>
-              </ScrollView>
+                <View style={{ width: 110 }}>
+                  {labelText(tr("Cust. no.", "Kunden-Nr.", "رقم العميل"))}
+                  <TextInput style={[styles.input, rtlTextAlign]} value={form.customerNr} onChangeText={(v) => setForm({ ...form, customerNr: asciiDigits(v).replace(/[^0-9]/g, "") })} keyboardType="number-pad" placeholderTextColor={Colors.textMuted} placeholder="123" />
+                </View>
+              </View>
 
-              {/* Street input with GeoAdmin autocomplete */}
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                <View style={{ flex: 2 }}>
-                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "الشارع" : "Strasse"}</Text>
+              <Text style={[styles.sectionLabel, rtlTextAlign]}>{tr("Delivery info", "Lieferinfos", "معلومات التوصيل")}</Text>
+              {labelText(tr("Directions", "Anfahrt", "كيف تصل"))}
+              <TextInput style={inputStyle} value={form.howToGo} onChangeText={(v) => setForm({ ...form, howToGo: v })} placeholderTextColor={Colors.textMuted} placeholder={tr("Driving directions…", "Wegbeschreibung…", "وصف الطريق…")} />
+
+              {labelText(tr("Door / screen info", "Tür-/Bildschirminfo", "معلومات الباب / الشاشة"))}
+              <TextInput style={inputStyle} value={form.screenInfo} onChangeText={(v) => setForm({ ...form, screenInfo: v })} placeholderTextColor={Colors.textMuted} placeholder={tr("Door code, floor…", "Türcode, Stockwerk…", "رمز الباب، الطابق…")} />
+
+              <Text style={[styles.sectionLabel, rtlTextAlign]}>{tr("Address", "Adresse", "العنوان")}</Text>
+
+              {/* Quick city picker (Swiss stores) */}
+              {isSwissStore && (
+                <>
+                  {labelText(tr("Pick a city", "Stadt wählen", "اختر المدينة"))}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} keyboardShouldPersistTaps="handled">
+                    <View style={{ flexDirection: rowDir, gap: 6, paddingBottom: 4 }}>
+                      {["Zürich", "Winterthur", "Bern", "Basel", "Genf", "Lausanne", "Luzern", "St. Gallen", "Zug", "Schaffhausen", "Frauenfeld", "Uster"].map((c) => (
+                        <Pressable
+                          key={c}
+                          onPress={() => { playClickSound("light"); setForm(prev => ({ ...prev, city: c })); }}
+                          style={[
+                            styles.chip,
+                            form.city === c
+                              ? { backgroundColor: Colors.accent, borderColor: Colors.accent }
+                              : { backgroundColor: Colors.surfaceLight, borderColor: Colors.cardBorder },
+                          ]}
+                        >
+                          <Text style={[{ fontSize: 12, fontWeight: "600" }, form.city === c ? { color: Colors.textDark } : { color: Colors.text }]}>
+                            {c}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </>
+              )}
+
+              {/* Street input with GeoAdmin autocomplete (Swiss stores) */}
+              <View style={{ flexDirection: rowDir, gap: 8 }}>
+                <View style={{ flex: 2, minWidth: 0 }}>
+                  {labelText(tr("Street", "Strasse", "الشارع"))}
                   <View>
                     <TextInput
-                      style={[styles.input, rtlTextAlign, rtlText]}
+                      style={inputStyle}
                       value={form.street}
                       onChangeText={(v) => handleStreetInputChange(v, form.city)}
                       onBlur={() => setTimeout(() => setShowStreetSuggestions(false), 200)}
                       placeholderTextColor={Colors.textMuted}
-                      placeholder={language === "ar" ? "ابدأ الكتابة..." : "Tippen zum Suchen..."}
+                      placeholder={isSwissStore ? tr("Type to search…", "Tippen zum Suchen…", "ابدأ الكتابة للبحث…") : tr("Street", "Strasse", "الشارع")}
                     />
                     {addressSearching && (
-                      <ActivityIndicator size="small" color={Colors.accent} style={{ position: "absolute", right: 10, top: 10 }} />
+                      <ActivityIndicator size="small" color={Colors.accent} style={{ position: "absolute", [isRTL ? "left" : "right"]: 10, top: 14 } as any} />
                     )}
                   </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "رقم" : "Nr."}</Text>
-                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.streetNr} onChangeText={(v) => setForm({ ...form, streetNr: v })} placeholderTextColor={Colors.textMuted} placeholder="Nr." />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  {labelText(tr("No.", "Nr.", "رقم"))}
+                  <TextInput style={inputStyle} value={form.streetNr} onChangeText={(v) => setForm({ ...form, streetNr: v })} placeholderTextColor={Colors.textMuted} placeholder={tr("No.", "Nr.", "رقم")} />
                 </View>
               </View>
 
               {/* Address suggestions dropdown */}
               {showStreetSuggestions && streetSuggestions.length > 0 && (
-                <View style={{
-                  backgroundColor: Colors.surfaceLight,
-                  borderWidth: 1,
-                  borderColor: Colors.accent + "50",
-                  borderRadius: 8,
-                  marginTop: -4,
-                  marginBottom: 10,
-                  maxHeight: 220,
-                  overflow: "hidden",
-                  elevation: 10,
-                }}>
+                <View style={styles.suggestBox}>
                   <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                     {streetSuggestions.map((s, i) => {
                       const display = s.label.replace(/<[^>]+>/g, "");
@@ -555,7 +747,7 @@ export default function CustomersScreen() {
                           key={i}
                           onPress={() => { playClickSound("light"); selectStreetSuggestion(s.label); }}
                           style={({ pressed }) => [
-                            { padding: 10, flexDirection: "row", alignItems: "center", gap: 8 },
+                            { minHeight: 44, padding: 10, flexDirection: rowDir, alignItems: "center", gap: 8 },
                             i < streetSuggestions.length - 1 && { borderBottomWidth: 1, borderBottomColor: Colors.cardBorder },
                             pressed && { backgroundColor: Colors.accent + "25" },
                           ]}
@@ -567,34 +759,36 @@ export default function CustomersScreen() {
                     })}
                     <Pressable
                       onPress={() => setShowStreetSuggestions(false)}
-                      style={{ padding: 8, alignItems: "center", borderTopWidth: 1, borderTopColor: Colors.cardBorder }}
+                      style={{ minHeight: 40, padding: 8, alignItems: "center", justifyContent: "center", borderTopWidth: 1, borderTopColor: Colors.cardBorder }}
                     >
-                      <Text style={{ color: Colors.textMuted, fontSize: 11 }}>{language === "ar" ? "إغلاق" : "Schließen"}</Text>
+                      <Text style={{ color: Colors.textMuted, fontSize: 12 }}>{t("close")}</Text>
                     </Pressable>
                   </ScrollView>
                 </View>
               )}
 
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                <View style={{ width: 80 }}>
-                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "الرمز" : "PLZ"}</Text>
-                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.postalCode} onChangeText={(v) => setForm({ ...form, postalCode: v })} keyboardType="numeric" placeholderTextColor={Colors.textMuted} placeholder="PLZ" />
+              <View style={{ flexDirection: rowDir, gap: 8 }}>
+                <View style={{ width: 100 }}>
+                  {labelText(tr("Postcode", "PLZ", "الرمز البريدي"))}
+                  <TextInput style={[styles.input, rtlTextAlign]} value={form.postalCode} onChangeText={(v) => setForm({ ...form, postalCode: asciiDigits(v) })} keyboardType="number-pad" placeholderTextColor={Colors.textMuted} placeholder={tr("Postcode", "PLZ", "الرمز")} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.label, rtlTextAlign]}>{language === "ar" ? "المدينة" : "Ort"}</Text>
-                  <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.city} onChangeText={(v) => setForm({ ...form, city: v })} placeholderTextColor={Colors.textMuted} placeholder={language === "ar" ? "المدينة" : "City"} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  {labelText(tr("City", "Ort", "المدينة"))}
+                  <TextInput style={inputStyle} value={form.city} onChangeText={(v) => setForm({ ...form, city: v })} placeholderTextColor={Colors.textMuted} placeholder={tr("City", "Ort", "المدينة")} />
                 </View>
               </View>
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("address")} ({language === "ar" ? "كامل" : "Full"})</Text>
-              <TextInput style={[styles.input, rtlTextAlign, rtlText]} value={form.address} onChangeText={(v) => setForm({ ...form, address: v })} placeholderTextColor={Colors.textMuted} placeholder={t("address")} />
+              {labelText(`${t("address")} (${tr("full", "vollständig", "كامل")})`)}
+              <TextInput style={inputStyle} value={form.address} onChangeText={(v) => setForm({ ...form, address: v })} placeholderTextColor={Colors.textMuted} placeholder={t("address")} />
 
-              <Text style={[styles.label, rtlTextAlign]}>{t("notes")}</Text>
-              <TextInput style={[styles.input, { height: 80, textAlignVertical: "top" }, rtlTextAlign, rtlText]} value={form.notes} onChangeText={(v) => setForm({ ...form, notes: v })} multiline placeholderTextColor={Colors.textMuted} placeholder={t("notes")} />
+              {labelText(t("notes"))}
+              <TextInput style={[...inputStyle, { height: 80, textAlignVertical: "top" }]} value={form.notes} onChangeText={(v) => setForm({ ...form, notes: v })} multiline placeholderTextColor={Colors.textMuted} placeholder={t("notes")} />
 
-              <Pressable style={styles.saveBtn} onPress={() => { playClickSound("heavy"); handleSave(); }}>
+              <Pressable style={[styles.saveBtn, saveMutation.isPending && { opacity: 0.7 }]} disabled={saveMutation.isPending} onPress={() => { playClickSound("heavy"); handleSave(); }}>
                 <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={styles.saveBtnGradient}>
-                  <Text style={styles.saveBtnText}>{editCustomer ? t("save") : t("addCustomer")}</Text>
+                  {saveMutation.isPending ? <ActivityIndicator color={Colors.white} /> : (
+                    <Text style={styles.saveBtnText}>{editCustomer ? t("save") : t("addCustomer")}</Text>
+                  )}
                 </LinearGradient>
               </Pressable>
             </ScrollView>
@@ -603,40 +797,44 @@ export default function CustomersScreen() {
       </Modal>
 
       {/* Customer Detail Modal */}
-      <Modal visible={showDetail} animationType="slide" transparent>
+      <Modal visible={showDetail} animationType="slide" transparent onRequestClose={() => setShowDetail(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: "90%" }]}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Text style={[styles.modalTitle, rtlTextAlign]}>{t("customerDetails")}</Text>
-              <Pressable onPress={() => { playClickSound("light"); setShowDetail(false); }}><Ionicons name="close" size={24} color={Colors.text} /></Pressable>
+          <View style={[styles.modalContent, { maxHeight: "92%" }]}>
+            <View style={[styles.modalHeader, { flexDirection: rowDir }]}>
+              <Text style={[styles.modalTitle, rtlTextAlign]} numberOfLines={1}>{t("customerDetails")}</Text>
+              {closeX(() => { playClickSound("light"); setShowDetail(false); })}
             </View>
 
             {selectedCustomer && (
               <ScrollView showsVerticalScrollIndicator={false}>
                 {/* Header */}
                 <View style={{ alignItems: "center", marginBottom: 16 }}>
-                  <View style={[styles.avatar, { width: 64, height: 64, borderRadius: 32, marginRight: 0, marginBottom: 10 }]}>
-                    <Text style={[styles.avatarText, { fontSize: 28 }]}>{selectedCustomer.name.charAt(0).toUpperCase()}</Text>
+                  <View style={[styles.avatar, { width: 64, height: 64, borderRadius: 32, marginBottom: 10 }]}>
+                    <Text style={[styles.avatarText, { fontSize: 28 }]}>{initial(selectedCustomer.name)}</Text>
                   </View>
-                  <Text style={{ color: Colors.text, fontSize: 20, fontWeight: "700" }}>{selectedCustomer.name}</Text>
-                  {selectedCustomer.salutation && <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>({selectedCustomer.salutation})</Text>}
-                  {selectedCustomer.company && <Text style={{ color: Colors.accent, fontSize: 13, marginTop: 4, fontWeight: "600" }}>{selectedCustomer.company}</Text>}
-                  {selectedCustomer.customerNr && <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }}>Kunden-Nr: #{selectedCustomer.customerNr}</Text>}
-                  {selectedCustomer.loyaltyTier && (
+                  <Text style={{ color: Colors.text, fontSize: 20, fontWeight: "700", textAlign: "center" }}>{selectedCustomer.name || "—"}</Text>
+                  {selectedCustomer.salutation ? <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>({selectedCustomer.salutation})</Text> : null}
+                  {selectedCustomer.company ? <Text style={{ color: Colors.accent, fontSize: 13, marginTop: 4, fontWeight: "600" }}>{selectedCustomer.company}</Text> : null}
+                  {selectedCustomer.customerNr ? <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 2 }}>{tr("Customer no.", "Kunden-Nr.", "رقم العميل")}: #{selectedCustomer.customerNr}</Text> : null}
+                  {selectedCustomer.customerType === "wholesale" ? (
+                    <Pressable onPress={() => { setShowDetail(false); router.push("/wholesale" as any); }} style={[styles.nrTag, { borderColor: Colors.info, marginTop: 6, paddingVertical: 4, paddingHorizontal: 10 }]}>
+                      <Text style={{ color: Colors.info, fontSize: 12, fontWeight: "700" }}>{tr("Wholesale trader — open statement", "Großhändler — Kontoauszug öffnen", "تاجر جملة — فتح كشف الحساب")}</Text>
+                    </Pressable>
+                  ) : null}
+                  {selectedCustomer.loyaltyTier ? (
                     <View style={{ marginTop: 6 }}>
-                      <LoyaltyBadge tier={selectedCustomer.loyaltyTier} points={selectedCustomer.loyaltyPoints} />
+                      <LoyaltyBadge tier={selectedCustomer.loyaltyTier} points={Number(selectedCustomer.loyaltyPoints) || 0} />
                     </View>
-                  )}
-                  {selectedCustomer.referralCode && (
-                    <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 4 }}>{t("referralCode")}: {selectedCustomer.referralCode}
-                    </Text>
-                  )}
+                  ) : null}
+                  {selectedCustomer.referralCode ? (
+                    <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 4 }} selectable>{t("referralCode")}: {selectedCustomer.referralCode}</Text>
+                  ) : null}
                 </View>
 
                 {/* Stats Row */}
-                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 6, marginBottom: 14 }}>
+                <View style={{ flexDirection: rowDir, flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
                   <View style={styles.statBox}>
-                    <Text style={[styles.statValue, { color: Colors.accent }]}>{formatMoney(selectedCustomer.totalSpent || selectedCustomer.legacyTotalSpent || 0, 0)}</Text>
+                    <Text style={[styles.statValue, { color: Colors.accent }]} numberOfLines={1} adjustsFontSizeToFit>{formatMoney(spent(selectedCustomer), 0)}</Text>
                     <Text style={styles.statLabel}>{t("totalSpent")}</Text>
                   </View>
                   <View style={styles.statBox}>
@@ -645,23 +843,23 @@ export default function CustomersScreen() {
                   </View>
                   {Number(selectedCustomer.averageOrderValue || 0) > 0 && (
                     <View style={styles.statBox}>
-                      <Text style={[styles.statValue, { color: Colors.warning }]}>{formatMoney(selectedCustomer.averageOrderValue, 0)}</Text>
-                      <Text style={styles.statLabel}>⌀ {language === "ar" ? "متوسط" : "Avg"}</Text>
+                      <Text style={[styles.statValue, { color: Colors.warning }]} numberOfLines={1} adjustsFontSizeToFit>{formatMoney(selectedCustomer.averageOrderValue, 0)}</Text>
+                      <Text style={styles.statLabel}>{tr("Avg. order", "Ø Bestellung", "متوسط الطلب")}</Text>
                     </View>
                   )}
                   {(selectedCustomer.loyaltyPoints || 0) > 0 && (
                     <View style={styles.statBox}>
-                      <View style={{ flexDirection: "row", gap: 3, alignItems: "center" }}>
+                      <View style={{ flexDirection: rowDir, gap: 3, alignItems: "center" }}>
                         <Ionicons name="star" size={14} color={Colors.warning} />
-                        <Text style={[styles.statValue, { color: Colors.warning }]}>{selectedCustomer.loyaltyPoints}</Text>
+                        <Text style={[styles.statValue, { color: Colors.warning }]}>{Number(selectedCustomer.loyaltyPoints).toLocaleString("en-US")}</Text>
                       </View>
                       <Text style={styles.statLabel}>{t("loyaltyPoints")}</Text>
                     </View>
                   )}
-                  {parseFloat(selectedCustomer.walletBalance || "0") > 0 && (
+                  {Number(selectedCustomer.walletBalance || 0) > 0 && (
                     <View style={styles.statBox}>
-                      <Text style={[styles.statValue, { color: Colors.success }]}>
-                        {parseFloat(selectedCustomer.walletBalance).toFixed(2)}
+                      <Text style={[styles.statValue, { color: Colors.success }]} numberOfLines={1} adjustsFontSizeToFit>
+                        {formatMoney(selectedCustomer.walletBalance)}
                       </Text>
                       <Text style={styles.statLabel}>{t("walletBalance")}</Text>
                     </View>
@@ -669,135 +867,133 @@ export default function CustomersScreen() {
                 </View>
 
                 {/* Contact Info */}
-                <View style={styles.detailSection}>
-                  <Text style={styles.sectionTitle}>{language === "ar" ? "معلومات الاتصال" : "Contact"}</Text>
-                  <InfoRow icon="call-outline" label={language === "ar" ? "هاتف" : "Telefon"} value={selectedCustomer.phone} isRTL={isRTL} />
-                  <InfoRow icon="mail-outline" label={language === "ar" ? "بريد" : "Email"} value={selectedCustomer.email} isRTL={isRTL} />
-                  {selectedCustomer.zhd && <InfoRow icon="person-outline" label="z.Hd." value={selectedCustomer.zhd} isRTL={isRTL} />}
-                </View>
+                {(selectedCustomer.phone || selectedCustomer.email || selectedCustomer.zhd) ? (
+                  <View style={styles.detailSection}>
+                    <Text style={[styles.sectionTitle, rtlTextAlign]}>{tr("Contact", "Kontakt", "معلومات الاتصال")}</Text>
+                    <InfoRow icon="call-outline" label={t("phone")} value={selectedCustomer.phone} rowDir={rowDir} textAlign={rtlTextAlign} />
+                    <InfoRow icon="mail-outline" label={t("email")} value={selectedCustomer.email} rowDir={rowDir} textAlign={rtlTextAlign} />
+                    <InfoRow icon="person-outline" label={tr("Attn. / c/o", "z.Hd.", "بعناية / لدى")} value={selectedCustomer.zhd} rowDir={rowDir} textAlign={rtlTextAlign} />
+                  </View>
+                ) : null}
 
                 {/* Address */}
-                {(selectedCustomer.address || selectedCustomer.street || selectedCustomer.city) && (
+                {(selectedCustomer.address || selectedCustomer.street || selectedCustomer.city) ? (
                   <View style={styles.detailSection}>
-                    <Text style={styles.sectionTitle}>{language === "ar" ? "العنوان" : "Adresse"}</Text>
-                    {selectedCustomer.street && (
-                      <InfoRow icon="navigate-outline" label={language === "ar" ? "الشارع" : "Strasse"} value={`${selectedCustomer.street || ""} ${selectedCustomer.streetNr || ""} ${selectedCustomer.houseNr || ""}`.trim()} isRTL={isRTL} />
-                    )}
-                    {(selectedCustomer.postalCode || selectedCustomer.city) && (
-                      <InfoRow icon="business-outline" label={language === "ar" ? "المدينة" : "Ort"} value={`${selectedCustomer.postalCode || ""} ${selectedCustomer.city || ""}`.trim()} isRTL={isRTL} />
-                    )}
-                    {selectedCustomer.quadrat && (
-                      <InfoRow icon="grid-outline" label="Quadrat" value={selectedCustomer.quadrat} isRTL={isRTL} />
-                    )}
-                    {selectedCustomer.address && !selectedCustomer.street && (
-                      <InfoRow icon="location-outline" label={language === "ar" ? "العنوان" : "Adresse"} value={selectedCustomer.address} isRTL={isRTL} />
-                    )}
+                    <Text style={[styles.sectionTitle, rtlTextAlign]}>{tr("Address", "Adresse", "العنوان")}</Text>
+                    {selectedCustomer.street ? (
+                      <InfoRow icon="navigate-outline" label={tr("Street", "Strasse", "الشارع")} value={`${selectedCustomer.street || ""} ${selectedCustomer.streetNr || ""} ${selectedCustomer.houseNr || ""}`.trim()} rowDir={rowDir} textAlign={rtlTextAlign} />
+                    ) : null}
+                    {(selectedCustomer.postalCode || selectedCustomer.city) ? (
+                      <InfoRow icon="business-outline" label={tr("City", "Ort", "المدينة")} value={`${selectedCustomer.postalCode || ""} ${selectedCustomer.city || ""}`.trim()} rowDir={rowDir} textAlign={rtlTextAlign} />
+                    ) : null}
+                    <InfoRow icon="grid-outline" label="Quadrat" value={selectedCustomer.quadrat} rowDir={rowDir} textAlign={rtlTextAlign} />
+                    {!selectedCustomer.street ? (
+                      <InfoRow icon="location-outline" label={tr("Address", "Adresse", "العنوان")} value={selectedCustomer.address} rowDir={rowDir} textAlign={rtlTextAlign} />
+                    ) : null}
                   </View>
-                )}
+                ) : null}
 
                 {/* Delivery */}
-                {(selectedCustomer.howToGo || selectedCustomer.screenInfo) && (
+                {(selectedCustomer.howToGo || selectedCustomer.screenInfo) ? (
                   <View style={styles.detailSection}>
-                    <Text style={styles.sectionTitle}>{language === "ar" ? "توصيل" : "Lieferung"}</Text>
-                    <InfoRow icon="car-outline" label={language === "ar" ? "كيف تصل" : "How to Go"} value={selectedCustomer.howToGo} isRTL={isRTL} />
-                    <InfoRow icon="tv-outline" label="Screen Info" value={selectedCustomer.screenInfo} isRTL={isRTL} />
+                    <Text style={[styles.sectionTitle, rtlTextAlign]}>{tr("Delivery", "Lieferung", "توصيل")}</Text>
+                    <InfoRow icon="car-outline" label={tr("Directions", "Anfahrt", "كيف تصل")} value={selectedCustomer.howToGo} rowDir={rowDir} textAlign={rtlTextAlign} />
+                    <InfoRow icon="tv-outline" label={tr("Door / screen info", "Tür-/Bildschirminfo", "معلومات الباب / الشاشة")} value={selectedCustomer.screenInfo} rowDir={rowDir} textAlign={rtlTextAlign} />
                   </View>
-                )}
+                ) : null}
 
                 {/* Order History Dates */}
-                {(selectedCustomer.firstOrderDate || selectedCustomer.lastOrderDate) && (
+                {(selectedCustomer.firstOrderDate || selectedCustomer.lastOrderDate) ? (
                   <View style={styles.detailSection}>
-                    <Text style={styles.sectionTitle}>{language === "ar" ? "تاريخ الطلبات" : "Bestellhistorie"}</Text>
-                    <InfoRow icon="calendar-outline" label={language === "ar" ? "أول طلب" : "Erste Bestellung"} value={selectedCustomer.firstOrderDate} isRTL={isRTL} />
-                    <InfoRow icon="time-outline" label={language === "ar" ? "آخر طلب" : "Letzte Bestellung"} value={selectedCustomer.lastOrderDate} isRTL={isRTL} />
+                    <Text style={[styles.sectionTitle, rtlTextAlign]}>{tr("Order history", "Bestellhistorie", "تاريخ الطلبات")}</Text>
+                    <InfoRow icon="calendar-outline" label={tr("First order", "Erste Bestellung", "أول طلب")} value={selectedCustomer.firstOrderDate} rowDir={rowDir} textAlign={rtlTextAlign} />
+                    <InfoRow icon="time-outline" label={tr("Last order", "Letzte Bestellung", "آخر طلب")} value={selectedCustomer.lastOrderDate} rowDir={rowDir} textAlign={rtlTextAlign} />
                   </View>
-                )}
+                ) : null}
 
                 {/* Notes */}
-                {selectedCustomer.notes && (
+                {selectedCustomer.notes ? (
                   <View style={styles.detailSection}>
-                    <Text style={styles.sectionTitle}>{language === "ar" ? "ملاحظات" : "Notizen"}</Text>
-                    <Text style={{ color: Colors.text, fontSize: 14, lineHeight: 20 }}>{selectedCustomer.notes}</Text>
+                    <Text style={[styles.sectionTitle, rtlTextAlign]}>{t("notes")}</Text>
+                    <Text style={[{ color: Colors.text, fontSize: 14, lineHeight: 20 }, rtlTextAlign]} selectable>{selectedCustomer.notes}</Text>
                   </View>
-                )}
+                ) : null}
 
                 {/* Source & Legacy Metadata */}
-                {(selectedCustomer.source || selectedCustomer.legacyRef || selectedCustomer.customerNr ||
+                {(selectedCustomer.source || selectedCustomer.legacyRef ||
                   selectedCustomer.r1 || selectedCustomer.r3 || selectedCustomer.r4 || selectedCustomer.r5 ||
                   selectedCustomer.r8 || selectedCustomer.r9 || selectedCustomer.r10 ||
-                  Number(selectedCustomer.r14) > 0 || Number(selectedCustomer.r15) > 0) && (
-                  <View style={[styles.detailSection, { backgroundColor: Colors.surface + "bb", borderStyle: "dashed", borderWidth: 1, borderColor: Colors.cardBorder }]}>
-                    <Text style={styles.sectionTitle}>{language === "ar" ? "معلومات إضافية" : "Additional Info"}</Text>
-                    {selectedCustomer.customerNr ? <InfoRow icon="id-card-outline" label="Kunden-Nr" value={`#${selectedCustomer.customerNr}`} isRTL={isRTL} /> : null}
-                    {selectedCustomer.source ? <InfoRow icon="cloud-outline" label="Source" value={selectedCustomer.source} isRTL={isRTL} /> : null}
-                    {selectedCustomer.legacyRef ? <InfoRow icon="link-outline" label="Legacy Ref" value={selectedCustomer.legacyRef} isRTL={isRTL} /> : null}
-                    {selectedCustomer.r1 ? <InfoRow icon="code-outline" label="R1" value={selectedCustomer.r1} isRTL={isRTL} /> : null}
-                    {selectedCustomer.r3 ? <InfoRow icon="code-outline" label="R3" value={selectedCustomer.r3} isRTL={isRTL} /> : null}
-                    {selectedCustomer.r4 ? <InfoRow icon="code-outline" label="R4" value={selectedCustomer.r4} isRTL={isRTL} /> : null}
-                    {selectedCustomer.r5 ? <InfoRow icon="code-outline" label="R5" value={selectedCustomer.r5} isRTL={isRTL} /> : null}
-                    {selectedCustomer.r8 ? <InfoRow icon="code-outline" label="R8" value={selectedCustomer.r8} isRTL={isRTL} /> : null}
-                    {selectedCustomer.r9 ? <InfoRow icon="code-outline" label="R9" value={selectedCustomer.r9} isRTL={isRTL} /> : null}
-                    {selectedCustomer.r10 ? <InfoRow icon="code-outline" label="R10" value={selectedCustomer.r10} isRTL={isRTL} /> : null}
-                    {Number(selectedCustomer.r14) > 0 ? <InfoRow icon="stats-chart-outline" label="R14" value={String(selectedCustomer.r14)} isRTL={isRTL} /> : null}
-                    {Number(selectedCustomer.r15) > 0 ? <InfoRow icon="stats-chart-outline" label="R15" value={String(selectedCustomer.r15)} isRTL={isRTL} /> : null}
+                  Number(selectedCustomer.r14) > 0 || Number(selectedCustomer.r15) > 0) ? (
+                  <View style={[styles.detailSection, { borderStyle: "dashed", borderWidth: 1, borderColor: Colors.cardBorder }]}>
+                    <Text style={[styles.sectionTitle, rtlTextAlign]}>{tr("Additional info", "Zusatzinfos", "معلومات إضافية")}</Text>
+                    <InfoRow icon="cloud-outline" label={tr("Source", "Quelle", "المصدر")} value={selectedCustomer.source} rowDir={rowDir} textAlign={rtlTextAlign} />
+                    <InfoRow icon="link-outline" label={tr("Legacy ref.", "Alt-Referenz", "مرجع قديم")} value={selectedCustomer.legacyRef} rowDir={rowDir} textAlign={rtlTextAlign} />
+                    {(["r1", "r3", "r4", "r5", "r8", "r9", "r10"] as const).map((k) => (
+                      <InfoRow key={k} icon="code-outline" label={k.toUpperCase()} value={selectedCustomer[k]} rowDir={rowDir} textAlign={rtlTextAlign} />
+                    ))}
+                    {Number(selectedCustomer.r14) > 0 ? <InfoRow icon="stats-chart-outline" label="R14" value={String(selectedCustomer.r14)} rowDir={rowDir} textAlign={rtlTextAlign} /> : null}
+                    {Number(selectedCustomer.r15) > 0 ? <InfoRow icon="stats-chart-outline" label="R15" value={String(selectedCustomer.r15)} rowDir={rowDir} textAlign={rtlTextAlign} /> : null}
                   </View>
-                )}
+                ) : null}
 
-                {canManage && (
-                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, marginBottom: 16 }}>
-                    <Pressable style={{ flex: 1, borderRadius: 12, overflow: "hidden" }} onPress={() => { playClickSound("medium"); setShowDetail(false); openEdit(selectedCustomer); }}>
-                      <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", paddingVertical: 12, gap: 6 }}>
-                        <Ionicons name="create-outline" size={18} color={Colors.white} />
-                        <Text style={{ color: Colors.white, fontSize: 14, fontWeight: "600" }}>{t("edit")}</Text>
-                      </LinearGradient>
-                    </Pressable>
+                {(canManage || canDeleteCustomers) && (
+                  <View style={{ flexDirection: rowDir, gap: 8, marginBottom: 16 }}>
+                    {canManage && (
+                      <Pressable style={{ flex: 1, borderRadius: 12, overflow: "hidden" }} onPress={() => { playClickSound("medium"); setShowDetail(false); openEdit(selectedCustomer); }}>
+                        <LinearGradient colors={[Colors.accent, Colors.gradientMid]} style={[styles.actionBtn, { flexDirection: rowDir }]}>
+                          <Ionicons name="create-outline" size={18} color={Colors.white} />
+                          <Text style={{ color: Colors.white, fontSize: 14, fontWeight: "600" }}>{t("edit")}</Text>
+                        </LinearGradient>
+                      </Pressable>
+                    )}
                     {canDeleteCustomers && (
-                      <Pressable style={{ flex: 1, borderRadius: 12, overflow: "hidden" }} onPress={() => {
-                        const msg = `${t("delete")} "${selectedCustomer.name}"?`;
-                        if (Platform.OS === "web") {
-                          if (window.confirm(msg)) {
-                            deleteMutation.mutate(selectedCustomer.id);
-                          }
-                        } else {
-                          Alert.alert(
-                            t("deleteCustomer" as any) || "Delete Customer",
-                            msg,
-                            [
-                              { text: t("cancel"), style: "cancel" },
-                              { text: t("delete"), style: "destructive", onPress: () => deleteMutation.mutate(selectedCustomer.id) },
-                            ]
-                          );
-                        }
-                      }}>
-                        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", backgroundColor: Colors.danger, alignItems: "center", justifyContent: "center", paddingVertical: 12, gap: 6 }}>
-                          <Ionicons name="trash-outline" size={18} color={Colors.white} />
-                          <Text style={{ color: Colors.white, fontSize: 14, fontWeight: "600" }}>{t("delete")}</Text>
-                        </View>
+                      <Pressable
+                        style={[styles.actionBtn, styles.dangerOutline, { flex: 1, flexDirection: rowDir }, deleteMutation.isPending && { opacity: 0.6 }]}
+                        disabled={deleteMutation.isPending}
+                        onPress={() => confirmDelete(selectedCustomer)}
+                      >
+                        {deleteMutation.isPending ? <ActivityIndicator color={Colors.danger} /> : (
+                          <>
+                            <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                            <Text style={{ color: Colors.danger, fontSize: 14, fontWeight: "700" }}>{t("delete")}</Text>
+                          </>
+                        )}
                       </Pressable>
                     )}
                   </View>
                 )}
 
-                <Text style={[{ color: Colors.textSecondary, fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }, rtlTextAlign]}>{t("purchaseHistory")}</Text>
+                <Text style={[styles.historyTitle, rtlTextAlign]}>{t("purchaseHistory")}</Text>
 
-                {customerSales.length === 0 ? (
+                {salesLoading ? (
+                  <ActivityIndicator color={Colors.accent} style={{ paddingVertical: 24 }} />
+                ) : salesError ? (
+                  <View style={{ alignItems: "center", paddingVertical: 20, gap: 10 }}>
+                    <Text style={{ color: Colors.textMuted, fontSize: 13 }}>{tr("Could not load purchases.", "Einkäufe konnten nicht geladen werden.", "تعذّر تحميل المشتريات.")}</Text>
+                    <Pressable style={styles.primarySmallBtn} onPress={() => refetchSales()}>
+                      <Text style={styles.primarySmallText}>{tr("Retry", "Erneut versuchen", "إعادة المحاولة")}</Text>
+                    </Pressable>
+                  </View>
+                ) : customerSales.length === 0 ? (
                   <View style={{ alignItems: "center", paddingVertical: 24 }}>
                     <Ionicons name="receipt-outline" size={36} color={Colors.textMuted} />
                     <Text style={{ color: Colors.textMuted, fontSize: 13, marginTop: 8 }}>{t("noPurchases")}</Text>
                   </View>
                 ) : (
                   customerSales.map((sale: any) => (
-                    <View key={sale.id} style={{ backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8 }}>
-                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center" }}>
-                        <Text style={[{ color: Colors.text, fontSize: 14, fontWeight: "600" }, rtlTextAlign]}>Sale #{sale.id}</Text>
+                    <View key={sale.id} style={styles.saleCard}>
+                      <View style={{ flexDirection: rowDir, justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                        <Text style={[{ color: Colors.text, fontSize: 14, fontWeight: "600", flex: 1, minWidth: 0 }, rtlTextAlign]} numberOfLines={1}>
+                          {sale.receiptNumber ? `${tr("Receipt", "Beleg", "إيصال")} ${sale.receiptNumber}` : `${tr("Sale", "Verkauf", "عملية بيع")} #${sale.id}`}
+                        </Text>
                         <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: "700" }}>{formatMoney(sale.totalAmount || 0)}</Text>
                       </View>
-                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginTop: 4 }}>
+                      <View style={{ flexDirection: rowDir, justifyContent: "space-between", alignItems: "center", marginTop: 4, gap: 8 }}>
                         <Text style={{ color: Colors.textMuted, fontSize: 12 }}>
-                          {sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : "N/A"}
+                          {sale.createdAt ? formatInStoreTz(sale.createdAt, dateLocale, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
                         </Text>
                         <View style={{ backgroundColor: sale.paymentMethod === "cash" ? Colors.accent + "20" : Colors.secondary + "20", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
-                          <Text style={{ color: sale.paymentMethod === "cash" ? Colors.accent : Colors.secondary, fontSize: 11, fontWeight: "600", textTransform: "capitalize" }}>{sale.paymentMethod || "cash"}</Text>
+                          <Text style={{ color: sale.paymentMethod === "cash" ? Colors.accent : Colors.secondary, fontSize: 11, fontWeight: "600" }}>{paymentLabel(sale.paymentMethod)}</Text>
                         </View>
                       </View>
                     </View>
@@ -816,39 +1012,51 @@ export default function CustomersScreen() {
 
 const styles = themedStyles((Colors) => ({
   container: { flex: 1, backgroundColor: Colors.background },
-  searchRow: { paddingHorizontal: 12, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 8 },
-  searchBox: { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 42, borderWidth: 1, borderColor: Colors.inputBorder },
-  searchInput: { flex: 1, color: Colors.text, fontSize: 15 },
-  countText: { color: Colors.textMuted, fontSize: 12, fontWeight: "600", minWidth: 36, textAlign: "right" },
+  banner: { alignItems: "center", gap: 8, marginHorizontal: 12, marginTop: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.accent + "15", borderWidth: 1, borderColor: Colors.accent + "40" },
+  bannerText: { flex: 1, color: Colors.text, fontSize: 13, fontWeight: "600" },
+  searchRow: { paddingHorizontal: 12, paddingVertical: 10, alignItems: "center", gap: 8 },
+  searchBox: { flex: 1, minWidth: 0, alignItems: "center", gap: 8, backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 44, borderWidth: 1, borderColor: Colors.inputBorder },
+  searchInput: { flex: 1, minWidth: 0, color: Colors.text, fontSize: 15, height: 44 },
+  countText: { color: Colors.textMuted, fontSize: 12, fontWeight: "600", minWidth: 36, textAlign: "center" },
   list: { paddingHorizontal: 12 },
-  card: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface, borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder },
+  card: { alignItems: "center", gap: 12, backgroundColor: Colors.surface, borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: Colors.cardBorder },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.gradientMid, justifyContent: "center", alignItems: "center" },
   avatarText: { color: Colors.white, fontSize: 18, fontWeight: "800" },
-  cardInfo: { flex: 1 },
+  cardInfo: { flex: 1, minWidth: 0 },
   cardName: { color: Colors.text, fontSize: 15, fontWeight: "600" },
   cardMeta: { color: Colors.textMuted, fontSize: 12, marginTop: 2 },
-  cardRight: { alignItems: "flex-end", gap: 4 },
-  loyaltyBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(245,158,11,0.15)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  cardRight: { gap: 4, flexShrink: 0, maxWidth: "40%" },
+  nrTag: { backgroundColor: Colors.surfaceLight, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, borderWidth: 1, borderColor: Colors.cardBorder },
+  loyaltyBadge: { alignItems: "center", gap: 4, backgroundColor: Colors.warning + "26", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
   loyaltyText: { color: Colors.warning, fontSize: 12, fontWeight: "700" },
   totalSpent: { color: Colors.textMuted, fontSize: 12 },
-  empty: { alignItems: "center", paddingVertical: 60 },
-  emptyText: { color: Colors.textMuted, fontSize: 15, marginTop: 12 },
+  empty: { alignItems: "center", paddingVertical: 60, paddingHorizontal: 16, gap: 12 },
+  emptyText: { color: Colors.textMuted, fontSize: 15, textAlign: "center" },
+  primarySmallBtn: { minHeight: 44, paddingHorizontal: 20, borderRadius: 12, backgroundColor: Colors.accent, alignItems: "center", justifyContent: "center" },
+  primarySmallText: { color: Colors.textDark, fontSize: 14, fontWeight: "700" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" },
-  modalContent: { backgroundColor: Colors.surface, borderRadius: 20, padding: 24, width: "90%", maxWidth: 520, maxHeight: "85%" },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  modalTitle: { color: Colors.text, fontSize: 20, fontWeight: "700" },
+  modalContent: { backgroundColor: Colors.surface, borderRadius: 20, padding: 20, width: "92%", maxWidth: 560, maxHeight: "85%" },
+  modalHeader: { justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12 },
+  modalTitle: { flex: 1, color: Colors.text, fontSize: 20, fontWeight: "700" },
+  closeBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: Colors.surfaceLight },
   label: { color: Colors.textSecondary, fontSize: 11, fontWeight: "600", marginBottom: 4, marginTop: 10, textTransform: "uppercase" as const, letterSpacing: 0.5 },
   sectionLabel: { color: Colors.accent, fontSize: 13, fontWeight: "700", marginTop: 16, marginBottom: 4 },
-  input: { backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: Colors.text, fontSize: 15, borderWidth: 1, borderColor: Colors.inputBorder },
+  input: { backgroundColor: Colors.inputBg, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 46, color: Colors.text, fontSize: 15, borderWidth: 1, borderColor: Colors.inputBorder },
+  chip: { minHeight: 36, justifyContent: "center", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 18, borderWidth: 1 },
+  suggestBox: { backgroundColor: Colors.surfaceLight, borderWidth: 1, borderColor: Colors.accent + "50", borderRadius: 8, marginTop: 4, marginBottom: 10, maxHeight: 220, overflow: "hidden", elevation: 10 },
   saveBtn: { borderRadius: 14, overflow: "hidden", marginTop: 20, marginBottom: 16 },
-  saveBtnGradient: { paddingVertical: 14, alignItems: "center" },
+  saveBtnGradient: { minHeight: 50, paddingVertical: 14, alignItems: "center", justifyContent: "center" },
   saveBtnText: { color: Colors.white, fontSize: 16, fontWeight: "700" },
-  loadMoreBtn: { marginVertical: 16, marginHorizontal: 4, borderRadius: 12, backgroundColor: Colors.gradientMid, paddingVertical: 14, alignItems: "center" },
+  actionBtn: { minHeight: 46, alignItems: "center", justifyContent: "center", paddingVertical: 12, gap: 6, borderRadius: 12 },
+  dangerOutline: { borderWidth: 1, borderColor: Colors.danger, backgroundColor: Colors.danger + "12" },
+  loadMoreBtn: { marginVertical: 16, marginHorizontal: 4, minHeight: 48, borderRadius: 12, backgroundColor: Colors.gradientMid, paddingVertical: 14, alignItems: "center", justifyContent: "center" },
   loadMoreText: { color: Colors.white, fontSize: 15, fontWeight: "600" },
   // Detail modal styles
-  statBox: { flex: 1, backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 10, alignItems: "center" },
-  statValue: { fontSize: 18, fontWeight: "800" },
-  statLabel: { color: Colors.textMuted, fontSize: 10, marginTop: 2 },
+  statBox: { flexGrow: 1, flexBasis: 96, minWidth: 0, backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 10, alignItems: "center" },
+  statValue: { fontSize: 17, fontWeight: "800" },
+  statLabel: { color: Colors.textMuted, fontSize: 10, marginTop: 2, textAlign: "center" },
   detailSection: { backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 10 },
   sectionTitle: { color: Colors.textSecondary, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
+  historyTitle: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 },
+  saleCard: { backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 12, marginBottom: 8 },
 }));

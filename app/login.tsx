@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
-  Text, View, Pressable, Platform, Alert, ActivityIndicator, TextInput, Modal,
+  Text, View, Pressable, Platform, ActivityIndicator, TextInput, Modal,
   ScrollView, Image, Animated, useWindowDimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -16,6 +16,9 @@ import * as Haptics from "expo-haptics";
 import { useLanguage } from "@/lib/language-context";
 import { useLicense } from "@/lib/license-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { showAlert, describeError, isNetworkFailure } from "@/lib/alert";
+import { parseAmountInput, roundMoney, toLatinDigits } from "@/lib/money-input";
+import { formatAmount, currencyLabel, isZeroDecimalCurrency, getCurrency } from "@/lib/currency";
 
 interface Employee {
   id: number;
@@ -26,19 +29,20 @@ interface Employee {
   permissions: string[];
 }
 
-const ROLE_COLORS: Record<string, string> = {
-  admin: Colors.danger,
-  manager: Colors.warning,
-  cashier: Colors.info,
-  owner: Colors.secondary,
-};
-
+// Read per call: `Colors` is a live proxy over the active theme, so a map
+// built once at module load would keep the first theme's colours.
 function getRoleBadgeColor(role: string): string {
-  return ROLE_COLORS[role.toLowerCase()] || Colors.info;
+  const colors: Record<string, string> = {
+    admin: Colors.danger,
+    manager: Colors.warning,
+    cashier: Colors.info,
+    owner: Colors.secondary,
+  };
+  return colors[String(role || "").toLowerCase()] || Colors.info;
 }
 
 function getInitial(name: string): string {
-  return name.trim().charAt(0).toUpperCase();
+  return String(name || "?").trim().charAt(0).toUpperCase() || "?";
 }
 
 const COPY = {
@@ -55,6 +59,13 @@ const COPY = {
     roles: { owner: "Owner", admin: "Admin", manager: "Manager", cashier: "Cashier" } as Record<string, string>,
     types: { pharmacy: "Pharmacy", restaurant: "Restaurant", supermarket: "Supermarket", cafe: "Café", retail: "Store", bakery: "Bakery" } as Record<string, string>,
     store: "Store",
+    tabletTip: "Best on a tablet or iPad — the POS is optimised for larger screens.",
+    del: "Delete", back: "Back to staff list",
+    offline: "No connection to the server. Check the internet and try again.",
+    loadFailed: "Could not load the staff list.",
+    retry: "Try again",
+    shiftFailed: "The shift could not be started.",
+    invalidAmount: "Enter a valid amount.",
   },
   de: {
     who: "Wer arbeitet gerade?",
@@ -69,6 +80,13 @@ const COPY = {
     roles: { owner: "Inhaber", admin: "Admin", manager: "Manager", cashier: "Kassierer" } as Record<string, string>,
     types: { pharmacy: "Apotheke", restaurant: "Restaurant", supermarket: "Supermarkt", cafe: "Café", retail: "Geschäft", bakery: "Bäckerei" } as Record<string, string>,
     store: "Geschäft",
+    tabletTip: "Am besten auf einem Tablet oder iPad – die Kasse ist für grössere Bildschirme optimiert.",
+    del: "Löschen", back: "Zurück zur Mitarbeiterliste",
+    offline: "Keine Verbindung zum Server. Internet prüfen und erneut versuchen.",
+    loadFailed: "Die Mitarbeiterliste konnte nicht geladen werden.",
+    retry: "Erneut versuchen",
+    shiftFailed: "Die Schicht konnte nicht gestartet werden.",
+    invalidAmount: "Bitte einen gültigen Betrag eingeben.",
   },
   ar: {
     who: "من يعمل الآن؟",
@@ -83,6 +101,13 @@ const COPY = {
     roles: { owner: "المالك", admin: "مدير النظام", manager: "مدير", cashier: "كاشير" } as Record<string, string>,
     types: { pharmacy: "صيدلية", restaurant: "مطعم", supermarket: "سوبر ماركت", cafe: "مقهى", retail: "متجر", bakery: "مخبز" } as Record<string, string>,
     store: "متجر",
+    tabletTip: "الأفضل على جهاز لوحي أو آيباد — نقطة البيع مصممة للشاشات الكبيرة.",
+    del: "حذف", back: "العودة لقائمة الموظفين",
+    offline: "لا يوجد اتصال بالخادم. تحقق من الإنترنت وحاول مرة أخرى.",
+    loadFailed: "تعذّر تحميل قائمة الموظفين.",
+    retry: "إعادة المحاولة",
+    shiftFailed: "تعذّر بدء الوردية.",
+    invalidAmount: "أدخل مبلغاً صحيحاً.",
   },
 };
 
@@ -124,7 +149,10 @@ export default function LoginScreen() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState(false);
+  /** Non-PIN failure (offline, server error): shown instead of "wrong PIN". */
+  const [loginError, setLoginError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [startingShift, setStartingShift] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [showShiftPrompt, setShowShiftPrompt] = useState(false);
   const [showOpeningCashInput, setShowOpeningCashInput] = useState(false);
@@ -148,7 +176,7 @@ export default function LoginScreen() {
     }
   }, []);
 
-  const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({
+  const { data: employees, isLoading: employeesLoading, isError: employeesError, refetch: refetchEmployees, isFetching: employeesFetching } = useQuery<Employee[]>({
     queryKey: [`/api/employees?tenantId=${tenant?.id}`],
     queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: !!tenant?.id,
@@ -193,6 +221,7 @@ export default function LoginScreen() {
     setSelectedEmployee(emp);
     setPin("");
     setPinError(false);
+    setLoginError("");
     setMode("pin");
   };
 
@@ -202,6 +231,7 @@ export default function LoginScreen() {
     setSelectedEmployee(null);
     setPin("");
     setPinError(false);
+    setLoginError("");
   }, []);
 
   const failPin = () => {
@@ -218,14 +248,30 @@ export default function LoginScreen() {
 
   const handleLogin = async (pinCode: string) => {
     setLoading(true);
+    setLoginError("");
+    let emp: any;
     try {
       const res = await apiRequest("POST", "/api/employees/login", { pin: pinCode, employeeId: selectedEmployee?.id });
-      const emp = await res.json();
+      emp = await res.json();
+    } catch (e) {
+      // Only a refusal (4xx) means the PIN was wrong; a dropped connection or a
+      // server error must not tell the cashier to retype a correct PIN.
+      const msg = String((e as any)?.message ?? "");
+      if (/^4\d\d:/.test(msg)) {
+        failPin();
+      } else {
+        setPin("");
+        setLoginError(isNetworkFailure(e) ? c.offline : describeError(e, language, c.offline));
+      }
+      setLoading(false);
+      return;
+    }
+    try {
       login(emp);
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       try {
-        const shiftRes = await apiRequest("GET", `/api/shifts/active/${emp.id}`);
+        const shiftRes = await apiRequest("GET", `/api/shifts/active/${emp.id}?tenantId=${tenant?.id ?? ""}`);
         const activeShift = await shiftRes.json();
         if (!activeShift) {
           setLoggedInEmployee(emp);
@@ -236,8 +282,6 @@ export default function LoginScreen() {
       } catch {
         router.replace("/(tabs)");
       }
-    } catch {
-      failPin();
     } finally {
       setLoading(false);
     }
@@ -247,6 +291,7 @@ export default function LoginScreen() {
     if (loading || pin.length >= 4) return;
     tap();
     setPinError(false);
+    setLoginError("");
     const newPin = pin + digit;
     setPin(newPin);
     if (newPin.length === 4) handleLogin(newPin);
@@ -261,7 +306,8 @@ export default function LoginScreen() {
   useEffect(() => {
     if (Platform.OS !== "web" || mode !== "pin" || typeof window === "undefined") return;
     const onKey = (e: KeyboardEvent) => {
-      if (/^[0-9]$/.test(e.key)) handlePinPress(e.key);
+      const key = toLatinDigits(e.key);
+      if (/^[0-9]$/.test(key)) handlePinPress(key);
       else if (e.key === "Backspace") handleDelete();
       else if (e.key === "Escape") handleBack();
     };
@@ -277,17 +323,31 @@ export default function LoginScreen() {
   };
 
   const handleStartShift = async () => {
-    if (!loggedInEmployee) return;
+    if (!loggedInEmployee || startingShift) return;
+    const currency = getCurrency();
+    const amount = openingCash.trim() ? parseAmountInput(openingCash, currency) : 0;
+    if (!Number.isFinite(amount) || amount < 0) {
+      showAlert(t("error"), c.invalidAmount);
+      return;
+    }
+    setStartingShift(true);
     try {
       await apiRequest("POST", "/api/shifts", {
         employeeId: loggedInEmployee.id,
         branchId: loggedInEmployee.branchId || 1,
-        openingCash: openingCash ? Number(openingCash) : 0,
+        openingCash: roundMoney(amount, currency),
       });
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(t("success"), t("shiftStartedSuccess"));
     } catch (e: any) {
-      console.error("Failed to start shift:", e);
+      // Stay on the prompt: a cashier must not reach the till without the
+      // shift they think they opened.
+      setStartingShift(false);
+      showAlert(t("error"), describeError(e, language, c.shiftFailed));
+      return;
+    }
+    setStartingShift(false);
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showAlert(t("success"), t("shiftStartedSuccess"));
     }
     setShowShiftPrompt(false);
     setShowOpeningCashInput(false);
@@ -298,9 +358,9 @@ export default function LoginScreen() {
   const handleSkipShift = () => {
     // Shift is mandatory for admin and cashier — warn them
     if (loggedInEmployee && (loggedInEmployee.role === "admin" || loggedInEmployee.role === "cashier" || loggedInEmployee.role === "owner")) {
-      Alert.alert(
-        t("shiftRequiredTitle" as any) || "Shift Required",
-        t("cannotSkipShift" as any) || "Starting a shift is mandatory before accessing the POS",
+      showAlert(
+        t("shiftRequiredTitle" as any),
+        t("cannotSkipShift" as any),
         [{ text: t("startShift"), onPress: () => setShowOpeningCashInput(true) }]
       );
       return;
@@ -386,6 +446,23 @@ export default function LoginScreen() {
       </View>
       {employeesLoading || isValidating || !tenant ? (
         <View style={styles.center}><ActivityIndicator size="large" color={Colors.white} /></View>
+      ) : employeesError ? (
+        <View style={styles.center}>
+          <Ionicons name="cloud-offline-outline" size={44} color="rgba(255,255,255,0.7)" />
+          <Text style={styles.emptyTitle}>{c.loadFailed}</Text>
+          <Text style={styles.emptyHint}>{c.offline}</Text>
+          <Pressable
+            onPress={() => refetchEmployees()}
+            disabled={employeesFetching}
+            style={[styles.retryBtn, employeesFetching && { opacity: 0.6 }]}
+            accessibilityRole="button"
+          >
+            {employeesFetching
+              ? <ActivityIndicator size="small" color={Colors.white} />
+              : <Ionicons name="refresh" size={18} color={Colors.white} />}
+            <Text style={styles.signOutText}>{c.retry}</Text>
+          </Pressable>
+        </View>
       ) : staff.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="people-outline" size={44} color="rgba(255,255,255,0.55)" />
@@ -430,7 +507,7 @@ export default function LoginScreen() {
           <View key={i} style={[styles.dot, i < pin.length && styles.dotFilled, pinError && styles.dotError]} />
         ))}
       </Animated.View>
-      <Text style={styles.pinError}>{pinError ? c.wrongPin : " "}</Text>
+      <Text style={styles.pinError} accessibilityLiveRegion="polite">{pinError ? c.wrongPin : loginError || " "}</Text>
     </View>
   );
 
@@ -450,7 +527,7 @@ export default function LoginScreen() {
               hovered && styles.keyHover,
               pressed && styles.keyPressed,
             ]}
-            accessibilityLabel={key === "del" ? "Delete" : key === "back" ? "Back" : key}
+            accessibilityLabel={key === "del" ? c.del : key === "back" ? c.back : key}
           >
             {icon ? (
               <Ionicons name={icon as any} size={clamp(keyH * 0.38, 20, 28)} color={Colors.white} />
@@ -498,9 +575,10 @@ export default function LoginScreen() {
               setShowTabletBanner(false);
             }}
             style={[styles.tabletTip, { bottom: insets.bottom + 12, flexDirection: row }]}
+            accessibilityRole="button"
           >
             <Ionicons name="tablet-landscape-outline" size={22} color={Colors.white} />
-            <Text style={styles.tabletTipText}>Best on a tablet or iPad — the POS is optimized for larger screens.</Text>
+            <Text style={[styles.tabletTipText, { textAlign: isRTL ? "right" : "left" }]}>{c.tabletTip}</Text>
             <Ionicons name="close" size={16} color="rgba(255,255,255,0.7)" />
           </Pressable>
         )}
@@ -528,7 +606,8 @@ export default function LoginScreen() {
         </View>
       </Modal>
 
-      <Modal visible={showShiftPrompt} animationType="fade" transparent>
+      {/* Android back does nothing here on purpose: the shift decision is required. */}
+      <Modal visible={showShiftPrompt} animationType="fade" transparent onRequestClose={() => { if (showOpeningCashInput && !startingShift) setShowOpeningCashInput(false); }}>
         <View style={styles.backdrop}>
           <View style={styles.dialog}>
             {!showOpeningCashInput ? (
@@ -559,20 +638,30 @@ export default function LoginScreen() {
               </>
             ) : (
               <>
-                <Text style={{ color: Colors.text, fontSize: 18, fontWeight: "700", marginBottom: 16, textAlign: "center" }}>{t("enterOpeningCash")}</Text>
+                <Text style={{ color: Colors.text, fontSize: 18, fontWeight: "700", marginBottom: 16, textAlign: "center" }}>{t("enterOpeningCash")} ({currencyLabel()})</Text>
                 <TextInput
                   style={{ alignSelf: "stretch", backgroundColor: Colors.surfaceLight, borderRadius: 12, padding: 14, fontSize: 18, color: Colors.text, textAlign: "center", borderWidth: 1, borderColor: Colors.cardBorder, marginBottom: 16 }}
                   value={openingCash}
                   onChangeText={setOpeningCash}
-                  keyboardType="decimal-pad"
-                  placeholder="0.00"
+                  keyboardType={isZeroDecimalCurrency() ? "number-pad" : "decimal-pad"}
+                  placeholder={formatAmount(0)}
                   placeholderTextColor={Colors.textMuted}
                   autoFocus
+                  onSubmitEditing={handleStartShift}
+                  returnKeyType="done"
+                  editable={!startingShift}
                 />
-                <Pressable onPress={handleStartShift} style={{ alignSelf: "stretch", backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10 }}>
+                <Pressable
+                  onPress={handleStartShift}
+                  disabled={startingShift}
+                  style={{ alignSelf: "stretch", backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8, marginBottom: 10, opacity: startingShift ? 0.6 : 1 }}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: startingShift, busy: startingShift }}
+                >
+                  {startingShift && <ActivityIndicator size="small" color={Colors.textDark} />}
                   <Text style={{ color: Colors.textDark, fontSize: 16, fontWeight: "700" }}>{t("startShift")}</Text>
                 </Pressable>
-                <Pressable onPress={() => setShowOpeningCashInput(false)} style={{ alignSelf: "stretch", borderRadius: 12, paddingVertical: 14, alignItems: "center" }}>
+                <Pressable onPress={() => setShowOpeningCashInput(false)} disabled={startingShift} style={{ alignSelf: "stretch", borderRadius: 12, paddingVertical: 14, alignItems: "center" }}>
                   <Text style={{ color: Colors.textSecondary, fontSize: 15 }}>{t("cancel")}</Text>
                 </Pressable>
               </>
@@ -628,11 +717,23 @@ const styles = themedStyles((Colors) => ({
     fontWeight: "600" as const,
     marginTop: 1,
   },
+  retryBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center",
+    gap: 8,
+    marginTop: 16,
+    paddingHorizontal: 18,
+    minHeight: 44,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
   signOutBtn: {
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
+    minHeight: 44,
     borderRadius: 999,
     backgroundColor: "rgba(0,0,0,0.18)",
     borderWidth: 1,
@@ -870,6 +971,8 @@ const styles = themedStyles((Colors) => ({
     flex: 1,
     borderRadius: 12,
     paddingVertical: 13,
+    minHeight: 48,
+    justifyContent: "center",
     alignItems: "center",
   },
   dialogBtnGhost: {

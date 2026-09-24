@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack, Redirect } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -31,9 +31,12 @@ if (Platform.OS === "web" && typeof window !== "undefined" && "serviceWorker" in
       const reg = await navigator.serviceWorker.register("/app/sw.js", { scope: "/app/" });
       console.log("[SW] Registered:", reg.scope);
 
-      // Request push permission and subscribe
-      const permission = await Notification.requestPermission();
-      if (permission === "granted") {
+      if (typeof Notification === "undefined" || !("PushManager" in window)) return;
+
+      // Browsers ignore (Chrome: silently blocks, Safari: rejects) a permission
+      // prompt that is not triggered by the user. Subscribe straight away when
+      // permission was already given; otherwise ask on the first tap/click.
+      const subscribe = async () => {
         try {
           const [licenseKey, tenantId] = await Promise.all([
             AsyncStorage.getItem("barmagly_license_key"),
@@ -78,6 +81,18 @@ if (Platform.OS === "web" && typeof window !== "undefined" && "serviceWorker" in
         } catch (pushErr) {
           console.warn("[Push] Subscription failed:", pushErr);
         }
+      };
+
+      if (Notification.permission === "granted") {
+        await subscribe();
+      } else if (Notification.permission === "default") {
+        const askOnce = () => {
+          window.removeEventListener("pointerdown", askOnce, true);
+          Notification.requestPermission()
+            .then((permission) => { if (permission === "granted") void subscribe(); })
+            .catch(() => { /* user or browser declined */ });
+        };
+        window.addEventListener("pointerdown", askOnce, true);
       }
     } catch (err) {
       console.warn("[SW] Registration failed:", err);
@@ -101,7 +116,6 @@ if (Platform.OS === "web" && typeof window !== "undefined") {
   });
 }
 
-import { useRouter, useSegments } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 
 WebBrowser.maybeCompleteAuthSession();

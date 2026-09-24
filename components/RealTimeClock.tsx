@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { Colors } from "@/constants/colors";
+import { useLanguage } from "@/lib/language-context";
 
 export default function RealTimeClock() {
+    const { language } = useLanguage();
+    const locale = language === "ar" ? "ar-SY-u-nu-latn" : language === "de" ? "de-CH" : "en-GB";
     const [time, setTime] = useState(new Date());
 
     useEffect(() => {
@@ -11,16 +13,20 @@ export default function RealTimeClock() {
     }, []);
 
     const formatDate = (date: Date) => {
-        // Expected output: 21. Mar. 26
+        // Expected output: 21. Mar. 26 (month name in the UI language; the
+        // device clock/timezone is the store's own, e.g. Asia/Damascus)
         const day = date.getDate().toString().padStart(2, '0');
-        const month = date.toLocaleString('en-US', { month: 'short' });
+        let month: string;
+        try { month = date.toLocaleString(locale, { month: 'short' }); }
+        catch { month = date.toLocaleString('en-GB', { month: 'short' }); }
         const year = date.getFullYear().toString().slice(-2);
-        return `${day}. ${month}. ${year}`;
+        return language === "ar" ? `${day} ${month} ${year}` : `${day}. ${month.replace(/\.$/, "")}. ${year}`;
     };
 
     const formatTime = (date: Date) => {
         // Expected output: 19:32:26
-        return date.toTimeString().split(' ')[0];
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
     };
 
     return (
@@ -46,7 +52,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 10,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.8,

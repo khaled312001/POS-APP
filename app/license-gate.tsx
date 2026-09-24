@@ -8,12 +8,51 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { useLanguage } from '@/lib/language-context';
-import { signInWithGoogleNative, supportsNativeGoogle, GoogleSignInCancelled } from '@/lib/google-signin';
+import { signInWithGoogleNative, signInWithGoogleWeb, supportsGoogle, GoogleSignInCancelled } from '@/lib/google-signin';
 
 
 
 const WEBSITE_URL = 'https://kassenta.com/';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const COPY = {
+    en: {
+        verifying: 'Verifying store activation…',
+        redirecting: 'Opening the staff login…',
+        subtitleA: 'Enter your store email and license key to activate, or subscribe to start your ',
+        trial: '14-day free trial',
+        subtitleB: ' instantly.',
+        device: 'Device',
+        detecting: 'Detecting…',
+        help: 'Need help? Contact your store administrator.',
+        googleFailed: 'Google sign-in failed. Please try again.',
+        activateFailed: 'Activation failed. Check the connection and try again.',
+    },
+    de: {
+        verifying: 'Geschäftsaktivierung wird geprüft…',
+        redirecting: 'Mitarbeiter-Anmeldung wird geöffnet…',
+        subtitleA: 'Geben Sie die E-Mail-Adresse und den Lizenzschlüssel Ihres Geschäfts ein, oder abonnieren Sie und starten Sie sofort Ihre ',
+        trial: '14-tägige Gratis-Testphase',
+        subtitleB: '.',
+        device: 'Gerät',
+        detecting: 'Wird ermittelt…',
+        help: 'Hilfe nötig? Wenden Sie sich an den Administrator Ihres Geschäfts.',
+        googleFailed: 'Google-Anmeldung fehlgeschlagen. Bitte erneut versuchen.',
+        activateFailed: 'Aktivierung fehlgeschlagen. Verbindung prüfen und erneut versuchen.',
+    },
+    ar: {
+        verifying: 'جارٍ التحقق من تفعيل المتجر…',
+        redirecting: 'جارٍ فتح تسجيل دخول الموظفين…',
+        subtitleA: 'أدخل بريد المتجر ومفتاح الترخيص للتفعيل، أو اشترك لتبدأ ',
+        trial: 'تجربة مجانية لمدة 14 يوماً',
+        subtitleB: ' فوراً.',
+        device: 'الجهاز',
+        detecting: 'جارٍ التحديد…',
+        help: 'تحتاج مساعدة؟ تواصل مع مسؤول المتجر.',
+        googleFailed: 'فشل تسجيل الدخول عبر Google. حاول مرة أخرى.',
+        activateFailed: 'فشل التفعيل. تحقق من الاتصال وحاول مرة أخرى.',
+    },
+};
 
 export default function LicenseGate() {
     const { isValidating, isValid, validateLicense, validateGoogleLogin, errorReason, deviceId } = useLicense();
@@ -23,9 +62,13 @@ export default function LicenseGate() {
     const [googleLoading, setGoogleLoading] = useState(false);
     const [googleError, setGoogleError] = useState<string | null>(null);
     const [focusedField, setFocusedField] = useState<string | null>(null);
+    const [activateError, setActivateError] = useState<string | null>(null);
+    const keyInputRef = useRef<TextInput>(null);
     const router = useRouter();
 
-    const { t } = useLanguage();
+    const { t, language, isRTL } = useLanguage();
+    const c = (COPY as any)[language] ?? COPY.en;
+    const textAlign = isRTL ? ('right' as const) : ('left' as const);
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -76,10 +119,18 @@ export default function LicenseGate() {
         const cleanEmail = email.trim();
         const cleanKey = key.replace(/\s+/g, '').toUpperCase();
 
-        if (!cleanEmail || !cleanKey) return;
+        if (!cleanEmail || !cleanKey || loading) return;
+        setActivateError(null);
         setLoading(true);
-        await validateLicense(cleanKey, cleanEmail);
-        setLoading(false);
+        try {
+            await validateLicense(cleanKey, cleanEmail);
+        } catch {
+            // validateLicense reports refusals through errorReason; anything
+            // thrown here is a transport failure.
+            setActivateError(c.activateFailed);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Signing in with Google creates the store and its 14-day trial licence on
@@ -89,12 +140,13 @@ export default function LicenseGate() {
         setGoogleError(null);
         setGoogleLoading(true);
         try {
-            const idToken = await signInWithGoogleNative();
-            const ok = await validateGoogleLogin(idToken);
+            const ok = Platform.OS === 'web'
+                ? await validateGoogleLogin(await signInWithGoogleWeb(), 'access')
+                : await validateGoogleLogin(await signInWithGoogleNative());
             if (!ok) setGoogleError(t('googleNoStore'));
         } catch (e: any) {
             if (!(e instanceof GoogleSignInCancelled)) {
-                setGoogleError(e?.message || 'Google sign-in failed');
+                setGoogleError(c.googleFailed);
             }
         } finally {
             setGoogleLoading(false);
@@ -112,7 +164,7 @@ export default function LicenseGate() {
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
                 <View style={styles.loaderContainer}>
                     <ActivityIndicator size="large" color={Colors.accent} />
-                    <Text style={styles.loadingText}>Verifying Store Activation...</Text>
+                    <Text style={styles.loadingText}>{c.verifying}</Text>
                 </View>
             </View>
         );
@@ -127,7 +179,7 @@ export default function LicenseGate() {
                         <Ionicons name="shield-checkmark" size={64} color={Colors.success} />
                     </View>
                     <Text style={styles.successText}>{t('success')}</Text>
-                    <Text style={styles.successSubtext}>Redirecting to login...</Text>
+                    <Text style={styles.successSubtext}>{c.redirecting}</Text>
                 </Animated.View>
             </View>
         );
@@ -161,15 +213,16 @@ export default function LicenseGate() {
                     {/* Header */}
                     <Text style={styles.title}>{t('activateStore')}</Text>
                     <Text style={styles.subtitle}>
-                        Enter your store email and license key to activate, or subscribe to start your{' '}
-                        <Text style={styles.trialHighlight}>14-day free trial</Text>
-                        {' '}instantly.
+                        {c.subtitleA}
+                        <Text style={styles.trialHighlight}>{c.trial}</Text>
+                        {c.subtitleB}
                     </Text>
 
                     <TouchableOpacity
                         style={styles.subscribeButton}
-                        onPress={() => Linking.openURL(WEBSITE_URL)}
+                        onPress={() => { Linking.openURL(WEBSITE_URL).catch(() => { }); }}
                         activeOpacity={0.8}
+                        accessibilityRole="link"
                     >
                         <Ionicons name="star" size={20} color="#fff" />
                         <Text style={styles.subscribeButtonText}>{t('subscribeNow')}</Text>
@@ -182,10 +235,10 @@ export default function LicenseGate() {
                     </View>
 
                     {/* Error */}
-                    {errorReason && (
-                        <View style={styles.errorContainer}>
+                    {!!(activateError || errorReason) && (
+                        <View style={styles.errorContainer} accessibilityRole="alert">
                             <Ionicons name="alert-circle" size={18} color={Colors.danger} />
-                            <Text style={styles.errorText}>{errorReason}</Text>
+                            <Text style={[styles.errorText, { textAlign }]}>{activateError || errorReason}</Text>
                         </View>
                     )}
 
@@ -193,7 +246,7 @@ export default function LicenseGate() {
                     <View style={styles.formCard}>
                         {/* Email Input */}
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>
+                            <Text style={[styles.label, { textAlign }]}>
                                 <Ionicons name="mail-outline" size={13} color={Colors.accent} /> {t('storeEmail')}
                             </Text>
                             <View style={[
@@ -211,13 +264,18 @@ export default function LicenseGate() {
                                     autoCorrect={false}
                                     onFocus={() => setFocusedField('email')}
                                     onBlur={() => setFocusedField(null)}
+                                    returnKeyType="next"
+                                    onSubmitEditing={() => keyInputRef.current?.focus()}
+                                    autoComplete="email"
+                                    textContentType="emailAddress"
+                                    accessibilityLabel={t('storeEmail')}
                                 />
                             </View>
                         </View>
 
                         {/* License Key Input */}
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>
+                            <Text style={[styles.label, { textAlign }]}>
                                 <Ionicons name="key-outline" size={13} color={Colors.accent} /> {t('licenseKey')}
                             </Text>
                             <View style={[
@@ -225,6 +283,7 @@ export default function LicenseGate() {
                                 focusedField === 'key' && styles.inputWrapperFocused
                             ]}>
                                 <TextInput
+                                    ref={keyInputRef}
                                     style={[styles.input, styles.inputKey]}
                                     placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXX"
                                     placeholderTextColor={Colors.textMuted}
@@ -234,6 +293,9 @@ export default function LicenseGate() {
                                     autoCorrect={false}
                                     onFocus={() => setFocusedField('key')}
                                     onBlur={() => setFocusedField(null)}
+                                    returnKeyType="go"
+                                    onSubmitEditing={handleValidate}
+                                    accessibilityLabel={t('licenseKey')}
                                 />
                             </View>
                         </View>
@@ -247,21 +309,22 @@ export default function LicenseGate() {
                             onPress={handleValidate}
                             disabled={!key.trim() || !email.trim() || loading}
                             activeOpacity={0.85}
+                            accessibilityRole="button"
+                            accessibilityState={{ disabled: !key.trim() || !email.trim() || loading, busy: loading }}
                         >
                             {loading ? (
-                                <ActivityIndicator color="#fff" />
+                                <ActivityIndicator color={Colors.textDark} />
                             ) : (
                                 <View style={styles.buttonContent}>
-                                    <Ionicons name="rocket-outline" size={20} color="#fff" />
-                                    <Text style={styles.buttonText}>{t('activateButton') || 'Activate Store'}</Text>
+                                    <Ionicons name="rocket-outline" size={20} color={Colors.textDark} />
+                                    <Text style={styles.buttonText}>{t('activateButton')}</Text>
                                 </View>
                             )}
                         </TouchableOpacity>
 
-                        {/* Google — native only. On the web build the account
-                            picker is a browser flow, which belongs on the site
-                            rather than inside this gate. */}
-                        {supportsNativeGoogle && (
+                        {/* Google — the native account picker on Android/iOS,
+                            Google's pop-up on the web build. */}
+                        {supportsGoogle && (
                             <>
                                 <View style={[styles.orDivider, { marginTop: 18 }]}>
                                     <View style={styles.orLine} />
@@ -298,14 +361,14 @@ export default function LicenseGate() {
                     <View style={styles.deviceInfo}>
                         <Ionicons name="finger-print-outline" size={14} color={Colors.textMuted} />
                         <Text style={styles.deviceInfoText}>
-                            Device: {deviceId ? deviceId.substring(0, 12) + '...' : 'Detecting...'}
+                            {c.device}: {deviceId ? deviceId.substring(0, 12) + '…' : c.detecting}
                         </Text>
                     </View>
 
                     {/* Help */}
                     <View style={styles.footer}>
                         <Ionicons name="help-circle-outline" size={14} color={Colors.textMuted} />
-                        <Text style={styles.footerText}>Need help? Contact your store administrator.</Text>
+                        <Text style={[styles.footerText, { flexShrink: 1 }]}>{c.help}</Text>
                     </View>
 
                     {/* ── Subscription Instructions Section ── */}
@@ -322,7 +385,8 @@ export default function LicenseGate() {
 
                         <TouchableOpacity
                             style={styles.subscribeLink}
-                            onPress={() => Linking.openURL(WEBSITE_URL)}
+                            onPress={() => { Linking.openURL(WEBSITE_URL).catch(() => { }); }}
+                            accessibilityRole="link"
                         >
                             <Text style={styles.subscribeLinkText}>{WEBSITE_URL}</Text>
                             <Ionicons name="open-outline" size={16} color={Colors.accent} />
@@ -598,7 +662,8 @@ const styles = themedStyles((Colors) => ({
         gap: 10,
     },
     buttonText: {
-        color: '#fff',
+        // Ink that sits on the accent fill (white in light, near-black in dark).
+        color: Colors.textDark,
         fontSize: 16,
         fontWeight: '700',
         letterSpacing: 0.3,

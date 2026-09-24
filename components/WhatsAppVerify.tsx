@@ -21,6 +21,14 @@ const COPY = {
     manage: "إدارة واتساب",
     link: "ربط واتساب",
   },
+  de: {
+    title: "WhatsApp des Geschäfts",
+    on: (p: string) => `Verbunden mit +${p} — Bestellnachrichten und Chats sind aktiv`,
+    waiting: "Warte auf das Scannen des QR-Codes",
+    off: "Nicht verbunden — verbinden Sie die Nummer Ihres Geschäfts, um Bestellnachrichten und Angebote zu senden und Kundenchats zu empfangen",
+    manage: "WhatsApp verwalten",
+    link: "WhatsApp verbinden",
+  },
   en: {
     title: "Store WhatsApp",
     on: (p: string) => `Linked to +${p} — order messages and chats are on`,
@@ -34,7 +42,7 @@ const COPY = {
 export default function WhatsAppVerify({ onOpen }: { onOpen?: () => void }) {
   const { colors } = useTheme();
   const { language, isRTL } = useLanguage();
-  const c = language === "ar" ? COPY.ar : COPY.en;
+  const c = language === "ar" ? COPY.ar : language === "de" ? COPY.de : COPY.en;
   const { data } = useQuery<any>({
     queryKey: ["/api/whatsapp/session"],
     queryFn: getQueryFn({ on401: "returnNull" }),
@@ -51,15 +59,16 @@ export default function WhatsAppVerify({ onOpen }: { onOpen?: () => void }) {
         <View style={[s.icon, { backgroundColor: "#25D36622" }]}>
           <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
         </View>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={[s.title, { color: colors.text, textAlign: align }]}>{c.title}</Text>
           <Text style={[s.sub, { color, textAlign: align }]}>
-            {connected && data?.phone ? c.on(data.phone) : status === "qr_ready" ? c.waiting : c.off}
+            {connected && data?.phone ? c.on(String(data.phone).replace(/^\+/, "")) : status === "qr_ready" || status === "connecting" ? c.waiting : c.off}
           </Text>
         </View>
       </View>
       <Pressable
         onPress={() => { onOpen?.(); router.push("/whatsapp" as any); }}
+        accessibilityRole="button"
         style={[s.btn, { backgroundColor: connected ? "transparent" : "#128C7E", borderColor: "#128C7E" }]}
       >
         <Ionicons name={connected ? "settings-outline" : "qr-code-outline"} size={16} color={connected ? "#128C7E" : "#fff"} />
@@ -75,6 +84,6 @@ const s = StyleSheet.create({
   icon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 15, fontWeight: "800" },
   sub: { fontSize: 12, fontWeight: "600", marginTop: 3, lineHeight: 17 },
-  btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderRadius: 12, paddingVertical: 11 },
+  btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 12, minHeight: 44 },
   btnText: { fontSize: 14, fontWeight: "800" },
 });

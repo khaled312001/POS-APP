@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, Pressable, TextInput, ActivityIndicator, Modal, ScrollView, Image, StyleSheet } from "react-native";
+import { View, Text, Pressable, TextInput, ActivityIndicator, Modal, ScrollView, Image, StyleSheet, Platform, I18nManager } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/lib/theme-context";
 import { useLanguage } from "@/lib/language-context";
 import { formatMoney } from "@/lib/currency";
 import { shamCashImageUri } from "@/components/ShamCashSettings";
+import { toLatinDigits } from "@/lib/money-input";
 
 /**
  * Till-side Sham Cash: shows the store's own QR code and number so the
@@ -49,34 +50,37 @@ export default function ShamCashTillModal({ visible, amount, info, busy, onConfi
   const { language, isRTL } = useLanguage();
   const c = (COPY as any)[language] ?? COPY.en;
   const align = isRTL ? ("right" as const) : ("left" as const);
+  // On web `dir="rtl"` already mirrors "row", and native RTL (I18nManager) does
+  // too; only an Arabic UI that is not yet laid out RTL needs an explicit flip.
+  const rowDir = isRTL && Platform.OS !== "web" && !I18nManager.isRTL ? ("row-reverse" as const) : ("row" as const);
   const [reference, setReference] = useState("");
   useEffect(() => { if (visible) setReference(""); }, [visible]);
 
   const qrUri = shamCashImageUri(info?.qrImage);
   const row = (label: string, value?: string | null) =>
     !value ? null : (
-      <View style={[s.row, { flexDirection: isRTL ? "row-reverse" : "row", borderColor: colors.border }]}>
+      <View style={[s.row, { flexDirection: rowDir, borderColor: colors.border }]}>
         <Text style={{ color: colors.textMuted, fontSize: 13 }}>{label}</Text>
-        <Text selectable style={{ color: colors.text, fontWeight: "700", fontSize: 15 }}>{value}</Text>
+        <Text selectable style={{ color: colors.text, fontWeight: "700", fontSize: 15, writingDirection: "ltr" }}>{value}</Text>
       </View>
     );
 
   return (
-    <Modal visible={visible} animationType="fade" transparent>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={() => { if (!busy) onCancel(); }}>
       <View style={s.overlay}>
         <View style={[s.card, { backgroundColor: colors.surface }]}>
-          <View style={[s.header, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+          <View style={[s.header, { flexDirection: rowDir }]}>
             <View style={[s.icon, { backgroundColor: "#0E9F6E20" }]}>
               <Ionicons name="wallet" size={20} color="#0E9F6E" />
             </View>
             <Text style={[s.title, { color: colors.text, textAlign: align, flex: 1 }]}>{c.title}</Text>
-            <Pressable onPress={onCancel} disabled={busy}>
-              <Ionicons name="close" size={24} color={colors.text} />
+            <Pressable onPress={onCancel} disabled={busy} style={s.close} accessibilityRole="button" accessibilityLabel={c.cancel}>
+              <Ionicons name="close" size={22} color={colors.text} />
             </Pressable>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={[s.amount, { color: colors.text }]}>{formatMoney(amount)}</Text>
+            <Text style={[s.amount, { color: colors.text }]} adjustsFontSizeToFit numberOfLines={1}>{formatMoney(amount)}</Text>
             <Text style={[s.step, { color: colors.textMuted, textAlign: align }]}>{c.scan}</Text>
             {!!qrUri && (
               <View style={s.qrWrap}>
@@ -88,7 +92,7 @@ export default function ShamCashTillModal({ visible, amount, info, busy, onConfi
 
             <TextInput
               value={reference}
-              onChangeText={setReference}
+              onChangeText={(v) => setReference(toLatinDigits(v))}
               placeholder={c.refPh}
               placeholderTextColor={colors.textMuted}
               keyboardType="number-pad"
@@ -96,7 +100,7 @@ export default function ShamCashTillModal({ visible, amount, info, busy, onConfi
             />
             <Text style={[s.step, { color: colors.warning, textAlign: align }]}>{c.check}</Text>
 
-            <Pressable onPress={() => onConfirm(reference.trim())} disabled={busy} style={[s.primary, busy && { opacity: 0.6 }]}>
+            <Pressable onPress={() => onConfirm(reference.trim())} disabled={busy} style={[s.primary, busy && { opacity: 0.6 }]} accessibilityRole="button" accessibilityState={{ disabled: !!busy, busy: !!busy }}>
               {busy ? <ActivityIndicator color="#fff" /> : (
                 <>
                   <Ionicons name="checkmark-circle" size={20} color="#fff" />
@@ -104,7 +108,7 @@ export default function ShamCashTillModal({ visible, amount, info, busy, onConfi
                 </>
               )}
             </Pressable>
-            <Pressable onPress={onCancel} disabled={busy} style={s.ghost}>
+            <Pressable onPress={onCancel} disabled={busy} style={s.ghost} accessibilityRole="button">
               <Text style={{ color: colors.textMuted }}>{c.cancel}</Text>
             </Pressable>
           </ScrollView>
@@ -126,7 +130,8 @@ const s = StyleSheet.create({
   qr: { width: 230, height: 230 },
   row: { justifyContent: "space-between", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, fontSize: 15, marginTop: 12 },
-  primary: { marginTop: 8, backgroundColor: "#0E9F6E", borderRadius: 12, paddingVertical: 13, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
+  primary: { marginTop: 8, backgroundColor: "#047857", borderRadius: 12, paddingVertical: 14, minHeight: 48, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   primaryText: { color: "#fff", fontSize: 15, fontWeight: "700" },
-  ghost: { alignItems: "center", paddingVertical: 12 },
+  ghost: { alignItems: "center", paddingVertical: 14 },
+  close: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
 });

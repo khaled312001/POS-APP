@@ -29,7 +29,7 @@ interface LicenseContextType {
     subscription: SubscriptionStatus | null;
     errorReason: string | null;
     validateLicense: (key: string, email?: string, password?: string) => Promise<boolean>;
-    validateGoogleLogin: (idToken: string) => Promise<boolean>;
+    validateGoogleLogin: (token: string, kind?: "id" | "access") => Promise<boolean>;
     logoutLicense: () => Promise<void>;
     deviceId: string;
 }
@@ -148,6 +148,14 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
 
             const data = await parseJsonResponse(response, "Validation server");
 
+            // Only an explicit verdict may sign the store out. A 429 (shared
+            // IP / carrier NAT), 5xx or any other error body is an outage, not
+            // an invalid key: it goes to the offline-grace path below instead
+            // of wiping the licence off the device.
+            if (!response.ok || typeof data?.isValid !== "boolean") {
+                throw new Error(data?.error || `Validation server returned ${response.status}`);
+            }
+
             if (data.isValid) {
                 await AsyncStorage.setItem("barmagly_license_key", key);
                 setCachedLicenseKey(key);
@@ -210,14 +218,14 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const validateGoogleLogin = async (idToken: string): Promise<boolean> => {
+    const validateGoogleLogin = async (token: string, kind: "id" | "access" = "id"): Promise<boolean> => {
         setErrorReason(null);
         try {
             let apiUrl = getApiUrl();
             const response = await fetch(`${apiUrl}/api/auth/google`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ idToken, deviceId })
+                body: JSON.stringify(kind === "access" ? { accessToken: token, deviceId } : { idToken: token, deviceId })
             });
 
             const data = await parseJsonResponse(response, "Google authentication server");

@@ -1,5 +1,5 @@
 import { Tabs, Redirect } from "expo-router";
-import { Platform, StyleSheet, Dimensions, Modal } from "react-native";
+import { Platform, StyleSheet, Dimensions, Modal, I18nManager } from "react-native";
 import React, { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/colors";
@@ -16,11 +16,14 @@ import { getQueryFn, getApiUrl } from "@/lib/query-client";
 import { getChromeMetrics, WEB_TOOLBAR_DESKTOP_H, WEB_TOOLBAR_MOBILE_H } from "@/lib/responsive";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatMoney } from "@/lib/currency";
+import { useTheme } from "@/lib/theme-context";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { isLoggedIn, isCashier } = useAuth();
-  const { t, isRTL } = useLanguage();
+  const { t, isRTL, language } = useLanguage();
+  const { isDark } = useTheme();
+  const L = (ar: string, de: string, en: string) => (language === "ar" ? ar : language === "de" ? de : en);
   const { subscription, tenant } = useLicense();
   const tenantId = tenant?.id;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -50,7 +53,7 @@ export default function TabLayout() {
   const router = useRouter();
   const navItems = [
     { href: "/", icon: "cart", label: t("pos") },
-    { href: "/online-orders", icon: "receipt", label: t("onlineOrdersTitle" as any) || "Orders" },
+    { href: "/online-orders", icon: "receipt", label: t("onlineOrdersTitle" as any) || L("الطلبات", "Bestellungen", "Orders") },
     { href: "/products", icon: "grid", label: t("products") },
     { href: "/customers", icon: "people", label: t("customers") },
     ...(!isCashier ? [
@@ -133,14 +136,31 @@ export default function TabLayout() {
     return <Redirect href="/license-gate" />;
   }
 
-  const showWarningUrl = "https://kassenta.com/upgrade"; // Or a modal
-
-  const banner = subscription?.requiresUpgrade ? (
-    <View style={{ backgroundColor: Colors.warning, padding: 12, paddingTop: Platform.OS === 'ios' ? 44 : 24, paddingBottom: 12 }}>
-      <Text style={{ color: '#000', fontWeight: 'bold', textAlign: 'center', fontSize: 13 }}>Your {subscription.plan} subscription {subscription.daysRemaining > 0 ? `expires in ${subscription.daysRemaining} days` : 'has expired'}. Contact super admin to avoid service interruption.
-      </Text>
-    </View>
-  ) : null;
+  const banner = subscription?.requiresUpgrade ? (() => {
+    const days = Number(subscription.daysRemaining) || 0;
+    const plan = String(subscription.plan || "");
+    const text = days > 0
+      ? L(
+        `اشتراكك (${plan}) ينتهي خلال ${days} يوم. تواصل مع الإدارة لتجنّب انقطاع الخدمة.`,
+        `Ihr ${plan}-Abo läuft in ${days} Tagen ab. Wenden Sie sich an den Administrator, um eine Unterbrechung zu vermeiden.`,
+        `Your ${plan} subscription expires in ${days} days. Contact the administrator to avoid service interruption.`,
+      )
+      : L(
+        `انتهى اشتراكك (${plan}). تواصل مع الإدارة لتجنّب انقطاع الخدمة.`,
+        `Ihr ${plan}-Abo ist abgelaufen. Wenden Sie sich an den Administrator, um eine Unterbrechung zu vermeiden.`,
+        `Your ${plan} subscription has expired. Contact the administrator to avoid service interruption.`,
+      );
+    return (
+      // Light warning tint + dark ink: readable in both themes (the dark
+      // palette's warning is a bright amber, the light one a deep brown).
+      <View
+        style={{ backgroundColor: "#FEF3C7", borderBottomWidth: 1, borderBottomColor: "#F59E0B", paddingHorizontal: 12, paddingTop: (Platform.OS === "web" ? 0 : insets.top) + 10, paddingBottom: 10 }}
+        accessibilityRole="alert"
+      >
+        <Text style={{ color: "#78350F", fontWeight: "700", textAlign: "center", fontSize: 13 }}>{text}</Text>
+      </View>
+    );
+  })() : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.background }}>
@@ -164,7 +184,7 @@ export default function TabLayout() {
           },
           tabBarBackground: () =>
             Platform.OS === "ios" ? (
-              <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
+              <BlurView intensity={100} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
             ) : null,
           tabBarLabelStyle: {
             fontSize: 10,
@@ -184,7 +204,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="online-orders"
           options={{
-            title: t("onlineOrdersTitle" as any) || "Orders",
+            title: t("onlineOrdersTitle" as any) || L("الطلبات", "Bestellungen", "Orders"),
             tabBarIcon: ({ color, size, focused }) => (
               <View style={{ position: "relative" }}>
                 <Ionicons name="receipt" size={size} color={color} />
@@ -210,7 +230,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="table-qr"
           options={{
-            title: "QR Tables",
+            title: L("طاولات QR", "QR-Tische", "QR Tables"),
             href: null,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="qr-code" size={size} color={color} />
@@ -270,7 +290,8 @@ export default function TabLayout() {
             backgroundColor: Colors.surface,
             borderBottomWidth: 1,
             borderBottomColor: Colors.border,
-            flexDirection: isRTL ? "row-reverse" : "row",
+            // Web only: dir="rtl" already mirrors "row" for Arabic.
+            flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
             paddingHorizontal: 12,
@@ -278,10 +299,10 @@ export default function TabLayout() {
           }}>
             <Pressable
               onPress={() => setShowMobileNav(true)}
-              accessibilityLabel="Open navigation"
+              accessibilityLabel={L("فتح القائمة", "Navigation öffnen", "Open navigation")}
               style={({ pressed }) => ({
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 borderRadius: 12,
                 alignItems: "center",
                 justifyContent: "center",
@@ -293,11 +314,11 @@ export default function TabLayout() {
               <Ionicons name="menu-outline" size={22} color={Colors.text} />
             </Pressable>
 
-            <Text style={{ color: Colors.text, fontSize: 16, fontWeight: "800" }} numberOfLines={1}>
+            <Text style={{ flex: 1, textAlign: "center", marginHorizontal: 8, color: Colors.text, fontSize: 16, fontWeight: "800" }} numberOfLines={1}>
               {currentTitle}
             </Text>
 
-            <View style={{ width: 40, height: 40, alignItems: "flex-end", justifyContent: "center" }}>
+            <View style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
               {isPosRoute ? (
                 <Pressable
                   onPress={() => {
@@ -305,10 +326,10 @@ export default function TabLayout() {
                       window.dispatchEvent(new CustomEvent("barmagly-open-cart"));
                     }
                   }}
-                  accessibilityLabel="Open cart"
+                  accessibilityLabel={L("فتح السلة", "Warenkorb öffnen", "Open cart")}
                   style={({ pressed }) => ({
-                    width: 40,
-                    height: 40,
+                    width: 44,
+                    height: 44,
                     borderRadius: 12,
                     alignItems: "center",
                     justifyContent: "center",
@@ -326,10 +347,19 @@ export default function TabLayout() {
           <Modal visible={showMobileNav} animationType="fade" transparent onRequestClose={() => setShowMobileNav(false)}>
             <View style={styles.mobileNavOverlay}>
               <Pressable style={styles.mobileNavBackdrop} onPress={() => setShowMobileNav(false)} />
-              <View style={[styles.mobileNavSheet, isRTL && { alignSelf: "flex-start" }]}>
-                <View style={[styles.mobileNavHeader, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Text style={styles.mobileNavTitle}>Kassenta POS</Text>
-                  <Pressable onPress={() => setShowMobileNav(false)} style={styles.mobileNavClose}>
+              {/* Opens from the side the menu button is on (start). Web only, so
+                  "row"/"flex-start" already follow dir="rtl". */}
+              <View style={[styles.mobileNavSheet, isRTL
+                ? { borderLeftWidth: 1, borderLeftColor: Colors.cardBorder }
+                : { borderRightWidth: 1, borderRightColor: Colors.cardBorder }]}>
+                <View style={styles.mobileNavHeader}>
+                  <Text style={[styles.mobileNavTitle, { flex: 1 }]} numberOfLines={1}>{tenant?.name || "Kassenta POS"}</Text>
+                  <Pressable
+                    onPress={() => setShowMobileNav(false)}
+                    style={styles.mobileNavClose}
+                    accessibilityRole="button"
+                    accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
+                  >
                     <Ionicons name="close" size={22} color={Colors.text} />
                   </Pressable>
                 </View>
@@ -343,10 +373,12 @@ export default function TabLayout() {
                         setShowMobileNav(false);
                         router.push(item.href as any);
                       }}
-                      style={[styles.mobileNavItem, active && styles.mobileNavItemActive, isRTL && { flexDirection: "row-reverse" }]}
+                      style={[styles.mobileNavItem, active && styles.mobileNavItemActive]}
+                      accessibilityRole="link"
+                      accessibilityState={{ selected: active }}
                     >
                       <Ionicons name={item.icon as any} size={20} color={active ? Colors.textDark : Colors.text} />
-                      <Text style={[styles.mobileNavItemText, active && styles.mobileNavItemTextActive]}>{item.label}</Text>
+                      <Text style={[styles.mobileNavItemText, { textAlign: isRTL ? "right" : "left" }, active && styles.mobileNavItemTextActive]}>{item.label}</Text>
                       {item.href === "/online-orders" && pendingCount > 0 ? (
                         <View style={styles.mobileNavBadge}>
                           <Text style={styles.mobileNavBadgeText}>{pendingCount > 9 ? "9+" : pendingCount}</Text>
@@ -382,7 +414,9 @@ export default function TabLayout() {
             backgroundColor: "#14532d",
             borderWidth: 2, borderColor: "#22c55e",
             borderRadius: 18, padding: 14,
-            flexDirection: isRTL ? "row-reverse" : "row",
+            // "row" mirrors itself under RTL on web (dir) and native (I18nManager);
+            // only an Arabic UI not yet laid out RTL (before restart) needs the flip.
+            flexDirection: isRTL && Platform.OS !== "web" && !I18nManager.isRTL ? "row-reverse" : "row",
             alignItems: "center", gap: 12,
           }}>
             {/* Pulsing icon */}
@@ -396,22 +430,24 @@ export default function TabLayout() {
             </Animated.View>
 
             <View style={{ flex: 1 }}>
-              <Text style={{ color: "#4ade80", fontWeight: "900", fontSize: 15, letterSpacing: 0.3 }}>{t("newOnlineOrder" as any) || "New Online Order!"}
+              <Text style={{ color: "#4ade80", fontWeight: "900", fontSize: 15, letterSpacing: 0.3, textAlign: isRTL ? "right" : "left" }}>{t("newOnlineOrder" as any) || L("طلب إلكتروني جديد!", "Neue Online-Bestellung!", "New Online Order!")}
               </Text>
-              <Text style={{ color: "#86efac", fontSize: 13, marginTop: 3, fontWeight: "700" }}>
+              <Text style={{ color: "#86efac", fontSize: 13, marginTop: 3, fontWeight: "700", textAlign: isRTL ? "right" : "left" }}>
                 #{onlineOrderNotification.orderNumber} · {onlineOrderNotification.customerName}
               </Text>
-              <Text style={{ color: "#bbf7d0", fontSize: 13, fontWeight: "800", marginTop: 1 }}>
+              <Text style={{ color: "#bbf7d0", fontSize: 13, fontWeight: "800", marginTop: 1, textAlign: isRTL ? "right" : "left" }}>
                 {formatMoney(onlineOrderNotification.totalAmount || 0)}
               </Text>
-              <Text style={{ color: "rgba(187,247,208,0.7)", fontSize: 11, marginTop: 3 }}>
-                {t("tapToViewDetails" as any) || "Tap to view details →"}
+              <Text style={{ color: "rgba(187,247,208,0.7)", fontSize: 11, marginTop: 3, textAlign: isRTL ? "right" : "left" }}>
+                {t("tapToViewDetails" as any) || L("اضغط لعرض التفاصيل", "Tippen für Details", "Tap to view details")}
               </Text>
             </View>
 
             <Pressable
               onPress={(e) => { e.stopPropagation(); setOnlineOrderNotification(null); }}
-              style={{ padding: 6, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.1)" }}
+              style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 20, backgroundColor: "rgba(255,255,255,0.1)" }}
+              accessibilityRole="button"
+              accessibilityLabel={L("إغلاق", "Schliessen", "Close")}
             >
               <Ionicons name="close" size={22} color="#4ade80" />
             </Pressable>
@@ -427,7 +463,7 @@ const styles = themedStyles((Colors) => ({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.48)",
     justifyContent: "flex-start",
-    alignItems: "flex-end",
+    alignItems: "flex-start",
   },
   mobileNavBackdrop: {
     position: "absolute",
@@ -442,8 +478,6 @@ const styles = themedStyles((Colors) => ({
     maxWidth: 320,
     height: "100%",
     backgroundColor: Colors.surface,
-    borderLeftWidth: 1,
-    borderLeftColor: Colors.cardBorder,
     paddingHorizontal: 16,
     paddingTop: 16,
   },
@@ -459,8 +493,8 @@ const styles = themedStyles((Colors) => ({
     fontWeight: "800",
   },
   mobileNavClose: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",

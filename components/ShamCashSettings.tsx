@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, Pressable, Switch, TextInput, ActivityIndicator, Image, StyleSheet } from "react-native";
+import { View, Text, Pressable, Switch, TextInput, ActivityIndicator, Image, StyleSheet, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@/lib/theme-context";
 import { useLanguage } from "@/lib/language-context";
 import { apiRequest, apiErrorMessage, getQueryFn, getApiUrl } from "@/lib/query-client";
+import { getCurrency } from "@/lib/currency";
+import { isValidStorePhone } from "@/components/store-locale";
 
 /**
  * Sham Cash (شام كاش) for a store: its own QR code and Sham Cash number,
@@ -27,10 +29,14 @@ const COPY = {
     phonePh: "e.g. 0944 123 456",
     holder: "Account holder name",
     holderPh: "Name shown in Sham Cash",
-    save: "Save",
+    save: "Save Sham Cash details",
     saved: "Saved",
     needOne: "Add a QR code or a Sham Cash number so customers know where to pay.",
     uploadFailed: "Upload failed",
+    badPhone: "That Sham Cash number does not look right.",
+    unsaved: "Unsaved changes",
+    loadFailed: "Could not load the Sham Cash settings.",
+    retry: "Try again",
   },
   de: {
     title: "Sham Cash",
@@ -46,10 +52,14 @@ const COPY = {
     phonePh: "z. B. 0944 123 456",
     holder: "Kontoinhaber",
     holderPh: "Name in Sham Cash",
-    save: "Speichern",
+    save: "Sham-Cash-Angaben speichern",
     saved: "Gespeichert",
     needOne: "QR-Code oder Sham-Cash-Nummer angeben, damit Kunden wissen, wohin sie zahlen.",
     uploadFailed: "Upload fehlgeschlagen",
+    badPhone: "Diese Sham-Cash-Nummer scheint nicht korrekt zu sein.",
+    unsaved: "Nicht gespeicherte Änderungen",
+    loadFailed: "Sham-Cash-Einstellungen konnten nicht geladen werden.",
+    retry: "Erneut versuchen",
   },
   ar: {
     title: "شام كاش",
@@ -65,10 +75,14 @@ const COPY = {
     phonePh: "مثال: 0944 123 456",
     holder: "اسم صاحب الحساب",
     holderPh: "الاسم كما يظهر في شام كاش",
-    save: "حفظ",
+    save: "حفظ بيانات شام كاش",
     saved: "تم الحفظ",
     needOne: "أضف رمز QR أو رقم شام كاش حتى يعرف الزبون أين يدفع.",
     uploadFailed: "فشل رفع الصورة",
+    badPhone: "رقم شام كاش غير صحيح.",
+    unsaved: "توجد تغييرات غير محفوظة",
+    loadFailed: "تعذّر تحميل إعدادات شام كاش.",
+    retry: "إعادة المحاولة",
   },
 };
 
@@ -87,13 +101,17 @@ const blobToBase64 = (blob: Blob): Promise<string> =>
     reader.readAsDataURL(blob);
   });
 
+/** Sham Cash only settles in these currencies (server/shamcash.ts). */
+const SHAMCASH_CURRENCIES = ["SYP", "USD"];
+
 export default function ShamCashSettings() {
   const { colors } = useTheme();
   const { language, isRTL } = useLanguage();
   const c = (COPY as any)[language] ?? COPY.en;
-  const { data, refetch, isLoading } = useQuery<any>({
+  const { data, refetch, isLoading, isError } = useQuery<any>({
     queryKey: ["/api/payment-gateway/shamcash"],
     queryFn: getQueryFn({ on401: "throw" }),
+    retry: 1,
   });
 
   const [enabled, setEnabled] = useState(false);
@@ -102,7 +120,7 @@ export default function ShamCashSettings() {
   const [holderName, setHolderName] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ text: string; error: boolean } | null>(null);
 
   useEffect(() => {
     if (!data) return;
@@ -112,30 +130,59 @@ export default function ShamCashSettings() {
     setHolderName(data.holderName ?? "");
   }, [data]);
 
+  // Stores in other currencies (e.g. the Swiss CHF stores) do not see Sham
+  // Cash at all, unless it was already switched on — then it stays visible
+  // so it can be switched off.
+  const storeCurrency = String(data?.currency || getCurrency() || "").toUpperCase();
+  const currencyOk = SHAMCASH_CURRENCIES.includes(storeCurrency);
+  const supported = data ? !!data.currency || !!data.enabled : currencyOk;
+
+  const dirty = !!data && (
+    phone.trim() !== String(data.phone ?? "").trim() ||
+    holderName.trim() !== String(data.holderName ?? "").trim()
+  );
+
   const save = async (patch?: { enabled?: boolean; qrImage?: string | null }) => {
+    const nextPhone = phone.trim();
+    if (nextPhone && !isValidStorePhone(nextPhone, storeCurrency)) {
+      setMsg({ text: c.badPhone, error: true });
+      // The switch or QR must not look saved when nothing was sent.
+      if (patch && "enabled" in patch) setEnabled(!!data?.enabled);
+      if (patch && "qrImage" in patch) setQrImage(data?.qrImage ?? null);
+      return;
+    }
     setBusy(true);
     setMsg(null);
     try {
       await apiRequest("PUT", "/api/payment-gateway/shamcash", {
         enabled: patch?.enabled ?? enabled,
         qrImage: patch && "qrImage" in patch ? patch.qrImage : qrImage,
-        phone,
-        holderName,
+        phone: nextPhone,
+        holderName: holderName.trim(),
       });
       await refetch();
-      setMsg(c.saved);
+      setMsg({ text: c.saved, error: false });
     } catch (e: any) {
-      setMsg(apiErrorMessage(e));
+      // Show what is really stored, not the position the user tapped.
+      setEnabled(!!data?.enabled);
+      setQrImage(data?.qrImage ?? null);
+      setMsg({ text: apiErrorMessage(e), error: true });
     } finally {
       setBusy(false);
     }
   };
 
   const pickQr = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images" as ImagePicker.MediaType,
-      quality: 0.9,
-    });
+    let result: ImagePicker.ImagePickerResult;
+    try {
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: "images" as ImagePicker.MediaType,
+        quality: 0.9,
+      });
+    } catch (e: any) {
+      setMsg({ text: apiErrorMessage(e, c.uploadFailed), error: true });
+      return;
+    }
     if (result.canceled || !result.assets[0]) return;
     setUploading(true);
     setMsg(null);
@@ -150,41 +197,66 @@ export default function ShamCashSettings() {
       setQrImage(objectPath);
       await save({ qrImage: objectPath });
     } catch (e: any) {
-      setMsg(apiErrorMessage(e, c.uploadFailed));
+      setMsg({ text: apiErrorMessage(e, c.uploadFailed), error: true });
     } finally {
       setUploading(false);
     }
   };
 
-  const live = !!data?.live;
-  const row = isRTL ? ("row-reverse" as const) : ("row" as const);
   const align = isRTL ? ("right" as const) : ("left" as const);
+  const cardStyle = [s.card, { borderColor: colors.border, backgroundColor: colors.card }];
+
+  if (isLoading) {
+    if (!currencyOk) return null;
+    return (
+      <View style={[cardStyle, { alignItems: "center" }]}>
+        <ActivityIndicator color="#0E9F6E" />
+      </View>
+    );
+  }
+  if (isError && !data) {
+    if (!currencyOk) return null;
+    return (
+      <View style={cardStyle}>
+        <Text style={{ color: colors.danger, fontSize: 13, textAlign: align }}>{c.loadFailed}</Text>
+        <Pressable onPress={() => refetch()} style={s.btn} accessibilityRole="button">
+          <Text style={s.btnText}>{c.retry}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+  if (!supported) return null;
+
+  const live = !!data?.live;
+  // react-native-web already flips "row" under dir=rtl; only native needs it.
+  const row = isRTL && Platform.OS !== "web" ? ("row-reverse" as const) : ("row" as const);
   const qrUri = shamCashImageUri(qrImage);
-  const inputStyle = [s.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card, textAlign: align }];
+  const inputStyle = [s.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background, textAlign: align }];
+  const locked = busy || uploading;
 
   return (
-    <View style={{ marginBottom: 8 }}>
+    <View style={cardStyle}>
       <View style={[s.header, { flexDirection: row }]}>
         <View style={[s.icon, { backgroundColor: "#0E9F6E20" }]}>
           <Ionicons name="wallet" size={24} color="#0E9F6E" />
         </View>
-        <View style={{ flex: 1, alignItems: isRTL ? "flex-end" : "flex-start" }}>
-          <Text style={[s.name, { color: colors.text }]}>{c.title}</Text>
-          <Text style={{ color: live ? colors.success : colors.textMuted, fontSize: 13, fontWeight: "600", marginTop: 3 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[s.name, { color: colors.text, textAlign: align }]}>{c.title}</Text>
+          <Text style={{ color: live ? colors.success : colors.textMuted, fontSize: 13, fontWeight: "600", marginTop: 3, textAlign: align }}>
             {live ? c.live : c.sub}
           </Text>
         </View>
-        {isLoading ? <ActivityIndicator /> : (
-          <Switch
-            value={enabled}
-            onValueChange={(v) => { setEnabled(v); save({ enabled: v }); }}
-            disabled={busy}
-          />
-        )}
+        <Switch
+          value={enabled}
+          onValueChange={(v) => { setEnabled(v); save({ enabled: v }); }}
+          disabled={locked}
+          trackColor={{ false: colors.border, true: "#0E9F6E" }}
+          accessibilityLabel={c.enabled}
+        />
       </View>
 
       <Text style={[s.label, { color: colors.textMuted, textAlign: align }]}>{c.qr}</Text>
-      <View style={[s.qrRow, { flexDirection: row, borderColor: colors.border, backgroundColor: colors.card }]}>
+      <View style={[s.qrRow, { flexDirection: row, borderColor: colors.border, backgroundColor: colors.background }]}>
         {qrUri ? (
           <Image source={{ uri: qrUri }} style={s.qr} resizeMode="contain" />
         ) : (
@@ -192,10 +264,15 @@ export default function ShamCashSettings() {
             <Ionicons name="qr-code-outline" size={40} color={colors.textMuted} />
           </View>
         )}
-        <View style={{ flex: 1, gap: 8 }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
           <Text style={{ color: colors.textMuted, fontSize: 12, textAlign: align }}>{c.qrHint}</Text>
           <View style={{ flexDirection: row, gap: 8, flexWrap: "wrap" }}>
-            <Pressable onPress={pickQr} disabled={uploading} style={[s.smallBtn, { backgroundColor: "#0E9F6E" }]}>
+            <Pressable
+              onPress={pickQr}
+              disabled={locked}
+              style={[s.smallBtn, { backgroundColor: "#0E9F6E" }, locked && { opacity: 0.6 }]}
+              accessibilityRole="button"
+            >
               {uploading ? <ActivityIndicator color="#fff" size="small" /> : (
                 <Text style={s.smallBtnText}>{qrUri ? c.change : c.upload}</Text>
               )}
@@ -203,7 +280,9 @@ export default function ShamCashSettings() {
             {!!qrUri && (
               <Pressable
                 onPress={() => { setQrImage(null); save({ qrImage: null }); }}
-                style={[s.smallBtn, { borderWidth: 1, borderColor: colors.danger }]}
+                disabled={locked}
+                style={[s.smallBtn, { borderWidth: 1, borderColor: colors.danger }, locked && { opacity: 0.6 }]}
+                accessibilityRole="button"
               >
                 <Text style={[s.smallBtnText, { color: colors.danger }]}>{c.remove}</Text>
               </Pressable>
@@ -219,6 +298,7 @@ export default function ShamCashSettings() {
         placeholder={c.phonePh}
         placeholderTextColor={colors.textMuted}
         keyboardType="phone-pad"
+        maxLength={40}
         style={inputStyle}
       />
 
@@ -228,6 +308,7 @@ export default function ShamCashSettings() {
         onChangeText={setHolderName}
         placeholder={c.holderPh}
         placeholderTextColor={colors.textMuted}
+        maxLength={80}
         style={inputStyle}
       />
 
@@ -235,27 +316,29 @@ export default function ShamCashSettings() {
         <Text style={[s.note, { color: colors.warning, textAlign: align }]}>{c.needOne}</Text>
       )}
 
-      <Pressable onPress={() => save()} disabled={busy} style={[s.btn, busy && { opacity: 0.6 }]}>
+      <Pressable onPress={() => save()} disabled={locked} style={[s.btn, locked && { opacity: 0.6 }]} accessibilityRole="button">
         {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>{c.save}</Text>}
       </Pressable>
-      {!!msg && <Text style={[s.hint, { color: colors.textMuted, textAlign: "center" }]}>{msg}</Text>}
+      {dirty && !busy && !msg && <Text style={[s.hint, { color: colors.warning }]}>{c.unsaved}</Text>}
+      {!!msg && <Text style={[s.hint, { color: msg.error ? colors.danger : colors.success }]}>{msg.text}</Text>}
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  header: { alignItems: "center", gap: 14, marginBottom: 12 },
+  card: { borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 16, marginBottom: 8 },
+  header: { alignItems: "center", gap: 14, marginBottom: 4 },
   icon: { width: 48, height: 48, borderRadius: 14, justifyContent: "center", alignItems: "center" },
   name: { fontSize: 18, fontWeight: "700" },
   label: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 12, marginBottom: 6 },
   qrRow: { alignItems: "center", gap: 12, borderWidth: 1, borderRadius: 12, padding: 10 },
   qr: { width: 110, height: 110, borderRadius: 8, backgroundColor: "#fff" },
   qrEmpty: { borderWidth: 1, borderStyle: "dashed", justifyContent: "center", alignItems: "center", backgroundColor: "transparent" },
-  smallBtn: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, minWidth: 80, alignItems: "center" },
+  smallBtn: { borderRadius: 10, paddingHorizontal: 14, minHeight: 44, minWidth: 88, alignItems: "center", justifyContent: "center" },
   smallBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
-  hint: { fontSize: 11, marginTop: 6 },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, minHeight: 44, fontSize: 14 },
+  hint: { fontSize: 12, marginTop: 8, textAlign: "center" },
   note: { fontSize: 12, marginTop: 8 },
-  btn: { marginTop: 14, backgroundColor: "#0E9F6E", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
+  btn: { marginTop: 14, backgroundColor: "#0E9F6E", borderRadius: 12, minHeight: 48, justifyContent: "center", alignItems: "center", paddingHorizontal: 12 },
   btnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 });

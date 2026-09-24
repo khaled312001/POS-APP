@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
-  StyleSheet, Text, View, FlatList, Pressable, ScrollView,
+  Text, View, FlatList, Pressable, ScrollView,
   Alert, Platform, Animated, RefreshControl, Modal, TextInput, KeyboardAvoidingView,
-  Image, useWindowDimensions, ActivityIndicator,
+  Image, useWindowDimensions, ActivityIndicator, Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -11,7 +11,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
 import { themedStyles } from "@/lib/themed-styles";
 import { useLicense } from "@/lib/license-context";
-import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
+import { apiRequest, getQueryFn, getApiUrl, apiErrorMessage } from "@/lib/query-client";
 import { getDisplayNumber } from "@/lib/api-config";
 import { useLanguage } from "@/lib/language-context";
 import { cloneOrderItems, normalizeOrderItems } from "@/lib/order-items";
@@ -27,22 +27,75 @@ import {
 import DriverAssignModal from "@/components/DriverAssignModal";
 import TrackingLinkButton from "@/components/TrackingLinkButton";
 import ScheduledOrderBadge from "@/components/ScheduledOrderBadge";
-import DeliveryStatusPipeline from "@/components/DeliveryStatusPipeline";
-import { formatMoney } from "@/lib/currency";
+import { formatMoney, formatAmount, isZeroDecimalCurrency, getCurrency } from "@/lib/currency";
+import { normalizeStorePhone, isValidStorePhone, storePhonePlaceholder, formatInStoreTz } from "@/components/store-locale";
 
-const STATUS_FLOW = ["pending", "accepted", "preparing", "ready", "delivered"];
+type StatusMeta = { label: string; labelAr: string; labelDe: string; color: string; icon: string; next?: string };
 
-const STATUS_META: Record<string, { label: string; labelAr: string; labelDe: string; color: string; icon: string; next?: string }> = {
-  pending: { label: "Pending", labelAr: "انتظار", labelDe: "Ausstehend", color: Colors.hueAmber, icon: "time-outline", next: "accepted" },
-  accepted: { label: "Accepted", labelAr: "مقبول", labelDe: "Angenommen", color: "#3B82F6", icon: "checkmark-circle-outline", next: "preparing" },
-  preparing: { label: "Preparing", labelAr: "قيد التحضير", labelDe: "In Zubereitung", color: Colors.hueViolet, icon: "flame-outline", next: "ready" },
-  ready: { label: "Ready", labelAr: "جاهز", labelDe: "Fertig", color: Colors.hueTeal, icon: "bag-check-outline", next: "delivered" },
-  delivered: { label: "Delivered", labelAr: "تم التوصيل", labelDe: "Geliefert", color: "#10B981", icon: "checkmark-done-outline" },
-  cancelled: { label: "Cancelled", labelAr: "ملغي", labelDe: "Storniert", color: Colors.hueRose, icon: "close-circle-outline" },
-  completed: { label: "Completed", labelAr: "مكتمل", labelDe: "Abgeschlossen", color: "#10B981", icon: "checkmark-done-outline" },
+// Built per render: `Colors` is a live view onto the active theme, so a
+// module-scope table would freeze the palette that was active at import time.
+// Status values mirror online_orders.status on the server: pending → accepted →
+// preparing → ready → (on_way, set by the driver app) → delivered, or cancelled.
+// POS sales use completed / refunded.
+function getStatusMeta(): Record<string, StatusMeta> {
+  return {
+    pending: { label: "Pending", labelAr: "قيد الانتظار", labelDe: "Ausstehend", color: Colors.hueAmber, icon: "time-outline", next: "accepted" },
+    accepted: { label: "Accepted", labelAr: "مقبول", labelDe: "Angenommen", color: "#3B82F6", icon: "checkmark-circle-outline", next: "preparing" },
+    preparing: { label: "Preparing", labelAr: "قيد التحضير", labelDe: "In Zubereitung", color: Colors.hueViolet, icon: "flame-outline", next: "ready" },
+    ready: { label: "Ready", labelAr: "جاهز", labelDe: "Fertig", color: Colors.hueTeal, icon: "bag-check-outline", next: "delivered" },
+    on_way: { label: "On the way", labelAr: "في الطريق", labelDe: "Unterwegs", color: Colors.statusOnWay, icon: "bicycle-outline", next: "delivered" },
+    delivered: { label: "Delivered", labelAr: "تم التوصيل", labelDe: "Geliefert", color: "#10B981", icon: "checkmark-done-outline" },
+    cancelled: { label: "Cancelled", labelAr: "ملغي", labelDe: "Storniert", color: Colors.hueRose, icon: "close-circle-outline" },
+    completed: { label: "Completed", labelAr: "مكتمل", labelDe: "Abgeschlossen", color: "#10B981", icon: "checkmark-done-outline" },
+    refunded: { label: "Refunded", labelAr: "مسترد", labelDe: "Erstattet", color: Colors.hueRose, icon: "return-down-back-outline" },
+  };
+}
+
+const ACTIVE_STATUSES = ["pending", "accepted", "preparing", "ready", "on_way"];
+const DONE_STATUSES = ["delivered", "cancelled", "completed", "refunded"];
+
+function notify(title: string, message?: string) {
+  if (Platform.OS === "web") {
+    try { window.alert(message ? `${title}\n\n${message}` : title); } catch { }
+    return;
+  }
+  Alert.alert(title, message);
+}
+
+/** Alert.alert with buttons is a no-op on react-native-web, so web uses window.confirm. */
+function confirmAsync(title: string, message: string, confirmText: string, cancelText: string): Promise<boolean> {
+  if (Platform.OS === "web") {
+    try { return Promise.resolve(window.confirm(`${title}\n\n${message}`)); } catch { return Promise.resolve(false); }
+  }
+  return new Promise((resolve) => {
+    Alert.alert(title, message, [
+      { text: cancelText, style: "cancel", onPress: () => resolve(false) },
+      { text: confirmText, style: "destructive", onPress: () => resolve(true) },
+    ], { cancelable: true, onDismiss: () => resolve(false) });
+  });
+}
+
+/** tel: and wa.me targets from the store-normalised number (SYP → 9639xxxxxxxx). */
+function phoneTargets(raw: string): { tel: string; wa: string | null } {
+  const isSyp = getCurrency().toUpperCase() === "SYP";
+  const norm = normalizeStorePhone(raw);
+  const compact = norm.replace(/[^\d+]/g, "");
+  if (isSyp && /^\d+$/.test(norm)) return { tel: `tel:+${norm}`, wa: norm };
+  let wa = compact.replace(/^\+/, "").replace(/^00/, "");
+  if (/^0\d/.test(compact)) wa = getCurrency().toUpperCase() === "CHF" ? `41${compact.slice(1)}` : "";
+  return { tel: `tel:${compact}`, wa: wa && wa.length >= 8 ? wa : null };
+}
+
+/** Money for API payloads: whole units for zero-decimal currencies (SYP). */
+function moneyStr(n: number): string {
+  const v = Number.isFinite(n) ? n : 0;
+  return isZeroDecimalCurrency() ? String(Math.round(v)) : v.toFixed(2);
+}
+
+const PAY_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
+  cash: "cash-outline", card: "card-outline", stripe: "card-outline", mobile: "phone-portrait-outline",
+  shamcash: "wallet-outline", wallet: "wallet-outline", transfer: "swap-horizontal-outline",
 };
-
-const PAY_ICON: Record<string, keyof typeof Ionicons.glyphMap> = { cash: "cash-outline", card: "card-outline", mobile: "phone-portrait-outline" };
 
 function FallbackOrderImage({ uri, style }: { uri: string; style: any }) {
   const fallbacks = getWebStaticFallbackChain(uri);
@@ -68,10 +121,17 @@ function FallbackOrderImage({ uri, style }: { uri: string; style: any }) {
   );
 }
 
+// One shared AudioContext: browsers cap how many can exist, so creating a new
+// one per chime eventually fails silently.
+let notifAudioCtx: any = null;
 function playNotificationSound() {
-  if (Platform.OS !== "web") return;
+  if (Platform.OS !== "web" || typeof window === "undefined") return;
   try {
-    const ctx = new (window as any).AudioContext();
+    const Ctor = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!Ctor) return;
+    if (!notifAudioCtx || notifAudioCtx.state === "closed") notifAudioCtx = new Ctor();
+    const ctx = notifAudioCtx;
+    if (ctx.state === "suspended") ctx.resume?.().catch?.(() => { });
     const times = [0, 0.15, 0.3];
     times.forEach((t, i) => {
       const osc = ctx.createOscillator();
@@ -101,11 +161,15 @@ export default function OrdersScreen() {
   const [driverAssignOrderId, setDriverAssignOrderId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [newOrderIds, setNewOrderIds] = useState<Set<number>>(new Set());
+  const [busyOrderIds, setBusyOrderIds] = useState<Set<number>>(new Set());
   const knownOrderIds = useRef<Set<string>>(new Set());
+  const ordersSeeded = useRef(false);
+  const announcedOrderIds = useRef<Set<number>>(new Set());
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Edit state (unified for both types)
   const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [editForm, setEditForm] = useState<{
     customerName: string;
     customerPhone: string;
@@ -115,54 +179,81 @@ export default function OrdersScreen() {
     items: any[];
     subtotal: number;
     deliveryFee: number;
+    /** Discount / tax / wallet part of the original total, kept when items change. */
+    adjustment: number;
     totalAmount: number;
   }>({
     customerName: "", customerPhone: "", customerAddress: "",
     notes: "", estimatedTime: "", items: [],
-    subtotal: 0, deliveryFee: 0, totalAmount: 0,
+    subtotal: 0, deliveryFee: 0, adjustment: 0, totalAmount: 0,
   });
 
+  const isRTL = language === "ar";
+  // document dir=rtl already mirrors "row" on web; flipping again would undo it.
+  const flipRow = isRTL && Platform.OS !== "web";
+  const { topPad, bottomPad } = getChromeMetrics(width);
+  const lbl = (en: string, ar: string, de: string) =>
+    language === "ar" ? ar : language === "de" ? de : en;
+  const dateLocale = language === "ar" ? "ar-u-nu-latn" : language === "de" ? "de-CH" : "en-GB";
+  const STATUS_META = getStatusMeta();
+
   // ── Chat state — restaurant-side chat for an active order ──
-  const [chatRoomOrderId, setChatRoomOrderId] = useState<number | null>(null);
+  const [chatOrder, setChatOrder] = useState<{ id: number; label: string } | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatRoomId, setChatRoomId] = useState<number | null>(null);
   const [chatDraft, setChatDraft] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [chatSending, setChatSending] = useState(false);
+  const chatRoomOrderId = chatOrder?.id ?? null;
+  // The realtime handler is registered once per tenant; it reads the open chat
+  // through this ref (a plain closure would always see "no chat open").
+  const chatOrderIdRef = useRef<number | null>(null);
+  chatOrderIdRef.current = chatRoomOrderId;
+  // Bodies this device just sent: their server echo must not be appended twice.
+  const sentChatBodies = useRef<Map<string, number>>(new Map());
 
   const openChat = async (order: any) => {
-    setChatRoomOrderId(order.id);
+    setChatOrder({ id: order.id, label: `#${getDisplayNumber(order.orderNumber) || order.id}` });
     setChatMessages([]);
     setChatRoomId(null);
+    setChatError(null);
     setChatLoading(true);
     if (!tenantId) { setChatLoading(false); return; }
     try {
-      // Look up the room for this order. The room only exists once the customer
-      // posts a first message (we lazily create on POST). If not found, show empty.
-      // Ensure a room exists (creates one on demand if customer hasn't started yet)
+      // Ensure a room exists (created on demand if the customer hasn't written yet).
       const ensureRes = await apiRequest("POST", `/api/chat/order/${order.id}/ensure?tenantId=${tenantId}`);
       const ensureData = await ensureRes.json();
       const room = ensureData.room;
-      if (!room) { setChatLoading(false); return; }
+      if (!room) return;
       setChatRoomId(room.id);
       const msgsRes = await apiRequest("GET", `/api/chat/rooms/${room.id}/messages?tenantId=${tenantId}`);
       const msgsData = await msgsRes.json();
       setChatMessages(msgsData.messages || []);
-    } catch (e) { /* swallow */ } finally { setChatLoading(false); }
+    } catch (e) {
+      setChatError(apiErrorMessage(e, lbl("Could not load the chat", "تعذّر تحميل المحادثة", "Chat konnte nicht geladen werden")));
+    } finally { setChatLoading(false); }
   };
 
   const sendChatMessage = async () => {
-    if (!chatDraft.trim() || !chatRoomId || !tenantId) return;
+    if (!chatDraft.trim() || !chatRoomId || !tenantId || chatSending) return;
     const body = chatDraft.trim();
-    setChatDraft("");
+    const senderName = storeSettings?.storeName || storeSettings?.name || tenant?.name || "Restaurant";
+    setChatSending(true);
+    sentChatBodies.current.set(body, Date.now());
     try {
       await apiRequest("POST", `/api/chat/rooms/${chatRoomId}/messages?tenantId=${tenantId}`, {
         body,
-        senderName: storeSettings?.storeName || "Restaurant",
+        senderName,
         senderType: "tenant",
       });
-      setChatMessages((m) => [...m, { senderType: "tenant", senderName: storeSettings?.storeName || "Restaurant", body, createdAt: new Date().toISOString() }]);
+      setChatDraft("");
+      setChatMessages((m) => [...m, { senderType: "tenant", senderName, body, createdAt: new Date().toISOString() }]);
     } catch (e: any) {
-      Alert.alert("Failed", e.message || "Could not send");
+      sentChatBodies.current.delete(body);
+      notify(lbl("Message not sent", "لم تُرسل الرسالة", "Nachricht nicht gesendet"), apiErrorMessage(e));
+    } finally {
+      setChatSending(false);
     }
   };
 
@@ -179,13 +270,8 @@ export default function OrdersScreen() {
   const [selectedToppings, setSelectedToppings] = useState<string[]>([]);
   const [showToppingsStep, setShowToppingsStep] = useState(false);
 
-  const isRTL = language === "ar";
-  const { topPad, bottomPad } = getChromeMetrics(width);
-  const lbl = (en: string, ar: string, de: string) =>
-    language === "ar" ? ar : language === "de" ? de : en;
-
   // --- Data Queries ---
-  const { data: onlineOrders = [], refetch: refetchOnline } = useQuery<any[]>({
+  const { data: onlineOrders = [], refetch: refetchOnline, isError: onlineError, error: onlineErrorObj, isSuccess: onlineSuccess } = useQuery<any[]>({
     queryKey: ["/api/online-orders", tenantId ? `?tenantId=${tenantId}` : ""],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
@@ -216,6 +302,18 @@ export default function OrdersScreen() {
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!tenantId,
   });
+
+  // Driver roster (same cache key as the Driver Management screen) — used to
+  // show who is on a delivery order.
+  const driversKey = `/api/delivery/manage/drivers?tenantId=${tenantId}`;
+  const { data: drivers = [] } = useQuery<any[]>({
+    queryKey: [driversKey],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!tenantId,
+    staleTime: 30000,
+  });
+  const driverNameById = new Map<number, string>();
+  (Array.isArray(drivers) ? drivers : []).forEach((d: any) => driverNameById.set(Number(d.id), d.driverName || ""));
 
   // Build category map for lookup
   const categoryMap: Record<number, { name: string; color: string; image?: string }> = {};
@@ -260,39 +358,51 @@ export default function OrdersScreen() {
     if (viewMode === "online" && o._type !== "online") return false;
     if (viewMode === "pos" && o._type !== "pos") return false;
     if (viewMode === "dine_in" && (o._type !== "online" || o.orderType !== "dine_in")) return false;
-    if (filter === "active") return ["pending", "accepted", "preparing", "ready"].includes(o.status);
-    if (filter === "done") return ["delivered", "cancelled", "completed"].includes(o.status);
-    // Delivery order type filter
-    if (orderTypeFilter === "delivery") return o.orderType === "delivery";
-    if (orderTypeFilter === "pickup") return o.orderType === "pickup";
-    if (orderTypeFilter === "dine_in") return o.orderType === "dine_in";
-    if (orderTypeFilter === "scheduled") return Boolean(o.scheduledAt);
+    // Status and order-type filters combine (they used to short-circuit each other).
+    if (filter === "active" && !ACTIVE_STATUSES.includes(o.status)) return false;
+    if (filter === "done" && !DONE_STATUSES.includes(o.status)) return false;
+    // The type chips are only shown in the Online view — never filter invisibly.
+    if (viewMode === "online") {
+      if (orderTypeFilter === "delivery" && o.orderType !== "delivery") return false;
+      if (orderTypeFilter === "pickup" && o.orderType !== "pickup") return false;
+      if (orderTypeFilter === "dine_in" && o.orderType !== "dine_in") return false;
+      if (orderTypeFilter === "scheduled" && !o.scheduledAt) return false;
+    }
     return true;
   });
 
   const pendingCount = normalizedOnlineOrders.filter((o: any) => o.status === "pending").length;
 
-  // New order notification
+  // New order notification. The first successful load only seeds the known
+  // set — otherwise every open order chimed each time the screen was opened.
   useEffect(() => {
-    if (!normalizedOnlineOrders.length) return;
-    const incoming = normalizedOnlineOrders.filter(o => !knownOrderIds.current.has(`online-${o.id}`) && o.status === "pending");
-    if (incoming.length > 0) {
-      playNotificationSound();
-      playClickSound("medium");
-      setNewOrderIds(prev => {
-        const next = new Set(prev);
-        incoming.forEach(o => next.add(o.id));
-        return next;
-      });
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.08, duration: 200, useNativeDriver: Platform.OS !== 'web' }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 200, useNativeDriver: Platform.OS !== 'web' }),
-        Animated.timing(pulseAnim, { toValue: 1.05, duration: 150, useNativeDriver: Platform.OS !== 'web' }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 150, useNativeDriver: Platform.OS !== 'web' }),
-      ]).start();
+    if (!tenantId || !onlineSuccess) return;
+    const list = normalizedOnlineOrders;
+    if (!ordersSeeded.current) {
+      list.forEach(o => knownOrderIds.current.add(`online-${o.id}`));
+      ordersSeeded.current = true;
+      return;
     }
-    normalizedOnlineOrders.forEach(o => knownOrderIds.current.add(`online-${o.id}`));
-  }, [normalizedOnlineOrders]);
+    const incoming = list.filter(o => !knownOrderIds.current.has(`online-${o.id}`) && o.status === "pending");
+    list.forEach(o => knownOrderIds.current.add(`online-${o.id}`));
+    if (incoming.length === 0) return;
+    // Orders already announced by the realtime channel were chimed by the
+    // global notification center; only poll-discovered ones chime here.
+    if (incoming.some(o => !announcedOrderIds.current.has(Number(o.id)))) playNotificationSound();
+    playClickSound("medium");
+    setNewOrderIds(prev => {
+      const next = new Set(prev);
+      incoming.forEach(o => next.add(o.id));
+      return next;
+    });
+    Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1.08, duration: 200, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(pulseAnim, { toValue: 1, duration: 200, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(pulseAnim, { toValue: 1.05, duration: 150, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(pulseAnim, { toValue: 1, duration: 150, useNativeDriver: Platform.OS !== 'web' }),
+    ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlineOrders, onlineSuccess, tenantId]);
 
   // ── Broadcast Orders (marketplace / drop-shipping) ───────────────────
   const { data: broadcastOrders = [], refetch: refetchBroadcasts } = useQuery<any[]>({
@@ -303,153 +413,248 @@ export default function OrdersScreen() {
   });
   const [bcBusyId, setBcBusyId] = useState<number | null>(null);
   const [bcToast, setBcToast] = useState<string | null>(null);
+  const bcToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showBcToast = (msg: string) => {
+    setBcToast(msg);
+    if (bcToastTimer.current) clearTimeout(bcToastTimer.current);
+    bcToastTimer.current = setTimeout(() => setBcToast(null), 4000);
+  };
+  useEffect(() => () => { if (bcToastTimer.current) clearTimeout(bcToastTimer.current); }, []);
+
+  // Broadcast countdowns tick every second while any are listed.
+  const [, setClockTick] = useState(0);
+  const hasBroadcasts = (broadcastOrders as any[]).length > 0;
+  useEffect(() => {
+    if (!hasBroadcasts) return;
+    const iv = setInterval(() => setClockTick(t => t + 1), 1000);
+    return () => clearInterval(iv);
+  }, [hasBroadcasts]);
 
   const acceptBroadcast = async (bc: any) => {
     if (!tenantId || bcBusyId) return;
     setBcBusyId(bc.id);
+    const tooLate = lbl("Too late — another restaurant accepted first", "فات الوقت — مطعم آخر قبل الطلب أولاً", "Zu spät — ein anderes Restaurant hat zuerst angenommen");
     try {
       const res = await apiRequest("POST", `/api/broadcast-orders/${bc.id}/accept`, { tenantId });
       const data = await res.json();
       if (data?.success) {
         playNotificationSound();
-        setBcToast(lbl("Order accepted — now in your POS queue", "تم قبول الطلب — موجود الآن في قائمتك", "Bestellung angenommen"));
-        qc.invalidateQueries({ queryKey: ["/api/broadcast-orders/pending"] });
+        showBcToast(lbl("Order accepted — now in your order list", "تم قبول الطلب — موجود الآن في قائمة الطلبات", "Bestellung angenommen — jetzt in Ihrer Bestellliste"));
         qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
       } else {
-        setBcToast(data?.error || lbl("Too late — another restaurant accepted first", "فات الوقت — مطعم آخر قبل الطلب أولاً", "Zu spät — ein anderes Restaurant hat zuerst angenommen"));
-        qc.invalidateQueries({ queryKey: ["/api/broadcast-orders/pending"] });
+        showBcToast(tooLate);
       }
     } catch (e: any) {
-      setBcToast(lbl("Failed: ", "فشل: ", "Fehlgeschlagen: ") + (e?.message || ""));
+      // 409 = someone else claimed it / it expired.
+      showBcToast(String(e?.message || "").startsWith("409") ? tooLate : lbl("Failed: ", "فشل: ", "Fehlgeschlagen: ") + apiErrorMessage(e));
     } finally {
+      qc.invalidateQueries({ queryKey: ["/api/broadcast-orders/pending"] });
       setBcBusyId(null);
-      setTimeout(() => setBcToast(null), 4000);
     }
   };
 
   const rejectBroadcast = async (bc: any) => {
-    if (!tenantId) return;
+    if (!tenantId || bcBusyId) return;
+    setBcBusyId(bc.id);
     try {
       await apiRequest("POST", `/api/broadcast-orders/${bc.id}/reject`, { tenantId });
       qc.invalidateQueries({ queryKey: ["/api/broadcast-orders/pending"] });
-    } catch { }
+    } catch (e) {
+      showBcToast(lbl("Failed: ", "فشل: ", "Fehlgeschlagen: ") + apiErrorMessage(e));
+    } finally {
+      setBcBusyId(null);
+    }
   };
 
-  // WebSocket for instant notifications
+  // Realtime updates (web). WebSocket first; the Hostinger CDN swallows the
+  // upgrade, so fall back to the SSE mirror of the same events. Native relies
+  // on the react-query refetchInterval above (it never stacks requests).
   useEffect(() => {
-    if (Platform.OS !== "web") return;
-    const wsUrl = `${getApiUrl().replace("http", "ws")}/api/ws/caller-id`;
-    let ws: WebSocket;
-    try {
-      ws = new WebSocket(wsUrl);
-      ws.onopen = () => {
-        if (tenantId) {
-          try { ws.send(JSON.stringify({ type: "register", tenantId })); } catch {}
-        }
-      };
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === "new_online_order") {
-            playNotificationSound();
-            qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-            setNewOrderIds(prev => { const next = new Set(prev); next.add(data.order?.id); return next; });
-          } else if (data.type === "online_order_updated") {
-            qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-          } else if (data.type === "broadcast_new" || data.type === "broadcast_claimed" || data.type === "broadcast_cancelled") {
-            if (data.type === "broadcast_new") playNotificationSound();
-            qc.invalidateQueries({ queryKey: ["/api/broadcast-orders/pending"] });
-            if (data.type === "broadcast_claimed" && data.claimedByTenantId === tenantId) {
-              qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-            }
-          } else if (data.type === "chat_new_message") {
-            // If the chat modal is open for this order, append the message live
-            if (chatRoomOrderId && data.orderId === chatRoomOrderId) {
-              setChatMessages((m) => [...m, { senderType: data.senderType, senderName: data.senderName, body: data.body, createdAt: data.createdAt }]);
-            } else if (data.senderType === "customer") {
-              // Customer message arrived for another order — gentle ping
-              playNotificationSound();
-            }
-          }
-        } catch { }
-      };
-    } catch { }
-    return () => ws?.close();
-  }, [tenantId]);
+    if (Platform.OS !== "web" || !tenantId) return;
+    let disposed = false;
+    let ws: WebSocket | null = null;
+    let es: EventSource | null = null;
+    let fellBack = false;
+    let wsTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // Polling for native
-  useEffect(() => {
-    if (Platform.OS === "web") return;
-    const interval = setInterval(() => {
-      qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-      qc.invalidateQueries({ queryKey: ["/api/sales"] });
-    }, 15000);
-    return () => clearInterval(interval);
-  }, []);
+    const handle = (data: any) => {
+      if (!data || typeof data !== "object") return;
+      if (data.type === "new_online_order") {
+        const id = Number(data.order?.id ?? data.orderId);
+        if (id) {
+          announcedOrderIds.current.add(id);
+          setNewOrderIds(prev => { const next = new Set(prev); next.add(id); return next; });
+        }
+        qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+      } else if (data.type === "online_order_updated" || data.type === "delivery_status_change") {
+        qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+        if (data.type === "delivery_status_change") qc.invalidateQueries({ queryKey: [driversKey] });
+      } else if (data.type === "driver_status_change") {
+        qc.invalidateQueries({ queryKey: [driversKey] });
+      } else if (data.type === "broadcast_new" || data.type === "broadcast_claimed" || data.type === "broadcast_cancelled") {
+        qc.invalidateQueries({ queryKey: ["/api/broadcast-orders/pending"] });
+        if (data.type === "broadcast_claimed" && data.claimedByTenantId === tenantId) {
+          qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+        }
+      } else if (data.type === "chat_new_message") {
+        const openId = chatOrderIdRef.current;
+        if (openId && data.orderId === openId) {
+          // Skip the echo of a message this device just sent.
+          const sentAt = sentChatBodies.current.get(String(data.body));
+          if (data.senderType !== "customer" && sentAt && Date.now() - sentAt < 30000) {
+            sentChatBodies.current.delete(String(data.body));
+            return;
+          }
+          setChatMessages((m) => [...m, { senderType: data.senderType, senderName: data.senderName, body: data.body, createdAt: data.createdAt }]);
+        }
+      }
+    };
+
+    const startSse = () => {
+      if (disposed || fellBack || typeof EventSource === "undefined") return;
+      fellBack = true;
+      try {
+        es = new EventSource(`${getApiUrl().replace(/\/$/, "")}/api/events?tenantId=${tenantId}`);
+        es.onmessage = (ev) => { try { handle(JSON.parse(ev.data)); } catch { } };
+      } catch { }
+    };
+
+    try {
+      ws = new WebSocket(`${getApiUrl().replace(/^http/, "ws")}/api/ws/caller-id`);
+      wsTimeout = setTimeout(() => {
+        if (ws && ws.readyState !== WebSocket.OPEN) { try { ws.close(); } catch { } startSse(); }
+      }, 3000);
+      ws.onopen = () => {
+        if (wsTimeout) clearTimeout(wsTimeout);
+        try { ws?.send(JSON.stringify({ type: "register", tenantId })); } catch { }
+      };
+      ws.onmessage = (event) => { try { handle(JSON.parse(event.data)); } catch { } };
+      ws.onerror = () => startSse();
+      ws.onclose = () => { if (!disposed) startSse(); };
+    } catch {
+      startSse();
+    }
+    return () => {
+      disposed = true;
+      if (wsTimeout) clearTimeout(wsTimeout);
+      try { ws?.close(); } catch { }
+      try { es?.close(); } catch { }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refetchOnline(), refetchPos()]);
-    setRefreshing(false);
-  }, [refetchOnline, refetchPos]);
+    try {
+      await Promise.all([refetchOnline(), refetchPos(), refetchBroadcasts()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchOnline, refetchPos, refetchBroadcasts]);
+
+  const setOrderBusy = (id: number, on: boolean) =>
+    setBusyOrderIds(prev => { const next = new Set(prev); if (on) next.add(id); else next.delete(id); return next; });
 
   const updateOnlineStatus = async (id: number, status: string) => {
+    if (busyOrderIds.has(id)) return;
+    setOrderBusy(id, true);
     try {
       await apiRequest("PUT", `/api/online-orders/${id}`, { status });
-      qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+      await qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
       setNewOrderIds(prev => { const next = new Set(prev); next.delete(id); return next; });
-    } catch {
-      Alert.alert("Error", "Failed to update order status");
+    } catch (e) {
+      notify(lbl("Status not updated", "لم يتم تحديث الحالة", "Status nicht aktualisiert"), apiErrorMessage(e));
+    } finally {
+      setOrderBusy(id, false);
+    }
+  };
+
+  const cancelOnlineOrder = async (item: any) => {
+    const isReject = item.status === "pending";
+    const num = getDisplayNumber(item.orderNumber) || item.id;
+    const ok = await confirmAsync(
+      isReject ? lbl("Reject order?", "رفض الطلب؟", "Bestellung ablehnen?") : lbl("Cancel order?", "إلغاء الطلب؟", "Bestellung stornieren?"),
+      lbl(
+        `Order #${num} will be cancelled. This cannot be undone.`,
+        `سيتم إلغاء الطلب #${num}. لا يمكن التراجع عن ذلك.`,
+        `Bestellung #${num} wird storniert. Dies kann nicht rückgängig gemacht werden.`,
+      ),
+      isReject ? lbl("Reject", "رفض", "Ablehnen") : lbl("Cancel order", "إلغاء الطلب", "Stornieren"),
+      lbl("Keep", "تراجع", "Behalten"),
+    );
+    if (ok) updateOnlineStatus(item.id, "cancelled");
+  };
+
+  /** Manual payments (Sham Cash transfer) stay unpaid until the store checks its wallet. */
+  const markOrderPaid = async (item: any) => {
+    if (busyOrderIds.has(item.id)) return;
+    const amount = formatMoney(item.totalAmount);
+    const ok = await confirmAsync(
+      lbl("Confirm payment received?", "تأكيد استلام الدفعة؟", "Zahlungseingang bestätigen?"),
+      lbl(
+        `Only confirm after you see ${amount} in your wallet.`,
+        `أكّد فقط بعد أن ترى مبلغ ${amount} في محفظتك.`,
+        `Nur bestätigen, wenn ${amount} in Ihrer Wallet eingegangen sind.`,
+      ),
+      lbl("Confirm", "تأكيد", "Bestätigen"),
+      lbl("Cancel", "إلغاء", "Abbrechen"),
+    );
+    if (!ok) return;
+    setOrderBusy(item.id, true);
+    try {
+      await apiRequest("PUT", `/api/online-orders/${item.id}`, { paymentStatus: "paid" });
+      await qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+    } catch (e) {
+      notify(lbl("Could not update payment", "تعذّر تحديث حالة الدفع", "Zahlung konnte nicht aktualisiert werden"), apiErrorMessage(e));
+    } finally {
+      setOrderBusy(item.id, false);
     }
   };
 
   const deleteOnlineOrder = async (id: number) => {
-    const confirmed = Platform.OS === "web"
-      ? window.confirm(lbl("Permanently delete this order?", "سيتم حذف هذا الطلب نهائياً", "Bestellung dauerhaft löschen?"))
-      : await new Promise<boolean>((resolve) => {
-        Alert.alert(
-          lbl("Delete Order?", "حذف الطلب", "Bestellung löschen?"),
-          lbl("This will permanently delete the order.", "سيتم حذف هذا الطلب نهائياً", "Diese Bestellung wird dauerhaft gelöscht."),
-          [
-            { text: lbl("Cancel", "إلغاء", "Abbrechen"), style: "cancel", onPress: () => resolve(false) },
-            { text: lbl("Delete", "حذف", "Löschen"), style: "destructive", onPress: () => resolve(true) },
-          ]
-        );
-      });
+    const confirmed = await confirmAsync(
+      lbl("Delete order?", "حذف الطلب؟", "Bestellung löschen?"),
+      lbl("This will permanently delete the order.", "سيتم حذف هذا الطلب نهائياً.", "Diese Bestellung wird dauerhaft gelöscht."),
+      lbl("Delete", "حذف", "Löschen"),
+      lbl("Cancel", "إلغاء", "Abbrechen"),
+    );
     if (!confirmed) return;
+    setOrderBusy(id, true);
     try {
       await apiRequest("DELETE", `/api/online-orders/${id}`);
-      qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
-    } catch {
-      Alert.alert("Error", "Failed to delete order");
+      await qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+    } catch (e) {
+      notify(lbl("Could not delete the order", "تعذّر حذف الطلب", "Bestellung konnte nicht gelöscht werden"), apiErrorMessage(e));
+    } finally {
+      setOrderBusy(id, false);
     }
   };
 
   const deletePosOrder = async (id: number) => {
-    const confirmed = Platform.OS === "web"
-      ? window.confirm(lbl("Permanently delete this invoice?", "سيتم حذف هذه الفاتورة نهائياً", "Rechnung dauerhaft löschen?"))
-      : await new Promise<boolean>((resolve) => {
-        Alert.alert(
-          lbl("Delete Invoice?", "حذف الفاتورة", "Rechnung löschen?"),
-          lbl("This will permanently delete the invoice.", "سيتم حذف هذه الفاتورة نهائياً", "Diese Rechnung wird dauerhaft gelöscht."),
-          [
-            { text: lbl("Cancel", "إلغاء", "Abbrechen"), style: "cancel", onPress: () => resolve(false) },
-            { text: lbl("Delete", "حذف", "Löschen"), style: "destructive", onPress: () => resolve(true) },
-          ]
-        );
-      });
+    const confirmed = await confirmAsync(
+      lbl("Delete invoice?", "حذف الفاتورة؟", "Rechnung löschen?"),
+      lbl("This will permanently delete the invoice.", "سيتم حذف هذه الفاتورة نهائياً.", "Diese Rechnung wird dauerhaft gelöscht."),
+      lbl("Delete", "حذف", "Löschen"),
+      lbl("Cancel", "إلغاء", "Abbrechen"),
+    );
     if (!confirmed) return;
+    setOrderBusy(id, true);
     try {
       await apiRequest("DELETE", `/api/sales/${id}`);
-      qc.invalidateQueries({ queryKey: ["/api/sales"] });
-    } catch {
-      Alert.alert("Error", "Failed to delete invoice");
+      await qc.invalidateQueries({ queryKey: ["/api/sales"] });
+    } catch (e) {
+      notify(lbl("Could not delete the invoice", "تعذّر حذف الفاتورة", "Rechnung konnte nicht gelöscht werden"), apiErrorMessage(e));
+    } finally {
+      setOrderBusy(id, false);
     }
   };
 
   const openEditOrder = async (order: any) => {
     if (order._type === "pos") {
-      // Fetch full sale + customer info
+      if (busyOrderIds.has(order.id)) return;
+      setOrderBusy(order.id, true);
+      // Fetch full sale + customer info. If this fails the editor must NOT
+      // open: saving an empty item list would wipe the invoice's items.
       try {
         const res = await apiRequest("GET", `/api/sales/${order.id}`);
         const full = await res.json();
@@ -462,7 +667,7 @@ export default function OrdersScreen() {
           notes: it.notes || "",
           modifiers: it.modifiers || [],
         }));
-        const subtotal = items.reduce((s: number, i: any) => s + i.total, 0);
+        const subtotal = items.reduce((s: number, i: any) => s + (Number(i.total) || 0), 0);
 
         // Fetch customer details if linked via customerId
         let custName = "";
@@ -479,6 +684,8 @@ export default function OrdersScreen() {
           } catch { }
         }
 
+        const deliveryFee = Number(full.deliveryFee || 0);
+        const totalAmount = Number(full.totalAmount ?? subtotal + deliveryFee);
         setEditForm({
           customerName: custName,
           customerPhone: custPhone,
@@ -487,67 +694,112 @@ export default function OrdersScreen() {
           estimatedTime: "",
           items,
           subtotal,
-          deliveryFee: Number(full.deliveryFee || 0),
-          totalAmount: Number(full.totalAmount || subtotal),
+          deliveryFee,
+          adjustment: Number.isFinite(totalAmount) ? totalAmount - subtotal - deliveryFee : 0,
+          totalAmount: Number.isFinite(totalAmount) ? totalAmount : subtotal + deliveryFee,
         });
-      } catch {
-        setEditForm({
-          customerName: "", customerPhone: "", customerAddress: "",
-          notes: order.notes || "", estimatedTime: "",
-          items: [], subtotal: 0, deliveryFee: 0, totalAmount: Number(order.totalAmount || 0),
-        });
+        setEditingOrder(order);
+      } catch (e) {
+        notify(lbl("Could not load the invoice", "تعذّر تحميل الفاتورة", "Rechnung konnte nicht geladen werden"), apiErrorMessage(e));
+      } finally {
+        setOrderBusy(order.id, false);
       }
-    } else {
-      setEditForm({
-        customerName: order.customerName || "",
-        customerPhone: order.customerPhone || "",
-        customerAddress: order.customerAddress || "",
-        notes: order.notes || "",
-        estimatedTime: order.estimatedTime ? String(order.estimatedTime) : "",
-        items: cloneOrderItems(order.items),
-        subtotal: Number(order.subtotal || 0),
-        deliveryFee: Number(order.deliveryFee || 0),
-        totalAmount: Number(order.totalAmount || 0),
-      });
+      return;
     }
+    const subtotal = Number(order.subtotal || 0);
+    const deliveryFee = Number(order.deliveryFee || 0);
+    const totalAmount = Number(order.totalAmount || 0);
+    setEditForm({
+      customerName: order.customerName || "",
+      customerPhone: order.customerPhone || "",
+      customerAddress: order.customerAddress || "",
+      notes: order.notes || "",
+      estimatedTime: order.estimatedTime ? String(order.estimatedTime) : "",
+      items: cloneOrderItems(order.items),
+      subtotal,
+      deliveryFee,
+      // Discount / tax / wallet share of the total — preserved when items change.
+      adjustment: totalAmount - subtotal - deliveryFee,
+      totalAmount,
+    });
     setEditingOrder(order);
   };
 
   const saveEditOrder = async () => {
-    if (!editingOrder) return;
+    if (!editingOrder || savingEdit) return;
+    const isPos = editingOrder._type === "pos";
+    if (editForm.items.length === 0) {
+      notify(
+        lbl("The order has no items", "الطلب لا يحتوي على أصناف", "Die Bestellung hat keine Artikel"),
+        lbl("Add at least one item, or cancel the order instead.", "أضف صنفاً واحداً على الأقل، أو ألغِ الطلب بدلاً من ذلك.", "Fügen Sie mindestens einen Artikel hinzu oder stornieren Sie die Bestellung."),
+      );
+      return;
+    }
+    let customerPhone = editForm.customerPhone.trim();
+    let estimatedTime: number | null = null;
+    if (!isPos) {
+      if (!editForm.customerName.trim()) {
+        notify(lbl("Customer name is required", "اسم العميل مطلوب", "Kundenname ist erforderlich"));
+        return;
+      }
+      // Only validate a phone the user actually changed — old orders may carry
+      // formats the current rules would reject.
+      if (customerPhone !== String(editingOrder.customerPhone || "").trim()) {
+        if (!isValidStorePhone(customerPhone)) {
+          notify(
+            lbl("Invalid phone number", "رقم الهاتف غير صالح", "Ungültige Telefonnummer"),
+            lbl(`Example: ${storePhonePlaceholder()}`, `مثال: ${storePhonePlaceholder()}`, `Beispiel: ${storePhonePlaceholder()}`),
+          );
+          return;
+        }
+        customerPhone = normalizeStorePhone(customerPhone);
+      }
+      if (editForm.estimatedTime.trim()) {
+        const n = Number(editForm.estimatedTime.trim());
+        if (!Number.isInteger(n) || n < 0 || n > 600) {
+          notify(lbl("Estimated time must be 0–600 minutes", "الوقت المقدر يجب أن يكون بين 0 و600 دقيقة", "Geschätzte Zeit: 0–600 Minuten"));
+          return;
+        }
+        estimatedTime = n;
+      }
+    }
+    setSavingEdit(true);
     try {
-      if (editingOrder._type === "pos") {
+      if (isPos) {
         await apiRequest("PUT", `/api/sales/${editingOrder.id}`, {
           notes: editForm.notes || null,
-          subtotal: String(editForm.subtotal.toFixed(2)),
-          totalAmount: String(editForm.totalAmount.toFixed(2)),
+          subtotal: moneyStr(editForm.subtotal),
+          totalAmount: moneyStr(editForm.totalAmount),
           items: editForm.items.map(it => ({
-            productId: it.productId,
+            // Free extras use productId 0 — sale_items.product_id is a foreign key.
+            productId: it.productId ? it.productId : null,
             productName: it.name,
             quantity: it.quantity,
-            unitPrice: String(it.unitPrice),
-            total: String(it.total),
+            unitPrice: moneyStr(Number(it.unitPrice) || 0),
+            total: moneyStr(Number(it.total) || 0),
             modifiers: it.modifiers || [],
             notes: it.notes || null,
           })),
         });
-        qc.invalidateQueries({ queryKey: ["/api/sales"] });
+        await qc.invalidateQueries({ queryKey: ["/api/sales"] });
       } else {
         await apiRequest("PUT", `/api/online-orders/${editingOrder.id}`, {
-          customerName: editForm.customerName,
-          customerPhone: editForm.customerPhone,
-          customerAddress: editForm.customerAddress || null,
+          customerName: editForm.customerName.trim(),
+          customerPhone,
+          customerAddress: editForm.customerAddress.trim() || null,
           notes: editForm.notes || null,
-          estimatedTime: editForm.estimatedTime ? Number(editForm.estimatedTime) : null,
+          estimatedTime,
           items: editForm.items,
-          subtotal: String(editForm.subtotal.toFixed(2)),
-          totalAmount: String(editForm.totalAmount.toFixed(2)),
+          subtotal: moneyStr(editForm.subtotal),
+          totalAmount: moneyStr(editForm.totalAmount),
         });
-        qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+        await qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
       }
       setEditingOrder(null);
-    } catch {
-      Alert.alert("Error", "Failed to update order");
+    } catch (e) {
+      notify(lbl("Could not save the order", "تعذّر حفظ الطلب", "Bestellung konnte nicht gespeichert werden"), apiErrorMessage(e));
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -562,7 +814,7 @@ export default function OrdersScreen() {
         nextItems[index] = { ...it, quantity: newQty, total: newQty * it.unitPrice };
       }
       const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
-      return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
+      return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: Math.max(0, newSubtotal + prev.deliveryFee + prev.adjustment) };
     });
   };
 
@@ -603,7 +855,7 @@ export default function OrdersScreen() {
         nextItems.push({ productId: prod.id, name: prod.name, quantity: 1, unitPrice: Number(prod.price), total: Number(prod.price) });
       }
       const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
-      return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
+      return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: Math.max(0, newSubtotal + prev.deliveryFee + prev.adjustment) };
     });
     setShowProductPicker(false);
   };
@@ -632,13 +884,13 @@ export default function OrdersScreen() {
         const nextItems = [...prev.items];
         nextItems[configuringItemIndex] = { ...nextItems[configuringItemIndex], name: finalName, unitPrice: finalUnitPrice, total: finalUnitPrice * nextItems[configuringItemIndex].quantity };
         const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
-        return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
+        return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: Math.max(0, newSubtotal + prev.deliveryFee + prev.adjustment) };
       });
     } else {
       setEditForm(prev => {
         const nextItems = [...prev.items, { productId: configuringProduct.id, name: finalName, quantity: 1, unitPrice: finalUnitPrice, total: finalUnitPrice }];
         const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
-        return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
+        return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: Math.max(0, newSubtotal + prev.deliveryFee + prev.adjustment) };
       });
     }
     setConfiguringProduct(null);
@@ -646,13 +898,44 @@ export default function OrdersScreen() {
   };
 
   // --- Render Order Card ---
+  const orderTypeLabel = (t: string) =>
+    t === "delivery" ? lbl("Delivery", "توصيل", "Lieferung")
+      : t === "pickup" ? lbl("Pickup", "استلام", "Abholung")
+        : t === "dine_in" ? lbl("Dine-in", "في المطعم", "Vor Ort")
+          : t;
+  const payLabel = (m: string) => {
+    const k = String(m || "").toLowerCase();
+    return k === "cash" ? lbl("Cash", "نقداً", "Bar")
+      : k === "card" || k === "stripe" ? lbl("Card", "بطاقة", "Karte")
+        : k === "shamcash" ? lbl("Sham Cash", "شام كاش", "Sham Cash")
+          : k === "mobile" ? lbl("Mobile", "دفع بالجوال", "Mobil")
+            : k === "wallet" ? lbl("Wallet", "المحفظة", "Guthaben")
+              : k === "transfer" ? lbl("Transfer", "تحويل", "Überweisung")
+                : k.toUpperCase();
+  };
+  // Label for the final step: "Delivered" only makes sense for deliveries.
+  const nextLabel = (next: string, orderType?: string) => {
+    if (next === "delivered" && orderType === "pickup") return lbl("Picked up", "تم الاستلام", "Abgeholt");
+    if (next === "delivered" && orderType === "dine_in") return lbl("Served", "تم التقديم", "Serviert");
+    const m = STATUS_META[next];
+    return m ? (language === "ar" ? m.labelAr : language === "de" ? m.labelDe : m.label) : next;
+  };
+  const nextVerb = (next: string, orderType?: string) =>
+    next === "accepted" ? lbl("Accept", "قبول", "Annehmen")
+      : next === "preparing" ? lbl("Start preparing", "بدء التحضير", "Zubereiten")
+        : next === "ready" ? lbl("Mark ready", "جاهز", "Fertig melden")
+          : nextLabel(next, orderType);
+
   const renderOrder = ({ item }: { item: any }) => {
-    const meta = STATUS_META[item.status] || STATUS_META.completed;
+    const meta: StatusMeta = STATUS_META[item.status] || (item.status
+      ? { label: String(item.status), labelAr: String(item.status), labelDe: String(item.status), color: Colors.textMuted, icon: "ellipse-outline" }
+      : STATUS_META.completed);
     const isNew = newOrderIds.has(item.id) && item._type === "online";
-    const orderDate = new Date(item.createdAt);
     const next = meta.next;
     const isPOS = item._type === "pos";
+    const busy = busyOrderIds.has(item.id);
     const orderItems = normalizeOrderItems(item.items);
+    const isActive = !isPOS && item.status !== "delivered" && item.status !== "cancelled";
 
     const nextBtnColor: Record<string, string[]> = {
       accepted: ["#3B82F6", "#1D4ED8"],
@@ -662,10 +945,17 @@ export default function OrdersScreen() {
     };
 
     const sourceColor = isPOS ? "#F59E0B" : "#6366F1";
-    const sourceBg = isPOS ? "rgba(245,158,11,0.12)" : "rgba(99,102,241,0.12)";
-    const sourceLabel = isPOS ? (language === "ar" ? "كاشير" : "POS") : (language === "ar" ? "إلكتروني" : "Online");
+    const sourceLabel = isPOS ? lbl("POS", "كاشير", "Kasse") : lbl("Online", "إلكتروني", "Online");
     const sourceIcon: keyof typeof Ionicons.glyphMap = isPOS ? "call-outline" : "globe-outline";
-    const orderId = isPOS ? (getDisplayNumber(item.receiptNumber) || `#${item.id}`) : `#${getDisplayNumber(item.orderNumber)}`;
+    const orderId = isPOS ? (getDisplayNumber(item.receiptNumber) || `#${item.id}`) : `#${getDisplayNumber(item.orderNumber) || item.id}`;
+    const timeText = formatInStoreTz(item.createdAt, dateLocale, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const pm = String(item.paymentMethod || "").toLowerCase();
+    const isPaid = item.paymentStatus === "paid";
+    // Sham Cash transfers are matched by hand: the order stays unpaid until the store confirms.
+    const awaitingManualPayment = !isPOS && pm === "shamcash" && !isPaid && item.status !== "cancelled";
+    const driverName = item.driverId ? driverNameById.get(Number(item.driverId)) : undefined;
+    const phoneLinks = !isPOS && item.customerPhone ? phoneTargets(String(item.customerPhone)) : null;
+    const showCustomerRow = !!(item.customerName || item.customerPhone || item.orderType || item.tableNumber || item.paymentMethod);
 
     return (
       <Animated.View style={[
@@ -675,14 +965,14 @@ export default function OrdersScreen() {
         { borderLeftColor: isPOS ? sourceColor : meta.color, transform: isNew ? [{ scale: pulseAnim }] : [] },
       ]}>
         {/* Source badge + Header */}
-        <View style={[styles.orderHeader, isRTL && { flexDirection: "row-reverse" }]}>
-          <View style={[styles.orderNumRow, isRTL && { flexDirection: "row-reverse" }]}>
+        <View style={[styles.orderHeader, flipRow && { flexDirection: "row-reverse" }]}>
+          <View style={[styles.orderNumRow, flipRow && { flexDirection: "row-reverse" }]}>
             {isNew && <View style={styles.newDot} />}
-            <View style={[styles.sourceBadge, { backgroundColor: sourceBg, borderColor: sourceColor + "60" }]}>
+            <View style={[styles.sourceBadge, { backgroundColor: sourceColor + "1F", borderColor: sourceColor + "60" }]}>
               <Ionicons name={sourceIcon} size={11} color={sourceColor} />
               <Text style={[styles.sourceBadgeText, { color: sourceColor }]}>{sourceLabel}</Text>
             </View>
-            <Text style={styles.orderNum}>{orderId}</Text>
+            <Text style={styles.orderNum} numberOfLines={1}>{orderId}</Text>
             <View style={[styles.statusBadge, { backgroundColor: meta.color + "22", borderColor: meta.color }]}>
               <Ionicons name={meta.icon as any} size={11} color={meta.color} />
               <Text style={[styles.statusText, { color: meta.color }]}>
@@ -694,43 +984,71 @@ export default function OrdersScreen() {
         </View>
 
         {/* Customer info */}
-        {(item.customerName || item.customerPhone) ? (
-          <View style={[styles.customerRow, isRTL && { flexDirection: "row-reverse" }]}>
+        {showCustomerRow ? (
+          <View style={[styles.customerRow, flipRow && { flexDirection: "row-reverse" }]}>
             <View style={styles.customerIcon}>
               <Ionicons name="person" size={14} color={Colors.accent} />
             </View>
-            <View style={{ flex: 1 }}>
-              {item.customerName ? <Text style={[styles.customerName, isRTL && { textAlign: "right" }]}>{item.customerName}</Text> : null}
-              <Text style={[styles.customerSub, isRTL && { textAlign: "right" }]}>
-                {item.customerPhone || ""}
-                {item.customerAddress ? ` • ${item.customerAddress}` : ""}
-              </Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              {item.customerName ? <Text style={[styles.customerName, isRTL && { textAlign: "right" }]} numberOfLines={1}>{item.customerName}</Text> : null}
+              {item.customerPhone || item.customerAddress ? (
+                <Text style={[styles.customerSub, isRTL && { textAlign: "right" }]} numberOfLines={2}>
+                  {item.customerPhone || ""}
+                  {item.customerAddress ? `${item.customerPhone ? " • " : ""}${item.customerAddress}` : ""}
+                </Text>
+              ) : null}
+              {phoneLinks ? (
+                <View style={[styles.contactRow, flipRow && { flexDirection: "row-reverse" }]}>
+                  <Pressable
+                    onPress={() => Linking.openURL(phoneLinks.tel).catch(() => notify(lbl("Cannot place call", "تعذّر الاتصال", "Anruf nicht möglich"), String(item.customerPhone)))}
+                    style={styles.contactBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel={lbl("Call customer", "اتصال بالعميل", "Kunde anrufen")}
+                  >
+                    <Ionicons name="call-outline" size={14} color={Colors.success} />
+                    <Text style={[styles.contactBtnText, { color: Colors.success }]}>{lbl("Call", "اتصال", "Anrufen")}</Text>
+                  </Pressable>
+                  {phoneLinks.wa ? (
+                    <Pressable
+                      onPress={() => Linking.openURL(`https://wa.me/${phoneLinks.wa}`).catch(() => { })}
+                      style={styles.contactBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel="WhatsApp"
+                    >
+                      <Ionicons name="logo-whatsapp" size={14} color="#25D366" />
+                      <Text style={[styles.contactBtnText, { color: "#25D366" }]}>WhatsApp</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
             <View style={styles.metaChips}>
               {item.paymentMethod ? (
-                <View style={styles.metaChip}>
-                  <Ionicons name={PAY_ICON[item.paymentMethod] || "cash-outline"} size={12} color={Colors.textSecondary} />
-                  <Text style={styles.metaChipText}>{item.paymentMethod?.toUpperCase()}</Text>
+                <View style={[styles.metaChip, isPaid && !isPOS && { backgroundColor: Colors.success + "22" }, awaitingManualPayment && { backgroundColor: Colors.warning + "26" }]}>
+                  <Ionicons name={PAY_ICON[pm] || "cash-outline"} size={12} color={awaitingManualPayment ? Colors.warning : isPaid && !isPOS ? Colors.success : Colors.textSecondary} />
+                  <Text style={[styles.metaChipText, awaitingManualPayment && { color: Colors.warning }, isPaid && !isPOS && { color: Colors.success }]}>
+                    {payLabel(pm)}{!isPOS && isPaid ? ` · ${lbl("Paid", "مدفوع", "Bezahlt")}` : awaitingManualPayment ? ` · ${lbl("Unconfirmed", "بانتظار التأكيد", "Unbestätigt")}` : ""}
+                  </Text>
                 </View>
               ) : null}
               {item.orderType ? (
                 <View style={[styles.metaChip, {
-                  backgroundColor: item.orderType === "delivery" ? "rgba(99,102,241,0.15)"
-                    : item.orderType === "dine_in" ? "rgba(245,158,11,0.15)"
-                    : "rgba(16,185,129,0.15)"
+                  backgroundColor: item.orderType === "delivery" ? "#6366F1" + "26"
+                    : item.orderType === "dine_in" ? "#F59E0B" + "26"
+                      : "#10B981" + "26"
                 }]}>
                   <Ionicons
                     name={item.orderType === "delivery" ? "bicycle-outline" : item.orderType === "dine_in" ? "restaurant-outline" : "walk-outline"}
                     size={12}
                     color={Colors.textSecondary}
                   />
-                  <Text style={styles.metaChipText}>{item.orderType === "dine_in" ? "Dine-in" : item.orderType}</Text>
+                  <Text style={styles.metaChipText}>{orderTypeLabel(item.orderType)}</Text>
                 </View>
               ) : null}
               {item.tableNumber ? (
-                <View style={[styles.metaChip, { backgroundColor: "rgba(30,64,175,0.15)" }]}>
+                <View style={[styles.metaChip, { backgroundColor: "#1E40AF" + "26" }]}>
                   <Ionicons name="grid-outline" size={12} color={Colors.textSecondary} />
-                  <Text style={styles.metaChipText}>{item.tableNumber}</Text>
+                  <Text style={styles.metaChipText} numberOfLines={1}>{item.tableNumber}</Text>
                 </View>
               ) : null}
             </View>
@@ -742,9 +1060,9 @@ export default function OrdersScreen() {
           <View style={styles.itemsList}>
             {orderItems.slice(0, 4).map((it: any, idx: number) => (
               <View key={idx} style={{ marginBottom: 4 }}>
-                <View style={[styles.itemRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <View style={[styles.itemRow, flipRow && { flexDirection: "row-reverse" }]}>
                   <Text style={styles.itemQty}>{it.quantity}×</Text>
-                  <Text style={[styles.itemName, { flex: 1 }, isRTL && { textAlign: "right" }]}>{it.name || it.productName}</Text>
+                  <Text style={[styles.itemName, { flex: 1, minWidth: 0 }, isRTL && { textAlign: "right" }]}>{it.name || it.productName}</Text>
                   <Text style={styles.itemPrice}>{formatMoney(Number(it.total) || (Number(it.unitPrice) * Number(it.quantity)) || 0)}</Text>
                 </View>
                 {it.notes ? <Text style={[styles.itemAddons, isRTL && { textAlign: "right" }]}>↳ {it.notes}</Text> : null}
@@ -766,86 +1084,111 @@ export default function OrdersScreen() {
           </View>
         ) : null}
 
-        {/* Tracking link + driver info */}
-        {!isPOS && item.orderType === "delivery" && item.trackingToken ? (
-          <View style={{ marginBottom: 6 }}>
-            <TrackingLinkButton trackingToken={item.trackingToken} label={lbl("Share Tracking", "رابط التتبع", "Tracking teilen")} />
+        {/* Driver + tracking link + chat */}
+        {!isPOS ? (
+          <View style={[styles.extraRow, flipRow && { flexDirection: "row-reverse" }]}>
+            {item.orderType === "delivery" && item.driverId ? (
+              <View style={[styles.driverChip, flipRow && { flexDirection: "row-reverse" }]}>
+                <Ionicons name="bicycle" size={14} color={Colors.deliveryPrimary} />
+                <Text style={styles.driverChipText} numberOfLines={1}>
+                  {driverName || lbl("Driver assigned", "تم تعيين سائق", "Fahrer zugewiesen")}
+                </Text>
+              </View>
+            ) : null}
+            {item.orderType === "delivery" && item.trackingToken ? (
+              <TrackingLinkButton trackingToken={item.trackingToken} label={lbl("Share tracking", "مشاركة رابط التتبع", "Tracking teilen")} />
+            ) : null}
+            <Pressable
+              onPress={() => openChat(item)}
+              style={styles.chatBtn}
+              accessibilityRole="button"
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={15} color={Colors.accent} />
+              <Text style={{ color: Colors.accent, fontWeight: "600", fontSize: 13 }}>{lbl("Chat", "محادثة", "Chat")}</Text>
+            </Pressable>
           </View>
         ) : null}
 
-        {/* Chat with customer (online orders only) */}
-        {!isPOS ? (
-          <Pressable
-            onPress={() => openChat(item)}
-            style={{ flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingVertical: 6, paddingHorizontal: 12, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.accent + "40", marginBottom: 6 }}
-          >
-            <Ionicons name="chatbubble-ellipses-outline" size={15} color={Colors.accent} />
-            <Text style={{ color: Colors.accent, fontWeight: "600", fontSize: 13 }}>{lbl("Chat", "محادثة", "Chat")}</Text>
-          </Pressable>
-        ) : null}
-
         {/* Time + fee */}
-        <View style={[styles.totalsRow, isRTL && { flexDirection: "row-reverse" }]}>
-          <Text style={styles.timeText}>
-            {orderDate.toLocaleDateString()} · {orderDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </Text>
+        <View style={[styles.totalsRow, flipRow && { flexDirection: "row-reverse" }]}>
+          <Text style={styles.timeText}>{timeText}</Text>
           {item.deliveryFee && Number(item.deliveryFee) > 0 ? (
             <Text style={styles.feeText}>+{formatMoney(item.deliveryFee)} {lbl("delivery", "توصيل", "Lieferung")}</Text>
           ) : null}
         </View>
 
+        {awaitingManualPayment ? (
+          <Pressable
+            style={[styles.payConfirmBtn, busy && { opacity: 0.5 }]}
+            onPress={() => markOrderPaid(item)}
+            disabled={busy}
+            accessibilityRole="button"
+          >
+            <Ionicons name="checkmark-circle-outline" size={16} color={Colors.warning} />
+            <Text style={styles.payConfirmText}>{lbl("Confirm Sham Cash payment", "تأكيد استلام دفعة شام كاش", "Sham-Cash-Zahlung bestätigen")}</Text>
+          </Pressable>
+        ) : null}
+
         {/* Actions */}
-        <View style={[styles.actions, isRTL && { flexDirection: "row-reverse" }]}>
+        <View style={[styles.actions, flipRow && { flexDirection: "row-reverse" }]}>
           {/* Next status button - only for online orders */}
-          {!isPOS && item.status !== "delivered" && item.status !== "cancelled" && next && nextBtnColor[next] && (
-            <Pressable style={{ flex: 1, borderRadius: 10, overflow: "hidden" }} onPress={() => { playClickSound("medium"); updateOnlineStatus(item.id, next); }}>
+          {isActive && next && nextBtnColor[next] ? (
+            <Pressable
+              style={[styles.nextBtnWrap, busy && { opacity: 0.6 }]}
+              disabled={busy}
+              onPress={() => { playClickSound("medium"); updateOnlineStatus(item.id, next); }}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: busy, busy }}
+            >
               <LinearGradient colors={nextBtnColor[next] as [string, string]} style={styles.actionBtnPrimary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                <Ionicons name={STATUS_META[next]?.icon as any || "arrow-forward"} size={16} color="#fff" />
-                <Text style={styles.actionBtnText}>
-                  {language === "ar" ? STATUS_META[next]?.labelAr : language === "de" ? STATUS_META[next]?.labelDe : STATUS_META[next]?.label}
-                </Text>
+                {busy ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name={STATUS_META[next]?.icon as any || "arrow-forward"} size={16} color="#fff" />}
+                <Text style={styles.actionBtnText} numberOfLines={1}>{nextVerb(next, item.orderType)}</Text>
               </LinearGradient>
             </Pressable>
-          )}
+          ) : null}
           {/* Assign Driver - delivery orders only */}
-          {!isPOS && item.orderType === "delivery" && item.status !== "delivered" && item.status !== "cancelled" && (
+          {isActive && item.orderType === "delivery" ? (
             <Pressable
               style={[styles.editBtn, { backgroundColor: Colors.deliveryPrimaryLight }]}
               onPress={() => { playClickSound("light"); setDriverAssignOrderId(item.id); }}
+              accessibilityRole="button"
+              accessibilityLabel={lbl("Assign driver", "تعيين سائق", "Fahrer zuweisen")}
             >
-              <Ionicons name="bicycle" size={16} color={Colors.deliveryPrimary} />
+              <Ionicons name="bicycle" size={18} color={Colors.deliveryPrimary} />
             </Pressable>
-          )}
+          ) : null}
           {/* Edit */}
-          <Pressable style={styles.editBtn} onPress={() => { playClickSound("light"); openEditOrder(item); }}>
-            <Ionicons name="pencil" size={16} color={Colors.accent} />
+          <Pressable
+            style={[styles.editBtn, busy && { opacity: 0.5 }]}
+            disabled={busy}
+            onPress={() => { playClickSound("light"); openEditOrder(item); }}
+            accessibilityRole="button"
+            accessibilityLabel={lbl("Edit", "تعديل", "Bearbeiten")}
+          >
+            {busy && isPOS ? <ActivityIndicator size="small" color={Colors.accent} /> : <Ionicons name="pencil" size={16} color={Colors.accent} />}
           </Pressable>
-          {/* Cancel (online only, active) */}
-          {!isPOS && item.status !== "delivered" && item.status !== "cancelled" && (
-            <Pressable style={styles.cancelBtn} onPress={() =>
-              Alert.alert(
-                lbl("Cancel Order?", "إلغاء الطلب", "Stornieren?"),
-                lbl("Are you sure?", "هل أنت متأكد؟", "Sind Sie sicher?"),
-                [
-                  { text: lbl("No", "لا", "Nein"), style: "cancel" },
-                  { text: lbl("Cancel", "إلغاء", "Stornieren"), style: "destructive", onPress: () => updateOnlineStatus(item.id, "cancelled") },
-                ]
-              )
-            }>
+          {/* Reject (pending) / Cancel (active) — online only */}
+          {isActive ? (
+            <Pressable
+              style={[styles.cancelBtn, busy && { opacity: 0.5 }]}
+              disabled={busy}
+              onPress={() => { playClickSound("light"); cancelOnlineOrder(item); }}
+              accessibilityRole="button"
+              accessibilityLabel={item.status === "pending" ? lbl("Reject order", "رفض الطلب", "Bestellung ablehnen") : lbl("Cancel order", "إلغاء الطلب", "Bestellung stornieren")}
+            >
               <Ionicons name="close" size={18} color={Colors.danger} />
             </Pressable>
-          )}
+          ) : null}
           {/* Delete */}
-          {!isPOS && (
-            <Pressable style={styles.deleteBtn} onPress={() => { playClickSound("light"); deleteOnlineOrder(item.id); }}>
-              <Ionicons name="trash-outline" size={16} color={Colors.danger} />
-            </Pressable>
-          )}
-          {isPOS && (
-            <Pressable style={styles.deleteBtn} onPress={() => { playClickSound("light"); deletePosOrder(item.id); }}>
-              <Ionicons name="trash-outline" size={16} color={Colors.danger} />
-            </Pressable>
-          )}
+          <Pressable
+            style={[styles.deleteBtn, busy && { opacity: 0.5 }]}
+            disabled={busy}
+            onPress={() => { playClickSound("light"); if (isPOS) deletePosOrder(item.id); else deleteOnlineOrder(item.id); }}
+            accessibilityRole="button"
+            accessibilityLabel={lbl("Delete", "حذف", "Löschen")}
+          >
+            <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+          </Pressable>
         </View>
       </Animated.View>
     );
@@ -916,7 +1259,7 @@ export default function OrdersScreen() {
     autoPrint3Copies(
       saleData, cartItems, editForm.subtotal, 0, 0, 0, editForm.totalAmount, editForm.deliveryFee,
       editingOrder.paymentMethod || "cash", 0,
-      editForm.customerName || "Laufkunde", "",
+      editForm.customerName || (language === "ar" ? "زبون" : "Laufkunde"), "",
       custObj, undefined, 0,
       storeSettings, tenant, allCategories as any[]
     );
@@ -940,8 +1283,10 @@ export default function OrdersScreen() {
           tenantId={tenantId || 0}
           licenseKey={(tenant as any)?.licenseKey || ""}
           apiBase={getApiUrl()}
-          onAssigned={(driverId) => {
+          currentDriverId={(normalizedOnlineOrders.find((o: any) => o.id === driverAssignOrderId) as any)?.driverId ?? null}
+          onAssigned={() => {
             qc.invalidateQueries({ queryKey: ["/api/online-orders"] });
+            qc.invalidateQueries({ queryKey: [driversKey] });
           }}
           onClose={() => setDriverAssignOrderId(null)}
         />
@@ -951,21 +1296,31 @@ export default function OrdersScreen() {
       <Modal visible={!!editingOrder} animationType="slide" transparent onRequestClose={() => setEditingOrder(null)}>
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <View style={styles.modalSheet}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }]}>
               <Text style={styles.modalTitle}>
                 {lbl("Edit Order", "تعديل الطلب", "Bestellung bearbeiten")}{" "}
                 {editingOrder?._type === "pos" ? (getDisplayNumber(editingOrder?.receiptNumber) || `#${editingOrder?.id}`) : `#${getDisplayNumber(editingOrder?.orderNumber)}`}
               </Text>
-              <Pressable onPress={() => setEditingOrder(null)}>
+              <Pressable onPress={() => setEditingOrder(null)} style={styles.modalCloseBtn} accessibilityLabel={lbl("Close", "إغلاق", "Schließen")}>
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </Pressable>
             </View>
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-              {/* Customer info - shown for all order types */}
-              {[
-                { label: lbl("Customer Name", "اسم العميل", "Kundenname"), key: "customerName", placeholder: "Name" },
-                { label: lbl("Phone", "الهاتف", "Telefon"), key: "customerPhone", placeholder: "+1 234 567" },
-                { label: lbl("Address", "العنوان", "Adresse"), key: "customerAddress", placeholder: "Street, City" },
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Customer info — editable on online orders. A POS invoice only
+                  links a customer record, which this form cannot change. */}
+              {editingOrder?._type === "pos" ? (
+                editForm.customerName || editForm.customerPhone || editForm.customerAddress ? (
+                  <View style={[styles.editField, styles.readOnlyBox]}>
+                    <Text style={[styles.editLabel, isRTL && { textAlign: "right" }]}>{lbl("Customer", "العميل", "Kunde")}</Text>
+                    <Text style={[styles.readOnlyText, isRTL && { textAlign: "right" }]}>
+                      {[editForm.customerName, editForm.customerPhone, editForm.customerAddress].filter(Boolean).join(" · ")}
+                    </Text>
+                  </View>
+                ) : null
+              ) : [
+                { label: lbl("Customer Name", "اسم العميل", "Kundenname"), key: "customerName", placeholder: lbl("Name", "الاسم", "Name"), keyboard: "default" },
+                { label: lbl("Phone", "الهاتف", "Telefon"), key: "customerPhone", placeholder: storePhonePlaceholder(), keyboard: "phone-pad" },
+                { label: lbl("Address", "العنوان", "Adresse"), key: "customerAddress", placeholder: lbl("Street, City", "الشارع، المدينة", "Straße, Ort"), keyboard: "default" },
               ].map((f: any) => (
                 <View key={f.key} style={styles.editField}>
                   <Text style={[styles.editLabel, isRTL && { textAlign: "right" }]}>{f.label}</Text>
@@ -975,6 +1330,7 @@ export default function OrdersScreen() {
                     onChangeText={v => setEditForm(prev => ({ ...prev, [f.key]: v }))}
                     placeholder={f.placeholder}
                     placeholderTextColor={Colors.textMuted}
+                    keyboardType={f.keyboard}
                   />
                 </View>
               ))}
@@ -985,10 +1341,11 @@ export default function OrdersScreen() {
                   <TextInput
                     style={[styles.editInput, isRTL && { textAlign: "right" }]}
                     value={editForm.estimatedTime}
-                    onChangeText={v => setEditForm(prev => ({ ...prev, estimatedTime: v }))}
+                    onChangeText={v => setEditForm(prev => ({ ...prev, estimatedTime: v.replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660)).replace(/[^0-9]/g, "") }))}
                     placeholder="30"
                     placeholderTextColor={Colors.textMuted}
                     keyboardType="number-pad"
+                    maxLength={3}
                   />
                 </View>
               )}
@@ -999,7 +1356,7 @@ export default function OrdersScreen() {
                   style={[styles.editInput, isRTL && { textAlign: "right" }, { minHeight: 60 }]}
                   value={editForm.notes}
                   onChangeText={v => setEditForm(prev => ({ ...prev, notes: v }))}
-                  placeholder="..."
+                  placeholder={lbl("Notes for the kitchen or driver", "ملاحظات للمطبخ أو السائق", "Hinweise für Küche oder Fahrer")}
                   placeholderTextColor={Colors.textMuted}
                   multiline
                 />
@@ -1007,9 +1364,9 @@ export default function OrdersScreen() {
 
               {/* Items section */}
               <View style={[styles.editDivider, { marginTop: 10, marginBottom: 15 }]} />
-              <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }, { marginBottom: 10, borderBottomWidth: 0 }]}>
+              <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }, { marginBottom: 10, borderBottomWidth: 0 }]}>
                 <Text style={[styles.editLabel, { marginBottom: 0 }]}>{lbl("Order Items", "محتويات الطلب", "Bestellartikel")}</Text>
-                <View style={{ flexDirection: "row", gap: 8 }}>
+                <View style={{ flexDirection: flipRow ? "row-reverse" : "row", gap: 8, flexWrap: "wrap" }}>
                   <Pressable onPress={() => { setShowFreeExtrasModal(true); }} style={[styles.addSmallBtn, { borderColor: Colors.success + "60", backgroundColor: Colors.success + "12" }]}>
                     <Ionicons name="leaf-outline" size={16} color={Colors.success} />
                     <Text style={[styles.addSmallText, { color: Colors.success }]}>{lbl("Free Extras", "إضافات مجانية", "Gratis Extras")}</Text>
@@ -1027,18 +1384,18 @@ export default function OrdersScreen() {
                 </View>
               ) : (
                 editForm.items.map((it, idx) => (
-                  <View key={idx} style={[styles.editItemRow, isRTL && { flexDirection: "row-reverse" }]}>
-                    <View style={{ flex: 1 }}>
+                  <View key={idx} style={[styles.editItemRow, flipRow && { flexDirection: "row-reverse" }]}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[styles.editItemName, isRTL && { textAlign: "right" }]}>{it.name}</Text>
-                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+                      <View style={{ flexDirection: flipRow ? "row-reverse" : "row", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                         <Text style={styles.editItemPrice}>{formatMoney(it.unitPrice)}</Text>
-                        <Pressable onPress={() => editItemAddons(idx)} style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.accent + "15", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
+                        {it.productId ? <Pressable onPress={() => editItemAddons(idx)} hitSlop={8} style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.accent + "15", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
                           <Ionicons name="options-outline" size={12} color={Colors.accent} />
-                          <Text style={{ fontSize: 10, color: Colors.accent, fontWeight: "700" }}>{lbl("Edit Addons", "تعديل الإضافات", "Extras bearbeiten")}</Text>
-                        </Pressable>
+                          <Text style={{ fontSize: 11, color: Colors.accent, fontWeight: "700" }}>{lbl("Edit Addons", "تعديل الإضافات", "Extras bearbeiten")}</Text>
+                        </Pressable> : null}
                       </View>
                     </View>
-                    <View style={[styles.qtyControl, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[styles.qtyControl, flipRow && { flexDirection: "row-reverse" }]}>
                       <Pressable onPress={() => { playClickSound("light"); updateItemQty(idx, -1); }} style={styles.qtyBtn}>
                         <Ionicons name="remove" size={16} color={Colors.text} />
                       </Pressable>
@@ -1047,8 +1404,8 @@ export default function OrdersScreen() {
                         <Ionicons name="add" size={16} color={Colors.text} />
                       </Pressable>
                     </View>
-                    <Text style={styles.editItemTotal}>{(it.total || 0).toFixed(2)}</Text>
-                    <Pressable onPress={() => updateItemQty(idx, -it.quantity)} style={styles.itemDelBtn}>
+                    <Text style={styles.editItemTotal}>{formatAmount(Number(it.total) || 0)}</Text>
+                    <Pressable onPress={() => updateItemQty(idx, -it.quantity)} style={styles.itemDelBtn} accessibilityLabel={lbl("Remove item", "حذف الصنف", "Artikel entfernen")}>
                       <Ionicons name="trash-outline" size={16} color={Colors.danger} />
                     </Pressable>
                   </View>
@@ -1056,23 +1413,35 @@ export default function OrdersScreen() {
               )}
 
               <View style={[styles.editDivider, { marginVertical: 15 }]} />
-              <View style={[styles.modalTotalRow, isRTL && { flexDirection: "row-reverse" }]}>
+              <View style={[styles.modalTotalRow, flipRow && { flexDirection: "row-reverse" }]}>
                 <Text style={styles.modalTotalLabel}>{lbl("Subtotal", "المجموع الفرعي", "Zwischensumme")}</Text>
                 <Text style={styles.modalTotalVal}>{formatMoney(editForm.subtotal)}</Text>
               </View>
               {editForm.deliveryFee > 0 && (
-                <View style={[styles.modalTotalRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <View style={[styles.modalTotalRow, flipRow && { flexDirection: "row-reverse" }]}>
                   <Text style={styles.modalTotalLabel}>{lbl("Delivery Fee", "رسوم التوصيل", "Liefergebühr")}</Text>
                   <Text style={styles.modalTotalVal}>{formatMoney(editForm.deliveryFee)}</Text>
                 </View>
               )}
-              <View style={[styles.modalTotalRow, isRTL && { flexDirection: "row-reverse" }, { marginTop: 4 }]}>
+              {Math.abs(editForm.adjustment) >= 0.005 && (
+                <View style={[styles.modalTotalRow, flipRow && { flexDirection: "row-reverse" }]}>
+                  <Text style={styles.modalTotalLabel}>
+                    {editForm.adjustment < 0
+                      ? lbl("Discounts", "الخصومات", "Rabatte")
+                      : lbl("Tax & other charges", "الضريبة ورسوم أخرى", "Steuer & weitere Gebühren")}
+                  </Text>
+                  <Text style={styles.modalTotalVal}>
+                    {editForm.adjustment < 0 ? "-" : "+"}{formatMoney(Math.abs(editForm.adjustment))}
+                  </Text>
+                </View>
+              )}
+              <View style={[styles.modalTotalRow, flipRow && { flexDirection: "row-reverse" }, { marginTop: 4 }]}>
                 <Text style={[styles.modalTotalLabel, { color: Colors.text, fontWeight: "700" }]}>{lbl("Total", "الإجمالي", "Gesamt")}</Text>
                 <Text style={[styles.modalTotalVal, { color: Colors.accent, fontSize: 18, fontWeight: "800" }]}>{formatMoney(editForm.totalAmount)}</Text>
               </View>
               <View style={{ height: 40 }} />
             </ScrollView>
-            <View style={[styles.modalFooter, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalFooter, flipRow && { flexDirection: "row-reverse" }]}>
               <Pressable style={styles.modalCancelBtn} onPress={() => { playClickSound("light"); setEditingOrder(null); }}>
                 <Text style={styles.modalCancelText}>{lbl("Cancel", "إلغاء", "Abbrechen")}</Text>
               </Pressable>
@@ -1080,8 +1449,12 @@ export default function OrdersScreen() {
                 <Ionicons name="print-outline" size={18} color={Colors.text} style={{ marginBottom: 2 }} />
                 <Text style={[styles.modalCancelText, { color: Colors.text, fontSize: 12 }]}>{lbl("Print", "طباعة", "Drucken")}</Text>
               </Pressable>
-              <Pressable style={styles.modalSaveBtn} onPress={() => { playClickSound("heavy"); saveEditOrder(); }}>
-                <Text style={styles.modalSaveText}>{lbl("Save Changes", "حفظ", "Speichern")}</Text>
+              <Pressable
+                style={[styles.modalSaveBtn, savingEdit && { opacity: 0.6 }]}
+                disabled={savingEdit}
+                onPress={() => { playClickSound("heavy"); saveEditOrder(); }}
+              >
+                {savingEdit ? <ActivityIndicator size="small" color="#000" /> : <Text style={styles.modalSaveText}>{lbl("Save Changes", "حفظ التغييرات", "Speichern")}</Text>}
               </Pressable>
             </View>
           </View>
@@ -1092,7 +1465,7 @@ export default function OrdersScreen() {
       <Modal visible={!!configuringProduct} animationType="fade" transparent>
         <View style={styles.pickerOverlay}>
           <View style={[styles.modalContent, { maxWidth: 700, padding: 24, maxHeight: "92%" }]}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }]}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.modalTitle, { fontSize: 22, fontWeight: "900" }]}>{configuringProduct?.name}</Text>
                 <Text style={{ fontSize: 13, color: Colors.textMuted, marginTop: 2 }}>
@@ -1120,13 +1493,13 @@ export default function OrdersScreen() {
                               const nextItems = [...prev.items];
                               nextItems[configuringItemIndex] = { ...nextItems[configuringItemIndex], name: variantName, unitPrice: Number(v.price), total: Number(v.price) * nextItems[configuringItemIndex].quantity };
                               const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
-                              return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
+                              return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: Math.max(0, newSubtotal + prev.deliveryFee + prev.adjustment) };
                             });
                           } else {
                             setEditForm(prev => {
                               const nextItems = [...prev.items, { productId: configuringProduct.id, name: variantName, quantity: 1, unitPrice: Number(v.price), total: Number(v.price) }];
                               const newSubtotal = nextItems.reduce((sum, i) => sum + (i.total || 0), 0);
-                              return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: newSubtotal + prev.deliveryFee };
+                              return { ...prev, items: nextItems, subtotal: newSubtotal, totalAmount: Math.max(0, newSubtotal + prev.deliveryFee + prev.adjustment) };
                             });
                           }
                           setConfiguringProduct(null);
@@ -1212,7 +1585,7 @@ export default function OrdersScreen() {
       <Modal visible={showFreeExtrasModal} animationType="fade" transparent onRequestClose={() => { setShowFreeExtrasModal(false); setFreeExtrasSelected([]); }}>
         <View style={styles.pickerOverlay}>
           <View style={[styles.pickerSheet, { maxHeight: "92%" }]}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }]}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <Ionicons name="leaf-outline" size={20} color={Colors.success} />
                 <Text style={styles.modalTitle}>{lbl("Free Extras", "إضافات مجانية", "Gratis Extras")}</Text>
@@ -1338,7 +1711,7 @@ export default function OrdersScreen() {
       <Modal visible={showProductPicker} animationType="fade" transparent onRequestClose={() => { setShowProductPicker(false); setPickerSearch(""); }}>
         <View style={styles.pickerOverlay}>
           <View style={[styles.pickerSheet, { maxHeight: "90%" }]}>
-            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.modalHeader, flipRow && { flexDirection: "row-reverse" }]}>
               <Text style={styles.modalTitle}>{lbl("Add Item", "إضافة صنف", "Artikel hinzufügen")}</Text>
               <Pressable onPress={() => { setShowProductPicker(false); setPickerSearch(""); }}>
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
@@ -1437,7 +1810,7 @@ export default function OrdersScreen() {
       <TabPageHeader
         title={lbl("All Orders", "جميع الطلبات", "Alle Bestellungen")}
         subtitle={pendingCount > 0
-          ? lbl(`${pendingCount} online order${pendingCount > 1 ? "s" : ""} pending`, `${pendingCount} طلب إلكتروني جديد`, `${pendingCount} neue Online - Bestellung(en)`)
+          ? lbl(`${pendingCount} online order${pendingCount > 1 ? "s" : ""} pending`, `${pendingCount} طلب إلكتروني جديد`, `${pendingCount} offene Online-Bestellung${pendingCount > 1 ? "en" : ""}`)
           : lbl("Live orders dashboard", "لوحة الطلبات المباشرة", "Live-Bestellübersicht")}
         icon="receipt"
         isRTL={isRTL}
@@ -1448,11 +1821,11 @@ export default function OrdersScreen() {
           </Animated.View>
         ) : undefined}
       >
-        <View style={[styles.filterRow, isRTL && { flexDirection: "row-reverse" }]}>
+        <View style={[styles.filterRow, flipRow && { flexDirection: "row-reverse" }]}>
           {([
             { key: "all", icon: "layers-outline", en: "All Orders", ar: "الكل", de: "Alle" },
             { key: "online", icon: "globe-outline", en: "Online", ar: "إلكتروني", de: "Online" },
-            { key: "dine_in", icon: "restaurant-outline", en: "Tables", ar: "طاولات", de: "Tisch" },
+            { key: "dine_in", icon: "restaurant-outline", en: "Tables", ar: "طاولات", de: "Tische" },
             { key: "pos", icon: "call-outline", en: "POS", ar: "كاشير", de: "Kasse" },
           ] as const).map(f => (
             <Pressable key={f.key} onPress={() => { playClickSound("light"); setViewMode(f.key); }} style={[styles.filterTab, styles.filterTabWithIcon, viewMode === f.key && styles.filterTabActive]}>
@@ -1464,7 +1837,7 @@ export default function OrdersScreen() {
           ))}
         </View>
 
-        <View style={[styles.filterRow, isRTL && { flexDirection: "row-reverse" }]}>
+        <View style={[styles.filterRow, flipRow && { flexDirection: "row-reverse" }]}>
           {[
             { key: "active", en: "Active", ar: "النشطة", de: "Aktiv" },
             { key: "done", en: "Done", ar: "المكتملة", de: "Erledigt" },
@@ -1481,19 +1854,19 @@ export default function OrdersScreen() {
 
         {/* Delivery order type filter */}
         {viewMode === "online" && (
-          <View style={[styles.filterRow, isRTL && { flexDirection: "row-reverse" }]}>
+          <View style={[styles.filterRow, flipRow && { flexDirection: "row-reverse" }]}>
             {([
               { key: "all_types", icon: "apps-outline", en: "All Types", ar: "الكل", de: "Alle" },
               { key: "delivery", icon: "bicycle-outline", en: "Delivery", ar: "توصيل", de: "Lieferung" },
               { key: "pickup", icon: "walk-outline", en: "Pickup", ar: "استلام", de: "Abholung" },
-              { key: "dine_in", icon: "restaurant-outline", en: "Dine-in", ar: "طاولات", de: "Vor Ort" },
+              { key: "dine_in", icon: "restaurant-outline", en: "Dine-in", ar: "في المطعم", de: "Vor Ort" },
               { key: "scheduled", icon: "calendar-outline", en: "Scheduled", ar: "مجدول", de: "Geplant" },
             ] as const).map(f => {
               const active = (orderTypeFilter || "all_types") === f.key;
               return (
                 <Pressable
                   key={f.key}
-                  onPress={() => { playClickSound("light"); setOrderTypeFilter?.(f.key); }}
+                  onPress={() => { playClickSound("light"); setOrderTypeFilter(f.key); }}
                   style={[
                     styles.filterTab,
                     styles.filterTabWithIcon,
@@ -1515,54 +1888,72 @@ export default function OrdersScreen() {
       {/* ===== ORDER LIST ===== */}
       <FlatList
         data={filteredOrders}
-        keyExtractor={(item: any) => `${item._type} -${item.id} `}
+        keyExtractor={(item: any) => `${item._type}-${item.id}`}
         renderItem={renderOrder}
         contentContainerStyle={[styles.listContent, { paddingBottom: bottomPad + 24 }]}
         ListHeaderComponent={
           <>
+            {onlineError ? (
+              <View style={[styles.errorBanner, flipRow && { flexDirection: "row-reverse" }]}>
+                <Ionicons name="cloud-offline-outline" size={18} color={Colors.danger} />
+                <Text style={[styles.errorBannerText, isRTL && { textAlign: "right" }]} numberOfLines={3}>
+                  {lbl("Online orders could not be refreshed", "تعذّر تحديث الطلبات الإلكترونية", "Online-Bestellungen konnten nicht aktualisiert werden")}
+                  {onlineErrorObj ? ` — ${apiErrorMessage(onlineErrorObj, "")}` : ""}
+                </Text>
+                <Pressable onPress={() => refetchOnline()} style={styles.errorRetryBtn}>
+                  <Text style={styles.errorRetryText}>{lbl("Retry", "إعادة", "Erneut")}</Text>
+                </Pressable>
+              </View>
+            ) : null}
             {bcToast ? (
               <View style={styles.bcToast}><Text style={styles.bcToastText}>{bcToast}</Text></View>
             ) : null}
             {(broadcastOrders as any[]).length > 0 ? (
               <View style={styles.bcSection}>
                 <View style={styles.bcSectionHdr}>
-                  <Text style={styles.bcSectionTitle}>
-                    {lbl("Incoming Broadcast Orders", "طلبات مفتوحة", "Eingehende Broadcast-Bestellungen")}
+                  <Text style={[styles.bcSectionTitle, isRTL && { textAlign: "right" }]}>
+                    {lbl("Incoming broadcast orders", "طلبات مفتوحة لكل المطاعم", "Eingehende Broadcast-Bestellungen")}
                     {"  "}
                     <Text style={styles.bcSectionCount}>({(broadcastOrders as any[]).length})</Text>
                   </Text>
-                  <Text style={styles.bcSectionSub}>
-                    {lbl("First to accept wins. Tap Accept to take the order.", "أول من يقبل يفوز. اضغط قبول لاستلام الطلب.", "Wer zuerst annimmt, gewinnt. Tippe auf Annehmen.")}
+                  <Text style={[styles.bcSectionSub, isRTL && { textAlign: "right" }]}>
+                    {lbl("First to accept wins. Tap Accept to take the order.", "أول من يقبل يفوز. اضغط قبول لاستلام الطلب.", "Wer zuerst annimmt, gewinnt. Tippen Sie auf Annehmen.")}
                   </Text>
                 </View>
                 {(broadcastOrders as any[]).map((bc: any) => {
                   const expiresMs = new Date(bc.expiresAt).getTime() - Date.now();
                   const secsLeft = Math.max(0, Math.floor(expiresMs / 1000));
+                  const expired = secsLeft <= 0;
+                  const bcBusy = bcBusyId === bc.id;
                   const bcItems = Array.isArray(bc.items) ? bc.items : (typeof bc.items === "string" ? (() => { try { return JSON.parse(bc.items); } catch { return []; } })() : []);
                   return (
-                    <View key={`bc-${bc.id}`} style={styles.bcCard}>
-                      <View style={styles.bcRow}>
-                        <Text style={styles.bcName}>{bc.customerName}</Text>
-                        <Text style={styles.bcTimer}>⏱ {Math.floor(secsLeft / 60)}:{String(secsLeft % 60).padStart(2, "0")}</Text>
+                    <View key={`bc-${bc.id}`} style={[styles.bcCard, expired && { opacity: 0.55 }]}>
+                      <View style={[styles.bcRow, flipRow && { flexDirection: "row-reverse" }]}>
+                        <Text style={[styles.bcName, isRTL && { textAlign: "right" }]} numberOfLines={1}>{bc.customerName}</Text>
+                        <Text style={styles.bcTimer}>
+                          {expired ? lbl("Expired", "انتهى", "Abgelaufen") : `⏱ ${Math.floor(secsLeft / 60)}:${String(secsLeft % 60).padStart(2, "0")}`}
+                        </Text>
                       </View>
-                      <Text style={styles.bcMeta}>{bc.customerPhone}</Text>
-                      {bc.customerAddress ? <Text style={styles.bcMeta}>{bc.customerAddress}</Text> : null}
+                      <Text style={[styles.bcMeta, isRTL && { textAlign: "right" }]}>{bc.customerPhone}</Text>
+                      {bc.customerAddress ? <Text style={[styles.bcMeta, isRTL && { textAlign: "right" }]}>{bc.customerAddress}</Text> : null}
                       <View style={styles.bcItemsBox}>
                         {bcItems.map((it: any, idx: number) => (
-                          <Text key={idx} style={styles.bcItem}>• {it.quantity}× {it.name}{it.notes ? ` — ${it.notes}` : ""}</Text>
+                          <Text key={idx} style={[styles.bcItem, isRTL && { textAlign: "right" }]}>• {it.quantity}× {it.name}{it.notes ? ` — ${it.notes}` : ""}</Text>
                         ))}
                       </View>
-                      {bc.notes ? <Text style={styles.bcNotes}>{bc.notes}</Text> : null}
-                      <View style={styles.bcTotalRow}>
-                        <Text style={styles.bcTotalLbl}>{lbl("Est. Total", "الإجمالي المقدر", "Geschätzt")}</Text>
+                      {bc.notes ? <Text style={[styles.bcNotes, isRTL && { textAlign: "right" }]}>{bc.notes}</Text> : null}
+                      <View style={[styles.bcTotalRow, flipRow && { flexDirection: "row-reverse" }]}>
+                        <Text style={styles.bcTotalLbl}>{lbl("Est. total", "الإجمالي المقدّر", "Geschätzte Summe")}</Text>
                         <Text style={styles.bcTotalVal}>{formatMoney(bc.estimatedTotal || 0)}</Text>
                       </View>
-                      <View style={styles.bcActions}>
-                        <Pressable style={[styles.bcBtn, styles.bcBtnReject]} onPress={() => rejectBroadcast(bc)} disabled={bcBusyId === bc.id}>
+                      <View style={[styles.bcActions, flipRow && { flexDirection: "row-reverse" }]}>
+                        <Pressable style={[styles.bcBtn, styles.bcBtnReject, (bcBusy || !!bcBusyId) && { opacity: 0.6 }]} onPress={() => rejectBroadcast(bc)} disabled={!!bcBusyId}>
                           <Text style={styles.bcBtnRejectText}>{lbl("Reject", "رفض", "Ablehnen")}</Text>
                         </Pressable>
-                        <Pressable style={[styles.bcBtn, styles.bcBtnAccept, bcBusyId === bc.id && { opacity: 0.6 }]} onPress={() => acceptBroadcast(bc)} disabled={bcBusyId === bc.id}>
-                          <Text style={styles.bcBtnAcceptText}>{bcBusyId === bc.id ? lbl("Accepting…", "جاري القبول…", "Wird angenommen…") : lbl("Accept", "قبول", "Annehmen")}</Text>
+                        <Pressable style={[styles.bcBtn, styles.bcBtnAccept, (bcBusy || expired) && { opacity: 0.6 }]} onPress={() => acceptBroadcast(bc)} disabled={!!bcBusyId || expired}>
+                          {bcBusy ? <ActivityIndicator size="small" color="#fff" /> : (
+                            <Text style={styles.bcBtnAcceptText}>{lbl("Accept", "قبول", "Annehmen")}</Text>
+                          )}
                         </Pressable>
                       </View>
                     </View>
@@ -1581,63 +1972,93 @@ export default function OrdersScreen() {
               color={Colors.textMuted}
               style={styles.emptyIcon}
             />
-            <Text style={styles.emptyTitle}>{lbl("No orders yet", "لا توجد طلبات", "Keine Bestellungen")}</Text>
-            <Text style={styles.emptyText}>
-              {lbl("Orders will appear here in real time", "ستظهر الطلبات هنا فور وصولها", "Bestellungen erscheinen hier in Echtzeit")}
-            </Text>
+            {filter !== "all" || (viewMode === "online" && orderTypeFilter !== "all_types") ? (
+              <>
+                <Text style={styles.emptyTitle}>{lbl("No orders match this filter", "لا توجد طلبات تطابق هذا الفلتر", "Keine Bestellungen für diesen Filter")}</Text>
+                <Pressable onPress={() => { setFilter("all"); setOrderTypeFilter("all_types"); }} style={styles.emptyResetBtn}>
+                  <Text style={styles.emptyResetText}>{lbl("Show all", "عرض الكل", "Alle anzeigen")}</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.emptyTitle}>{lbl("No orders yet", "لا توجد طلبات", "Keine Bestellungen")}</Text>
+                <Text style={styles.emptyText}>
+                  {lbl("Orders will appear here in real time", "ستظهر الطلبات هنا فور وصولها", "Bestellungen erscheinen hier in Echtzeit")}
+                </Text>
+              </>
+            )}
           </View>
         }
       />
 
       {/* ===== Chat with customer modal ===== */}
-      <Modal visible={!!chatRoomOrderId} animationType="slide" onRequestClose={() => setChatRoomOrderId(null)} transparent>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }}>
-          <View style={{ backgroundColor: Colors.background, height: "85%", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-              <View>
-                <Text style={{ color: Colors.text, fontWeight: "800", fontSize: 16 }}>{lbl("Chat with customer", "محادثة العميل", "Chat mit Kunde")}</Text>
-                <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }}>{lbl("Order #", "طلب #", "Bestellung #")}{chatRoomOrderId}</Text>
+      <Modal visible={!!chatRoomOrderId} animationType="slide" onRequestClose={() => setChatOrder(null)} transparent>
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <View style={styles.chatSheet}>
+            <View style={[styles.chatHeader, flipRow && { flexDirection: "row-reverse" }]}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[{ color: Colors.text, fontWeight: "800", fontSize: 16 }, isRTL && { textAlign: "right" }]}>{lbl("Chat with customer", "محادثة العميل", "Chat mit Kunde")}</Text>
+                <Text style={[{ color: Colors.textMuted, fontSize: 12, marginTop: 2 }, isRTL && { textAlign: "right" }]}>{lbl("Order", "طلب", "Bestellung")} {chatOrder?.label}</Text>
               </View>
-              <Pressable onPress={() => setChatRoomOrderId(null)} style={{ padding: 8 }}>
+              <Pressable onPress={() => setChatOrder(null)} style={styles.modalCloseBtn} accessibilityLabel={lbl("Close", "إغلاق", "Schließen")}>
                 <Ionicons name="close" size={22} color={Colors.text} />
               </Pressable>
             </View>
-            <ScrollView style={{ flex: 1, marginBottom: 8 }} contentContainerStyle={{ paddingBottom: 12 }}>
+            <ScrollView style={{ flex: 1, marginBottom: 8 }} contentContainerStyle={{ paddingBottom: 12 }} keyboardShouldPersistTaps="handled">
               {chatLoading && chatMessages.length === 0 ? (
                 <View style={{ padding: 20, alignItems: "center" }}><ActivityIndicator color={Colors.accent} /></View>
+              ) : chatError ? (
+                <View style={{ padding: 30, alignItems: "center", gap: 10 }}>
+                  <Ionicons name="cloud-offline-outline" size={36} color={Colors.textMuted} />
+                  <Text style={{ color: Colors.textMuted, fontSize: 13, textAlign: "center" }}>{chatError}</Text>
+                  <Pressable
+                    onPress={() => { const o = normalizedOnlineOrders.find((x: any) => x.id === chatRoomOrderId); if (o) openChat(o); }}
+                    style={styles.emptyResetBtn}
+                  >
+                    <Text style={styles.emptyResetText}>{lbl("Try again", "إعادة المحاولة", "Erneut versuchen")}</Text>
+                  </Pressable>
+                </View>
               ) : chatMessages.length === 0 ? (
                 <View style={{ padding: 30, alignItems: "center" }}>
                   <Ionicons name="chatbubbles-outline" size={40} color={Colors.textMuted} style={{ marginBottom: 8, opacity: 0.6 }} />
                   <Text style={{ color: Colors.textMuted, fontSize: 13, textAlign: "center" }}>
-                    {lbl("No messages yet — wait for the customer to start", "لا توجد رسائل — انتظر حتى يبدأ العميل المحادثة", "Noch keine Nachrichten")}
+                    {lbl("No messages yet — write the first one", "لا توجد رسائل بعد — اكتب أول رسالة", "Noch keine Nachrichten — schreiben Sie die erste")}
                   </Text>
                 </View>
               ) : chatMessages.map((m, i) => {
                 const mine = m.senderType !== "customer";
                 return (
                   <View key={i} style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "78%", marginVertical: 4, padding: 10, paddingHorizontal: 14, borderRadius: 14, backgroundColor: mine ? Colors.accent : Colors.surface, borderBottomRightRadius: mine ? 4 : 14, borderBottomLeftRadius: mine ? 14 : 4 }}>
-                    {!mine ? <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 2, fontWeight: "700" }}>{m.senderName || "Customer"}</Text> : null}
+                    {!mine ? <Text style={{ color: Colors.textMuted, fontSize: 11, marginBottom: 2, fontWeight: "700" }}>{m.senderName || lbl("Customer", "العميل", "Kunde")}</Text> : null}
                     <Text style={{ color: mine ? "#fff" : Colors.text, fontSize: 14 }}>{m.body}</Text>
-                    <Text style={{ color: mine ? "rgba(255,255,255,0.7)" : Colors.textMuted, fontSize: 10, marginTop: 4 }}>{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
+                    <Text style={{ color: mine ? "rgba(255,255,255,0.7)" : Colors.textMuted, fontSize: 10, marginTop: 4 }}>
+                      {formatInStoreTz(m.createdAt, dateLocale, { hour: "2-digit", minute: "2-digit" })}
+                    </Text>
                   </View>
                 );
               })}
             </ScrollView>
-            <View style={{ flexDirection: "row", gap: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.border }}>
+            <View style={[styles.chatInputRow, flipRow && { flexDirection: "row-reverse" }]}>
               <TextInput
                 value={chatDraft}
                 onChangeText={setChatDraft}
                 placeholder={lbl("Type a reply…", "اكتب رداً…", "Antwort eingeben…")}
                 placeholderTextColor={Colors.textMuted}
-                style={{ flex: 1, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 10, padding: 10, color: Colors.text, fontSize: 14 }}
+                style={[styles.chatInput, isRTL && { textAlign: "right" }]}
                 onSubmitEditing={sendChatMessage}
+                editable={!!chatRoomId}
+                maxLength={2000}
               />
-              <Pressable onPress={sendChatMessage} style={{ backgroundColor: Colors.accent, paddingHorizontal: 18, justifyContent: "center", borderRadius: 10 }}>
-                <Text style={{ color: "#fff", fontWeight: "800" }}>{lbl("Send", "إرسال", "Senden")}</Text>
+              <Pressable
+                onPress={sendChatMessage}
+                disabled={!chatRoomId || chatSending || !chatDraft.trim()}
+                style={[styles.chatSendBtn, (!chatRoomId || chatSending || !chatDraft.trim()) && { opacity: 0.5 }]}
+              >
+                {chatSending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "800" }}>{lbl("Send", "إرسال", "Senden")}</Text>}
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -1675,9 +2096,9 @@ const styles = themedStyles((Colors) => ({
     justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: "rgba(255,255,255,0.3)",
   },
   pendingBadgeText: { color: "#fff", fontWeight: "900", fontSize: 18 },
-  filterRow: { flexDirection: "row", gap: 8, paddingBottom: 10 },
+  filterRow: { flexDirection: "row", gap: 8, paddingBottom: 10, flexWrap: "wrap" },
   filterTab: {
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999,
+    paddingHorizontal: 14, paddingVertical: 7, minHeight: 36, justifyContent: "center", borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)",
   },
   filterTabWithIcon: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -1704,8 +2125,8 @@ const styles = themedStyles((Colors) => ({
     paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1,
   },
   sourceBadgeText: { fontSize: 10, fontWeight: "800" },
-  orderHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  orderNumRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  orderHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8 },
+  orderNumRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", flex: 1, minWidth: 0 },
   orderNum: { color: Colors.text, fontWeight: "800", fontSize: 14 },
   statusBadge: {
     flexDirection: "row", alignItems: "center", gap: 4,
@@ -1721,7 +2142,30 @@ const styles = themedStyles((Colors) => ({
   },
   customerName: { color: Colors.text, fontWeight: "700", fontSize: 13 },
   customerSub: { color: Colors.textMuted, fontSize: 11, marginTop: 1 },
-  metaChips: { flexDirection: "column", gap: 4, alignItems: "flex-end" },
+  metaChips: { flexDirection: "column", gap: 4, alignItems: "flex-end", maxWidth: "45%" },
+  contactRow: { flexDirection: "row", gap: 8, marginTop: 6, flexWrap: "wrap" },
+  contactBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, minHeight: 32, borderRadius: 8, backgroundColor: Colors.surfaceLight },
+  contactBtnText: { fontSize: 12, fontWeight: "700" },
+  extraRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 8 },
+  driverChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, minHeight: 36, borderRadius: 8, backgroundColor: Colors.deliveryPrimaryLight, maxWidth: 220 },
+  driverChipText: { color: Colors.deliveryPrimary, fontSize: 12, fontWeight: "700", flexShrink: 1 },
+  chatBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, minHeight: 36, backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.accent + "40" },
+  payConfirmBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 44, borderRadius: 10, marginBottom: 8, borderWidth: 1, borderColor: Colors.warning + "80", backgroundColor: Colors.warning + "18" },
+  payConfirmText: { color: Colors.warning, fontWeight: "800", fontSize: 13 },
+  errorBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: 10, marginBottom: 10, borderWidth: 1, borderColor: Colors.danger + "60", backgroundColor: Colors.danger + "14" },
+  errorBannerText: { flex: 1, minWidth: 0, color: Colors.text, fontSize: 12 },
+  errorRetryBtn: { paddingHorizontal: 12, minHeight: 36, justifyContent: "center", borderRadius: 8, backgroundColor: Colors.danger },
+  errorRetryText: { color: Colors.white, fontWeight: "700", fontSize: 12 },
+  emptyResetBtn: { marginTop: 12, paddingHorizontal: 16, minHeight: 40, justifyContent: "center", borderRadius: 10, backgroundColor: Colors.accent + "22", borderWidth: 1, borderColor: Colors.accent },
+  emptyResetText: { color: Colors.accent, fontWeight: "700", fontSize: 13 },
+  chatSheet: { backgroundColor: Colors.background, height: "85%", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, width: "100%", maxWidth: 720, alignSelf: "center" },
+  chatHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 8 },
+  chatInputRow: { flexDirection: "row", gap: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.border },
+  chatInput: { flex: 1, minHeight: 44, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 10, paddingHorizontal: 12, color: Colors.text, fontSize: 14 },
+  chatSendBtn: { backgroundColor: Colors.accent, paddingHorizontal: 18, minHeight: 44, justifyContent: "center", alignItems: "center", borderRadius: 10, minWidth: 72 },
+  modalCloseBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  readOnlyBox: { backgroundColor: Colors.background, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: Colors.cardBorder },
+  readOnlyText: { color: Colors.text, fontSize: 14 },
   metaChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(255,255,255,0.06)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
   metaChipText: { color: Colors.textSecondary, fontSize: 10, fontWeight: "600" },
 
@@ -1737,24 +2181,25 @@ const styles = themedStyles((Colors) => ({
   timeText: { color: Colors.textMuted, fontSize: 11 },
   feeText: { color: Colors.textMuted, fontSize: 11 },
 
-  actions: { flexDirection: "row", gap: 8 },
+  actions: { flexDirection: "row", gap: 8, alignItems: "center" },
+  nextBtnWrap: { flex: 1, minWidth: 120, borderRadius: 10, overflow: "hidden" },
   actionBtnPrimary: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 6, paddingVertical: 11, paddingHorizontal: 16, borderRadius: 10,
+    gap: 6, minHeight: 44, paddingHorizontal: 12, borderRadius: 10,
   },
   actionBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
   editBtn: {
-    width: 42, height: 42, borderRadius: 10,
+    width: 44, height: 44, borderRadius: 10,
     backgroundColor: "rgba(47,211,198,0.1)", borderWidth: 1, borderColor: "rgba(47,211,198,0.3)",
     justifyContent: "center", alignItems: "center",
   },
   cancelBtn: {
-    width: 42, height: 42, borderRadius: 10,
+    width: 44, height: 44, borderRadius: 10,
     backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1, borderColor: "rgba(239,68,68,0.3)",
     justifyContent: "center", alignItems: "center",
   },
   deleteBtn: {
-    width: 42, height: 42, borderRadius: 10,
+    width: 44, height: 44, borderRadius: 10,
     backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1, borderColor: "rgba(239,68,68,0.3)",
     justifyContent: "center", alignItems: "center",
   },
@@ -1763,7 +2208,7 @@ const styles = themedStyles((Colors) => ({
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   modalSheet: {
     backgroundColor: Colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: 20, maxHeight: "88%",
+    padding: 20, maxHeight: "88%", height: "88%", width: "100%", maxWidth: 760, alignSelf: "center",
   },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   modalTitle: { color: Colors.text, fontWeight: "800", fontSize: 16 },
@@ -1774,13 +2219,13 @@ const styles = themedStyles((Colors) => ({
     borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: Colors.text, fontSize: 14,
   },
   modalFooter: { flexDirection: "row", gap: 10, marginTop: 16 },
-  modalCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 10, borderWidth: 1, borderColor: Colors.cardBorder, alignItems: "center" },
+  modalCancelBtn: { flex: 1, minHeight: 46, justifyContent: "center", borderRadius: 10, borderWidth: 1, borderColor: Colors.cardBorder, alignItems: "center" },
   modalCancelText: { color: Colors.textMuted, fontWeight: "600", fontSize: 14 },
-  modalSaveBtn: { flex: 2, paddingVertical: 13, borderRadius: 10, backgroundColor: Colors.accent, alignItems: "center" },
+  modalSaveBtn: { flex: 2, minHeight: 46, justifyContent: "center", borderRadius: 10, backgroundColor: Colors.accent, alignItems: "center" },
   modalSaveText: { color: "#000", fontWeight: "800", fontSize: 14 },
 
   editDivider: { height: 1, backgroundColor: Colors.cardBorder },
-  addSmallBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, backgroundColor: Colors.accent + "15" },
+  addSmallBtn: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 36, paddingHorizontal: 10, borderRadius: 8, backgroundColor: Colors.accent + "15" },
   addSmallText: { color: Colors.accent, fontSize: 12, fontWeight: "700" },
   emptyItems: { padding: 20, alignItems: "center" },
   emptyItemsText: { color: Colors.textMuted, fontSize: 12 },
@@ -1788,10 +2233,10 @@ const styles = themedStyles((Colors) => ({
   editItemName: { color: Colors.text, fontSize: 13, fontWeight: "600" },
   editItemPrice: { color: Colors.textMuted, fontSize: 11 },
   qtyControl: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.background, borderRadius: 8, borderWidth: 1, borderColor: Colors.cardBorder },
-  qtyBtn: { width: 30, height: 30, justifyContent: "center", alignItems: "center" },
+  qtyBtn: { width: 36, height: 36, justifyContent: "center", alignItems: "center" },
   qtyVal: { color: Colors.text, fontSize: 13, fontWeight: "700", minWidth: 24, textAlign: "center" },
   editItemTotal: { color: Colors.text, fontSize: 13, fontWeight: "700", minWidth: 50, textAlign: "right" },
-  itemDelBtn: { padding: 4 },
+  itemDelBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
   modalTotalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
   modalTotalLabel: { color: Colors.textMuted, fontSize: 12 },
   modalTotalVal: { color: Colors.text, fontSize: 13, fontWeight: "600" },
