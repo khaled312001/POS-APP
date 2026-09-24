@@ -3051,22 +3051,7 @@ async function test(){
   });
 
   app.get("/api/super-admin/whatsapp/session-info", requireSuperAdmin as any, async (_req: any, res: any) => {
-    try {
-      const pathMod = await import("path");
-      const fsMod = await import("fs");
-      const tokenDir = pathMod.resolve(process.cwd(), ".wppconnect", "tokens");
-      let hasSession = false;
-      let sessionModified: string | null = null;
-      if (fsMod.existsSync(tokenDir)) {
-        const files = fsMod.readdirSync(tokenDir).filter((f: string) => f.endsWith(".data.json") || f.endsWith(".json"));
-        if (files.length > 0) {
-          hasSession = true;
-          const stat = fsMod.statSync(pathMod.join(tokenDir, files[0]));
-          sessionModified = stat.mtime.toISOString();
-        }
-      }
-      res.json({ hasSession, sessionModified });
-    } catch (e: any) { res.json({ hasSession: false, sessionModified: null, error: e.message }); }
+    res.json({ hasSession: whatsappService.hasSession(), sessionModified: whatsappService.sessionModified() });
   });
 
   app.post("/api/super-admin/whatsapp/test", requireSuperAdmin as any, async (req: any, res: any) => {

@@ -88,17 +88,24 @@ pages.home = {
       };
       // Arabic name to key map
       var arMap = {"بيتزا":"pizza","برجر":"burger","سوشي":"sushi","دجاج":"chicken","باستا":"pasta","سلطة":"salad","حلويات":"dessert","مشروبات":"drinks","فطار":"breakfast","ساندوتشات":"sandwich","مأكولات بحرية":"seafood","مشويات":"grill","نباتي":"vegan","شوربة":"soup","قهوة":"coffee"};
+      // A category's own image, else a photo of one of its products; stock
+      // food photos only when the name clearly names a dish (pizza, sushi…).
+      // Guessing by hash put pizza and sushi on a pharmacy's categories.
+      function getCategoryImage(c) {
+        if (c.image) return fixImageUrl(c.image);
+        var withImg = allProducts.find(function (p) {
+          return p.categoryId === c.id && p.imageUrl && p.imageUrl.length > 10 && !p.imageUrl.startsWith("data:image/svg");
+        });
+        if (withImg) return fixImageUrl(withImg.imageUrl);
+        return getCuisineImage(c.name);
+      }
       function getCuisineImage(name) {
         var key = name.toLowerCase();
         // Try direct match
         for (var k in cuisineImages) { if (key.includes(k)) return cuisineImages[k]; }
         // Try Arabic
         if (arMap[name]) return cuisineImages[arMap[name]];
-        // Fallback: pick by hash
-        var keys = Object.keys(cuisineImages);
-        var hash = 0;
-        for (var i = 0; i < name.length; i++) hash = ((hash << 5) - hash) + name.charCodeAt(i);
-        return cuisineImages[keys[Math.abs(hash) % keys.length]];
+        return null;
       }
 
       container.innerHTML = `
@@ -202,11 +209,13 @@ pages.home = {
     </div>
     <div class="cuisine-grid">
       ${filteredCategories.slice(0, 12).map(c => {
-        const imgUrl = getCuisineImage(c.name);
+        const imgUrl = getCategoryImage(c);
         return `
         <div class="cuisine-card" onclick="pages.home._filterByCategory(${c.id})" data-cat="${c.id}">
           <div class="cuisine-card__emoji-wrap">
-            <img src="${imgUrl}" alt="${c.name}" loading="lazy" onerror="this.style.display='none'" />
+            ${imgUrl
+              ? `<img src="${imgUrl}" alt="${c.name}" loading="lazy" onerror="this.style.display='none'" />`
+              : `<i data-lucide="layout-grid" class="icon-lg"></i>`}
           </div>
           <div class="cuisine-card__label">${c.name}</div>
         </div>`;

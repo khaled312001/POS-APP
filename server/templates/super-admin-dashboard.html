@@ -4024,7 +4024,7 @@
       } else if (d.status === 'connected') {
         qrArea.innerHTML = '<div style="font-size:36px;margin-bottom:10px">✅</div><div style="font-size:16px;color:var(--ok);font-weight:700">Connected to WhatsApp</div><div style="font-size:12px;color:var(--mu);margin-top:6px">You can now send messages and test the connection.<br><span style="opacity:.7">متصل — يمكنك إرسال رسائل الآن</span></div>';
       } else if (d.status === 'connecting' || d.status === 'qr_ready') {
-        qrArea.innerHTML = '<div style="font-size:30px;margin-bottom:10px">⏳</div><div style="color:var(--tx);font-size:13px;font-weight:600">Launching browser & generating QR…</div><div style="color:var(--mu);font-size:12px;margin-top:6px">This may take 10–20 seconds.<br><span style="opacity:.7">جاري تشغيل المتصفح وتوليد رمز QR</span></div>';
+        qrArea.innerHTML = '<div style="font-size:30px;margin-bottom:10px">⏳</div><div style="color:var(--tx);font-size:13px;font-weight:600">Generating QR…</div><div style="color:var(--mu);font-size:12px;margin-top:6px">This takes a few seconds.<br><span style="opacity:.7">جاري توليد رمز QR</span></div>';
       } else {
         qrArea.innerHTML = '<div style="font-size:32px;margin-bottom:10px;opacity:.4">📱</div><div style="color:var(--mu);font-size:13px">Click "Connect WhatsApp" to start and generate a QR code.</div>';
       }

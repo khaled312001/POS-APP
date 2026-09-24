@@ -1,28 +1,23 @@
-import os from 'os';
 import path from 'path';
 import fs from 'fs';
+import { pathToFileURL } from 'url';
+// @ts-ignore -- qrcode ships no type declarations
+import QRCode from 'qrcode';
 
-let wppconnect: any = null;
-
-async function loadWppConnect() {
-    if (!wppconnect) {
-        console.log("[WhatsApp] Attempting to load @wppconnect-team/wppconnect...");
-        try {
-            const mod = await import("@wppconnect-team/wppconnect");
-            wppconnect = mod.default ?? mod;
-            console.log("[WhatsApp] Successfully loaded @wppconnect-team/wppconnect");
-        } catch (err: any) {
-            console.error("[WhatsApp] FAIL to load wppconnect:", err);
-            return null;
-        }
-    }
-    return wppconnect;
-}
-
-const SESSION_NAME = "barmagly-pos";
-const STORAGE_DIR = path.resolve(process.cwd(), ".wppconnect");
-const CHROME_DATA_DIR = path.join(STORAGE_DIR, "chrome-data");
-const TOKEN_DIR = path.join(STORAGE_DIR, "tokens");
+/**
+ * Platform WhatsApp session, over Baileys (WhatsApp Web's own WebSocket
+ * protocol — no browser). It replaced wppconnect + headless Chrome, which
+ * needs ~50 threads: on the shared hosting account that budget is shared by
+ * every site, so Chrome never got a renderer and took the other sites down
+ * with it. Baileys runs inside the node process (~11 threads).
+ *
+ * Baileys is ESM-only and is installed on the server in its own folder
+ * (wa-baileys/ next to the app, or BAILEYS_DIR) so the app's node_modules are
+ * left alone; a normal node_modules install is used as a fallback.
+ */
+const STORAGE_DIR = path.resolve(process.cwd(), ".whatsapp");
+const AUTH_DIR = path.join(STORAGE_DIR, "auth");
+const BAILEYS_DIR = process.env.BAILEYS_DIR || path.resolve(process.cwd(), "wa-baileys");
 
 export type WhatsAppStatus = "disconnected" | "connecting" | "qr_ready" | "connected";
 
@@ -48,17 +43,16 @@ interface OrderData {
     notes?: string | null;
 }
 
-let client: any = null;
-let clientReady = false;
+let baileys: any = null;
+let sock: any = null;
 let status: WhatsAppStatus = "disconnected";
 let lastQrCode: string | null = null;
 let lastError: string | null = null;
 let connectionLog: { time: string; event: string }[] = [];
-let connecting = false;
 let connectionPhase: "idle" | "starting" | "awaiting_qr" | "qr_scanned" | "ready" = "idle";
-let connectionStartTime = 0;
-let autoReconnectTimer: any = null;
-let keepAliveInterval: any = null;
+let reconnectTimer: any = null;
+let reconnectAttempts = 0;
+let manualStop = false;
 let pendingMessages: { phone: string; text: string; timestamp: number }[] = [];
 
 function log(event: string) {
@@ -68,7 +62,32 @@ function log(event: string) {
     console.log(`[WhatsApp] ${event}`);
 }
 
-function toChatId(phone: string): string {
+// Baileys wants a pino-style logger; its protocol chatter is not useful here.
+const quietLogger: any = {
+    level: "silent",
+    child() { return quietLogger; },
+    trace() { }, debug() { }, info() { },
+    warn() { },
+    error() { },
+    fatal(obj: any, msg?: string) { console.error("[WhatsApp] fatal", msg || "", obj?.err?.message || ""); },
+};
+
+async function loadBaileys(): Promise<any> {
+    if (baileys) return baileys;
+    const entry = path.join(BAILEYS_DIR, "node_modules", "@whiskeysockets", "baileys", "lib", "index.js");
+    try {
+        baileys = fs.existsSync(entry)
+            ? await import(pathToFileURL(entry).href)
+            : await import("@whiskeysockets/baileys" as any);
+        return baileys;
+    } catch (err: any) {
+        lastError = `Baileys not installed: ${err?.message || err}`;
+        log(lastError);
+        return null;
+    }
+}
+
+function toJid(phone: string): string {
     let digits = phone.replace(/\D/g, "");
 
     // Normalize Swiss numbers
@@ -85,357 +104,135 @@ function toChatId(phone: string): string {
         digits = "41" + digits;
     }
 
-    return `${digits}@c.us`;
+    return `${digits}@s.whatsapp.net`;
 }
 
-async function cleanupProcesses() {
-    // Kill any lingering Chromium processes
-    try {
-        const { execSync } = await import("child_process");
-        const isWindows = os.platform() === 'win32';
-        if (isWindows) {
-            execSync(`wmic process where "name='chrome.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: 'ignore' });
-            execSync(`wmic process where "name='chromium.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: 'ignore' });
+function hasSession(): boolean {
+    return fs.existsSync(path.join(AUTH_DIR, "creds.json"));
+}
+
+function queue(phone: string, text: string) {
+    pendingMessages.push({ phone, text, timestamp: Date.now() });
+    if (pendingMessages.length > 50) pendingMessages.shift();
+}
+
+async function flushPending() {
+    if (!pendingMessages.length) return;
+    const toSend = pendingMessages;
+    pendingMessages = [];
+    log(`Flushing ${toSend.length} queued message(s)`);
+    for (const m of toSend) {
+        if (Date.now() - m.timestamp < 10 * 60 * 1000) {
+            await whatsappService.sendText(m.phone, m.text);
         } else {
-            // Only our own browser (its profile dir is on the command line):
-            // the hosting account runs other apps that may use Chrome too.
-            execSync(
-                `pkill -9 -f '${CHROME_DATA_DIR}' 2>/dev/null; true`,
-                { timeout: 4000 }
-            );
+            log(`Dropped stale queued message for ${m.phone} (>10min old)`);
         }
-        await new Promise(r => setTimeout(r, 800));
-    } catch { }
-
-    // Drop only the profile's lock files. The profile itself holds the linked
-    // WhatsApp session, so wiping it would force a new QR scan after every
-    // restart. SingletonLock is a symlink, hence rmSync with force.
-    for (const lock of ["SingletonLock", "SingletonSocket", "SingletonCookie"]) {
-        try { fs.rmSync(path.join(CHROME_DATA_DIR, lock), { force: true }); } catch { }
-    }
-
-    fs.mkdirSync(CHROME_DATA_DIR, { recursive: true });
-    if (!fs.existsSync(TOKEN_DIR)) fs.mkdirSync(TOKEN_DIR, { recursive: true });
-}
-
-async function isClientAlive(): Promise<boolean> {
-    if (!client) return false;
-    try {
-        const state = await Promise.race([
-            client.getConnectionState(),
-            new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 5000))
-        ]);
-        return state === "CONNECTED";
-    } catch {
-        return false;
     }
 }
 
-function startKeepAlive() {
-    if (keepAliveInterval) clearInterval(keepAliveInterval);
-    keepAliveInterval = setInterval(async () => {
-        if (status !== "connected" || !client || !clientReady) return;
-        try {
-            const alive = await isClientAlive();
-            if (!alive) {
-                log("Keepalive check failed — marking disconnected and scheduling reconnect");
-                clientReady = false;
-                status = "disconnected";
-                client = null;
-                connectionPhase = "idle";
-                scheduleAutoReconnect();
-            }
-        } catch { }
-    }, 60000); // check every 60 seconds
+function scheduleReconnect(delayMs?: number) {
+    if (manualStop || reconnectTimer) return;
+    reconnectAttempts++;
+    const delay = delayMs ?? Math.min(60000, 5000 * reconnectAttempts);
+    log(`Reconnecting in ${Math.round(delay / 1000)}s…`);
+    reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        startSocket().catch((e) => log(`Reconnect failed: ${e?.message || e}`));
+    }, delay);
 }
 
-function stopKeepAlive() {
-    if (keepAliveInterval) {
-        clearInterval(keepAliveInterval);
-        keepAliveInterval = null;
-    }
+function closeSocket() {
+    const s = sock;
+    sock = null;
+    if (!s) return;
+    try { s.ev.removeAllListeners(); } catch { }
+    try { s.end(undefined); } catch { }
 }
 
-function scheduleAutoReconnect() {
-    if (autoReconnectTimer) clearTimeout(autoReconnectTimer);
-    autoReconnectTimer = setTimeout(async () => {
-        autoReconnectTimer = null;
-        if (status === "disconnected" && !connecting) {
-            // If client is still alive (transient disconnect recovered natively), skip full reconnect
-            if (client) {
-                const alive = await isClientAlive();
-                if (alive) {
-                    log("Native recovery detected — resuming without full reconnect");
-                    status = "connected";
-                    clientReady = true;
-                    connectionPhase = "ready";
-                    return;
-                }
-            }
-            // Clear stale chrome lock files before reconnecting
+async function startSocket(): Promise<void> {
+    const B = await loadBaileys();
+    if (!B) { status = "disconnected"; connectionPhase = "idle"; return; }
+    const makeWASocket = B.default?.default || B.default || B.makeWASocket;
+    const { useMultiFileAuthState, fetchLatestBaileysVersion, Browsers, DisconnectReason } = B;
+
+    closeSocket();
+    fs.mkdirSync(AUTH_DIR, { recursive: true });
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    let version: number[] | undefined;
+    try { version = (await fetchLatestBaileysVersion()).version; } catch { }
+
+    status = "connecting";
+    connectionPhase = hasSession() && state.creds?.registered ? "starting" : "awaiting_qr";
+    const s = makeWASocket({
+        auth: state,
+        logger: quietLogger,
+        version,
+        browser: Browsers.ubuntu("Kassenta"),
+        markOnlineOnConnect: false,
+        syncFullHistory: false,
+    });
+    sock = s;
+    s.ev.on("creds.update", saveCreds);
+    s.ev.on("connection.update", async (u: any) => {
+        if (sock !== s) return;
+        if (u.qr) {
             try {
-                const fsMod = await import("fs");
-                const lockFile = path.join(CHROME_DATA_DIR, "SingletonLock");
-                if (fsMod.existsSync(lockFile)) fsMod.unlinkSync(lockFile);
-                const cookieLock = path.join(CHROME_DATA_DIR, "Default", "Cookies-journal");
-                if (fsMod.existsSync(cookieLock)) fsMod.unlinkSync(cookieLock);
-            } catch { }
-            log("Auto-reconnecting…");
-            try {
-                await whatsappService.connect();
-                if (whatsappService.getStatus().status === "connected" && pendingMessages.length > 0) {
-                    log(`Flushing ${pendingMessages.length} queued message(s)`);
-                    const toSend = [...pendingMessages];
-                    pendingMessages = [];
-                    for (const m of toSend) {
-                        if (Date.now() - m.timestamp < 10 * 60 * 1000) {
-                            await whatsappService.sendText(m.phone, m.text);
-                        } else {
-                            log(`Dropped stale queued message for ${m.phone} (>10min old)`);
-                        }
-                    }
-                }
-            } catch (err: any) {
-                log(`Auto-reconnect failed: ${err.message}`);
-                scheduleAutoReconnect();
-            }
-        }
-    }, 15000);
-}
-
-async function _connectBackground(wpp: any): Promise<void> {
-    try {
-        const { execSync } = await import("child_process");
-        const fsMod = await import("fs");
-
-        let browserPath: string | undefined;
-
-        const envChrome = process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH;
-        if (envChrome && fsMod.existsSync(envChrome)) {
-            browserPath = envChrome;
-            log(`Using env override: ${browserPath}`);
-        }
-
-        const isWindows = os.platform() === 'win32';
-
-        if (!browserPath && !isWindows) {
-            try {
-                const found = execSync(
-                    "which chromium 2>/dev/null || which chromium-browser 2>/dev/null || which google-chrome-stable 2>/dev/null || which google-chrome 2>/dev/null",
-                    { encoding: "utf-8", timeout: 5000 }
-                ).trim().split("\n")[0];
-                if (found && fsMod.existsSync(found)) { browserPath = found; }
-            } catch { }
-        }
-
-        if (!browserPath && !isWindows) {
-            try {
-                const nixFound = execSync(
-                    "find /nix/store -maxdepth 4 -name 'chromium' -type f 2>/dev/null | grep '/bin/chromium$' | head -1",
-                    { encoding: "utf-8", timeout: 8000 }
-                ).trim();
-                if (nixFound && fsMod.existsSync(nixFound)) { browserPath = nixFound; }
-            } catch { }
-        }
-
-        // Windows: search common Chrome/Chromium install paths
-        if (!browserPath && isWindows) {
-            const username = os.userInfo().username;
-            const windowsPaths = [
-                'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-                'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-                `C:\\Users\\${username}\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe`,
-                'C:\\Program Files\\Chromium\\Application\\chromium.exe',
-                `C:\\Users\\${username}\\AppData\\Local\\Chromium\\Application\\chrome.exe`,
-            ];
-            for (const p of windowsPaths) {
-                if (fsMod.existsSync(p)) { browserPath = p; break; }
-            }
-        }
-
-        if (!browserPath) {
-            try {
-                const { executablePath } = await import("puppeteer");
-                const ep = executablePath();
-                if (ep && fsMod.existsSync(ep)) { browserPath = ep; }
-            } catch { }
-        }
-
-        if (!browserPath) throw new Error("No Chrome/Chromium found. Set CHROME_PATH environment variable.");
-        log(`Using browser: ${browserPath}`);
-
-        fsMod.mkdirSync(CHROME_DATA_DIR, { recursive: true });
-        fsMod.mkdirSync(TOKEN_DIR, { recursive: true });
-
-        // Shared hosting lacks a couple of Chrome's system libraries
-        // (libatk-bridge, libatspi); copies placed in .wppconnect/lib are put
-        // on the loader path of the browser we spawn.
-        const libDir = path.join(STORAGE_DIR, "lib");
-        if (!isWindows && fsMod.existsSync(libDir)) {
-            const cur = process.env.LD_LIBRARY_PATH || "";
-            if (!cur.split(":").includes(libDir)) {
-                process.env.LD_LIBRARY_PATH = cur ? `${libDir}:${cur}` : libDir;
-            }
-        }
-
-        const browserArgs = [
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-gpu",
-            "--no-first-run",
-            "--disable-extensions",
-            "--disable-software-rasterizer",
-            "--disable-features=VizDisplayCompositor,AudioServiceOutOfProcess",
-            "--disable-background-networking",
-            "--disable-default-apps",
-            "--disable-sync",
-            "--disable-translate",
-            "--hide-scrollbars",
-            "--metrics-recording-only",
-            "--mute-audio",
-            "--safebrowsing-disable-auto-update",
-            "--window-size=1280,800",
-            // The hosting account caps threads/processes per user; keep
-            // Chrome to as few processes as it will run with.
-            "--renderer-process-limit=1",
-            "--disable-breakpad",
-        ];
-
-        connectionPhase = "awaiting_qr";
-
-        // Track whether statusFind confirmed the session is live
-        let sessionConfirmedByEvent = false;
-        // Track brief disconnects during stabilisation (disconnectedMobile is transient)
-        let stabilisationComplete = false;
-
-        client = await wpp.create({
-            session: SESSION_NAME,
-            folderNameToken: TOKEN_DIR,
-            headless: true,
-            devtools: false,
-            useChrome: false,
-            debug: false,
-            logQR: false,
-            autoClose: 0,
-            disableWelcome: true,
-            waitForInjectToken: true,
-            puppeteerOptions: {
-                executablePath: browserPath,
-                args: browserArgs,
-                headless: true,
-                userDataDir: CHROME_DATA_DIR,
-                timeout: 90000,
-                protocolTimeout: 90000,
-            },
-            browserArgs,
-            catchQR: (base64Qr: string) => {
-                lastQrCode = base64Qr;
+                lastQrCode = await QRCode.toDataURL(u.qr, { margin: 1, width: 320 });
                 status = "qr_ready";
                 connectionPhase = "awaiting_qr";
                 log("QR code generated — scan with WhatsApp");
-            },
-            statusFind: (statusSession: string, session: string) => {
-                log(`Session "${session}": ${statusSession}`);
-
-                if (statusSession === "qrReadSuccess") {
-                    connectionPhase = "qr_scanned";
-                    log("QR scanned — waiting for session to confirm");
-                }
-
-                // inChat / isLogged = session IS authenticated and active
-                if (statusSession === "inChat" || statusSession === "isLogged") {
-                    sessionConfirmedByEvent = true;
-                    if (connectionPhase !== "ready") {
-                        connectionPhase = "qr_scanned";
-                    }
-                    if (status === "disconnected" && !connecting) {
-                        status = "connected";
-                        clientReady = true;
-                        connectionPhase = "ready";
-                        log("WhatsApp reconnected natively from mobile");
-                    }
-                }
-
-                // Transient disconnects — phone went to sleep, network changed, WhatsApp refreshed.
-                // Do NOT null the client. WPPConnect often recovers natively via inChat/isLogged.
-                if (statusSession === "disconnectedMobile" || statusSession === "desconnectedMobile") {
-                    if (stabilisationComplete) {
-                        log(`Transient disconnect (${statusSession}) — waiting for native recovery…`);
-                        status = "disconnected";
-                        clientReady = false;
-                        connectionPhase = "idle";
-                        // Keep client reference alive so native recovery can happen.
-                        // scheduleAutoReconnect will check isClientAlive() first before doing a hard restart.
-                        scheduleAutoReconnect();
-                    }
-                    return;
-                }
-
-                // Hard/permanent disconnects — session is truly gone, needs new QR.
-                if (
-                    statusSession === "notLogged" ||
-                    statusSession === "browserClose" ||
-                    statusSession === "serverWssNotConnected" ||
-                    statusSession === "deviceNotConnected"
-                ) {
-                    status = "disconnected";
-                    clientReady = false;
-                    client = null;
-                    connectionPhase = "idle";
-                    connecting = false;
-
-                    log(`Session offline (${statusSession}) — will automatically retry/reconnect...`);
-                    scheduleAutoReconnect();
-                }
-            },
-        });
-
-        log("WPP client created — waiting for session to stabilize...");
-
-        // If statusFind already told us the session is live, trust it and settle briefly
-        if (sessionConfirmedByEvent) {
-            log("Session confirmed via statusFind — settling for 3s...");
-            await new Promise(r => setTimeout(r, 3000));
-        } else {
-            // Wait longer for the session events to arrive
-            await new Promise(r => setTimeout(r, 8000));
-
-            if (!sessionConfirmedByEvent) {
-                // Fall back to API check
-                const alive = await isClientAlive();
-                if (!alive) {
-                    log("Session not confirmed yet — retrying in 5s...");
-                    await new Promise(r => setTimeout(r, 5000));
-                    const retryAlive = await isClientAlive();
-                    if (!retryAlive && !sessionConfirmedByEvent) {
-                        throw new Error("WhatsApp session failed to stabilize — please scan the QR code again");
-                    }
-                }
+            } catch (e: any) {
+                log(`QR render failed: ${e?.message || e}`);
             }
         }
-
-        stabilisationComplete = true;
-        status = "connected";
-        clientReady = true;
-        connectionPhase = "ready";
-        lastQrCode = null;
-        connecting = false;
-        log("✅ WhatsApp connected and ready");
-
-        startKeepAlive();
-
-        client.onMessage(async (message: any) => {
-            log(`Msg from ${message.from}: ${(message.body || "").slice(0, 80)}`);
-        });
-    } catch (err: any) {
-        lastError = err.message || String(err);
-        status = "disconnected";
-        clientReady = false;
-        connecting = false;
-        connectionPhase = "idle";
-        log(`Connection failed: ${lastError}`);
-    }
+        if (u.connection === "open") {
+            status = "connected";
+            connectionPhase = "ready";
+            lastQrCode = null;
+            lastError = null;
+            reconnectAttempts = 0;
+            log(`✅ WhatsApp connected as ${String(s.user?.id || "").split(":")[0]}`);
+            flushPending().catch(() => { });
+        }
+        if (u.connection === "close") {
+            const code = u.lastDisconnect?.error?.output?.statusCode;
+            const reason = u.lastDisconnect?.error?.message || "closed";
+            status = "disconnected";
+            connectionPhase = "idle";
+            lastQrCode = null;
+            sock = null;
+            if (code === DisconnectReason.loggedOut) {
+                // Unlinked from the phone: the saved credentials are dead.
+                lastError = "WhatsApp was logged out from the phone — connect again and scan the QR code";
+                log(lastError);
+                try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }); } catch { }
+                return;
+            }
+            if (code === DisconnectReason.restartRequired) {
+                // Normal right after the QR is scanned.
+                connectionPhase = "qr_scanned";
+                log("QR scanned — restarting the session");
+                scheduleReconnect(500);
+                return;
+            }
+            if (code === DisconnectReason.timedOut && !state.creds?.registered) {
+                lastError = "QR code expired — press connect to get a new one";
+                log(lastError);
+                return;
+            }
+            lastError = `${reason}${code ? ` (${code})` : ""}`;
+            log(`Connection closed: ${lastError}`);
+            scheduleReconnect();
+        }
+    });
+    s.ev.on("messages.upsert", ({ messages, type }: any) => {
+        if (type !== "notify") return;
+        for (const m of messages || []) {
+            if (m.key?.fromMe) continue;
+            const body = m.message?.conversation || m.message?.extendedTextMessage?.text || "";
+            log(`Msg from ${m.key?.remoteJid}: ${body.slice(0, 80)}`);
+        }
+    });
 }
 
 export const whatsappService = {
@@ -447,80 +244,59 @@ export const whatsappService = {
         return lastQrCode;
     },
 
+    /** Whether a linked session is saved (survives restarts). */
+    hasSession,
+
+    sessionModified(): string | null {
+        try { return fs.statSync(path.join(AUTH_DIR, "creds.json")).mtime.toISOString(); } catch { return null; }
+    },
+
+    /** On boot: resume a linked session; never start a QR flow on its own. */
+    async autoConnect(): Promise<void> {
+        if (process.env.WHATSAPP_DISABLED === "1" || !hasSession()) return;
+        await this.connect();
+    },
+
     async connect(): Promise<{ status: WhatsAppStatus; qrCode?: string }> {
-        // Kill switch: the headless browser needs dozens of threads, and on
-        // shared hosting that budget is shared with every other site on the
-        // account. WHATSAPP_BROWSER_DISABLED=1 keeps it from starting at all.
-        if (process.env.WHATSAPP_BROWSER_DISABLED === "1") {
-            lastError = "WhatsApp browser disabled on this server (WHATSAPP_BROWSER_DISABLED=1)";
-            status = "disconnected";
-            return { status };
-        }
-        if (clientReady && status === "connected" && client) {
-            const alive = await isClientAlive();
-            if (alive) return { status: "connected" };
-            log("Client was marked connected but is actually dead — reconnecting");
-            clientReady = false;
-            status = "disconnected";
-            client = null;
-        }
-
-        if (connecting) {
-            if (Date.now() - connectionStartTime > 60000) {
-                log("Connection starting phase seems stuck for over 60s. Forcing restart...");
-                connecting = false;
-            } else {
-                log("Connection already in progress — ignored duplicate request");
-                return { status };
-            }
-        }
-        connecting = true;
-        connectionStartTime = Date.now();
-        connectionPhase = "starting";
-        clientReady = false;
-
-        if (client) {
-            try { await client.close(); } catch { }
-            client = null;
-        }
-
-        await cleanupProcesses();
-        log("Cleared previous session data");
-
-        const wpp = await loadWppConnect();
-        if (!wpp) {
-            lastError = "@wppconnect-team/wppconnect package not installed";
-            connecting = false;
-            connectionPhase = "idle";
+        if (process.env.WHATSAPP_DISABLED === "1") {
+            lastError = "WhatsApp is disabled on this server (WHATSAPP_DISABLED=1)";
             return { status: "disconnected" };
         }
-
-        status = "connecting";
+        if (sock && (status === "connected" || status === "qr_ready" || status === "connecting")) {
+            return { status, qrCode: lastQrCode || undefined };
+        }
+        manualStop = false;
+        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
         lastError = null;
         lastQrCode = null;
         log("Connecting…");
-
-        // Run in background so the HTTP request returns immediately.
-        // The frontend should poll /status and /qr until QR appears or connected.
-        _connectBackground(wpp);
-        return { status: "connecting" };
+        await startSocket();
+        // The QR usually arrives within a couple of seconds; give the caller
+        // a chance to get it in the same response.
+        for (let i = 0; i < 16 && status === "connecting"; i++) {
+            await new Promise(r => setTimeout(r, 250));
+        }
+        return { status, qrCode: lastQrCode || undefined };
     },
 
     async disconnect(): Promise<void> {
-        if (autoReconnectTimer) { clearTimeout(autoReconnectTimer); autoReconnectTimer = null; }
-        stopKeepAlive();
-        if (client) {
-            try { await client.close(); } catch { }
-            client = null;
-        }
-        await cleanupProcesses();
+        manualStop = true;
+        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+        closeSocket();
         status = "disconnected";
-        clientReady = false;
         lastQrCode = null;
-        connecting = false;
         connectionPhase = "idle";
         pendingMessages = [];
         log("Disconnected (manual)");
+    },
+
+    /** Unlink the device and forget the saved session. */
+    async logout(): Promise<void> {
+        manualStop = true;
+        try { await sock?.logout(); } catch { }
+        await this.disconnect();
+        try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }); } catch { }
+        log("Logged out — session removed");
     },
 
     /** Alias — several routes historically call sendMessage(). */
@@ -528,63 +304,25 @@ export const whatsappService = {
         return this.sendText(phone, text);
     },
 
-    async sendText(phone: string, text: string, _attempt = 1): Promise<boolean> {
-        if (!client || !clientReady || status !== "connected") {
+    async sendText(phone: string, text: string): Promise<boolean> {
+        if (!sock || status !== "connected") {
             log(`Cannot send — not ready (status="${status}"). Queuing message for ${phone}`);
-            pendingMessages.push({ phone, text, timestamp: Date.now() });
-            if (pendingMessages.length > 50) pendingMessages.shift();
-            scheduleAutoReconnect();
+            queue(phone, text);
+            if (hasSession() && !manualStop && !sock) scheduleReconnect();
             return false;
         }
-
-        if (_attempt === 1) {
-            const alive = await isClientAlive();
-            if (!alive) {
-                log("Client not alive when trying to send — queuing and reconnecting");
-                clientReady = false;
-                status = "disconnected";
-                client = null;
-                connectionPhase = "idle";
-                pendingMessages.push({ phone, text, timestamp: Date.now() });
-                if (pendingMessages.length > 50) pendingMessages.shift();
-                scheduleAutoReconnect();
+        const jid = toJid(phone);
+        try {
+            const [found] = (await sock.onWhatsApp(jid)) || [];
+            if (found && found.exists === false) {
+                log(`${phone} is not on WhatsApp — not sent`);
                 return false;
             }
-        }
-
-        try {
-            const resolvedChatId = toChatId(phone);
-            log(`Attempting to send message to resolved chatId: ${resolvedChatId}`);
-
-            const result = await client.sendText(resolvedChatId, text);
-            log(`Message successfully sent to ${phone}`);
-            console.log(`[WhatsApp Detailed Log] sendText result for ${phone}:`, JSON.stringify(result));
+            await sock.sendMessage(found?.jid || jid, { text });
+            log(`Message sent to ${phone}`);
             return true;
         } catch (err: any) {
-            const msg = typeof err === "object" ? (err.message || JSON.stringify(err)) : String(err);
-            log(`Failed to send to ${phone}: ${msg}`);
-
-            if (
-                (msg.includes("WPP is not defined") || msg.includes("NotInitializedError")) &&
-                _attempt < 4
-            ) {
-                log(`Retrying send (attempt ${_attempt + 1})…`);
-                await new Promise(r => setTimeout(r, 2500 * _attempt));
-                return this.sendText(phone, text, _attempt + 1);
-            }
-
-            if (
-                msg.includes("Execution context was destroyed") ||
-                msg.includes("Protocol error") ||
-                msg.includes("Session closed") ||
-                msg.includes("Target closed")
-            ) {
-                log("Client browser crashed — marking as disconnected");
-                clientReady = false;
-                status = "disconnected";
-                client = null;
-                connectionPhase = "idle";
-            }
+            log(`Failed to send to ${phone}: ${err?.message || err}`);
             return false;
         }
     },

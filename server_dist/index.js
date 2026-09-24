@@ -3769,12 +3769,12 @@ var init_callerIdService = __esm({
         const matches = (clientTenantId) => tenantId ? clientTenantId === tenantId : true;
         let wsTotal = 0, wsMatched = 0;
         if (this.wss) {
-          this.wss.clients.forEach((client2) => {
-            if (client2.readyState === import_ws.WebSocket.OPEN) {
+          this.wss.clients.forEach((client) => {
+            if (client.readyState === import_ws.WebSocket.OPEN) {
               wsTotal++;
-              if (matches(client2.tenantId)) {
+              if (matches(client.tenantId)) {
                 wsMatched++;
-                client2.send(payload);
+                client.send(payload);
               }
             }
           });
@@ -6840,8 +6840,8 @@ async function getStripeClient() {
   return cached ? cached.client : null;
 }
 async function requireStripeClient() {
-  const client2 = await getStripeClient();
-  if (!client2) {
+  const client = await getStripeClient();
+  if (!client) {
     const err = new Error(
       "Stripe is not configured. Set STRIPE_SECRET_KEY (and STRIPE_PUBLISHABLE_KEY) in the server environment."
     );
@@ -6849,7 +6849,7 @@ async function requireStripeClient() {
     err.statusCode = 503;
     throw err;
   }
-  return client2;
+  return client;
 }
 async function getUncachableStripeClient() {
   return requireStripeClient();
@@ -7019,39 +7019,23 @@ async function repriceOrder(opts) {
 init_emailService();
 
 // server/whatsappService.ts
-var import_os = __toESM(require("os"));
 var import_path = __toESM(require("path"));
 var import_fs = __toESM(require("fs"));
-var wppconnect = null;
-async function loadWppConnect() {
-  if (!wppconnect) {
-    console.log("[WhatsApp] Attempting to load @wppconnect-team/wppconnect...");
-    try {
-      const mod = await import("@wppconnect-team/wppconnect");
-      wppconnect = mod.default ?? mod;
-      console.log("[WhatsApp] Successfully loaded @wppconnect-team/wppconnect");
-    } catch (err) {
-      console.error("[WhatsApp] FAIL to load wppconnect:", err);
-      return null;
-    }
-  }
-  return wppconnect;
-}
-var SESSION_NAME = "barmagly-pos";
-var STORAGE_DIR = import_path.default.resolve(process.cwd(), ".wppconnect");
-var CHROME_DATA_DIR = import_path.default.join(STORAGE_DIR, "chrome-data");
-var TOKEN_DIR = import_path.default.join(STORAGE_DIR, "tokens");
-var client = null;
-var clientReady = false;
+var import_url = require("url");
+var import_qrcode = __toESM(require("qrcode"));
+var STORAGE_DIR = import_path.default.resolve(process.cwd(), ".whatsapp");
+var AUTH_DIR = import_path.default.join(STORAGE_DIR, "auth");
+var BAILEYS_DIR = process.env.BAILEYS_DIR || import_path.default.resolve(process.cwd(), "wa-baileys");
+var baileys = null;
+var sock = null;
 var status = "disconnected";
 var lastQrCode = null;
 var lastError = null;
 var connectionLog = [];
-var connecting = false;
 var connectionPhase = "idle";
-var connectionStartTime = 0;
-var autoReconnectTimer = null;
-var keepAliveInterval = null;
+var reconnectTimer = null;
+var reconnectAttempts = 0;
+var manualStop = false;
 var pendingMessages = [];
 function log(event) {
   const entry = { time: (/* @__PURE__ */ new Date()).toISOString(), event };
@@ -7059,7 +7043,38 @@ function log(event) {
   if (connectionLog.length > 100) connectionLog.length = 100;
   console.log(`[WhatsApp] ${event}`);
 }
-function toChatId(phone) {
+var quietLogger = {
+  level: "silent",
+  child() {
+    return quietLogger;
+  },
+  trace() {
+  },
+  debug() {
+  },
+  info() {
+  },
+  warn() {
+  },
+  error() {
+  },
+  fatal(obj, msg) {
+    console.error("[WhatsApp] fatal", msg || "", obj?.err?.message || "");
+  }
+};
+async function loadBaileys() {
+  if (baileys) return baileys;
+  const entry = import_path.default.join(BAILEYS_DIR, "node_modules", "@whiskeysockets", "baileys", "lib", "index.js");
+  try {
+    baileys = import_fs.default.existsSync(entry) ? await import((0, import_url.pathToFileURL)(entry).href) : await import("@whiskeysockets/baileys");
+    return baileys;
+  } catch (err) {
+    lastError = `Baileys not installed: ${err?.message || err}`;
+    log(lastError);
+    return null;
+  }
+}
+function toJid(phone) {
   let digits2 = phone.replace(/\D/g, "");
   if (digits2.startsWith("410") && digits2.length === 12) {
     digits2 = "41" + digits2.slice(3);
@@ -7068,314 +7083,142 @@ function toChatId(phone) {
   } else if (digits2.length === 9 && !digits2.startsWith("0")) {
     digits2 = "41" + digits2;
   }
-  return `${digits2}@c.us`;
+  return `${digits2}@s.whatsapp.net`;
 }
-async function cleanupProcesses() {
-  try {
-    const { execSync } = await import("child_process");
-    const isWindows = import_os.default.platform() === "win32";
-    if (isWindows) {
-      execSync(`wmic process where "name='chrome.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: "ignore" });
-      execSync(`wmic process where "name='chromium.exe' and commandline like '%chrome-data%'" call terminate 2>nul`, { stdio: "ignore" });
+function hasSession() {
+  return import_fs.default.existsSync(import_path.default.join(AUTH_DIR, "creds.json"));
+}
+function queue(phone, text2) {
+  pendingMessages.push({ phone, text: text2, timestamp: Date.now() });
+  if (pendingMessages.length > 50) pendingMessages.shift();
+}
+async function flushPending() {
+  if (!pendingMessages.length) return;
+  const toSend = pendingMessages;
+  pendingMessages = [];
+  log(`Flushing ${toSend.length} queued message(s)`);
+  for (const m of toSend) {
+    if (Date.now() - m.timestamp < 10 * 60 * 1e3) {
+      await whatsappService.sendText(m.phone, m.text);
     } else {
-      execSync(
-        `pkill -9 -f '${CHROME_DATA_DIR}' 2>/dev/null; true`,
-        { timeout: 4e3 }
-      );
+      log(`Dropped stale queued message for ${m.phone} (>10min old)`);
     }
-    await new Promise((r) => setTimeout(r, 800));
+  }
+}
+function scheduleReconnect(delayMs) {
+  if (manualStop || reconnectTimer) return;
+  reconnectAttempts++;
+  const delay = delayMs ?? Math.min(6e4, 5e3 * reconnectAttempts);
+  log(`Reconnecting in ${Math.round(delay / 1e3)}s\u2026`);
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    startSocket().catch((e) => log(`Reconnect failed: ${e?.message || e}`));
+  }, delay);
+}
+function closeSocket() {
+  const s = sock;
+  sock = null;
+  if (!s) return;
+  try {
+    s.ev.removeAllListeners();
   } catch {
   }
-  for (const lock of ["SingletonLock", "SingletonSocket", "SingletonCookie"]) {
-    try {
-      import_fs.default.rmSync(import_path.default.join(CHROME_DATA_DIR, lock), { force: true });
-    } catch {
-    }
-  }
-  import_fs.default.mkdirSync(CHROME_DATA_DIR, { recursive: true });
-  if (!import_fs.default.existsSync(TOKEN_DIR)) import_fs.default.mkdirSync(TOKEN_DIR, { recursive: true });
-}
-async function isClientAlive() {
-  if (!client) return false;
   try {
-    const state = await Promise.race([
-      client.getConnectionState(),
-      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 5e3))
-    ]);
-    return state === "CONNECTED";
+    s.end(void 0);
   } catch {
-    return false;
   }
 }
-function startKeepAlive() {
-  if (keepAliveInterval) clearInterval(keepAliveInterval);
-  keepAliveInterval = setInterval(async () => {
-    if (status !== "connected" || !client || !clientReady) return;
-    try {
-      const alive = await isClientAlive();
-      if (!alive) {
-        log("Keepalive check failed \u2014 marking disconnected and scheduling reconnect");
-        clientReady = false;
-        status = "disconnected";
-        client = null;
-        connectionPhase = "idle";
-        scheduleAutoReconnect();
-      }
-    } catch {
-    }
-  }, 6e4);
-}
-function stopKeepAlive() {
-  if (keepAliveInterval) {
-    clearInterval(keepAliveInterval);
-    keepAliveInterval = null;
+async function startSocket() {
+  const B = await loadBaileys();
+  if (!B) {
+    status = "disconnected";
+    connectionPhase = "idle";
+    return;
   }
-}
-function scheduleAutoReconnect() {
-  if (autoReconnectTimer) clearTimeout(autoReconnectTimer);
-  autoReconnectTimer = setTimeout(async () => {
-    autoReconnectTimer = null;
-    if (status === "disconnected" && !connecting) {
-      if (client) {
-        const alive = await isClientAlive();
-        if (alive) {
-          log("Native recovery detected \u2014 resuming without full reconnect");
-          status = "connected";
-          clientReady = true;
-          connectionPhase = "ready";
-          return;
-        }
-      }
-      try {
-        const fsMod = await import("fs");
-        const lockFile = import_path.default.join(CHROME_DATA_DIR, "SingletonLock");
-        if (fsMod.existsSync(lockFile)) fsMod.unlinkSync(lockFile);
-        const cookieLock = import_path.default.join(CHROME_DATA_DIR, "Default", "Cookies-journal");
-        if (fsMod.existsSync(cookieLock)) fsMod.unlinkSync(cookieLock);
-      } catch {
-      }
-      log("Auto-reconnecting\u2026");
-      try {
-        await whatsappService.connect();
-        if (whatsappService.getStatus().status === "connected" && pendingMessages.length > 0) {
-          log(`Flushing ${pendingMessages.length} queued message(s)`);
-          const toSend = [...pendingMessages];
-          pendingMessages = [];
-          for (const m of toSend) {
-            if (Date.now() - m.timestamp < 10 * 60 * 1e3) {
-              await whatsappService.sendText(m.phone, m.text);
-            } else {
-              log(`Dropped stale queued message for ${m.phone} (>10min old)`);
-            }
-          }
-        }
-      } catch (err) {
-        log(`Auto-reconnect failed: ${err.message}`);
-        scheduleAutoReconnect();
-      }
-    }
-  }, 15e3);
-}
-async function _connectBackground(wpp) {
+  const makeWASocket = B.default?.default || B.default || B.makeWASocket;
+  const { useMultiFileAuthState, fetchLatestBaileysVersion, Browsers, DisconnectReason } = B;
+  closeSocket();
+  import_fs.default.mkdirSync(AUTH_DIR, { recursive: true });
+  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+  let version;
   try {
-    const { execSync } = await import("child_process");
-    const fsMod = await import("fs");
-    let browserPath;
-    const envChrome = process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH;
-    if (envChrome && fsMod.existsSync(envChrome)) {
-      browserPath = envChrome;
-      log(`Using env override: ${browserPath}`);
-    }
-    const isWindows = import_os.default.platform() === "win32";
-    if (!browserPath && !isWindows) {
+    version = (await fetchLatestBaileysVersion()).version;
+  } catch {
+  }
+  status = "connecting";
+  connectionPhase = hasSession() && state.creds?.registered ? "starting" : "awaiting_qr";
+  const s = makeWASocket({
+    auth: state,
+    logger: quietLogger,
+    version,
+    browser: Browsers.ubuntu("Kassenta"),
+    markOnlineOnConnect: false,
+    syncFullHistory: false
+  });
+  sock = s;
+  s.ev.on("creds.update", saveCreds);
+  s.ev.on("connection.update", async (u) => {
+    if (sock !== s) return;
+    if (u.qr) {
       try {
-        const found = execSync(
-          "which chromium 2>/dev/null || which chromium-browser 2>/dev/null || which google-chrome-stable 2>/dev/null || which google-chrome 2>/dev/null",
-          { encoding: "utf-8", timeout: 5e3 }
-        ).trim().split("\n")[0];
-        if (found && fsMod.existsSync(found)) {
-          browserPath = found;
-        }
-      } catch {
-      }
-    }
-    if (!browserPath && !isWindows) {
-      try {
-        const nixFound = execSync(
-          "find /nix/store -maxdepth 4 -name 'chromium' -type f 2>/dev/null | grep '/bin/chromium$' | head -1",
-          { encoding: "utf-8", timeout: 8e3 }
-        ).trim();
-        if (nixFound && fsMod.existsSync(nixFound)) {
-          browserPath = nixFound;
-        }
-      } catch {
-      }
-    }
-    if (!browserPath && isWindows) {
-      const username = import_os.default.userInfo().username;
-      const windowsPaths = [
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-        `C:\\Users\\${username}\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe`,
-        "C:\\Program Files\\Chromium\\Application\\chromium.exe",
-        `C:\\Users\\${username}\\AppData\\Local\\Chromium\\Application\\chrome.exe`
-      ];
-      for (const p of windowsPaths) {
-        if (fsMod.existsSync(p)) {
-          browserPath = p;
-          break;
-        }
-      }
-    }
-    if (!browserPath) {
-      try {
-        const { executablePath } = await import("puppeteer");
-        const ep = executablePath();
-        if (ep && fsMod.existsSync(ep)) {
-          browserPath = ep;
-        }
-      } catch {
-      }
-    }
-    if (!browserPath) throw new Error("No Chrome/Chromium found. Set CHROME_PATH environment variable.");
-    log(`Using browser: ${browserPath}`);
-    fsMod.mkdirSync(CHROME_DATA_DIR, { recursive: true });
-    fsMod.mkdirSync(TOKEN_DIR, { recursive: true });
-    const libDir = import_path.default.join(STORAGE_DIR, "lib");
-    if (!isWindows && fsMod.existsSync(libDir)) {
-      const cur = process.env.LD_LIBRARY_PATH || "";
-      if (!cur.split(":").includes(libDir)) {
-        process.env.LD_LIBRARY_PATH = cur ? `${libDir}:${cur}` : libDir;
-      }
-    }
-    const browserArgs = [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--no-first-run",
-      "--disable-extensions",
-      "--disable-software-rasterizer",
-      "--disable-features=VizDisplayCompositor,AudioServiceOutOfProcess",
-      "--disable-background-networking",
-      "--disable-default-apps",
-      "--disable-sync",
-      "--disable-translate",
-      "--hide-scrollbars",
-      "--metrics-recording-only",
-      "--mute-audio",
-      "--safebrowsing-disable-auto-update",
-      "--window-size=1280,800",
-      // The hosting account caps threads/processes per user; keep
-      // Chrome to as few processes as it will run with.
-      "--renderer-process-limit=1",
-      "--disable-breakpad"
-    ];
-    connectionPhase = "awaiting_qr";
-    let sessionConfirmedByEvent = false;
-    let stabilisationComplete = false;
-    client = await wpp.create({
-      session: SESSION_NAME,
-      folderNameToken: TOKEN_DIR,
-      headless: true,
-      devtools: false,
-      useChrome: false,
-      debug: false,
-      logQR: false,
-      autoClose: 0,
-      disableWelcome: true,
-      waitForInjectToken: true,
-      puppeteerOptions: {
-        executablePath: browserPath,
-        args: browserArgs,
-        headless: true,
-        userDataDir: CHROME_DATA_DIR,
-        timeout: 9e4,
-        protocolTimeout: 9e4
-      },
-      browserArgs,
-      catchQR: (base64Qr) => {
-        lastQrCode = base64Qr;
+        lastQrCode = await import_qrcode.default.toDataURL(u.qr, { margin: 1, width: 320 });
         status = "qr_ready";
         connectionPhase = "awaiting_qr";
         log("QR code generated \u2014 scan with WhatsApp");
-      },
-      statusFind: (statusSession, session) => {
-        log(`Session "${session}": ${statusSession}`);
-        if (statusSession === "qrReadSuccess") {
-          connectionPhase = "qr_scanned";
-          log("QR scanned \u2014 waiting for session to confirm");
-        }
-        if (statusSession === "inChat" || statusSession === "isLogged") {
-          sessionConfirmedByEvent = true;
-          if (connectionPhase !== "ready") {
-            connectionPhase = "qr_scanned";
-          }
-          if (status === "disconnected" && !connecting) {
-            status = "connected";
-            clientReady = true;
-            connectionPhase = "ready";
-            log("WhatsApp reconnected natively from mobile");
-          }
-        }
-        if (statusSession === "disconnectedMobile" || statusSession === "desconnectedMobile") {
-          if (stabilisationComplete) {
-            log(`Transient disconnect (${statusSession}) \u2014 waiting for native recovery\u2026`);
-            status = "disconnected";
-            clientReady = false;
-            connectionPhase = "idle";
-            scheduleAutoReconnect();
-          }
-          return;
-        }
-        if (statusSession === "notLogged" || statusSession === "browserClose" || statusSession === "serverWssNotConnected" || statusSession === "deviceNotConnected") {
-          status = "disconnected";
-          clientReady = false;
-          client = null;
-          connectionPhase = "idle";
-          connecting = false;
-          log(`Session offline (${statusSession}) \u2014 will automatically retry/reconnect...`);
-          scheduleAutoReconnect();
-        }
-      }
-    });
-    log("WPP client created \u2014 waiting for session to stabilize...");
-    if (sessionConfirmedByEvent) {
-      log("Session confirmed via statusFind \u2014 settling for 3s...");
-      await new Promise((r) => setTimeout(r, 3e3));
-    } else {
-      await new Promise((r) => setTimeout(r, 8e3));
-      if (!sessionConfirmedByEvent) {
-        const alive = await isClientAlive();
-        if (!alive) {
-          log("Session not confirmed yet \u2014 retrying in 5s...");
-          await new Promise((r) => setTimeout(r, 5e3));
-          const retryAlive = await isClientAlive();
-          if (!retryAlive && !sessionConfirmedByEvent) {
-            throw new Error("WhatsApp session failed to stabilize \u2014 please scan the QR code again");
-          }
-        }
+      } catch (e) {
+        log(`QR render failed: ${e?.message || e}`);
       }
     }
-    stabilisationComplete = true;
-    status = "connected";
-    clientReady = true;
-    connectionPhase = "ready";
-    lastQrCode = null;
-    connecting = false;
-    log("\u2705 WhatsApp connected and ready");
-    startKeepAlive();
-    client.onMessage(async (message) => {
-      log(`Msg from ${message.from}: ${(message.body || "").slice(0, 80)}`);
-    });
-  } catch (err) {
-    lastError = err.message || String(err);
-    status = "disconnected";
-    clientReady = false;
-    connecting = false;
-    connectionPhase = "idle";
-    log(`Connection failed: ${lastError}`);
-  }
+    if (u.connection === "open") {
+      status = "connected";
+      connectionPhase = "ready";
+      lastQrCode = null;
+      lastError = null;
+      reconnectAttempts = 0;
+      log(`\u2705 WhatsApp connected as ${String(s.user?.id || "").split(":")[0]}`);
+      flushPending().catch(() => {
+      });
+    }
+    if (u.connection === "close") {
+      const code = u.lastDisconnect?.error?.output?.statusCode;
+      const reason = u.lastDisconnect?.error?.message || "closed";
+      status = "disconnected";
+      connectionPhase = "idle";
+      lastQrCode = null;
+      sock = null;
+      if (code === DisconnectReason.loggedOut) {
+        lastError = "WhatsApp was logged out from the phone \u2014 connect again and scan the QR code";
+        log(lastError);
+        try {
+          import_fs.default.rmSync(AUTH_DIR, { recursive: true, force: true });
+        } catch {
+        }
+        return;
+      }
+      if (code === DisconnectReason.restartRequired) {
+        connectionPhase = "qr_scanned";
+        log("QR scanned \u2014 restarting the session");
+        scheduleReconnect(500);
+        return;
+      }
+      if (code === DisconnectReason.timedOut && !state.creds?.registered) {
+        lastError = "QR code expired \u2014 press connect to get a new one";
+        log(lastError);
+        return;
+      }
+      lastError = `${reason}${code ? ` (${code})` : ""}`;
+      log(`Connection closed: ${lastError}`);
+      scheduleReconnect();
+    }
+  });
+  s.ev.on("messages.upsert", ({ messages, type }) => {
+    if (type !== "notify") return;
+    for (const m of messages || []) {
+      if (m.key?.fromMe) continue;
+      const body = m.message?.conversation || m.message?.extendedTextMessage?.text || "";
+      log(`Msg from ${m.key?.remoteJid}: ${body.slice(0, 80)}`);
+    }
+  });
 }
 var whatsappService = {
   getStatus() {
@@ -7384,126 +7227,92 @@ var whatsappService = {
   getQrCode() {
     return lastQrCode;
   },
+  /** Whether a linked session is saved (survives restarts). */
+  hasSession,
+  sessionModified() {
+    try {
+      return import_fs.default.statSync(import_path.default.join(AUTH_DIR, "creds.json")).mtime.toISOString();
+    } catch {
+      return null;
+    }
+  },
+  /** On boot: resume a linked session; never start a QR flow on its own. */
+  async autoConnect() {
+    if (process.env.WHATSAPP_DISABLED === "1" || !hasSession()) return;
+    await this.connect();
+  },
   async connect() {
-    if (process.env.WHATSAPP_BROWSER_DISABLED === "1") {
-      lastError = "WhatsApp browser disabled on this server (WHATSAPP_BROWSER_DISABLED=1)";
-      status = "disconnected";
-      return { status };
-    }
-    if (clientReady && status === "connected" && client) {
-      const alive = await isClientAlive();
-      if (alive) return { status: "connected" };
-      log("Client was marked connected but is actually dead \u2014 reconnecting");
-      clientReady = false;
-      status = "disconnected";
-      client = null;
-    }
-    if (connecting) {
-      if (Date.now() - connectionStartTime > 6e4) {
-        log("Connection starting phase seems stuck for over 60s. Forcing restart...");
-        connecting = false;
-      } else {
-        log("Connection already in progress \u2014 ignored duplicate request");
-        return { status };
-      }
-    }
-    connecting = true;
-    connectionStartTime = Date.now();
-    connectionPhase = "starting";
-    clientReady = false;
-    if (client) {
-      try {
-        await client.close();
-      } catch {
-      }
-      client = null;
-    }
-    await cleanupProcesses();
-    log("Cleared previous session data");
-    const wpp = await loadWppConnect();
-    if (!wpp) {
-      lastError = "@wppconnect-team/wppconnect package not installed";
-      connecting = false;
-      connectionPhase = "idle";
+    if (process.env.WHATSAPP_DISABLED === "1") {
+      lastError = "WhatsApp is disabled on this server (WHATSAPP_DISABLED=1)";
       return { status: "disconnected" };
     }
-    status = "connecting";
+    if (sock && (status === "connected" || status === "qr_ready" || status === "connecting")) {
+      return { status, qrCode: lastQrCode || void 0 };
+    }
+    manualStop = false;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
     lastError = null;
     lastQrCode = null;
     log("Connecting\u2026");
-    _connectBackground(wpp);
-    return { status: "connecting" };
+    await startSocket();
+    for (let i = 0; i < 16 && status === "connecting"; i++) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return { status, qrCode: lastQrCode || void 0 };
   },
   async disconnect() {
-    if (autoReconnectTimer) {
-      clearTimeout(autoReconnectTimer);
-      autoReconnectTimer = null;
+    manualStop = true;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
     }
-    stopKeepAlive();
-    if (client) {
-      try {
-        await client.close();
-      } catch {
-      }
-      client = null;
-    }
-    await cleanupProcesses();
+    closeSocket();
     status = "disconnected";
-    clientReady = false;
     lastQrCode = null;
-    connecting = false;
     connectionPhase = "idle";
     pendingMessages = [];
     log("Disconnected (manual)");
+  },
+  /** Unlink the device and forget the saved session. */
+  async logout() {
+    manualStop = true;
+    try {
+      await sock?.logout();
+    } catch {
+    }
+    await this.disconnect();
+    try {
+      import_fs.default.rmSync(AUTH_DIR, { recursive: true, force: true });
+    } catch {
+    }
+    log("Logged out \u2014 session removed");
   },
   /** Alias — several routes historically call sendMessage(). */
   async sendMessage(phone, text2) {
     return this.sendText(phone, text2);
   },
-  async sendText(phone, text2, _attempt = 1) {
-    if (!client || !clientReady || status !== "connected") {
+  async sendText(phone, text2) {
+    if (!sock || status !== "connected") {
       log(`Cannot send \u2014 not ready (status="${status}"). Queuing message for ${phone}`);
-      pendingMessages.push({ phone, text: text2, timestamp: Date.now() });
-      if (pendingMessages.length > 50) pendingMessages.shift();
-      scheduleAutoReconnect();
+      queue(phone, text2);
+      if (hasSession() && !manualStop && !sock) scheduleReconnect();
       return false;
     }
-    if (_attempt === 1) {
-      const alive = await isClientAlive();
-      if (!alive) {
-        log("Client not alive when trying to send \u2014 queuing and reconnecting");
-        clientReady = false;
-        status = "disconnected";
-        client = null;
-        connectionPhase = "idle";
-        pendingMessages.push({ phone, text: text2, timestamp: Date.now() });
-        if (pendingMessages.length > 50) pendingMessages.shift();
-        scheduleAutoReconnect();
+    const jid = toJid(phone);
+    try {
+      const [found] = await sock.onWhatsApp(jid) || [];
+      if (found && found.exists === false) {
+        log(`${phone} is not on WhatsApp \u2014 not sent`);
         return false;
       }
-    }
-    try {
-      const resolvedChatId = toChatId(phone);
-      log(`Attempting to send message to resolved chatId: ${resolvedChatId}`);
-      const result = await client.sendText(resolvedChatId, text2);
-      log(`Message successfully sent to ${phone}`);
-      console.log(`[WhatsApp Detailed Log] sendText result for ${phone}:`, JSON.stringify(result));
+      await sock.sendMessage(found?.jid || jid, { text: text2 });
+      log(`Message sent to ${phone}`);
       return true;
     } catch (err) {
-      const msg = typeof err === "object" ? err.message || JSON.stringify(err) : String(err);
-      log(`Failed to send to ${phone}: ${msg}`);
-      if ((msg.includes("WPP is not defined") || msg.includes("NotInitializedError")) && _attempt < 4) {
-        log(`Retrying send (attempt ${_attempt + 1})\u2026`);
-        await new Promise((r) => setTimeout(r, 2500 * _attempt));
-        return this.sendText(phone, text2, _attempt + 1);
-      }
-      if (msg.includes("Execution context was destroyed") || msg.includes("Protocol error") || msg.includes("Session closed") || msg.includes("Target closed")) {
-        log("Client browser crashed \u2014 marking as disconnected");
-        clientReady = false;
-        status = "disconnected";
-        client = null;
-        connectionPhase = "idle";
-      }
+      log(`Failed to send to ${phone}: ${err?.message || err}`);
       return false;
     }
   },
@@ -11830,24 +11639,7 @@ async function test(){
     res.json({ qrCode: qr });
   });
   app2.get("/api/super-admin/whatsapp/session-info", requireSuperAdmin, async (_req, res) => {
-    try {
-      const pathMod = await import("path");
-      const fsMod = await import("fs");
-      const tokenDir = pathMod.resolve(process.cwd(), ".wppconnect", "tokens");
-      let hasSession = false;
-      let sessionModified = null;
-      if (fsMod.existsSync(tokenDir)) {
-        const files = fsMod.readdirSync(tokenDir).filter((f) => f.endsWith(".data.json") || f.endsWith(".json"));
-        if (files.length > 0) {
-          hasSession = true;
-          const stat = fsMod.statSync(pathMod.join(tokenDir, files[0]));
-          sessionModified = stat.mtime.toISOString();
-        }
-      }
-      res.json({ hasSession, sessionModified });
-    } catch (e) {
-      res.json({ hasSession: false, sessionModified: null, error: e.message });
-    }
+    res.json({ hasSession: whatsappService.hasSession(), sessionModified: whatsappService.sessionModified() });
   });
   app2.post("/api/super-admin/whatsapp/test", requireSuperAdmin, async (req, res) => {
     const globalPhone = await storage.getPlatformSetting("whatsapp_admin_phone");
@@ -13434,11 +13226,11 @@ Open app: ${process.env.APP_URL || ""}/driver/${driver.driverAccessToken}`
       const msg = `data: ${JSON.stringify(payload)}
 
 `;
-      clients.forEach((client2) => {
+      clients.forEach((client) => {
         try {
-          client2.write(msg);
+          client.write(msg);
         } catch (_) {
-          clients.delete(client2);
+          clients.delete(client);
         }
       });
     };
@@ -22565,7 +22357,7 @@ async function initStripe() {
     });
   });
   await callerIdService.init(server);
-  whatsappService.connect().catch((err) => log2("WhatsApp auto-connect error:", err));
+  whatsappService.autoConnect().catch((err) => log2("WhatsApp auto-connect error:", err));
   initStripe().catch((err) => log2("Stripe init error (non-fatal):", err));
   if (usingMySql) {
     log2("MySQL mode active; skipping legacy Postgres-only startup migrations");

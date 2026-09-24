@@ -1260,7 +1260,7 @@ async function initStripe() {
   await callerIdService.init(server);
 
   // Auto-connect WhatsApp if a session exists
-  whatsappService.connect().catch((err: any) => log('WhatsApp auto-connect error:', err));
+  whatsappService.autoConnect().catch((err: any) => log('WhatsApp auto-connect error:', err));
 
   initStripe().catch(err => log('Stripe init error (non-fatal):', err));
 
